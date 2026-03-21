@@ -49,13 +49,47 @@ LAYER 5: VERIFY     → 5-point check: INPUT → GOAL → ADVERSARIAL → VOICE 
 
 For non-prospect work (system changes, lead filtering, strategy), only 2.4 and 2.7 apply.
 
+## Layer 2.5: SIMULATE (runs for prospect/strategy work — skip for SIMPLE tasks)
+
+**Purpose:** Predict outcomes before committing. Generate candidates, score against historical data, select the best path. Log the prediction for calibration.
+
+> Source: Friston (Free Energy Principle), LeCun (World Models), DeepMind (MuZero). The system should minimize surprise by predicting before acting.
+
+| Step | What | How |
+|------|------|-----|
+| 2.5.1 | Generate candidates | Produce 2-3 candidate approaches (angle/framework/tone combos) based on Layer 2 memory |
+| 2.5.2 | Score against history | For each candidate, check PATTERNS.md reply rates for that angle+persona combo. Check persona MOC for resonance. Check lessons for known failures. |
+| 2.5.3 | Predict & select | Assign predicted effectiveness (H/M/L or %) to each candidate. Select highest. Log reason. |
+| 2.5.4 | Log prediction | Record: `SIMULATION: candidates=[A, B, C] | predicted=[A: H, B: L, C: M] | selected=A | reason=[X]` |
+
+**Output:** "Simulation: [N] candidates | selected [X] | predicted [H/M/L] | reason: [one line]"
+
+**Calibration:** At wrap-up, compare prediction to actual outcome. Prediction error feeds CW-5 (rubric drift) and self-model reliability scores.
+
+**Skip condition:** SIMPLE tasks (Layer 1.1 classification) and system work bypass simulation — no forward model needed for deterministic operations.
+
+## Layer 2.7: ROUTE (System 1 / System 2 — always runs)
+
+**Purpose:** Decide execution track based on task complexity and proven reliability.
+
+> Source: Kahneman (Thinking, Fast and Slow). Not everything needs the full pipeline.
+
+| Condition | Track | What happens |
+|-----------|-------|-------------|
+| Self-model reliability > 0.9 AND task is SIMPLE AND no [PROVISIONAL] lessons in this category | **FAST (System 1)** | Skip Layer 2.5, compress Layer 4 to 4.3+4.4 only, compress Layer 5 to 5.2+5.5 only. One-line verification. |
+| All other cases | **DELIBERATE (System 2)** | Full waterfall as defined. All layers, all steps. |
+
+**Safeguard:** If a fast-track output gets corrected by Oliver, that task type loses fast-track eligibility for 5 sessions. Log the demotion.
+
+**Output:** "Route: [FAST/DELIBERATE] | reliability: [X] | reason: [X]"
+
 ## Layer 3: EXECUTE (always runs)
 
 **Purpose:** Do the actual work with all context and memory loaded.
 
 This is where the email gets drafted, the demo prep gets built, the CRM note gets written, the lead list gets filtered, the system change gets made.
 
-Rules from Layer 1 are active. Memory from Layer 2 informs decisions. Lessons from 1.3 prevent known mistakes.
+Rules from Layer 1 are active. Memory from Layer 2 informs decisions. Simulation from 2.5 selected the approach. Lessons from 1.3 prevent known mistakes.
 
 ## Layer 4: QUALITY (always runs)
 
@@ -112,16 +146,16 @@ Score: X/10 (type) — [gap to 9] — agree?
 
 ## Which Layers Apply to Which Action Type
 
-| Action Type | L1 Context | L2 Memory | L3 Execute | L4 Quality | L5 Verify |
-|------------|-----------|-----------|-----------|-----------|----------|
-| Email draft | FULL | FULL (all 7 steps) | YES | FULL + humanizer | Pre-flight + score |
-| Demo prep | FULL | FULL | YES | FULL | Pre-flight + score |
-| CRM note | FULL | 2.1, 2.7 | YES | 4.3, 4.4 | 5.2, 5.4 |
-| Call script | FULL | FULL | YES | FULL + humanizer | Pre-flight + score |
-| Lead filtering | FULL | 2.4, 2.7 | YES | 4.3, 4.4 | 5.2, 5.4 |
-| System work | 1.2, 1.3 | 2.7 | YES | 4.3 | 5.2, 5.4 |
-| Strategy/analysis | FULL | 2.4, 2.5, 2.7 | YES | 4.3, 4.4 | 5.2, 5.3, 5.4 |
-| Follow-up | FULL | FULL | YES | FULL + humanizer + competitive | Pre-flight + score |
+| Action Type | L1 Context | L2 Memory | L2.5 Simulate | L2.7 Route | L3 Execute | L4 Quality | L5 Verify |
+|------------|-----------|-----------|-------------|-----------|-----------|-----------|----------|
+| Email draft | FULL | FULL | YES (angle+tone) | DELIBERATE | YES | FULL + humanizer | Pre-flight + score |
+| Demo prep | FULL | FULL | YES (framework) | DELIBERATE | YES | FULL | Pre-flight + score |
+| CRM note | FULL | 2.1, 2.7 | SKIP | FAST eligible | YES | 4.3, 4.4 | 5.2, 5.5 |
+| Call script | FULL | FULL | YES (opening) | DELIBERATE | YES | FULL + humanizer | Pre-flight + score |
+| Lead filtering | FULL | 2.4, 2.7 | SKIP | FAST eligible | YES | 4.3, 4.4 | 5.2, 5.5 |
+| System work | 1.2, 1.3 | 2.7 | SKIP | FAST eligible | YES | 4.3 | 5.2, 5.5 |
+| Strategy/analysis | FULL | 2.4, 2.5, 2.7 | YES (approach) | DELIBERATE | YES | 4.3, 4.4 | 5.2, 5.3, 5.5 |
+| Follow-up | FULL | FULL | YES (angle+tone) | DELIBERATE | YES | FULL + humanizer + competitive | Pre-flight + score |
 
 ## Why Waterfall > Flat Rules
 

@@ -78,6 +78,32 @@ Append-only. One line per change.
 | CW-11: Correction Rate → Autonomy Scope | Track correction rate → adjust trust_level up or down |
 | CW-12: Escalation → Lessons | Every REDUCE_SCOPE or STOP escalation auto-generates a lesson |
 
+## Agent-Local Rules (Independent Evolution)
+
+> Source: Netflix Full Cycle Developers / Spotify Squad Model. Agents at trust >= 2 can develop specialized rules.
+
+Agents with `trust_level` >= `config+instructions` may propose **agent-local rules** — behavioral rules that apply only within their scope. This enables specialization without polluting the global rule system.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `local_rules` | list of rules | Agent-specific behavioral rules (same format as CARL) |
+| `local_rule_cap` | int | Max agent-local rules. Default: 5. |
+| `local_rule_lifecycle` | same as lessons | [PROVISIONAL:5] → [CONFIRMED] → graduated to domain CARL |
+
+**Lifecycle:**
+1. Agent proposes a local rule based on corrections or outcomes within its scope
+2. Rule is `[PROVISIONAL:5]` — tracked for 5 sessions within agent scope
+3. If effective (prevented repeat 2+ times): promoted to `[CONFIRMED]`
+4. If confirmed and generalizable: graduated to domain CARL rule (e.g., domain/carl/demo-prep)
+5. If ineffective after 5 sessions: auto-retired
+
+**Safeguards:**
+- Agent-local rules CANNOT contradict system CARL, safety rules, or the Rule Constitution
+- Agent-local rules cannot expand the agent's own permissions or trust level
+- Oliver can veto any agent-local rule at any time
+
+**Tracking:** Agent-local rule count, promotion rate, and correction rate on local vs system rules — logged in agent brain updates.
+
 ## Creating New Agents
 
 Use the `/agent-scaffold` skill. It generates a manifest from this schema plus an instruction file template.

@@ -305,6 +305,16 @@ Mark each relevant item. Skip irrelevant ones. Fix any failures before closing.
 - Neural bus signals: [total count] — [dominant type: gates/reflects/blocks/patterns]
 - Metacognitive insight: [one sentence from Pre-Phase scan]
 
+## Decision Journal
+[For every major decision this session (angle chosen, framework selected, rule created, architecture choice), log one line:]
+- DECISION: [what] | ALTERNATIVES: [considered] | REASON: [why] | CONFIDENCE: [H/M/L] | REVISIT: [condition]
+[Source: Ray Dalio (Radical Transparency). If no major decisions: "No major decisions this session."]
+
+## Simulation Accuracy
+[If Layer 2.5 simulations were run, compare predictions to outcomes:]
+- SIMULATION: [predicted] → ACTUAL: [result] | DELTA: [accurate/off by N]
+[If no simulations: "No simulations this session (systems-only / SIMPLE tasks)."]
+
 ## Line Counts
 - CLAUDE.md: [X]/150
 - lessons.md: [X] active (cap 30)

@@ -19,7 +19,10 @@
 | **CLAUDE.md** | Master rules — session flow, work style, wrap-up steps | CLAUDE.md | AIOS |
 | **DOMAIN.md** | Sprites config — role, ICP, tools, pipeline rules | domain/DOMAIN.md | Domain |
 | **CARL Manifest** | Routes which CARL domains load and when | .carl/manifest | AIOS |
-| **Agent Manifest Schema** | Second universal standard (alongside Score). Governs agent permissions, trust, context. | agents/manifest-schema.md | AIOS |
+| **Agent Manifest Schema** | Second universal standard (alongside Score). Governs agent permissions, trust, context, agent-local rules. | agents/manifest-schema.md | AIOS |
+| **Self-Model** | Live capability assessment — reliability per output type, blind spots, resource state. Read at session start. | brain/self-model.md | Brain |
+| **Eval Suite** | Held-out golden test cases for regression detection after system changes. | brain/evals/ | Brain |
+| **Rule Constitution** | Meta-rules governing how rules are created, modified, retired. Oliver-only modification. | .carl/global (CONSTITUTION_1-5) | AIOS |
 | **Agent Scaffold** | Skill to create new agents with manifest + instructions + wiring | skills/agent-scaffold/SKILL.md | AIOS |
 | **Escalation Ladder** | Graduated in-task error response: 3→change strategy, 4→reduce scope, 5→stop | .claude/fallback-chains.md (section) | AIOS |
 | **5-Point Verification** | Consolidated verification: INPUT → GOAL → ADVERSARIAL → VOICE → SCORE (replaced 9-step stack) | .claude/gates.md (section) | AIOS |

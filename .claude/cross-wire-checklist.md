@@ -231,3 +231,16 @@ COMPOUND BRAIN: [X/5] active. [Status sentence from brain/system-patterns.md]
 **ACTION UNDERCONFIDENT (low score, zero corrections):** The rubric may be too harsh for this session type. Check if systems-only sessions are being scored against prospect rubrics.
 **TRACK:** mismatch_fires, direction (over/under)
 **SOURCE:** Biological homeostatic plasticity — adjust sensitivity based on actual outcomes
+
+## DS-5: Post-Failure Hardening (Antifragility)
+**CLASS:** DANGER
+**TRIGGER:** Any ESCALATION_TRIGGERED signal at REDUCE_SCOPE or STOP level, OR any session that fails the 8.0 hard gate on first attempt.
+**CHECK:** Identify the 3 components closest to the failure point (use component-map.md neighborhood scan).
+**ACTION:**
+1. Run a targeted stress test on each of the 3 neighboring components within the same session.
+2. For each stress test: does the component handle the failure scenario correctly?
+3. If any neighbor fails: create a hardening lesson immediately and tighten that component.
+4. Increase chaos test frequency for the failure category from 1/session to 1/task for the next 3 sessions.
+**OUTPUT:** `ANTIFRAGILE: [failure] → [3 components tested] → [N/3 passed] → [hardening: Y/N]`
+**TRACK:** hardening_fires, neighbors_tested, neighbors_hardened
+**SOURCE:** Nassim Taleb (Antifragile) — failure should strengthen the neighborhood, not just log a lesson

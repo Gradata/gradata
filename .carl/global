@@ -19,3 +19,17 @@ GLOBAL_RULE_3_PRIORITY=HIGH
 
 GLOBAL_RULE_4=CONTEXT HYGIENE: Compact at 50% context usage. Past 50%, output quality degrades. Use subagents for discrete subtasks. Use /clear when switching to unrelated tasks. Never let the main context become a dumping ground for parallel workstreams.
 GLOBAL_RULE_4_PRIORITY=HIGH
+
+# ── Rule Constitution (meta-rules governing rule creation) ──────
+# Source: Anthropic Constitutional AI. Rules about how rules are made.
+# This section can ONLY be modified by Oliver, never by the system autonomously.
+CONSTITUTION_1=Every new CARL rule must have a testable failure condition. If you cannot describe a scenario where the rule would catch a violation, the rule is too vague to create.
+CONSTITUTION_1_PRIORITY=CRITICAL
+CONSTITUTION_2=No rule may weaken, override, or contradict a CRITICAL-priority rule without Oliver's explicit approval in the current session. CRITICAL rules are constitutional — they outrank everything except Oliver's direct instruction.
+CONSTITUTION_2_PRIORITY=CRITICAL
+CONSTITUTION_3=Every rule must trace to one of: (a) a correction from Oliver, (b) an experiment result with data, (c) a safety requirement. No rules from intuition, speculation, or "best practice" without evidence. If the source is unclear, ask before creating.
+CONSTITUTION_3_PRIORITY=CRITICAL
+CONSTITUTION_4=Maximum 5 active rules per output type per domain. Before adding a 6th, consolidate or retire the lowest-utility existing rule. Complexity is finite — every rule competes for attention.
+CONSTITUTION_4_PRIORITY=HIGH
+CONSTITUTION_5=Rules with zero fires and zero prevented-repeats across 20+ sessions are automatically flagged for deletion at the next meta-loop cycle. Unfired rules are dead weight until proven otherwise.
+CONSTITUTION_5_PRIORITY=HIGH

@@ -2,6 +2,19 @@
 # Every rule change gets logged here with date, what changed, and why.
 # If a change makes things worse, roll back by reversing the entry.
 
+## 2026-03-21 — 10-Gap Architecture Closure (Friston→Taleb→Dalio)
+- **#1 Simulation Layer:** Layer 2.5 SIMULATE added to action-waterfall.md. Generates 2-3 candidates, scores against PATTERNS.md, predicts outcomes, logs for calibration. Prediction error feeds CW-5 + self-model. SDK-portable (brain methodology).
+- **#2 Self-Model:** brain/self-model.md created. Reliability per output type, known blind spots, resource state. Read at session start. Feeds System 1/2 routing. Brain layer.
+- **#3 System 1/System 2:** Layer 2.7 ROUTE added to action-waterfall.md. FAST track (reliability >0.9, SIMPLE, no provisionals) vs DELIBERATE track (full waterfall). Demotion on correction. Runtime layer.
+- **#4 Rule Constitution:** 5 meta-rules added to .carl/global (CONSTITUTION_1-5). Testable failure conditions, no weakening CRITICAL rules, evidence-based creation, 5-rule cap per type, 20-session auto-flag. Oliver-only modification. Runtime layer.
+- **#5 SLOs + Error Budgets:** 5 SLOs added to system-patterns.md (first-draft pass, gate completion, correction rate, calibration accuracy, wrap-up completion). Error budget consumed → investigation mode. Brain layer.
+- **#6 Antifragility:** DS-5 Post-Failure Hardening added to cross-wire-checklist.md. Escalation triggers neighborhood stress test (3 closest components). Chaos frequency increases for 3 sessions. Runtime layer.
+- **#7 Decision Journal:** Added to session note template in wrap-up skill. One-line format per major decision: what/alternatives/reason/confidence/revisit. Brain layer.
+- **#8 Eval Suite:** brain/evals/ framework created with golden/, results/, README with capture protocol. Golden cases: 0/5, collecting during next prospect sessions. Brain layer.
+- **#9 Agent Evolution:** Agent-local rules added to manifest-schema.md. Trust >= 2 agents can propose scoped rules. Same lifecycle as lessons. Cannot contradict CARL/safety/constitution. Both layers.
+- **#10 Causal Chains:** Added to system-patterns.md. Tracks observed propagation chains with type (reinforcing/balancing) and value. 4 chains logged retroactively. Brain layer.
+- **Sources:** Friston (Free Energy), LeCun (World Models), MuZero, Joscha Bach (MicroPsi), Kahneman (System 1/2), Anthropic (Constitutional AI), Google SRE, Taleb (Antifragile), Dalio (Radical Transparency), OpenAI (Evals), Netflix/Spotify (squad model), Senge (Fifth Discipline).
+
 ## 2026-03-21 — Cross-Wire v2: Three Trigger Classes + Utility Scoring
 - **cross-wire-checklist.md:** Expanded from 12 event triggers to 3 classes: EVENT (CW-1→12, unchanged), TREND (CW-13→16, new), DANGER (DS-1→4, new). 20 total triggers.
 - **TREND triggers (PID control theory):** CW-13 audit score drift (integral), CW-14 correction rate acceleration (derivative), CW-15 rule accumulation check (double-loop, every 5 sessions), CW-16 session type imbalance (variety).
