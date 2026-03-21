@@ -81,11 +81,15 @@
 
 | Component | What it does | File | Layer |
 |-----------|-------------|------|-------|
-| **Neural Bus** | Session-level signal file — systems write events, other systems read before acting | brain/sessions/neural-bus.md | Brain |
-| **Staleness Sensor** | Scans brain files >7 days stale at session start | skills/session-start/SKILL.md (Phase 0) | AIOS |
+| **Neural Bus** | Session-level signal file with typed taxonomy (12 signal types). Systems write events, other systems read before acting. | brain/sessions/neural-bus.md | Brain |
+| **Signal Taxonomy** | Typed signals (SAFETY_BLOCK, FALLBACK_FIRED, GATE_CATCH, SKILL_MISS, CORRECTION, etc.) with defined writer→reader contracts | brain/sessions/neural-bus.md | Brain |
+| **Launch Validator** | Pre-session integrity check (headers, staleness, inter-session mods, RAG graduation). Emits LAUNCH_CHECK signal. | brain/scripts/launch.py | Brain |
+| **Staleness Sensor** | Scans brain files >7 days stale at session start. Emits STALE_FILE signals. | skills/session-start/SKILL.md (Phase 0) | AIOS |
 | **Gap Scanner** | Mid-session scan for skipped steps, unused tools, missing pre-flights | .claude/gap-scanner.md | AIOS |
 | **Metacognitive Scan** | 60-second "what did this session reveal about AIOS" before wrap-up | skills/wrap-up/SKILL.md (Pre-Phase) | AIOS |
-| **Cross-Wires** | 7 bidirectional feedback connections between components (CW-1 through CW-7) | .claude/cross-wire-checklist.md | AIOS |
+| **Cross-Wires** | 9 bidirectional feedback connections between components (CW-1 through CW-9) | .claude/cross-wire-checklist.md | AIOS |
+| **CW-8 Skill Miss** | Skill didn't auto-trigger → fix description keywords (from skills article) | .claude/cross-wire-checklist.md | AIOS |
+| **CW-9 Safety Verdict** | Every safety block gets a verdict (legit vs false positive) — never just logged (from nova-tracer) | .claude/cross-wire-checklist.md | AIOS |
 
 ## Session Flow
 
@@ -117,6 +121,17 @@
 | **System Patterns** | Component effectiveness tracking (gates, lessons, smoke checks, audits) | brain/system-patterns.md | Brain |
 | **Quality Loop** | Every-5-sessions system evaluation (scorecard, diagnose, fix) | skills/quality-loop/SKILL.md | AIOS |
 | **NotebookLM Feeds** | Post-call/demo data fed back into notebooks for compounding | domain/notebooks/registry.md | Domain |
+
+## RAG Pipeline (dormant until graduation)
+
+| Component | What it does | File | Layer |
+|-----------|-------------|------|-------|
+| **Config** | Shared paths, Gemini model settings, graduation thresholds, file type map | brain/scripts/config.py | Brain |
+| **Launch Validator** | Pre-session integrity: header consistency, staleness, RAG graduation check | brain/scripts/launch.py | Brain |
+| **Embed** | Delta embedding at wrap-up via Gemini (hash-based change detection, ChromaDB) | brain/scripts/embed.py | Brain |
+| **Query** | Semantic search with task-type aware queries + metadata filtering | brain/scripts/query.py | Brain |
+| **Session Launcher** | Single entry point: pre-flight → state restore → Claude Code launch | brain/scripts/start.py | Brain |
+| **Graduation** | RAG activates at 20+ sessions. Domain packs can override threshold. | brain/scripts/config.py (RAG_ACTIVATION_THRESHOLD) | Brain |
 
 ## Voice & Writing
 

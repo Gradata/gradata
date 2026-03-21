@@ -102,3 +102,19 @@ COMPOUND BRAIN: [X/5] active. [Status sentence from brain/system-patterns.md]
 **ACTION YES:** Skip
 **ACTION NO:** Add blocked angle for that persona to Pre-Draft gate
 **TRACK:** pattern_to_gate_fires, angles_blocked
+
+## CW-8: Skill Miss → Description Fix
+**TRIGGER:** Neural bus has SKILL_MISS signal this session (Oliver manually invoked a skill that should have auto-triggered from his message)
+**CHECK:** Does the skill's description include the phrases Oliver actually used?
+**ACTION YES:** Trigger condition may need loosening — add Oliver's phrasing as alternate keywords
+**ACTION NO:** Add Oliver's exact phrasing to the skill description field
+**TRACK:** skill_miss_fires, descriptions_fixed
+**SOURCE:** Skills article pattern — description richness determines trigger reliability
+
+## CW-9: Safety Block → Audit Trail
+**TRIGGER:** Neural bus has SAFETY_BLOCK or TOOL_NOTABLE signal this session
+**CHECK:** Was the block legitimate (real threat) or false positive (normal operation flagged)?
+**ACTION LEGITIMATE:** Log to session note as security event. No further action.
+**ACTION FALSE POSITIVE:** Loosen the specific rule or add an exception. Log which rule and why.
+**TRACK:** safety_block_fires, false_positives
+**SOURCE:** Nova-tracer pattern — every safety event gets a verdict, not just a log line
