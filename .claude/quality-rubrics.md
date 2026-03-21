@@ -52,6 +52,53 @@ Benchmark: Would this pass review at a team shipping AI infrastructure at OpenAI
 | 3-4 | Doesn't integrate. Duplicates existing functionality. Untested. Hardcoded assumptions. Would be rejected in review. |
 | 1-2 | Breaks existing system. Introduces regressions. Wrong architecture for the problem. |
 
+## Session-Level Scorecards (Dual-Mode Measurement)
+
+> Source: DORA metrics (Forsgren), Toyota (Ohno), Shape Up (Singer), Spotify Health Check (Kniberg), OKR paired indicators (Grove), Portfolio theory (Markowitz/Reinertsen), Tech debt ratios (Fowler/Cunningham).
+> Every session is tagged Type E (execution), Type A (architecture), or Type H (hybrid). Each type is scored against its own dimensions. Never score architecture sessions against sales metrics or vice versa.
+
+### Type E — Execution Session Scorecard
+
+| Dimension | What It Measures | Weight | Scale |
+|-----------|-----------------|--------|-------|
+| Throughput | Touches, emails sent, demos booked, deals advanced | 0.15 | count |
+| Cycle Quality | First-pass output quality (no rework needed) | 0.25 | 1-10 |
+| Pipeline Effect | Did pipeline value increase? Deals move stages? | 0.20 | 1-10 |
+| Conversion Signal | Response rates, meetings booked, stage advances | 0.15 | 1-10 |
+| Gate Compliance | Mandatory gates fired and completed correctly | 0.15 | 1-10 |
+| Correction Density | Corrections per output (lower = better, invert for score) | 0.10 | 1-10 |
+
+### Type A — Architecture Session Scorecard
+
+| Dimension | What It Measures | Weight | Scale |
+|-----------|-----------------|--------|-------|
+| Components Shipped | New or upgraded system components deployed and working | 0.15 | count→scale |
+| Leverage Ratio | How many future sessions does this affect? (1=one-off, 10=permanent) | 0.25 | 1-10 |
+| Integration Quality | Wired into nervous system? Tested? Documented? Component map updated? | 0.25 | 1-10 |
+| Debt Retired | Workarounds eliminated, manual steps automated, stale refs fixed | 0.10 | count→scale |
+| Regression Safety | Did anything existing break? (10=nothing broke, 0=regressions) | 0.15 | 1-10 |
+| Downstream Forecast | Expected reduction in cycle time/error rate for future Type E sessions | 0.10 | 1-10 |
+
+### Type H — Hybrid Session Scorecard
+Weight by time split: e.g., 60% prospect work / 40% system work → 0.6 * Type E score + 0.4 * Type A score.
+
+### Portfolio Allocation Tracking
+
+Track rolling session type ratio. Target allocation adjusts by maturity phase (see CLAUDE.md Maturity Schedule):
+
+| Phase | Target Type E | Target Type A | Alert |
+|-------|--------------|--------------|-------|
+| INFANT (current) | 40-60% | 40-60% | OK — building the machine |
+| ADOLESCENT | 60-75% | 25-40% | 5+ consecutive same type = flag |
+| MATURE | 75-85% | 15-25% | 3+ consecutive same type = flag |
+| STABLE | 80-90% | 10-20% | Standard maintenance |
+
+### Downstream Validation (Toyota — measure setup by production impact)
+
+After every Type E session, note: "Did any system built in a previous Type A session get used? Did it help?"
+Format: `DOWNSTREAM: [Type A session] → [what was used] → [time saved / errors prevented / quality improved]`
+This creates the compound return metric that validates architecture investment retroactively.
+
 ## Anti-Mediocrity Rule
 
 If a first draft scores 5-6, do NOT incrementally patch it. Scrap the draft, diagnose why it's mediocre (wrong angle? missing data? bad structure?), and rebuild from scratch with the diagnosis as input. Two clean attempts beat four incremental patches. This applies to all output types. Mediocre output that ships erodes trust faster than a delayed output that lands.

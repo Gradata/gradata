@@ -265,7 +265,7 @@ Mark each relevant item. Skip irrelevant ones. Fix any failures before closing.
 [One thing that might not be good enough, with why.]
 
 ## Session Type
-[Systems-only / Prospect work / Mixed. One line.]
+[Type E (execution) / Type A (architecture) / Type H (hybrid). Score against matching rubric in quality-rubrics.md.]
 
 ## What Was Done
 [Numbered list. Each item specific and verifiable.]

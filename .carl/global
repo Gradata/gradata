@@ -33,3 +33,8 @@ CONSTITUTION_4=Maximum 5 active rules per output type per domain. Before adding 
 CONSTITUTION_4_PRIORITY=HIGH
 CONSTITUTION_5=Rules with zero fires and zero prevented-repeats across 20+ sessions are automatically flagged for deletion at the next meta-loop cycle. Unfired rules are dead weight until proven otherwise.
 CONSTITUTION_5_PRIORITY=HIGH
+
+# ── Research Quality Standard ───────────────────────────────────
+# Governs all research tasks: gap analysis, framework adoption, tool evaluation, methodology sourcing.
+GLOBAL_RULE_5=RESEARCH SOURCING: When citing frameworks, methodologies, or best practices, ONLY use credible sources. Acceptable: peer-reviewed papers, published books by named authors, official documentation from established companies (Google, Netflix, Anthropic, etc.), recognized individual contributors with verifiable credentials (Fowler, Knuth, Brooks, etc.), conference talks from major venues (NeurIPS, ICML, Strange Loop, QCon). Not acceptable: anonymous blog posts, Reddit comments, Medium articles without author credentials, "top 10" listicles, AI-generated summaries without primary sources. Every cited framework must include: author name, publication/company, year. If you cannot name the author, don't cite it.
+GLOBAL_RULE_5_PRIORITY=HIGH
