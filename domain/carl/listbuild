@@ -34,3 +34,6 @@ LISTBUILD_RULE_6=After processing a batch through ZeroBounce, feed the results i
 
 # Step 7: Google Sheets integration (via Rube MCP)
 LISTBUILD_RULE_7=When Google Sheets is available (Rube MCP connected), use it as the live tracking layer: (a) Apify scrape output goes directly into a campaign Sheet instead of just a local CSV. (b) Each campaign gets one Sheet with tabs: Raw Commenters | ICP Scored | Enriched | Verified | Sent | Replied. (c) Update enrichment status per row as leads move through the pipeline. (d) Track credit usage in a Credits tab. This replaces CSV-juggling with a single live view Oliver can check from his phone.
+
+# Step 8: Ad platform signal detection (FREE — runs after Step 4, before Step 5)
+LISTBUILD_RULE_8=After post-enrichment scoring (Step 4), scan each surviving lead's company_domain for ad platform signals (Meta Pixel, Google Ads tag, GTM, Klaviyo, Shopify). This is FREE (website fetch only, no API credits). Add columns: meta_pixel, google_ads, ad_platforms, likely_budget_tier, top_roas_gap. Use domain/reference/meta-api-patterns.md and domain/reference/google-ads-patterns.md inference tables. If domain missing or scan fails, infer from industry + company_size. These columns power personalized cold email angles and demo prep. See lead-filtering-sop.md Step 4b for full detection spec.
