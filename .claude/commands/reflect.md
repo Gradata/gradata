@@ -189,6 +189,24 @@ If any root cause was identified via double-loop, also write:
 `[HH:MM] [reflect] [ROOT-CAUSE] category=[X] description=[Y]`
 And append the structured entry to brain/sessions/reflect-patterns.md per LOOP_RULE_45.
 
+### Step 8c: Architectural Gap Analysis (every 10 sessions)
+
+Check current session number. If divisible by 10 (or `--gaps` flag passed):
+
+**Prompt:** "Evaluate this system as a whole against established frameworks from leading AI research labs, cognitive science, distributed systems engineering, and recognized individual contributors. Identify structural gaps — capabilities that credible, proven architectures possess that this system lacks. For each gap: name the source framework, describe the missing capability, assess whether it's high-leverage or theoretical, and propose a concrete improvement. Do not praise what exists — focus exclusively on what's missing."
+
+**Process:**
+1. Read CLAUDE.md, cross-wire-checklist.md, component-map.md, system-patterns.md, action-waterfall.md
+2. Research against: cognitive architectures (SOAR, ACT-R), control theory (VSM, PID), organizational learning (Argyris, Senge), distributed systems (chaos eng, circuit breakers), neuroscience (predictive coding, active inference), and notable open-source agent frameworks
+3. Output a structured gap report: Gap | Source | Severity | Proposed Fix | Layer (brain/runtime)
+4. Save to brain/vault/gap-analysis-[YYYY-MM-DD].md
+5. Surface top 3 gaps to Oliver for prioritization
+
+**Rules:**
+- Honest assessment, not a sales pitch. If the system is overbuilt in an area, say so.
+- Credit sources. No vague "best practices" — name the framework, paper, or contributor.
+- Classify each gap as brain-layer (SDK-portable) or runtime-layer (platform-specific).
+
 ### Step 9: Summary
 
 ```
