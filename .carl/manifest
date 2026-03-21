@@ -42,6 +42,14 @@
 DEVMODE=false
 
 # ============================================================================
+# SAFETY - Structural & operational protections (always loaded from .carl/safety)
+# ============================================================================
+SAFETY_STATE=active
+SAFETY_ALWAYS_ON=true
+SAFETY_FILE=.carl/safety
+SAFETY_PRIORITY=CRITICAL
+
+# ============================================================================
 # GLOBAL - AIOS universal rules (always loaded from .carl/global)
 # ============================================================================
 GLOBAL_STATE=active

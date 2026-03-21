@@ -7,6 +7,7 @@ Domain CARL rules: domain/carl/ (loaded via .carl/manifest domain routing)
 Domain gates: domain/gates/ (loaded on demand when task triggers)
 Domain skills: domain/skills/ (loaded on demand)
 Domain voice: domain/soul.md (Sprites email frameworks, persona, signature)
+Safety rules: .carl/safety (always loaded)
 
 ## Session Startup — DO THIS FIRST
 Read and execute skills/session-start/SKILL.md. Load context-manifest.md and follow its tiers. Tier 0 always loads. Tier 1 runs at startup (parallel, summarize, release). Tier 2 loads on demand. Tier 3 governed by .agentignore. Give 3-line status + Loop health line + deal health alerts, then respond.
