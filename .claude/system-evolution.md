@@ -153,6 +153,21 @@ quality-rubrics.md | fallback-chains.md | auditor-system.md | health-audit.md | 
 **Applied:** Request complexity classification (SIMPLE/STANDARD/DEEP) as GLOBAL_RULE_2 (was GLOBAL_RULE_14 pre-compaction).
 **Portability:** DOMAIN-AGNOSTIC
 
+### Ironsail / Genus OS (github.com/Ironsail-llc/genus-os)
+**Concept:** Multi-tenant agent OS with declarative manifests, graduated trust, escalation ladders, tool allow/deny lists, budget cascades, and post-execution verification.
+**Applied (Session 21 — Tranche 1):**
+- Agent manifest schema (structured markdown, not YAML) — second universal standard alongside Score. agents/manifest-schema.md
+- Tool allow/deny per agent in manifests — formal permission boundaries
+- Graduated trust scoring — correction_rate tracks over 5 sessions, gates autonomy scope (config-only → config+instructions → config+instructions+code). Adapted from Nightwatch merge-rate trust.
+- Auto-pause circuit breaker — 3 consecutive rejections = SYSTEM_PAUSE signal
+- In-task escalation ladder — 3 errors=change strategy, 4=reduce scope, 5=stop. Extended fallback-chains.md.
+- 5-Point Verification Stack consolidation — replaced 9-step verification with 5 distinct questions (INPUT→GOAL→ADVERSARIAL→VOICE→SCORE). Added GOAL check (the question we were missing: "is this what was asked for?"). Removed overlap between Layer 5 verify, gate checklist, and separated scoring sub-steps.
+- Agent scaffold skill — generates manifests from schema with nervous system wiring
+- 4 new bus signals: TOOL_DENIED, SYSTEM_PAUSE, ESCALATION_TRIGGERED, AGENT_CREATED
+- 3 new cross-wires: CW-10 (Tool Violation→Manifest Fix, dormant), CW-11 (Correction Rate→Autonomy Scope), CW-12 (Escalation→Lessons)
+**What was NOT borrowed:** YAML format (we use structured markdown), Redis/PostgreSQL infrastructure, server daemon architecture, workflow engine (we don't need declarative pipelines), heartbeat system (session-based, not always-on).
+**Portability:** DOMAIN-AGNOSTIC (all governance patterns, no sales-specific content)
+
 ---
 
 ## What Oliver Built vs What Was Borrowed

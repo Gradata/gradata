@@ -18,7 +18,11 @@
 |-----------|-------------|---------|-------|
 | **CLAUDE.md** | Master rules — session flow, work style, wrap-up steps | CLAUDE.md | AIOS |
 | **DOMAIN.md** | Sprites config — role, ICP, tools, pipeline rules | domain/DOMAIN.md | Domain |
-| **Manifest** | Routes which CARL domains load and when | .carl/manifest | AIOS |
+| **CARL Manifest** | Routes which CARL domains load and when | .carl/manifest | AIOS |
+| **Agent Manifest Schema** | Second universal standard (alongside Score). Governs agent permissions, trust, context. | agents/manifest-schema.md | AIOS |
+| **Agent Scaffold** | Skill to create new agents with manifest + instructions + wiring | skills/agent-scaffold/SKILL.md | AIOS |
+| **Escalation Ladder** | Graduated in-task error response: 3→change strategy, 4→reduce scope, 5→stop | .claude/fallback-chains.md (section) | AIOS |
+| **5-Point Verification** | Consolidated verification: INPUT → GOAL → ADVERSARIAL → VOICE → SCORE (replaced 9-step stack) | .claude/gates.md (section) | AIOS |
 
 ## CARL Domains (behavioral rules)
 
@@ -65,9 +69,7 @@
 | Component | What it does | File | Layer |
 |-----------|-------------|------|-------|
 | **Capture Hook** | Auto-detects corrections in real-time during session | .claude/hooks/reflect/scripts/capture_learning.py | AIOS |
-| **Confidence Flags** | HIGH/MEDIUM/LOW before every major output (Step 0 of self-score) | .claude/quality-rubrics.md | AIOS |
-| **Blocking Gate** | Score <7 = output blocked, requires Oliver override | .claude/quality-rubrics.md | AIOS |
-| **Metacognitive Honesty** | Must state what a 9/10 would look like, not why 7/10 is fine | .claude/quality-rubrics.md | AIOS |
+| **Self-Score Protocol** | Confidence flag + score + fix-before-score + gap statement + blocking gate (<7) — unified in SCORE step of 5-Point Verification | .claude/quality-rubrics.md | AIOS |
 | **/reflect** | Processes queued learnings, routes to CLAUDE.md or lessons.md | .claude/commands/reflect.md | AIOS |
 | **Double-Loop** | After identifying what went wrong, asks what ALLOWED it (system gap) | .claude/commands/reflect.md (Step 4) | AIOS |
 | **Micro-Reflections** | Lightweight integration check on every system addition | .claude/micro-reflections.md | AIOS |
@@ -91,6 +93,9 @@
 | **Cross-Wires** | 9 bidirectional feedback connections between components (CW-1 through CW-9) | .claude/cross-wire-checklist.md | AIOS |
 | **CW-8 Skill Miss** | Skill didn't auto-trigger → fix description keywords (from skills article) | .claude/cross-wire-checklist.md | AIOS |
 | **CW-9 Safety Verdict** | Every safety block gets a verdict (legit vs false positive) — never just logged (from nova-tracer) | .claude/cross-wire-checklist.md | AIOS |
+| **CW-10 Tool Violation** | Tool denied by manifest → check if allowlist needs updating or agent overstepped (DORMANT) | .claude/cross-wire-checklist.md | AIOS |
+| **CW-11 Correction Rate** | Track correction rate → adjust trust_level up or down. Feeds graduated trust. | .claude/cross-wire-checklist.md | AIOS |
+| **CW-12 Escalation → Lessons** | REDUCE_SCOPE or STOP escalation auto-generates a lesson | .claude/cross-wire-checklist.md | AIOS |
 
 ## Session Flow
 

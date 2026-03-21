@@ -2,6 +2,18 @@
 # Every rule change gets logged here with date, what changed, and why.
 # If a change makes things worse, roll back by reversing the entry.
 
+## 2026-03-21 — Genus OS Tranche 1: Governance Foundation (Session 21)
+- **Source:** Audited github.com/Ironsail-llc/genus-os. Adapted governance patterns, not architecture.
+- **Agent Manifest Schema:** agents/manifest-schema.md — second universal standard alongside Score. Structured markdown (not YAML). Required fields: id, name, status, version, department, description, instruction_file. Permission fields: tools_allowed, tools_denied, write_paths. Trust fields: trust_level, correction_rate, consecutive_rejections, auto_pause_threshold.
+- **Agent Manifests:** Created agents/sales/manifest.md and agents/systems/manifest.md. Updated agents/registry.md to point to manifests.
+- **Graduated Trust:** Trust Scores table added to brain/system-patterns.md. Per-agent correction rate tracking over 5-session rolling window. Trust levels: config-only → config+instructions → config+instructions+code. Promotion at <0.10 correction rate (Oliver approval). Demotion at >0.25 or 3 consecutive rejections (automatic).
+- **Auto-Pause:** 3 consecutive rejections = SYSTEM_PAUSE signal. Circuit breaker.
+- **Escalation Ladder:** Added to .claude/fallback-chains.md. 3 errors=CHANGE_STRATEGY, 4=REDUCE_SCOPE, 5=STOP. Hard abort at 10 total. CW-12 auto-generates lessons from REDUCE_SCOPE/STOP.
+- **5-Point Verification:** Consolidated 9-step verification stack → 5 steps: INPUT, GOAL, ADVERSARIAL, VOICE, SCORE. Added GOAL check ("is this what was asked for?" — the missing question). Merged fix-before-score + metacognitive honesty + blocking gate into SCORE. Killed Layer 5 verify (duplicate of INPUT).
+- **Agent Scaffold:** skills/agent-scaffold/SKILL.md — generates manifest + instructions + wiring.
+- **Nervous System:** +4 bus signals (TOOL_DENIED, SYSTEM_PAUSE, ESCALATION_TRIGGERED, AGENT_CREATED). +3 cross-wires (CW-10 dormant, CW-11 active, CW-12 active). Cross-wire budget: 7→11 (1 dormant). Limit raised to 15.
+- **Net complexity:** Verification steps reduced (9→5). Cross-wires increased (+4 net). New files: 4 created (manifest-schema, 2 manifests, scaffold skill). Modified files: 8 (registry, gates, action-waterfall, quality-rubrics, fallback-chains, cross-wire-checklist, component-map, neural-bus).
+
 ## 2026-03-20 — PASSIVE_PATTERN_RULE rewritten as modular 6-category compounding engine
 - **What:** Replaced monolithic LOOP_RULE_60 with 6 independent sub-rules (60, 60B-60F). Each category compounds independently based on session activity.
 - **LOOP_RULE_60:** PROSPECT WORK — reply rates, touch sequence, stage conversion, ghosted detection, angle underperformance, segment outperformance

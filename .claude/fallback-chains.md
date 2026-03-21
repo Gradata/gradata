@@ -41,6 +41,24 @@ See .claude/skills/notebooklm/SKILL.md for three-tier fallback: MCP → CLI → 
 - **50+ people:** Bulk tools appropriate. Get OK on cost estimate before running.
 - **Always state the cost** before running any paid tool.
 
+## In-Task Escalation Ladder
+
+When consecutive errors accumulate within a single task (not session-wide — per task):
+
+| Consecutive Errors | Level | Action |
+|---|---|---|
+| 3 | **CHANGE_STRATEGY** | Stop current approach. Consult fallback chains above. Try alternative method. Emit `ESCALATION_TRIGGERED` (level=CHANGE_STRATEGY) to neural bus. |
+| 4 | **REDUCE_SCOPE** | Simplify the goal. Drop optional steps. Tell Oliver what's being cut and why. Emit `ESCALATION_TRIGGERED` (level=REDUCE_SCOPE). |
+| 5 | **STOP** | Summarize what failed, what was tried, and present options. Wait for Oliver. Emit `ESCALATION_TRIGGERED` (level=STOP). |
+
+**Hard abort:** 10 total errors on a single task (consecutive or not) → STOP regardless of level.
+
+**What counts as an error:** Tool failure, API error, gate failure, output blocked by self-score, verification failure. Does NOT count: Oliver requesting revisions (that's feedback, not failure).
+
+**Recovery:** After CHANGE_STRATEGY succeeds, error counter resets to 0. After REDUCE_SCOPE, counter carries forward (next error = STOP).
+
+**Cross-wire:** CW-12 fires on REDUCE_SCOPE or STOP — auto-generates a lesson from the failure.
+
 ## General Rule
 - If a required tool fails and no fallback works → FLAG with: what failed, what data is missing, what the impact is
 - Never silently skip a gate step

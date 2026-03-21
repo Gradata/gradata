@@ -52,19 +52,19 @@ Benchmark: Would this pass review at a team shipping AI infrastructure at OpenAI
 | 3-4 | Doesn't integrate. Duplicates existing functionality. Untested. Hardcoded assumptions. Would be rejected in review. |
 | 1-2 | Breaks existing system. Introduces regressions. Wrong architecture for the problem. |
 
-## Self-Score Protocol
-Before presenting ANY output to Oliver:
-0. **Confidence flag** — assign HIGH / MEDIUM / LOW before scoring. HIGH = strong research + proven framework match + clear angle. MEDIUM = one of those was weak or untested. LOW = gaps filled with assumptions or insufficient data. Show the flag above the output: `CONFIDENCE: [HIGH/MEDIUM/LOW]`. This is mandatory on every major output — not just prospect-facing. Systems work, architecture decisions, and rule changes all get flagged.
-1. Identify which rubric applies
-2. Score the output honestly
-3. If below 7 → output is **BLOCKED**. Do not present. Revise until 7+. Oliver can override with "ship it anyway" but the block must be explicit and visible: `BLOCKED: self-score [X]/10 — revising before delivery.` This is not a warning — it is a stop.
-4. If 7-8 → present but note what would make it 9+
-5. If 9-10 → present with confidence
-6. Log the self-score in the daily notes
-7. **FIX-BEFORE-SCORE GATE** — if scoring identifies a specific weakness or issue (not just "could be better"), FIX IT before presenting the score. Never present a score that names a fixable problem you haven't fixed. The score reflects the FINAL state, not the first draft. This applies to both sales outputs and system work.
+## Self-Score Protocol (SCORE step in 5-Point Verification)
 
-## Metacognitive Honesty Rule
-Never rationalize weak outputs. When self-scoring below 8, you MUST state what the correct output would have looked like — not why the current output is "good enough." Bad: "7/10 — solid structure but could be more personal." Good: "7/10 — a 9 would reference their LinkedIn post about Q4 hiring and tie it to the multi-brand pain point. I didn't find that post, so I used a generic industry hook instead." The gap between actual and ideal is the most valuable signal in the system.
+The SCORE step is one unified pass, not separate sub-steps. It runs as step 5 of the verification stack (see .claude/gates.md).
+
+Before presenting ANY output to Oliver:
+1. **Confidence flag** — HIGH / MEDIUM / LOW. Mandatory on every major output.
+2. **Identify rubric** — which rubric applies to this output type?
+3. **Score honestly** — rate against the rubric. If scoring identifies a fixable problem, **fix it before presenting the score.** The score reflects the final state, not the first draft.
+4. **State the gap** — when below 8, state what a 9/10 would look like. Not why 7/10 is fine. Bad: "7/10 — solid structure." Good: "7/10 — a 9 would reference their LinkedIn post about Q4 hiring. I didn't find that post, so I used a generic industry hook."
+5. **Enforce** — below 7 = **BLOCKED**. Do not present. Revise until 7+. Oliver can override with "ship it anyway" but the block must be explicit: `BLOCKED: self-score [X]/10 — revising.`
+6. **Log** — record the self-score in daily notes.
+
+This consolidates what were previously separate steps (fix-before-score, metacognitive honesty, blocking gate) into one flow. Same enforcement, fewer labels. Changed in Session 21 verification stack consolidation.
 
 ## First-Draft Quality Floor
 - First draft of ANY output must score 7+ before presenting

@@ -118,3 +118,26 @@ COMPOUND BRAIN: [X/5] active. [Status sentence from brain/system-patterns.md]
 **ACTION FALSE POSITIVE:** Loosen the specific rule or add an exception. Log which rule and why.
 **TRACK:** safety_block_fires, false_positives
 **SOURCE:** Nova-tracer pattern — every safety event gets a verdict, not just a log line
+
+## CW-10: Tool Violation → Manifest Fix (DORMANT — wakes on first TOOL_DENIED signal)
+**TRIGGER:** Neural bus has TOOL_DENIED signal this session
+**CHECK:** Was the agent's manifest too restrictive (legitimate tool need) or did the agent overstep?
+**ACTION TOO RESTRICTIVE:** Update the agent's manifest tools_allowed list. Log the addition.
+**ACTION OVERSTEPPED:** Log the violation. If repeated, tighten trust_level.
+**TRACK:** tool_denied_fires, manifest_updates
+**SOURCE:** Genus OS — agent tool registry with allow/deny filtering
+
+## CW-11: Correction Rate → Autonomy Scope
+**TRIGGER:** Agent's correction_rate updated at wrap-up (from CORRECTION signals)
+**CHECK:** Compare correction_rate against thresholds: <0.10 = eligible for trust promotion, >0.25 = trust demotion
+**ACTION PROMOTE:** Flag for Oliver: "[agent] correction rate [X] over 5 sessions — eligible for trust_level increase from [current] to [next]"
+**ACTION DEMOTE:** Auto-demote trust_level by one tier. Emit SYSTEM_PAUSE if consecutive_rejections >= auto_pause_threshold.
+**TRACK:** trust_promotions, trust_demotions, pause_events
+**SOURCE:** Genus OS Nightwatch — graduated trust based on merge rate
+
+## CW-12: Escalation → Lessons
+**TRIGGER:** Neural bus has ESCALATION_TRIGGERED signal at REDUCE_SCOPE or STOP level
+**CHECK:** What broke? What was the root cause?
+**ACTION:** Auto-generate lesson: "[DATE] ESCALATION-GENERATED: [level] on [task] — [root cause] → [what to avoid]"
+**TRACK:** escalation_to_lesson_fires, lessons_generated
+**SOURCE:** Genus OS — escalation as a learning signal, not just a safety valve

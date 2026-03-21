@@ -15,7 +15,7 @@ LAYER 3: EXECUTE    → Do the work with full context loaded.
     ↓
 LAYER 4: QUALITY    → Is this good enough? Polish and score.
     ↓
-LAYER 5: VERIFY     → Did we follow process? Show proof. Present.
+LAYER 5: VERIFY     → 5-point check: INPUT → GOAL → ADVERSARIAL → VOICE → SCORE. Present.
 ```
 
 ## Layer 1: CONTEXT (always runs)
@@ -87,17 +87,28 @@ This is not optional politeness. This is the difference between an assistant tha
 
 ## Layer 5: VERIFY (always runs)
 
-**Purpose:** Prove process was followed. Present with proof.
+**Purpose:** 5-point verification. Each step asks a different question. No overlap. See .claude/gates.md for full spec.
 
-| Step | What | Applies To |
-|------|------|-----------|
-| 5.1 | Pre-flight block | Show the verification checklist above prospect output | Prospect work |
-| 5.2 | Truth protocol | Every claim backed by evidence? Sources cited? | ALL outputs |
-| 5.3 | Score surfacing | "Score: X/10 (type) — agree? Say 'that's a [X]' to override" | ALL major outputs |
-| 5.4 | Canonical log | Log the action to system.db with full context | ALL actions |
-| 5.5 | Chaos test | Once per session, silently test one rule | Random (silent) |
+| Step | Check | Question | Applies To |
+|------|-------|----------|-----------|
+| 5.1 | **INPUT** | Did I have the right inputs? Show pre-flight proof block. | All gated outputs |
+| 5.2 | **GOAL** | Does this deliver what was specifically asked for? | ALL outputs |
+| 5.3 | **ADVERSARIAL** | Would the prospect/user reject this? | Prospect-facing |
+| 5.4 | **VOICE** | Does it sound human? Humanizer pass. | Emails, LinkedIn, calls |
+| 5.5 | **SCORE** | Good enough to ship? Score, fix if broken, state gap, block <7. | ALL major outputs |
+| 5.6 | Canonical log | Log the action to system.db with full context | ALL actions |
+| 5.7 | Chaos test | Once per session, silently test one rule | Random (silent) |
 
-**Output:** The final output presented to Oliver, with pre-flight block (if prospect) and score surfacing.
+**Output:** Final output with inline verification block:
+```
+INPUT: [PASS/FAIL] — [proof summary]
+GOAL: [PASS/PARTIAL/FAIL] — asked=[X], delivered=[Y]
+ADVERSARIAL: [HANDLED/REVISED] — "[objection]"
+VOICE: [PASS] — humanizer clean
+Score: X/10 (type) — [gap to 9] — agree?
+```
+
+**GOAL = FAIL → stop and realign before polishing.** Don't humanize the wrong output.
 
 ## Which Layers Apply to Which Action Type
 

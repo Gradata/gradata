@@ -9,9 +9,37 @@ Every gate follows this sequence:
 3. **Checkpoint** — present findings to user BEFORE drafting
 4. **User approval** — user approves the approach
 5. **Execute** — draft/build the output
-6. **Self-play objection check** — predict the most likely specific pushback, revise if vulnerable
-7. **Quality pass** — humanizer + self-score against quality-rubrics.md
-8. **Present** — show output with pre-flight proof block
+6. **5-Point Verification** — run the verification stack (see below)
+7. **Present** — show output with pre-flight proof block + verification line
+
+### 5-Point Verification Stack
+
+After executing, every output passes through 5 checks. Each asks a different question. No overlap.
+
+| # | Check | Question | Applies to |
+|---|-------|----------|-----------|
+| 1 | **INPUT** | Did I have the right inputs? Show the pre-flight proof block. | All gated outputs |
+| 2 | **GOAL** | Does this deliver what was specifically asked for? Not "is it good" — "is it right?" | All outputs |
+| 3 | **ADVERSARIAL** | Would the prospect/user reject this? Self-play objection check. | Prospect-facing outputs |
+| 4 | **VOICE** | Does it sound human? Humanizer pass. | Emails, LinkedIn, call scripts |
+| 5 | **SCORE** | Is this good enough to ship? Self-score (quality-rubrics.md). If score identifies a fixable problem, fix it before presenting. State what a 9/10 would look like. Block if <7. | All major outputs |
+
+**Format — show inline after every major output:**
+```
+INPUT: [PASS] vault read, PATTERNS checked, NLM queried
+GOAL: [PASS/PARTIAL/FAIL] asked=[what Oliver requested], delivered=[what was built]
+ADVERSARIAL: [HANDLED/REVISED] "[specific objection]"
+VOICE: [PASS] humanizer clean
+Score: X/10 (type) — [what a 9 would look like] — agree?
+```
+
+If GOAL = FAIL → stop and realign before polishing. Don't humanize the wrong output.
+If GOAL = PARTIAL → state what's missing and why. Oliver decides if it ships.
+
+**What this replaced (Session 21 consolidation):**
+- Merged: self-score + fix-before-score + metacognitive honesty + blocking gate → single SCORE step
+- Killed: Layer 5 verify (duplicate of INPUT) and separate gate checklist verification
+- Added: GOAL check (the question no previous step asked)
 
 ### Pre-Flight Proof Block (MUST appear above every prospect-facing output):
 ```
