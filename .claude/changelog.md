@@ -2,6 +2,38 @@
 # Every rule change gets logged here with date, what changed, and why.
 # If a change makes things worse, roll back by reversing the entry.
 
+## 2026-03-21 — Layer Split Execution (Brain / Runtime Extraction)
+- **paths.py created** (RUNTIME) — All hardcoded paths extracted from config.py into brain/scripts/paths.py. Supports env var overrides (BRAIN_DIR, DOMAIN_DIR, WORKING_DIR, PYTHON_PATH, CLAUDE_CMD). To port to a new machine: edit paths.py only.
+- **config.py cleaned** (BRAIN) — Now imports all paths from paths.py. Contains only portable config: embedding model, ChromaDB collections, file type map, RAG graduation, episodic memory, confidence scoring, outcome linking, query defaults. Zero hardcoded paths.
+- **start.py updated** (RUNTIME) — Imports tool paths (PYTHON, CLAUDE_CMD) from paths.py instead of hardcoding.
+- **/runtime/ skeleton created** — Four adapter directories: runtime/claude-code/, runtime/cursor/, runtime/api/, runtime/template/. Each has a README describing what moves there at extraction.
+- **Verified:** All imports clean (config, paths, embed, query, launch, start). Full re-embed successful (94 chunks from 63 files).
+- **Layer classification:** paths.py = RUNTIME. config.py = BRAIN. embed.py = BRAIN. query.py = BRAIN. launch.py = RUNTIME. start.py = RUNTIME. runtime/ = RUNTIME scaffolding.
+
+## 2026-03-21 — Two-Layer Architecture (Brain / Runtime)
+- **sdk-north-star.md:** Appended "Platform Universality" section defining brain layer (universal, platform agnostic) vs runtime layer (Claude Code specific adapters). Includes target folder structure for SDK extraction (/brain, /runtime/claude-code, /runtime/cursor, /runtime/api, /runtime/template). **SDK-portable.**
+- **CLAUDE.md:** New "SDK Architecture" section — whole-picture rule loaded every session. Requires every architectural decision to be classified as brain layer or runtime layer before implementation. Brain = SDK-portable by default. Runtime = flagged as platform specific. **Runtime layer** (this rule governs Claude Code behavior).
+
+## 2026-03-21 — Product Name Placeholders in SDK Files
+- **sdk-north-star.md:** Replaced all instances of "the Starter SDK" and "the SDK" with [NAME]. Replaced "at SDK extraction" with "at [NAME] extraction".
+- **sdk-audit.md:** Replaced all instances of "the Starter SDK" and "the SDK" with [NAME].
+- **Why:** Product names are undecided. Placeholder tokens ensure no premature branding leaks into architecture docs.
+
+## 2026-03-21 — Environment Section Added to CLAUDE.md
+- **CLAUDE.md:** New "Environment" section — Windows OS, path conventions, Python/Node locations, PowerShell default.
+- **Portability:** SDK-portable architecture decision. Any Starter SDK should capture the user's environment at onboarding so the agent knows the host OS, shell, and tool paths from session 1.
+
+## 2026-03-21 — Periodic Audit Schedule
+- **periodic-audits.md** created at .claude/periodic-audits.md — session-counted triggers for 4 recurring audits: /sdk-audit (every 5 sessions), memory index cleanup (every 10), RAG freshness check (every 3), config bloat scan (every 10).
+- **Session start wired** — Phase 0.5 step 9 added to skills/session-start/SKILL.md. Checks audit schedule, queues due audits to appropriate phase (startup/session/wrap-up).
+- **Component map updated** — Periodic Audits section added, RAG Pipeline descriptions updated to reflect episodic memory, confidence scoring, and outcome linking.
+- **Portability:** Periodic audit schedule is SDK-portable (frequencies are generic). /sdk-audit is SDK-specific tooling.
+
+## 2026-03-21 — SDK North Star + Boundary Enforcement
+- **sdk-north-star.md** created at brain/vault/sdk-north-star.md — strategic context documenting the boundary between the Sprites Work operation (private, domain-specific) and the Starter SDK (open source, profession-agnostic compounding brain framework with marketplace layer). Sprites Work is the proof of concept, not the product.
+- **sdk-audit.md** created at .claude/commands/sdk-audit.md — SDK boundary enforcement slash command. Scans CLAUDE.md, agents/registry.md, hook files, and RAG scripts for Sprites-specific contamination. Reports CONTAMINATED/REVIEW/CLEAN per file. Read-only — never auto-edits.
+- **Portability:** Both are SDK-portable architecture decisions. The north star defines the extraction boundary; the audit enforces it.
+
 ## 2026-03-21 — Ad Platform Intelligence Integration (Session 25)
 - **Source:** External Claude Code config review (zip file with agents/skills for Sprites product dev)
 - **CLAUDE.md:** Added context hygiene rule (compact at 50%) and anti-mediocrity rule (scrap mediocre drafts, rebuild clean)

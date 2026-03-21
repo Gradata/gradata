@@ -39,7 +39,7 @@ Save to docs/Session Notes/[YYYY-MM-DD].md. Steps 0.5, 1, 7, 8, 9, 9.5, 10, 10.5
 * Tool fails → .claude/fallback-chains.md. Domain-specific overrides in domain/pipeline/fallback-overrides.md. Never improvise. Never silently skip.
 * **Never skip steps. Ever.** When told to "wrap up" — run ALL steps. When a gate has 7 steps — run all 7. No shortcuts, no judgment calls about what's optional.
 * Subagents get: note template, quality rules, post-validation.
-* 3+ independent items → parallel agents.
+* 3+ independent items → parallel agents. Use `isolation: "worktree"` when agents may edit overlapping files or when running concurrent terminals — each agent gets an isolated repo copy, merges cleanly.
 * User approves copy → straight to draft. No extra confirmation.
 * Log to lessons, vault, daily notes without asking. Changelog for CLAUDE.md edits.
 * **Wikilinks** — all new brain/ files (sessions, prospects, vault updates) MUST include relevant [[wikilinks]] at time of writing. Link prospects to personas/objections, sessions to prospects touched.
@@ -47,6 +47,7 @@ Save to docs/Session Notes/[YYYY-MM-DD].md. Steps 0.5, 1, 7, 8, 9, 9.5, 10, 10.5
 * **Post-task reflection** — after every major task, run a 30-second internal check: what went wrong, what was inefficient, what would I do differently? Log anything actionable to lessons.md silently.
 * **Context hygiene** — Compact at 50% context usage, not later. Past 50% quality degrades. Use subagents for discrete subtasks to keep main context focused. Use /clear when switching to a completely different task.
 * **Anti-mediocrity** — If a fix or draft is mediocre, scrap it and rebuild the elegant solution from scratch. Don't patch bad work. Two clean attempts beat four incremental patches.
+* **Scoped Impact Scan** — Before modifying any system component (.claude/*, .carl/*, CLAUDE.md, agents/, gates/, skills/), open component-map.md, find the component being changed, and read ONLY its row + the rows it connects to (same group or cross-referenced). State in one line: `Impact: [component] → touches [X, Y]. No breaks.` or `Impact: [component] → touches [X]. [X] needs update because [reason].` Then proceed. Don't scan the full map — just the neighborhood. Skip for brain/ data writes (prospects, sessions, notes) — those are data, not system.
 
 ## Recursive Self-Improvement (5 Layers)
 - **L1 Loop** — Tag → track → learn → improve (domain activities). **L2 System Loop** — Track component effectiveness (gates, lessons, smoke checks, audits). Tracking: brain/system-patterns.md.
@@ -55,6 +56,12 @@ Save to docs/Session Notes/[YYYY-MM-DD].md. Steps 0.5, 1, 7, 8, 9, 9.5, 10, 10.5
 
 ## Enterprise Quality System
 .claude/quality-rubrics.md | .claude/fallback-chains.md | .claude/auditor-system.md | .claude/health-audit.md | .claude/loop-audit.md | .claude/audit-log.md | .claude/review-queue.md | .claude/changelog.md | .claude/truth-protocol.md | .claude/cross-wire-checklist.md | brain/system-patterns.md | brain/metrics/ | brain/sessions/ | brain/system.db | brain/.git
+
+## SDK Architecture
+This system has two layers. Brain layer -- everything in brain/ -- is universal and platform agnostic. Runtime layer -- CLAUDE.md, hooks, commands -- is Claude Code specific. Every architectural decision must be classified as brain layer or runtime layer before implementation. Brain layer = SDK-portable by default. Runtime layer = flag in changelog as platform specific. Never mix the two. When in doubt, ask before building.
+
+## Environment
+This system runs on Windows. Always use Windows-compatible paths with backslashes or forward slashes where both are accepted. Never assume Unix-style commands or path separators. PowerShell is the default shell. Python is at C:/Users/olive/AppData/Local/Programs/Python/Python312/. Node is available. When writing bash commands default to PowerShell syntax.
 
 ## Truth Protocol
 See GLOBAL_RULE_0 in .carl/global + .claude/truth-protocol.md. Single source — not repeated here.

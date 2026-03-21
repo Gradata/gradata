@@ -128,14 +128,22 @@
 | **Quality Loop** | Every-5-sessions system evaluation (scorecard, diagnose, fix) | skills/quality-loop/SKILL.md | AIOS |
 | **NotebookLM Feeds** | Post-call/demo data fed back into notebooks for compounding | domain/notebooks/registry.md | Domain |
 
-## RAG Pipeline (dormant until graduation)
+## Periodic Audits
 
 | Component | What it does | File | Layer |
 |-----------|-------------|------|-------|
-| **Config** | Shared paths, Gemini model settings, graduation thresholds, file type map | brain/scripts/config.py | Brain |
+| **Periodic Audit Schedule** | Session-counted triggers for recurring audits (SDK, memory, RAG, bloat) | .claude/periodic-audits.md | AIOS |
+| **/sdk-audit** | SDK boundary enforcement — scans core files for Sprites contamination | .claude/commands/sdk-audit.md | AIOS |
+| **SDK North Star** | Strategic context: Sprites Work vs Starter SDK boundary definition | brain/vault/sdk-north-star.md | Brain |
+
+## RAG Pipeline
+
+| Component | What it does | File | Layer |
+|-----------|-------------|------|-------|
+| **Config** | Shared paths, Gemini model settings, graduation thresholds, episodic/confidence/outcome config | brain/scripts/config.py | Brain |
 | **Launch Validator** | Pre-session integrity: header consistency, staleness, RAG graduation check | brain/scripts/launch.py | Brain |
-| **Embed** | Delta embedding at wrap-up via Gemini (hash-based change detection, ChromaDB) | brain/scripts/embed.py | Brain |
-| **Query** | Semantic search with task-type aware queries + metadata filtering | brain/scripts/query.py | Brain |
+| **Embed** | Delta embedding with outcome linking + session metadata (hash-based, ChromaDB, Gemini) | brain/scripts/embed.py | Brain |
+| **Query** | Semantic search with episodic recency weighting, confidence scoring, outcome surfacing | brain/scripts/query.py | Brain |
 | **Session Launcher** | Single entry point: pre-flight → state restore → Claude Code launch | brain/scripts/start.py | Brain |
 | **Graduation** | RAG activates at 20+ sessions. Domain packs can override threshold. | brain/scripts/config.py (RAG_ACTIVATION_THRESHOLD) | Brain |
 
