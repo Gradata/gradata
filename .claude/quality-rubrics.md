@@ -40,6 +40,18 @@ Your benchmark is the operational standard of the world's leading AI labs -- Ope
 | 5-6 | Some contacts are borderline ICP. Pain points are generic. Some may overlap with existing pipeline. |
 | 3-4 | Contacts don't match ICP. No pain points listed. Duplicates with pipeline. |
 
+## System / Architecture Work
+
+Benchmark: Would this pass review at a team shipping AI infrastructure at OpenAI, Anthropic, DeepMind, or equivalent? Oliver judges sales outputs — the system judges itself on engineering standards.
+
+| Score | Criteria |
+|-------|----------|
+| 9-10 | Clean architecture with clear separation of concerns. Wired into nervous system (bus signals, cross-wires, component map). Tested and verified working. No dead code, no orphan components. Delta-aware (doesn't rebuild what hasn't changed). Error handling covers failure modes. Documentation matches implementation. Would merge in a production codebase. |
+| 7-8 | Architecture is sound. Wired into the system. Works correctly. Minor gaps: missing edge case handling, incomplete error paths, or one integration point not fully tested. Would merge with minor comments. |
+| 5-6 | Works but standalone — not wired into nervous system. Or wired in but brittle (hardcoded paths, no error handling, breaks on edge cases). Would get "needs work" in review. |
+| 3-4 | Doesn't integrate. Duplicates existing functionality. Untested. Hardcoded assumptions. Would be rejected in review. |
+| 1-2 | Breaks existing system. Introduces regressions. Wrong architecture for the problem. |
+
 ## Self-Score Protocol
 Before presenting ANY output to Oliver:
 0. **Confidence flag** — assign HIGH / MEDIUM / LOW before scoring. HIGH = strong research + proven framework match + clear angle. MEDIUM = one of those was weak or untested. LOW = gaps filled with assumptions or insufficient data. Show the flag above the output: `CONFIDENCE: [HIGH/MEDIUM/LOW]`. This is mandatory on every major output — not just prospect-facing. Systems work, architecture decisions, and rule changes all get flagged.
