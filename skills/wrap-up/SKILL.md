@@ -235,3 +235,21 @@ cd "C:/Users/olive/OneDrive/Desktop/Sprites Work" && git add -A && git commit -m
 ```
 
 This captures every file change from the session in one atomic commit. If nothing changed, git will say "nothing to commit" — that's fine, move on.
+
+### Tier 2 — Stable Snapshots (manual, prompted)
+
+After any session where a major structural change was confirmed working (new skill architecture, CARL overhaul, file reorganization, etc.), prompt Oliver:
+
+> "Structural change confirmed working. Tag a stable snapshot? `git tag stable-vX.X -m "description"`"
+
+Do NOT auto-tag. Oliver decides when to tag. Stable tags are the rollback targets for `git checkout stable-vX.X` if a future session breaks something.
+
+### Tier 3 — Recovery Baseline (manual only)
+
+The `recovery` branch exists as a nuclear restore point. It is NEVER auto-updated. Only promote to it manually when Oliver instructs:
+
+```bash
+git checkout recovery && git merge stable-vX.X && git checkout master
+```
+
+Do not touch the recovery branch during wrap-up, automation, or any other process. It moves only on explicit instruction.
