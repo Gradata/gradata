@@ -52,7 +52,20 @@ Save to docs/Session Notes/[YYYY-MM-DD].md. Steps 0.5, 1, 7, 8, 9, 9.5, 10, 10.5
 ## Recursive Self-Improvement (5 Layers)
 - **L1 Loop** — Tag → track → learn → improve (domain activities). **L2 System Loop** — Track component effectiveness (gates, lessons, smoke checks, audits). Tracking: brain/system-patterns.md.
 - **L3 Cross-Wiring** — Three trigger classes: EVENT (12 this-session triggers), TREND (4 cross-session integral/derivative), DANGER (4 anomaly signals). Utility-scored. Components feed bidirectionally: Auditor→gates, gates→lessons, lessons→CARL, smoke→lessons, rubric drift→tighten, fallback→reorder, PATTERNS→gates. Trends catch drift across sessions. Danger signals catch stress mid-session.
-- **L4 Meta-Loop** — Track which cross-wire connections produce value. Kill dead wires, strengthen high-value ones. Runs every 5 sessions. **L5 Convergence** — Auto-detect maturity. Kill switches: 5 cycles zero value = auto-disable. Max 3 active layers.
+- **L4 Meta-Loop** — Track which cross-wire connections produce value. Kill dead wires, strengthen high-value ones. Runs every 5 sessions. **L5 Convergence** — Auto-detect maturity. Kill switches adjust by maturity phase (see below). Max 3 active layers.
+
+## Maturity Schedule (Exploration → Exploitation)
+> Source: Simulated annealing (Kirkpatrick), RL exploration schedules, synaptic pruning.
+> The system deliberately overbuilds early, then prunes as patterns stabilize.
+
+| Phase | Sessions | Tolerance | Kill Switch | Pruning |
+|-------|----------|-----------|-------------|---------|
+| **INFANT** (current) | 0-50 | HIGH — let rules accumulate, wires stay dormant, experiments run loose | 10 cycles zero value (not 5) | Flag only, don't auto-delete |
+| **ADOLESCENT** | 50-100 | MEDIUM — start pruning low-value rules, tighten thresholds | 7 cycles zero value | Auto-flag, Oliver confirms deletion |
+| **MATURE** | 100-200 | LOW — exploit proven patterns, explore only via explicit experiments | 5 cycles zero value | Auto-delete unfired rules, Oliver notified |
+| **STABLE** | 200+ | MINIMAL — system runs on proven rules, exploration via designated experiment sessions only | 3 cycles zero value | Aggressive pruning, quarterly review |
+
+Current phase: **INFANT (Session 27/50).** All thresholds use INFANT tolerance. Transition at session 50.
 
 ## Enterprise Quality System
 .claude/quality-rubrics.md | .claude/fallback-chains.md | .claude/auditor-system.md | .claude/health-audit.md | .claude/loop-audit.md | .claude/audit-log.md | .claude/review-queue.md | .claude/changelog.md | .claude/truth-protocol.md | .claude/cross-wire-checklist.md | brain/system-patterns.md | brain/metrics/ | brain/sessions/ | brain/system.db | brain/.git
