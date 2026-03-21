@@ -1,0 +1,229 @@
+SPRITES.AI OUTREACH TEMPLATES AND FORMATS
+==========================================
+
+EMAIL WRITING RULES:
+- Under 150 words
+- No em dashes
+- No bullet points
+- No jargon or buzzwords
+- Personalized first line referencing something specific about the company
+- Clear one sentence explanation of what Sprites does
+- Address their specific pain point
+- Soft close with one question
+- Sign as: Siamak Freydoonnejad, Co-Founder, Sprites.ai
+
+---
+
+COLD EMAIL TEMPLATE - MULTI BRAND OPERATOR:
+
+Subject: Managing [X] brands on one marketing team
+
+[Name],
+
+[Personalized opener referencing their specific brands or situation].
+
+Managing paid ads across multiple brands with a lean team usually means fragmented visibility, manual reporting, and one brand always getting more attention than the others.
+
+Sprites is an AI platform that unifies all your brand ad accounts in one place, surfaces real time performance per brand, automatically shifts budget toward what is converting, and executes campaigns without your team having to manually manage each one.
+
+Worth a 20 minute look?
+
+Siamak Freydoonnejad
+Co-Founder, Sprites.ai
+
+---
+
+COLD EMAIL TEMPLATE - EXECUTION GAP:
+
+Subject: [Personalized subject referencing their company]
+
+[Name],
+
+[Personalized opener].
+
+Most teams are using AI tools like ChatGPT to get insights and recommendations but still manually executing everything themselves. Sprites does everything end to end. Strategy, content creation, campaign launches, budget optimization, all in one platform with your review and approval before anything goes live.
+
+Less time managing, more performance out of every dollar.
+
+Worth a quick conversation?
+
+Siamak Freydoonnejad
+Co-Founder, Sprites.ai
+
+---
+
+COLD EMAIL TEMPLATE - AI SEARCH ENGINE VISIBILITY:
+
+Subject: Are [Company] brands showing up on AI search engines
+
+[Name],
+
+Right now when someone asks ChatGPT or Perplexity a question your brand should be answering, you are likely invisible in those results.
+
+Sprites analyzes your current AI visibility, implements the schema markup your pages need, writes SEO content optimized for AI search queries, and publishes it directly to your Shopify or CMS automatically. The difference from just using ChatGPT is execution. ChatGPT can write the blog. It cannot publish it, embed the schema, or connect to your store. Sprites does all of it automatically.
+
+Worth a quick look?
+
+Siamak Freydoonnejad
+Co-Founder, Sprites.ai
+
+---
+
+COLD EMAIL TEMPLATE - FIRED OR LOST HEAD OF MARKETING:
+
+Subject: [Company]'s performance marketing gap
+
+[Name],
+
+Noticed [Company] recently parted ways with your head of performance marketing. That role is hard to backfill quickly and in the meantime your paid acquisition does not slow down.
+
+Sprites is an AI platform that acts as a full performance marketing team inside your Meta and Google accounts. It analyzes historical campaign data, builds and launches campaigns, continuously reallocates budget toward what is converting, and flags wasted spend automatically without needing a dedicated hire to manage it day to day.
+
+Worth a 20 minute look?
+
+Siamak Freydoonnejad
+Co-Founder, Sprites.ai
+
+---
+
+COLD EMAIL TEMPLATE - AGENCY OUTREACH:
+
+Subject: Following up, Sprites.ai overview
+
+[Name],
+
+Quick question before anything else. Does [Agency] run paid ads or SEO for your clients? If not, this platform is not relevant and feel free to disregard. If you do, keep reading.
+
+Sprites is an end to end AI marketing platform. Strategy, content creation, campaign launches, budget optimization, all automated with your review and approval before anything goes live. For an agency managing multiple clients, each client gets their own profile so the AI understands their brand, goals, and audience separately.
+
+Instead of manually managing campaigns across multiple client accounts you have one platform executing and optimizing across all of them simultaneously.
+
+Happy to jump on a quick call:
+https://calendly.com/spritesai/sprites-demo
+
+Siamak Freydoonnejad
+Co-Founder, Sprites.ai
+
+---
+
+LINKEDIN INMAIL TEMPLATE - MULTI BRAND:
+
+Subject: Managing [X] brands on paid ads
+
+Hi [Name],
+
+Managing paid ads across [number] brands with a lean team usually means by the time you pull performance data across all accounts and figure out where spend is working, the week is already over.
+
+Sprites is an AI platform that unifies all your brand ad accounts in one place, surfaces real time performance per brand, automatically shifts budget toward what is converting, and executes campaigns without your team having to manually manage each one.
+
+On the organic side, Sprites also analyzes how visible each of your brands are on AI search engines like ChatGPT and Perplexity, implements the schema markup needed so each brand gets cited when someone searches for the services they offer, and publishes SEO content automatically.
+
+Would love to show you what that looks like across a portfolio like [Company]. Worth a quick conversation?
+
+---
+
+LINKEDIN SHORT MESSAGE TEMPLATE:
+
+Hey [Name], [one personalized sentence referencing their specific situation or brands].
+
+Sprites is an AI platform that manages paid ads and SEO end to end so your team is not manually executing everything. Each brand gets its own profile so strategy stays separate across accounts.
+
+Open to a quick conversation?
+
+---
+
+BDR NOTES FORMAT:
+
+BDR NOTES - [COMPANY NAME]
+Contact: [Name], [Title]
+Email: [email]
+Demo: [Date and time] | [Who is joining from Sprites side]
+
+COMPANY SITUATION:
+[2 to 3 sentences on what the company does, size, structure, and current marketing setup]
+
+PAIN POINTS:
+[Bullet list of specific pain points mentioned on the call or identified through research]
+
+WHAT THEY WANT:
+[What the prospect said they are looking for or hoping to get from the demo]
+
+KEY QUOTE:
+"[Most important or revealing thing they said on the call]"
+
+DEMO FOCUS:
+[Specific use cases to lead with. What to show first and why.]
+
+THE CLOSE:
+[Recommended next step or trial offer to propose at end of demo]
+
+WATCH OUT FOR:
+[Any objections, sensitivities, or things to be aware of going into the demo]
+
+---
+
+DEMO CONFIRMATION EMAIL FORMAT:
+
+Subject: Looking forward to [Day], [Name]
+
+[Name],
+
+My colleague Oliver mentioned you had a great conversation. I wanted to reach out personally as the founder before your demo.
+
+[2 to 3 sentences summarizing exactly what pain points were discussed on the call, reflecting back what the prospect said.]
+
+That is exactly what we built Sprites for. Looking forward to showing you what it looks like live.
+
+See you at the demo.
+
+Siamak Freydoonnejad
+Co-Founder, Sprites.ai
+
+---
+
+APOLLO SEQUENCE - 6 TOUCH:
+
+Day 1 - Cold Email: Pain focused opener personalized to their specific situation
+Day 3 - LinkedIn Connection Request: No message, just connect
+Day 6 - Email: Fragmented stack problem angle or execution gap angle
+Day 8 - LinkedIn Message: Short follow up if connection accepted
+Day 12 - Email: Social proof referencing Black Lapel or Great Seal
+Day 16 - Final breakup email: Short, no hard feelings, leave door open
+
+Settings: Tuesday to Thursday only, 8am to 11am local time, batches of 15, stop on reply.
+
+---
+
+SUBJECT LINES THAT WORK:
+
+For multi-brand operators:
+- "Managing [X] brands on one marketing team"
+- "Managing [Brand 1] and [Brand 2] marketing"
+- "[Brand 1], [Brand 2], [Brand 3] on paid ads"
+
+For execution gap angle:
+- "Still manually executing your AI recommendations"
+- "Your performance marketing gap"
+
+For AI search visibility:
+- "Are [Company] brands showing up on AI search engines"
+- "How Sprites gets your clients showing up on AI search engines"
+
+For agency outreach:
+- "Following up, Sprites.ai overview"
+
+---
+
+OBJECTION HANDLING:
+
+OBJECTION: We already use ChatGPT
+RESPONSE: ChatGPT gives you recommendations but you still have to manually execute everything. Sprites connects directly to your Meta and Google accounts and actually launches the campaign, moves the budget, and publishes the content. That last mile is where we are different.
+
+OBJECTION: We have an agency
+RESPONSE: A lot of our customers actually use Sprites alongside their agency to get better visibility into what the agency is actually doing. It surfaces exactly what is performing and what is not so you are not relying on their report to know what is happening.
+
+OBJECTION: Is this just a GPT wrapper
+RESPONSE: A GPT wrapper puts a different interface on ChatGPT. Sprites has direct API integrations into Meta and Google that let the AI actually execute inside your ad accounts. ChatGPT cannot move your budget or launch a campaign. Sprites can.
+
+OBJECTION: We do not have budget right now
+RESPONSE: We have a $60 per month proof of concept tier specifically for this. Connect two or three brand accounts, run it for 30 days, and build the case for the bigger budget conversation.

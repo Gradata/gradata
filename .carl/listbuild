@@ -1,0 +1,36 @@
+# CARL List Build Domain
+# =======================
+# Triggers when Oliver mentions list building, CSV management, lead enrichment,
+# LinkedIn post scraping, or any step in the Apify/Prospeo/ZeroBounce/Instantly pipeline.
+# Compacted 2026-03-19: 10 → 9 rules. Retired meta-description (routing in manifest).
+# Compacted 2026-03-20: 9 → 8 rules. Merged pipeline context loading (→ CORE_LOAD_SKILLS).
+#
+# Format: {DOMAIN}_RULE_{N}=rule text
+# Skills & pipeline context: see CORE_LOAD_SKILLS in .carl/global
+# Credit gate: see CREDIT_GATE_RULE in .carl/global
+
+# Step 0: LinkedIn post commenter scraping (Apify)
+LISTBUILD_RULE_0=If Oliver wants to scrape commenters from a LinkedIn post, use Apify MCP (connected via Cowork connector). Use no-cookie actors for safety (~$2/1k comments). Output CSV to Leads/wip/[campaign-name]/. This replaces PhantomBuster for comment scraping — cheaper and no LinkedIn ban risk. After scraping, proceed to Step 1 to run the CSV through the enrichment pipeline.
+
+# Step 1: Enforce folder conventions
+LISTBUILD_RULE_1=All lead files go to the correct subfolder — NEVER to Downloads or Desktop. Raw imports → Leads/wip/[campaign-name]/. Prospeo-ready CSVs → Leads/enriched/. ZeroBounce results → Leads/enriched/batchN_zerobounce/. Valid emails for Instantly → Leads/enriched/batchN_zerobounce/valid.csv. If any file is in the wrong location, move it immediately and log the correction.
+
+# Step 2: Credit tracking
+LISTBUILD_RULE_2=Track API credits after every enrichment action. Prospeo: 1 credit per email search. Update the count in startup-brief.md after each batch. Before running a batch, calculate how many credits it will use and confirm there are enough remaining. Current balance is in startup-brief.md under "Credits". Never burn credits on contacts that already have verified emails in Apollo. (See also CREDIT_GATE_RULE in .carl/global for the 50-credit approval gate.)
+
+# Step 3: ICP scoring before enrichment
+# NotebookLM queries: see brain/notebooklm-queries.md (List Build section) | tier system: .claude/skills/notebooklm/SKILL.md
+LISTBUILD_RULE_3=Before enriching a batch, score prospects against ICP criteria from "Sales Playbooks/prospecting-instructions.txt". Query ICP Signals notebook (see brain/notebooklm-queries.md). Prioritize enrichment for high-ICP-score contacts first to maximize credit efficiency.
+
+# Step 4: Deduplication
+LISTBUILD_RULE_4=Before uploading any batch to Prospeo, check for duplicates against: (a) Previously enriched batches in Leads/enriched/. (b) Apollo contacts already in the system (apollo_contacts_search). (c) Brain prospect notes. Never enrich a contact we already have data on.
+
+# Step 5: Pipeline status tracking
+LISTBUILD_RULE_5=After any pipeline action, update Leads/STATUS.md with: which batch was processed, how many valid/invalid/catch-all, credits used, and next step. Also update startup-brief.md pipeline section if a campaign progressed.
+
+# Step 6: Feed ICP Signals notebook
+# NotebookLM feed command: see brain/notebooklm-queries.md (List Build section)
+LISTBUILD_RULE_6=After processing a batch through ZeroBounce, feed the results into the ICP Signals notebook (see brain/notebooklm-queries.md for command). Save a summary of which prospect types had valid vs invalid emails, which industries had the best hit rate, and any patterns observed.
+
+# Step 7: Google Sheets integration (via Rube MCP)
+LISTBUILD_RULE_7=When Google Sheets is available (Rube MCP connected), use it as the live tracking layer: (a) Apify scrape output goes directly into a campaign Sheet instead of just a local CSV. (b) Each campaign gets one Sheet with tabs: Raw Commenters | ICP Scored | Enriched | Verified | Sent | Replied. (c) Update enrichment status per row as leads move through the pipeline. (d) Track credit usage in a Credits tab. This replaces CSV-juggling with a single live view Oliver can check from his phone.

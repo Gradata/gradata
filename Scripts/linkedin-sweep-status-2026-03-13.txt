@@ -1,0 +1,59 @@
+LINKEDIN PROFILE SWEEP STATUS - 2026-03-13
+============================================
+
+TASK: Extract data from LinkedIn profiles 43-113 (71 profiles total)
+
+COMPLETION STATUS:
+- Profiles visited and extracted: 13 (43-48, 50-56)
+- Profiles remaining: 57 (49, 57-112)
+- Estimated time for remaining: 14-17 minutes at 15-second intervals
+
+EXTRACTION RESULTS:
+- Total ICP leads found (across all 112 profiles): 19
+- Total skipped: 93
+- Still pending extraction: 59
+
+ICP LEADS IDENTIFIED (from visited profiles):
+1. Row 48: David English - Group Marketing Director at Amtivo Group (UK)
+2. Row 50: Michelle Coelho - Semrush, Self-employed (Spain)
+3. Row 53: Alfonso Sainz de Baranda - Founder at Growth4U (Spain)
+4. Row 55: Dirk Wunder - Vice President Corporate Marketing at TURCK (Germany)
+
+CSV FILE: /sessions/laughing-quirky-maxwell/mnt/Sprites Work/leads/raw/katya-post-enriched-2026-03-13.csv
+
+DATA EXTRACTION SCRIPT LOCATION: /tmp/process_batch.py
+- Includes comprehensive location parsing
+- Applies ICP filtering rules (title keywords, geography)
+- Marks profiles as ICP, SKIP:[reason], or SKIP:no-data-yet
+
+NEXT STEPS TO COMPLETE:
+1. Continue visiting profiles 49, 57-112 sequentially
+2. Extract profile data using the same JavaScript function
+3. Wait 15 seconds between each profile visit (mandatory for LinkedIn rate limiting)
+4. Update CSV rows with extracted data
+5. Run final ICP analysis on complete dataset
+
+PROFILES VISITED:
+✓ 43: Andrew Marks (BDR - SKIP:not-marketing)
+✓ 44: Yana Borisevich (Lead Gen Specialist - SKIP:not-marketing)
+✓ 45: Zahret elyasmine khobzi (DeepMinds™ - SKIP:geo-algeria)
+✓ 46: Francesco Lo Turco (PID Digital Mentor - SKIP:not-marketing)
+✓ 47: Frank Booth (Executive Producer - SKIP:not-marketing)
+✓ 48: David English (Group Marketing Director - ICP ✓)
+✓ 50: Michelle Coelho (Semrush/Self-employed - ICP ✓)
+✓ 51: Akshaya Desai (Digital Media Consultant - SKIP:geo-india)
+✓ 52: Siddarth Nandakumar (Product Marketing Intern - SKIP:not-marketing)
+✓ 53: Alfonso Sainz de Baranda (Founder Growth4U - ICP ✓)
+✓ 54: Arthur Ginder da Costa (CMOaaS - SKIP:geo-brazil)
+✓ 55: Dirk Wunder (VP Corporate Marketing - ICP ✓)
+✓ 56: Anna Lepert (Convercus company name - SKIP:not-marketing)
+
+STILL TO VISIT:
+⧖ 49: David English (navigation page not loaded)
+⧖ 57-112: Remaining 56 profiles
+
+RATE LIMITING RULES APPLIED:
+- 15-second wait between profile navigations (LinkedIn requirement)
+- 3-second wait after navigation for page load
+- JavaScript extraction of: name, location, title, company, company LinkedIn URL
+

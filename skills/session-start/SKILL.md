@@ -1,0 +1,204 @@
+---
+name: session-start
+description: Run automatically at every session start before responding to Oliver's first message. Loads docs/startup-brief.md, lessons.md, CARL, and checks Google Calendar. Defers all other context to on-demand loading based on task intent. Use this skill whenever a new session begins, the user says "start up", "load context", or any time CLAUDE.md's session startup instructions need to execute. This is mandatory — never skip it.
+---
+
+# Session Startup (Lazy Load)
+
+Run automatically at session start. Optimized to minimize token cost. Everything not loaded here is available on demand via file pointers in docs/startup-brief.md.
+
+## Phase -1: DELTA_SCAN (Brain Alert System)
+
+Run FIRST, before any context loads. Compare current state to previous session snapshot.
+
+1. **Read brain/loop-state.md** — this is the previous session's handoff snapshot.
+2. **Prospect overdue scan** — for every prospect with a `next_touch` date, check if that date is 2+ sessions overdue (approximate: 2+ calendar days since the `next_touch` date). Flag any matches.
+3. **Angle failure scan** — for every prospect in brain/prospects/, check if any outreach angle has 3+ consecutive no-replies in sequence. Flag any matches.
+4. **Deal stagnation scan** — cross-reference Pipedrive deal stages (from loop-state.md pipeline snapshot or brain/forecasting.md). Flag any deal that has not moved stages in 14+ calendar days.
+5. **Output** — if any findings, output the top 3 most urgent as:
+   ```
+   🧠 BRAIN ALERT [1/3]: [Prospect] overdue for contact by [N] sessions — last touch [date], next_touch was [date]
+   🧠 BRAIN ALERT [2/3]: [Prospect] — [angle] angle has [N] consecutive no-replies, rotate approach
+   🧠 BRAIN ALERT [3/3]: [Deal/Company] stuck in [stage] for [N] days — needs intervention
+   ```
+   If nothing anomalous: `"Brain clean — no alerts"`
+6. These alerts display BEFORE the session status block, so Oliver sees them immediately.
+
+## Phase 0: Stale Brief Detection
+
+Before loading anything:
+1. **Check brain/morning-brief.md** — if it exists and is fresh (< 4 hours old), read it. It contains Gmail replies, Fireflies recordings, Pipedrive changes, pre-drafted follow-ups, and deal health alerts. Skip Gmail/Fireflies scans in Phase 1.5. If stale or missing, Gmail/Fireflies/Pipedrive checks run inline during Phase 1.5.
+2. Check modification dates on docs/startup-brief.md, lessons.md, Leads/STATUS.md, brain/prospects/
+3. If any file was modified AFTER the last session's daily note timestamp → surface changes to Oliver ("Since last session: follow-up checker flagged 2 stale prospects, startup-brief updated by scheduled task")
+4. This catches external edits and anything that changed between sessions
+
+## Phase 0.5: System Heartbeat
+
+Quick health pulse before loading context. **Run steps 1-4 + 7 as a single parallel batch** — they are independent file checks with no dependencies between them.
+
+**PARALLEL BATCH (all at once):**
+1. Check brain/system.db exists and is readable (SQLite backing store)
+2. Check brain/.git exists (version control active)
+3. Check .carl/loop file size hasn't changed unexpectedly (rule tampering detection)
+4. Check CLAUDE.md line count is under 150 (bloat detection)
+7. **Gap Scanner** — run .claude/gap-scanner.md startup scan. Check all systems connected, detect process drift from canonical_logs, surface any gaps in the startup status output.
+
+**THEN (sequential, after batch completes):**
+5. If any check fails -> surface immediately: "SYSTEM ALERT: [what failed]"
+6. **Truth Protocol active** — .claude/truth-protocol.md governs all session output. No success claims without evidence. Verify every tool output. Cite every data source.
+
+This takes <2 seconds. It catches file corruption, accidental deletions, and system drift before they compound.
+
+## Phase 1: Core (~5k tokens)
+
+1. **CLAUDE.md** — auto-loaded by Claude Code. Has ICP, writing rules, email frameworks, tool stack, demo prep rules.
+
+**PARALLEL BATCH (steps 2, 3, 4 — no dependencies between them, fire all at once):**
+2. **Read docs/startup-brief.md** — pipeline snapshot, active campaigns, top lessons, file pointers, credit balances. Read the **Handoff** section first — it tells you exactly where last session left off and what to do first.
+3. **Read .claude/lessons.md** — mistakes log. Scan every entry. Never repeat a logged mistake.
+4. **Check Google Calendar for today + tomorrow** — surface demos, calls, meetings.
+
+## Phase 1.5: Sequence Engine Scan (~2k tokens)
+
+These checks replace the overnight agent. They run every startup, taking ~15 seconds with parallel tool calls.
+
+Load `.carl/loop` rules for this phase (Loop replaced sequence-engine in Session 3).
+
+**PARALLEL BATCH A (steps 5+7 merged + step 9 — fire all at once):**
+5+7. **Prospect loading (two tiers)** — Read docs/startup-brief.md pipeline section to identify prospects with a meeting, demo, or follow-up due within 48 hours. These are **Tier 1** — read their full brain/prospects/ file now. All other prospects are **Tier 2** — do NOT read their files. Only load a Tier 2 prospect's brain file when Oliver names them or their company mid-session. Do NOT scan or read all prospect files. For Tier 1 prospects loaded, also check for: (a) `next_touch` dates <= today, AND (b) touches missing tag blocks (type, intent, angle, tone, framework, outcome). Flag untagged: "Untagged interactions in [prospect] — tagging required before PATTERNS.md sync."
+9. **Check brain/signals.md** — scan for unprocessed signals with `relevance >= 7`. These are high-priority triggers (competitive moves, buying intent, key person changes) that need attention this session. Surface any hits in the startup status under `[signal]`.
+
+**PARALLEL BATCH B (after batch A identifies pending outcomes — fire all Gmail searches at once):**
+6. **Outcome check** — for EVERY prospect with `outcome: pending`, search Gmail `from:[prospect_email] after:[last_touch_date]` **in parallel** (one tool call per prospect, all fired simultaneously). If reply found: update outcome, reply_sentiment, outcome_date. If no reply and next_touch passed: set outcome to "no-reply".
+
+**THEN (sequential):**
+8. **Surface findings** in status:
+   - REPLIES RECEIVED: who replied, sentiment
+   - OVERDUE: touches past due date
+   - DUE TODAY: touches due, with suggested angle from PATTERNS.md
+   - UPCOMING: next 3 days
+
+## Phase 2: CARL (lightweight)
+
+**PARALLEL BATCH (steps 8, 9, 10 — three independent file reads, fire all at once):**
+8. **Read .carl/manifest** — check active domains.
+9. **Read .carl/global** — universal rules.
+10. **Read .carl/context** — context bracket rules.
+
+**THEN (sequential, needs manifest loaded):**
+11. **Keyword-match CARL domains against Oliver's first message** — load demo-prep or prospect-email domain only if task triggers recall keywords.
+
+## Phase 3: Task-Triggered Loading (on demand)
+
+Load these ONLY when the task requires them. Do not preload.
+
+**This is intent-based routing, not literal keyword matching.** Read Oliver's message for what he's trying to DO, then load the right context. Examples below are illustrative, not exhaustive.
+
+### Email writing (any type)
+**Intent:** Oliver wants to write, draft, send, or edit any email — cold, inbound, follow-up, reply, sequence, etc.
+**Load:** "docs/Email Templates/templates.txt", .carl/prospect-email, "docs/Sales Playbooks/my-role.txt"
+**Also load if cold outreach:** docs/sprites_context.md (for case studies/proof points)
+
+### Demo prep (any demo)
+**Intent:** Oliver wants to prepare for a demo, call, or meeting. Could reference a name, a time ("my 2pm"), "today's demos", "tomorrow's call", or a company name.
+**Load:** "docs/Sales Playbooks/sales-methodology.txt", "docs/Demo Prep/Demo Threads.txt", .carl/demo-prep
+**Then:** Check calendar to identify which demo, find/create prospect note in "docs/Demo Prep/" and Obsidian brain
+
+### Prospecting / list building
+**Intent:** Oliver wants to find leads, build lists, research companies, enrich contacts, run sweeps, or score prospects.
+**Load:** "docs/Sales Playbooks/prospecting-instructions.txt"
+
+### Product knowledge / case studies
+**Intent:** Oliver needs Sprites product details, pricing, ICP deep-dive, case study specifics, objection handling, or competitive positioning.
+**Load:** docs/sprites_context.md
+**Prefer:** Use `ctx_index` + `ctx_search` instead of reading full file when only a specific section is needed.
+
+### Lead campaign management
+**Intent:** Oliver asks about campaign status, sweep progress, batch progress, enrichment state, or lead pipeline.
+**Load:** Leads/STATUS.md, check Leads/wip/
+
+### Prospect history / notes
+**Intent:** Oliver mentions a specific person or company and needs context on prior interactions.
+**Load:** Check Obsidian brain (C:/Users/olive/SpritesWork/brain/prospects/), check Apollo Activities tab
+
+### General rule
+If the task spans multiple intents (e.g., "prep for Tim's demo and draft the follow-up for Hassan"), load context for ALL relevant intents. When in doubt about whether to load something, load it — a few extra thousand tokens is cheaper than missing context and producing bad output.
+
+## Phase 4: Skills (on demand)
+
+Do NOT preload all sales skills. Load the relevant subset based on what Oliver is doing:
+
+- **Writing cold outreach** → cold-email-manifesto, copywriting
+- **Preparing for demos/calls** → buyer-psychology, jolt-indecision, sales-methodology (already in Phase 3)
+- **Building prospect lists** → fanatical-prospecting, outbound-playbook
+- **Writing follow-ups** → jolt-indecision, buyer-psychology
+- **Handling objections / indecision** → jolt-indecision
+
+Salesably skills (skills/sales-skills/skills/) — load only the specific one relevant to the task, never all 9.
+
+## During Session: Obsidian Brain
+
+Use the brain proactively — don't wait to be told.
+
+**Before any prospect work:**
+- Check `C:/Users/olive/SpritesWork/brain/prospects/` for existing notes on the person/company
+- If a note exists, read it before hitting Apollo or burning credits
+
+**After any interaction** (email sent, call done, demo, research):
+- Create or update the prospect note in `brain/prospects/[Name] — [Company].md`
+- Use tags: `#lead`, `#demo-booked`, `#demo-done`, `#follow-up`, `#onboarding`, `#closed-won`, `#closed-lost`
+- Include: contact info, company context, outreach history, objections, next steps
+
+**Tag-based queries (on-demand, not at startup):**
+- When Oliver asks about follow-ups or pending items, scan `brain/prospects/` for `#follow-up` or `#demo-booked` tags
+- Do NOT bulk-scan all prospect files at startup — use startup-brief.md as the pipeline source of truth and only auto-load Tier 1 (48h-due) prospects
+
+**Auto-sync rule:**
+When you learn new info from Apollo, Fireflies, or Clay during a session, update the brain note immediately. Don't batch it for wrap-up — write it as you go so the note is always current.
+
+## During Session: NotebookLM (see .claude/skills/notebooklm/SKILL.md for tier system)
+
+Query proactively when the task benefits from it:
+- **Demo prep:** Add prospect website to Demo Prep notebook (`6bdf40a0-e9e5-462b-bfcd-02a2985214c1`), query for marketing intel
+- **Email writing:** Query Sprites Sales notebook (`1e9d15ed-0308-4a30-ae27-edf749dc8953`) for relevant case studies
+- Don't wait to be told. If the task involves a prospect, NotebookLM adds value.
+
+## Session End: Update docs/startup-brief.md + Brain
+
+During wrap-up, update docs/startup-brief.md with:
+- Pipeline changes (new prospects, demos booked, deals closed)
+- Campaign progress
+- New top lessons
+- Credit balance changes
+
+Also write a session summary to `C:/Users/olive/SpritesWork/brain/sessions/[YYYY-MM-DD] — [Session Type].md`
+
+This keeps the next session cheap and current.
+
+## Self-Heal Protocol
+
+If ANY step fails:
+1. Try alternative method (different tool, python, web search)
+2. Log failure in .claude/lessons.md
+3. NEVER silently skip. Tell Oliver what failed.
+4. Python: C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe (python-docx, openpyxl)
+5. If ANY MCP tool call fails during Phase 1-2 (calendar, Gmail, Apollo, etc), immediately tell Oliver: "Run /doctor in terminal — [tool name] isn't responding." Don't retry silently more than once.
+
+## Output
+
+After loading, give Oliver a concise status (plus freshness alerts if any):
+```
+[check] Context loaded (brief, lessons, CARL, vault) | ~XXk tokens
+[morning] [Morning brief status — fresh/stale/not available]
+[calendar] [Today's demos/meetings if any]
+[clipboard] [Active campaign one-liner]
+[vault] [Prospects needing follow-up from brain/ scan]
+[signal] [Unprocessed signals with relevance >= 7 — only show if any exist]
+[heartbeat] [X/4 systems healthy] [list any failures]
+[health] [Deal health alerts — any deals below 40 health score]
+[alert] [Files changed since last session — only show if something changed]
+```
+
+Include approximate token spend for the startup sequence (file reads + API calls + tool schemas). This helps Oliver track context budget.
+
+Do not dump a wall of text. Confirm loaded, surface time-sensitive items, respond to Oliver's request.
