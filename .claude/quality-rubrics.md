@@ -52,6 +52,10 @@ Benchmark: Would this pass review at a team shipping AI infrastructure at OpenAI
 | 3-4 | Doesn't integrate. Duplicates existing functionality. Untested. Hardcoded assumptions. Would be rejected in review. |
 | 1-2 | Breaks existing system. Introduces regressions. Wrong architecture for the problem. |
 
+## Anti-Mediocrity Rule
+
+If a first draft scores 5-6, do NOT incrementally patch it. Scrap the draft, diagnose why it's mediocre (wrong angle? missing data? bad structure?), and rebuild from scratch with the diagnosis as input. Two clean attempts beat four incremental patches. This applies to all output types. Mediocre output that ships erodes trust faster than a delayed output that lands.
+
 ## Self-Score Protocol (SCORE step in 5-Point Verification)
 
 The SCORE step is one unified pass, not separate sub-steps. It runs as step 5 of the verification stack (see .claude/gates.md).

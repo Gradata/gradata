@@ -16,3 +16,6 @@ GLOBAL_RULE_2_PRIORITY=HIGH
 
 GLOBAL_RULE_3=CONFLICT RESOLUTION: When rules, lessons, or patterns contradict each other, resolve in this priority order: (1) User's explicit instruction in the current session (always wins), (2) CLAUDE.md permanent rules, (3) Active CARL domain rules, (4) lessons.md behavioral corrections, (5) PATTERNS.md data-driven insights, (6) Default behavior. At the same priority level: most recent entry wins. If ambiguous after applying this hierarchy, ask — don't guess. Log every conflict resolution to daily notes.
 GLOBAL_RULE_3_PRIORITY=HIGH
+
+GLOBAL_RULE_4=CONTEXT HYGIENE: Compact at 50% context usage. Past 50%, output quality degrades. Use subagents for discrete subtasks. Use /clear when switching to unrelated tasks. Never let the main context become a dumping ground for parallel workstreams.
+GLOBAL_RULE_4_PRIORITY=HIGH

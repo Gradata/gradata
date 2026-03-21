@@ -45,6 +45,8 @@ Save to docs/Session Notes/[YYYY-MM-DD].md. Steps 0.5, 1, 7, 8, 9, 9.5, 10, 10.5
 * **Wikilinks** — all new brain/ files (sessions, prospects, vault updates) MUST include relevant [[wikilinks]] at time of writing. Link prospects to personas/objections, sessions to prospects touched.
 * Never double-dip enrichment. Never list pending from memory — verify.
 * **Post-task reflection** — after every major task, run a 30-second internal check: what went wrong, what was inefficient, what would I do differently? Log anything actionable to lessons.md silently.
+* **Context hygiene** — Compact at 50% context usage, not later. Past 50% quality degrades. Use subagents for discrete subtasks to keep main context focused. Use /clear when switching to a completely different task.
+* **Anti-mediocrity** — If a fix or draft is mediocre, scrap it and rebuild the elegant solution from scratch. Don't patch bad work. Two clean attempts beat four incremental patches.
 
 ## Recursive Self-Improvement (5 Layers)
 - **L1 Loop** — Tag → track → learn → improve (domain activities). **L2 System Loop** — Track component effectiveness (gates, lessons, smoke checks, audits). Tracking: brain/system-patterns.md.

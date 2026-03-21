@@ -13,7 +13,7 @@ PRE-FLIGHT: [prospect name]
 ```
 If any shows [ ] instead of [x], STOP and complete before presenting output.
 
-### Research Checklist (13-step):
+### Research Checklist (15-step):
 1. **Win Story** — Write the closed-won narrative FIRST (3-5 lines): what they sign, what changes for them, what the deciding factor was, what referral they give. Then work backwards.
 2. **Google Calendar** — confirm demo time, attendees, meeting link.
 3. **Web search: company** — what they do, industry, size, services, clients.
@@ -23,6 +23,8 @@ If any shows [ ] instead of [x], STOP and complete before presenting output.
 7. **Web search: deeper person** — full name + company + role for additional context.
 8. **Company website: leadership** — org structure, decision-maker chain.
 9. **Company website: homepage** — services, tech stack (check for GTM/HubSpot/Meta Pixel), ad presence.
+9b. **Ad platform audit** — Using domain/reference/meta-api-patterns.md and domain/reference/google-ads-patterns.md, analyze what this prospect is likely running and where they're leaving ROAS on the table. Check for: Meta Pixel present? Google Ads tag? What campaign types would serve them best? What bidding strategy fits their budget and goals? What common mistakes are they probably making (wrong objective, no batch optimization, manual bidding on small budgets)? This analysis directly shapes which Sprites threads to demo and what ROAS/ROI improvement story to tell.
+9c. **Thread flow design** — Based on the ad platform audit, select and sequence the demo threads that map to THIS prospect's biggest gaps. For each thread: (1) what platform gap it addresses, (2) what ROAS/ROI improvement it unlocks, (3) what the before/after looks like in their specific case. This makes the demo a consulting session, not a feature tour.
 10. **Gmail search** — all prior emails with this person.
 11. **Gmail read** — read the actual email threads.
 12. **Personal website/resume** — full work history and skills.
