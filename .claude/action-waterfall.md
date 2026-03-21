@@ -41,13 +41,13 @@ LAYER 5: VERIFY     → 5-point check: INPUT → GOAL → ADVERSARIAL → VOICE 
 | 2.2 | Persona MOC | brain/personas/[type].md — what works for this persona? | Prospect work |
 | 2.3 | Knowledge graph | `query-playbook [persona]` — ranked angles, objections, frameworks | Prospect work |
 | 2.4 | PATTERNS.md | What angles/tones are working? What's failing? Confidence levels? | Any drafting |
-| 2.5 | NotebookLM (tier system: .claude/skills/notebooklm/SKILL.md) | Query relevant notebook for case studies, proof points, objection counters | Prospect + demo + strategy |
+| 2.5 | NotebookLM (tier system: .claude/skills/notebooklm/SKILL.md) | Query relevant notebook for case studies, proof points, objection counters, domain knowledge | **ALL research flows** — prospect, competitor, architecture, domain. MANDATORY. Never skip, never require a reminder. |
 | 2.6 | Gmail history | Prior threads with this person? Last email sent? | Email drafting |
 | 2.7 | Lessons archive | Search graduated lessons for this category | ALL actions |
 
 **Output:** "Memory loaded: vault [Y/N] | persona [Y/N] | KG [insight] | patterns [insight] | NLM [case study] | gmail [thread status]"
 
-For non-prospect work (system changes, lead filtering, strategy), only 2.4 and 2.7 apply.
+For non-prospect work (system changes, lead filtering, strategy): 2.4, 2.5, and 2.7 apply. NotebookLM is mandatory for ALL research regardless of type.
 
 ## Layer 2.5: SIMULATE (runs for prospect/strategy work — skip for SIMPLE tasks)
 
@@ -57,12 +57,14 @@ For non-prospect work (system changes, lead filtering, strategy), only 2.4 and 2
 
 | Step | What | How |
 |------|------|-----|
-| 2.5.1 | Generate candidates | Produce 2-3 candidate approaches (angle/framework/tone combos) based on Layer 2 memory |
-| 2.5.2 | Score against history | For each candidate, check PATTERNS.md reply rates for that angle+persona combo. Check persona MOC for resonance. Check lessons for known failures. |
-| 2.5.3 | Predict & select | Assign predicted effectiveness (H/M/L or %) to each candidate. Select highest. Log reason. |
-| 2.5.4 | Log prediction | Record: `SIMULATION: candidates=[A, B, C] | predicted=[A: H, B: L, C: M] | selected=A | reason=[X]` |
+| 2.5.1 | Evaluate approaches | Consider angle/framework/tone options based on Layer 2 memory |
+| 2.5.2 | Score against history | Check PATTERNS.md reply rates for angle+persona combo. Check persona MOC. Check lessons for known failures. Check decision journal for past decisions with this persona/stage. |
+| 2.5.3 | Pick the best | Select highest predicted effectiveness. If past decision exists for similar situation, factor in whether it worked. |
+| 2.5.4 | Log choice | One line shown to Oliver: `Approach: [framework] + [angle] — [why] (past: [result if any])` |
 
-**Output:** "Simulation: [N] candidates | selected [X] | predicted [H/M/L] | reason: [one line]"
+**Output (shown to Oliver):** One line explaining the choice. e.g., "Approach: Gap Selling + direct angle — 8.8% reply rate for agency owners. Last time this converted with Hassan."
+**Oliver has final say.** If he redirects, log the override and use his choice.
+**Do NOT show 3 candidates.** Pick the best, explain it, let Oliver override.
 
 **Calibration:** At wrap-up, compare prediction to actual outcome. Prediction error feeds CW-5 (rubric drift) and self-model reliability scores.
 
@@ -81,7 +83,9 @@ For non-prospect work (system changes, lead filtering, strategy), only 2.4 and 2
 
 **Safeguard:** If a fast-track output gets corrected by Oliver, that task type loses fast-track eligibility for 5 sessions. Log the demotion.
 
-**Output:** "Route: [FAST/DELIBERATE] | reliability: [X] | reason: [X]"
+**Output (shown to Oliver — one line only):** `Confidence: [task type] [X] [FAST/DELIBERATE] — [reason if HIGH-RISK]`
+e.g., "Confidence: demo prep 0.62 (HIGH-RISK) — loading extra rules" or "Confidence: CRM note 0.92 — fast track"
+Do NOT show the full self-model table. One line. Oliver sees the signal, not the machinery.
 
 ## Layer 3: EXECUTE (always runs)
 
