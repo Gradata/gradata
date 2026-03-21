@@ -2,6 +2,16 @@
 # Every rule change gets logged here with date, what changed, and why.
 # If a change makes things worse, roll back by reversing the entry.
 
+## 2026-03-21 — Ad Platform Intelligence Integration (Session 25)
+- **Source:** External Claude Code config review (zip file with agents/skills for Sprites product dev)
+- **CLAUDE.md:** Added context hygiene rule (compact at 50%) and anti-mediocrity rule (scrap mediocre drafts, rebuild clean)
+- **CARL:** GLOBAL_RULE_4 (context hygiene), LISTBUILD_RULE_8 (ad platform signal detection)
+- **Quality rubrics:** Anti-mediocrity rule (score 5-6 = scrap and rebuild, don't patch)
+- **New files:** domain/reference/meta-api-patterns.md, domain/reference/google-ads-patterns.md
+- **Demo prep gate:** Steps 9b (ad platform audit) + 9c (thread flow design) — analyze prospect's ad setup, map Sprites threads to their specific ROAS gaps
+- **Lead filtering SOP:** Step 4b (ad platform signal detection) — free website scan adds 7 columns (meta_pixel, google_ads, google_analytics, gtm, ad_platforms, likely_budget_tier, top_roas_gap)
+- **Memory:** feedback_concurrent_sessions.md — Oliver runs up to 3 terminals concurrently, verify session numbers before writing
+
 ## 2026-03-21 — Genus OS Tranche 1: Governance Foundation (Session 21)
 - **Source:** Audited github.com/Ironsail-llc/genus-os. Adapted governance patterns, not architecture.
 - **Agent Manifest Schema:** agents/manifest-schema.md — second universal standard alongside Score. Structured markdown (not YAML). Required fields: id, name, status, version, department, description, instruction_file. Permission fields: tools_allowed, tools_denied, write_paths. Trust fields: trust_level, correction_rate, consecutive_rejections, auto_pause_threshold.

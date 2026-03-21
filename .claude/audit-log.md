@@ -1,6 +1,28 @@
 # Audit Log
 
 ---
+DATE: 2026-03-21 (Session 25 — Ad Platform Intelligence Integration)
+SESSION: 25
+SCORES: Research 8 | Quality 8 | Process 9 | Learning N/A | Outcomes N/A
+AVERAGE: 8.3 (ABBREVIATED — systems-only, scored dimensions only)
+SELF-SCORES: Systems/Architecture: 8/10
+GAPS IDENTIFIED: Website scan reliability at scale unknown (SCAN_FAILED fallback exists)
+CHANGES WRITTEN: 8 files (CLAUDE.md, .carl/global, quality-rubrics.md, 2x reference docs, demo-prep.md, lead-filtering-sop.md, domain/carl/listbuild)
+CORRECTIONS: 0
+
+---
+DATE: 2026-03-21 (Session 24 — VS Code Best Practices)
+SESSION: 24
+SCORES: Research N/A | Quality 8 | Process 9 | Learning N/A | Outcomes N/A
+AVERAGE: 8.5 (ABBREVIATED — scored dimensions only)
+SELF-SCORES: General knowledge answer: 8/10
+GAPS IDENTIFIED: None (minimal session)
+CHANGES WRITTEN: NONE
+CHANGES QUEUED: NONE
+META-ANALYSIS DUE: No (Session 25 = 5-session milestone from S20)
+---
+
+---
 DATE: 2026-03-18
 SCORES: Research 6 | Quality 7 | Process 5 | Learning 9 | Outcomes 5
 AVERAGE: 6.4
