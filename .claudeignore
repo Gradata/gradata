@@ -1,0 +1,45 @@
+# .claudeignore — Prevents Claude from reading these files during codebase indexing
+# Mirrors .agentignore where relevant, adds heavy directories Claude shouldn't scan
+
+# Brain vectorstore and embeddings (RAG layer, not human-readable)
+brain/.vectorstore/
+brain/.chroma/
+
+# Brain logs (operational, not context-relevant)
+brain/logs/
+
+# Brain git internals
+brain/.git/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+~$*
+
+# Editor artifacts
+*.swp
+*.swo
+*~
+
+# Large binaries
+*.zip
+*.tar.gz
+*.rar
+
+# Git internals
+.git/
+
+# Node modules (if any)
+node_modules/
+
+# Credential files
+.env
+*.credentials
+*.secret
+credentials.json

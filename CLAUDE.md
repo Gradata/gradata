@@ -28,7 +28,8 @@ Save to docs/Session Notes/[YYYY-MM-DD].md. Steps 0.5, 1, 7, 8, 9, 9.5, 10, 10.5
 9.5. **Git checkpoint** — stage and commit brain/ changes: 'Session [N]: [summary]'. Increment patch in brain/VERSION.md. Every 5th session: minor version + git tag.
 10. **Session summary** — write brain/sessions/[YYYY-MM-DD].md with session narrative, corrections processed, outcomes logged, and scores.
 10.5. **Startup brief refresh** — update domain/pipeline/startup-brief.md with current state. Header MUST read `# Last updated: [DATE] (Session [N])` with the CURRENT session number. Update handoff section, pipeline table, system state, and any stale data. This is the pipeline source of truth at startup — never let it go stale.
-11. **Handoff** — REWRITE brain/loop-state.md. Header MUST read `# Loop State — Last Updated [DATE] (Session [N] Close)` with the CURRENT session number. Pipeline snapshot, pending items, what changed, due next session, Loop health score. Under 80 lines. LAST thing you write. **VERIFY:** after writing, confirm header session number matches the current session — if it doesn't, fix it before closing.
+11. **Handoff** — REWRITE brain/loop-state.md. Header MUST read `# Loop State — Last Updated [DATE] (Session [N] Close)` with the CURRENT session number. Pipeline snapshot, pending items, what changed, due next session, Loop health score. Under 80 lines. **"What Changed" bullets MUST be prefixed with `[TAG]`** where TAG is a scope tag (OUTREACH, COMMUNICATION, DEMO, PIPELINE, CRM, PROSPECT, PERSONA, OBJECTION, SYSTEM, ARCHITECTURE, INTEGRATION, SAFETY, AUDIT, QUALITY, NERVOUS-SYSTEM). Bullets that match no tag are written without a prefix. **VERIFY immediately after writing loop-state.md:** confirm header session number matches the current session — if it doesn't, fix it before proceeding to 11b.
+11b. **Agent Distillation** — runs after step 11 is written and verified. Read agents/registry.md (if missing, create with placeholder structure). For each ACTIVE agent: (1) collect session lessons from step 2 — match lesson category prefix against agent scope tags; (2) collect vault deltas — match changed file paths against agent scope paths; (3) collect "What Changed" bullets — match `[TAG]` prefix against agent scope tags. Write matches to `agents/[agent-name]/brain/updates/[YYYY-MM-DD]-S[N].md`. Skip agents with zero matches. No empty files.
 
 ## Work Style Rules
 * Research before asking. Check available tools, calendar, vault first.
@@ -41,6 +42,7 @@ Save to docs/Session Notes/[YYYY-MM-DD].md. Steps 0.5, 1, 7, 8, 9, 9.5, 10, 10.5
 * 3+ independent items → parallel agents.
 * User approves copy → straight to draft. No extra confirmation.
 * Log to lessons, vault, daily notes without asking. Changelog for CLAUDE.md edits.
+* **Wikilinks** — all new brain/ files (sessions, prospects, vault updates) MUST include relevant [[wikilinks]] at time of writing. Link prospects to personas/objections, sessions to prospects touched.
 * Never double-dip enrichment. Never list pending from memory — verify.
 * **Post-task reflection** — after every major task, run a 30-second internal check: what went wrong, what was inefficient, what would I do differently? Log anything actionable to lessons.md silently.
 
