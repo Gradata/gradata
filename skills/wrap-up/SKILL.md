@@ -231,23 +231,74 @@ This is the MOST IMPORTANT part of wrap-up. A bad handoff means the next session
 
 Mark each relevant item. Skip irrelevant ones. Fix any failures before closing.
 
-## Phase 5b: Daily Note + Brain
+## Phase 5b: Session Note (HARD GATE — cannot commit or close without this)
 
-**Daily note** (Sprites Work folder):
-- Path: C:\Users\olive\OneDrive\Desktop\Sprites Work\[YYYY-MM-DD].md
-- Append if file already exists
-- Include: what we worked on, decisions made, pending items, next steps
-- Keep it scannable — bullets, not paragraphs
+**Path:** docs/Session Notes/[YYYY-MM-DD]-S[N].md
+**Gate:** The session note file MUST exist and contain ALL 9 sections below before Phase 6 (git commit) can run. No exceptions. No skipping regardless of session weight tier. If a section has nothing to report, write "None" — do not omit the section.
 
-**Brain session summary** (Obsidian vault):
+**Template (mandatory — use this exact structure):**
+
+```markdown
+# Session [N] — [YYYY-MM-DD] ([Session Type Summary])
+
+## OLIVER'S SUMMARY
+
+**What you asked / What I did:**
+[What Oliver asked for and what was actually done. Plain English, under 200 words.]
+
+**Where I was confident / Where I was guessing:**
+[Which parts had strong evidence vs which were assumptions or untested.]
+
+**Best work today:**
+[One specific thing done well, with why it was good.]
+
+**Not sure about:**
+[One thing that might not be good enough, with why.]
+
+## Session Type
+[Systems-only / Prospect work / Mixed. One line.]
+
+## What Was Done
+[Numbered list. Each item specific and verifiable.]
+
+## Gates
+[Which gates triggered and passed. If systems-only: "No sales gates triggered (systems-only session)."]
+
+## Best Output
+[Single best output with reasoning.]
+
+## Weakest Output
+[Single weakest output with reasoning. If nothing weak: explain why.]
+
+## Self-Scores
+[Per-category scores with reasoning. Minimum categories:]
+- Architecture/strategy decisions: X/10 — [reasoning]
+- Execution precision: X/10 — [reasoning]
+- Completeness: X/10 — [reasoning]
+
+## Corrections Received
+[Numbered list of corrections. If none: "None."]
+
+## Conditional Steps
+[List every conditional wrap-up step (2-6) and whether it ran or was skipped, with reason.]
+- Step 2 (Lessons): [ran/skipped — reason]
+- Step 3 (Vault sync): [ran/skipped — reason]
+- Step 4 (Loop sync): [ran/skipped — reason]
+- Step 5 (Domain sync): [ran/skipped — reason]
+- Step 6 (Health audit): [ran/skipped — reason]
+
+## Line Counts
+- CLAUDE.md: [X]/150
+- lessons.md: [X] active (cap 30)
+- startup-brief.md: [X]/60
+```
+
+**Verification:** Before proceeding to Phase 6, check that the session note file exists at the expected path and contains all 9 section headers (OLIVER'S SUMMARY, Session Type, What Was Done, Gates, Best Output, Weakest Output, Self-Scores, Corrections Received, Conditional Steps, Line Counts). If any section is missing, add it before committing.
+
+**Brain session summary** (Obsidian vault — write after session note):
 - Path: C:/Users/olive/SpritesWork/brain/sessions/[YYYY-MM-DD] — [Session Type].md
-- Tag with `#session` and relevant tags (`#system-improvements`, `#prospecting`, `#demo-prep`, etc.)
-- Include: what we did, new rules added, gaps found, system health
-
-**Brain pipeline snapshot** (weekly or when pipeline changes):
-- Path: C:/Users/olive/SpritesWork/brain/pipeline/[YYYY-MM-DD] — Pipeline Snapshot.md
-- Table of all active deals with stage, next step, priority
-- Campaign status, credit balances, key observations
+- Tag with `#session` and relevant tags
+- Shorter than session note — narrative + scores + key outcomes
 
 **Brain prospect notes** (if any prospects were touched this session):
 - Create or update notes in `brain/prospects/[Name] — [Company].md`
