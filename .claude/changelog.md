@@ -2,6 +2,17 @@
 # Every rule change gets logged here with date, what changed, and why.
 # If a change makes things worse, roll back by reversing the entry.
 
+## 2026-03-21 — Cross-Wire v2: Three Trigger Classes + Utility Scoring
+- **cross-wire-checklist.md:** Expanded from 12 event triggers to 3 classes: EVENT (CW-1→12, unchanged), TREND (CW-13→16, new), DANGER (DS-1→4, new). 20 total triggers.
+- **TREND triggers (PID control theory):** CW-13 audit score drift (integral), CW-14 correction rate acceleration (derivative), CW-15 rule accumulation check (double-loop, every 5 sessions), CW-16 session type imbalance (variety).
+- **DANGER signals (immune system theory):** DS-1 rapid correction burst (mid-session), DS-2 session duration anomaly, DS-3 orphan signal detection (requisite variety), DS-4 score-correction mismatch (homeostatic calibration).
+- **Utility scoring (ACT-R):** Every cross-wire now has a continuous utility float (+1 per valuable fire, -1 per non-valuable). Negative utility = redesign candidate. Replaces binary fire/no-fire tracking.
+- **system-patterns.md:** Cross-Wire Performance table restructured into 3 sections (Event/Trend/Danger) with utility column. Complexity budget updated.
+- **CW-3 retroactive fix:** Lesson #70 (all-playbooks rule) promoted to DEMOPREP_RULE_2 in domain/carl/demo-prep. Should have fired in Session 14.
+- **CLAUDE.md:** L3 Cross-Wiring description updated to reflect 3 trigger classes.
+- **Portability:** Cross-wire architecture is BRAIN layer (methodology). Trigger definitions are SDK-portable. Utility scoring is SDK-portable.
+- **Sources:** PID control theory (Wiener/Ashby), ACT-R utility learning (CMU), Argyris double-loop learning, Ashby's Law of Requisite Variety, biological danger theory (immune system).
+
 ## 2026-03-21 — Layer Split Execution (Brain / Runtime Extraction)
 - **paths.py created** (RUNTIME) — All hardcoded paths extracted from config.py into brain/scripts/paths.py. Supports env var overrides (BRAIN_DIR, DOMAIN_DIR, WORKING_DIR, PYTHON_PATH, CLAUDE_CMD). To port to a new machine: edit paths.py only.
 - **config.py cleaned** (BRAIN) — Now imports all paths from paths.py. Contains only portable config: embedding model, ChromaDB collections, file type map, RAG graduation, episodic memory, confidence scoring, outcome linking, query defaults. Zero hardcoded paths.

@@ -90,7 +90,7 @@
 | **Staleness Sensor** | Scans brain files >7 days stale at session start. Emits STALE_FILE signals. | skills/session-start/SKILL.md (Phase 0) | AIOS |
 | **Gap Scanner** | Mid-session scan for skipped steps, unused tools, missing pre-flights | .claude/gap-scanner.md | AIOS |
 | **Metacognitive Scan** | 60-second "what did this session reveal about AIOS" before wrap-up | skills/wrap-up/SKILL.md (Pre-Phase) | AIOS |
-| **Cross-Wires** | 9 bidirectional feedback connections between components (CW-1 through CW-9) | .claude/cross-wire-checklist.md | AIOS |
+| **Cross-Wires** | 3-class feedback system: 12 event triggers (CW-1→12), 4 trend triggers (CW-13→16), 4 danger signals (DS-1→4). Utility-scored. | .claude/cross-wire-checklist.md | AIOS |
 | **CW-8 Skill Miss** | Skill didn't auto-trigger → fix description keywords (from skills article) | .claude/cross-wire-checklist.md | AIOS |
 | **CW-9 Safety Verdict** | Every safety block gets a verdict (legit vs false positive) — never just logged (from nova-tracer) | .claude/cross-wire-checklist.md | AIOS |
 | **CW-10 Tool Violation** | Tool denied by manifest → check if allowlist needs updating or agent overstepped (DORMANT) | .claude/cross-wire-checklist.md | AIOS |

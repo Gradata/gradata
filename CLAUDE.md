@@ -51,7 +51,7 @@ Save to docs/Session Notes/[YYYY-MM-DD].md. Steps 0.5, 1, 7, 8, 9, 9.5, 10, 10.5
 
 ## Recursive Self-Improvement (5 Layers)
 - **L1 Loop** — Tag → track → learn → improve (domain activities). **L2 System Loop** — Track component effectiveness (gates, lessons, smoke checks, audits). Tracking: brain/system-patterns.md.
-- **L3 Cross-Wiring** — Components feed bidirectionally: Auditor→gates, gates→lessons, lessons→CARL, smoke→lessons, rubric drift→tighten, fallback→reorder, PATTERNS→gates.
+- **L3 Cross-Wiring** — Three trigger classes: EVENT (12 this-session triggers), TREND (4 cross-session integral/derivative), DANGER (4 anomaly signals). Utility-scored. Components feed bidirectionally: Auditor→gates, gates→lessons, lessons→CARL, smoke→lessons, rubric drift→tighten, fallback→reorder, PATTERNS→gates. Trends catch drift across sessions. Danger signals catch stress mid-session.
 - **L4 Meta-Loop** — Track which cross-wire connections produce value. Kill dead wires, strengthen high-value ones. Runs every 5 sessions. **L5 Convergence** — Auto-detect maturity. Kill switches: 5 cycles zero value = auto-disable. Max 3 active layers.
 
 ## Enterprise Quality System

@@ -19,3 +19,6 @@ DEMOPREP_RULE_0=After adding the source, query NotebookLM for the prospect's spe
 
 # Step 2: Check existing prospect notes
 DEMOPREP_RULE_1=Read the docs/Demo Prep/ folder for any existing files matching the prospect's name or company. Check for .docx, .pdf, .md, or .txt files. Surface any prior notes, call summaries, or research already done on this person. When building a deck, load docs/Demo Prep/deck-template.md for the 8-slide structure and format rules.
+
+# Step 3: Use ALL sales playbooks — CW-3 promoted from lesson #70 (Session 14, 3 corrections)
+DEMOPREP_RULE_2=Before building any cheat sheet, load ALL sales playbooks (Great Demo, SPIN, Gap Selling, JOLT, Challenger). Apply each framework's structure to the prospect's specific situation. Do not use a single framework — synthesize across all of them. The cheat sheet must show which framework maps to which discovery question and which thread.

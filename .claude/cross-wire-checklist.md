@@ -1,15 +1,20 @@
 # Cross-Wire Execution Checklist
 # Run at wrap-up step 9 AFTER scoring audit dimensions.
-# Each cross-wire has a trigger condition and action. Check every one. No skipping.
+# Three trigger classes: EVENT (this session), TREND (across sessions), DANGER (anomaly).
+# Check every one. No skipping.
 
 ## Instructions
 For each cross-wire below:
-1. Check the TRIGGER condition
-2. If triggered: execute the ACTION and increment the "fires" counter
-3. If the action produces a useful change: increment "value_produced" counter
-4. Log results to brain/system-patterns.md Cross-Wire Performance table
-5. If not triggered: skip silently (don't log non-events)
-6. Write summary to brain/sessions/neural-bus.md: `[HH:MM] [cross-wire] [FIRED/CLEAN] CW=[list of fired] value=[Y/N]`
+1. Check the TRIGGER condition (event, trend, or danger)
+2. If triggered: execute the ACTION and update utility score: `score += value_produced ? +1 : -1`
+3. Log results to brain/system-patterns.md Cross-Wire Performance table
+4. If not triggered: skip silently (don't log non-events)
+5. Write summary to brain/sessions/neural-bus.md: `[HH:MM] [cross-wire] [FIRED/CLEAN] CW=[list of fired] value=[Y/N]`
+
+## Trigger Classes
+- **EVENT** — fires on this-session activity (original cross-wires). Requires specific session output.
+- **TREND** — fires on patterns across N sessions (integral/derivative). Always evaluable regardless of session type.
+- **DANGER** — fires on contextual anomalies (immune system pattern). Session-type agnostic stress indicators.
 
 ## Output Format (show to Oliver at wrap-up step 9)
 
@@ -141,3 +146,88 @@ COMPOUND BRAIN: [X/5] active. [Status sentence from brain/system-patterns.md]
 **ACTION:** Auto-generate lesson: "[DATE] ESCALATION-GENERATED: [level] on [task] — [root cause] → [what to avoid]"
 **TRACK:** escalation_to_lesson_fires, lessons_generated
 **SOURCE:** Genus OS — escalation as a learning signal, not just a safety valve
+
+---
+
+## TREND TRIGGERS (Integral + Derivative — Cross-Session Patterns)
+> These fire on accumulated patterns across sessions, not single-session events.
+> Always evaluable regardless of session type (prospect, systems, architecture).
+> Source: PID control theory (integral = accumulated drift, derivative = rate of change).
+
+## CW-13: Audit Score Drift (Integral)
+**CLASS:** TREND
+**TRIGGER:** Average audit score across last 5 sessions has declined by 0.5+ points compared to the 5 sessions before that. Read from brain/system-patterns.md Audit Score Trends table.
+**CHECK:** Is the decline in a specific dimension or system-wide?
+**ACTION SPECIFIC:** Tighten the relevant gate or rubric for that dimension.
+**ACTION SYSTEM-WIDE:** Flag for Oliver: "System-wide quality trending down. [X] → [Y] over 5 sessions. Recommend diagnostic session."
+**TRACK:** drift_fires, dimension_targeted
+**SOURCE:** PID integral — catches slow drift that no single session triggers
+
+## CW-14: Correction Rate Acceleration (Derivative)
+**CLASS:** TREND
+**TRIGGER:** Corrections per session increased for 3 consecutive sessions (rate of change is positive and accelerating). Read from brain/metrics/ files.
+**CHECK:** Are corrections clustering in one category or spread across many?
+**ACTION CLUSTERED:** The category's rules aren't working — flag for rule rewrite, not just new lesson.
+**ACTION SPREAD:** System is regressing broadly — flag for Oliver: "Correction rate accelerating. [N1] → [N2] → [N3] over 3 sessions. Something is drifting."
+**TRACK:** acceleration_fires, category_flagged
+**SOURCE:** PID derivative — catches deterioration before it compounds
+
+## CW-15: Rule Accumulation Check (Integral)
+**CLASS:** TREND
+**TRIGGER:** Every 5 sessions. Count: active lessons + active CARL rules + active cross-wires. Compare to previous 5-session checkpoint.
+**CHECK:** Did the system get more complex (net positive rules) with no measurable quality improvement?
+**ACTION YES:** Flag top 3 lowest-value rules for pruning. Rules with zero fires and zero prevented-repeats in 10+ sessions are candidates.
+**ACTION NO:** System is growing efficiently. Log and continue.
+**TRACK:** accumulation_checks, rules_pruned
+**SOURCE:** Argyris double-loop learning — question the rules, not just apply them
+
+## CW-16: Session Type Imbalance (Integral)
+**CLASS:** TREND
+**TRIGGER:** 5+ consecutive sessions of the same type (all systems, all prospect, all architecture) with no sessions of the other type.
+**CHECK:** Is the imbalance intentional (Oliver directed it) or drift?
+**ACTION DRIFT:** Surface to Oliver: "[N] consecutive [type] sessions. Pipeline/system work may be accumulating debt. Prospect lessons are untested for [N] sessions."
+**ACTION INTENTIONAL:** Log and continue — don't nag about deliberate focus periods.
+**TRACK:** imbalance_fires, type_streak
+**SOURCE:** Controls variety (Ashby) — the system needs diverse inputs to stay calibrated
+
+---
+
+## DANGER SIGNALS (Contextual Anomaly Triggers)
+> Fire on stress indicators regardless of session type or specific cross-wire conditions.
+> These catch blind spots that event-based triggers miss entirely.
+> Source: Biological immune system danger theory — respond to stress, not just patterns.
+
+## DS-1: Rapid Correction Burst
+**CLASS:** DANGER
+**TRIGGER:** 3+ corrections from Oliver before the first major task completes this session.
+**CHECK:** Are corrections about the current task or about accumulated system issues?
+**ACTION CURRENT TASK:** Stop, re-read the relevant gate/CARL rules, restart the task. Something wasn't loaded.
+**ACTION SYSTEM ISSUES:** Flag: "Multiple system corrections early in session. Context may not have loaded correctly. Run startup health check."
+**TRACK:** burst_fires, root_cause
+**NOTE:** This fires MID-SESSION, not at wrap-up. Check after every correction.
+
+## DS-2: Session Duration Anomaly
+**CLASS:** DANGER
+**TRIGGER:** Session has consumed 2x the average context window usage compared to similar session types. (Estimate: if this session's tool calls exceed 2x the 5-session average for this session type.)
+**CHECK:** Is the session legitimately complex or is the agent spinning?
+**ACTION SPINNING:** Compact context, re-read loop-state, refocus on the core task. Log what caused the spiral.
+**ACTION LEGITIMATE:** Note the complexity and continue — some sessions are genuinely big.
+**TRACK:** duration_anomaly_fires, cause
+
+## DS-3: Orphan Signal Detection
+**CLASS:** DANGER
+**TRIGGER:** At wrap-up, check if any significant session event (correction, tool failure, gate catch, Oliver override) was NOT matched by any cross-wire trigger.
+**CHECK:** List all session events. For each, verify at least one CW/DS trigger covers it.
+**ACTION ORPHAN FOUND:** Log the orphan signal type. If it recurs across 2+ sessions, propose a new cross-wire to catch it.
+**ACTION ALL COVERED:** System has sufficient variety. Log clean.
+**TRACK:** orphan_signals_found, new_wires_proposed
+**SOURCE:** Ashby's Law of Requisite Variety — the regulator must match the complexity of what it regulates
+
+## DS-4: Score-Correction Mismatch
+**CLASS:** DANGER
+**TRIGGER:** Session self-scored 8+ but Oliver gave 2+ corrections this session. Or: session self-scored below 7 but Oliver gave zero corrections.
+**CHECK:** Is the scoring miscalibrated or was the session genuinely unusual?
+**ACTION OVERCONFIDENT (high score, many corrections):** Flag rubric calibration issue. The self-assessment is blind to something Oliver sees. Check which corrections the rubric missed.
+**ACTION UNDERCONFIDENT (low score, zero corrections):** The rubric may be too harsh for this session type. Check if systems-only sessions are being scored against prospect rubrics.
+**TRACK:** mismatch_fires, direction (over/under)
+**SOURCE:** Biological homeostatic plasticity — adjust sensitivity based on actual outcomes
