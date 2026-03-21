@@ -280,8 +280,8 @@ Lessons graduate from lessons.md to lessons-archive.md based on evidence, not sl
 ### Graduation Log
 When graduating, note in lessons-archive.md: which criterion was met, what permanent rule (if any) replaced it, date graduated.
 
-## Reflection Feed (read before scoring)
-Before scoring any dimension, read the reflection data from this session:
+## Session Context Feed (read before scoring)
+Before scoring any dimension, read brain/sessions/neural-bus.md for the full session signal history. This gives you context from every other system — gates passed/failed, outputs blocked, patterns flagged, reflect results. Then read the reflection data from this session:
 - **Provisional lessons count** — how many new lessons were written this session (from lessons.md)
 - **Graduated lessons count** — how many lessons graduated this session
 - **Blocked outputs count** — how many outputs scored <7 and were blocked/revised (from session history)

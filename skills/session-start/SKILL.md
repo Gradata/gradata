@@ -30,7 +30,8 @@ Before loading anything:
 1. **Check brain/morning-brief.md** — if it exists and is fresh (< 4 hours old), read it. It contains Gmail replies, Fireflies recordings, Pipedrive changes, pre-drafted follow-ups, and deal health alerts. Skip Gmail/Fireflies scans in Phase 1.5. If stale or missing, Gmail/Fireflies/Pipedrive checks run inline during Phase 1.5.
 2. Check modification dates on domain/pipeline/startup-brief.md, lessons.md, Leads/STATUS.md, brain/prospects/
 3. If any file was modified AFTER the last session's daily note timestamp → surface changes to Oliver ("Since last session: follow-up checker flagged 2 stale prospects, startup-brief updated by scheduled task")
-4. This catches external edits and anything that changed between sessions
+4. **Staleness sensor** — scan brain files that should be updated regularly. Flag any modified more than 7 days ago: brain/loop-state.md (should update every session), domain/pipeline/startup-brief.md (every session), brain/emails/PATTERNS.md (every prospect session), brain/system-patterns.md (every 5 sessions). Surface stale files as a priority signal: "STALE: [file] last updated [N] days ago — update this session."
+5. **Initialize neural-bus** — create fresh brain/sessions/neural-bus.md for this session. Archive previous session's bus to brain/sessions/neural-bus-[prev-date].md. Write first signal: `[HH:MM] [session-start] [INIT] session=[N] stale_files=[list] brain_alerts=[N]`
 
 ## Phase 0.5: System Heartbeat
 

@@ -9,6 +9,7 @@ For each cross-wire below:
 3. If the action produces a useful change: increment "value_produced" counter
 4. Log results to brain/system-patterns.md Cross-Wire Performance table
 5. If not triggered: skip silently (don't log non-events)
+6. Write summary to brain/sessions/neural-bus.md: `[HH:MM] [cross-wire] [FIRED/CLEAN] CW=[list of fired] value=[Y/N]`
 
 ## Output Format (show to Oliver at wrap-up step 9)
 

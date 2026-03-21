@@ -182,6 +182,13 @@ Proposed rule: "[synthesized rule]"
 Add to CLAUDE.md? [y/n]
 ```
 
+### Step 8b: Write to Neural Bus
+After processing, write a summary signal to brain/sessions/neural-bus.md:
+`[HH:MM] [reflect] [PROCESSED] rules=[N] lessons=[N] manual=[N] blocked=[N] root-causes=[list]`
+If any root cause was identified via double-loop, also write:
+`[HH:MM] [reflect] [ROOT-CAUSE] category=[X] description=[Y]`
+And append the structured entry to brain/sessions/reflect-patterns.md per LOOP_RULE_45.
+
 ### Step 9: Summary
 
 ```

@@ -44,6 +44,10 @@ If any shows [ ] instead of [x], STOP and complete before presenting.
 After drafting, generate the prospect's most likely SPECIFIC objection based on the research. If vulnerable, revise before presenting.
 Format: `OBJECTION CHECK: "[specific objection]" — [HANDLED in draft / REVISED to address]`
 
+## Neural Bus Signal (write after every gate)
+After any gate completes, write one line to brain/sessions/neural-bus.md:
+`[HH:MM] [gate:gate-name] [PASSED/FAILED] prospect=[name] confidence=[HIGH/MEDIUM/LOW]`
+
 ## Domain Gates
 Gate content is domain-specific. Domain gates inherit this protocol — they define task-specific research checklists but do NOT redefine the universal steps (tag block, objection check, humanizer, self-score). Those always come from this file.
 Load the relevant gate file when the task triggers:

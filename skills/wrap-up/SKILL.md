@@ -7,6 +7,15 @@ description: Use when user says "wrap up", "close session", "end session",
 
 # Session Wrap-Up
 
+## Pre-Phase: Metacognitive Scan (always runs, max 60 seconds)
+
+Before calculating session weight, run a quick metacognitive scan:
+1. Read brain/sessions/neural-bus.md — what were the dominant signal types this session? (gates, reflects, blocks, patterns)
+2. Read brain/system-patterns.md — is this session better or worse than the baseline trend?
+3. Ask: what is the single most important thing this session revealed about how AIOS operates?
+4. Write one line to brain/sessions/neural-bus.md: `[HH:MM] [metacog] [INSIGHT] [one sentence] [implication for next session]`
+5. If the insight implies a rule change — queue it for Phase 3 (Review & Apply) rather than acting immediately
+
 ## Phase 0: Calculate Session Weight (ALWAYS_ON — runs first)
 
 Calculate weight score before any other wrap-up step. This determines depth for all subsequent phases.
@@ -293,6 +302,8 @@ Mark each relevant item. Skip irrelevant ones. Fix any failures before closing.
 - Blocked outputs (score <7): [N] — [list or "none"]
 - Top root cause this session: [from /reflect double-loop or "none"]
 - Confidence distribution: [X HIGH / Y MEDIUM / Z LOW]
+- Neural bus signals: [total count] — [dominant type: gates/reflects/blocks/patterns]
+- Metacognitive insight: [one sentence from Pre-Phase scan]
 
 ## Line Counts
 - CLAUDE.md: [X]/150
