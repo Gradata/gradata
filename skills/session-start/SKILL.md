@@ -11,7 +11,7 @@ Run automatically at session start. Optimized to minimize token cost. Everything
 
 Run FIRST, before any context loads. Compare current state to previous session snapshot.
 
-1. **Read brain/loop-state.md** — this is the previous session's handoff snapshot.
+1. **Read C:/Users/olive/SpritesWork/brain/loop-state.md** — this is the previous session's handoff snapshot.
 2. **Prospect overdue scan** — for every prospect with a `next_touch` date, check if that date is 2+ sessions overdue (approximate: 2+ calendar days since the `next_touch` date). Flag any matches.
 3. **Angle failure scan** — for every prospect in brain/prospects/, check if any outreach angle has 3+ consecutive no-replies in sequence. Flag any matches.
 4. **Deal stagnation scan** — cross-reference Pipedrive deal stages (from loop-state.md pipeline snapshot or brain/forecasting.md). Flag any deal that has not moved stages in 14+ calendar days.
