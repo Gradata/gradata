@@ -343,6 +343,32 @@ Before git commit can run, verify ALL of these. If any fails, resolve before com
 If all pass: proceed to Phase 6.
 If any fail: fix the failure, then re-check all three before committing.
 
+## Phase 5d: Wrap-Up Summary (ALWAYS — show to Oliver)
+
+After all phases complete, show Oliver a compact summary. This is the ONLY wrap-up output Oliver needs to see. All prior phases run silently.
+
+```
+WRAP-UP: [N]/[N] steps complete [✓ or ⚠]
+  Compounding: [output type] quality [↑/↓/→] since last [type] session | [untested types] untested since S[N]
+  Saved: [list of files written — session note, loop-state, startup brief, brain commit]
+  Learned: [N] lessons | [N] graduated | [N] corrections
+  Pipeline: [N] overdue, [N] due this week, [N] newly closed
+  Score: [X]/10 (Type [E/A/H]) — [one-line gap to 9]
+```
+
+**If any steps were skipped or failed:**
+```
+WRAP-UP: [N]/[N] steps complete ⚠
+  SKIPPED: Step [X] ([name]) — [reason]
+  FAILED: Step [Y] ([name]) — [error] — [auto-fix attempted: Y/N]
+```
+
+**Rules:**
+- All 15 steps execute. Oliver sees only this summary.
+- Details only surface on skip/failure.
+- Compounding line MUST reference the specific output type trend, not just a generic score.
+- If this is the first session of a type in 5+ sessions, note it: "First Type E session since S14 — baseline resetting."
+
 ## Phase 6: Git Checkpoint
 
 After all other wrap-up phases complete, commit the working directory:

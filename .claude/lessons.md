@@ -9,6 +9,9 @@
 # After 3 shadow occurrences: promote to active or kill. See auditor-system.md.
 #
 # Wrap-up: decrement all [PROVISIONAL:N] counters. Delete any with reversal flag. Promote [PROVISIONAL:0] to [CONFIRMED].
+# CONFIRMATION LOOP: First 3 times a lesson's category comes up in live work, ask Oliver: "Did [lesson] hold?"
+# After 3 confirmed holds: graduate automatically. If Oliver says no: flag [INEFFECTIVE], rewrite the rule.
+# Format: [CONFIRM:0/3] after promotion to [CONFIRMED]. Tracks holds, not just time.
 # Format for new lessons: [DATE] [PROVISIONAL:5] CATEGORY: What happened → What to do instead. Root cause: [what systemic gap allowed this]
 # Root cause is MANDATORY on every new lesson — it feeds the double-loop in /reflect.
 # Effectiveness: New lessons start with [TRACK:0/3]. After each scenario occurrence, increment and log Y/N.

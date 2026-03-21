@@ -67,6 +67,11 @@ Save to docs/Session Notes/[YYYY-MM-DD].md. Steps 0.5, 1, 7, 8, 9, 9.5, 10, 10.5
 
 Current phase: **INFANT (Session 27/50).** All thresholds use INFANT tolerance. Transition at session 50.
 
+This is trust layer 1 of 3 for the marketplace:
+1. **Brain trusts itself** — maturity schedule above (self-awareness of own confidence)
+2. **Owner trusts their brain** — compound proof over sessions (corrections decrease, output quality increases)
+3. **Renter trusts someone else's brain** — try-before-you-trust verification period (not yet built, needed for SDK marketplace)
+
 ## Enterprise Quality System
 .claude/quality-rubrics.md | .claude/fallback-chains.md | .claude/auditor-system.md | .claude/health-audit.md | .claude/loop-audit.md | .claude/audit-log.md | .claude/review-queue.md | .claude/changelog.md | .claude/truth-protocol.md | .claude/cross-wire-checklist.md | brain/system-patterns.md | brain/metrics/ | brain/sessions/ | brain/system.db | brain/.git
 

@@ -62,25 +62,42 @@ This takes <2 seconds. It catches file corruption, accidental deletions, and sys
 3. **Read .claude/lessons.md** — mistakes log. Scan every entry. Never repeat a logged mistake.
 4. **Check Google Calendar for today + tomorrow** — surface demos, calls, meetings.
 
-## Phase 1.5: Sequence Engine Scan (~2k tokens)
+## Phase 1.5: Full Tool Scan (~15 seconds with parallel calls)
 
-These checks replace the overnight agent. They run every startup, taking ~15 seconds with parallel tool calls.
+> Replaces the overnight agent. Scans ALL connected tools at session start.
+> If any scan fails: auto-fix via fallback chain FIRST, then surface result.
+> Oliver sees results, not problems. Only escalate if fix also fails.
 
-Load `domain/carl/loop` rules for this phase (Loop replaced sequence-engine in Session 3).
+Load `domain/carl/loop` rules for this phase.
 
-**PARALLEL BATCH A (steps 5+7 merged + step 9 — fire all at once):**
-5+7. **Prospect loading (two tiers)** — Read domain/pipeline/startup-brief.md pipeline section to identify prospects with a meeting, demo, or follow-up due within 48 hours. These are **Tier 1** — read their full brain/prospects/ file now. All other prospects are **Tier 2** — do NOT read their files. Only load a Tier 2 prospect's brain file when Oliver names them or their company mid-session. Do NOT scan or read all prospect files. For Tier 1 prospects loaded, also check for: (a) `next_touch` dates <= today, AND (b) touches missing tag blocks (type, intent, angle, tone, framework, outcome). Flag untagged: "Untagged interactions in [prospect] — tagging required before PATTERNS.md sync."
-9. **Check brain/signals.md** — scan for unprocessed signals with `relevance >= 7`. These are high-priority triggers (competitive moves, buying intent, key person changes) that need attention this session. Surface any hits in the startup status under `[signal]`.
+**PARALLEL BATCH A (all independent — fire all at once):**
+5+7. **Prospect loading (two tiers)** — Read startup-brief pipeline section. Prospects with meeting/demo/follow-up due within 48h = **Tier 1** (read full brain/prospects/ file). All others = **Tier 2** (load on demand when Oliver names them). For Tier 1, check: (a) `next_touch` dates <= today, (b) untagged touches.
+9. **Check brain/signals.md** — unprocessed signals with `relevance >= 7`.
+10. **Gmail scan** — search for new replies since last session. `gmail_search_messages after:[last_session_date]`.
+11. **Calendar scan** — today + tomorrow + next 7 days. Surface demos, calls, meetings with times.
+12. **Fireflies scan** — check for new recordings since last session.
+13. **Pipedrive scan** — pull Oliver-tagged deals. Check for: (a) stage changes since last session, (b) newly closed deals (won or lost) for forecasting calibration, (c) deals with zero upcoming activities.
+14. **Instantly scan** — check campaign analytics for reply rate changes, new replies, bounces.
 
-**PARALLEL BATCH B (after batch A identifies pending outcomes — fire all Gmail searches at once):**
-6. **Outcome check** — for EVERY prospect with `outcome: pending`, search Gmail `from:[prospect_email] after:[last_touch_date]` **in parallel** (one tool call per prospect, all fired simultaneously). If reply found: update outcome, reply_sentiment, outcome_date. If no reply and next_touch passed: set outcome to "no-reply".
+**PARALLEL BATCH B (after batch A — fire all Gmail searches at once):**
+6. **Outcome check** — for EVERY prospect with `outcome: pending`, search Gmail `from:[prospect_email] after:[last_touch_date]` in parallel. Reply found → update outcome. No reply + next_touch passed → "no-reply".
+
+**AUTO-FIX PROTOCOL:** If any scan fails (MCP timeout, connection error), run fallback chain immediately. Log: `Auto-fixed: [tool] [error] → [fallback] → [result]`. Only escalate to Oliver if fallback also fails.
 
 **THEN (sequential):**
-8. **Surface findings** in status:
-   - REPLIES RECEIVED: who replied, sentiment
-   - OVERDUE: touches past due date
-   - DUE TODAY: touches due, with suggested angle from PATTERNS.md
-   - UPCOMING: next 3 days
+8. **Surface findings as checklist summary:**
+```
+STARTUP: [N]/[N] scans complete ✓
+  Gmail: [N] new replies | Calendar: [N] meetings today | Pipedrive: [N] deals changed
+  Fireflies: [N] new recordings | Instantly: [campaign] reply rate [X]%
+  Auto-fixed: [tool] → [fallback] → [result] (if any)
+  REPLIES: [who replied, sentiment]
+  OVERDUE: [touches past due]
+  DUE TODAY: [touches due, suggested angle from PATTERNS.md]
+  UPCOMING: [next 3 days]
+  CLOSED DEALS: [any newly closed → logged to forecasting.md for calibration]
+```
+If all scans pass and nothing is overdue: keep to 3 lines. Details only expand on findings.
 
 ## Phase 2: CARL (lightweight)
 
