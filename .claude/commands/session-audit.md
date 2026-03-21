@@ -135,7 +135,7 @@ This format is consistent with brain/sessions/ (date-keyed, frontmatter with ses
 
 ```
 ════════════════════════════════════════════════════════════
-SESSION AUDIT COMPLETE
+SESSION AUDIT COMPLETE (Steps 1-5 of 11)
 ════════════════════════════════════════════════════════════
   Learnings processed:     [N]
   Outcomes logged:         [N]
@@ -145,3 +145,20 @@ SESSION AUDIT COMPLETE
   Rule upgrades applied:   [N]
 ════════════════════════════════════════════════════════════
 ```
+
+### Step 7: MANDATORY — Cross-Check CLAUDE.md Wrap-Up Steps
+
+**This skill covers steps 7, 10, and partial 1. The following CLAUDE.md steps are NOT covered by this skill and MUST run separately. Check each one:**
+
+```
+[ ] Step 0.5 — User Summary (in session note)
+[ ] Step 1   — Daily notes (brain/sessions/)
+[ ] Step 8   — Post-session audit (.claude/auditor-system.md + .claude/loop-audit.md)
+[ ] Step 9   — Cross-wire checklist (.claude/cross-wire-checklist.md)
+[ ] Step 9.5 — Git checkpoint (brain/ commit + VERSION.md increment)
+[ ] Step 10.5— Startup brief refresh (domain/pipeline/startup-brief.md)
+[ ] Step 11  — Handoff (rewrite brain/loop-state.md)
+[ ] Step 11b — Agent Distillation (agents/registry.md → updates/)
+```
+
+**Do NOT declare wrap-up complete until every box is checked. This skill is a subset, not a replacement.**

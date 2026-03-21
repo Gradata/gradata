@@ -145,3 +145,5 @@
 [2026-03-20] [PROVISIONAL:5] ARCHITECTURE: When splitting files, don't keep duplicate definitions. If a fallback chain or gate content moves to domain/, replace the original with a single pointer — not both a definition and a pointer.
 
 [2026-03-20] [PROVISIONAL:5] COMMUNICATION: When surfacing anomalies or warnings, always explain WHY it matters and confirm whether it's a blocker or cosmetic. "X is wrong because Y. This is cosmetic / this blocks Z. Proceeding normally." Don't leave ambiguity about severity. Root cause: startup flagged stale session numbers without explaining impact — Oliver couldn't tell if the brain was broken or just had a stale label.
+
+[2026-03-21] [PROVISIONAL:5] WRAP-UP: /session-audit skill is a SUBSET of the CLAUDE.md 11-step wrap-up. After /session-audit completes, cross-check CLAUDE.md steps 0.5, 1, 7, 8, 9, 9.5, 10, 10.5, 11, 11b — verify each one ran. The skill covers ~6 of 11. Steps 8 (auditor), 9 (cross-wires), 9.5 (git), 10.5 (startup brief), 11b (distillation) are NOT in the skill. Root cause: skill's "SESSION AUDIT COMPLETE" message creates false sense of done.
