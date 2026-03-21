@@ -118,12 +118,32 @@ process.stdin.on('end', () => {
       } catch (e) {}
     }
 
-    // ── Prospect Count ──
+    // ── Prospect Count (due within 48 hours, including overdue) ──
     let prospectCount = 0;
     const brainPath = 'C:/Users/olive/SpritesWork/brain/prospects';
     if (fs.existsSync(brainPath)) {
       try {
-        prospectCount = fs.readdirSync(brainPath).filter(f => f.endsWith('.md')).length;
+        const now = new Date();
+        const cutoff = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+        const files = fs.readdirSync(brainPath).filter(f => f.endsWith('.md'));
+        for (const f of files) {
+          try {
+            const content = fs.readFileSync(path.join(brainPath, f), 'utf8');
+            const match = content.match(/(?:next_touch|Next Touch)\s*[:=]\s*(.+)/i);
+            if (!match) continue;
+            const raw = match[1].trim();
+            let touchDate = new Date(raw);
+            if (isNaN(touchDate.getTime())) {
+              const parts = raw.match(/^(\d{1,2})\/(\d{1,2})$/);
+              if (parts) {
+                touchDate = new Date(now.getFullYear(), parseInt(parts[1]) - 1, parseInt(parts[2]));
+              }
+            }
+            if (!isNaN(touchDate.getTime()) && touchDate <= cutoff) {
+              prospectCount++;
+            }
+          } catch (e) {}
+        }
       } catch (e) {}
     }
 

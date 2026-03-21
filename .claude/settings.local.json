@@ -171,7 +171,8 @@
       "Bash(powershell.exe -NoProfile -Command \"& { \\\\$null = [System.Management.Automation.PSParser]::Tokenize\\(\\(Get-Content 'C:\\\\Users\\\\olive\\\\OneDrive\\\\Desktop\\\\Sprites Work\\\\launch.ps1' -Raw\\), [ref]\\\\$null\\); Write-Host 'Syntax OK' }\")",
       "Bash(claude plugin:*)",
       "Bash(uv tool:*)",
-      "Bash(nlm:*)"
+      "Bash(nlm:*)",
+      "Bash(node:*)"
     ]
   }
 }

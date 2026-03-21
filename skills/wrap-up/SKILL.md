@@ -225,3 +225,13 @@ Mark each relevant item. Skip irrelevant ones. Fix any failures before closing.
 **Brain prospect notes** (if any prospects were touched this session):
 - Create or update notes in `brain/prospects/[Name] — [Company].md`
 - Don't defer this to "later" — write it now while context is fresh
+
+## Phase 6: Git Checkpoint
+
+After all other wrap-up phases complete, commit the working directory:
+
+```bash
+cd "C:/Users/olive/OneDrive/Desktop/Sprites Work" && git add -A && git commit -m "Session wrap-up — $(date +%Y-%m-%d)"
+```
+
+This captures every file change from the session in one atomic commit. If nothing changed, git will say "nothing to commit" — that's fine, move on.
