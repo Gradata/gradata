@@ -39,7 +39,7 @@ Quick health pulse before loading context. **Run steps 1-4 + 7 as a single paral
 **PARALLEL BATCH (all at once):**
 1. Check brain/system.db exists and is readable (SQLite backing store)
 2. Check brain/.git exists (version control active)
-3. Check .carl/loop file size hasn't changed unexpectedly (rule tampering detection)
+3. Check domain/carl/loop file size hasn't changed unexpectedly (rule tampering detection)
 4. Check CLAUDE.md line count is under 150 (bloat detection)
 7. **Gap Scanner** — run .claude/gap-scanner.md startup scan. Check all systems connected, detect process drift from canonical_logs, surface any gaps in the startup status output.
 
@@ -51,7 +51,7 @@ This takes <2 seconds. It catches file corruption, accidental deletions, and sys
 
 ## Phase 1: Core (~5k tokens)
 
-1. **CLAUDE.md** — auto-loaded by Claude Code. Has ICP, writing rules, email frameworks, tool stack, demo prep rules.
+1. **CLAUDE.md** — auto-loaded by Claude Code. AIOS rules, session flow, work style. Domain config in domain/DOMAIN.md (ICP, tool stack, email frameworks).
 
 **PARALLEL BATCH (steps 2, 3, 4 — no dependencies between them, fire all at once):**
 2. **Read domain/pipeline/startup-brief.md** — pipeline snapshot, active campaigns, top lessons, file pointers, credit balances. Read the **Handoff** section first — it tells you exactly where last session left off and what to do first.
@@ -62,7 +62,7 @@ This takes <2 seconds. It catches file corruption, accidental deletions, and sys
 
 These checks replace the overnight agent. They run every startup, taking ~15 seconds with parallel tool calls.
 
-Load `.carl/loop` rules for this phase (Loop replaced sequence-engine in Session 3).
+Load `domain/carl/loop` rules for this phase (Loop replaced sequence-engine in Session 3).
 
 **PARALLEL BATCH A (steps 5+7 merged + step 9 — fire all at once):**
 5+7. **Prospect loading (two tiers)** — Read domain/pipeline/startup-brief.md pipeline section to identify prospects with a meeting, demo, or follow-up due within 48 hours. These are **Tier 1** — read their full brain/prospects/ file now. All other prospects are **Tier 2** — do NOT read their files. Only load a Tier 2 prospect's brain file when Oliver names them or their company mid-session. Do NOT scan or read all prospect files. For Tier 1 prospects loaded, also check for: (a) `next_touch` dates <= today, AND (b) touches missing tag blocks (type, intent, angle, tone, framework, outcome). Flag untagged: "Untagged interactions in [prospect] — tagging required before PATTERNS.md sync."
@@ -82,8 +82,8 @@ Load `.carl/loop` rules for this phase (Loop replaced sequence-engine in Session
 
 **PARALLEL BATCH (steps 8, 9, 10 — three independent file reads, fire all at once):**
 8. **Read .carl/manifest** — check active domains.
-9. **Read .carl/global** — universal rules.
-10. **Read .carl/context** — context bracket rules.
+9. **Read .carl/global** — AIOS universal rules. **Also read domain/carl/global** — domain-specific rules (research protocol, skill loading, CCQ, OOO, channel collision, credit gate).
+10. **Read .carl/context** — context bracket rules. **Read .carl/safety** — structural protections.
 
 **THEN (sequential, needs manifest loaded):**
 11. **Keyword-match CARL domains against Oliver's first message** — load demo-prep or prospect-email domain only if task triggers recall keywords.
@@ -96,17 +96,17 @@ Load these ONLY when the task requires them. Do not preload.
 
 ### Email writing (any type)
 **Intent:** Oliver wants to write, draft, send, or edit any email — cold, inbound, follow-up, reply, sequence, etc.
-**Load:** "docs/Email Templates/templates.txt", .carl/prospect-email, "docs/Sales Playbooks/my-role.txt"
+**Load:** "domain/templates/templates.txt", domain/carl/prospect-email, "domain/playbooks/my-role.txt"
 **Also load if cold outreach:** domain/sprites_context.md (for case studies/proof points)
 
 ### Demo prep (any demo)
 **Intent:** Oliver wants to prepare for a demo, call, or meeting. Could reference a name, a time ("my 2pm"), "today's demos", "tomorrow's call", or a company name.
-**Load:** "docs/Sales Playbooks/sales-methodology.txt", "docs/Demo Prep/Demo Threads.txt", .carl/demo-prep
+**Load:** "domain/playbooks/sales-methodology.txt", "domain/prep/Demo Threads.txt", domain/carl/demo-prep
 **Then:** Check calendar to identify which demo, find/create prospect note in "docs/Demo Prep/" and Obsidian brain
 
 ### Prospecting / list building
 **Intent:** Oliver wants to find leads, build lists, research companies, enrich contacts, run sweeps, or score prospects.
-**Load:** "docs/Sales Playbooks/prospecting-instructions.txt"
+**Load:** "domain/playbooks/prospecting-instructions.txt"
 
 ### Product knowledge / case studies
 **Intent:** Oliver needs Sprites product details, pricing, ICP deep-dive, case study specifics, objection handling, or competitive positioning.

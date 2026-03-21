@@ -45,7 +45,8 @@ After drafting, generate the prospect's most likely SPECIFIC objection based on 
 Format: `OBJECTION CHECK: "[specific objection]" — [HANDLED in draft / REVISED to address]`
 
 ## Domain Gates
-Gate content is domain-specific. Load the relevant gate file when the task triggers:
+Gate content is domain-specific. Domain gates inherit this protocol — they define task-specific research checklists but do NOT redefine the universal steps (tag block, objection check, humanizer, self-score). Those always come from this file.
+Load the relevant gate file when the task triggers:
 - Pre-Draft Research: domain/gates/pre-draft.md
 - Demo Prep: domain/gates/demo-prep.md
 - Post-Demo Follow-Up: domain/gates/post-demo.md

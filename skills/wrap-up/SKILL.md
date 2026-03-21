@@ -5,9 +5,34 @@ description: Use when user says "wrap up", "close session", "end session",
   end-of-session checklist for sales ops, memory, and self-improvement
 ---
 
-# Session Wrap-Up (Sales Ops)
+# Session Wrap-Up
 
-Run four phases in order. Each phase is conversational and inline. All phases auto-apply without asking; present a consolidated report at the end.
+## Phase 0: Calculate Session Weight (ALWAYS_ON — runs first)
+
+Calculate weight score before any other wrap-up step. This determines depth for all subsequent phases.
+
+**Scoring:**
+- +1 per 5 files changed this session
+- +2 per CARL domain modified (AIOS or domain/)
+- +3 per structural change (file move/delete/new domain/new directory)
+- +1 per new lesson added
+- +1 per prospect interaction (email, call, demo, research)
+- +5 automatic if any core file modified (CLAUDE.md, session-start, wrap-up, .carl/manifest)
+
+**Weight Tiers:**
+
+| Tier | Score | Depth | Target Time |
+|------|-------|-------|-------------|
+| 1 — Light | 1-3 | Skip unchanged sections. Compress health check to 30s. One-line status per area. Fast commit, no scoring. | < 2 min |
+| 2 — Medium | 4-7 | Run health check on changed areas only. Skip unchanged CARL domains and skills. Standard quality scoring. | < 5 min |
+| 3 — Heavy | 8-12 | Full integration audit across all layers. Heal broken connections. Verify compounding chain. Full quality scoring. | < 10 min |
+| 4 — Structural | Any session with AIOS/domain/CARL structural changes | Full Phase 1-5 integration heal regardless of score. Verify every layer connects. Mandatory smoke test on session-start and wrap-up flows. | Complete, not fast |
+
+Session weight tier also feeds into .claude/auditor-system.md Session Weight (FULL/STANDARD/COMPRESSED/ABBREVIATED) — these are complementary: this tier controls wrap-up depth, auditor-system.md tiers control audit depth. Both auto-select based on session output.
+
+**Output:** `SESSION WEIGHT: [score] → Tier [N] ([Light/Medium/Heavy/Structural])`
+
+Then proceed to Phase 1 at the depth determined by the tier.
 
 ## Phase 1: Ship It
 
@@ -78,13 +103,15 @@ Review what was learned during the session. Place knowledge in the right locatio
 **Memory placement guide:**
 - **CLAUDE.md** — Permanent rules, writing conventions, workflow changes, tool stack updates. Keep under 150 lines.
 - **lessons.md** — Mistakes made, corrections received, things Oliver had to repeat. Format: date, what happened, what to do differently.
-- **.carl/domain files** — Domain-specific rules (demo-prep, prospect-email, etc.)
+- **domain/carl/ files** — Domain-specific rules (demo-prep, prospect-email, etc.)
 - **Auto memory** — Debugging insights, patterns, project quirks Claude discovered
 
 **Decision framework:**
 - Did Oliver correct me? → lessons.md
-- Is it a permanent workflow rule? → CLAUDE.md
-- Is it specific to email or demo prep? → .carl/ domain file
+- Is it a permanent AIOS workflow rule? → CLAUDE.md
+- Is it a domain-specific workflow rule? → domain/DOMAIN.md
+- Is it specific to email or demo prep? → domain/carl/ file
+- Is it an AIOS infrastructure rule? → .carl/global
 - Is it a pattern I discovered? → Auto memory
 
 Note anything important in the appropriate location.
@@ -104,7 +131,7 @@ Analyze the conversation for self-improvement. If session was routine with nothi
 **Action types:**
 - **CLAUDE.md** — Edit project rules
 - **lessons.md** — Log the mistake and fix
-- **.carl/** — Update domain rules
+- **domain/carl/** — Update domain rules
 - **Auto memory** — Save insight for future sessions
 - **Skill** — Document new skill or hook spec
 
@@ -204,7 +231,7 @@ This is the MOST IMPORTANT part of wrap-up. A bad handoff means the next session
 
 Mark each relevant item. Skip irrelevant ones. Fix any failures before closing.
 
-## Phase 5: Daily Note + Brain
+## Phase 5b: Daily Note + Brain
 
 **Daily note** (Sprites Work folder):
 - Path: C:\Users\olive\OneDrive\Desktop\Sprites Work\[YYYY-MM-DD].md

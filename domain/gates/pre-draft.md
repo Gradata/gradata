@@ -40,31 +40,4 @@ If any shows [ ] instead of [x], STOP and complete before presenting draft.
 
 Oliver approves the angle, THEN I draft. No skipping. No exceptions. Ever.
 
-### Post-Draft Tag Block (add to prospect note after Oliver approves):
-```
-## Touch [N] — [date]
-- type: [cold|warm|follow-up|re-engage|post-demo|proposal|breakup]
-- channel: email
-- intent: [book-call|get-reply|nurture|close|discover]
-- tone: [direct|casual|consultative|curious|empathetic]
-- angle: [from LOOP_RULE_5 closed set]
-- framework: [CCQ|Gap|SPIN|JOLT|Challenger]
-- subject: [subject line]
-- outcome: pending
-- next_touch: [date]
-- patterns_applied: [what from PATTERNS.md informed this draft]
-```
-
-### Self-Play Objection Check (MANDATORY — runs before Oliver sees anything):
-After drafting, generate the prospect's most likely SPECIFIC objection based on the research. Not generic — specific: "If I were [name], I would push back on [X] because [Y]." If vulnerable, revise the draft to preemptively address it before presenting.
-Format: `OBJECTION CHECK: "[specific objection]" — [HANDLED in draft / REVISED to address]`
-
-### Post-Draft Polish:
-- **Humanizer pass** — run /humanizer on the draft before presenting.
-- **Self-score** — rate against quality-rubrics.md. Show inline: `Score: X/10 (email draft) — agree? Say "that's a [X]" to override`
-
-### Email Structure (locked in):
-1. **Hook** — personal, shows homework, graceful (never condescending)
-2. **Pain** — their specific situation based on research (not generic)
-3. **Solution** — how Sprites solves line 2, with case study numbers
-4. **CTA** — low friction, casual (book a call or just reply)
+Post-draft steps (tag block, objection check, humanizer, self-score, email structure) are inherited from .claude/gates.md gate protocol. Do not redefine here.
