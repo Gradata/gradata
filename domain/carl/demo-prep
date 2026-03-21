@@ -1,0 +1,21 @@
+# CARL Demo Prep Domain
+# =====================
+# Triggers on demo prep, prospect research, or pre-call briefing.
+# Automates NotebookLM research, skill loading, and deck outline generation.
+# Compacted 2026-03-19: 21 → 8 rules. Retired meta-description.
+# Compacted 2026-03-20: 8 → 2 rules. Merged research (→ GLOBAL_RESEARCH_PROTOCOL),
+# website+deep research (→ GLOBAL_RESEARCH_PROTOCOL), skill loading (→ CORE_LOAD_SKILLS).
+# Deck format rules (12 rules) still in docs/Demo Prep/deck-template.md — load when building decks.
+#
+# Format: {DOMAIN}_RULE_{N}=rule text
+# Research: see GLOBAL_RESEARCH_PROTOCOL in .carl/global
+# Skills: see CORE_LOAD_SKILLS in .carl/global
+
+# Step 1: Query NotebookLM for prospect intelligence (tier system: .claude/skills/notebooklm/SKILL.md)
+DEMOPREP_RULE_0=After adding the source, query NotebookLM for the prospect's specific pain points, current marketing setup (agencies, in-house, tools), team size, ad channels they run (Meta, Google, both), monthly ad spend if discoverable, and any recent company news or changes. Run: notebooklm ask "[prospect company] marketing setup, pain points, team size, ad channels, ad spend" -n 6bdf40a0-e9e5-462b-bfcd-02a2985214c1
+
+# Steps 1b-1d: Query Objection Handling, Closed Won, Competitor Intel notebooks
+# NotebookLM queries: see brain/notebooklm-queries.md (Demo Prep section)
+
+# Step 2: Check existing prospect notes
+DEMOPREP_RULE_1=Read the docs/Demo Prep/ folder for any existing files matching the prospect's name or company. Check for .docx, .pdf, .md, or .txt files. Surface any prior notes, call summaries, or research already done on this person. When building a deck, load docs/Demo Prep/deck-template.md for the 8-slide structure and format rules.

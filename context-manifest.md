@@ -12,7 +12,8 @@ Files that must be in active context for the entire session. Auto-loaded or read
 | soul.md | ~1,500 | Voice/writing rules needed for any prospect-facing output. |
 | brain/loop-state.md | ~1,500 | Session checkpoint. What's due, who needs contact, what changed. |
 | .carl/manifest | ~500 | Domain routing. Which CARL files to load and when. |
-| .carl/global | ~600 | 10 universal rules (truth, honesty, complexity, conflict, research protocol, skill loading, CCQ, OOO, channel collision, credit gate). |
+| .carl/global | ~300 | 4 universal AIOS rules (truth, honesty, complexity, conflict). |
+| domain/carl/global | ~400 | Domain-specific rules (research protocol, skill loading, CCQ, OOO, channel collision, credit gate). |
 
 **Tier 0 total: ~7,800 tokens**
 
@@ -23,7 +24,7 @@ Files read during startup. Results surfaced in the 3-line status output. Full fi
 |---------------|-------------|---------|--------|
 | brain/morning-brief.md | ~1,500 | If fresh (<4h), read and skip Gmail/Fireflies | Status lines for pipeline, replies, recordings |
 | .claude/lessons.md | ~2,000 | Always — scan graduated index + active lessons | Relevant lessons held; file released |
-| docs/startup-brief.md | ~1,500 | Always — read Handoff section first | Pipeline state, credit balances, campaign status |
+| domain/pipeline/startup-brief.md | ~1,500 | Always — read Handoff section first | Pipeline state, credit balances, campaign status |
 | Google Calendar (API) | ~500 | Always — today + tomorrow | [calendar] line in status |
 | Gmail scan (API) | ~300 | Only emails in loop-state.md Gmail Check List | [replies] line in status |
 | Fireflies scan (API) | ~300 | Match against active deals by attendee email | New recordings surfaced or "none" |
@@ -54,9 +55,9 @@ Files loaded when Oliver's message or the current task requires them. Intent-bas
 | .claude/loop-audit.md | Wrap-up audit (Loop dimensions) |
 | .claude/cross-wire-checklist.md | Wrap-up step 9 |
 | .claude/health-audit.md | Wrap-up step 6 |
-| .claude/pipedrive-templates.md | Publishing CRM notes |
-| .claude/weekly-pulse-template.md | Monday sessions |
-| docs/sprites_context.md | Product knowledge, case studies, competitive positioning |
+| domain/pipeline/pipedrive-templates.md | Publishing CRM notes |
+| domain/pipeline/weekly-pulse-template.md | Monday sessions |
+| domain/sprites_context.md | Product knowledge, case studies, competitive positioning |
 | "docs/Sales Playbooks/sales-methodology.txt" | Demo prep, discovery calls |
 | "docs/Sales Playbooks/prospecting-instructions.txt" | List building, ICP scoring |
 | "docs/Sales Playbooks/my-role.txt" | Email writing context |
@@ -102,7 +103,7 @@ Files excluded from agent context entirely. See .agentignore for patterns.
 | Signals (step 7) | CLAUDE.md startup | Tier 1 | Scan, surface hits |
 | Health check | CLAUDE.md startup | Tier 1 | Quick pulse, release |
 | lessons.md | session-start Phase 1 | Tier 1 | Scan, hold relevant, release file |
-| docs/startup-brief.md | session-start Phase 1 | Tier 1 | Read handoff, release file |
+| domain/pipeline/startup-brief.md | session-start Phase 1 | Tier 1 | Read handoff, release file |
 | All CARL task domains | session-start Phase 2-3 | Tier 2 | No change — already on-demand |
 | All gate/quality files | session-start Phase 3 | Tier 2 | No change — already on-demand |
 | All sales playbooks | session-start Phase 3 | Tier 2 | No change — already on-demand |

@@ -145,10 +145,10 @@ Run EVERY wrap-up. This prevents memory rot and token waste. Auto-fix without as
 **4c. Prospect staleness:**
 - Scan `brain/prospects/` for notes with no updates in 14+ days → add `#stale` tag
 - Any prospect tagged `#stale` for 30+ days → move to `brain/archive/`
-- Update docs/startup-brief.md pipeline section to remove archived prospects
+- Update domain/pipeline/startup-brief.md pipeline section to remove archived prospects
 
 **4d. File line caps (enforce hard limits):**
-- `docs/startup-brief.md` > 60 lines → trim completed campaigns, archived prospects, old handoff details
+- `domain/pipeline/startup-brief.md` > 60 lines → trim completed campaigns, archived prospects, old handoff details
 - `CLAUDE.md` > 150 lines → archive old sections to `.claude/CLAUDE-archive.md` (protect: Rules Index, ICP, Writing Rules, Email Frameworks, Tool Stack)
 - `lessons.md` > 30 active entries → force graduation check (4b)
 - Daily note > 100 lines → you're logging too much detail. Summarize, don't transcribe.
@@ -180,18 +180,18 @@ Quick verification — only check what's relevant to this session's work.
 - [ ] Any promised follow-ups not yet drafted?
 
 **Smoke test (always run, 5 seconds):**
-- [ ] Can read: CLAUDE.md, docs/startup-brief.md, lessons.md (file system OK)
+- [ ] Can read: CLAUDE.md, domain/pipeline/startup-brief.md, lessons.md (file system OK)
 - [ ] settings.json parses as valid JSON (config not corrupted)
 - [ ] .claude.json parses as valid JSON (MCP config intact)
 - [ ] brain/ directory accessible at C:/Users/olive/SpritesWork/
 - [ ] .carl/manifest accessible
-- [ ] Line counts: CLAUDE.md < 150, docs/startup-brief.md < 60, lessons.md < 30 active
+- [ ] Line counts: CLAUDE.md < 150, domain/pipeline/startup-brief.md < 60, lessons.md < 30 active
 
 If any smoke test fails, fix it BEFORE writing the handoff.
 
-**Update docs/startup-brief.md** with any pipeline, campaign, lesson, or credit changes so next session starts current.
+**Update domain/pipeline/startup-brief.md** with any pipeline, campaign, lesson, or credit changes so next session starts current.
 
-**Write the Handoff section** in docs/startup-brief.md (## Handoff). This prevents context rot between sessions. Include:
+**Write the Handoff section** in domain/pipeline/startup-brief.md (## Handoff). This prevents context rot between sessions. Include:
 - Last session: what type of work was done (prospect work, system building, campaign, etc.)
 - Momentum: what mode were we in, what's the current energy/direction
 - What was half-done: anything incomplete that MUST be picked up

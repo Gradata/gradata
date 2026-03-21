@@ -1,0 +1,24 @@
+# CARL Domain Global — Sprites-Specific Protocols
+# ================================================
+# Domain-specific rules extracted from .carl/global.
+# AIOS universal rules (GLOBAL_RULE_0-3) remain in .carl/global.
+# These rules apply only when the Sprites domain is loaded.
+
+# NotebookLM tier system: .claude/skills/notebooklm/SKILL.md
+DOMAIN_RESEARCH_PROTOCOL=UNIVERSAL PROSPECT RESEARCH: Before ANY prospect-facing activity (email, call, demo, LinkedIn), run this research sequence: (1) brain/prospects/[Name].md — existing notes, angles tried, outcomes. (2) Apollo MCP (apollo_contacts_search) — contact data, Activities tab for prior calls/transcripts/touchpoints. (3) Fireflies (fireflies_search) — prior call transcripts (critical for follow-ups and demo prep). (4) Web research — LinkedIn profile (posts, activity, job changes, mutual connections), company website, news. (5) NotebookLM — ingest research into ICP Signals notebook (bf84ba08) for general prospects; ALSO add to Demo Prep notebook (6bdf40a0) if demo is booked. For demo prep specifically: also run deep research mode (--mode deep --no-wait --import-all) and wait for completion before querying. The goal: find at least one specific, referenceable detail about this person before any output.
+DOMAIN_RESEARCH_PROTOCOL_PRIORITY=CRITICAL
+
+DOMAIN_LOAD_SKILLS=SKILL LOADING BY ACTIVITY: Load the relevant skill set before executing. EMAIL: skills/cold-email-manifesto/SKILL.md (CCQ), skills/buyer-psychology/SKILL.md (emotional triggers), skills/outbound-playbook/SKILL.md (cadence, objections). DEMO PREP: all four — cold-email-manifesto, buyer-psychology, outbound-playbook, AND skills/jolt-indecision/SKILL.md (overcoming indecision, risk reversal). LIST BUILD: skills/lead-pipeline/SKILL.md (pipeline workflow) + "domain/playbooks/prospecting-instructions.txt" (ICP scoring, CSV format) + domain/leads/STATUS.md (campaign state). COLD CALL: skills/fanatical-prospecting/SKILL.md (call structure) + outbound-playbook + "domain/playbooks/sales-methodology.txt" (SPIN, Gap Selling). Load once per activity type per session.
+DOMAIN_LOAD_SKILLS_PRIORITY=HIGH
+
+DOMAIN_COMMUNICATION_FRAMEWORK=CCQ FRAMEWORK (all channels): Structure persuasive outreach using Compliment/Case Study/Question. EMAIL: Compliment (one specific, genuine observation — not generic flattery), Case Study (one sentence with a specific result, e.g. "H.M. Cole went from agency retainers to 5.8x ROAS in one month"), Question (simple yes/no CTA or hyperlinked meeting link). LINKEDIN DM/INMAIL (modified): Reference something specific from their LinkedIn. One sentence on why you're reaching out tied to their situation. Soft CTA. Under 75 words. No attachments, no links in first message. Follow domain/soul.md + soul.md writing rules on both channels.
+DOMAIN_COMMUNICATION_FRAMEWORK_PRIORITY=HIGH
+
+OOO_RULE=OUT-OF-OFFICE DETECTION: If a prospect reply is detected as an out-of-office auto-reply, do NOT follow up. Log the OOO detection date and expected return date in brain/prospects/[Name].md. Set next_touch to return date + 1 business day, or OOO date + 5 business days if no return date stated. Tag the interaction: outcome=ooo, auto_reply=true.
+OOO_RULE_PRIORITY=CRITICAL
+
+DUPLICATE_OUTREACH_RULE=CHANNEL COLLISION BLOCK: If a LinkedIn message was sent to a prospect within the last 24 hours, do NOT send an email. Check brain/prospects/[Name].md for the last LinkedIn touch timestamp before any email draft. The reverse also applies. Minimum 24-hour gap between channels. Violation = tag [CHANNEL_COLLISION] in daily notes.
+DUPLICATE_OUTREACH_RULE_PRIORITY=CRITICAL
+
+CREDIT_GATE_RULE=CREDIT APPROVAL GATE: Before executing any research or list-build task, estimate the total credit cost. If estimated cost exceeds 50 credits, STOP and present the estimate to Oliver. Log actual credits used after completion in domain/pipeline/startup-brief.md.
+CREDIT_GATE_RULE_PRIORITY=CRITICAL

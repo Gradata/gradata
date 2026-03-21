@@ -1,4 +1,14 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "WebFetch(*)",
+      "WebSearch(*)"
+    ],
+    "deny": []
+  },
   "hooks": {
     "SessionStart": [
       {

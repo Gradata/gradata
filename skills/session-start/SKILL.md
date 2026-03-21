@@ -1,11 +1,11 @@
 ---
 name: session-start
-description: Run automatically at every session start before responding to Oliver's first message. Loads docs/startup-brief.md, lessons.md, CARL, and checks Google Calendar. Defers all other context to on-demand loading based on task intent. Use this skill whenever a new session begins, the user says "start up", "load context", or any time CLAUDE.md's session startup instructions need to execute. This is mandatory — never skip it.
+description: Run automatically at every session start before responding to Oliver's first message. Loads domain/pipeline/startup-brief.md, lessons.md, CARL, and checks Google Calendar. Defers all other context to on-demand loading based on task intent. Use this skill whenever a new session begins, the user says "start up", "load context", or any time CLAUDE.md's session startup instructions need to execute. This is mandatory — never skip it.
 ---
 
 # Session Startup (Lazy Load)
 
-Run automatically at session start. Optimized to minimize token cost. Everything not loaded here is available on demand via file pointers in docs/startup-brief.md.
+Run automatically at session start. Optimized to minimize token cost. Everything not loaded here is available on demand via file pointers in domain/pipeline/startup-brief.md.
 
 ## Phase -1: DELTA_SCAN (Brain Alert System)
 
@@ -28,7 +28,7 @@ Run FIRST, before any context loads. Compare current state to previous session s
 
 Before loading anything:
 1. **Check brain/morning-brief.md** — if it exists and is fresh (< 4 hours old), read it. It contains Gmail replies, Fireflies recordings, Pipedrive changes, pre-drafted follow-ups, and deal health alerts. Skip Gmail/Fireflies scans in Phase 1.5. If stale or missing, Gmail/Fireflies/Pipedrive checks run inline during Phase 1.5.
-2. Check modification dates on docs/startup-brief.md, lessons.md, Leads/STATUS.md, brain/prospects/
+2. Check modification dates on domain/pipeline/startup-brief.md, lessons.md, Leads/STATUS.md, brain/prospects/
 3. If any file was modified AFTER the last session's daily note timestamp → surface changes to Oliver ("Since last session: follow-up checker flagged 2 stale prospects, startup-brief updated by scheduled task")
 4. This catches external edits and anything that changed between sessions
 
@@ -54,7 +54,7 @@ This takes <2 seconds. It catches file corruption, accidental deletions, and sys
 1. **CLAUDE.md** — auto-loaded by Claude Code. Has ICP, writing rules, email frameworks, tool stack, demo prep rules.
 
 **PARALLEL BATCH (steps 2, 3, 4 — no dependencies between them, fire all at once):**
-2. **Read docs/startup-brief.md** — pipeline snapshot, active campaigns, top lessons, file pointers, credit balances. Read the **Handoff** section first — it tells you exactly where last session left off and what to do first.
+2. **Read domain/pipeline/startup-brief.md** — pipeline snapshot, active campaigns, top lessons, file pointers, credit balances. Read the **Handoff** section first — it tells you exactly where last session left off and what to do first.
 3. **Read .claude/lessons.md** — mistakes log. Scan every entry. Never repeat a logged mistake.
 4. **Check Google Calendar for today + tomorrow** — surface demos, calls, meetings.
 
@@ -65,7 +65,7 @@ These checks replace the overnight agent. They run every startup, taking ~15 sec
 Load `.carl/loop` rules for this phase (Loop replaced sequence-engine in Session 3).
 
 **PARALLEL BATCH A (steps 5+7 merged + step 9 — fire all at once):**
-5+7. **Prospect loading (two tiers)** — Read docs/startup-brief.md pipeline section to identify prospects with a meeting, demo, or follow-up due within 48 hours. These are **Tier 1** — read their full brain/prospects/ file now. All other prospects are **Tier 2** — do NOT read their files. Only load a Tier 2 prospect's brain file when Oliver names them or their company mid-session. Do NOT scan or read all prospect files. For Tier 1 prospects loaded, also check for: (a) `next_touch` dates <= today, AND (b) touches missing tag blocks (type, intent, angle, tone, framework, outcome). Flag untagged: "Untagged interactions in [prospect] — tagging required before PATTERNS.md sync."
+5+7. **Prospect loading (two tiers)** — Read domain/pipeline/startup-brief.md pipeline section to identify prospects with a meeting, demo, or follow-up due within 48 hours. These are **Tier 1** — read their full brain/prospects/ file now. All other prospects are **Tier 2** — do NOT read their files. Only load a Tier 2 prospect's brain file when Oliver names them or their company mid-session. Do NOT scan or read all prospect files. For Tier 1 prospects loaded, also check for: (a) `next_touch` dates <= today, AND (b) touches missing tag blocks (type, intent, angle, tone, framework, outcome). Flag untagged: "Untagged interactions in [prospect] — tagging required before PATTERNS.md sync."
 9. **Check brain/signals.md** — scan for unprocessed signals with `relevance >= 7`. These are high-priority triggers (competitive moves, buying intent, key person changes) that need attention this session. Surface any hits in the startup status under `[signal]`.
 
 **PARALLEL BATCH B (after batch A identifies pending outcomes — fire all Gmail searches at once):**
@@ -97,7 +97,7 @@ Load these ONLY when the task requires them. Do not preload.
 ### Email writing (any type)
 **Intent:** Oliver wants to write, draft, send, or edit any email — cold, inbound, follow-up, reply, sequence, etc.
 **Load:** "docs/Email Templates/templates.txt", .carl/prospect-email, "docs/Sales Playbooks/my-role.txt"
-**Also load if cold outreach:** docs/sprites_context.md (for case studies/proof points)
+**Also load if cold outreach:** domain/sprites_context.md (for case studies/proof points)
 
 ### Demo prep (any demo)
 **Intent:** Oliver wants to prepare for a demo, call, or meeting. Could reference a name, a time ("my 2pm"), "today's demos", "tomorrow's call", or a company name.
@@ -110,7 +110,7 @@ Load these ONLY when the task requires them. Do not preload.
 
 ### Product knowledge / case studies
 **Intent:** Oliver needs Sprites product details, pricing, ICP deep-dive, case study specifics, objection handling, or competitive positioning.
-**Load:** docs/sprites_context.md
+**Load:** domain/sprites_context.md
 **Prefer:** Use `ctx_index` + `ctx_search` instead of reading full file when only a specific section is needed.
 
 ### Lead campaign management
@@ -163,9 +163,9 @@ Query proactively when the task benefits from it:
 - **Email writing:** Query Sprites Sales notebook (`1e9d15ed-0308-4a30-ae27-edf749dc8953`) for relevant case studies
 - Don't wait to be told. If the task involves a prospect, NotebookLM adds value.
 
-## Session End: Update docs/startup-brief.md + Brain
+## Session End: Update domain/pipeline/startup-brief.md + Brain
 
-During wrap-up, update docs/startup-brief.md with:
+During wrap-up, update domain/pipeline/startup-brief.md with:
 - Pipeline changes (new prospects, demos booked, deals closed)
 - Campaign progress
 - New top lessons

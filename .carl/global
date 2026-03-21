@@ -1,50 +1,18 @@
-# CARL Global Domain
-# ===================
-# Universal rules that apply to all sessions.
-# Keep this lean — domain-specific rules belong in their own files.
-# Compacted 2026-03-19: 16 → 4 rules. Retired 12 rules that duplicate
-# Claude Code system prompt defaults or CLAUDE.md sections.
-# Compacted 2026-03-20: Added 6 merged/new rules from cross-domain audit.
-# Merged: research protocols, skill loading, communication framework.
-# Added: OOO, duplicate outreach, credit gate.
+# CARL Global Domain — AIOS Universal Rules
+# ===========================================
+# Universal rules that apply to all sessions regardless of domain.
+# Domain-specific rules live in domain/carl/global.
 #
 # Format: {DOMAIN}_RULE_{N}=rule text
 
 GLOBAL_RULE_0=TRUTH & VERIFICATION: No success claims without evidence. Show tool output (IDs, paths, API responses) for every state-changing action. Cite sources for every data claim. No silent failures — report immediately. Never fabricate. Full verification protocols, banned success phrases, and mutation logging rules: .claude/truth-protocol.md. This rule and that file are the single source of truth — no other file repeats these constraints.
 GLOBAL_RULE_0_PRIORITY=CRITICAL
 
-GLOBAL_RULE_1=BRUTAL HONESTY: On EVERY output and EVERY recommendation, proactively surface what's weak, what's risky, and what you're unsure about. Don't wait for Oliver to ask. Don't bury concerns in politeness. If you think a task is wrong-priority, wrong-timing, or over-engineered — say so BEFORE executing, not after. If an email draft has a weak CTA, say "the CTA is weak because..." when you present it. If you're building the 15th system improvement without testing the first one, flag the risk. Silence on concerns = failure. This applies to every action, not just when Oliver pushes.
+GLOBAL_RULE_1=BRUTAL HONESTY: On EVERY output and EVERY recommendation, proactively surface what's weak, what's risky, and what you're unsure about. Don't wait to be asked. Don't bury concerns in politeness. If you think a task is wrong-priority, wrong-timing, or over-engineered — say so BEFORE executing, not after. Silence on concerns = failure. This applies to every action, not just when pushed.
 GLOBAL_RULE_1_PRIORITY=CRITICAL
 
-GLOBAL_RULE_2=REQUEST COMPLEXITY CLASSIFICATION: Before executing any request, classify it as SIMPLE (1 tool call, 1 file, direct lookup — execute immediately), STANDARD (2-4 steps, single gate, one output — run the gate and execute), or DEEP (5+ steps, multiple gates, multiple outputs, cross-referencing, or research-heavy — announce the plan before starting). For DEEP requests, show Oliver a 2-3 line plan: "This needs [N] steps: [list]. Starting with [first step]."
+GLOBAL_RULE_2=REQUEST COMPLEXITY CLASSIFICATION: Before executing any request, classify it as SIMPLE (1 tool call, 1 file, direct lookup — execute immediately), STANDARD (2-4 steps, single gate, one output — run the gate and execute), or DEEP (5+ steps, multiple gates, multiple outputs, cross-referencing, or research-heavy — announce the plan before starting). For DEEP requests, show a 2-3 line plan: "This needs [N] steps: [list]. Starting with [first step]."
 GLOBAL_RULE_2_PRIORITY=HIGH
 
-GLOBAL_RULE_3=CONFLICT RESOLUTION: When rules, lessons, or patterns contradict each other, resolve in this priority order: (1) Oliver's explicit instruction in the current session (always wins), (2) CLAUDE.md permanent rules, (3) Active CARL domain rules, (4) lessons.md behavioral corrections, (5) PATTERNS.md data-driven insights, (6) Default behavior. At the same priority level: most recent entry wins. If ambiguous after applying this hierarchy, ask Oliver — don't guess. Log every conflict resolution to daily notes.
+GLOBAL_RULE_3=CONFLICT RESOLUTION: When rules, lessons, or patterns contradict each other, resolve in this priority order: (1) User's explicit instruction in the current session (always wins), (2) CLAUDE.md permanent rules, (3) Active CARL domain rules, (4) lessons.md behavioral corrections, (5) PATTERNS.md data-driven insights, (6) Default behavior. At the same priority level: most recent entry wins. If ambiguous after applying this hierarchy, ask — don't guess. Log every conflict resolution to daily notes.
 GLOBAL_RULE_3_PRIORITY=HIGH
-
-# ============================================================================
-# MERGED RULES: Cross-domain protocols consolidated here
-# ============================================================================
-
-# NotebookLM tier system: .claude/skills/notebooklm/SKILL.md
-GLOBAL_RESEARCH_PROTOCOL=UNIVERSAL PROSPECT RESEARCH: Before ANY prospect-facing activity (email, call, demo, LinkedIn), run this research sequence: (1) brain/prospects/[Name].md — existing notes, angles tried, outcomes. (2) Apollo MCP (apollo_contacts_search) — contact data, Activities tab for prior calls/transcripts/touchpoints. (3) Fireflies (fireflies_search) — prior call transcripts (critical for follow-ups and demo prep). (4) Web research — LinkedIn profile (posts, activity, job changes, mutual connections), company website, news. (5) NotebookLM — ingest research into ICP Signals notebook (bf84ba08) for general prospects; ALSO add to Demo Prep notebook (6bdf40a0) if demo is booked. For demo prep specifically: also run deep research mode (--mode deep --no-wait --import-all) and wait for completion before querying. The goal: find at least one specific, referenceable detail about this person before any output.
-GLOBAL_RESEARCH_PROTOCOL_PRIORITY=CRITICAL
-
-CORE_LOAD_SKILLS=SKILL LOADING BY ACTIVITY: Load the relevant skill set before executing. EMAIL: skills/cold-email-manifesto/SKILL.md (CCQ), skills/buyer-psychology/SKILL.md (emotional triggers), skills/outbound-playbook/SKILL.md (cadence, objections). DEMO PREP: all four — cold-email-manifesto, buyer-psychology, outbound-playbook, AND skills/jolt-indecision/SKILL.md (overcoming indecision, risk reversal). LIST BUILD: skills/lead-pipeline/SKILL.md (pipeline workflow) + "docs/Sales Playbooks/prospecting-instructions.txt" (ICP scoring, CSV format) + Leads/STATUS.md (campaign state). COLD CALL: skills/fanatical-prospecting/SKILL.md (call structure) + outbound-playbook + "docs/Sales Playbooks/sales-methodology.txt" (SPIN, Gap Selling). Load once per activity type per session — don't reload if already in context.
-CORE_LOAD_SKILLS_PRIORITY=HIGH
-
-COMMUNICATION_FRAMEWORK=CCQ FRAMEWORK (all channels): Structure persuasive outreach using Compliment/Case Study/Question. EMAIL: Compliment (one specific, genuine observation — not generic flattery), Case Study (one sentence with a specific result, e.g. "H.M. Cole went from agency retainers to 5.8x ROAS in one month"), Question (simple yes/no CTA or hyperlinked meeting link). LINKEDIN DM/INMAIL (modified): Reference something specific from their LinkedIn (a post, job change, company milestone — NOT generic). One sentence on why you're reaching out tied to their situation. Soft CTA — "worth a quick chat?" or "happy to share what we're seeing." Under 75 words. No attachments, no links in first message. Links in second message only if they respond. Follow soul.md writing rules on both channels.
-COMMUNICATION_FRAMEWORK_PRIORITY=HIGH
-
-# ============================================================================
-# HARD CONSTRAINTS: Gap-fill rules from external audit
-# ============================================================================
-
-OOO_RULE=OUT-OF-OFFICE DETECTION: If a prospect reply is detected as an out-of-office auto-reply (vacation, leave, OOO, automatic reply indicators), do NOT follow up. Log the OOO detection date and expected return date (if stated) in brain/prospects/[Name].md. Set next_touch to return date + 1 business day, or OOO date + 5 business days if no return date stated. Do not add them to any sequence or cadence until the next_touch date. Tag the interaction: outcome=ooo, auto_reply=true.
-OOO_RULE_PRIORITY=CRITICAL
-
-DUPLICATE_OUTREACH_RULE=CHANNEL COLLISION BLOCK: If a LinkedIn message was sent to a prospect within the last 24 hours, do NOT send an email to that prospect. This is a hard block, not a suggestion — do not draft, do not suggest, do not offer as an option. Check brain/prospects/[Name].md for the last LinkedIn touch timestamp before any email draft. The reverse also applies: if an email was sent today, do not send a LinkedIn message today. Minimum 24-hour gap between channels to the same prospect. Violation = tag [CHANNEL_COLLISION] in daily notes.
-DUPLICATE_OUTREACH_RULE_PRIORITY=CRITICAL
-
-CREDIT_GATE_RULE=CREDIT APPROVAL GATE: Before executing any research or list-build task, estimate the total credit cost across all tools (Apollo enrichment, Prospeo, ZeroBounce, Apify, etc.). If the estimated cost exceeds 50 credits, STOP and present the estimate to Oliver: "This task will use approximately [N] credits across [tools]. Approve?" Do not proceed until Oliver confirms. For batches, calculate per-contact cost × batch size. Log actual credits used after completion in docs/startup-brief.md. This gate applies even if Oliver said "enrich this list" — the approval is for the cost, not the action.
-CREDIT_GATE_RULE_PRIORITY=CRITICAL

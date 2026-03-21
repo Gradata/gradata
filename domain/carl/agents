@@ -1,0 +1,11 @@
+# CARL Domain Agents — Sprites-Specific Agent Roster
+# ===================================================
+# Agent framework (types, contracts, boundaries) lives in .carl/agents (AIOS).
+# This file defines the Sprites-specific agent configuration.
+
+# Sprites agent tools mapping:
+# RESEARCH AGENT: Apollo, LinkedIn, websites, NotebookLM (.claude/skills/notebooklm/SKILL.md), Fireflies, web search
+# DRAFT AGENT: emails, scripts, messages, proposals. Input: research note + PATTERNS.md + framework
+# CRM AGENT: Pipedrive reads/writes via RUBE_MULTI_EXECUTE. Oliver-tagged deals only (label 45)
+# AUDIT AGENT: quality scoring, gate verification per .claude/quality-rubrics.md
+# ORCHESTRATOR: main Claude session. Routes to Oliver.

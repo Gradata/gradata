@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Sprites.ai Sales Statusline v2
-// Clean, readable, no broken unicode
+// AIOS Statusline v3 — Domain-aware
+// Reads domain name from domain/DOMAIN.md if present
 
 const fs = require('fs');
 const path = require('path');
@@ -15,7 +15,6 @@ process.stdin.on('end', () => {
   try {
     const data = JSON.parse(input);
     const model = (data.model && data.model.display_name) || data.model || 'Claude';
-    // Hardcode project root as fallback — Claude Code may not pass cwd to statusline hooks
     const SPRITES_ROOT = 'C:/Users/olive/OneDrive/Desktop/Sprites Work';
     const dir = (data.workspace && data.workspace.current_dir) || data.cwd || process.env.SPRITES_ROOT || SPRITES_ROOT;
     const session = data.session_id || '';
@@ -36,6 +35,22 @@ process.stdin.on('end', () => {
       white: '\x1b[37m',
       blink: '\x1b[5m',
     };
+
+    // ── Domain Detection ──
+    let domainName = 'AIOS';
+    const domainPath = path.join(dir, 'domain', 'DOMAIN.md');
+    if (fs.existsSync(domainPath)) {
+      try {
+        const domainContent = fs.readFileSync(domainPath, 'utf8');
+        const titleMatch = domainContent.match(/^#\s+(.+)/m);
+        if (titleMatch) {
+          // Extract short name from title (e.g. "Sprites.ai Sales Domain Configuration" → "Sprites.ai")
+          const title = titleMatch[1];
+          const dotMatch = title.match(/^(\S+\.?\S*)/);
+          domainName = dotMatch ? dotMatch[1] : title.split(' ')[0];
+        }
+      } catch (e) {}
+    }
 
     // ── Context Bar (using simple ASCII) ──
     let ctxDisplay = '';
@@ -95,7 +110,6 @@ process.stdin.on('end', () => {
       try {
         const allFiles = fs.readdirSync(todosDir)
           .filter(f => f.endsWith('.json'));
-        // Count unique active agent sessions
         const agentSessions = new Set();
         for (const f of allFiles) {
           try {
@@ -147,15 +161,21 @@ process.stdin.on('end', () => {
       } catch (e) {}
     }
 
-    // ── Skills Count ──
+    // ── Skills Count (root + .claude/skills + domain/skills) ──
     let skillCount = 0;
-    const skillsPath = path.join(dir, 'skills');
-    if (fs.existsSync(skillsPath)) {
-      try {
-        skillCount = fs.readdirSync(skillsPath).filter(f => {
-          return fs.statSync(path.join(skillsPath, f)).isDirectory();
-        }).length;
-      } catch (e) {}
+    const skillDirs = [
+      path.join(dir, 'skills'),
+      path.join(dir, '.claude', 'skills'),
+      path.join(dir, 'domain', 'skills')
+    ];
+    for (const sp of skillDirs) {
+      if (fs.existsSync(sp)) {
+        try {
+          skillCount += fs.readdirSync(sp).filter(f => {
+            return fs.statSync(path.join(sp, f)).isDirectory();
+          }).length;
+        } catch (e) {}
+      }
     }
 
     // ── MCP Count ──
@@ -165,7 +185,6 @@ process.stdin.on('end', () => {
       if (fs.existsSync(homeConfig)) {
         const config = JSON.parse(fs.readFileSync(homeConfig, 'utf8'));
         const globalCount = Object.keys(config.mcpServers || {}).length;
-        // Sum MCPs from all matching project entries (exact match on dir)
         let localCount = 0;
         const dirNorm = dir.replace(/\\/g, '/');
         for (const [key, val] of Object.entries(config.projects || {})) {
@@ -191,25 +210,27 @@ process.stdin.on('end', () => {
     }
     const apiDisplay = apiKeys.length > 0 ? `${c.green}${apiKeys.join(' ')}${c.reset}` : `${c.red}NO KEYS${c.reset}`;
 
-    // ── CARL Domains ──
+    // ── CARL Domains (AIOS + domain) ──
     let carlCount = 0;
-    const carlPath = path.join(dir, '.carl');
-    if (fs.existsSync(carlPath)) {
-      try {
-        carlCount = fs.readdirSync(carlPath).filter(f => {
-          return fs.statSync(path.join(carlPath, f)).isFile();
-        }).length;
-      } catch (e) {}
+    const carlPaths = [path.join(dir, '.carl'), path.join(dir, 'domain', 'carl')];
+    for (const cp of carlPaths) {
+      if (fs.existsSync(cp)) {
+        try {
+          carlCount += fs.readdirSync(cp).filter(f => {
+            return fs.statSync(path.join(cp, f)).isFile();
+          }).length;
+        } catch (e) {}
+      }
     }
 
     // ── Time ──
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    const now2 = new Date();
+    const timeStr = now2.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
     // ── Build Output ──
     // Line 1: Branding | Model | Context
     const line1parts = [
-      `${c.bold}${c.cyan}Sprites.ai${c.reset}`,
+      `${c.bold}${c.cyan}${domainName}${c.reset}`,
       `${c.dim}${model}${c.reset}`,
       ctxDisplay,
       `${c.dim}${timeStr}${c.reset}`
@@ -240,6 +261,6 @@ process.stdin.on('end', () => {
     process.stdout.write(output);
 
   } catch (e) {
-    process.stdout.write('\x1b[36mSprites.ai\x1b[0m');
+    process.stdout.write('\x1b[36mAIOS\x1b[0m');
   }
 });
