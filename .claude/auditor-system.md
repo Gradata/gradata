@@ -280,6 +280,15 @@ Lessons graduate from lessons.md to lessons-archive.md based on evidence, not sl
 ### Graduation Log
 When graduating, note in lessons-archive.md: which criterion was met, what permanent rule (if any) replaced it, date graduated.
 
+## Reflection Feed (read before scoring)
+Before scoring any dimension, read the reflection data from this session:
+- **Provisional lessons count** — how many new lessons were written this session (from lessons.md)
+- **Graduated lessons count** — how many lessons graduated this session
+- **Blocked outputs count** — how many outputs scored <7 and were blocked/revised (from session history)
+- **Confidence flag distribution** — ratio of HIGH/MEDIUM/LOW across session outputs
+- **Root cause patterns** — read brain/sessions/reflect-patterns.md for systemic gaps identified by /reflect's double-loop
+This context informs the audit — a session with 3 blocked outputs is fundamentally different from one with zero. Score accordingly.
+
 ## Quality Self-Assessment in Daily Notes
 Every session's daily notes MUST include a reflection section at the end:
 

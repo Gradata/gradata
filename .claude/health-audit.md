@@ -102,6 +102,7 @@ Runs as part of the smoke test step. More thorough than startup.
 - [ ] Email tracking updated for every email drafted/sent
 - [ ] Changelog updated if CLAUDE.md was modified
 - [ ] Audit log entry written for this session
+- [ ] Reflection chain complete: capture → confidence flag → self-score → block if <7 → /reflect ran → patterns logged → auditor scored → session note written
 
 ### Report Format (wrap-up)
 ```

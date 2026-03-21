@@ -40,14 +40,13 @@ def main() -> int:
     if "git commit" not in command or "--amend" in command:
         return 0
 
-    # Build reminder message
-    msg = "Git commit detected!"
-
+    # Auto-trigger /reflect after every commit
     items = load_queue()
-    if items:
-        msg += f" You have {len(items)} queued learning(s)."
+    if not items:
+        # Empty queue — silent exit, no interruption
+        return 0
 
-    msg += " Feature complete? Run /reflect to process learnings."
+    msg = f"Git commit detected! {len(items)} queued learning(s). /reflect auto-firing — process before continuing."
 
     # Output proper JSON for hook response
     response = {

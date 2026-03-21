@@ -9,6 +9,8 @@
 # After 3 shadow occurrences: promote to active or kill. See auditor-system.md.
 #
 # Wrap-up: decrement all [PROVISIONAL:N] counters. Delete any with reversal flag. Promote [PROVISIONAL:0] to [CONFIRMED].
+# Format for new lessons: [DATE] [PROVISIONAL:5] CATEGORY: What happened → What to do instead. Root cause: [what systemic gap allowed this]
+# Root cause is MANDATORY on every new lesson — it feeds the double-loop in /reflect.
 # Effectiveness: New lessons start with [TRACK:0/3]. After each scenario occurrence, increment and log Y/N.
 # Format: [TRACK:hits/3:YYN] where Y=prevented, N=repeated. At 3 hits: 2+Y=[EFFECTIVE], 2+N=[REWRITE NEEDED].
 # If 20+ sessions pass with 0 hits: mark [UNTESTABLE].

@@ -33,10 +33,11 @@ Check if recent sessions show signs of skipping:
 
 ## Mid-Session Scan (runs after every 3rd major action)
 
-Quick check — 3 questions:
+Quick check — 4 questions:
 1. Am I about to present prospect output? → Did pre-flight run?
 2. Have I used the vault this session for any prospect work? → If not, why?
 3. Have I queried NotebookLM for any research task? → If not, should I?
+4. **Heartbeat reflection** (every 10 major outputs): auto-run /reflect on the queue regardless of whether Oliver asked. Log the result to .claude/micro-reflections.md. This prevents queue buildup that gets skipped at wrap-up. If queue is empty, log "heartbeat: queue empty" and continue.
 
 If any answer suggests a gap: surface immediately.
 "GAP ALERT: [what's missing] — [why it matters] — [fixing now]"

@@ -107,7 +107,7 @@ python .claude/hooks/reflect/scripts/extract_session_learnings.py <session-file>
 python .claude/hooks/reflect/scripts/extract_tool_rejections.py <session-file>
 ```
 
-### Step 4: Classify Each Learning
+### Step 4: Classify Each Learning (with Double-Loop Analysis)
 
 For each queued item, determine the route:
 
@@ -115,6 +115,7 @@ For each queued item, determine the route:
 2. **Check if it's a behavioral rule** (universal, applies across sessions, imperative voice)
 3. **Check if it's a specific mistake** (has a root cause, tied to an incident, pattern of "did X → should have done Y")
 4. **Check if it's a methodology insight** (strategic, needs judgment, about market/prospect/approach)
+5. **Double-loop question** (MANDATORY for every Route 2 mistake): After identifying what went wrong, ask: "What rule, assumption, or gap in the system ALLOWED this to happen?" This separates output-level fixes from system-level gaps. If the answer is "no rule covers this case" → flag as a system gap and propose a new rule (Route 1 candidate). If the answer is "the rule exists but was skipped" → flag as process enforcement gap. Write the root cause in the lesson: `[PROVISIONAL:5] CATEGORY: What happened → What to do instead. Root cause: [what systemic gap allowed this]`
 
 Present classification to user:
 ```

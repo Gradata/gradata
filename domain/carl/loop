@@ -282,6 +282,12 @@ LOOP_RULE_59=MICRO-REFLECTION TRIGGER: Every time something new is added to the 
 LOOP_RULE_59_PRIORITY=HIGH
 
 # ============================================================================
+# REFLECT-PATTERNS FEEDBACK: Root causes that compound across sessions
+# ============================================================================
+LOOP_RULE_45=REFLECT-PATTERN ESCALATION: At session start, read brain/sessions/reflect-patterns.md. For any root cause that has appeared 3+ times but has NOT yet triggered a rule change (rule-change-proposed: no), surface it immediately: "PATTERN ALERT: Root cause '[category]' has appeared [N] times without a rule change. Entries: [list dates]. Propose a rule now or mark as accepted risk." This closes the loop — patterns cannot hide in the log forever. At wrap-up, when /reflect identifies a new root cause via double-loop analysis, write a structured entry to reflect-patterns.md: `[date] [session] [category] [description] [times-seen] [rule-change-proposed: no]`. Increment times-seen if the same category already exists.
+LOOP_RULE_45_PRIORITY=CRITICAL
+
+# ============================================================================
 # PASSIVE PATTERN DETECTION: Modular compounding engine at every wrap-up
 # ============================================================================
 # Six independent categories. Each fires only when its trigger condition is met.

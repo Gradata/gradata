@@ -287,13 +287,20 @@ Mark each relevant item. Skip irrelevant ones. Fix any failures before closing.
 - Step 5 (Domain sync): [ran/skipped — reason]
 - Step 6 (Health audit): [ran/skipped — reason]
 
+## Reflection Signal
+- Provisional lessons written: [N]
+- Lessons graduated: [N]
+- Blocked outputs (score <7): [N] — [list or "none"]
+- Top root cause this session: [from /reflect double-loop or "none"]
+- Confidence distribution: [X HIGH / Y MEDIUM / Z LOW]
+
 ## Line Counts
 - CLAUDE.md: [X]/150
 - lessons.md: [X] active (cap 30)
 - startup-brief.md: [X]/60
 ```
 
-**Verification:** Before proceeding to Phase 6, check that the session note file exists at the expected path and contains all 9 section headers (OLIVER'S SUMMARY, Session Type, What Was Done, Gates, Best Output, Weakest Output, Self-Scores, Corrections Received, Conditional Steps, Line Counts). If any section is missing, add it before committing.
+**Verification:** Before proceeding to Phase 6, check that the session note file exists at the expected path and contains all 10 section headers (OLIVER'S SUMMARY, Session Type, What Was Done, Gates, Best Output, Weakest Output, Self-Scores, Corrections Received, Conditional Steps, Reflection Signal, Line Counts). If any section is missing, add it before committing.
 
 **Brain session summary** (Obsidian vault — write after session note):
 - Path: C:/Users/olive/SpritesWork/brain/sessions/[YYYY-MM-DD] — [Session Type].md
@@ -303,6 +310,17 @@ Mark each relevant item. Skip irrelevant ones. Fix any failures before closing.
 **Brain prospect notes** (if any prospects were touched this session):
 - Create or update notes in `brain/prospects/[Name] — [Company].md`
 - Don't defer this to "later" — write it now while context is fresh
+
+## Phase 5c: Pre-Commit Reflection Gate (HARD GATE — blocks Phase 6)
+
+Before git commit can run, verify ALL of these. If any fails, resolve before committing:
+
+- [ ] **/reflect has run this session** — check .claude/micro-reflections.md for today's date entry. If no entry exists, run /reflect now (even if queue is empty — it logs the empty run).
+- [ ] **All provisional lessons reviewed** — scan lessons.md for any [PROVISIONAL:0] entries. Graduate or defer each one. No zero-counter provisionals may persist across commits.
+- [ ] **No blocked outputs shipped without override** — check session history for any output with self-score <7. If any were presented to Oliver without his explicit "ship it anyway" override, flag it as a process violation and log to lessons.md.
+
+If all pass: proceed to Phase 6.
+If any fail: fix the failure, then re-check all three before committing.
 
 ## Phase 6: Git Checkpoint
 
