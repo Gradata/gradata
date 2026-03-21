@@ -45,19 +45,17 @@ DORMANT: CW-[X] ([N] sessions dormant) — [wake check: recent CLAUDE.md change?
 ```
 Check each dormant connection against the dormancy re-evaluation trigger (LOOP_RULE_69). If a recent structural change should wake it, say so.
 
-### Compound Brain Status (one line, always shown after cross-wire status)
+### Compound Intelligence (always shown after cross-wire status)
 ```
-COMPOUND BRAIN: [X/5] active. [Status sentence from brain/system-patterns.md]
+CQ: [score] ([+/-N] from last session) | Trajectory: [label]
+  Strongest: [dimension] ([value]%) | Weakest: [dimension] ([value]%)
+```
+Or if fewer than 5 metrics files exist:
+```
+CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 ```
 
-**Indicators:**
-1. Tasks completed this week >= 3
-2. Corrections applied automatically >= 1 this week
-3. Workflows saved >= 1 lifetime
-4. Quality score trend = UP or FLAT (not DOWN, not "building baseline")
-5. Days since last working session <= 7
-
-**Read current values from brain/system-patterns.md Compound Brain Status table.**
+**Compute from brain/system-patterns.md CQ section.** Read metrics/ files for rolling averages. Log CQ in current session's metrics file.
 
 ---
 

@@ -2,6 +2,15 @@
 # Every rule change gets logged here with date, what changed, and why.
 # If a change makes things worse, roll back by reversing the entry.
 
+## 2026-03-21 — Compound Brain → Compound Intelligence (CQ) Redesign
+- **Problem:** Old Compound Brain was 5 binary liveness checks (is it running?). Saturated at 5/5 by Session 27 and stayed there permanently. Measured status, not growth.
+- **Fix:** Replaced with CQ (Compound Intelligence) — 5 continuous dimensions (0-100 each) that track whether the system is actually getting smarter: Correction Decay, First-Draft Pass Rate, Knowledge Utilization, Lesson Hit Rate, Autonomy Trend.
+- **CQ score:** Weighted composite, no cap, tracked per session with trajectory labels (accelerating/steady/plateau/dip). Dimensions feed each other — better lessons → fewer corrections → higher pass rate → compounding growth.
+- **brain/system-patterns.md:** Compound Brain Status section replaced with CQ section. History table started (Sessions 14/19/27/28 as baseline).
+- **cross-wire-checklist.md:** Display format updated from `COMPOUND BRAIN: X/5` to `CQ: [score] (+/-N) | Trajectory: [label]`.
+- **brain/metrics/:** CQ section added to S27 and S28 metrics files. All future metrics files include CQ dimensions.
+- **Portability:** CQ framework is brain layer (methodology). Display format in cross-wire-checklist is runtime layer.
+
 ## 2026-03-21 — Session Cleanup Step Added to Wrap-Up
 - **CLAUDE.md:** New step 12 added as final wrap-up step. Removes orphaned Claude Code project folders from `~/.claude/projects/`, keeping only `C--Users-olive-OneDrive-Desktop-Sprites-Work` and `C--Users-olive-SpritesWork-brain`. Reports count removed and remaining. Added to always-run list.
 - **Portability:** Runtime layer, Windows-specific (PowerShell). Not SDK-portable.
