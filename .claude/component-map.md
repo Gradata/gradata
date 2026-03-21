@@ -51,6 +51,7 @@
 | Component | What it does | File | Layer |
 |-----------|-------------|------|-------|
 | **Gate Protocol** | Universal gate execution framework (tag block, objection check, score) | .claude/gates.md | AIOS |
+| **Integration Gate** | HARD GATE: every system addition must wire into neural bus + cross-wires + component map. No orphans. | .claude/gates.md | AIOS |
 | **Pre-Draft** | 7-step research before any email | domain/gates/pre-draft.md | Domain |
 | **Demo-Prep** | 13-step research before any demo cheat sheet | domain/gates/demo-prep.md | Domain |
 | **Post-Demo** | Fireflies transcript required before follow-up | domain/gates/post-demo.md | Domain |
