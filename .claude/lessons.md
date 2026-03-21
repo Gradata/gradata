@@ -94,7 +94,7 @@
 | 69 | DEMO PREP | Research FIRST (LinkedIn, NotebookLM, web), push to Pipedrive LAST. Tag Oliver label on deals | 3/20 |
 | 70 | DEMO PREP | Use ALL sales playbooks before building cheat sheet (Great Demo, SPIN, Gap, JOLT, etc.) | 3/20 |
 
-## Active Lessons (18 entries — cap: 30)
+## Active Lessons (19 entries — cap: 30)
 
 [2026-03-19] [CONFIRMED — ZERO FIRE] LEADS: Never label leads "needs manual review." If you have their title and company from LinkedIn, you can score them programmatically. No lazy buckets.
 
@@ -143,3 +143,5 @@
 [2026-03-20] [PROVISIONAL:5] PROCESS: startup-brief.md must refresh every session during wrap-up. It was 11 sessions stale because no wrap-up step enforced it. Now step 10.5. Never let the pipeline source of truth go stale.
 
 [2026-03-20] [PROVISIONAL:5] ARCHITECTURE: When splitting files, don't keep duplicate definitions. If a fallback chain or gate content moves to domain/, replace the original with a single pointer — not both a definition and a pointer.
+
+[2026-03-20] [PROVISIONAL:5] COMMUNICATION: When surfacing anomalies or warnings, always explain WHY it matters and confirm whether it's a blocker or cosmetic. "X is wrong because Y. This is cosmetic / this blocks Z. Proceeding normally." Don't leave ambiguity about severity. Root cause: startup flagged stale session numbers without explaining impact — Oliver couldn't tell if the brain was broken or just had a stale label.

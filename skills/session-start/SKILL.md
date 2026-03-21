@@ -43,6 +43,7 @@ Quick health pulse before loading context. **Run steps 1-4 + 7 as a single paral
 3. Check domain/carl/loop file size hasn't changed unexpectedly (rule tampering detection)
 4. Check CLAUDE.md line count is under 150 (bloat detection)
 7. **Gap Scanner** — run .claude/gap-scanner.md startup scan. Check all systems connected, detect process drift from canonical_logs, surface any gaps in the startup status output.
+8. **Brain launch check** — run `python brain/scripts/launch.py --json`. Validates header consistency (session numbers match across loop-state + startup-brief), staleness, inter-session modifications, and RAG graduation status. Surface any issues in startup output. If `rag_graduation_ready`, prompt user to activate embedding layer.
 
 **THEN (sequential, after batch completes):**
 5. If any check fails -> surface immediately: "SYSTEM ALERT: [what failed]"
