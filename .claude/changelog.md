@@ -2,6 +2,10 @@
 # Every rule change gets logged here with date, what changed, and why.
 # If a change makes things worse, roll back by reversing the entry.
 
+## 2026-03-21 — Session Cleanup Step Added to Wrap-Up
+- **CLAUDE.md:** New step 12 added as final wrap-up step. Removes orphaned Claude Code project folders from `~/.claude/projects/`, keeping only `C--Users-olive-OneDrive-Desktop-Sprites-Work` and `C--Users-olive-SpritesWork-brain`. Reports count removed and remaining. Added to always-run list.
+- **Portability:** Runtime layer, Windows-specific (PowerShell). Not SDK-portable.
+
 ## 2026-03-21 — 10-Gap Architecture Closure (Friston→Taleb→Dalio)
 - **#1 Simulation Layer:** Layer 2.5 SIMULATE added to action-waterfall.md. Generates 2-3 candidates, scores against PATTERNS.md, predicts outcomes, logs for calibration. Prediction error feeds CW-5 + self-model. SDK-portable (brain methodology).
 - **#2 Self-Model:** brain/self-model.md created. Reliability per output type, known blind spots, resource state. Read at session start. Feeds System 1/2 routing. Brain layer.
