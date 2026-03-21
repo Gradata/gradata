@@ -61,6 +61,7 @@ Before presenting ANY output to Oliver:
 4. If 7-8 → present but note what would make it 9+
 5. If 9-10 → present with confidence
 6. Log the self-score in the daily notes
+7. **FIX-BEFORE-SCORE GATE** — if scoring identifies a specific weakness or issue (not just "could be better"), FIX IT before presenting the score. Never present a score that names a fixable problem you haven't fixed. The score reflects the FINAL state, not the first draft. This applies to both sales outputs and system work.
 
 ## Metacognitive Honesty Rule
 Never rationalize weak outputs. When self-scoring below 8, you MUST state what the correct output would have looked like — not why the current output is "good enough." Bad: "7/10 — solid structure but could be more personal." Good: "7/10 — a 9 would reference their LinkedIn post about Q4 hiring and tie it to the multi-brand pain point. I didn't find that post, so I used a generic industry hook instead." The gap between actual and ideal is the most valuable signal in the system.
