@@ -137,3 +137,7 @@
 [2026-03-20] [PROVISIONAL:5] SIGNATURE: Spell out "Account Executive" in email signatures, not "AE". Full title reads more professional in prospect-facing emails.
 
 [2026-03-20] [PROVISIONAL:5] ACCURACY: Don't inflate self-scores on systems-only sessions. No prospect work = no real gates fired, no real outputs judged. Untested infrastructure doesn't earn 8.5+. Cap systems-only sessions at 8.0 unless Oliver says otherwise.
+
+[2026-03-20] [PROVISIONAL:5] PROCESS: startup-brief.md must refresh every session during wrap-up. It was 11 sessions stale because no wrap-up step enforced it. Now step 10.5. Never let the pipeline source of truth go stale.
+
+[2026-03-20] [PROVISIONAL:5] ARCHITECTURE: When splitting files, don't keep duplicate definitions. If a fallback chain or gate content moves to domain/, replace the original with a single pointer — not both a definition and a pointer.
