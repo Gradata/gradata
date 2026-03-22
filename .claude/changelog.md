@@ -2,6 +2,20 @@
 # Every rule change gets logged here with date, what changed, and why.
 # If a change makes things worse, roll back by reversing the entry.
 
+## 2026-03-22 — FITFO + Delta Tagging + Session Counter (Session 31)
+- **CLAUDE.md**: Added FITFO attitude rule ("When stuck, exhaust 4+ strategies before giving up. Test own solutions. Full protocol: skills/fitfo/SKILL.md"). +1 line.
+- **CLAUDE.md**: Added delta tagging rule ("Every prospect-touching output MUST be logged via delta_tag.py"). +1 line.
+- **CLAUDE.md**: Session counter updated from 27 to 31.
+- **skills/fitfo/SKILL.md**: Created. Intent-triggered problem-solving protocol (triage, research passes, verify+iterate loop, failure protocol).
+- **skills/session-start/SKILL.md**: Added prospecting intent trigger (Phase 3), FITFO intent trigger (Phase 3), manual activity detection (Step 17).
+- **.claude/hooks/sprites-statusline.js**: v4 to v5. Added CQ to Line 3, added Line 4 (delta: reply/pipeline/deals/outcomes/tier).
+- **brain/scripts/delta_tag.py**: Created. Activity + prep + outcome logging to SQLite.
+- **brain/scripts/delta_report.py**: Created. Monthly delta computation vs industry benchmarks.
+- **brain/scripts/backfill_tags.py**: Created. Historical data backfill from prospect files.
+- **brain/scripts/prospecting/**: Created. 12 modules (4,708 lines). Free lead discovery + enrichment pipeline.
+- **brain/vault/marketplace-audit-framework.md**: Created (v3). 3-layer enterprise audit gate with anti-gaming.
+- **brain/scripts/evolution_scorecard.py**: Added DELTA section to scorecard output.
+
 ## 2026-03-21 — Self-Audit Baseline + Double-Loop Fix (Session 30)
 - **CLAUDE.md**: Added source-verification gate (prove inputs loaded before generating). From self-audit double-loop finding: PROCESS_SKIP pattern persisted across 4 corrections despite individual fixes.
 - **CLAUDE.md ACCURACY rule**: Added cross-source hypothesis framing default. From self-audit Lens 3: overconfidence when combining data sources for the first time.
