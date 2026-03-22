@@ -29,7 +29,7 @@ Save to docs/Session Notes/[YYYY-MM-DD].md. When Oliver says "wrap up", IMMEDIAT
 
 **Agent 1 — Metrics & Mechanical** (run `python brain/scripts/wrap_up.py --session N --type TYPE`):
 - Step 6: Health check (ALWAYS runs -- core files, DB, git, CLAUDE.md lines, overdue prospects, all checked regardless of session type)
-- Step 7: Decrement [PROVISIONAL:N] counters, promote [PROVISIONAL:0] to [CONFIRMED]
+- Step 7: Decrement [PROVISIONAL:N] counters, promote [PROVISIONAL:0] to [CONFIRMED]. **The script handles this — do NOT manually decrement. Report the script's output only.**
 - Step 7b: Tag audit -- verify every prospect-facing output this session has a delta tag in SQLite (activity_log or prep_outcomes). Cross-reference session outputs against activity_log WHERE session=N. Any untagged output = log it now. Report: "X/Y outputs tagged. Z backfilled."
 - Step 12: Session cleanup (orphaned folders)
 
