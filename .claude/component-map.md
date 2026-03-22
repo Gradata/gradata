@@ -164,5 +164,41 @@
 
 | Component | What it does | File | Layer |
 |-----------|-------------|------|-------|
-| **Statusline** | Domain-aware status bar (domain name, skills, CARL, prospects, lessons, keys) | .claude/hooks/sprites-statusline.js | AIOS |
+| **Statusline v5** | 4-line status: context+model, pipeline+skills, system health+CQ, delta metrics | .claude/hooks/sprites-statusline.js | AIOS |
 | **Prospect Counter** | Counts brain/prospects/ files with next_touch within 48h + overdue | .claude/hooks/sprites-statusline.js | AIOS |
+| **Delta Line** | Line 4: reply rate, pipeline value, deals won/lost, outcomes count, marketplace tier | .claude/hooks/sprites-statusline.js | AIOS |
+
+## Delta Measurement System (Session 31+)
+
+| Component | What it does | File | Layer |
+|-----------|-------------|------|-------|
+| **Delta Tagger** | Log AI-assisted activities, prep work, and outcomes to SQLite | brain/scripts/delta_tag.py | Brain |
+| **Delta Report** | Monthly computation of brain vs industry benchmark + marketplace readiness | brain/scripts/delta_report.py | Brain |
+| **Backfill Script** | One-time historical data population from prospect files | brain/scripts/backfill_tags.py | Brain |
+| **Scorecard Delta** | DELTA section in evolution scorecard (reply rate, pipeline, outcomes, tier) | brain/scripts/evolution_scorecard.py | Brain |
+| **Metrics Template** | Session metrics format with delta-first layout | brain/metrics/_TEMPLATE.md | Brain |
+| **Monthly Delta Reports** | Stored monthly delta computations | brain/metrics/delta/*.md | Brain |
+| **Marketplace Audit Framework** | 3-layer enterprise audit gate (12 role templates, anti-gaming) | brain/vault/marketplace-audit-framework.md | Brain |
+
+## Prospecting Pipeline (Session 31+)
+
+| Component | What it does | File | Layer |
+|-----------|-------------|------|-------|
+| **Directory Scraper** | Find agencies/businesses via Clutch, DesignRush, web search | brain/scripts/prospecting/google_maps.py | Brain |
+| **Meta Ads Discovery** | Find companies running Meta ads via Ad Library API | brain/scripts/prospecting/meta_ads.py | Brain |
+| **Job Board Scanner** | Detect hiring signals from Greenhouse/Lever/Ashby | brain/scripts/prospecting/job_boards.py | Brain |
+| **Tech Scanner** | Detect ad pixels + marketing tools from HTML + DNS | brain/scripts/prospecting/tech_scanner.py | Brain |
+| **Contact Finder** | Scrape team pages + email patterns + SMTP verify | brain/scripts/prospecting/contact_finder.py | Brain |
+| **Company Resolver** | Name to domain via Clearbit Autocomplete (free, no key) | brain/scripts/prospecting/company_resolve.py | Brain |
+| **Subdomain Intel** | Discover subdomains via crt.sh for ecommerce/app detection | brain/scripts/prospecting/subdomain_intel.py | Brain |
+| **Web Search** | Google results as JSON via Serper.dev | brain/scripts/prospecting/web_search.py | Brain |
+| **PageSpeed Tech** | Tech stack from Lighthouse stackPacks | brain/scripts/prospecting/pagespeed_tech.py | Brain |
+| **WHOIS Intel** | Domain age and registration data | brain/scripts/prospecting/whois_intel.py | Brain |
+| **Pipeline Orchestrator** | Chains discovery, enrichment, scoring, export | brain/scripts/prospecting/pipeline.py | Brain |
+| **ICP Profile** | Default Sprites ICP filters (multi-brand, <=300 emp, 1-2 marketing) | brain/scripts/prospecting/profiles/default.json | Brain |
+
+## Skills (Session 31+)
+
+| Component | What it does | File | Layer |
+|-----------|-------------|------|-------|
+| **FITFO** | Persistent problem-solving protocol (triage, research, verify+iterate) | skills/fitfo/SKILL.md | AIOS |
