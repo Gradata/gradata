@@ -535,101 +535,61 @@ process.stdin.on('end', () => {
     // Outcomes: red < 10 (thin data), yellow 10-30 (building), green > 30 (statistical base)
     const outcomesColor = outcomesCount >= 30 ? c.green : outcomesCount >= 10 ? c.yellow : c.red;
 
-    // -- Build Output --
-    // Line 1: AIOS | Talent: [domain] | Model | Context | Health | Time
-    const brandParts = [`${c.bold}${c.cyan}AIOS${c.reset}`];
-    if (domainTalent) brandParts.push(`${c.white}Talent: ${domainTalent}${c.reset}`);
-    const brand = brandParts.join(` ${c.dim}|${c.reset} `);
+    // -- Build Output (3 lines, professional layout) --
 
+    const gitColor = gitAge.endsWith('d') && parseInt(gitAge) > 1 ? c.yellow : c.green;
+    const gateColor = gateRateNum >= 0.95 ? c.green : gateRateNum >= 0.80 ? c.yellow : c.red;
+    const gateLag = currentSession - gateSession;
+    const gateDisplay = gateLag >= 3
+      ? `${c.orange}Gate:${gateRate}(${gateLag}ago)${c.reset}`
+      : `${gateColor}Gate:${gateRate}${c.reset}`;
+    const trendColor = trendLabel === 'IMPROVING' ? c.green : trendLabel === 'DEGRADING' ? c.red : c.yellow;
+
+    // Line 1: Identity + Context
     const line1parts = [
-      brand,
+      `${c.bold}${c.cyan}AIOS${c.reset}`,
+      domainTalent ? `${c.white}Talent: ${domainTalent}${c.reset}` : '',
+      currentSession > 0 ? `${c.bold}${c.white}S${currentSession}${c.reset}` : '',
       `${c.dim}${model}${c.reset}`,
       ctxDisplay,
       `${contextHealthColor}[${contextHealth}]${c.reset}`,
-      `${c.dim}${timeStr}${c.reset}`
-    ];
+      `${c.dim}${timeStr}${c.reset}`,
+    ].filter(Boolean);
 
-    // Line 2: Pipeline + stats
-    let pipeDisplay = `${c.white}Pipeline:${totalActive}${c.reset}`;
-    if (overdueCount > 0) pipeDisplay += ` ${c.red}${c.bold}TASK OD:${overdueCount}${c.reset}`;
-    if (dueTodayCount > 0) pipeDisplay += ` ${c.yellow}Today:${dueTodayCount}${c.reset}`;
-    if (activeDealsCount > 0) pipeDisplay += ` ${c.cyan}Active Deals:${activeDealsCount}${c.reset}`;
-    if (overdueCount === 0 && dueTodayCount === 0 && activeDealsCount === 0) pipeDisplay += ` ${c.green}clear${c.reset}`;
-
-    const statParts = [
-      pipeDisplay,
-      `${c.magenta}SK:${skillCount}${c.reset}`,
-      `${c.cyan}MCP:${mcpTotal}${c.reset}`,
-      `${c.green}L:${lessonsCount}/${lessonsCap}${c.reset}`,
-      `${c.blue}CARL:${carlCount}${c.reset}`,
-    ];
-
-    if (agentCount > 0) {
-      statParts.unshift(`${c.orange}Agents:${agentCount}${c.reset}`);
-    }
-
-    // Line 3: System health with Brain scores
-    const gitColor = gitAge.endsWith('d') && parseInt(gitAge) > 1 ? c.yellow : c.green;
-    const hookColor = hooksOk === hooksTotal ? c.green : c.red;
-    const dbColor = dbOk ? c.green : c.red;
-    const gateColor = gateRateNum >= 0.95 ? c.green : gateRateNum >= 0.80 ? c.yellow : c.red;
-
-    const salesEditColor = salesEditRate && parseInt(salesEditRate) <= 10 ? c.green : parseInt(salesEditRate) <= 25 ? c.yellow : c.orange;
-    const sysEditColor = sysEditRate && parseInt(sysEditRate) <= 10 ? c.green : parseInt(sysEditRate) <= 25 ? c.yellow : c.orange;
-    // -- Events count (v2.0 backbone health) --
-    let eventsCount = 0;
-    const eventsPath = 'C:/Users/olive/SpritesWork/brain/events.jsonl';
-    if (fs.existsSync(eventsPath)) {
-      try {
-        const lines = fs.readFileSync(eventsPath, 'utf8').trim().split('\n');
-        eventsCount = lines.length;
-      } catch (e) {}
-    }
-
-    // Staleness indicator: if gate is 3+ sessions behind current, flag it
-    const gateLag = currentSession - gateSession;
-    const gateStale = gateLag >= 3;
-    const gateDisplay = gateStale
-      ? `${c.orange}Gate:${gateRate}(${gateLag}ago)${c.reset}`
-      : `${gateColor}Gate:${gateRate}${c.reset}`;
-
-    const healthParts = [
-      currentSession > 0 ? `${c.bold}${c.white}S${currentSession}${c.reset}` : '',
-      `${c.cyan}Brain:${brainVersion}${c.reset}`,
-      `${gitColor}Git:${gitAge}${c.reset}`,
+    // Line 2: Brain Report Card (the scores that matter)
+    const brainParts = [
       gateDisplay,
       `${brainSysColor}System:${brainSystem}${c.reset}`,
       `${brainQualColor}AI Quality:${brainQuality}${c.reset}`,
       `${brainGrowthColor}Growth:${brainGrowth}${c.reset}`,
       `${brainArchColor}Arch:${brainArch}${c.reset}`,
       brierDisplay ? brierDisplay : '',
-      trendLabel === 'IMPROVING' ? `${c.green}${trendArrow}${c.reset}` : trendLabel === 'DEGRADING' ? `${c.red}${trendArrow}${c.reset}` : `${c.yellow}${trendArrow}${c.reset}`,
-      `${c.green}Grad:${graduatedCount}${c.reset}`,
-      salesEditRate ? `${salesEditColor}TEdit:${salesEditRate}${c.reset}` : '',
-      sysEditRate ? `${sysEditColor}SEdit:${sysEditRate}${c.reset}` : '',
-      eventsCount > 0 ? `${c.dim}Ev:${eventsCount}${c.reset}` : '',
+      `${trendColor}${trendArrow}${c.reset}`,
+      `${gitColor}Git:${gitAge}${c.reset}`,
+      `${c.cyan}Brain:${brainVersion}${c.reset}`,
     ].filter(Boolean);
 
-    // Line 4: Delta metrics -- reply rate, pipeline value, deals, outcomes, tier
-    const deltaParts = [
+    // Line 3: Pipeline + Business Metrics
+    let pipeDisplay = '';
+    if (overdueCount > 0) pipeDisplay += `${c.red}${c.bold}Overdue:${overdueCount}${c.reset} `;
+    if (dueTodayCount > 0) pipeDisplay += `${c.yellow}Today:${dueTodayCount}${c.reset} `;
+    if (activeDealsCount > 0) pipeDisplay += `${c.cyan}Deals:${activeDealsCount}${c.reset} `;
+    if (!pipeDisplay) pipeDisplay = `${c.green}Pipeline: clear${c.reset} `;
+
+    const bizParts = [
+      pipeDisplay.trim(),
       `${replyColor}Reply:${replyRate}${c.reset}`,
-      `${c.white}Pipeline:${pipelineVal}${c.reset}`,
-      `${dealsColor}Deals:${dealsDisplay}${c.reset}`,
+      `${c.white}Value:${pipelineVal}${c.reset}`,
+      `${dealsColor}Won/Lost:${dealsDisplay}${c.reset}`,
       `${outcomesColor}Outcomes:${outcomesCount}${c.reset}`,
       `${c.cyan}Tier:${tierDisplay}${c.reset}`,
     ];
 
     let output = line1parts.join(` ${c.dim}|${c.reset} `);
     output += `\n`;
-
-    if (task) {
-      output += `${c.bold}> ${task}${c.reset} ${c.dim}|${c.reset} `;
-    }
-    output += statParts.join(` ${c.dim}|${c.reset} `);
+    output += brainParts.join(` ${c.dim}|${c.reset} `);
     output += `\n`;
-    output += healthParts.join(` ${c.dim}|${c.reset} `);
-    output += `\n`;
-    output += deltaParts.join(` ${c.dim}|${c.reset} `);
+    output += bizParts.join(` ${c.dim}|${c.reset} `);
 
     process.stdout.write(output);
 
