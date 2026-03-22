@@ -106,6 +106,7 @@
 |-----------|-------------|------|-------|
 | **Session-Start** | Lazy-load startup (delta scan, heartbeat, brief, calendar, prospects) | skills/session-start/SKILL.md | AIOS |
 | **Wrap-Up** | End-of-session (weight → ship → remember → review → anti-bloat → health → note → gate → git) | skills/wrap-up/SKILL.md | AIOS |
+| **Wrap-Up Validator** | Mechanical enforcement — 10 checks across 3 phases, blocks commit if any FAIL. Runs at Step 9.5 before git checkpoint. | brain/scripts/wrap_up_validator.py | Brain |
 | **Session Weight** | Auto-calculates wrap-up depth (Light/Medium/Heavy/Structural) | skills/wrap-up/SKILL.md (Phase 0) | AIOS |
 | **Session Note** | 10-section hard-gated note (Oliver's Summary through Line Counts) | skills/wrap-up/SKILL.md (Phase 5b) | AIOS |
 | **Handoff** | Rewrites loop-state.md — pipeline snapshot, priorities, what changed | brain/loop-state.md | Brain |

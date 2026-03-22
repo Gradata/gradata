@@ -18,7 +18,7 @@ Save to docs/Session Notes/[YYYY-MM-DD].md. When Oliver says "wrap up", IMMEDIAT
 
 ### Phase A: Main Context (do these FIRST, sequentially)
 0.5. **User Summary** — FIRST section in session note. Plain English, under 200 words. (1) what was done, (2) confident vs guessing, (3) one thing done well, (4) one thing not sure about.
-1. **Daily notes** — session summary + self-assessment
+1. **Daily notes** — write docs/Session Notes/[YYYY-MM-DD]-S[N].md (session summary + self-assessment)
 2. **Lessons** [IF corrections received] — log to .claude/lessons.md. Every correction gets evaluated. No skipping.
 3. **Vault sync** [IF brain/ files changed] — update brain/ for prospects, objections, templates touched.
 4. **Loop sync + Outcomes** [IF interactions] — `/log-outcome` for tactic-result pairs. Update PATTERNS.md.
@@ -44,9 +44,9 @@ Save to docs/Session Notes/[YYYY-MM-DD].md. When Oliver says "wrap up", IMMEDIAT
 
 ### Phase C: Main Context (after agents complete)
 10. **Session summary** — write brain/sessions/[YYYY-MM-DD].md
-10.5. **Startup brief refresh** — update domain/pipeline/startup-brief.md. Header MUST show current session number.
+10.5. **Startup brief refresh** — update domain/pipeline/startup-brief.md. Header MUST show current session number. **REWRITE the Handoff section** (last ~8 lines) with current session's work, recap, overdue, next week, pending Oliver, new systems, first thing next session. Stale handoff = next session starts blind.
 11. **Handoff** — REWRITE brain/loop-state.md. Under 80 lines. "What Changed" bullets prefixed with [TAG]. VERIFY header session number matches.
-9.5. **Git checkpoint** — commit brain/ changes: 'Session [N]: [summary]'. Increment patch in VERSION.md. Every 5th session: minor version + git tag.
+9.5. **Git checkpoint** — Run `python brain/scripts/wrap_up_validator.py --session N --date YYYY-MM-DD` FIRST. If ANY check fails: fix the failure, re-run until CLEAR. Only then commit brain/ changes: 'Session [N]: [summary]'. Increment patch in VERSION.md. Every 5th session: minor version + git tag. **Committing with a FAIL = protocol violation.**
 11c. **Self-Audit Check** [conditional] — if session divisible by 10, output reminder.
 
 ## Work Style Rules
