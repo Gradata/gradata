@@ -83,6 +83,17 @@ Load `domain/carl/loop` rules for this phase.
 **PARALLEL BATCH B (after batch A — fire all Gmail searches at once):**
 6. **Outcome check** — for EVERY prospect with `outcome: pending`, search Gmail `from:[prospect_email] after:[last_touch_date]` in parallel. Reply found → update outcome. No reply + next_touch passed → "no-reply".
 
+   When a reply is found, also run:
+     `python brain/scripts/delta_tag.py log-outcome --prospect "[NAME]" --prep-type "email_draft" --outcome "reply" --days [DAYS_SINCE_LAST_TOUCH]`
+
+   When no reply is found and next_touch has passed:
+     `python brain/scripts/delta_tag.py log-outcome --prospect "[NAME]" --prep-type "email_draft" --outcome "no_reply" --days [DAYS_SINCE_LAST_TOUCH]`
+
+   When a deal stage change is detected (from Pipedrive scan step 13):
+     `python brain/scripts/delta_tag.py log-outcome --prospect "[NAME]" --prep-type "research" --outcome "deal_advanced" --days [DAYS]`
+
+   This auto-links prep work to outcomes without manual intervention.
+
 **AUTO-FIX PROTOCOL:** If any scan fails (MCP timeout, connection error), run fallback chain immediately. Log: `Auto-fixed: [tool] [error] → [fallback] → [result]`. Only escalate to Oliver if fallback also fails.
 
 **THEN (sequential):**
@@ -90,6 +101,20 @@ Load `domain/carl/loop` rules for this phase.
 16. **Daily snapshot (silent)** — After all MCP scans complete, assemble the data into a snapshot JSON and run `python brain/scripts/snapshot.py save '{...}'` silently in the background. Include deals, gmail, instantly, calendar data from steps 10-14. The script auto-diffs and writes brain/morning-brief.md. Do NOT surface snapshot results in the startup output — the statusline reads from the snapshot data automatically. This is infrastructure, not user-facing output.
 
 17. **Delta tagging: detect manual activities** — After snapshot completes, run manual activity detection. Compare Gmail sent count and Pipedrive activity count from MCP scans against today's activity_log entries. Call `python brain/scripts/delta_tag.py detect-manual --gmail-sent [N] --crm-updates [N] --session-logged [N]` silently. This tags activities that happened outside Claude sessions as `source: manual`. Do NOT surface results — this is background bookkeeping for the delta report.
+
+18. **Auto-draft follow-ups** — Read brain/Follow-Up Tracker.md. For every prospect with a touch due TODAY:
+    a. Load the prospect file from brain/prospects/
+    b. Determine which cadence track (A or B) and which touch number
+    c. Auto-draft the follow-up email using the cadence playbook + prospect context + PATTERNS.md best angle for their persona
+    d. Present the draft to Oliver for review. Never auto-send.
+    e. Log the prep via delta_tag.py: `log-prep --prospect "[NAME]" --type email_draft --prep 2`
+
+19. **Auto-prep demos** — Check Calendar for demos/calls within 48 hours. For each:
+    a. Check if a cheat sheet exists in docs/Demo Prep/ or brain/demos/
+    b. If NO cheat sheet exists: auto-load demo prep skill, start building cheat sheet from prospect file + LinkedIn + NotebookLM + Fireflies history
+    c. If cheat sheet EXISTS: surface it with any updates needed (new info since last prep)
+    d. Log the prep via delta_tag.py: `log-prep --prospect "[NAME]" --type cheat_sheet --prep 3`
+    e. Present prep to Oliver. Don't skip -- even if cheat sheet exists, surface it so Oliver sees it.
 
 8. **Surface findings as checklist summary:**
 ```

@@ -73,6 +73,14 @@
             "command": "python \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/reflect/scripts/post_commit_reminder.py\""
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/delta-auto-tag.js"
+          }
+        ]
       }
     ]
   },
