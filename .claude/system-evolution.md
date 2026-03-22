@@ -13,9 +13,9 @@ Oliver built the entire foundational system from scratch for his full-cycle AE w
 ### Five-Layer Self-Improvement Architecture
 - **L1 Loop** — Tag every sales interaction, track outcomes, aggregate patterns, make the next action smarter.
 - **L2 System Loop** — Track whether the system's own components (gates, lessons, smoke checks, audits) are working. Dead weight gets flagged.
-- **L3 Cross-Wiring** — Seven bidirectional connections (LOOP_RULE_28-34): auditor→gates, gates→lessons, lessons→CARL, smoke→lessons, rubric drift→tighten, fallback→reorder, PATTERNS→gates.
-- **L4 Meta-Loop** — Track which cross-wire connections produce value (LOOP_RULE_35-36). Kill dead wires, strengthen high-value ones. Runs every 5 sessions.
-- **L5 Convergence** — Auto-detect maturity (LOOP_RULE_37-38). Kill switches: 5 cycles zero value = auto-disable. Max 3 active layers.
+- **L3 Cross-Wiring** — Seven bidirectional connections (LOOP_RULE_28-34): auditor→gates, gates→lessons, lessons→CARL, smoke→lessons, rubric drift→tighten, fallback→reorder, PATTERNS→gates. *(v2.0: replaced by hooks + event queries)*
+- **L4 Meta-Loop** — Track which cross-wire connections produce value (LOOP_RULE_35-36). Kill dead wires, strengthen high-value ones. Runs every 5 sessions. *(v2.0: killed — premature abstraction)*
+- **L5 Convergence** — Auto-detect maturity (LOOP_RULE_37-38). Kill switches: 5 cycles zero value = auto-disable. Max 3 active layers. *(v2.0: killed — premature abstraction)*
 
 No external source informed this architecture.
 
@@ -81,7 +81,7 @@ Universal learning engine covering the full deal lifecycle:
 - Micro-reflection trigger on every system addition (LOOP_RULE_59)
 
 ### Enterprise Quality System (14 governance files)
-quality-rubrics.md | fallback-chains.md | auditor-system.md | health-audit.md | loop-audit.md | gates.md | pipedrive-templates.md | weekly-pulse-template.md | audit-log.md | review-queue.md | changelog.md | truth-protocol.md | cross-wire-checklist.md | micro-reflections.md
+quality-rubrics.md | fallback-chains.md | auditor-system.md | health-audit.md | loop-audit.md | gates.md | pipedrive-templates.md | weekly-pulse-template.md | audit-log.md | review-queue.md | changelog.md | truth-protocol.md | micro-reflections.md
 
 ---
 
@@ -163,8 +163,8 @@ quality-rubrics.md | fallback-chains.md | auditor-system.md | health-audit.md | 
 - In-task escalation ladder — 3 errors=change strategy, 4=reduce scope, 5=stop. Extended fallback-chains.md.
 - 5-Point Verification Stack consolidation — replaced 9-step verification with 5 distinct questions (INPUT→GOAL→ADVERSARIAL→VOICE→SCORE). Added GOAL check (the question we were missing: "is this what was asked for?"). Removed overlap between Layer 5 verify, gate checklist, and separated scoring sub-steps.
 - Agent scaffold skill — generates manifests from schema with nervous system wiring
-- 4 new bus signals: TOOL_DENIED, SYSTEM_PAUSE, ESCALATION_TRIGGERED, AGENT_CREATED
-- 3 new cross-wires: CW-10 (Tool Violation→Manifest Fix, dormant), CW-11 (Correction Rate→Autonomy Scope), CW-12 (Escalation→Lessons)
+- 4 new bus signals: TOOL_DENIED, SYSTEM_PAUSE, ESCALATION_TRIGGERED, AGENT_CREATED *(v2.0: bus signals now emitted via events.py)*
+- 3 new cross-wires: CW-10 (Tool Violation→Manifest Fix, dormant), CW-11 (Correction Rate→Autonomy Scope), CW-12 (Escalation→Lessons) *(v2.0: cross-wires replaced by hooks + event queries)*
 **What was NOT borrowed:** YAML format (we use structured markdown), Redis/PostgreSQL infrastructure, server daemon architecture, workflow engine (we don't need declarative pipelines), heartbeat system (session-based, not always-on).
 **Portability:** DOMAIN-AGNOSTIC (all governance patterns, no sales-specific content)
 
@@ -186,9 +186,9 @@ quality-rubrics.md | fallback-chains.md | auditor-system.md | health-audit.md | 
 - Framework auto-promotion and dead framework archival
 - Compound experiments
 - Complexity ceilings and kill switches
-- Cross-wire connections (7 bidirectional links)
-- Meta-loop tracking
-- Convergence detection with auto-disable
+- Cross-wire connections (7 bidirectional links) *(v2.0: replaced by hooks + event queries)*
+- Meta-loop tracking *(v2.0: killed)*
+- Convergence detection with auto-disable *(v2.0: killed)*
 - Truth protocol
 - Bloat prevention and compaction rules
 - Session handoff system (loop-state.md)
@@ -271,7 +271,7 @@ Scored using the 5 auditor dimensions from auditor-system.md, against the qualit
 |-----------|-------|-----------|---------------|
 | **Research Depth** | 8.0 | Gates enforce multi-source research with question-driven retrieval, pre-flight proof blocks, and research receipts. soul.md ensures voice consistency. Gap: only 1 pipeline session (Session 5) has run the full gate pipeline with real prospects. | 10+ prospect interactions through the complete gate pipeline. Verify receipts are genuine, not rubber-stamped. |
 | **Output Quality** | 7.5 | Rubrics exist for every output type. Humanizer, self-play objection check, confidence flags live. soul.md centralizes voice rules (no duplication drift). Gap: only 3 calibration events exist (all demo_prep, delta narrowing from -1 to -0.2). No email or CRM note calibration data. | 10+ Oliver score overrides across output types. Calibration accumulation adjusts rubrics from real data. |
-| **Process Adherence** | 8.5 | 114 CARL rules (compacted from 187 — cleaner, fewer conflicts). 8 mandatory gates. Context manifest controls loading. Wrap-up gate enforced. Conflict resolution hierarchy active. Gap: Session 6 proved rules can exist without being followed. PROVISIONAL lesson counters still haven't been decremented across sessions. | Track gate completion rates over 10 sessions. Decrement PROVISIONAL counters at next wrap-up. Verify the compacted rule set eliminates the hedging behavior seen at 187 rules. |
+| **Process Adherence** | 8.5 | 114 CARL rules (compacted from 187 — cleaner, fewer conflicts). 8 mandatory gates. Context manifest controls loading. Wrap-up gate enforced. Conflict resolution hierarchy active. Gap: Session 6 proved rules can exist without being followed. *(v2.0: PROVISIONAL format replaced by [INSTINCT:X.XX] confidence scoring.)* | Track gate completion rates over 10 sessions. Update instinct confidence scores at each wrap-up. Verify the compacted rule set eliminates the hedging behavior seen at 187 rules. |
 | **Learning Capture** | 8.0 | Structured lesson IDs, status lifecycle, recurrence tracking, corrections buffer, data compaction, micro-reflections. 50 graduated lessons, 35 active. Gap: the structured format (LRN-/ERR- IDs, Pattern-Key, recurrence counts) has never been used in practice. All current lessons use the old freeform format. | 5 sessions with the structured format. Verify recurrence tracking fires, compaction works, promotion triggers produce real rules. |
 | **Outcome Linkage** | 6.0 | Deal health scoring, close probability, signal monitoring, and framework auto-promotion designed but uncalibrated. 0 closed deals to validate against (Matt Cosprite was onboarding, not closed-won in Pipedrive). Vault decay and weekly health metrics in place but no baseline data collected yet. | Close 15+ deals. Let deal health calibrate. Let framework auto-promotion fire on real data. This dimension improves last — it's a lagging indicator. |
 

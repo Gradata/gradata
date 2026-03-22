@@ -8,14 +8,14 @@ Files that must be in active context for the entire session. Auto-loaded or read
 
 | File | Est. Tokens | Why Always |
 |------|-------------|------------|
-| CLAUDE.md | ~4,000 | Auto-loaded by Claude Code. Master rules, gates list, work style, ICP. |
-| soul.md | ~1,500 | Voice/writing rules needed for any prospect-facing output. |
-| brain/loop-state.md | ~1,500 | Session checkpoint. What's due, who needs contact, what changed. |
-| .carl/manifest | ~500 | Domain routing. Which CARL files to load and when. |
-| .carl/global | ~300 | 4 universal AIOS rules (truth, honesty, complexity, conflict). |
-| domain/carl/global | ~400 | Domain-specific rules (research protocol, skill loading, CCQ, OOO, channel collision, credit gate). |
+| CLAUDE.md | ~800 | Auto-loaded by Claude Code. v2.0 lean master rules. |
+| soul.md | ~420 | Voice/writing rules needed for any prospect-facing output. |
+| brain/loop-state.md | ~770 | Session checkpoint. What's due, who needs contact, what changed. Path: C:/Users/olive/SpritesWork/brain/loop-state.md |
+| .carl/manifest | ~900 | Domain routing. Which CARL files to load and when. |
+| .carl/global | ~870 | 4 universal AIOS rules (truth, honesty, complexity, conflict). |
+| domain/carl/global | ~600 | Domain-specific rules (research protocol, skill loading, CCQ, OOO, channel collision, credit gate). |
 
-**Tier 0 total: ~7,800 tokens**
+**Tier 0 total: ~4,360 tokens** (down from ~7,800 after v2.0 CLAUDE.md surgery)
 
 ## Tier 1: Startup Checks (read, summarize, release)
 Files read during startup. Results surfaced in the 3-line status output. Full file content released from context after summary — only the findings persist.
@@ -23,8 +23,9 @@ Files read during startup. Results surfaced in the 3-line status output. Full fi
 | File / Action | Est. Tokens | Trigger | Output |
 |---------------|-------------|---------|--------|
 | brain/morning-brief.md | ~1,500 | If fresh (<4h), read and skip Gmail/Fireflies | Status lines for pipeline, replies, recordings |
-| .claude/lessons.md | ~2,000 | Always — scan graduated index + active lessons | Relevant lessons held; file released |
-| domain/pipeline/startup-brief.md | ~1,500 | Always — read Handoff section first | Pipeline state, credit balances, campaign status |
+| .claude/work-style.md | ~500 | Always -- detailed behavioral rules (v2.0) | Scan and internalize; release file |
+| .claude/lessons.md | ~2,800 | Always -- scan graduated index + active instincts/patterns | Relevant lessons held; file released |
+| domain/pipeline/startup-brief.md | ~1,400 | Always -- read Handoff section first | Pipeline state, credit balances, campaign status |
 | Google Calendar (API) | ~500 | Always — today + tomorrow | [calendar] line in status |
 | Gmail scan (API) | ~300 | Only emails in loop-state.md Gmail Check List | [replies] line in status |
 | Fireflies scan (API) | ~300 | Match against active deals by attendee email | New recordings surfaced or "none" |
@@ -33,14 +34,15 @@ Files read during startup. Results surfaced in the 3-line status output. Full fi
 | .carl/context | ~200 | ALWAYS_ON — context bracket detection | Bracket mode set |
 | System heartbeat | ~100 | Check brain/system.db, brain/.git, .carl/loop size, CLAUDE.md lines | [heartbeat] line |
 
-**Tier 1 total: ~10,000 tokens read, ~2,000 retained (lessons + findings)**
+**Tier 1 total: ~12,000 tokens read, ~2,500 retained (lessons + findings)**
 
 ## Tier 2: Task-Triggered (load only when needed)
 Files loaded when Oliver's message or the current task requires them. Intent-based routing.
 
 | File | Trigger Intent |
 |------|---------------|
-| soul.md (Writing Quality Standards) | Drafting any prospect-facing copy (email, LinkedIn, call script) — quality scoring + anti-pattern checks |
+| .claude/self-improvement.md | System work, wrap-up, meta-analysis |
+| soul.md (Writing Quality Standards) | Drafting any prospect-facing copy (email, LinkedIn, call script) |
 | .carl/prospect-email | Writing any email to a prospect |
 | .carl/demo-prep | Preparing for a demo, call, or meeting |
 | .carl/coldcall | Phone prospecting, call scripts, voicemail |
@@ -53,7 +55,7 @@ Files loaded when Oliver's message or the current task requires them. Intent-bas
 | .claude/truth-protocol.md | Referenced inline (rules in CLAUDE.md); full file on demand |
 | .claude/auditor-system.md | Wrap-up audit |
 | .claude/loop-audit.md | Wrap-up audit (Loop dimensions) |
-| .claude/cross-wire-checklist.md | Wrap-up step 9 |
+| .claude/work-style.md | Tier 1 startup load (detailed behavioral rules) |
 | .claude/health-audit.md | Wrap-up step 6 |
 | domain/pipeline/pipedrive-templates.md | Publishing CRM notes |
 | domain/pipeline/weekly-pulse-template.md | Monday sessions |

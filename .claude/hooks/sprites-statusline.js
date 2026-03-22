@@ -424,10 +424,21 @@ process.stdin.on('end', () => {
     const timeStr = now2.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
     // -- Delta Metrics (Line 4) --
-    // Reply rate from system.db
+    // Reply rate -- try Oliver-only from startup-brief first, fall back to system.db
     let replyRate = '?';
     let replyRateNum = 0;
-    if (dbOk) {
+    const briefPath = path.join(dir, 'domain', 'pipeline', 'startup-brief.md');
+    if (fs.existsSync(briefPath)) {
+      try {
+        const briefContent = fs.readFileSync(briefPath, 'utf8');
+        const rrMatch = briefContent.match(/Oliver's Instantly reply rate:\s*([\d.]+)%/);
+        if (rrMatch) {
+          replyRateNum = parseFloat(rrMatch[1]);
+          replyRate = replyRateNum.toFixed(1) + '%';
+        }
+      } catch (e) {}
+    }
+    if (replyRate === '?' && dbOk) {
       const out = safeExec(`python -c "import sqlite3; c=sqlite3.connect('C:/Users/olive/SpritesWork/brain/system.db'); r=c.execute('SELECT instantly_reply_rate FROM daily_metrics ORDER BY date DESC LIMIT 1').fetchone(); print(r[0]) if r and r[0] is not None else print('')"`);
       if (out && out !== '') {
         replyRateNum = parseFloat(out);
@@ -470,29 +481,14 @@ process.stdin.on('end', () => {
       outcomesCount = parseInt(outcomesOut) || 0;
     }
 
-    // Session count for marketplace tier (from latest metrics file)
-    let sessionNum = 0;
-    if (fs.existsSync(metricsPath)) {
-      try {
-        const mFiles = fs.readdirSync(metricsPath).filter(f => f.endsWith('.md')).sort().reverse();
-        for (const mf of mFiles) {
-          const content = fs.readFileSync(path.join(metricsPath, mf), 'utf8');
-          const sessMatch = content.match(/session:\s*(\d+)/);
-          if (sessMatch) {
-            sessionNum = parseInt(sessMatch[1]);
-            break;
-          }
-        }
-      } catch (e) {}
-    }
-    // Tier thresholds: Seed=20, Growth=75, Proven=150
+    // Tier thresholds: Seed=20, Growth=75, Proven=150 (use currentSession from loop-state)
     let tierName = 'Seed';
-    if (sessionNum >= 150) tierName = 'Proven';
-    else if (sessionNum >= 75) tierName = 'Growth';
-    else if (sessionNum >= 20) tierName = 'Seed';
+    if (currentSession >= 150) tierName = 'Proven';
+    else if (currentSession >= 75) tierName = 'Growth';
+    else if (currentSession >= 20) tierName = 'Seed';
     else tierName = 'Pre-Seed';
-    const tierTarget = 150; // target is always Proven
-    const tierDisplay = `${tierName}(${sessionNum}/${tierTarget})`;
+    const tierTarget = 150;
+    const tierDisplay = `${tierName}(${currentSession}/${tierTarget})`;
 
     // Delta line colors
     const replyColor = replyRateNum > 3 ? c.green : replyRateNum > 1 ? c.yellow : c.red;
@@ -540,15 +536,44 @@ process.stdin.on('end', () => {
 
     const salesEditColor = salesEditRate && parseInt(salesEditRate) <= 10 ? c.green : parseInt(salesEditRate) <= 25 ? c.yellow : c.orange;
     const sysEditColor = sysEditRate && parseInt(sysEditRate) <= 10 ? c.green : parseInt(sysEditRate) <= 25 ? c.yellow : c.orange;
+    // -- Current Session Number (from loop-state.md, not audit) --
+    let currentSession = 0;
+    const loopStatePath = 'C:/Users/olive/SpritesWork/brain/loop-state.md';
+    if (fs.existsSync(loopStatePath)) {
+      try {
+        const lsContent = fs.readFileSync(loopStatePath, 'utf8').substring(0, 200);
+        const sessMatch = lsContent.match(/Session\s+(\d+)/);
+        if (sessMatch) currentSession = parseInt(sessMatch[1]);
+      } catch (e) {}
+    }
+
+    // -- Events count (v2.0 backbone health) --
+    let eventsCount = 0;
+    const eventsPath = 'C:/Users/olive/SpritesWork/brain/events.jsonl';
+    if (fs.existsSync(eventsPath)) {
+      try {
+        const lines = fs.readFileSync(eventsPath, 'utf8').trim().split('\n');
+        eventsCount = lines.length;
+      } catch (e) {}
+    }
+
+    // Staleness indicator: if audit is 3+ sessions behind current, flag it
+    const auditLag = currentSession - auditSession;
+    const auditStale = auditLag >= 3;
+    const auditDisplay = auditStale
+      ? `${c.orange}Audit:${auditScore}(${auditLag}ago)${c.reset}`
+      : `${auditColor}Audit:${auditScore}${c.reset}`;
+
     const healthParts = [
+      currentSession > 0 ? `${c.bold}${c.white}S${currentSession}${c.reset}` : '',
       `${c.cyan}Brain:${brainVersion}${c.reset}`,
       `${gitColor}Git:${gitAge}${c.reset}`,
-      `${auditColor}Audit:${auditScore}${auditSession ? ` S${auditSession}` : ''}${c.reset}`,
+      auditDisplay,
       `${cqColor}CQ:${cqScore}${c.reset}`,
-      `${c.green}Graduated:${graduatedCount}${c.reset}`,
-      salesEditRate ? `${salesEditColor}Talent Edit:${salesEditRate}${c.reset}` : '',
-      sysEditRate ? `${sysEditColor}System Edit:${sysEditRate}${c.reset}` : '',
-      auditSession ? `${c.dim}S${auditSession}${c.reset}` : '',
+      `${c.green}Grad:${graduatedCount}${c.reset}`,
+      salesEditRate ? `${salesEditColor}TEdit:${salesEditRate}${c.reset}` : '',
+      sysEditRate ? `${sysEditColor}SEdit:${sysEditRate}${c.reset}` : '',
+      eventsCount > 0 ? `${c.dim}Ev:${eventsCount}${c.reset}` : '',
     ].filter(Boolean);
 
     // Line 4: Delta metrics -- reply rate, pipeline value, deals, outcomes, tier

@@ -72,28 +72,23 @@ If any shows [ ] instead of [x], STOP and complete before presenting.
 After drafting, generate the prospect's most likely SPECIFIC objection based on the research. If vulnerable, revise before presenting.
 Format: `OBJECTION CHECK: "[specific objection]" — [HANDLED in draft / REVISED to address]`
 
-## Neural Bus Signal (write after every gate)
-After any gate completes, write one line to brain/sessions/neural-bus.md:
-`[HH:MM] [gate:gate-name] [PASSED/FAILED] prospect=[name] confidence=[HIGH/MEDIUM/LOW]`
+## Event Emission (after every gate)
+After any gate completes, emit via events.py:
+`emit("GATE_RESULT", "gate:[name]", {"result": "PASS/FAIL", "prospect": "[name]", "confidence": "HIGH/MEDIUM/LOW"})`
 
 ## System Integration Gate (MANDATORY for every system addition)
 
-Fires when: adding any new component, script, rule, cross-wire, signal, tool, or pattern to the system.
+Fires when: adding any new component, script, rule, hook, signal, tool, or pattern to the system.
 
 | Step | Check | Pass criteria |
 |------|-------|---------------|
-| 0 | **Purpose statement** | State in 2-3 sentences: (1) what this component does in plain English, (2) why the system needs it, (3) how the system behaves differently with it. No file paths or implementation in this step. If you can't articulate the "why," stop and ask Oliver. |
-| 1 | Read `brain/sessions/neural-bus.md` signal taxonomy | Identified which signals the addition writes or reads |
-| 2 | Read `.claude/cross-wire-checklist.md` | Identified which cross-wire(s) the addition feeds or consumes |
-| 3 | Define bus connection | Addition has at least ONE signal it emits OR consumes. No orphans. |
-| 4 | Update signal taxonomy | New signal type added to neural-bus.md if needed |
-| 5 | Update or add cross-wire | New CW added or existing CW updated to include the addition |
-| 6 | Update `.claude/component-map.md` | Addition listed with correct layer, file path, and bus connections |
+| 0 | **Purpose statement** | State in 2-3 sentences: (1) what this component does in plain English, (2) why the system needs it, (3) how the system behaves differently with it. If you can't articulate the "why," stop and ask Oliver. |
+| 1 | Check events.py integration | Does this component emit or consume events? If yes, which types? |
+| 2 | Check hook integration | Does this need a hook for enforcement? If so, which hook point? |
+| 3 | Define event connection | Addition emits OR consumes at least ONE event type via events.py. No orphans. |
+| 4 | Update `.claude/component-map.md` | Addition listed with correct layer, file path, and event connections |
 
-**HARD GATE: If step 3 fails (no bus connection), the addition does not ship.** Ask Oliver: "This doesn't wire into the nervous system — should I rethink the approach or skip it?"
-
-**Neural Bus Signal:**
-`[HH:MM] [gate:integration] [PASSED/FAILED] component=[name] signals=[list] cross-wires=[list]`
+**HARD GATE: If step 3 fails (no event connection), the addition does not ship.** Ask Oliver: "This doesn't wire into the event system — should I rethink the approach or skip it?"
 
 ## Domain Gates
 Gate content is domain-specific. Domain gates inherit this protocol — they define task-specific research checklists but do NOT redefine the universal steps (tag block, objection check, humanizer, self-score). Those always come from this file.

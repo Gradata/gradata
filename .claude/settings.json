@@ -26,6 +26,15 @@
             "command": "python \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/reflect/scripts/session_start_reminder.py\""
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/context-budget.js",
+            "timeout": 3000
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -56,7 +65,39 @@
         ]
       }
     ],
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/quality-gate.js",
+            "timeout": 3000
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/mcp-health.js",
+            "timeout": 3000
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/secret-scan.js",
+            "timeout": 3000
+          }
+        ]
+      },
       {
         "hooks": [
           {
@@ -79,6 +120,35 @@
           {
             "type": "command",
             "command": "node .claude/hooks/delta-auto-tag.js"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/suggest-compact.js",
+            "timeout": 3000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/cost-tracking.js",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/session-persist.js",
+            "timeout": 5000
           }
         ]
       }

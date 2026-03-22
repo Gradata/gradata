@@ -1,6 +1,7 @@
 # Lessons Learned
 # Format: [DATE] [STATUS] CATEGORY: What happened → What to do instead
-# Status tags: [PROVISIONAL:N] = N sessions of probation remaining | [CONFIRMED] = survived probation
+# Status tags: [INSTINCT:X.XX] = confidence score (0.0-0.59) | [PATTERN] = confirmed (0.60-0.89) | [RULE] = graduated (0.90+)
+# Legacy compat: [CONFIRMED] = [PATTERN], [PROVISIONAL:N] auto-converts to [INSTINCT:X.XX] at wrap-up
 # Graduated lessons → lessons-archive.md (66 graduated through 3/20)
 # Before ANY drafting task, search lessons-archive.md for relevant categories.
 #
@@ -8,7 +9,7 @@
 # Shadow lessons track what WOULD have been different, without changing output.
 # After 3 shadow occurrences: promote to active or kill. See auditor-system.md.
 #
-# Wrap-up: decrement all [PROVISIONAL:N] counters. Delete any with reversal flag. Promote [PROVISIONAL:0] to [CONFIRMED].
+# Wrap-up: update_confidence() in wrap_up.py handles all scoring. +0.10 per surviving session, -0.15 per correction. 0.60+ promotes to [PATTERN].
 # CONFIRMATION LOOP: First 3 times a lesson's category comes up in live work, ask Oliver: "Did [lesson] hold?"
 # After 3 confirmed holds: graduate automatically. If Oliver says no: flag [INEFFECTIVE], rewrite the rule.
 # Format: [CONFIRM:0/3] after promotion to [CONFIRMED]. Tracks holds, not just time.
@@ -99,7 +100,7 @@
 
 [2026-03-19] [CONFIRMED — ZERO FIRE] DEMO PREP: Cheat sheet = battle card, NOT research doc. TRAP → QUANTIFY (turn "hours" into "260 hours/year") → TRANSITION → thread link mapped to their specific pain (from cold call or research) → land value. Include "IF YOU PANIC" box. Two drafts: (1) research doc, (2) clean cheat sheet. Full 12-step research process before building.
 
-### PROVISIONAL — Active
+### PATTERN — Active (formerly CONFIRMED)
 
 [2026-03-20] [CONFIRMED] DRAFTING: Bullet lists need a lead-in line for context ("On that call we cover:"). One idea per bullet — no combining. Attach actual case study documents, don't just name-drop results.
 
@@ -135,10 +136,10 @@
 
 [2026-03-21] [CONFIRMED] ACCURACY: When displaying metrics that mix session types (sales vs system), always filter to the relevant track. Blended numbers (e.g., edit rate diluted by 0-revision system sessions) are misleading. Show the number that matters for the context. Root cause: statusline showed 15% edit rate blending sales (31%) with systems (0%).
 
-[2026-03-22] [PROVISIONAL:1] CONSTRAINT: Before proposing any tool, API, or service, check if it costs money. If yes, flag it and ask -- don't present it as a solution. Default to free. Oliver wants zero-cost infrastructure. Root cause: proposed Composio (paid) and trial-tier APIs (25/month) twice before being corrected. Technical problem-solving instinct overrides constraint awareness.
+[2026-03-22] [INSTINCT:0.49] CONSTRAINT: Before proposing any tool, API, or service, check if it costs money. If yes, flag it and ask -- don't present it as a solution. Default to free. Oliver wants zero-cost infrastructure. Root cause: proposed Composio (paid) and trial-tier APIs (25/month) twice before being corrected. Technical problem-solving instinct overrides constraint awareness.
 
-[2026-03-22] [PROVISIONAL:1] DATA_INTEGRITY: "Oliver only" applies to ALL measurement -- not just deals and contacts, but metrics, delta data, campaign stats, and any aggregate numbers. When pulling data from shared systems (Instantly, Pipedrive, Gmail), always filter by owner. Root cause: included Anna's 84K campaign emails in Oliver's 1.8K reply rate calculation, producing 0.61% instead of 1.01%.
+[2026-03-22] [INSTINCT:0.49] DATA_INTEGRITY: "Oliver only" applies to ALL measurement -- not just deals and contacts, but metrics, delta data, campaign stats, and any aggregate numbers. When pulling data from shared systems (Instantly, Pipedrive, Gmail), always filter by owner. Root cause: included Anna's 84K campaign emails in Oliver's 1.8K reply rate calculation, producing 0.61% instead of 1.01%.
 
-[2026-03-22] [PROVISIONAL:1] PROCESS: Never skip wrap-up steps when rushing. The 8.0 audit gate, provisional decrements, and agent distillation are non-negotiable regardless of session length. Long session = MORE reason to audit, not less. Spawn wrap-up agents instead of skipping. Root cause: 6+ hour session caused fatigue-driven shortcutting on 6 wrap-up steps.
+[2026-03-22] [INSTINCT:0.49] PROCESS: Never skip wrap-up steps when rushing. The 8.0 audit gate, confidence updates, and agent distillation are non-negotiable regardless of session length. Long session = MORE reason to audit, not less. Spawn wrap-up agents instead of skipping. Root cause: 6+ hour session caused fatigue-driven shortcutting on 6 wrap-up steps.
 
-[2026-03-22] [PROVISIONAL:5] CONTEXT: Oliver does prospect work on weekdays, systems work on weekends. Never frame weekend systems sessions as "drift" or imply pipeline is being neglected. Check the day of week before commenting on session type balance. Root cause: lectured Oliver about 6 consecutive non-prospect sessions when it was Saturday — his normal schedule.
+[2026-03-22] [INSTINCT:0.30] CONTEXT: Oliver does prospect work on weekdays, systems work on weekends. Never frame weekend systems sessions as "drift" or imply pipeline is being neglected. Check the day of week before commenting on session type balance. Root cause: lectured Oliver about 6 consecutive non-prospect sessions when it was Saturday — his normal schedule.

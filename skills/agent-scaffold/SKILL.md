@@ -90,6 +90,6 @@ Show Oliver the manifest and ask for approval before committing.
 | Department | Default tools_denied | Default bootstrap_files | Default warmup |
 |---|---|---|---|
 | sales | [Edit .claude/*, Write .carl/*, Bash destructive] | [domain/DOMAIN.md, domain/soul.md] | [brain/loop-state.md, domain/pipeline/startup-brief.md] |
-| systems | [Apollo, Gmail, Fireflies, Pipedrive, Instantly] | [.claude/component-map.md, .claude/cross-wire-checklist.md] | [brain/system-patterns.md, brain/sessions/neural-bus.md] |
+| systems | [Apollo, Gmail, Fireflies, Pipedrive, Instantly] | [.claude/component-map.md, .claude/self-improvement.md] | [brain/system-patterns.md, brain/events.jsonl] |
 | domain | [Edit .claude/*, Bash destructive] | [domain/DOMAIN.md] | [brain/loop-state.md] |
 | core | [] | [CLAUDE.md] | [brain/system-patterns.md] |

@@ -2,13 +2,13 @@
 
 > The mechanism that turns accumulated data into expertise.
 > Without this, the brain gets bigger. With it, the brain gets smarter.
-> Runs every 10 sessions. Triggered by periodic-audits.md or manually.
+> Runs every 10 sessions. Triggered by periodic_audits SQLite table or manually.
 > Never auto-edits CLAUDE.md, CARL, or any core file. Surfaces and waits.
 > SDK-portable (brain methodology). Output files are brain layer.
 
 ## When This Runs
 
-- Every 10 sessions (checked at wrap-up via periodic-audits.md)
+- Every 10 sessions (checked at startup via periodic_audits SQLite table)
 - Wrap-up outputs a reminder. Run before closing or first thing next session.
 - Can also be triggered manually anytime ("run self-audit" / "run lens 2")
 - Each lens can run independently if time is short.
@@ -252,7 +252,7 @@ After all lenses complete:
 
 1. **Update self-model.md** — adjust reliability scores and blind spots based on findings. Surface only, don't auto-write. Ask Oliver to confirm changes.
 2. **Feed CQ** — Lens 1 error trends feed Correction Decay. Lens 2 patterns feed Knowledge Utilization. Lens 3 judgment accuracy feeds Lesson Hit Rate and Autonomy Trend. Note which CQ dimensions were affected.
-3. **Log run** — add entry to periodic-audits.md with `last_run` session number.
+3. **Log run** — update periodic_audits SQLite table: `UPDATE periodic_audits SET last_run_session=N, next_due_session=N+10 WHERE audit_name='self-audit'`
 
 ```
 SELF-AUDIT COMPLETE — Session [N]

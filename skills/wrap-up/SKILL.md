@@ -10,10 +10,10 @@ description: Use when user says "wrap up", "close session", "end session",
 ## Pre-Phase: Metacognitive Scan (always runs, max 60 seconds)
 
 Before calculating session weight, run a quick metacognitive scan:
-1. Read brain/sessions/neural-bus.md — what were the dominant signal types this session? (gates, reflects, blocks, patterns)
+1. Query events.jsonl for this session's events — what types fired? (corrections, gate results, calibration)
 2. Read brain/system-patterns.md — is this session better or worse than the baseline trend?
 3. Ask: what is the single most important thing this session revealed about how AIOS operates?
-4. Write one line to brain/sessions/neural-bus.md: `[HH:MM] [metacog] [INSIGHT] [one sentence] [implication for next session]`
+4. Emit insight to events.jsonl via `events.emit("HEALTH_CHECK", "metacog", {"insight": "..."})`
 5. If the insight implies a rule change — queue it for Phase 3 (Review & Apply) rather than acting immediately
 
 ## Phase 0: Calculate Session Weight (ALWAYS_ON — runs first)
@@ -249,6 +249,7 @@ Mark each relevant item. Skip irrelevant ones. Fix any failures before closing.
 
 ```markdown
 # Session [N] — [YYYY-MM-DD] ([Session Type Summary])
+Tags: [2-5 topic tags]
 
 ## OLIVER'S SUMMARY
 
@@ -321,6 +322,8 @@ Mark each relevant item. Skip irrelevant ones. Fix any failures before closing.
 - startup-brief.md: [X]/60
 ```
 
+**Session Tags (MANDATORY):** Every session note header must include a `Tags:` line with 2-5 topic tags for searchability. Examples: `Tags: pipeline, demo-prep, genus, system-audit, prospecting`. These enable quick session lookup: `grep -l 'Tags:.*demo-prep' brain/sessions/*.md`
+
 **Verification:** Before proceeding to Phase 6, check that the session note file exists at the expected path and contains all 10 section headers (OLIVER'S SUMMARY, Session Type, What Was Done, Gates, Best Output, Weakest Output, Self-Scores, Corrections Received, Conditional Steps, Reflection Signal, Line Counts). If any section is missing, add it before committing.
 
 **Brain session summary** (Obsidian vault — write after session note):
@@ -337,7 +340,7 @@ Mark each relevant item. Skip irrelevant ones. Fix any failures before closing.
 Before git commit can run, verify ALL of these. If any fails, resolve before committing:
 
 - [ ] **/reflect has run this session** — check .claude/micro-reflections.md for today's date entry. If no entry exists, run /reflect now (even if queue is empty — it logs the empty run).
-- [ ] **All provisional lessons reviewed** — scan lessons.md for any [PROVISIONAL:0] entries. Graduate or defer each one. No zero-counter provisionals may persist across commits.
+- [ ] **All instinct confidence scores updated** — wrap_up.py update_confidence() handles this. Verify no [INSTINCT:0.60+] entries remain (should auto-promote to [PATTERN]).
 - [ ] **No blocked outputs shipped without override** — check session history for any output with self-score <7. If any were presented to Oliver without his explicit "ship it anyway" override, flag it as a process violation and log to lessons.md.
 
 If all pass: proceed to Phase 6.

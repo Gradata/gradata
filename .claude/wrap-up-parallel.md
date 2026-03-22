@@ -28,7 +28,7 @@ Wave 1 ────────────────────────�
   │           SKIP if no corrections this session
   │
   ├─ Agent C: Step 7         /reflect + anti-bloat
-  │           Decrement [PROVISIONAL:N] counters
+  │           Update [INSTINCT:X.XX] confidence scores
   │           Check for 3+ similar corrections → propose rule upgrade
   │           Daily note rotation, lessons graduation
   │
@@ -57,8 +57,8 @@ Wave 2 ────────────────────────�
   │           HARD GATE: 8.0+ to close — if fail, fix-cycle
   │           Input: session note, lessons, reflect output
   │
-  ├─ Agent H: Step 9         Cross-wire checklist
-  │           Check all triggers (EVENT, TREND, DANGER)
+  ├─ Agent H: Step 9         Event connection verification
+  │           Query events.jsonl for session signals
   │           Log to brain/system-patterns.md
   │           Show compound brain status
   │
@@ -156,7 +156,7 @@ Phase 0 + 0.5 (parallel) ──────────────────�
      brain/.git integrity
      system.db check
      CLAUDE.md line count (detect bloat)
-     Gap scanner
+     session_start_reminder.py hook (startup checks)
      Brain launch check
 ```
 

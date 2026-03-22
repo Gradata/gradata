@@ -147,21 +147,21 @@ LOOP_RULE_34=PATTERNS.md → Gates. When PATTERNS.md shows an angle with [PROVEN
 LOOP_RULE_34_PRIORITY=NORMAL
 
 # ============================================================================
-# META-LOOP: Track the cross-wiring itself (merged from 5 rules)
+# META-LOOP: Track event connections and hooks (merged from 5 rules)
 # ============================================================================
-LOOP_RULE_35=CROSS-WIRE TRACKING: Every cross-wire connection (rules 28-34) has tracking counters: fires (times triggered), value_produced (times output was useful — used by Oliver, prevented a mistake, improved a score). Update at wrap-up step 9 in system-patterns.md Cross-Wire Performance table. Health scoring: value_rate = value_produced / fires. Below 0.2 after 10+ fires → LOW VALUE, flag for review. Above 0.6 → HIGH VALUE, consider strengthening. Zero fires after 5 sessions → DORMANT, investigate.
+LOOP_RULE_35=EVENT CONNECTION TRACKING: Every event connection (hooks + rules 28-34) has tracking counters: fires (times triggered), value_produced (times output was useful — used by Oliver, prevented a mistake, improved a score). Update at wrap-up step 9 in system-patterns.md Event Connection Performance table. Health scoring: value_rate = value_produced / fires. Below 0.2 after 10+ fires → LOW VALUE, flag for review. Above 0.6 → HIGH VALUE, consider strengthening. Zero fires after 5 sessions → DORMANT, investigate.
 LOOP_RULE_35_PRIORITY=NORMAL
 
-LOOP_RULE_36=META-LOOP OPERATION: Runs every 5th session (aligned with system trend analysis). Produces "Cross-Wire Report" — 3 lines max: (1) highest-value connection and why, (2) lowest-value connection and recommendation (tighten, loosen, or kill), (3) dormant connections to investigate. Self-tracking: after 3 meta-loop cycles (15 sessions), evaluate if recommendations improved system performance. No improvement → simplify to annual review. RECURSION CAP: maximum 3 layers (L1 sales, L2 system, L3 meta). No Layer 4. Complexity earns its keep or dies.
+LOOP_RULE_36=META-LOOP OPERATION: Runs every 5th session (aligned with system trend analysis). Produces "Connection Report" — 3 lines max: (1) highest-value event connection and why, (2) lowest-value connection and recommendation (tighten, loosen, or kill), (3) dormant connections to investigate. Self-tracking: after 3 meta-loop cycles (15 sessions), evaluate if recommendations improved system performance. No improvement → simplify to annual review. RECURSION CAP: maximum 3 layers (L1 sales, L2 system, L3 meta). No Layer 4. Complexity earns its keep or dies.
 LOOP_RULE_36_PRIORITY=NORMAL
 
 # ============================================================================
 # CONVERGENCE & COMPLEXITY (merged from 5 rules)
 # ============================================================================
-LOOP_RULE_37=CONVERGENCE & KILL SWITCHES: Kill switch: every optimization mechanism has a cycle counter. 5 consecutive cycles producing zero actionable changes → auto-disable to DORMANT. Oliver can re-enable. Convergence detection: system is converging when (a) audit scores 9+ for 3 sessions, (b) no new lessons for 3 sessions, (c) CARL rules stable for 3 sessions, (d) cross-wire value rates above 0.5 or dormant. When converging → reduce meta-loop to every 10 sessions. Maturity indicators tracked in system-patterns.md: sessions_since_last_new_lesson, sessions_since_last_rule_change, sessions_since_last_gate_catch, avg_audit_score_last_5, cross_wire_dormancy_rate. 4/5 stable → system is mature.
+LOOP_RULE_37=CONVERGENCE & KILL SWITCHES: Kill switch: every optimization mechanism has a cycle counter. 5 consecutive cycles producing zero actionable changes → auto-disable to DORMANT. Oliver can re-enable. Convergence detection: system is converging when (a) audit scores 9+ for 3 sessions, (b) no new lessons for 3 sessions, (c) CARL rules stable for 3 sessions, (d) event connection value rates above 0.5 or dormant. When converging → reduce meta-loop to every 10 sessions. Maturity indicators tracked in system-patterns.md: sessions_since_last_new_lesson, sessions_since_last_rule_change, sessions_since_last_gate_catch, avg_audit_score_last_5, event_connection_dormancy_rate. 4/5 stable → system is mature.
 LOOP_RULE_37_PRIORITY=NORMAL
 
-LOOP_RULE_38=DIVERGENCE & COMPLEXITY BUDGET: Divergence: if a converged system shows audit score below 8, 3+ new lessons in one session, or 2+ smoke check failures → re-enable dormant optimizations, increase meta-loop to every 5 sessions. Complexity budget: max 10 cross-wire rules, max 5 meta-loop trackers, max 100 CARL behavioral rules. At 90% of any limit → trigger pruning, remove lowest value_rate first. Complexity is a finite resource.
+LOOP_RULE_38=DIVERGENCE & COMPLEXITY BUDGET: Divergence: if a converged system shows audit score below 8, 3+ new lessons in one session, or 2+ smoke check failures → re-enable dormant optimizations, increase meta-loop to every 5 sessions. Complexity budget: max 10 event connections, max 5 meta-loop trackers, max 100 CARL behavioral rules. At 90% of any limit → trigger pruning, remove lowest value_rate first. Complexity is a finite resource.
 LOOP_RULE_38_PRIORITY=NORMAL
 
 # ============================================================================
@@ -222,9 +222,9 @@ LOOP_RULE_48=CONFIDENCE DECAY: Any pattern in PATTERNS.md older than 90 days wit
 LOOP_RULE_48_PRIORITY=HIGH
 
 # ============================================================================
-# DORMANCY RE-EVALUATION: Wake dormant cross-wires when context changes
+# DORMANCY RE-EVALUATION: Wake dormant event connections when context changes
 # ============================================================================
-LOOP_RULE_49=DORMANCY RE-EVALUATION TRIGGER: Cross-wire connections in DORMANT status get a mandatory review pass when ANY of these structural changes occur: (1) CLAUDE.md is modified, (2) a new tool is added, (3) a new cross-wire is created, (4) a CARL domain is significantly modified. Check each dormant connection: given the structural change, is the trigger condition now more likely to fire? If yes, move back to ACTIVE with note in audit-log.md.
+LOOP_RULE_49=DORMANCY RE-EVALUATION TRIGGER: Event connections in DORMANT status get a mandatory review pass when ANY of these structural changes occur: (1) CLAUDE.md is modified, (2) a new tool is added, (3) a new hook is created, (4) a CARL domain is significantly modified. Check each dormant connection: given the structural change, is the trigger condition now more likely to fire? If yes, move back to ACTIVE with note in audit-log.md.
 LOOP_RULE_49_PRIORITY=NORMAL
 
 # ============================================================================
@@ -278,7 +278,7 @@ LOOP_RULE_58_PRIORITY=NORMAL
 # ============================================================================
 # MICRO-REFLECTION: Lightweight integration check on every system addition
 # ============================================================================
-LOOP_RULE_59=MICRO-REFLECTION TRIGGER: Every time something new is added to the system (CARL rule, lesson, gate step, file, cross-wire), run a 60-second reflection BEFORE committing: (1) Does this conflict with anything existing? (2) Does this make any existing rule redundant? If yes, propose removing it in the same commit. (3) Does this unlock any new capability? Log to .claude/micro-reflections.md. If a conflict IS found, resolve before adding. If a redundancy IS found, remove in the same change.
+LOOP_RULE_59=MICRO-REFLECTION TRIGGER: Every time something new is added to the system (CARL rule, lesson, gate step, file, hook), run a 60-second reflection BEFORE committing: (1) Does this conflict with anything existing? (2) Does this make any existing rule redundant? If yes, propose removing it in the same commit. (3) Does this unlock any new capability? Log to .claude/micro-reflections.md. If a conflict IS found, resolve before adding. If a redundancy IS found, remove in the same change.
 LOOP_RULE_59_PRIORITY=HIGH
 
 # ============================================================================

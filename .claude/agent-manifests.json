@@ -1,0 +1,80 @@
+{
+  "_schema_version": "1.0",
+  "_description": "Agent type definitions. Read by agent-scaffold skill and wrap-up orchestrator.",
+  "agents": {
+    "research": {
+      "description": "Prospect research, LinkedIn scraping, company analysis",
+      "trust_level": "standard",
+      "tools_allowed": ["Read", "Grep", "Glob", "WebSearch", "WebFetch", "Bash"],
+      "tools_denied": ["Write .claude/*", "Write .carl/*", "Edit CLAUDE.md"],
+      "write_paths": ["brain/prospects/*", "brain/demos/*", "docs/Demo Prep/*"],
+      "warmup_files": ["domain/DOMAIN.md", "domain/soul.md"],
+      "bootstrap_context": ["brain/loop-state.md", "domain/pipeline/startup-brief.md"],
+      "max_tokens": 50000,
+      "changelog": []
+    },
+    "draft": {
+      "description": "Email drafting, follow-up writing, LinkedIn messages",
+      "trust_level": "standard",
+      "tools_allowed": ["Read", "Grep", "Glob", "Write", "Edit", "WebFetch"],
+      "tools_denied": ["Bash destructive", "Write .claude/*", "Write .carl/*"],
+      "write_paths": ["brain/prospects/*", "domain/pipeline/*", "docs/*"],
+      "warmup_files": ["domain/soul.md", "domain/templates/templates.txt"],
+      "bootstrap_context": ["brain/emails/PATTERNS.md", ".claude/lessons.md"],
+      "max_tokens": 40000,
+      "changelog": []
+    },
+    "crm": {
+      "description": "Pipedrive notes, deal updates, activity logging",
+      "trust_level": "elevated",
+      "tools_allowed": ["Read", "Grep", "Glob", "Bash", "mcp__*"],
+      "tools_denied": ["Write .claude/*", "Write .carl/*", "Edit CLAUDE.md"],
+      "write_paths": ["brain/prospects/*", "brain/forecasting.md"],
+      "warmup_files": ["domain/DOMAIN.md"],
+      "bootstrap_context": ["brain/loop-state.md"],
+      "max_tokens": 30000,
+      "changelog": []
+    },
+    "audit": {
+      "description": "Post-session scoring, quality checks, system review",
+      "trust_level": "elevated",
+      "tools_allowed": ["Read", "Grep", "Glob", "Write", "Edit", "Bash"],
+      "tools_denied": [],
+      "write_paths": [".claude/audit-log.md", ".claude/lessons.md", "brain/sessions/*", "brain/metrics/*"],
+      "warmup_files": [".claude/auditor-system.md", ".claude/quality-rubrics.md"],
+      "bootstrap_context": ["brain/events.jsonl", ".claude/lessons.md"],
+      "max_tokens": 60000,
+      "changelog": []
+    },
+    "distillation": {
+      "description": "Route learnings to agent-specific brain files",
+      "trust_level": "standard",
+      "tools_allowed": ["Read", "Grep", "Glob", "Write"],
+      "tools_denied": ["Bash", "Edit CLAUDE.md", "Write .carl/*"],
+      "write_paths": ["agents/*/brain/updates/*"],
+      "warmup_files": [],
+      "bootstrap_context": [],
+      "max_tokens": 30000,
+      "changelog": []
+    }
+  },
+  "orchestration": {
+    "max_nesting_depth": 2,
+    "max_concurrent_agents": 5,
+    "default_agent_timeout_ms": 300000,
+    "dedup_window_seconds": 10,
+    "budget_cascade": {
+      "enabled": true,
+      "parent_reserves_percent": 20,
+      "child_warning_threshold_percent": 80,
+      "child_hard_limit_percent": 95
+    }
+  },
+  "guardrails": {
+    "global_write_deny": [".claude/settings.json", ".claude/settings.local.json", ".env", "credentials*"],
+    "global_exec_deny_patterns": ["rm -rf /", "git push --force", "git reset --hard", "DROP TABLE", "DELETE FROM"],
+    "sensitive_data_patterns": ["sk-[a-zA-Z0-9]{20,}", "AKIA[A-Z0-9]{16}", "-----BEGIN.*PRIVATE KEY-----", "ghp_[a-zA-Z0-9]{36}"],
+    "max_file_write_size_bytes": 1048576,
+    "post_execution_scan": true
+  }
+}

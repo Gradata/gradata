@@ -31,7 +31,7 @@ Before loading anything:
 2. Check modification dates on domain/pipeline/startup-brief.md, lessons.md, Leads/STATUS.md, brain/prospects/
 3. If any file was modified AFTER the last session's daily note timestamp → surface changes to Oliver ("Since last session: follow-up checker flagged 2 stale prospects, startup-brief updated by scheduled task")
 4. **Staleness sensor** — scan brain files that should be updated regularly. Flag any modified more than 7 days ago: brain/loop-state.md (should update every session), domain/pipeline/startup-brief.md (every session), brain/emails/PATTERNS.md (every prospect session), brain/system-patterns.md (every 5 sessions). Surface stale files as a priority signal: "STALE: [file] last updated [N] days ago — update this session."
-5. **Initialize neural-bus** — create fresh brain/sessions/neural-bus.md for this session. Archive previous session's bus to brain/sessions/neural-bus-[prev-date].md. Write first signal: `[HH:MM] [session-start] [INIT] session=[N] stale_files=[list] brain_alerts=[N]`
+5. **Emit session init event** — call `python brain/scripts/events.py` or use events.emit() to log: `HEALTH_CHECK, "session-start", {"stale_files": [...], "brain_alerts": N}`.
 
 ## Phase 0.5: System Heartbeat
 
@@ -42,10 +42,10 @@ Quick health pulse before loading context. **Run steps 1-4 + 7 as a single paral
 2. Check brain/.git exists (version control active)
 3. Check domain/carl/loop file size hasn't changed unexpectedly (rule tampering detection)
 4. Check CLAUDE.md line count is under 150 (bloat detection)
-7. **Gap Scanner** — run .claude/gap-scanner.md startup scan. Check all systems connected, detect process drift from canonical_logs, surface any gaps in the startup status output.
+7. **System Health** — session_start_reminder.py hook runs 6 automated checks (vault, DB, PATTERNS, git, CLAUDE.md lines, events.jsonl). Surfaces CRITICAL/WARNING alerts automatically.
 8. **Brain launch check** — run `python brain/scripts/launch.py --json`. Validates header consistency (session numbers match across loop-state + startup-brief), staleness, inter-session modifications, and RAG graduation status. Surface any issues in startup output. If `rag_graduation_ready`, prompt user to activate embedding layer.
 
-9. **Periodic audit check** — read .claude/periodic-audits.md. Compare each audit's `last_run` session number against current session number. If any audit's trigger condition is met, queue it: startup-time audits run now (RAG freshness), session-time audits note in status output ("SDK audit due this session"), wrap-up audits fire automatically at step 7.
+9. **Periodic audit check** — session_start_reminder.py hook queries `periodic_audits` SQLite table automatically. Due audits surfaced in startup output. After running an audit, update: `UPDATE periodic_audits SET last_run_session=N, next_due_session=N+frequency WHERE audit_name='...'`
 
 **THEN (sequential, after batch completes):**
 5. If any check fails -> surface immediately: "SYSTEM ALERT: [what failed]"
