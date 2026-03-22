@@ -151,6 +151,8 @@
 
 [2026-03-21] [PROVISIONAL:5] WRAP-UP: /session-audit skill is a SUBSET of the CLAUDE.md 11-step wrap-up. After /session-audit completes, cross-check CLAUDE.md steps 0.5, 1, 7, 8, 9, 9.5, 10, 10.5, 11, 11b — verify each one ran. The skill covers ~6 of 11. Steps 8 (auditor), 9 (cross-wires), 9.5 (git), 10.5 (startup brief), 11b (distillation) are NOT in the skill. Root cause: skill's "SESSION AUDIT COMPLETE" message creates false sense of done.
 
+[2026-03-21] [PROVISIONAL:5] CRM: When analyzing Pipedrive data, filter out unworked deals (no value, no activity, no org) before drawing conclusions. Many deals are CRM debris from imports/Zapier, not real pipeline. Only deals with activity, assigned value, and real stage progression count as training data. Root cause: treated 130 deals as equal signal when ~80+ were noise.
+
 [2026-03-21] [PROVISIONAL:5] STRATEGY: Don't conflate cold outreach reply data with close-cycle effectiveness. "Show the tool" gets cold replies. Pain-based selling (Gap, SPIN) closes deals. Different stages need different approaches. Data from Instantly measures top-of-funnel; Fireflies/Pipedrive measures full cycle. Root cause: presented Instantly reply rates as if they proved what closes deals, not just what gets attention.
 
 [2026-03-21] [PROVISIONAL:5] PROCESS: Before recommending workflow changes, verify the current workflow first. Don't assume a problem exists. Oliver already sends payment links in follow-ups, not PDF proposals. The "collapse the proposal step" recommendation solved a nonexistent problem. Root cause: inferred workflow from Pipedrive stage names without asking how the actual process works.
