@@ -82,6 +82,7 @@ Fires when: adding any new component, script, rule, cross-wire, signal, tool, or
 
 | Step | Check | Pass criteria |
 |------|-------|---------------|
+| 0 | **Purpose statement** | State in 2-3 sentences: (1) what this component does in plain English, (2) why the system needs it, (3) how the system behaves differently with it. No file paths or implementation in this step. If you can't articulate the "why," stop and ask Oliver. |
 | 1 | Read `brain/sessions/neural-bus.md` signal taxonomy | Identified which signals the addition writes or reads |
 | 2 | Read `.claude/cross-wire-checklist.md` | Identified which cross-wire(s) the addition feeds or consumes |
 | 3 | Define bus connection | Addition has at least ONE signal it emits OR consumes. No orphans. |

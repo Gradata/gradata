@@ -2,6 +2,13 @@
 # Every rule change gets logged here with date, what changed, and why.
 # If a change makes things worse, roll back by reversing the entry.
 
+## 2026-03-22 — Deep Audit: 3 Missing CLAUDE.md Rules + Waterfall Fix (Session 32)
+- **CLAUDE.md**: Added big-picture gate ("state what it DOES, WHY, and behavior change before implementing"). Was only in memory + lesson — never in CLAUDE.md. Root cause of Oliver's repeated correction.
+- **CLAUDE.md**: Added brutal honesty rule ("surface what's weak, risky, unsure on EVERY output"). Was only in .carl/global GLOBAL_RULE_1 + waterfall Layer 4.5 — skipped for system work.
+- **CLAUDE.md**: Added fact-check gate ("verify key facts against source files before presenting ANY output"). Was only in .carl/global GLOBAL_RULE_0 — system work skipped it via light waterfall pipeline.
+- **action-waterfall.md**: Split "System work" into routine (fast-track eligible) vs new component (DELIBERATE, FULL verify). New components now get full context loading + Layer 4.5 brutal honesty + full verification. Prevents architectural decisions from running on the lightest pipeline.
+- **CLAUDE.md**: Step 10.5 expanded (full handoff rewrite mandate). Step 1 specifies exact file path. Step 9.5 requires wrap_up_validator.py CLEAR before commit.
+
 ## 2026-03-22 — FITFO + Delta Tagging + Session Counter (Session 31)
 - **CLAUDE.md**: Added FITFO attitude rule ("When stuck, exhaust 4+ strategies before giving up. Test own solutions. Full protocol: skills/fitfo/SKILL.md"). +1 line.
 - **CLAUDE.md**: Added delta tagging rule ("Every prospect-touching output MUST be logged via delta_tag.py"). +1 line.

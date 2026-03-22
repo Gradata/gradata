@@ -3,6 +3,17 @@
 # Three trigger classes: EVENT (this session), TREND (across sessions), DANGER (anomaly).
 # Check every one. No skipping.
 
+## Signal-to-Wire Map (quick reference)
+
+| Signal | Feeds These Wires |
+|--------|-------------------|
+| CORRECTION | CW-1, CW-5, CW-11, DS-1, DS-4 |
+| GATE_PASS / GATE_FAIL | CW-1, CW-2 |
+| AUDIT_SCORE | CW-13, DS-4, DS-5 |
+| LESSON_CREATED | CW-2, CW-3 |
+| STALE_ALERT | (startup only, no cross-wire) |
+| **UNWIRED** (no signal) | CW-4, CW-6, CW-7, CW-8, CW-9, CW-12, DS-2, DS-3 |
+
 ## Instructions
 For each cross-wire below:
 1. Check the TRIGGER condition (event, trend, or danger)
@@ -60,6 +71,7 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 ---
 
 ## CW-1: Auditor → Gates (LOOP_RULE_28)
+**SIGNAL:** CORRECTION, GATE_FAIL, AUDIT_SCORE | **STATUS:** WIRED
 **TRIGGER:** Any audit dimension scored below 7 this session
 **CHECK:** Does a gate in .claude/gates.md cover that dimension?
 **ACTION YES:** Tighten the relevant gate step (add specificity or raise bar)
@@ -67,6 +79,7 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 **TRACK:** auditor_to_gate_fires, improvements_made
 
 ## CW-2: Gates → Lessons (LOOP_RULE_29)
+**SIGNAL:** GATE_FAIL, LESSON_CREATED | **STATUS:** WIRED
 **TRIGGER:** Any gate caught a real problem this session (not rubber-stamped)
 **CHECK:** Is this problem pattern already in lessons.md?
 **ACTION YES:** Skip (already captured)
@@ -74,6 +87,7 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 **TRACK:** gate_to_lesson_fires, lessons_generated
 
 ## CW-3: Lessons → CARL (LOOP_RULE_30)
+**SIGNAL:** LESSON_CREATED | **STATUS:** WIRED
 **TRIGGER:** Any lesson has prevented the same mistake 3+ times (check system-patterns.md Lesson Effectiveness)
 **CHECK:** Is this lesson already a CARL rule?
 **ACTION YES:** Graduate lesson to archive
@@ -81,6 +95,7 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 **TRACK:** lesson_to_carl_fires, rules_created
 
 ## CW-4: Smoke → Lessons (LOOP_RULE_31)
+**SIGNAL:** (none — smoke checks don't emit signals) | **STATUS:** UNWIRED
 **TRIGGER:** Any smoke check failed this session
 **CHECK:** Is there already a lesson for this failure mode?
 **ACTION YES:** Skip
@@ -88,18 +103,21 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 **TRACK:** smoke_to_lesson_fires, lessons_generated
 
 ## CW-5: Rubric Drift → Tighten (LOOP_RULE_32)
+**SIGNAL:** CORRECTION | **STATUS:** WIRED
 **TRIGGER:** Oliver corrected a self-score by 2+ points on same output type 3 times (check audit-log.md)
 **CHECK:** Has this output type been corrected 3+ times?
 **ACTION:** Tighten that rubric dimension by 1 point in quality-rubrics.md
 **TRACK:** drift_corrections, rubrics_tightened
 
 ## CW-6: Fallback → Reorder (LOOP_RULE_33)
+**SIGNAL:** (none — fallback success not tracked) | **STATUS:** UNWIRED
 **TRIGGER:** A fallback tool worked on first try 5+ times while primary failed (check system-patterns.md Fallback Chain table)
 **CHECK:** Has the fallback outperformed the primary 5+ times?
 **ACTION:** Swap primary and fallback in fallback-chains.md
 **TRACK:** reorder_fires, swaps_made
 
 ## CW-7: PATTERNS → Gates (LOOP_RULE_34)
+**SIGNAL:** (none — PATTERNS data not signaled) | **STATUS:** UNWIRED
 **TRIGGER:** PATTERNS.md shows an angle with [PROVEN] failure rate >80% for a persona
 **CHECK:** Is this angle already blocked in gates.md Pre-Draft gate?
 **ACTION YES:** Skip
@@ -107,6 +125,7 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 **TRACK:** pattern_to_gate_fires, angles_blocked
 
 ## CW-8: Skill Miss → Description Fix
+**SIGNAL:** (SKILL_MISS retired) | **STATUS:** UNWIRED
 **TRIGGER:** Neural bus has SKILL_MISS signal this session (Oliver manually invoked a skill that should have auto-triggered from his message)
 **CHECK:** Does the skill's description include the phrases Oliver actually used?
 **ACTION YES:** Trigger condition may need loosening — add Oliver's phrasing as alternate keywords
@@ -115,6 +134,7 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 **SOURCE:** Skills article pattern — description richness determines trigger reliability
 
 ## CW-9: Safety Block → Audit Trail
+**SIGNAL:** (SAFETY_BLOCK retired) | **STATUS:** UNWIRED
 **TRIGGER:** Neural bus has SAFETY_BLOCK or TOOL_NOTABLE signal this session
 **CHECK:** Was the block legitimate (real threat) or false positive (normal operation flagged)?
 **ACTION LEGITIMATE:** Log to session note as security event. No further action.
@@ -123,6 +143,7 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 **SOURCE:** Nova-tracer pattern — every safety event gets a verdict, not just a log line
 
 ## CW-12: Escalation → Lessons
+**SIGNAL:** (ESCALATION_TRIGGERED retired) | **STATUS:** UNWIRED
 **TRIGGER:** Neural bus has ESCALATION_TRIGGERED signal at REDUCE_SCOPE or STOP level
 **CHECK:** What broke? What was the root cause?
 **ACTION:** Auto-generate lesson: "[DATE] ESCALATION-GENERATED: [level] on [task] — [root cause] → [what to avoid]"
@@ -137,6 +158,7 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 > Source: PID control theory (integral = accumulated drift, derivative = rate of change).
 
 ## CW-13: Audit Score Drift (Integral)
+**SIGNAL:** AUDIT_SCORE | **STATUS:** WIRED
 **CLASS:** TREND
 **TRIGGER:** Average audit score across last 5 sessions has declined by 0.5+ points compared to the 5 sessions before that. Read from brain/system-patterns.md Audit Score Trends table.
 **CHECK:** Is the decline in a specific dimension or system-wide?
@@ -146,6 +168,7 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 **SOURCE:** PID integral — catches slow drift that no single session triggers
 
 ## CW-14: Correction Rate Acceleration (Derivative)
+**SIGNAL:** CORRECTION (count per session) | **STATUS:** WIRED
 **CLASS:** TREND
 **TRIGGER:** Corrections per session increased for 3 consecutive sessions (rate of change is positive and accelerating). Read from brain/metrics/ files.
 **CHECK:** Are corrections clustering in one category or spread across many?
@@ -155,6 +178,7 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 **SOURCE:** PID derivative — catches deterioration before it compounds
 
 ## CW-15: Rule Accumulation Check (Integral)
+**SIGNAL:** (time-based, no signal needed) | **STATUS:** WIRED (fires on schedule)
 **CLASS:** TREND
 **TRIGGER:** Every 5 sessions. Count: active lessons + active CARL rules + active cross-wires. Compare to previous 5-session checkpoint.
 **CHECK:** Did the system get more complex (net positive rules) with no measurable quality improvement?
@@ -164,6 +188,7 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 **SOURCE:** Argyris double-loop learning — question the rules, not just apply them
 
 ## CW-16: Session Type Imbalance (Integral)
+**SIGNAL:** (session type tracking, no signal needed) | **STATUS:** WIRED (fires on pattern)
 **CLASS:** TREND
 **TRIGGER:** 5+ consecutive sessions of the same type (all systems, all prospect, all architecture) with no sessions of the other type.
 **CHECK:** Is the imbalance intentional (Oliver directed it) or drift?
@@ -180,6 +205,7 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 > Source: Biological immune system danger theory — respond to stress, not just patterns.
 
 ## DS-1: Rapid Correction Burst
+**SIGNAL:** CORRECTION (mid-session) | **STATUS:** WIRED
 **CLASS:** DANGER
 **TRIGGER:** 3+ corrections from Oliver before the first major task completes this session.
 **CHECK:** Are corrections about the current task or about accumulated system issues?
@@ -189,6 +215,7 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 **NOTE:** This fires MID-SESSION, not at wrap-up. Check after every correction.
 
 ## DS-2: Session Duration Anomaly
+**SIGNAL:** (none — no duration tracking signal) | **STATUS:** UNWIRED
 **CLASS:** DANGER
 **TRIGGER:** Session has consumed 2x the average context window usage compared to similar session types. (Estimate: if this session's tool calls exceed 2x the 5-session average for this session type.)
 **CHECK:** Is the session legitimately complex or is the agent spinning?
@@ -197,6 +224,7 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 **TRACK:** duration_anomaly_fires, cause
 
 ## DS-3: Orphan Signal Detection
+**SIGNAL:** (meta — checks all other signals) | **STATUS:** UNWIRED (depends on bus being active)
 **CLASS:** DANGER
 **TRIGGER:** At wrap-up, check if any significant session event (correction, tool failure, gate catch, Oliver override) was NOT matched by any cross-wire trigger.
 **CHECK:** List all session events. For each, verify at least one CW/DS trigger covers it.
@@ -206,6 +234,7 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 **SOURCE:** Ashby's Law of Requisite Variety — the regulator must match the complexity of what it regulates
 
 ## DS-4: Score-Correction Mismatch
+**SIGNAL:** CORRECTION + AUDIT_SCORE | **STATUS:** WIRED
 **CLASS:** DANGER
 **TRIGGER:** Session self-scored 8+ but Oliver gave 2+ corrections this session. Or: session self-scored below 7 but Oliver gave zero corrections.
 **CHECK:** Is the scoring miscalibrated or was the session genuinely unusual?
@@ -215,6 +244,7 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 **SOURCE:** Biological homeostatic plasticity — adjust sensitivity based on actual outcomes
 
 ## DS-5: Post-Failure Hardening (Antifragility)
+**SIGNAL:** AUDIT_SCORE (below 8.0) | **STATUS:** PARTIALLY WIRED (escalation signal retired)
 **CLASS:** DANGER
 **TRIGGER:** Any ESCALATION_TRIGGERED signal at REDUCE_SCOPE or STOP level, OR any session that fails the 8.0 hard gate on first attempt.
 **CHECK:** Identify the 3 components closest to the failure point (use component-map.md neighborhood scan).

@@ -19,7 +19,7 @@ Save to docs/Session Notes/[YYYY-MM-DD].md. When Oliver says "wrap up", IMMEDIAT
 ### Phase A: Main Context (do these FIRST, sequentially)
 0.5. **User Summary** — FIRST section in session note. Plain English, under 200 words. (1) what was done, (2) confident vs guessing, (3) one thing done well, (4) one thing not sure about.
 1. **Daily notes** — write docs/Session Notes/[YYYY-MM-DD]-S[N].md (session summary + self-assessment)
-2. **Lessons** [IF corrections received] — log to .claude/lessons.md. Every correction gets evaluated. No skipping.
+2. **Lessons** [IF corrections received] — log to .claude/lessons.md. Every correction gets evaluated. No skipping. If a new lesson is written, emit LESSON_CREATED to brain/sessions/neural-bus.md (append row to Current Session Signals table).
 3. **Vault sync** [IF brain/ files changed] — update brain/ for prospects, objections, templates touched.
 4. **Loop sync + Outcomes** [IF interactions] — `/log-outcome` for tactic-result pairs. Update PATTERNS.md.
 5. **Domain sync** [IF domain data touched] — CRM, deals, activities.
@@ -35,6 +35,7 @@ Save to docs/Session Notes/[YYYY-MM-DD].md. When Oliver says "wrap up", IMMEDIAT
 
 **Agent 2 — Scoring & System Loop:**
 - Step 8: Post-session audit (.claude/auditor-system.md). Score 5 core + 3 loop dimensions. **HARD GATE: 8.0+ to close.**
+- Step 8b: Neural bus signal aggregation -- review session for CORRECTION, GATE_PASS/FAIL, AUDIT_SCORE events. Write signal rows to brain/sessions/neural-bus.md Current Session Signals table. Then archive bus to neural-bus-[YYYY-MM-DD]-S[N]-archive.md.
 - Step 9: Cross-wire checklist (.claude/cross-wire-checklist.md). Trends + danger signals. Abbreviated for systems sessions (skip event triggers, keep trends).
 - Step 11c: Self-audit check (if session divisible by 10).
 
@@ -67,6 +68,9 @@ Save to docs/Session Notes/[YYYY-MM-DD].md. When Oliver says "wrap up", IMMEDIAT
 * **Context hygiene** — Compact at 50% context usage, not later. Past 50% quality degrades. Use subagents for discrete subtasks to keep main context focused. Use /clear when switching to a completely different task.
 * **Source-verification gate** — Before ANY content generation (email, cheat sheet, cadence, analysis), output a 1-line "Sources loaded:" checklist proving all relevant inputs were read (vault, playbooks, PATTERNS.md, templates, prospect file). No generation starts until sources are verified. This prevents the persistent "start building before finishing reading" pattern.
 * **Design-first check** — For DEEP or STANDARD tasks, before executing: pause and ask "Is there a more elegant solution than the obvious approach?" Consider: (1) Can this be simpler? (2) Can I eliminate a step? (3) Is there a pattern that generalizes this? If yes, redesign before building. For SIMPLE tasks, skip — the obvious approach is fine.
+* **Big-picture gate** — Before building ANY new component (skill, gate, script, rule, cross-wire, hook), state in 2-3 sentences: (1) what it DOES in plain English, (2) WHY the system needs it, (3) what changes in the system's behavior once it exists. This happens BEFORE file paths, wiring, or implementation. If you can't articulate the "why," stop and ask.
+* **Brutal honesty** — On EVERY output and recommendation, proactively surface what's weak, what's risky, and what you're unsure about. Don't wait to be asked. If you think a task is wrong-priority, wrong-timing, or over-engineered — say so BEFORE executing. Silence on concerns = failure.
+* **Fact-check gate** — Before presenting ANY output (not just data claims): verify key facts against source files, confirm referenced files exist, confirm numbers match actual data. This applies to system work too — not just prospect outputs. If a fact can't be verified in this session, label it "unverified." No output ships without this pass.
 * **Anti-mediocrity** — If a fix or draft is mediocre, scrap it and rebuild the elegant solution from scratch. Don't patch bad work. Two clean attempts beat four incremental patches.
 * **Replan on failure** — If execution hits a block, unexpected result, or wrong assumption: STOP immediately. Do not push through. Re-read the plan, diagnose what changed, rewrite the plan with the new information, then resume. Replanning is cheaper than debugging a bad path. This applies mid-task, not just at wrap-up.
 * **FITFO attitude** — When stuck, do not hedge or ask Oliver to do what you can do yourself. Exhaust 4+ search strategies before saying "I can't find this." Test your own solutions before presenting them. If the first approach fails, try another. If five fail, find the closest working path and bridge the gap. Full protocol: skills/fitfo/SKILL.md (auto-loads on intent).

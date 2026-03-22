@@ -87,8 +87,8 @@
 
 | Component | What it does | File | Layer |
 |-----------|-------------|------|-------|
-| **Neural Bus** | Session-level signal file with typed taxonomy (12 signal types). Systems write events, other systems read before acting. | brain/sessions/neural-bus.md | Brain |
-| **Signal Taxonomy** | Typed signals (SAFETY_BLOCK, FALLBACK_FIRED, GATE_CATCH, SKILL_MISS, CORRECTION, etc.) with defined writer→reader contracts | brain/sessions/neural-bus.md | Brain |
+| **Neural Bus** | Session-level signal log (5 signal types: CORRECTION, GATE_PASS/FAIL, AUDIT_SCORE, LESSON_CREATED, STALE_ALERT). Written at wrap-up by Agent 2. Archived per session. | brain/sessions/neural-bus.md | Brain |
+| **Signal-Wire Map** | Maps 5 signals → cross-wires they feed. 8 cross-wires marked UNWIRED (no triggering signal). | .claude/cross-wire-checklist.md (top) | AIOS |
 | **Launch Validator** | Pre-session integrity check (headers, staleness, inter-session mods, RAG graduation). Emits LAUNCH_CHECK signal. | brain/scripts/launch.py | Brain |
 | **Staleness Sensor** | Scans brain files >7 days stale at session start. Emits STALE_FILE signals. | skills/session-start/SKILL.md (Phase 0) | AIOS |
 | **Gap Scanner** | Mid-session scan for skipped steps, unused tools, missing pre-flights | .claude/gap-scanner.md | AIOS |

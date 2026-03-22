@@ -159,7 +159,8 @@ Score: X/10 (type) — [gap to 9] — agree?
 | CRM note | FULL | 2.1, 2.7 | SKIP | FAST eligible | YES | 4.3, 4.4 | 5.2, 5.5 |
 | Call script | FULL | FULL | YES (opening) | DELIBERATE | YES | FULL + humanizer | Pre-flight + score |
 | Lead filtering | FULL | 2.4, 2.7 | SKIP | FAST eligible | YES | 4.3, 4.4 | 5.2, 5.5 |
-| System work | 1.2, 1.3 | 2.7 | SKIP | FAST eligible | YES | 4.3 | 5.2, 5.5 |
+| System work (routine) | 1.2, 1.3 | 2.7 | SKIP | FAST eligible | YES | 4.3, 4.5 | 5.2, 5.5 |
+| System work (new component) | FULL | 2.4, 2.7 | SKIP | DELIBERATE | YES | 4.3, 4.5 | FULL |
 | Strategy/analysis | FULL | 2.4, 2.5, 2.7 | YES (approach) | DELIBERATE | YES | 4.3, 4.4 | 5.2, 5.3, 5.5 |
 | Follow-up | FULL | FULL | YES (angle+tone) | DELIBERATE | YES | FULL + humanizer + competitive | Pre-flight + score |
 
