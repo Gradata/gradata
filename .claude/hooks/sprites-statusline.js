@@ -302,6 +302,10 @@ process.stdin.on('end', () => {
     // -- Brain Scores (System/Quality/Growth from session_metrics + events) --
     let brainSystem = '?', brainQuality = '?', brainGrowth = '?', brainArch = '?';
     let brainSysNum = 0, brainQualNum = 0, brainGrowthNum = 0, brainArchNum = 0;
+    let brierScore = '';
+    let brierDisplay = '';
+    let trendLabel = 'STABLE';
+    let trendArrow = '\u2192';
     if (dbOk) {
       const out = safeExec(`python "C:/Users/olive/SpritesWork/brain/scripts/brain_scores_cli.py"`);
       if (out) {
@@ -314,6 +318,23 @@ process.stdin.on('end', () => {
         brainQuality = Math.round(brainQualNum) + '%';
         brainGrowth = Math.round(brainGrowthNum) + '%';
         brainArch = Math.round(brainArchNum) + '%';
+        // Brier calibration score (index 4)
+        if (parts[4] && parts[4] !== '') {
+          const bVal = parseFloat(parts[4]);
+          if (!isNaN(bVal)) {
+            brierScore = bVal.toFixed(2);
+            if (bVal < 0.10) brierDisplay = `${c.green}Cal:${brierScore}${c.reset}`;
+            else if (bVal < 0.20) brierDisplay = `${c.yellow}Cal:${brierScore}${c.reset}`;
+            else brierDisplay = `${c.red}Cal:${brierScore}${c.reset}`;
+          }
+        }
+        // Trend (index 5)
+        if (parts[5]) {
+          trendLabel = parts[5].trim();
+          if (trendLabel === 'IMPROVING') trendArrow = '\u2191';
+          else if (trendLabel === 'DEGRADING') trendArrow = '\u2193';
+          else trendArrow = '\u2192';
+        }
       }
     }
     // Color: red = bad, yellow = baseline, green = progressing
@@ -579,6 +600,8 @@ process.stdin.on('end', () => {
       `${brainQualColor}AI Quality:${brainQuality}${c.reset}`,
       `${brainGrowthColor}Growth:${brainGrowth}${c.reset}`,
       `${brainArchColor}Arch:${brainArch}${c.reset}`,
+      brierDisplay ? brierDisplay : '',
+      `${c.dim}${trendArrow}${c.reset}`,
       `${c.green}Grad:${graduatedCount}${c.reset}`,
       salesEditRate ? `${salesEditColor}TEdit:${salesEditRate}${c.reset}` : '',
       sysEditRate ? `${sysEditColor}SEdit:${sysEditRate}${c.reset}` : '',
