@@ -1,4 +1,4 @@
-# AIOS Component Map v2.0
+# AIOS Component Map v2.1
 
 > Single reference for every active component. Updated when components change.
 
@@ -43,8 +43,9 @@
 
 | Component | What it does | File | Layer |
 |-----------|-------------|------|-------|
-| Quality Rubrics | Self-score protocol, blocking gate | .claude/quality-rubrics.md | AIOS |
-| Auditor | Session scoring, 8.0+ gate, calibration | .claude/auditor-system.md | AIOS |
+| Quality Rubrics | Per-output self-score, 7+ blocking gate | .claude/quality-rubrics.md | AIOS |
+| Binary Gate | 15-check wrap-up validator, 80% threshold, 3 auto-fix cycles | brain/scripts/wrap_up_validator.py | Brain |
+| Brain Report Card | 4 scores: System, AI Quality, Growth, Arch | .claude/hooks/sprites-statusline.js + wrap-up | AIOS |
 | Pre-flight | Verification before prospect output | .claude/preflight.md | AIOS |
 | Humanizer | AI pattern detection, rewrite | soul.md + /humanizer | AIOS |
 

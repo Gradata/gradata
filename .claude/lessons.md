@@ -1,7 +1,7 @@
 # Lessons Learned
 # Format: [DATE] [STATUS] CATEGORY: What happened → What to do instead
 # Status tags: [INSTINCT:X.XX] = confidence score (0.0-0.59) | [PATTERN] = confirmed (0.60-0.89) | [RULE] = graduated (0.90+)
-# Legacy compat: [CONFIRMED] = [PATTERN], [PROVISIONAL:N] auto-converts to [INSTINCT:X.XX] at wrap-up
+# Legacy compat: [CONFIRMED] = [PATTERN]. Old [PROVISIONAL:N] format retired — use [INSTINCT:X.XX] for all new lessons.
 # Graduated lessons → lessons-archive.md (66 graduated through 3/20)
 # Before ANY drafting task, search lessons-archive.md for relevant categories.
 #
@@ -13,7 +13,7 @@
 # CONFIRMATION LOOP: First 3 times a lesson's category comes up in live work, ask Oliver: "Did [lesson] hold?"
 # After 3 confirmed holds: graduate automatically. If Oliver says no: flag [INEFFECTIVE], rewrite the rule.
 # Format: [CONFIRM:0/3] after promotion to [CONFIRMED]. Tracks holds, not just time.
-# Format for new lessons: [DATE] [PROVISIONAL:5] CATEGORY: What happened → What to do instead. Root cause: [what systemic gap allowed this]
+# Format for new lessons: [DATE] [INSTINCT:0.30] CATEGORY: What happened → What to do instead. Root cause: [what systemic gap allowed this]
 # Root cause is MANDATORY on every new lesson — it feeds the double-loop in /reflect.
 # Effectiveness: New lessons start with [TRACK:0/3]. After each scenario occurrence, increment and log Y/N.
 # Format: [TRACK:hits/3:YYN] where Y=prevented, N=repeated. At 3 hits: 2+Y=[EFFECTIVE], 2+N=[REWRITE NEEDED].

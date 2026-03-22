@@ -1,89 +1,111 @@
-# Sprites.ai Sales Agent — System Architecture
+# Sprites.ai Sales Agent — System Architecture (v2.1)
 
 ## Overview
 
-Autonomous AI sales agent built on Claude Code with recursive self-improvement capabilities. Manages the full deal lifecycle from prospecting through close with integrated CRM, email, calendar, and meeting intelligence. The system learns from every interaction, tracks its own component health, and self-optimizes through a five-layer intelligence architecture.
+Autonomous AI sales agent built on Claude Code with recursive self-improvement capabilities. Manages the full deal lifecycle from prospecting through close with integrated CRM, email, calendar, and meeting intelligence. The system learns from every interaction, tracks its own component health via an events backbone, and self-optimizes through a three-step improvement pipeline (Instinct -> Pattern -> Rule).
 
-## Architecture Layers
+## Architecture
 
-### Layer 1: Sales Intelligence (Loop)
+### Sales Intelligence (Loop)
 
 Closed-loop learning engine applied to all sales activities — emails, calls, demos, proposals, closes.
 
-- **Tag → Track → Learn → Improve** cycle on every prospect interaction
+- **Tag -> Track -> Learn -> Improve** cycle on every prospect interaction
 - 82K+ email dataset seeding pattern recognition (cold tier via Instantly)
 - Two-tier data model: Cold (bulk outreach, read-only) + Pipeline (personalized, Claude-written)
-- Confidence-weighted recommendations with sample sizes: INSUFFICIENT (<3) → HYPOTHESIS (3-9) → EMERGING (10-25) → PROVEN (25-50) → HIGH CONFIDENCE (50-100) → DEFINITIVE (100+)
+- Confidence-weighted recommendations with sample sizes: INSUFFICIENT (<3) -> HYPOTHESIS (3-9) -> EMERGING (10-25) -> PROVEN (25-50) -> HIGH CONFIDENCE (50-100) -> DEFINITIVE (100+)
 - Framework auto-selection: CCQ, Gap Selling, JOLT, SPIN, Challenger, Cohan — routed by persona and tracked conversion rates
 - Pre-action pattern check prevents repeating failed angles; 70/30 proven/experimental split
 
-### Layer 2: Component Monitoring (System Loop)
+### Events Backbone (replaced neural bus + cross-wires in v2.0)
 
-Same pattern as Layer 1 but applied to the system itself. Every internal component is tracked for effectiveness.
+All system signals flow through a unified events layer. No separate cross-wire checklist, no neural bus markdown file.
 
-- 25+ tracked components across quality gates, lessons, smoke checks, startup/wrap-up execution, CARL routing, fallback chains
-- Automated audit scoring with 8.0 minimum quality gate (hard gate — session cannot close below 8.0)
-- Session-over-session trend analysis with lowest-dimension identification
-- Ping-pong audit protocol: gaps found → concede/defend/partial → changes written
-- Bloat prevention: file size limits, lesson caps, session note rotation, active prospect ceiling
+- **events.jsonl** — append-only event stream (SDK-portable, brain layer)
+- **system.db (events table)** — queryable SQLite mirror for aggregation and trend analysis
+- **Event types:** CORRECTION, GATE_RESULT, AUDIT_SCORE, LESSON_CHANGE, COST_EVENT, TOOL_FAILURE, CALIBRATION, HEALTH_CHECK, DEFER, STEP_COMPLETE, OUTPUT, HALLUCINATION, STALE_DATA, GATE_OVERRIDE
+- **emit() + query()** API in brain/scripts/events.py — dual-write to both stores
+- Hooks consume events for enforcement; wrap-up queries events for scoring
 
-### Layer 3: Cross-Wiring (Bidirectional Feedback)
+### Quality System
 
-Automated connections between system components that fire procedurally every session.
+Two tiers of quality enforcement:
 
-| Connection | Rule | Purpose |
-|------------|------|---------|
-| Auditor → Gates | R34 | Audit findings tighten gate steps |
-| Gates → Lessons | R35 | Gate catches become logged lessons |
-| Lessons → CARL | R36 | Repeated lessons become permanent rules |
-| Smoke → Lessons | R37 | Smoke check failures generate lessons |
-| Rubric Drift → Tighten | R38 | Self-score drift triggers rubric recalibration |
-| Fallback → Reorder | R39 | Better-performing fallbacks get promoted to primary |
-| PATTERNS → Gates | R40 | Pattern insights update gate checklists |
+**Per-output (inline):**
+- Self-score against quality-rubrics.md — 7+ quality floor, block below 7
+- Oliver's calibration overrides adjust rubric thresholds
+- 5-point verification: INPUT -> GOAL -> ADVERSARIAL -> VOICE -> SCORE
 
-These are procedural execution checklists — they run every session, not aspirationally.
+**Per-session (wrap-up):**
+- **15-check binary gate** via wrap_up_validator.py — 80% threshold required to close
+- Auto-fix with up to 3 retry cycles before escalating
+- **Brain Report Card** — 4 scores: System, AI Quality, Growth, Architecture
+- Visible in statusline + wrap-up output
 
-### Layer 4: Meta-Optimization
+### Self-Improvement Pipeline
 
-Tracks which event connections and hooks actually produce value and prunes the ones that do not.
+Three steps. No meta-layers. Evidence-driven. See .claude/self-improvement.md.
 
-- Reviews hook/event connection performance every 5 sessions
-- Kill switch: 5 consecutive cycles of zero value → connection goes DORMANT
-- Self-evaluates after 3 cycles (session 18) — determines if meta-optimization itself improves the system
-- Prevents unbounded complexity growth in the event/hook layer
+```
+INSTINCT (confidence 0.00 - 0.59)
+    |  +0.10 per session where it prevents a mistake
+    |  -0.15 per session where Oliver corrects despite the rule
+    v
+PATTERN (confidence 0.60 - 0.89)
+    |  Accumulates evidence via [TRACK:N/3]
+    |  3+ fires across 2+ sessions -> promote
+    v
+RULE (confidence 0.90+)
+    |  Permanent in CARL / CLAUDE.md / gates
+    |  Kill switch by maturity phase (INFANT: 10 cycles)
+    v
+ARCHIVE (graduated, reference only)
+```
 
-### Layer 5: Convergence Detection
+### Self-Heal Infrastructure
 
-Monitors whether the system is stabilizing or still forming, and adjusts optimization frequency accordingly.
+- **Validator retry loop** — wrap_up_validator.py 15 checks, auto-fix up to 3 cycles
+- **Startup self-heal** — session_start_reminder.py hook (6 automated checks), auto-creates events.jsonl if missing
+- **Agnix** — config lint, auto-runs at startup
+- **Ruff** — Python auto-fix at wrap-up
+- **Biome** — JS lint
+- **config-validate.js** — JSON config validation hook at startup
 
-| Indicator | Threshold | Purpose |
-|-----------|-----------|---------|
-| Sessions since last new lesson | 3 | Learning rate slowdown |
-| Sessions since last rule change | 3 | Rule stability |
-| Sessions since last gate catch | 3 | Gate effectiveness plateau |
-| Avg audit score (last 5) | 9.0+ | Quality maturity |
-| Event connection dormancy rate | >50% stable | Hook/event maturation |
+### Hooks (enforcement layer)
 
-- At convergence: optimization frequency reduces from every 5 sessions to every 10
-- Divergence detection re-enables aggressive optimization on regression
-- Current state: FORMING (0/5 indicators stable as of session 4)
+8 core hooks + 4 specialized hooks:
+
+| Hook | Type | What it does |
+|------|------|-------------|
+| suggest-compact | PostToolUse | Compaction reminder at 50/75/100 tool calls |
+| cost-tracking | Stop | Log session token costs |
+| session-persist | Stop | Auto-save minimum handoff data |
+| quality-gate | PreToolUse:Write | Prospect-facing write reminder |
+| mcp-health | PreToolUse:mcp__* | MCP server health + backoff |
+| context-budget | Startup | File size limit enforcement |
+| config-validate | Startup | JSON config validation |
+| secret-scan | PostToolUse | API key/token detection in writes |
+| session-start-reminder | Startup | 6 automated system checks |
+| delta-auto-tag | PostToolUse | Auto-tag prospect activities |
+| sprites-statusline | statusLine | 4-line context display (Report Card + pipeline + health + delta) |
+| gsd | Various | Task execution hooks |
 
 ## Data Infrastructure
 
-- **SQLite Database**: Queryable backing store for deals, signals, frameworks, audit history, event connections
-- **Markdown Views**: Human-readable views of database state for context loading (system-patterns.md, PATTERNS.md, prospect notes)
-- **CARL Rule Engine**: ~60 rules across 10 domains (global, context, commands, loop, agents, prospect-email, demo-prep, coldcall, linkedin, listbuild) with keyword-triggered lazy loading
+- **SQLite Database** (brain/system.db): Queryable backing store for events, periodic audits, delta tags, deals, signals
+- **events.jsonl**: Append-only event stream — primary audit trail
+- **Markdown Views**: Human-readable views for context loading (system-patterns.md, PATTERNS.md, prospect notes)
+- **CARL Rule Engine**: ~109 rules across 10 domains with keyword-triggered lazy loading
 - **Brain Vault**: Structured knowledge store — prospects, pipeline data, email patterns, system patterns, loop state handoffs
 
 ## Quality Assurance
 
-- **Mandatory gates** before every output: Pre-Draft (7-step), Demo Prep (8-step), Post-Demo Follow-Up, Cold Call, LinkedIn, Pipedrive Notes, Win/Loss, Calendar Check
-- **Self-scoring** with calibration against human feedback (quality-rubrics.md)
+- **Mandatory gates** before every output: Pre-Draft (7-step), Demo Prep (13-step), Post-Demo Follow-Up, Cold Call, LinkedIn, Pipedrive Notes, Win/Loss, Calendar Check
+- **Self-scoring** with calibration against human feedback (quality-rubrics.md) — 7+ floor
+- **15-check binary gate** at wrap-up (80% threshold, auto-fix 3 cycles)
+- **Brain Report Card** — 4 scores visible in statusline
 - **Event-driven hooks** prevent recurring failures from persisting
-- **Rule validation** detects conflicts and dead references
-- **Auditor system** with ping-pong protocol — independent scoring, gap identification, fix cycles
-- **Loop audit** — separate audit focused on sales intelligence effectiveness
-- **Health audit** — comprehensive system health check across files, vault, MCPs, credits, process, data, learning
+- **Rule validation** (Agnix) detects conflicts and dead references
 
 ## Integration Layer
 
@@ -116,7 +138,7 @@ Four specialized agent types with enforced boundaries and an orchestrator:
 - Research agent prompts must not include drafting instructions
 - Draft agent receives research output as input, no research tool access
 - Audit agent never sees draft agent's self-score (prevents self-grading bias leakage)
-- 2+ point score divergence between draft and audit → flagged for human review
+- 2+ point score divergence between draft and audit -> flagged for human review
 - Every spawn logged: agent type, task, I/O contract, boundary violations
 - Cost control: maximum 5 subagents per session unless explicitly approved
 
@@ -124,17 +146,18 @@ Four specialized agent types with enforced boundaries and an orchestrator:
 
 | Metric | Value |
 |--------|-------|
-| CARL rules governing behavior | ~60 across 10 domains |
-| Event connections | Hooks + events.jsonl queries |
-| Convergence indicators | 5 tracking system maturity |
+| CARL rules governing behavior | ~109 across 10 domains |
+| Event types tracked | 14 via events backbone |
+| Hooks (enforcement layer) | 8 core + 4 specialized |
 | Quality gates | 8 mandatory checkpoints |
 | Tracked system components | 25+ |
 | Cold email dataset | 82K+ for pattern seeding |
 | Agent boundary rules | 5 hard enforcement rules |
-| Audit minimum score | 8.0 (hard gate) |
+| Wrap-up gate | 15-check binary, 80% threshold |
+| Per-output quality floor | 7/10 (self-score, Oliver calibrates) |
 | Max subagents per session | 5 (cost-controlled) |
 | Pipeline health model | Calibrates at 15+ closed deals |
-| Complexity budget ceiling | 100 CARL rules, 10 event connections, 5 meta-trackers, 3 optimization layers |
+| Self-improvement pipeline | Instinct -> Pattern -> Rule (confidence-scored) |
 
 ## ICP (Ideal Customer Profile)
 

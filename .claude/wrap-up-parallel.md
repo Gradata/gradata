@@ -52,15 +52,15 @@ Wave 2 ────────────────────────�
   │           Output: health scores
   │
   ├─ Agent G: Step 8         Post-session audit
-  │           Run auditor-system.md + loop-audit.md
-  │           Score all dimensions
-  │           HARD GATE: 8.0+ to close — if fail, fix-cycle
+  │           Run 15-check binary gate (wrap_up_validator.py)
+  │           80% threshold — auto-fix with up to 3 retry cycles
+  │           HARD GATE: must pass before close
   │           Input: session note, lessons, reflect output
   │
   ├─ Agent H: Step 9         Event connection verification
   │           Query events.jsonl for session signals
-  │           Log to brain/system-patterns.md
-  │           Show compound brain status
+  │           Compute Brain Report Card (System, AI Quality, Growth, Arch)
+  │           Show scores in statusline + wrap-up output
   │
   └─ Agent I: Step 10        Brain session summary
               Write brain/sessions/[YYYY-MM-DD].md
@@ -240,7 +240,7 @@ Phase 2:   [CARL x3 in parallel]
 
 - Each Wave 1-3 agent receives: session number, date, session context summary
 - Agents writing to brain/ should use `isolation: "worktree"` if overlapping paths are possible
-- Step 8 agent (post-session audit) owns the 8.0+ gate — if it fails, it fix-cycles before returning
+- Step 8 agent (post-session audit) owns the 15-check binary gate (80% threshold) — if it fails, auto-fix cycles (max 3) before returning
 - Step 11 agent MUST verify header session number after writing — self-check before returning
 - Startup agents are read-heavy — no worktree needed, parallel reads are safe
 - Phase 1.5 agents hit external APIs — fire all at once, collect results as they return

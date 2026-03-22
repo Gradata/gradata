@@ -2,6 +2,23 @@
 # Every rule change gets logged here with date, what changed, and why.
 # If a change makes things worse, roll back by reversing the entry.
 
+## 2026-03-22 — v2.1 System File Audit (Session 35)
+- **docs/ARCHITECTURE.md**: Full rewrite. Removed 5-layer architecture (Layers 3-5: cross-wiring, meta-optimization, convergence). Replaced with current system: events backbone, 15-check binary gate, Brain Report Card (4 scores), self-improvement pipeline (Instinct->Pattern->Rule), self-heal infrastructure.
+- **skills/session-start/SKILL.md**: Self-Heal Protocol rewritten. Old: 5-step manual escalation. New: documents auto-fix infrastructure (validator retry loop, startup self-heal, config_validator, agnix, ruff) + manual escalation as last resort.
+- **.claude/health-audit.md**: Rewritten to reflect 15-check binary gate (80% threshold) + session_start_reminder.py hook (6 checks). Old /10 scoring dimensions removed. Supplementary manual checks retained for quarterly deep-dives.
+- **.claude/wrap-up-parallel.md**: Updated Agent G (post-session audit) from "/10 scoring + 8.0+ gate" to "15-check binary gate (80% threshold, 3 retry cycles)". Updated Agent H from "compound brain status" to "Brain Report Card (4 scores)".
+- **.claude/fallback-chains.md**: Removed neural bus references ("Emit ESCALATION_TRIGGERED to neural bus"). Replaced with events.py logging. Removed CW-12 cross-wire reference.
+- **brain/system-patterns.md**: Replaced CQ section with Brain Report Card reference. Replaced Cross-Wire Performance, Kill Switch, and Meta-Loop sections with events backbone reference. Retained data tables (component tracking, audit scores, trust scores) as historical record.
+- **.claude/component-map.md**: Minor cleanup — Quality & Scoring section updated to reflect binary gate + Brain Report Card.
+- **context-manifest.md**: Removed cross-wire-checklist.md reference (file deleted in S34).
+
+## 2026-03-22 — AIOS v2.0 revamp: events backbone, hooks, confidence scoring, ECC standardization (Session 34)
+- **CLAUDE.md**: Self-improvement pipeline (Instinct->Pattern->Rule) replaced [PROVISIONAL] counters. Maturity schedule with kill switches. Trust layers for marketplace. Brain Report Card (4 scores). Events backbone (events.jsonl + SQLite). 8 hooks enumerated.
+- **.claude/self-improvement.md**: Created. Three-step pipeline with confidence scoring, shadow mode, kill switches by maturity phase.
+- **.claude/component-map.md**: Full rewrite for v2.0. Event System section replaced neural bus. Hook table updated. Reflection system, delta measurement, agent infrastructure sections added.
+- **Deleted**: .claude/cross-wire-checklist.md, .claude/neural-bus.md (replaced by events backbone)
+- **brain/scripts/events.py**: Created. emit() + query() API with dual-write to JSONL + SQLite.
+
 ## 2026-03-22 — Deep Audit: 3 Missing CLAUDE.md Rules + Waterfall Fix (Session 32)
 - **CLAUDE.md**: Added big-picture gate ("state what it DOES, WHY, and behavior change before implementing"). Was only in memory + lesson — never in CLAUDE.md. Root cause of Oliver's repeated correction.
 - **CLAUDE.md**: Added brutal honesty rule ("surface what's weak, risky, unsure on EVERY output"). Was only in .carl/global GLOBAL_RULE_1 + waterfall Layer 4.5 — skipped for system work.

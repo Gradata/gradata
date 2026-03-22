@@ -47,9 +47,9 @@ When consecutive errors accumulate within a single task (not session-wide — pe
 
 | Consecutive Errors | Level | Action |
 |---|---|---|
-| 3 | **CHANGE_STRATEGY** | Stop current approach. Consult fallback chains above. Try alternative method. Emit `ESCALATION_TRIGGERED` (level=CHANGE_STRATEGY) to neural bus. |
-| 4 | **REDUCE_SCOPE** | Simplify the goal. Drop optional steps. Tell Oliver what's being cut and why. Emit `ESCALATION_TRIGGERED` (level=REDUCE_SCOPE). |
-| 5 | **STOP** | Summarize what failed, what was tried, and present options. Wait for Oliver. Emit `ESCALATION_TRIGGERED` (level=STOP). |
+| 3 | **CHANGE_STRATEGY** | Stop current approach. Consult fallback chains above. Try alternative method. Log `TOOL_FAILURE` event via events.py. |
+| 4 | **REDUCE_SCOPE** | Simplify the goal. Drop optional steps. Tell Oliver what's being cut and why. Log `TOOL_FAILURE` event. |
+| 5 | **STOP** | Summarize what failed, what was tried, and present options. Wait for Oliver. Log `TOOL_FAILURE` event. |
 
 **Hard abort:** 10 total errors on a single task (consecutive or not) → STOP regardless of level.
 
@@ -57,7 +57,7 @@ When consecutive errors accumulate within a single task (not session-wide — pe
 
 **Recovery:** After CHANGE_STRATEGY succeeds, error counter resets to 0. After REDUCE_SCOPE, counter carries forward (next error = STOP).
 
-**Cross-wire:** CW-12 fires on REDUCE_SCOPE or STOP — auto-generates a lesson from the failure.
+**Auto-lesson:** On REDUCE_SCOPE or STOP, auto-generate a lesson from the failure and log a CORRECTION event via events.py.
 
 ## General Rule
 - If a required tool fails and no fallback works → FLAG with: what failed, what data is missing, what the impact is

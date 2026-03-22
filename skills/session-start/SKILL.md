@@ -241,12 +241,21 @@ This keeps the next session cheap and current.
 
 ## Self-Heal Protocol
 
-If ANY step fails:
+Auto-fix infrastructure handles most failures. Manual escalation only when auto-fix exhausts retries.
+
+### Automatic Self-Heal (runs without Oliver)
+1. **Validator retry loop** — wrap_up_validator.py runs 15 binary checks (80% threshold). On FAIL, auto-fix attempts up to 3 cycles before escalating. Covers: file existence, header consistency, event logging, git state, bloat limits.
+2. **Startup self-heal** — session_start_reminder.py hook runs 6 automated checks (vault, DB, PATTERNS, git, CLAUDE.md lines, events.jsonl). Auto-creates events.jsonl if missing. Surfaces CRITICAL/WARNING alerts.
+3. **Config validator** — config-validate.js hook validates JSON configs at startup. Flags malformed configs before they cause downstream failures.
+4. **Agnix** — config lint tool. Auto-runs at startup to catch structural drift in CARL/manifest/rules files.
+5. **Ruff auto-fix** — Python linter runs at wrap-up. Auto-fixes formatting issues in brain/scripts/.
+
+### Manual Escalation (only when auto-fix fails)
 1. Try alternative method (different tool, python, web search)
-2. Log failure in .claude/lessons.md
+2. Log failure via `python brain/scripts/events.py` with event_type TOOL_FAILURE
 3. NEVER silently skip. Tell Oliver what failed.
 4. Python: C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe (python-docx, openpyxl)
-5. If ANY MCP tool call fails during Phase 1-2 (calendar, Gmail, Apollo, etc), immediately tell Oliver: "Run /doctor in terminal — [tool name] isn't responding." Don't retry silently more than once.
+5. If ANY MCP tool call fails during Phase 1-2, follow .claude/fallback-chains.md. Only escalate to Oliver if fallback also fails.
 
 ## Output
 
