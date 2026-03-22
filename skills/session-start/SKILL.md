@@ -89,6 +89,8 @@ Load `domain/carl/loop` rules for this phase.
 
 16. **Daily snapshot (silent)** — After all MCP scans complete, assemble the data into a snapshot JSON and run `python brain/scripts/snapshot.py save '{...}'` silently in the background. Include deals, gmail, instantly, calendar data from steps 10-14. The script auto-diffs and writes brain/morning-brief.md. Do NOT surface snapshot results in the startup output — the statusline reads from the snapshot data automatically. This is infrastructure, not user-facing output.
 
+17. **Delta tagging: detect manual activities** — After snapshot completes, run manual activity detection. Compare Gmail sent count and Pipedrive activity count from MCP scans against today's activity_log entries. Call `python brain/scripts/delta_tag.py detect-manual --gmail-sent [N] --crm-updates [N] --session-logged [N]` silently. This tags activities that happened outside Claude sessions as `source: manual`. Do NOT surface results — this is background bookkeeping for the delta report.
+
 8. **Surface findings as checklist summary:**
 ```
 STARTUP: [N]/[N] scans complete ✓

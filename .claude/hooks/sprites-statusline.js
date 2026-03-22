@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// AIOS Statusline v4 — Domain-aware + System Health + Context Rot + Plan Usage
+// AIOS Statusline v5 -- Domain-aware + System Health + Context Rot + Plan Usage + Delta Metrics
 // Reads domain name from domain/DOMAIN.md if present
 
 const fs = require('fs');
@@ -21,7 +21,7 @@ process.stdin.on('end', () => {
     const session = data.session_id || '';
     const remaining = data.context_window ? data.context_window.remaining_percentage : (data.remaining_context_percentage || null);
 
-    // ── Helpers ──
+    // -- Helpers --
     const c = {
       reset: '\x1b[0m',
       dim: '\x1b[2m',
@@ -41,7 +41,7 @@ process.stdin.on('end', () => {
       try { return execSync(cmd, { timeout, stdio: ['pipe','pipe','pipe'] }).toString().trim(); } catch (e) { return ''; }
     }
 
-    // ── Domain Detection (AIOS + Talent) ──
+    // -- Domain Detection (AIOS + Talent) --
     let domainTalent = '';
     const domainPath = path.join(dir, 'domain', 'DOMAIN.md');
     if (fs.existsSync(domainPath)) {
@@ -52,7 +52,7 @@ process.stdin.on('end', () => {
         if (roleMatch) {
           domainTalent = roleMatch[1].trim().split(/[,\n]/)[0].trim();
         } else {
-          // Fallback: extract from title (e.g., "Sprites.ai Sales Domain" → "Sales")
+          // Fallback: extract from title (e.g., "Sprites.ai Sales Domain" -> "Sales")
           const titleMatch = domainContent.match(/^#\s+(.+)/m);
           if (titleMatch) {
             const title = titleMatch[1];
@@ -66,7 +66,7 @@ process.stdin.on('end', () => {
 
     const homeDir = os.homedir();
 
-    // ── Context Bar + Burn Rate + Context Rot ──
+    // -- Context Bar + Burn Rate + Context Rot --
     let ctxDisplay = '';
     let usedPct = 0;
     let compactionCount = 0;
@@ -162,7 +162,7 @@ process.stdin.on('end', () => {
       ctxDisplay = `${color}[${bar}] ${usedPct}%${burnRate}${compactLabel}${c.reset}`;
     }
 
-    // ── Current Task ──
+    // -- Current Task --
     let task = '';
     const claudeDir = process.env.CLAUDE_CONFIG_DIR || path.join(homeDir, '.claude');
     const todosDir = path.join(claudeDir, 'todos');
@@ -180,7 +180,7 @@ process.stdin.on('end', () => {
       } catch (e) {}
     }
 
-    // ── Agent Count (running background tasks) ──
+    // -- Agent Count (running background tasks) --
     let agentCount = 0;
     if (session && fs.existsSync(todosDir)) {
       try {
@@ -198,7 +198,7 @@ process.stdin.on('end', () => {
       } catch (e) {}
     }
 
-    // ── Lessons Count (active + graduated) ──
+    // -- Lessons Count (active + graduated) --
     let lessonsCount = 0;
     let graduatedCount = 0;
     const lessonsCap = 30;
@@ -213,7 +213,7 @@ process.stdin.on('end', () => {
       } catch (e) {}
     }
 
-    // ── Edit Rates (split by track) ──
+    // -- Edit Rates (split by track) --
     let salesEditRate = '';
     let sysEditRate = '';
     const metricsPath = 'C:/Users/olive/SpritesWork/brain/metrics';
@@ -238,7 +238,7 @@ process.stdin.on('end', () => {
       } catch (e) {}
     }
 
-    // ── Brain Version ──
+    // -- Brain Version --
     let brainVersion = '?';
     const versionPath = 'C:/Users/olive/SpritesWork/brain/VERSION.md';
     if (fs.existsSync(versionPath)) {
@@ -249,7 +249,7 @@ process.stdin.on('end', () => {
       } catch (e) {}
     }
 
-    // ── Last Git Commit Age (brain repo) ──
+    // -- Last Git Commit Age (brain repo) --
     let gitAge = '?';
     const gitTs = safeExec('git -C "C:/Users/olive/SpritesWork/brain" log -1 --format=%ct');
     if (gitTs) {
@@ -260,7 +260,7 @@ process.stdin.on('end', () => {
       else gitAge = `${Math.floor(diffMins / 1440)}d`;
     }
 
-    // ── Hook Health ──
+    // -- Hook Health --
     let hooksOk = 0;
     let hooksTotal = 0;
     const hooksDir = path.join(dir, '.claude', 'hooks');
@@ -275,7 +275,7 @@ process.stdin.on('end', () => {
       } catch (e) {}
     }
 
-    // ── Brain DB Health (entity count from system.db) ──
+    // -- Brain DB Health (entity count from system.db) --
     let dbEntities = 0;
     let dbOk = false;
     const dbPath = 'C:/Users/olive/SpritesWork/brain/system.db';
@@ -285,7 +285,7 @@ process.stdin.on('end', () => {
       if (out) dbEntities = parseInt(out) || 0;
     }
 
-    // ── Last Audit Score (from system.db) ──
+    // -- Last Audit Score (from system.db) --
     let auditScore = '?';
     let auditSession = 0;
     if (dbOk) {
@@ -297,7 +297,26 @@ process.stdin.on('end', () => {
       }
     }
 
-    // ── Employment Week (Oliver started Feb 4, 2026 — Sunday-based weeks) ──
+    // -- CQ Score (from latest metrics file) --
+    let cqScore = '?';
+    let cqScoreNum = 0;
+    if (fs.existsSync(metricsPath)) {
+      try {
+        const mFiles = fs.readdirSync(metricsPath).filter(f => f.endsWith('.md')).sort().reverse();
+        for (const mf of mFiles) {
+          const content = fs.readFileSync(path.join(metricsPath, mf), 'utf8');
+          const cqMatch = content.match(/cq_score:\s*([\d.]+)/);
+          if (cqMatch) {
+            cqScoreNum = parseFloat(cqMatch[1]);
+            cqScore = cqScoreNum.toFixed(1);
+            break;
+          }
+        }
+      } catch (e) {}
+    }
+    const cqColor = cqScoreNum >= 8.0 ? c.green : cqScoreNum >= 7.0 ? c.yellow : c.red;
+
+    // -- Employment Week (Oliver started Feb 4, 2026 -- Sunday-based weeks) --
     // Week 1 starts the Sunday on or before Feb 4 (Feb 1, 2026)
     // New week begins every Sunday
     const startDate = new Date(2026, 1, 1); // Feb 1, 2026 (Sunday before Feb 4 start)
@@ -306,7 +325,7 @@ process.stdin.on('end', () => {
     nowForWeek.setHours(0,0,0,0);
     const employmentWeek = Math.max(1, Math.floor((nowForWeek - startDate) / (7 * 24 * 60 * 60 * 1000)) + 1);
 
-    // ── Prospect Pipeline (live from brain/prospects/) ──
+    // -- Prospect Pipeline (live from brain/prospects/) --
     let overdueCount = 0;
     let dueTodayCount = 0;
     let activeDealsCount = 0;
@@ -345,7 +364,7 @@ process.stdin.on('end', () => {
       } catch (e) {}
     }
 
-    // ── Skills Count (deduplicated across all 3 locations) ──
+    // -- Skills Count (deduplicated across all 3 locations) --
     let skillCount = 0;
     const skillSet = new Set();
     const skillDirs = [
@@ -364,7 +383,7 @@ process.stdin.on('end', () => {
     }
     skillCount = skillSet.size;
 
-    // ── MCP Count (local: .claude.json + .mcp.json) ──
+    // -- MCP Count (local: .claude.json + .mcp.json) --
     let mcpTotal = 0;
     try {
       // Count from ~/.claude.json (global + project-scoped)
@@ -387,7 +406,7 @@ process.stdin.on('end', () => {
       }
     } catch (e) {}
 
-    // ── CARL Domains (AIOS + domain) ──
+    // -- CARL Domains (AIOS + domain) --
     let carlCount = 0;
     const carlPaths = [path.join(dir, '.carl'), path.join(dir, 'domain', 'carl')];
     for (const cp of carlPaths) {
@@ -400,11 +419,87 @@ process.stdin.on('end', () => {
       }
     }
 
-    // ── Time ──
+    // -- Time --
     const now2 = new Date();
     const timeStr = now2.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
-    // ── Build Output ──
+    // -- Delta Metrics (Line 4) --
+    // Reply rate from system.db
+    let replyRate = '?';
+    let replyRateNum = 0;
+    if (dbOk) {
+      const out = safeExec(`python -c "import sqlite3; c=sqlite3.connect('C:/Users/olive/SpritesWork/brain/system.db'); r=c.execute('SELECT instantly_reply_rate FROM daily_metrics ORDER BY date DESC LIMIT 1').fetchone(); print(r[0]) if r and r[0] is not None else print('')"`);
+      if (out && out !== '') {
+        replyRateNum = parseFloat(out);
+        replyRate = replyRateNum.toFixed(1) + '%';
+      }
+    }
+
+    // Pipeline value from system.db
+    let pipelineVal = '?';
+    if (dbOk) {
+      const out = safeExec(`python -c "import sqlite3; c=sqlite3.connect('C:/Users/olive/SpritesWork/brain/system.db'); r=c.execute('SELECT pipeline_value FROM daily_metrics ORDER BY date DESC LIMIT 1').fetchone(); print(r[0]) if r and r[0] is not None else print('')"`);
+      if (out && out !== '') {
+        const val = parseFloat(out);
+        if (val >= 1000) {
+          pipelineVal = '$' + (val / 1000).toFixed(1) + 'K';
+        } else {
+          pipelineVal = '$' + val.toFixed(0);
+        }
+      }
+    }
+
+    // Deals won/lost from system.db
+    let dealsWon = 0;
+    let dealsLost = 0;
+    let dealsDisplay = '?';
+    if (dbOk) {
+      const out = safeExec(`python -c "import sqlite3; c=sqlite3.connect('C:/Users/olive/SpritesWork/brain/system.db'); r=c.execute('SELECT deals_closed_won, deals_closed_lost FROM daily_metrics ORDER BY date DESC LIMIT 1').fetchone(); print(f'{r[0]}|{r[1]}') if r and r[0] is not None else print('')"`);
+      if (out && out !== '') {
+        const parts = out.split('|');
+        dealsWon = parseInt(parts[0]) || 0;
+        dealsLost = parseInt(parts[1]) || 0;
+        dealsDisplay = `+${dealsWon}/-${dealsLost}`;
+      }
+    }
+
+    // Outcomes count from prospect files
+    let outcomesCount = 0;
+    const outcomesOut = safeExec(`python -c "import os,re; files=[f for f in os.listdir('C:/Users/olive/SpritesWork/brain/prospects') if f.endswith('.md')]; c=sum(1 for f in files if re.search(r'outcome:\\s*(?!pending)\\S+', open(os.path.join('C:/Users/olive/SpritesWork/brain/prospects',f),encoding='utf-8').read(),re.I)); print(c)"`, 3000);
+    if (outcomesOut && outcomesOut !== '') {
+      outcomesCount = parseInt(outcomesOut) || 0;
+    }
+
+    // Session count for marketplace tier (from latest metrics file)
+    let sessionNum = 0;
+    if (fs.existsSync(metricsPath)) {
+      try {
+        const mFiles = fs.readdirSync(metricsPath).filter(f => f.endsWith('.md')).sort().reverse();
+        for (const mf of mFiles) {
+          const content = fs.readFileSync(path.join(metricsPath, mf), 'utf8');
+          const sessMatch = content.match(/session:\s*(\d+)/);
+          if (sessMatch) {
+            sessionNum = parseInt(sessMatch[1]);
+            break;
+          }
+        }
+      } catch (e) {}
+    }
+    // Tier thresholds: Seed=20, Growth=75, Proven=150
+    let tierName = 'Seed';
+    if (sessionNum >= 150) tierName = 'Proven';
+    else if (sessionNum >= 75) tierName = 'Growth';
+    else if (sessionNum >= 20) tierName = 'Seed';
+    else tierName = 'Pre-Seed';
+    const tierTarget = 150; // target is always Proven
+    const tierDisplay = `${tierName}(${sessionNum}/${tierTarget})`;
+
+    // Delta line colors
+    const replyColor = replyRateNum > 3 ? c.green : replyRateNum > 1 ? c.yellow : c.red;
+    const dealsColor = dealsWon > 0 && dealsLost > 0 ? c.yellow : dealsWon > 0 ? c.green : dealsLost > 0 ? c.red : c.white;
+    const outcomesColor = outcomesCount > 50 ? c.green : outcomesCount > 25 ? c.yellow : c.red;
+
+    // -- Build Output --
     // Line 1: AIOS | Talent: [domain] | Model | Context | Health | Time
     const brandParts = [`${c.bold}${c.cyan}AIOS${c.reset}`];
     if (domainTalent) brandParts.push(`${c.white}Talent: ${domainTalent}${c.reset}`);
@@ -437,7 +532,7 @@ process.stdin.on('end', () => {
       statParts.unshift(`${c.orange}Agents:${agentCount}${c.reset}`);
     }
 
-    // Line 3: System health
+    // Line 3: System health (with CQ score between Audit and Graduated)
     const gitColor = gitAge.endsWith('d') && parseInt(gitAge) > 1 ? c.yellow : c.green;
     const hookColor = hooksOk === hooksTotal ? c.green : c.red;
     const dbColor = dbOk ? c.green : c.red;
@@ -449,12 +544,21 @@ process.stdin.on('end', () => {
       `${c.cyan}Brain:${brainVersion}${c.reset}`,
       `${gitColor}Git:${gitAge}${c.reset}`,
       `${auditColor}Audit:${auditScore}${auditSession ? ` S${auditSession}` : ''}${c.reset}`,
+      `${cqColor}CQ:${cqScore}${c.reset}`,
       `${c.green}Graduated:${graduatedCount}${c.reset}`,
       salesEditRate ? `${salesEditColor}Talent Edit:${salesEditRate}${c.reset}` : '',
       sysEditRate ? `${sysEditColor}System Edit:${sysEditRate}${c.reset}` : '',
       auditSession ? `${c.dim}S${auditSession}${c.reset}` : '',
     ].filter(Boolean);
 
+    // Line 4: Delta metrics -- reply rate, pipeline value, deals, outcomes, tier
+    const deltaParts = [
+      `${replyColor}Reply:${replyRate}${c.reset}`,
+      `${c.white}Pipeline:${pipelineVal}${c.reset}`,
+      `${dealsColor}Deals:${dealsDisplay}${c.reset}`,
+      `${outcomesColor}Outcomes:${outcomesCount}${c.reset}`,
+      `${c.cyan}Tier:${tierDisplay}${c.reset}`,
+    ];
 
     let output = line1parts.join(` ${c.dim}|${c.reset} `);
     output += `\n`;
@@ -465,6 +569,8 @@ process.stdin.on('end', () => {
     output += statParts.join(` ${c.dim}|${c.reset} `);
     output += `\n`;
     output += healthParts.join(` ${c.dim}|${c.reset} `);
+    output += `\n`;
+    output += deltaParts.join(` ${c.dim}|${c.reset} `);
 
     process.stdout.write(output);
 
