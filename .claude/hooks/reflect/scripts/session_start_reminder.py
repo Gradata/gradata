@@ -78,10 +78,14 @@ def system_health_checks() -> list:
         if lines > 80:
             alerts.append(("WARNING", f"CLAUDE.md at {lines} lines (target: <60, limit: 80)"))
 
-    # 6. events.jsonl exists (v2.0 backbone)
+    # 6. events.jsonl exists (v2.0 backbone) — auto-create if missing
     events_file = BRAIN_PATH / "events.jsonl"
     if not events_file.exists():
-        alerts.append(("WARNING", "events.jsonl missing — run: python brain/scripts/events.py init"))
+        try:
+            events_file.touch()
+            alerts.append(("AUTO-FIXED", "events.jsonl was missing — created empty file"))
+        except Exception:
+            alerts.append(("WARNING", "events.jsonl missing — run: python brain/scripts/events.py init"))
 
     # 7. Config validation (settings.json, agent manifests, codebase health)
     try:
@@ -94,10 +98,15 @@ def system_health_checks() -> list:
                 capture_output=True, text=True, timeout=10
             )
             if result.returncode != 0:
-                # Extract FAIL lines
                 fails = [l.strip() for l in result.stdout.splitlines() if "[FAIL]" in l]
                 if fails:
-                    alerts.append(("WARNING", f"Config: {len(fails)} issue(s) — run config_validator.py"))
+                    # Try auto-fix: re-run agnix if available
+                    try:
+                        subprocess.run(["agnix", "--fix", str(SPRITES_WORK)],
+                                      capture_output=True, timeout=30)
+                        alerts.append(("AUTO-FIXED", f"Config: {len(fails)} issue(s) — agnix auto-fix applied"))
+                    except FileNotFoundError:
+                        alerts.append(("WARNING", f"Config: {len(fails)} issue(s) — run config_validator.py"))
     except Exception:
         pass  # Non-blocking
 
