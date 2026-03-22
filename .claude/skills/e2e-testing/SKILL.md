@@ -1,6 +1,6 @@
 ---
 name: e2e-testing
-description: Write, run, and fix Playwright E2E tests. Triggers on "write a test", "test the flow", "e2e test", "end to end", "test coverage", "regression test", "test suite", "Page Object", "playwright test". For live browsing and screenshots of external sites, use the playwright-skill instead.
+description: Use when user wants to Write, run, and fix Playwright E2E tests. Triggers on "write a test", "test the flow", "e2e test", "end to end", "test coverage", "regression test", "test suite", "Page Object", "playwright test". For live browsing and screenshots of external sites, use the playwright-skill instead.
 ---
 
 # E2E Testing with Playwright

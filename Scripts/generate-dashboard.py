@@ -266,7 +266,7 @@ def generate_html(data, generated_at):
             <td>{cw.get('last_fired','—')}</td>
         </tr>"""
     if not cw_rows:
-        cw_rows = '<tr><td colspan="7" style="text-align:center;color:#888;">No cross-wire data</td></tr>'
+        cw_rows = '<tr><td colspan="7" style="text-align:center;color:#888;">No event connection data</td></tr>'
 
     # --- Convergence rows ---
     conv_rows = ""

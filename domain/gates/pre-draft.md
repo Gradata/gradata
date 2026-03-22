@@ -15,6 +15,8 @@ PRE-FLIGHT: [prospect name]
 If any shows [ ] instead of [x], STOP and complete before presenting draft.
 
 ### Research Checklist:
+**Auto-depth:** After step 0 (vault check), use .claude/skills/research/SKILL.md Phase 0 to measure the gap. If vault has rich data (3+ prior touches, known pain, angle history), steps 1-2 can be abbreviated. If vault is empty (new prospect), run all steps fully. The gate sources below are MANDATORY — auto-depth controls how deep, not whether to check.
+
 0. **Obsidian vault** [MANDATORY — CANNOT SKIP] — query brain/ with specific questions, not whole-file reads. Ask: "What do I already know about [person/company]?" "What angles have been tried?" "What objections came up with similar personas?" "What worked for this persona type?" Check persona MOC page (brain/personas/[type].md) with: "What patterns work for [persona type]?" Check knowledge graph: `python knowledge_graph.py query-playbook [persona]`. This is FREE institutional memory — skipping it means repeating mistakes.
 0.5. **Lessons archive** — search lessons-archive.md for categories matching this task (TONE, FLOW, LANGUAGE, DRAFTING, STRATEGY). Check graduated index in lessons.md first for quick scan.
 1. **LinkedIn profile** — visit via browser (not Apollo). Read recent posts, activity, headline, about section. Find a personal insight to reference.

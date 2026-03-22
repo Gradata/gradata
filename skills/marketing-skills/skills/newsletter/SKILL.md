@@ -1,6 +1,6 @@
 ---
 name: newsletter
-description: Creates engaging newsletters using 9 proven formats for recurring audience engagement. This skill should be used when launching a newsletter, improving open and click rates, varying content to prevent subscriber fatigue, or when existing newsletters feel stale or generic.
+description: Use when user wants to Creates engaging newsletters using 9 proven formats for recurring audience engagement. This skill should be used when launching a newsletter, improving open and click rates, varying content to prevent subscriber fatigue, or when existing newsletters feel stale or generic.
 ---
 
 # Newsletter

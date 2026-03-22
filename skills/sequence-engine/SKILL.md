@@ -1,3 +1,5 @@
+---
+---
 DEPRECATED: Replaced by Loop. See skills/loop/SKILL.md
 
 ---

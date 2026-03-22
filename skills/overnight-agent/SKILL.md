@@ -1,6 +1,6 @@
 ---
 name: overnight-agent
-description: Scheduled pre-session agent that runs at 7am PT daily (weekdays). Checks Gmail, Fireflies, Pipedrive, Instantly for overnight changes. Pre-drafts due follow-ups. Writes morning-brief.md so Oliver starts with zero boot time. Triggered automatically by scheduled task or manually via /overnight-agent.
+description: Use when user wants to Scheduled pre-session agent that runs at 7am PT daily (weekdays). Checks Gmail, Fireflies, Pipedrive, Instantly for overnight changes. Pre-drafts due follow-ups. Writes morning-brief.md so Oliver starts with zero boot time. Triggered automatically by scheduled task or manually via /overnight-agent.
 ---
 
 # Overnight Agent — Pre-Session Preparation

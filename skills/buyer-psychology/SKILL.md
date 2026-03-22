@@ -1,6 +1,6 @@
 ---
 name: buyer-psychology
-description: >
+description: Use when user wants to Buyer psychology and discovery frameworks from Sell the Way You Buy by David Priemer. Use this skill whenever Oliver needs help with discovery calls, running demos, positioning Sprites, asking better questions, or handling resistance during sales conversations. Also trigger when he says "they didn't seem interested," "how do I run a better demo," "what questions should I ask on the call," "they got defensive when I pitched," "how do I position this differently," "I talked too much on the call," "they went quiet during the demo," "what's the best way to open a discovery call," "how do I make them care," or any discussion about demo structure, discovery technique, buyer emotions, or sales conversation strategy. This skill is about the psychology of HOW to sell, not WHAT to say in an email.
   Buyer psychology and discovery frameworks from Sell the Way You Buy by David Priemer.
   Use this skill whenever Oliver needs help with discovery calls, running demos, positioning Sprites,
   asking better questions, or handling resistance during sales conversations. Also trigger when he says

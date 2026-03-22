@@ -285,36 +285,42 @@ process.stdin.on('end', () => {
       if (out) dbEntities = parseInt(out) || 0;
     }
 
-    // -- Last Audit Score (from system.db) --
-    let auditScore = '?';
-    let auditSession = 0;
+    // -- Gate Pass Rate (from session_metrics) --
+    let gateRate = '?';
+    let gateSession = 0;
+    let gateRateNum = 0;
     if (dbOk) {
-      const out = safeExec(`python -c "import sqlite3; c=sqlite3.connect('C:/Users/olive/SpritesWork/brain/system.db'); r=c.execute('SELECT session, combined_avg FROM audit_scores ORDER BY session DESC LIMIT 1').fetchone(); print(f'{r[0]}|{r[1]}') if r else print('0|0')"`);
+      const out = safeExec(`python -c "import sqlite3; c=sqlite3.connect('C:/Users/olive/SpritesWork/brain/system.db'); r=c.execute('SELECT session, gate_pass_rate FROM session_metrics ORDER BY session DESC LIMIT 1').fetchone(); print(f'{r[0]}|{r[1]}') if r else print('0|0')"`);
       if (out) {
-        const [sess, score] = out.split('|');
-        auditSession = parseInt(sess) || 0;
-        auditScore = parseFloat(score) ? parseFloat(score).toFixed(1) : '?';
+        const [sess, rate] = out.split('|');
+        gateSession = parseInt(sess) || 0;
+        gateRateNum = parseFloat(rate) || 0;
+        gateRate = gateRateNum > 0 ? Math.round(gateRateNum * 100) + '%' : '?';
       }
     }
 
-    // -- CQ Score (from latest metrics file) --
-    let cqScore = '?';
-    let cqScoreNum = 0;
-    if (fs.existsSync(metricsPath)) {
-      try {
-        const mFiles = fs.readdirSync(metricsPath).filter(f => f.endsWith('.md')).sort().reverse();
-        for (const mf of mFiles) {
-          const content = fs.readFileSync(path.join(metricsPath, mf), 'utf8');
-          const cqMatch = content.match(/cq_score:\s*([\d.]+)/);
-          if (cqMatch) {
-            cqScoreNum = parseFloat(cqMatch[1]);
-            cqScore = cqScoreNum.toFixed(1);
-            break;
-          }
-        }
-      } catch (e) {}
+    // -- Brain Scores (System/Quality/Growth from session_metrics + events) --
+    let brainSystem = '?', brainQuality = '?', brainGrowth = '?', brainArch = '?';
+    let brainSysNum = 0, brainQualNum = 0, brainGrowthNum = 0, brainArchNum = 0;
+    if (dbOk) {
+      const out = safeExec(`python "C:/Users/olive/SpritesWork/brain/scripts/brain_scores_cli.py"`);
+      if (out) {
+        const parts = out.split('|');
+        brainSysNum = parseFloat(parts[0]) || 0;
+        brainQualNum = parseFloat(parts[1]) || 0;
+        brainGrowthNum = parseFloat(parts[2]) || 100;
+        brainArchNum = parseFloat(parts[3]) || 0;
+        brainSystem = Math.round(brainSysNum) + '%';
+        brainQuality = Math.round(brainQualNum) + '%';
+        brainGrowth = Math.round(brainGrowthNum) + '%';
+        brainArch = Math.round(brainArchNum) + '%';
+      }
     }
-    const cqColor = cqScoreNum >= 8.0 ? c.green : cqScoreNum >= 7.0 ? c.yellow : c.red;
+    // Color: red = bad, yellow = baseline, green = progressing
+    const brainSysColor = brainSysNum >= 80 ? c.green : brainSysNum >= 50 ? c.yellow : c.red;
+    const brainQualColor = brainQualNum >= 60 ? c.green : brainQualNum >= 30 ? c.yellow : c.red;
+    const brainGrowthColor = brainGrowthNum > 110 ? c.green : brainGrowthNum >= 100 ? c.yellow : c.red;
+    const brainArchColor = brainArchNum >= 80 ? c.green : brainArchNum >= 50 ? c.yellow : c.red;
 
     // -- Employment Week (Oliver started Feb 4, 2026 -- Sunday-based weeks) --
     // Week 1 starts the Sunday on or before Feb 4 (Feb 1, 2026)
@@ -539,11 +545,11 @@ process.stdin.on('end', () => {
       statParts.unshift(`${c.orange}Agents:${agentCount}${c.reset}`);
     }
 
-    // Line 3: System health (with CQ score between Audit and Graduated)
+    // Line 3: System health with Brain scores
     const gitColor = gitAge.endsWith('d') && parseInt(gitAge) > 1 ? c.yellow : c.green;
     const hookColor = hooksOk === hooksTotal ? c.green : c.red;
     const dbColor = dbOk ? c.green : c.red;
-    const auditColor = auditScore !== '?' && parseFloat(auditScore) >= 8.0 ? c.green : parseFloat(auditScore) >= 7.0 ? c.yellow : c.red;
+    const gateColor = gateRateNum >= 0.8 ? c.green : gateRateNum >= 0.6 ? c.yellow : c.red;
 
     const salesEditColor = salesEditRate && parseInt(salesEditRate) <= 10 ? c.green : parseInt(salesEditRate) <= 25 ? c.yellow : c.orange;
     const sysEditColor = sysEditRate && parseInt(sysEditRate) <= 10 ? c.green : parseInt(sysEditRate) <= 25 ? c.yellow : c.orange;
@@ -557,19 +563,22 @@ process.stdin.on('end', () => {
       } catch (e) {}
     }
 
-    // Staleness indicator: if audit is 3+ sessions behind current, flag it
-    const auditLag = currentSession - auditSession;
-    const auditStale = auditLag >= 3;
-    const auditDisplay = auditStale
-      ? `${c.orange}Audit:${auditScore}(${auditLag}ago)${c.reset}`
-      : `${auditColor}Audit:${auditScore}${c.reset}`;
+    // Staleness indicator: if gate is 3+ sessions behind current, flag it
+    const gateLag = currentSession - gateSession;
+    const gateStale = gateLag >= 3;
+    const gateDisplay = gateStale
+      ? `${c.orange}Gate:${gateRate}(${gateLag}ago)${c.reset}`
+      : `${gateColor}Gate:${gateRate}${c.reset}`;
 
     const healthParts = [
       currentSession > 0 ? `${c.bold}${c.white}S${currentSession}${c.reset}` : '',
       `${c.cyan}Brain:${brainVersion}${c.reset}`,
       `${gitColor}Git:${gitAge}${c.reset}`,
-      auditDisplay,
-      `${cqColor}CQ:${cqScore}${c.reset}`,
+      gateDisplay,
+      `${brainSysColor}System:${brainSystem}${c.reset}`,
+      `${brainQualColor}AI Quality:${brainQuality}${c.reset}`,
+      `${brainGrowthColor}Growth:${brainGrowth}${c.reset}`,
+      `${brainArchColor}Arch:${brainArch}${c.reset}`,
       `${c.green}Grad:${graduatedCount}${c.reset}`,
       salesEditRate ? `${salesEditColor}TEdit:${salesEditRate}${c.reset}` : '',
       sysEditRate ? `${sysEditColor}SEdit:${sysEditRate}${c.reset}` : '',

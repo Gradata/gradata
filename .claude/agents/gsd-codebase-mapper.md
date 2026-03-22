@@ -760,7 +760,7 @@ Ready for orchestrator summary.
 
 **DO NOT COMMIT.** The orchestrator handles git operations.
 
-</critical_rules>
+</forbidden_files>
 
 <success_criteria>
 - [ ] Focus area parsed correctly
@@ -770,3 +770,4 @@ Ready for orchestrator summary.
 - [ ] File paths included throughout documents
 - [ ] Confirmation returned (not document contents)
 </success_criteria>
+</forbidden_files></critical_rules>

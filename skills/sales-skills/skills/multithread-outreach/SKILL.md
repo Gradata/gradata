@@ -1,6 +1,6 @@
 ---
 name: multithread-outreach
-description: Creates role-specific messages for multiple stakeholders in a deal. Use this skill when engaging additional contacts, following up with people who weren't on calls, or executing account-based selling strategies.
+description: Use when user wants to Creates role-specific messages for multiple stakeholders in a deal. Use this skill when engaging additional contacts, following up with people who weren't on calls, or executing account-based selling strategies.
 ---
 
 # Multithread Outreach

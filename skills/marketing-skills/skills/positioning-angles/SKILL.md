@@ -1,6 +1,6 @@
 ---
 name: positioning-angles
-description: Discovers differentiated market positioning using 8 proven frameworks. This skill should be used when launching a new product or service, entering competitive markets, refreshing stale positioning, or when current messaging sounds like every other competitor.
+description: Use when user wants to Discovers differentiated market positioning using 8 proven frameworks. This skill should be used when launching a new product or service, entering competitive markets, refreshing stale positioning, or when current messaging sounds like every other competitor.
 ---
 
 # Positioning Angles

@@ -32,3 +32,4 @@ The workflow handles all logic including:
 4. Model table generation from MODEL_PROFILES
 5. Confirmation display
 </process>
+</profile>

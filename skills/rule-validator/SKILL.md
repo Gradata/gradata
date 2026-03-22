@@ -29,8 +29,8 @@ description: Validates CARL rules for conflicts, dead references, and coverage g
 - All kill switch thresholds should be consistent (5 cycles)
 - All bloat limits should be documented and non-conflicting
 
-### 5. Cross-Wire Integrity
-- Every cross-wire (LOOP_RULE_34-40) references a source and target component
+### 5. Event Connection Integrity
+- Every event connection (hooks, LOOP_RULE_28-34) references a source and target component
 - Verify both source and target exist and are tracked in system-patterns.md
 - Verify no circular dependencies that could cause infinite loops
 

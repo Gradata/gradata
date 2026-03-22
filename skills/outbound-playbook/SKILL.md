@@ -1,6 +1,6 @@
 ---
 name: outbound-playbook
-description: >
+description: Use when user wants to Tactical outbound sales methodology from Outbound Sales No Fluff by Rex Biberston and Ryan Reisert. Use this skill whenever Oliver needs help building outbound sequences, structuring cadences, cleaning lead lists, writing multi-touch campaigns, or improving reply rates. Also trigger when he says things like "my emails aren't getting replies," "how should I structure my sequence," "build me a cadence," "what should I say on the phone," "how many touches should I do," "my list needs work," "help me build my outbound motion," "what metrics should I track," or any discussion about multi-channel outreach structure, email deliverability, or sequence optimization. If Oliver is working on an Instantly campaign, Apollo sequence, or LinkedIn outreach cadence, this skill applies.
   Tactical outbound sales methodology from Outbound Sales No Fluff by Rex Biberston and Ryan Reisert.
   Use this skill whenever Oliver needs help building outbound sequences, structuring cadences, cleaning
   lead lists, writing multi-touch campaigns, or improving reply rates. Also trigger when he says things

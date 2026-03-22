@@ -116,7 +116,7 @@ Create `.planning/phases/XX-name/DISCOVERY.md`:
 </validation_checkpoints>
 </metadata>
 ```
-</output_structure>
+
 
 <success_criteria>
 - All scope questions answered with authoritative sources

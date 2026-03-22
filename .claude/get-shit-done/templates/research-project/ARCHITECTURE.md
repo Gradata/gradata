@@ -202,3 +202,4 @@ src/
 - Helps prevent common mistakes during implementation
 
 </guidelines>
+</template>

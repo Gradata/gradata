@@ -11,7 +11,7 @@
 ## Route 2: Specific Mistake
 **Target:** .claude/lessons.md
 **Criteria:** Tied to an incident. Has root cause. Pattern: "did X → should have done Y"
-**Format:** `[DATE] [PROVISIONAL:5] CATEGORY: What happened → What to do instead`
+**Format:** `[DATE] [INSTINCT:0.30] CATEGORY: What happened → What to do instead`
 **Categories:** [Define your categories here]
 
 ## Route 3: Methodology Insight

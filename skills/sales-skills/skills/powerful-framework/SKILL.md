@@ -1,6 +1,6 @@
 ---
 name: powerful-framework
-description: Applies the POWERFUL deal qualification framework to analyze sales opportunities. Use this skill when qualifying deals, assessing opportunity strength, identifying gaps in deal intelligence, or coaching sales teams on deal execution.
+description: Use when user wants to Applies the POWERFUL deal qualification framework to analyze sales opportunities. Use this skill when qualifying deals, assessing opportunity strength, identifying gaps in deal intelligence, or coaching sales teams on deal execution.
 ---
 
 # POWERFUL Framework

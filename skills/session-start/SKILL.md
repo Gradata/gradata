@@ -1,6 +1,6 @@
 ---
 name: session-start
-description: Run automatically at every session start before responding to Oliver's first message. Loads domain/pipeline/startup-brief.md, lessons.md, CARL, and checks Google Calendar. Defers all other context to on-demand loading based on task intent. Use this skill whenever a new session begins, the user says "start up", "load context", or any time CLAUDE.md's session startup instructions need to execute. This is mandatory — never skip it.
+description: Use when user wants to Run automatically at every session start before responding to Oliver's first message. Loads domain/pipeline/startup-brief.md, lessons.md, CARL, and checks Google Calendar. Defers all other context to on-demand loading based on task intent. Use this skill whenever a new session begins, the user says "start up", "load context", or any time CLAUDE.md's session startup instructions need to execute. This is mandatory — never skip it.
 ---
 
 # Session Startup (Lazy Load)

@@ -24,9 +24,9 @@ Purpose: Handle urgent work discovered during execution without renumbering enti
 Arguments: $ARGUMENTS (format: <after-phase-number> <description>)
 
 Roadmap and state are resolved in-workflow via `init phase-op` and targeted tool calls.
-</context>
+</description>
 
 <process>
-Execute the insert-phase workflow from @./.claude/get-shit-done/workflows/insert-phase.md end-to-end.
 Preserve all validation gates (argument parsing, phase verification, decimal calculation, roadmap updates).
 </process>
+</description></after-phase-number></context></description></after>

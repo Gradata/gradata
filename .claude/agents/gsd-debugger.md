@@ -1211,7 +1211,7 @@ Only return this after human verification confirms the fix.
 
 See <checkpoint_behavior> section for full format.
 
-</structured_returns>
+</checkpoint_behavior>
 
 <modes>
 
@@ -1255,3 +1255,4 @@ Check for mode flags in prompt context:
 - [ ] Fix verified against original symptoms
 - [ ] Appropriate return format based on mode
 </success_criteria>
+</checkpoint_behavior></structured_returns>

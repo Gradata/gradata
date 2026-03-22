@@ -111,6 +111,40 @@ def create_tables(cur):
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )""")
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS session_metrics (
+        session INTEGER PRIMARY KEY,
+        date TEXT NOT NULL,
+        session_type TEXT NOT NULL DEFAULT 'full',
+        outputs_produced INTEGER DEFAULT 0,
+        outputs_unedited INTEGER DEFAULT 0,
+        corrections INTEGER DEFAULT 0,
+        first_draft_acceptance REAL,
+        correction_density REAL,
+        source_coverage REAL,
+        confidence_calibration REAL,
+        gate_pass_count INTEGER,
+        gate_total_count INTEGER,
+        gate_pass_rate REAL,
+        gate_result TEXT CHECK(gate_result IN ('PASS','FAIL')),
+        growth_reply_rate REAL,
+        growth_deal_velocity REAL,
+        growth_pipeline_trend REAL,
+        growth_win_rate REAL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )""")
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS session_gates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session INTEGER NOT NULL,
+        check_name TEXT NOT NULL,
+        passed BOOLEAN NOT NULL,
+        detail TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )""")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_session_gates_session ON session_gates(session)")
+
 
 def seed_deals(cur):
     """Seed 7 deals from pipeline snapshot (loop-state.md, 2026-03-18)."""
@@ -133,7 +167,7 @@ def seed_deals(cur):
 
 
 def seed_cross_wires(cur):
-    """Seed 7 cross-wire connections from system-patterns.md (all at 0 fires)."""
+    """Seed 7 event connections from system-patterns.md (all at 0 fires)."""
     wires = [
         (1, 'Auditor -> Gates', 'R34', 0, 0, None, 'ACTIVE', None),
         (2, 'Gates -> Lessons', 'R35', 0, 0, None, 'ACTIVE', None),
@@ -219,7 +253,7 @@ def main():
     print("Seeding deals (7)...")
     seed_deals(cur)
 
-    print("Seeding cross-wires (7)...")
+    print("Seeding event connections (7)...")
     seed_cross_wires(cur)
 
     print("Seeding frameworks (5)...")

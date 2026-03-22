@@ -1,6 +1,6 @@
 ---
 name: keyword-research
-description: Content planning framework using the 6 Circles Method for identifying high-value topics without paid SEO tools. This skill should be used when building content strategy from scratch, planning quarterly content calendars, finding content gaps, or when unsure what to write about next.
+description: Use when user wants to Content planning framework using the 6 Circles Method for identifying high-value topics without paid SEO tools. This skill should be used when building content strategy from scratch, planning quarterly content calendars, finding content gaps, or when unsure what to write about next.
 ---
 
 # Keyword Research

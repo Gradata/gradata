@@ -1,6 +1,6 @@
 ---
 name: research
-description: General-purpose MECE research diamond for any deep research task. Triggers on "research", "deep dive", "investigate", "evaluate", "compare vendors", "market analysis", "how does X work", "what are the options for", "competitive landscape", "who are the players in", "sizing", "due diligence", "regulatory", "compliance check", "technical evaluation", "benchmark", "assess". Covers prospect research, technical research, market analysis, vendor evaluation, hiring research, regulatory questions, content research, and anything requiring structured depth.
+description: Use when user wants to General-purpose MECE research diamond for any deep research task. Triggers on "research", "deep dive", "investigate", "evaluate", "compare vendors", "market analysis", "how does X work", "what are the options for", "competitive landscape", "who are the players in", "sizing", "due diligence", "regulatory", "compliance check", "technical evaluation", "benchmark", "assess". Covers prospect research, technical research, market analysis, vendor evaluation, hiring research, regulatory questions, content research, and anything requiring structured depth.
 ---
 
 # Research Diamond (MECE)

@@ -1,6 +1,6 @@
 ---
 name: content-atomizer
-description: Repurposes single content pieces into multiple formats for maximum distribution while maintaining brand voice. This skill should be used when maximizing ROI from pillar content, filling content calendars efficiently, reaching audiences across multiple platforms, or when creating original content for every channel feels unsustainable.
+description: Use when user wants to Repurposes single content pieces into multiple formats for maximum distribution while maintaining brand voice. This skill should be used when maximizing ROI from pillar content, filling content calendars efficiently, reaching audiences across multiple platforms, or when creating original content for every channel feels unsustainable.
 ---
 
 # Content Atomizer

@@ -1,6 +1,6 @@
 ---
 name: sales-skills
-description: Router for the 9 Salesably sales skills suite — account qualification, call analysis, cold call scripts, company intelligence, follow-up emails, multithread outreach, POWERFUL framework, prospect research, and sales orchestrator. Use this skill when Oliver needs structured sales methodology that goes beyond the core skills (cold-email-manifesto, buyer-psychology, JOLT, fanatical-prospecting). Trigger when Oliver asks about deal qualification, account tiering, call coaching, multithreading into an account, the POWERFUL framework, or when he needs the sales orchestrator to figure out which skill to use. Also trigger on "Salesably", "sales skills", "which sales skill", or "help me work this deal".
+description: Use when user wants to Router for the 9 Salesably sales skills suite — account qualification, call analysis, cold call scripts, company intelligence, follow-up emails, multithread outreach, POWERFUL framework, prospect research, and sales orchestrator. Use this skill when Oliver needs structured sales methodology that goes beyond the core skills (cold-email-manifesto, buyer-psychology, JOLT, fanatical-prospecting). Trigger when Oliver asks about deal qualification, account tiering, call coaching, multithreading into an account, the POWERFUL framework, or when he needs the sales orchestrator to figure out which skill to use. Also trigger on "Salesably", "sales skills", "which sales skill", or "help me work this deal".
 ---
 
 # Salesably Sales Skills Suite

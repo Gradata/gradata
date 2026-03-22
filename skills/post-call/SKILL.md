@@ -1,6 +1,6 @@
 ---
 name: post-call
-description: Automate post-call workflow after any sales call or demo — pull the transcript, draft a follow-up email, and prep CRM notes. Use this skill whenever Oliver says "post-call", "post call", "call follow up", "after the call", "draft follow-up from the call", "what happened on that call", or references a call that just ended and needs follow-up. Also trigger when Oliver mentions a contact name right after a scheduled call time has passed. Input is typically a contact name.
+description: Use when user wants to Automate post-call workflow after any sales call or demo — pull the transcript, draft a follow-up email, and prep CRM notes. Use this skill whenever Oliver says "post-call", "post call", "call follow up", "after the call", "draft follow-up from the call", "what happened on that call", or references a call that just ended and needs follow-up. Also trigger when Oliver mentions a contact name right after a scheduled call time has passed. Input is typically a contact name.
 ---
 
 # Post-Call Automation

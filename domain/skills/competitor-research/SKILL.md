@@ -1,6 +1,6 @@
 ---
 name: competitor-research
-description: Build a pre-call research brief on a prospect's company — their ad presence, tech stack, competitive landscape, and talking points for Oliver's call. Use this skill whenever Oliver says "research [company]", "competitor research", "pre-call research", "what do we know about [company]", "prep for my call with [name]", "look into [company] before the demo", or any time Oliver needs intel on a prospect's company before a call or outreach. Also trigger when Oliver mentions a company name and asks what they're running for ads or what tools they use.
+description: Use when user wants to Build a pre-call research brief on a prospect's company — their ad presence, tech stack, competitive landscape, and talking points for Oliver's call. Use this skill whenever Oliver says "research [company]", "competitor research", "pre-call research", "what do we know about [company]", "prep for my call with [name]", "look into [company] before the demo", or any time Oliver needs intel on a prospect's company before a call or outreach. Also trigger when Oliver mentions a company name and asks what they're running for ads or what tools they use.
 ---
 
 # Pre-Call Competitor & Prospect Research

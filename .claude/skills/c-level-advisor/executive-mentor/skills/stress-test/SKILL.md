@@ -1,6 +1,6 @@
 ---
 name: "stress-test"
-description: "/em -stress-test — Business Assumption Stress Testing"
+description: "Use when user wants to /em -stress-test — Business Assumption Stress Testing"
 ---
 
 # /em:stress-test — Business Assumption Stress Testing

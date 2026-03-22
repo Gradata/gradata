@@ -1,6 +1,6 @@
 ---
 name: sales-orchestrator
-description: Diagnoses sales needs and sequences appropriate skills for comprehensive deal execution. Use this skill when unsure which sales skill to use, planning multi-step deal strategies, coaching reps on process, or coordinating complex sales motions.
+description: Use when user wants to Diagnoses sales needs and sequences appropriate skills for comprehensive deal execution. Use this skill when unsure which sales skill to use, planning multi-step deal strategies, coaching reps on process, or coordinating complex sales motions.
 ---
 
 # Sales Orchestrator

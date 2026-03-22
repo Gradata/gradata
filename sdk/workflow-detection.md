@@ -73,7 +73,7 @@ Trigger: [phrase or intent that activates this workflow]
 - [check derived from user corrections during these tasks]
 
 ## Starter Lessons
-[5 PROVISIONAL lessons generated from observed patterns — see below]
+[5 INSTINCT lessons generated from observed patterns — see below]
 ```
 
 ---
@@ -83,7 +83,7 @@ Trigger: [phrase or intent that activates this workflow]
 When a workflow is saved:
 
 1. **context-manifest.md** — add as Tier 2 entry with trigger intent
-2. **Starter lessons** — generate 5 PROVISIONAL lessons from the 3 observed instances:
+2. **Starter lessons** — generate 5 INSTINCT lessons from the 3 observed instances:
    - What step required retries? → "Verify [X] before [step]"
    - What correction did the user give? → "Always [correction] when [task]"
    - What tool failed? → "Use [fallback] when [tool] fails during [task]"

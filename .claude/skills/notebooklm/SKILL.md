@@ -1,6 +1,6 @@
 ---
 name: notebooklm
-description: Three-tier NotebookLM integration — MCP (preferred), CLI (fallback), manual browser (last resort). Use this skill whenever querying or feeding NotebookLM notebooks. Covers tier detection, authentication, failure handling, and logging. All NotebookLM operations in the system route through this file.
+description: Use when user wants to Three-tier NotebookLM integration — MCP (preferred), CLI (fallback), manual browser (last resort). Use this skill whenever querying or feeding NotebookLM notebooks. Covers tier detection, authentication, failure handling, and logging. All NotebookLM operations in the system route through this file.
 ---
 
 # NotebookLM Integration — Three-Tier Fallback

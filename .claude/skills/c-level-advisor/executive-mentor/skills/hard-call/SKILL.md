@@ -1,6 +1,6 @@
 ---
 name: "hard-call"
-description: "/em -hard-call — Framework for Decisions With No Good Options"
+description: "Use when user wants to /em -hard-call — Framework for Decisions With No Good Options"
 ---
 
 # /em:hard-call — Framework for Decisions With No Good Options

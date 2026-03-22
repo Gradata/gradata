@@ -1,6 +1,6 @@
 ---
 name: prospect-research
-description: Creates comprehensive prospect profiles and knowledge capsules for sales preparation. Use this skill when researching new prospects, preparing for calls, onboarding to new accounts, or updating prospect intelligence.
+description: Use when user wants to Creates comprehensive prospect profiles and knowledge capsules for sales preparation. Use this skill when researching new prospects, preparing for calls, onboarding to new accounts, or updating prospect intelligence.
 ---
 
 # Prospect Research

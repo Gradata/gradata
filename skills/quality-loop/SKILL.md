@@ -1,6 +1,6 @@
 ---
 name: quality-loop
-description: Run every 5 sessions to evaluate and improve the entire Sprites sales ops system. Reads session summaries, grades workflow execution, identifies degradation, and auto-fixes skills, CARL domains, and rules. Use this skill when Oliver says "run quality check", "quality loop", "evaluate the system", "how are we doing", "system health", or when the session counter in brain/sessions/ hits a multiple of 5. Also trigger proactively if you notice repeated mistakes or skipped steps across sessions.
+description: Use when user wants to Run every 5 sessions to evaluate and improve the entire Sprites sales ops system. Reads session summaries, grades workflow execution, identifies degradation, and auto-fixes skills, CARL domains, and rules. Use this skill when Oliver says "run quality check", "quality loop", "evaluate the system", "how are we doing", "system health", or when the session counter in brain/sessions/ hits a multiple of 5. Also trigger proactively if you notice repeated mistakes or skipped steps across sessions.
 ---
 
 # Quality Loop — Self-Improving Sales Ops

@@ -1,6 +1,6 @@
 ---
 name: fitfo
-description: "FITFO -- persistent problem-solving protocol. Load when Oliver is stuck, debugging, asks 'why isn't this working', 'figure out', 'is this possible', 'how do I', or any problem requiring real research and iteration rather than a simple lookup."
+description: "Use when user wants to FITFO -- persistent problem-solving protocol. Load when Oliver is stuck, debugging, asks 'why isn't this working', 'figure out', 'is this possible', 'how do I', or any problem requiring real research and iteration rather than a simple lookup."
 ---
 
 # FITFO -- Figure It The Fuck Out
@@ -42,6 +42,7 @@ You do not stop until the problem is solved or you have proven it cannot be solv
 - If docs conflict with reality, say so. Find what actually works.
 - If the "right" way doesn't exist, build the workaround and document why
 - Bias toward action. If you can write the code and test it, do that instead of theorizing
+- **Debug instrumentation cleanup:** When adding debug logs/prints to investigate, tag them `[DEBUG-MODE]`. Commit the repro test FIRST (clean), then add instrumentation to the working tree. After the bug is found, run `git restore .` to strip all debug code cleanly instead of manually removing logs (LLMs miss removals). Source: franzenzenhofer/debug-mode-skill.
 
 ---
 

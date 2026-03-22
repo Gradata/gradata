@@ -1,3 +1,8 @@
+---
+name: agent-scaffold
+description: Generate a new agent following the AIOS manifest schema. Use when creating specialized subagents with scoped permissions, bootstrap files, and trust levels.
+---
+
 # /agent-scaffold — Create New Agent with Manifest
 
 > Generates a new agent following the AIOS manifest schema.

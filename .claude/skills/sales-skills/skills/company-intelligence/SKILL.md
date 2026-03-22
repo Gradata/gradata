@@ -1,6 +1,6 @@
 ---
 name: company-intelligence
-description: Generates comprehensive company research reports for sales preparation. Use this skill when preparing for executive meetings, researching target accounts, creating account plans, or understanding competitive landscape.
+description: Use when user wants to Generates comprehensive company research reports for sales preparation. Use this skill when preparing for executive meetings, researching target accounts, creating account plans, or understanding competitive landscape.
 ---
 
 # Company Intelligence

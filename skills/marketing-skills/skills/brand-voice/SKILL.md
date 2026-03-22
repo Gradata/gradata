@@ -1,6 +1,6 @@
 ---
 name: brand-voice
-description: Defines and maintains consistent brand communication across all marketing materials. This skill should be used when creating new marketing content, auditing existing materials for voice consistency, onboarding team members to brand guidelines, or when content sounds generic or "off-brand."
+description: Use when user wants to Defines and maintains consistent brand communication across all marketing materials. This skill should be used when creating new marketing content, auditing existing materials for voice consistency, onboarding team members to brand guidelines, or when content sounds generic or "off-brand."
 ---
 
 # Brand Voice

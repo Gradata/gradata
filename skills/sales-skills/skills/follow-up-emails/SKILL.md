@@ -1,6 +1,6 @@
 ---
 name: follow-up-emails
-description: Creates professional follow-up emails after sales calls that capture key points and drive next steps. Use this skill when sending post-call summaries, confirming action items, or maintaining deal momentum between conversations.
+description: Use when user wants to Creates professional follow-up emails after sales calls that capture key points and drive next steps. Use this skill when sending post-call summaries, confirming action items, or maintaining deal momentum between conversations.
 ---
 
 # Follow-Up Emails

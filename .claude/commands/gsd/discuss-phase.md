@@ -88,3 +88,4 @@ Generate 3-4 **phase-specific** gray areas, not generic categories.
 - CONTEXT.md captures decisions, not vague vision
 - User knows next steps
 </success_criteria>
+</phase>

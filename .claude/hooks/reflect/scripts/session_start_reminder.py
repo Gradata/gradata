@@ -83,6 +83,24 @@ def system_health_checks() -> list:
     if not events_file.exists():
         alerts.append(("WARNING", "events.jsonl missing — run: python brain/scripts/events.py init"))
 
+    # 7. Config validation (settings.json, agent manifests, codebase health)
+    try:
+        import subprocess
+        python = "C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe"
+        validator = BRAIN_PATH / "scripts" / "config_validator.py"
+        if validator.exists():
+            result = subprocess.run(
+                [python, str(validator), "--quick"],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode != 0:
+                # Extract FAIL lines
+                fails = [l.strip() for l in result.stdout.splitlines() if "[FAIL]" in l]
+                if fails:
+                    alerts.append(("WARNING", f"Config: {len(fails)} issue(s) — run config_validator.py"))
+    except Exception:
+        pass  # Non-blocking
+
     return alerts
 
 

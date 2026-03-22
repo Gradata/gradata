@@ -13,4 +13,4 @@
 - **Manifest:** [[agents/systems/manifest.md]]
 - **Brain path:** agents/systems/brain/updates/
 - **Scope tags:** SYSTEM, ARCHITECTURE, INTEGRATION, SAFETY, AUDIT, QUALITY, NERVOUS-SYSTEM
-- **Scope paths:** system-patterns.md, signals.md, metrics/*, sessions/neural-bus.md
+- **Scope paths:** system-patterns.md, signals.md, metrics/*, events.jsonl

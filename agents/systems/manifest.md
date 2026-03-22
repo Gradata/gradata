@@ -6,7 +6,7 @@
 - status: active
 - version: 2026-03-21
 - department: systems
-- description: Spawned for health audits, cross-wire checks, component integration, nervous system updates, RAG pipeline
+- description: Spawned for health audits, event verification, component integration, nervous system updates, RAG pipeline
 - instruction_file: agents/systems/CLAUDE.md
 
 ## Permissions
@@ -15,11 +15,11 @@
 - write_paths: [.claude/*, .carl/*, agents/*, brain/system-patterns.md, brain/sessions/*, brain/metrics/*, brain/scripts/*]
 
 ## Context
-- bootstrap_files: [.claude/component-map.md, .claude/cross-wire-checklist.md]
+- bootstrap_files: [.claude/component-map.md, .claude/self-improvement.md]
 - bootstrap_limit: 12000 chars/file, 30000 total
-- warmup: [brain/system-patterns.md, brain/sessions/neural-bus.md]
+- warmup: [brain/system-patterns.md, brain/events.jsonl]
 - scope_tags: [SYSTEM, ARCHITECTURE, INTEGRATION, SAFETY, AUDIT, QUALITY, NERVOUS-SYSTEM]
-- scope_paths: [system-patterns.md, signals.md, metrics/*, sessions/neural-bus.md]
+- scope_paths: [system-patterns.md, signals.md, metrics/*, events.jsonl]
 
 ## Trust
 - trust_level: config+instructions+code

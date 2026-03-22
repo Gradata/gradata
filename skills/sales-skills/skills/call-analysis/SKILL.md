@@ -1,6 +1,6 @@
 ---
 name: call-analysis
-description: Analyzes sales call transcripts using the POWERFUL framework to extract insights and action items. Use this skill when reviewing call recordings, coaching reps, qualifying opportunities, or extracting deal intelligence from conversations.
+description: Use when user wants to Analyzes sales call transcripts using the POWERFUL framework to extract insights and action items. Use this skill when reviewing call recordings, coaching reps, qualifying opportunities, or extracting deal intelligence from conversations.
 ---
 
 # Call Analysis

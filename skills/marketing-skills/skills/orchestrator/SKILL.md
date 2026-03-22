@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-description: Diagnoses marketing needs and sequences appropriate skills for comprehensive campaigns. This skill should be used when unsure which marketing skill to use, planning multi-step marketing campaigns, creating integrated marketing strategies, or when a project spans multiple marketing disciplines.
+description: Use when user wants to Diagnoses marketing needs and sequences appropriate skills for comprehensive campaigns. This skill should be used when unsure which marketing skill to use, planning multi-step marketing campaigns, creating integrated marketing strategies, or when a project spans multiple marketing disciplines.
 ---
 
 # Orchestrator

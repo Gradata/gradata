@@ -1,6 +1,6 @@
 ---
 name: direct-response-copy
-description: Writes high-converting landing pages and sales copy using proven page architecture and persuasion principles. This skill should be used when creating sales pages, landing pages, product pages, or any copy designed to drive immediate action like purchases, sign-ups, or bookings.
+description: Use when user wants to Writes high-converting landing pages and sales copy using proven page architecture and persuasion principles. This skill should be used when creating sales pages, landing pages, product pages, or any copy designed to drive immediate action like purchases, sign-ups, or bookings.
 ---
 
 # Direct Response Copy

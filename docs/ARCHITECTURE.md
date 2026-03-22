@@ -45,12 +45,12 @@ These are procedural execution checklists — they run every session, not aspira
 
 ### Layer 4: Meta-Optimization
 
-Tracks which cross-wire connections actually produce value and prunes the ones that do not.
+Tracks which event connections and hooks actually produce value and prunes the ones that do not.
 
-- Reviews cross-wire performance every 5 sessions (aligned with LOOP_RULE_33)
+- Reviews hook/event connection performance every 5 sessions
 - Kill switch: 5 consecutive cycles of zero value → connection goes DORMANT
 - Self-evaluates after 3 cycles (session 18) — determines if meta-optimization itself improves the system
-- Prevents unbounded complexity growth in the cross-wiring layer
+- Prevents unbounded complexity growth in the event/hook layer
 
 ### Layer 5: Convergence Detection
 
@@ -62,7 +62,7 @@ Monitors whether the system is stabilizing or still forming, and adjusts optimiz
 | Sessions since last rule change | 3 | Rule stability |
 | Sessions since last gate catch | 3 | Gate effectiveness plateau |
 | Avg audit score (last 5) | 9.0+ | Quality maturity |
-| Cross-wire dormancy rate | >50% stable | Cross-wire maturation |
+| Event connection dormancy rate | >50% stable | Hook/event maturation |
 
 - At convergence: optimization frequency reduces from every 5 sessions to every 10
 - Divergence detection re-enables aggressive optimization on regression
@@ -70,7 +70,7 @@ Monitors whether the system is stabilizing or still forming, and adjusts optimiz
 
 ## Data Infrastructure
 
-- **SQLite Database**: Queryable backing store for deals, signals, frameworks, audit history, cross-wire performance
+- **SQLite Database**: Queryable backing store for deals, signals, frameworks, audit history, event connections
 - **Markdown Views**: Human-readable views of database state for context loading (system-patterns.md, PATTERNS.md, prospect notes)
 - **CARL Rule Engine**: ~60 rules across 10 domains (global, context, commands, loop, agents, prospect-email, demo-prep, coldcall, linkedin, listbuild) with keyword-triggered lazy loading
 - **Brain Vault**: Structured knowledge store — prospects, pipeline data, email patterns, system patterns, loop state handoffs
@@ -79,7 +79,7 @@ Monitors whether the system is stabilizing or still forming, and adjusts optimiz
 
 - **Mandatory gates** before every output: Pre-Draft (7-step), Demo Prep (8-step), Post-Demo Follow-Up, Cold Call, LinkedIn, Pipedrive Notes, Win/Loss, Calendar Check
 - **Self-scoring** with calibration against human feedback (quality-rubrics.md)
-- **Cross-wire automation** prevents recurring failures from persisting
+- **Event-driven hooks** prevent recurring failures from persisting
 - **Rule validation** detects conflicts and dead references
 - **Auditor system** with ping-pong protocol — independent scoring, gap identification, fix cycles
 - **Loop audit** — separate audit focused on sales intelligence effectiveness
@@ -125,7 +125,7 @@ Four specialized agent types with enforced boundaries and an orchestrator:
 | Metric | Value |
 |--------|-------|
 | CARL rules governing behavior | ~60 across 10 domains |
-| Cross-wire connections | 7 with automated execution |
+| Event connections | Hooks + events.jsonl queries |
 | Convergence indicators | 5 tracking system maturity |
 | Quality gates | 8 mandatory checkpoints |
 | Tracked system components | 25+ |
@@ -134,7 +134,7 @@ Four specialized agent types with enforced boundaries and an orchestrator:
 | Audit minimum score | 8.0 (hard gate) |
 | Max subagents per session | 5 (cost-controlled) |
 | Pipeline health model | Calibrates at 15+ closed deals |
-| Complexity budget ceiling | 100 CARL rules, 10 cross-wires, 5 meta-trackers, 3 optimization layers |
+| Complexity budget ceiling | 100 CARL rules, 10 event connections, 5 meta-trackers, 3 optimization layers |
 
 ## ICP (Ideal Customer Profile)
 

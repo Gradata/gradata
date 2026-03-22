@@ -309,3 +309,4 @@ curl -X POST http://localhost:3000/api/test-email \
 **Naming:** `{phase}-USER-SETUP.md` matches the phase number pattern.
 **Status tracking:** User marks checkboxes and updates status line when complete.
 **Searchability:** `grep -r "USER-SETUP" .planning/` finds all phases with user requirements.
+</stripe_example>

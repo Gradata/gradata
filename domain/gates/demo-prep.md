@@ -14,6 +14,8 @@ PRE-FLIGHT: [prospect name]
 If any shows [ ] instead of [x], STOP and complete before presenting output.
 
 ### Research Checklist (15-step):
+**Auto-depth:** After step 1 (win story) and vault check, use .claude/skills/research/SKILL.md Phase 0 to measure the gap. Returning prospect with Fireflies transcript + prior notes = abbreviated web research. New cold inbound = full 15-step deep dive. The gate sources below are MANDATORY — auto-depth controls depth, not whether to check.
+
 1. **Win Story** — Write the closed-won narrative FIRST (3-5 lines): what they sign, what changes for them, what the deciding factor was, what referral they give. Then work backwards.
 2. **Google Calendar** — confirm demo time, attendees, meeting link.
 3. **Web search: company** — what they do, industry, size, services, clients.

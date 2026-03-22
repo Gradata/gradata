@@ -1,6 +1,6 @@
 ---
 name: account-qualification
-description: Qualifies and tiers accounts based on signals, fit, and potential. Use this skill when building target lists, prioritizing accounts, identifying high-potential prospects, or defining ideal customer profile criteria.
+description: Use when user wants to Qualifies and tiers accounts based on signals, fit, and potential. Use this skill when building target lists, prioritizing accounts, identifying high-potential prospects, or defining ideal customer profile criteria.
 ---
 
 # Account Qualification

@@ -1,6 +1,6 @@
 ---
 name: lead-pipeline
-description: Manage the lead enrichment-to-send pipeline — from raw CSV to Prospeo enrichment to ZeroBounce verification to Instantly import. Use this skill whenever Oliver says "run the pipeline", "enrich batch", "next batch", "process leads", "clean the results", "upload to Instantly", "ZeroBounce results", or references moving leads through any stage of the enrichment pipeline. Also trigger when Oliver drops a CSV file path or says "I got the results back" from Prospeo or ZeroBounce.
+description: Use when user wants to Manage the lead enrichment-to-send pipeline — from raw CSV to Prospeo enrichment to ZeroBounce verification to Instantly import. Use this skill whenever Oliver says "run the pipeline", "enrich batch", "next batch", "process leads", "clean the results", "upload to Instantly", "ZeroBounce results", or references moving leads through any stage of the enrichment pipeline. Also trigger when Oliver drops a CSV file path or says "I got the results back" from Prospeo or ZeroBounce.
 ---
 
 # Lead Pipeline Automation

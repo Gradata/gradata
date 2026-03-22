@@ -1,6 +1,6 @@
 ---
 name: email-sequences
-description: Creates automated email sequences for every stage of the customer journey including welcome, nurture, conversion, and launch flows. This skill should be used when building automated email flows, launching products, improving email-driven conversions, or onboarding new customers.
+description: Use when user wants to Creates automated email sequences for every stage of the customer journey including welcome, nurture, conversion, and launch flows. This skill should be used when building automated email flows, launching products, improving email-driven conversions, or onboarding new customers.
 ---
 
 # Email Sequences

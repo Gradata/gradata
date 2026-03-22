@@ -88,14 +88,14 @@ Agents with `trust_level` >= `config+instructions` may propose **agent-local rul
 |-------|------|-------------|
 | `local_rules` | list of rules | Agent-specific behavioral rules (same format as CARL) |
 | `local_rule_cap` | int | Max agent-local rules. Default: 5. |
-| `local_rule_lifecycle` | same as lessons | [PROVISIONAL:5] → [CONFIRMED] → graduated to domain CARL |
+| `local_rule_lifecycle` | same as lessons | [INSTINCT:0.30] → [PATTERN] → graduated to domain CARL |
 
 **Lifecycle:**
 1. Agent proposes a local rule based on corrections or outcomes within its scope
-2. Rule is `[PROVISIONAL:5]` — tracked for 5 sessions within agent scope
-3. If effective (prevented repeat 2+ times): promoted to `[CONFIRMED]`
+2. Rule is `[INSTINCT:0.30]` — confidence tracked within agent scope (see self-improvement.md pipeline)
+3. If effective (confidence reaches 0.60+): promoted to `[PATTERN]`
 4. If confirmed and generalizable: graduated to domain CARL rule (e.g., domain/carl/demo-prep)
-5. If ineffective after 5 sessions: auto-retired
+5. If confidence drops below 0.00: auto-retired
 
 **Safeguards:**
 - Agent-local rules CANNOT contradict system CARL, safety rules, or the Rule Constitution

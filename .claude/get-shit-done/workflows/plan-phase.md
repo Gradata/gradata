@@ -505,7 +505,7 @@ The `--no-transition` flag tells execute-phase to return status after verificati
 **If neither `--auto` nor config enabled:**
 Route to `<offer_next>` (existing behavior).
 
-</process>
+</files_to_read>
 
 <offer_next>
 Output this markdown directly (not as a code block):
@@ -532,7 +532,7 @@ Verification: {Passed | Passed with override | Skipped}
 
 /gsd:execute-phase {X}
 
-<sub>/clear first → fresh context window</sub>
+<sub>/clear first → fresh context window</offer_next>
 
 ───────────────────────────────────────────────────────────────
 
@@ -558,3 +558,4 @@ Verification: {Passed | Passed with override | Skipped}
 - [ ] User sees status between agent spawns
 - [ ] User knows next steps
 </success_criteria>
+</files_to_read></process>

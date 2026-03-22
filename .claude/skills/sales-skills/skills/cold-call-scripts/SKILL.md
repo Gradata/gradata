@@ -1,6 +1,6 @@
 ---
 name: cold-call-scripts
-description: Creates personalized cold call scripts using a proven 5-step framework. Use this skill when preparing for prospecting calls, coaching reps on call structure, or creating call templates for campaigns.
+description: Use when user wants to Creates personalized cold call scripts using a proven 5-step framework. Use this skill when preparing for prospecting calls, coaching reps on call structure, or creating call templates for campaigns.
 ---
 
 # Cold Call Scripts

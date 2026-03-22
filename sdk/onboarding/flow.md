@@ -21,7 +21,7 @@ Do NOT run this flow if company.md already exists. The presence of company.md me
 
 ## How This Flow Works (agent instructions, not shown to buyer)
 
-You are onboarding a new buyer of the AI sales agent SDK. The buyer does not know how the system works internally. Your job is to ask conversational questions in 4 sections, wait for answers, then generate 4 output files from their responses. Never mention CARL, cross-wires, meta-loops, audit systems, or internal architecture. The buyer should feel like they're setting up a smart assistant, not configuring enterprise infrastructure.
+You are onboarding a new buyer of the AI sales agent SDK. The buyer does not know how the system works internally. Your job is to ask conversational questions in 4 sections, wait for answers, then generate 4 output files from their responses. Never mention CARL, event hooks, meta-loops, audit systems, or internal architecture. The buyer should feel like they're setting up a smart assistant, not configuring enterprise infrastructure.
 
 **Pacing rules:**
 - Ask ONE section at a time. Wait for answers before moving to the next section.
@@ -264,7 +264,7 @@ Write to `context-manifest.md` in the project root. This is the lazy loading con
 | .carl/linkedin | LinkedIn outreach task detected | ~600 |
 | .carl/loop | Prospect interaction (always-on but heavy — defer full read to task) | ~4000 |
 | .claude/auditor-system.md | Session wrap-up | ~3000 |
-| .claude/cross-wire-checklist.md | Session wrap-up step 9 | ~800 |
+| brain/events.jsonl | Session wrap-up step 9 (event verification) | ~800 |
 | .claude/health-audit.md | Session wrap-up step 6 | ~1000 |
 | .claude/truth-protocol.md | Loaded via CARL global pointer, not file read | ~500 |
 | brain/system-patterns.md | Session wrap-up step 9, meta-analysis | ~3000 |

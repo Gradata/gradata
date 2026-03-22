@@ -1,6 +1,6 @@
 ---
 name: seo-content
-description: Creates search-optimized articles that rank well and read naturally for humans. This skill should be used when writing blog posts, pillar content, guides, or any content where organic search traffic is a goal - balancing search engine requirements with genuine reader value.
+description: Use when user wants to Creates search-optimized articles that rank well and read naturally for humans. This skill should be used when writing blog posts, pillar content, guides, or any content where organic search traffic is a goal - balancing search engine requirements with genuine reader value.
 ---
 
 # SEO Content

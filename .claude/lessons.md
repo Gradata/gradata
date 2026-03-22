@@ -143,3 +143,6 @@
 [2026-03-22] [INSTINCT:0.49] PROCESS: Never skip wrap-up steps when rushing. The 8.0 audit gate, confidence updates, and agent distillation are non-negotiable regardless of session length. Long session = MORE reason to audit, not less. Spawn wrap-up agents instead of skipping. Root cause: 6+ hour session caused fatigue-driven shortcutting on 6 wrap-up steps.
 
 [2026-03-22] [INSTINCT:0.30] CONTEXT: Oliver does prospect work on weekdays, systems work on weekends. Never frame weekend systems sessions as "drift" or imply pipeline is being neglected. Check the day of week before commenting on session type balance. Root cause: lectured Oliver about 6 consecutive non-prospect sessions when it was Saturday — his normal schedule.
+
+[2026-03-22] [INSTINCT:0.30] THOROUGHNESS: Never recommend "park" or "skip" as a first response to a deferred item. If the work can be done with subagents, do it. If it takes 30 minutes, take the 30 minutes. "Park" is only valid when Oliver explicitly says to defer, or when the task genuinely requires external input (API keys, Oliver's decisions, third-party approvals). Spawning agents is free — laziness is not. Root cause: recommended parking 3 of 6 S34 deferred items to avoid work, then Oliver had to push back twice.
+</p>

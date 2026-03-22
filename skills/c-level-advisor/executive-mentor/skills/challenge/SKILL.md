@@ -1,6 +1,6 @@
 ---
 name: "challenge"
-description: "/em -challenge — Pre-Mortem Plan Analysis"
+description: "Use when user wants to /em -challenge — Pre-Mortem Plan Analysis"
 ---
 
 # /em:challenge — Pre-Mortem Plan Analysis

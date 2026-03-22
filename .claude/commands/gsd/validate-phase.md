@@ -30,6 +30,5 @@ Phase: $ARGUMENTS — optional, defaults to last completed phase.
 </context>
 
 <process>
-Execute @./.claude/get-shit-done/workflows/validate-phase.md.
 Preserve all workflow gates.
 </process>

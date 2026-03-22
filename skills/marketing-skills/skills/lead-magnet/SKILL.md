@@ -1,6 +1,6 @@
 ---
 name: lead-magnet
-description: Creates high-converting lead magnets with compelling hooks, strategic format selection, and validation frameworks. This skill should be used when building email lists, launching new products, creating content upgrades, or when current opt-in rates are below 15-20%.
+description: Use when user wants to Creates high-converting lead magnets with compelling hooks, strategic format selection, and validation frameworks. This skill should be used when building email lists, launching new products, creating content upgrades, or when current opt-in rates are below 15-20%.
 ---
 
 # Lead Magnet

@@ -1,3 +1,8 @@
+---
+name: loop
+description: Use when user wants to Closed-loop sales intelligence engine. Tags every prospect interaction, tracks outcomes, builds PATTERNS.md, rotates angles based on data. Loaded via CARL LOOP domain (always-on).
+---
+
 # Loop — Closed-Loop Sales Intelligence
 
 ## What Loop Is

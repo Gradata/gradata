@@ -16,7 +16,6 @@
 ## Filters to Create
 
 ### 1. Sprites Team
-- From: *@spritesai.com
 - Apply label: Sprites Team
 - Keep in inbox (team comms are important)
 

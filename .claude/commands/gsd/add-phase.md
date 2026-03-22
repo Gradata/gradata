@@ -41,3 +41,4 @@ The workflow handles all logic including:
 7. Roadmap entry insertion
 8. STATE.md updates
 </process>
+</description>

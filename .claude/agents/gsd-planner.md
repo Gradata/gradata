@@ -275,7 +275,7 @@ For each external service, determine:
 
 Record in `user_setup` frontmatter. Only include what Claude literally cannot do. Do NOT surface in planning output — execute-plan handles presentation.
 
-</task_breakdown>
+</done>
 
 <dependency_graph>
 
@@ -519,7 +519,7 @@ From src/api/auth.ts:
 export function validateToken(token: string): Promise<User | null>;
 export function createSession(user: User): Promise<SessionToken>;
 ```
-</interfaces>
+</plan_format>
 ```
 
 ### For plans that CREATE new interfaces:
@@ -1307,3 +1307,4 @@ Planning complete when:
 - [ ] User knows to run `/gsd:execute-phase {X}` next
 
 </success_criteria>
+</done></verify></action></files></task_breakdown>

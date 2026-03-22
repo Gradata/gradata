@@ -9,39 +9,21 @@ description: Use when user says "wrap up", "close session", "end session",
 
 ## Pre-Phase: Metacognitive Scan (always runs, max 60 seconds)
 
-Before calculating session weight, run a quick metacognitive scan:
+Before classifying session type, run a quick metacognitive scan:
 1. Query events.jsonl for this session's events — what types fired? (corrections, gate results, calibration)
 2. Read brain/system-patterns.md — is this session better or worse than the baseline trend?
 3. Ask: what is the single most important thing this session revealed about how AIOS operates?
 4. Emit insight to events.jsonl via `events.emit("HEALTH_CHECK", "metacog", {"insight": "..."})`
 5. If the insight implies a rule change — queue it for Phase 3 (Review & Apply) rather than acting immediately
 
-## Phase 0: Calculate Session Weight (ALWAYS_ON — runs first)
+## Phase 0: Session Type Classification (ALWAYS_ON — runs first)
 
-Calculate weight score before any other wrap-up step. This determines depth for all subsequent phases.
+Classify session as `full` (prospect work) or `systems` (architecture/infrastructure only).
+This determines which of the 15 gate checks apply at wrap-up close (checks 12-15 skip for systems).
 
-**Scoring:**
-- +1 per 5 files changed this session
-- +2 per CARL domain modified (AIOS or domain/)
-- +3 per structural change (file move/delete/new domain/new directory)
-- +1 per new lesson added
-- +1 per prospect interaction (email, call, demo, research)
-- +5 automatic if any core file modified (CLAUDE.md, session-start, wrap-up, .carl/manifest)
+**Output:** `SESSION TYPE: [full|systems]`
 
-**Weight Tiers:**
-
-| Tier | Score | Depth | Target Time |
-|------|-------|-------|-------------|
-| 1 — Light | 1-3 | Skip unchanged sections. Compress health check to 30s. One-line status per area. Fast commit, no scoring. | < 2 min |
-| 2 — Medium | 4-7 | Run health check on changed areas only. Skip unchanged CARL domains and skills. Standard quality scoring. | < 5 min |
-| 3 — Heavy | 8-12 | Full integration audit across all layers. Heal broken connections. Verify compounding chain. Full quality scoring. | < 10 min |
-| 4 — Structural | Any session with AIOS/domain/CARL structural changes | Full Phase 1-5 integration heal regardless of score. Verify every layer connects. Mandatory smoke test on session-start and wrap-up flows. | Complete, not fast |
-
-Session weight tier also feeds into .claude/auditor-system.md Session Weight (FULL/STANDARD/COMPRESSED/ABBREVIATED) — these are complementary: this tier controls wrap-up depth, auditor-system.md tiers control audit depth. Both auto-select based on session output.
-
-**Output:** `SESSION WEIGHT: [score] → Tier [N] ([Light/Medium/Heavy/Structural])`
-
-Then proceed to Phase 1 at the depth determined by the tier.
+Then proceed to Phase 1.
 
 ## Phase 1: Ship It
 
@@ -215,15 +197,17 @@ Quick verification — only check what's relevant to this session's work.
 - [ ] Tomorrow's calendar checked — any demos needing prep?
 - [ ] Any promised follow-ups not yet drafted?
 
-**Smoke test (always run, 5 seconds):**
-- [ ] Can read: CLAUDE.md, domain/pipeline/startup-brief.md, lessons.md (file system OK)
-- [ ] settings.json parses as valid JSON (config not corrupted)
-- [ ] .claude.json parses as valid JSON (MCP config intact)
-- [ ] brain/ directory accessible at C:/Users/olive/SpritesWork/
-- [ ] .carl/manifest accessible
-- [ ] Line counts: CLAUDE.md < 150, domain/pipeline/startup-brief.md < 60, lessons.md < 30 active
+**Smoke test:** Handled by hooks (session-start-reminder.py runs 7 health checks + config validation, context-budget.js enforces line limits). Only manual check: verify brain/ is accessible at C:/Users/olive/SpritesWork/ if any brain writes happened this session.
 
-If any smoke test fails, fix it BEFORE writing the handoff.
+**Code lint (auto-fix, always run):**
+```bash
+# Python — fix unused imports, f-string issues
+ruff check "C:/Users/olive/SpritesWork/brain/scripts" --select F401,F541 --fix --quiet
+
+# JS — check hooks for issues (report only, don't auto-fix hooks)
+biome check "C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks" --max-diagnostics=5 2>&1 | tail -3
+```
+Run silently. Only surface to Oliver if errors remain after auto-fix.
 
 **Update domain/pipeline/startup-brief.md** with any pipeline, campaign, lesson, or credit changes so next session starts current.
 
@@ -243,7 +227,7 @@ Mark each relevant item. Skip irrelevant ones. Fix any failures before closing.
 ## Phase 5b: Session Note (HARD GATE — cannot commit or close without this)
 
 **Path:** docs/Session Notes/[YYYY-MM-DD]-S[N].md
-**Gate:** The session note file MUST exist and contain ALL 9 sections below before Phase 6 (git commit) can run. No exceptions. No skipping regardless of session weight tier. If a section has nothing to report, write "None" — do not omit the section.
+**Gate:** The session note file MUST exist and contain ALL 9 sections below before Phase 6 (git commit) can run. No exceptions. No skipping. If a section has nothing to report, write "None" — do not omit the section.
 
 **Template (mandatory — use this exact structure):**
 
@@ -280,11 +264,12 @@ Tags: [2-5 topic tags]
 ## Weakest Output
 [Single weakest output with reasoning. If nothing weak: explain why.]
 
-## Self-Scores
-[Per-category scores with reasoning. Minimum categories:]
-- Architecture/strategy decisions: X/10 — [reasoning]
-- Execution precision: X/10 — [reasoning]
-- Completeness: X/10 — [reasoning]
+## Leading Indicators
+[Computed from events, not self-assessed:]
+- First-draft acceptance: [X]% ([unedited]/[total] outputs)
+- Correction density: [X] ([corrections]/[outputs])
+- Source coverage: [X]% (gates with full sources)
+- Confidence calibration: [X]% (overrides within 2 pts)
 
 ## Corrections Received
 [Numbered list of corrections. If none: "None."]
@@ -324,7 +309,7 @@ Tags: [2-5 topic tags]
 
 **Session Tags (MANDATORY):** Every session note header must include a `Tags:` line with 2-5 topic tags for searchability. Examples: `Tags: pipeline, demo-prep, genus, system-audit, prospecting`. These enable quick session lookup: `grep -l 'Tags:.*demo-prep' brain/sessions/*.md`
 
-**Verification:** Before proceeding to Phase 6, check that the session note file exists at the expected path and contains all 10 section headers (OLIVER'S SUMMARY, Session Type, What Was Done, Gates, Best Output, Weakest Output, Self-Scores, Corrections Received, Conditional Steps, Reflection Signal, Line Counts). If any section is missing, add it before committing.
+**Verification:** Before proceeding to Phase 6, check that the session note file exists at the expected path and contains all 10 section headers (OLIVER'S SUMMARY, Session Type, What Was Done, Gates, Best Output, Weakest Output, Leading Indicators, Corrections Received, Conditional Steps, Reflection Signal, Line Counts). If any section is missing, add it before committing.
 
 **Brain session summary** (Obsidian vault — write after session note):
 - Path: C:/Users/olive/SpritesWork/brain/sessions/[YYYY-MM-DD] — [Session Type].md
@@ -342,9 +327,21 @@ Before git commit can run, verify ALL of these. If any fails, resolve before com
 - [ ] **/reflect has run this session** — check .claude/micro-reflections.md for today's date entry. If no entry exists, run /reflect now (even if queue is empty — it logs the empty run).
 - [ ] **All instinct confidence scores updated** — wrap_up.py update_confidence() handles this. Verify no [INSTINCT:0.60+] entries remain (should auto-promote to [PATTERN]).
 - [ ] **No blocked outputs shipped without override** — check session history for any output with self-score <7. If any were presented to Oliver without his explicit "ship it anyway" override, flag it as a process violation and log to lessons.md.
+- [ ] **Run session gate** — `python brain/scripts/wrap_up_validator.py --session N --date YYYY-MM-DD --session-type [full|systems]`. Must PASS (80%+ checks) before Phase 6.
+- [ ] **Collect Growth metrics (prospect sessions only)** — Query MCP tools and write to session_metrics:
+  ```python
+  # 1. Reply rate from Instantly (Oliver-only campaigns)
+  #    get_campaign_analytics → extract reply rate
+  # 2. Deal velocity from Pipedrive (avg days in current stage for active deals)
+  # 3. Pipeline value trend (total pipeline $ from active deals)
+  # 4. Win rate (closed-won / total closed deals, if any closed this session)
+  # Store: UPDATE session_metrics SET growth_reply_rate=?, growth_deal_velocity=?,
+  #        growth_pipeline_trend=?, growth_win_rate=? WHERE session=?
+  ```
+  Skip for systems-only sessions. This feeds the Growth brain score.
 
 If all pass: proceed to Phase 6.
-If any fail: fix the failure, then re-check all three before committing.
+If any fail: fix the failure, then re-check before committing.
 
 ## Phase 5d: Wrap-Up Summary (ALWAYS — show to Oliver)
 
@@ -352,11 +349,12 @@ After all phases complete, show Oliver a compact summary. This is the ONLY wrap-
 
 ```
 WRAP-UP: [N]/[N] steps complete [✓ or ⚠]
-  Compounding: [output type] quality [↑/↓/→] since last [type] session | [untested types] untested since S[N]
+  Gate: [X]/[Y] checks ([Z]%) — [PASS/FAIL]
+  Brain: System [X]% | Quality [Y]% | Growth [Z]% | Arch [W]%
+  Indicators: acceptance=[X]% | corrections=[Y] | calibration=[Z]%
   Saved: [list of files written — session note, loop-state, startup brief, brain commit]
   Learned: [N] lessons | [N] graduated | [N] corrections
   Pipeline: [N] overdue, [N] due this week, [N] newly closed
-  Score: [X]/10 (Type [E/A/H]) — [one-line gap to 9]
 ```
 
 **If any steps were skipped or failed:**

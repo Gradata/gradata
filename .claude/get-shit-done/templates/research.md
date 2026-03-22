@@ -77,7 +77,7 @@ npm install [packages]
 # or
 yarn add [packages]
 ```
-</standard_stack>
+
 
 <architecture_patterns>
 ## Architecture Patterns
@@ -295,7 +295,7 @@ Key finding: Don't hand-roll physics or collision detection. Rapier (via @react-
 ```bash
 npm install three @react-three/fiber @react-three/drei @react-three/rapier zustand
 ```
-</standard_stack>
+
 
 <architecture_patterns>
 ## Architecture Patterns
@@ -385,7 +385,7 @@ function Buildings({ positions }) {
 | LOD | Manual distance checks | drei <Detailed> | Handles transitions, hysteresis |
 
 **Key insight:** 3D game development has 40+ years of solved problems. Rapier implements proper physics simulation. drei implements proper 3D helpers. Fighting these leads to bugs that look like "game feel" issues but are actually physics edge cases.
-</dont_hand_roll>
+</Detailed>
 
 <common_pitfalls>
 ## Common Pitfalls
@@ -474,7 +474,7 @@ function useVehicleControls(rigidBodyRef) {
 **Deprecated/outdated:**
 - **cannon.js (original):** Use cannon-es fork or better, Rapier
 - **Manual raycasting for physics:** Just use Rapier colliders
-</sota_updates>
+</Instances>
 
 <sources>
 ## Sources
@@ -550,3 +550,4 @@ function useVehicleControls(rigidBodyRef) {
 - File lives in phase directory: `.planning/phases/XX-name/{phase_num}-RESEARCH.md`
 - Referenced during planning workflow
 - plan-phase loads it automatically when present
+</Instances></sota_updates></Detailed></dont_hand_roll>

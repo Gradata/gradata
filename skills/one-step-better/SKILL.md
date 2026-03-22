@@ -1,3 +1,8 @@
+---
+name: one-step-better
+description: Use when user wants to Scans session history for personalized improvement tips. Checks 8 categories (stale tools, unused vault data, lesson stagnation, etc.) and surfaces the single highest-impact recommendation.
+---
+
 # /one-step-better
 
 > Scans actual usage patterns from session history, scores personalized
@@ -61,7 +66,7 @@ Scan 8 categories. For each, check if a recommendation exists and score it:
    - Ease: 3 (requires behavioral change)
 
 6. **Lesson Stagnation**
-   - Signal: lessons at PROVISIONAL for 10+ sessions without firing (TRACK:0/3)
+   - Signal: lessons at INSTINCT for 10+ sessions without firing (TRACK:0/3)
    - Tip template: "These [N] lessons haven't been tested in [N] sessions. They're either untestable or too narrow. Consider rewriting or removing: [list]."
    - Impact: 2 (system hygiene)
    - Ease: 4 (review and delete)
