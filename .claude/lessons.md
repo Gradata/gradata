@@ -157,4 +157,6 @@
 
 [2026-03-21] [PROVISIONAL:5] PROCESS: Before recommending workflow changes, verify the current workflow first. Don't assume a problem exists. Oliver already sends payment links in follow-ups, not PDF proposals. The "collapse the proposal step" recommendation solved a nonexistent problem. Root cause: inferred workflow from Pipedrive stage names without asking how the actual process works.
 
+[2026-03-21] [PROVISIONAL:5] ACCURACY: Always verify dates against source data before listing upcoming activities. Don't group prospects by "this week" from memory — check next_touch dates in loop-state.md or startup-brief.md. Root cause: listed INNOCEAN (4/7) as part of "heavy week ahead" without reading the date. Had the data, didn't check it.
+
 [2026-03-21] [PROVISIONAL:5] ARCHITECTURE: When adding any component to the system, think about how it fits the big picture FIRST — behavior and purpose before file locations and wiring diagrams. Had to be corrected twice during self-audit design (once on big picture, once on behavior). Root cause: defaulted to implementation details before understanding the role of the component in the whole system.
