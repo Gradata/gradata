@@ -135,9 +135,12 @@
 
 | Component | What it does | File | Layer |
 |-----------|-------------|------|-------|
-| **Periodic Audit Schedule** | Session-counted triggers for recurring audits (SDK, memory, RAG, bloat) | .claude/periodic-audits.md | AIOS |
+| **Periodic Audit Schedule** | Session-counted triggers for recurring audits (SDK, memory, RAG, bloat, self-audit) | .claude/periodic-audits.md | AIOS |
 | **/sdk-audit** | SDK boundary enforcement — scans core files for Sprites contamination | .claude/commands/sdk-audit.md | AIOS |
 | **SDK North Star** | Strategic context: Sprites Work vs Starter SDK boundary definition | brain/vault/sdk-north-star.md | Brain |
+| **Self-Audit** | Compounding intelligence review — error patterns, outcome retrospective, judgment calibration. The mechanism that turns accumulated data into expertise. Every 10 sessions. | skills/self-audit/SKILL.md | AIOS |
+| **Outcome Retrospectives** | Append-only vault of tactic→result pattern insights. Written by self-audit Lens 2. | brain/vault/outcome-retrospectives.md | Brain |
+| **Judgment Calibration** | Append-only vault of decision evaluations against brain state at time of decision. Written by self-audit Lens 3. The proof of expertise development. | brain/vault/judgment-calibration.md | Brain |
 
 ## RAG Pipeline
 

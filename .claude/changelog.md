@@ -2,6 +2,19 @@
 # Every rule change gets logged here with date, what changed, and why.
 # If a change makes things worse, roll back by reversing the entry.
 
+## 2026-03-21 — Self-Audit: Compounding Intelligence Review (Session 28)
+- **Purpose:** The mechanism that closes the loop between logging data and developing expertise. Without this, the brain accumulates data. With this, the brain compounds judgment. This is the core differentiator for the marketplace — a renter pays for demonstrated expertise, not data volume.
+- **skills/self-audit/SKILL.md:** Three-lens periodic review. Lens 1: Error pattern analysis (classify corrections by error type, detect double-loop candidates, find persistent vs eliminated error types). Lens 2: Outcome retrospective (win/loss by decision type, confidence calibration, sustain/improve split — max 5 insights). Lens 3: Judgment calibration (evaluate past decisions against brain state at time of decision, counterfactual analysis, confidence accuracy). Each lens runs independently.
+- **brain/vault/outcome-retrospectives.md:** Created. Append-only dated entries. Brain layer.
+- **brain/vault/judgment-calibration.md:** Created. Append-only dated entries. The trend in this file is the proof of expertise. Brain layer.
+- **.claude/periodic-audits.md:** Self-audit row added. Every 10 sessions. First fire: Session 30.
+- **CLAUDE.md:** Step 11c added (conditional). Checks session number divisible by 10, outputs reminder. Brain layer, SDK-portable.
+- **.claude/component-map.md:** Self-Audit, Outcome Retrospectives, and Judgment Calibration added to Periodic Audits section.
+- **Error taxonomy:** DATA_GAP, PATTERN_FAILURE, CONFIDENCE_ERROR, PROCESS_SKIP, COMMUNICATION_ERROR, NOVEL_SITUATION. Applied in Lens 1 and Lens 3.
+- **Rules:** Never auto-edits core files. Surfaces candidates only. All promotions require Oliver's manual approval. Reports data sparsity honestly.
+- **Research sources:** Klein (RPD), Ericsson (deliberate practice), Kahneman (Noise), Tetlock (superforecasting/Brier), Argyris (double-loop learning), Croskerry (cognitive error taxonomy), US Army AAR protocol, Heuer (ACH/competing hypotheses), Guo et al. (ML calibration/ECE), Anthropic (Constitutional AI self-critique).
+- **Portability:** Skill file is AIOS layer. Vault output files are brain layer. Error taxonomy is brain layer. All SDK-portable.
+
 ## 2026-03-21 — Compound Brain → Compound Intelligence (CQ) Redesign
 - **Problem:** Old Compound Brain was 5 binary liveness checks (is it running?). Saturated at 5/5 by Session 27 and stayed there permanently. Measured status, not growth.
 - **Fix:** Replaced with CQ (Compound Intelligence) — 5 continuous dimensions (0-100 each) that track whether the system is actually getting smarter: Correction Decay, First-Draft Pass Rate, Knowledge Utilization, Lesson Hit Rate, Autonomy Trend.
