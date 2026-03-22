@@ -337,11 +337,11 @@ process.stdin.on('end', () => {
         }
       }
     }
-    // Color: red = bad, yellow = baseline, green = progressing
-    const brainSysColor = brainSysNum >= 80 ? c.green : brainSysNum >= 50 ? c.yellow : c.red;
-    const brainQualColor = brainQualNum >= 60 ? c.green : brainQualNum >= 30 ? c.yellow : c.red;
-    const brainGrowthColor = brainGrowthNum > 110 ? c.green : brainGrowthNum >= 100 ? c.yellow : c.red;
-    const brainArchColor = brainArchNum >= 80 ? c.green : brainArchNum >= 50 ? c.yellow : c.red;
+    // Color: red = bad (needs attention), yellow = baseline (ok), green = progressing (good)
+    const brainSysColor = brainSysNum >= 90 ? c.green : brainSysNum >= 70 ? c.yellow : c.red;
+    const brainQualColor = brainQualNum >= 70 ? c.green : brainQualNum >= 50 ? c.yellow : c.red;
+    const brainGrowthColor = brainGrowthNum > 110 ? c.green : brainGrowthNum >= 95 ? c.yellow : c.red;
+    const brainArchColor = brainArchNum >= 90 ? c.green : brainArchNum >= 70 ? c.yellow : c.red;
 
     // -- Employment Week (Oliver started Feb 4, 2026 -- Sunday-based weeks) --
     // Week 1 starts the Sunday on or before Feb 4 (Feb 1, 2026)
@@ -529,9 +529,11 @@ process.stdin.on('end', () => {
     const tierDisplay = `${tierName}(${currentSession}/${tierTarget})`;
 
     // Delta line colors
-    const replyColor = replyRateNum > 3 ? c.green : replyRateNum > 1 ? c.yellow : c.red;
+    // Reply: red < 1% (below industry), yellow 1-2% (baseline), green > 2% (beating industry)
+    const replyColor = replyRateNum >= 2 ? c.green : replyRateNum >= 1 ? c.yellow : c.red;
     const dealsColor = dealsWon > 0 && dealsLost > 0 ? c.yellow : dealsWon > 0 ? c.green : dealsLost > 0 ? c.red : c.white;
-    const outcomesColor = outcomesCount > 50 ? c.green : outcomesCount > 25 ? c.yellow : c.red;
+    // Outcomes: red < 10 (thin data), yellow 10-30 (building), green > 30 (statistical base)
+    const outcomesColor = outcomesCount >= 30 ? c.green : outcomesCount >= 10 ? c.yellow : c.red;
 
     // -- Build Output --
     // Line 1: AIOS | Talent: [domain] | Model | Context | Health | Time
@@ -570,7 +572,7 @@ process.stdin.on('end', () => {
     const gitColor = gitAge.endsWith('d') && parseInt(gitAge) > 1 ? c.yellow : c.green;
     const hookColor = hooksOk === hooksTotal ? c.green : c.red;
     const dbColor = dbOk ? c.green : c.red;
-    const gateColor = gateRateNum >= 0.8 ? c.green : gateRateNum >= 0.6 ? c.yellow : c.red;
+    const gateColor = gateRateNum >= 0.95 ? c.green : gateRateNum >= 0.80 ? c.yellow : c.red;
 
     const salesEditColor = salesEditRate && parseInt(salesEditRate) <= 10 ? c.green : parseInt(salesEditRate) <= 25 ? c.yellow : c.orange;
     const sysEditColor = sysEditRate && parseInt(sysEditRate) <= 10 ? c.green : parseInt(sysEditRate) <= 25 ? c.yellow : c.orange;
@@ -601,7 +603,7 @@ process.stdin.on('end', () => {
       `${brainGrowthColor}Growth:${brainGrowth}${c.reset}`,
       `${brainArchColor}Arch:${brainArch}${c.reset}`,
       brierDisplay ? brierDisplay : '',
-      `${c.dim}${trendArrow}${c.reset}`,
+      trendLabel === 'IMPROVING' ? `${c.green}${trendArrow}${c.reset}` : trendLabel === 'DEGRADING' ? `${c.red}${trendArrow}${c.reset}` : `${c.yellow}${trendArrow}${c.reset}`,
       `${c.green}Grad:${graduatedCount}${c.reset}`,
       salesEditRate ? `${salesEditColor}TEdit:${salesEditRate}${c.reset}` : '',
       sysEditRate ? `${sysEditColor}SEdit:${sysEditRate}${c.reset}` : '',
