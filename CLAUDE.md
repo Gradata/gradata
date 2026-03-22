@@ -13,25 +13,40 @@ Safety rules: .carl/safety (always loaded)
 Read and execute skills/session-start/SKILL.md. Load context-manifest.md and follow its tiers. Tier 0 always loads. Tier 1 runs at startup (parallel, summarize, release). Tier 2 loads on demand. Tier 3 governed by .agentignore. Give 3-line status + Loop health line + deal health alerts, then respond.
 At session start: read last 3 entries in brain/metrics/, note correction patterns, actively avoid repeating them.
 
-## Session Wrap-Up
-Save to docs/Session Notes/[YYYY-MM-DD].md. Steps 0.5, 1, 3, 7, 8, 9, 9.5, 10, 10.5, 11, 12 always run. Others are conditional:
-0.5. **User Summary** — FIRST section in the session note. Plain English, under 200 words, no jargon. Four parts: (1) what was asked for and what was done, (2) where you were confident vs guessing, (3) one thing you did well and why, (4) one thing you're not sure was good enough. See auditor-system.md for format.
-1. **Daily notes** — session summary + self-assessment (best/weakest output, gates skipped, self-scores)
-2. **Lessons** [IF corrections received] — log to .claude/lessons.md
-3. **Vault sync + NotebookLM feed** [IF brain/ files created or updated] — update brain/ for every prospect, objection, template, demo touched. Then feed any new/updated brain files to their matching NotebookLM notebook (see domain/notebooks/registry.md for mapping). Run feeds in parallel. Use notebooklm CLI.
-4. **Loop sync + Outcomes** [IF interactions happened] — run `/log-outcome` for any tactic→result pairs. Update PATTERNS.md. Recalculate tables.
-5. **Domain sync** [IF domain data touched] — domain-specific sync (CRM, deals, activities)
-6. **Health audit** [abbreviated if systems-only session] — run .claude/health-audit.md
-7. **Anti-bloat + Reflect** — run `/reflect` automatically. Daily note rotation, lessons graduation (auditor-system.md), decrement [PROVISIONAL:N] counters in lessons.md. If 3+ similar corrections exist under same category, propose a rule upgrade to CLAUDE.md.
-8. **Post-session audit** — run .claude/auditor-system.md (unified scoring: 5 core + 3 loop dimensions). **HARD GATE: 8.0+ to close.**
-9. **System Loop** — run .claude/cross-wire-checklist.md. Show cross-wire status + compound brain status. (Layers 2-5.)
-9.5. **Git checkpoint** — stage and commit brain/ changes: 'Session [N]: [summary]'. Increment patch in brain/VERSION.md. Every 5th session: minor version + git tag.
-10. **Session summary** — write brain/sessions/[YYYY-MM-DD].md with session narrative, corrections processed, outcomes logged, and scores.
-10.5. **Startup brief refresh** — update domain/pipeline/startup-brief.md with current state. Header MUST read `# Last updated: [DATE] (Session [N])` with the CURRENT session number. Update handoff section, pipeline table, system state, and any stale data. This is the pipeline source of truth at startup — never let it go stale.
-11. **Handoff** — REWRITE brain/loop-state.md. Header MUST read `# Loop State — Last Updated [DATE] (Session [N] Close)` with the CURRENT session number. Pipeline snapshot, pending items, what changed, due next session, Loop health score. Under 80 lines. **"What Changed" bullets MUST be prefixed with `[TAG]`** where TAG is a scope tag (OUTREACH, COMMUNICATION, DEMO, PIPELINE, CRM, PROSPECT, PERSONA, OBJECTION, SYSTEM, ARCHITECTURE, INTEGRATION, SAFETY, AUDIT, QUALITY, NERVOUS-SYSTEM). Bullets that match no tag are written without a prefix. **VERIFY immediately after writing loop-state.md:** confirm header session number matches the current session — if it doesn't, fix it before proceeding to 11b.
-11b. **Agent Distillation** — runs after step 11 is written and verified. Read agents/registry.md (if missing, create with placeholder structure). For each ACTIVE agent: (1) collect session lessons from step 2 — match lesson category prefix against agent scope tags; (2) collect vault deltas — match changed file paths against agent scope paths; (3) collect "What Changed" bullets — match `[TAG]` prefix against agent scope tags. Write matches to `agents/[agent-name]/brain/updates/[YYYY-MM-DD]-S[N].md`. Skip agents with zero matches. No empty files.
-11c. **Self-Audit Check** [conditional] — if current session number is divisible by 10, output: `Self-audit is due this session — run skills/self-audit/SKILL.md before wrapping up or schedule it for the start of next session.` If not divisible by 10, skip silently. **Brain layer, SDK-portable.**
-12. **Session Cleanup** — remove orphaned Claude Code project folders, keep only active Sprites Work directories. Run: `Get-ChildItem "$env:USERPROFILE\.claude\projects" | Where-Object { $_.Name -notin @('C--Users-olive-OneDrive-Desktop-Sprites-Work', 'C--Users-olive-SpritesWork-brain') } | Remove-Item -Recurse -Force`. Confirm how many orphaned session folders were removed and how many remain. **Runtime layer, Windows-specific, not SDK-portable.**
+## Session Wrap-Up — MANDATORY AGENT PROTOCOL
+Save to docs/Session Notes/[YYYY-MM-DD].md. When Oliver says "wrap up", IMMEDIATELY spawn 3 agents + run the automation script. Do NOT print a summary and stop. Do NOT skip steps regardless of session length.
+
+### Phase A: Main Context (do these FIRST, sequentially)
+0.5. **User Summary** — FIRST section in session note. Plain English, under 200 words. (1) what was done, (2) confident vs guessing, (3) one thing done well, (4) one thing not sure about.
+1. **Daily notes** — session summary + self-assessment
+2. **Lessons** [IF corrections received] — log to .claude/lessons.md. Every correction gets evaluated. No skipping.
+3. **Vault sync** [IF brain/ files changed] — update brain/ for prospects, objections, templates touched.
+4. **Loop sync + Outcomes** [IF interactions] — `/log-outcome` for tactic-result pairs. Update PATTERNS.md.
+5. **Domain sync** [IF domain data touched] — CRM, deals, activities.
+
+### Phase B: MANDATORY — Spawn 3 Agents in Parallel
+**HARD RULE: These 3 agents MUST be spawned. Failure to spawn = incomplete wrap-up.**
+
+**Agent 1 — Metrics & Mechanical** (run `python brain/scripts/wrap_up.py --session N --type TYPE`):
+- Step 6: Health check (ALWAYS runs -- core files, DB, git, CLAUDE.md lines, overdue prospects, all checked regardless of session type)
+- Step 7: Decrement [PROVISIONAL:N] counters, promote [PROVISIONAL:0] to [CONFIRMED]
+- Step 12: Session cleanup (orphaned folders)
+
+**Agent 2 — Scoring & System Loop:**
+- Step 8: Post-session audit (.claude/auditor-system.md). Score 5 core + 3 loop dimensions. **HARD GATE: 8.0+ to close.**
+- Step 9: Cross-wire checklist (.claude/cross-wire-checklist.md). Trends + danger signals. Abbreviated for systems sessions (skip event triggers, keep trends).
+- Step 11c: Self-audit check (if session divisible by 10).
+
+**Agent 3 — Knowledge Routing:**
+- Step 11b: Agent distillation. Match [TAG] prefixes to agent scopes. Write to agents/[name]/brain/updates/.
+- Step 3b: NotebookLM feed [IF brain/ files changed]. Feed new/updated files to matching notebooks.
+
+### Phase C: Main Context (after agents complete)
+10. **Session summary** — write brain/sessions/[YYYY-MM-DD].md
+10.5. **Startup brief refresh** — update domain/pipeline/startup-brief.md. Header MUST show current session number.
+11. **Handoff** — REWRITE brain/loop-state.md. Under 80 lines. "What Changed" bullets prefixed with [TAG]. VERIFY header session number matches.
+9.5. **Git checkpoint** — commit brain/ changes: 'Session [N]: [summary]'. Increment patch in VERSION.md. Every 5th session: minor version + git tag.
+11c. **Self-Audit Check** [conditional] — if session divisible by 10, output reminder.
 
 ## Work Style Rules
 * Research before asking. Check available tools, calendar, vault first.
