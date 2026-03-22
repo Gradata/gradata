@@ -87,19 +87,13 @@ Load `domain/carl/loop` rules for this phase.
 
 **THEN (sequential):**
 
-16. **Daily snapshot** — After all MCP scans complete, assemble the data into a snapshot JSON and run `python brain/scripts/snapshot.py save '{...}'`. The JSON should include:
-    - `deals`: array of {id, title, company, stage, value, activities_count, owner} from Pipedrive scan (step 13)
-    - `gmail`: {sent_count, received_count, thread_count, replies_from: [names]} from Gmail scan (step 10 + batch B)
-    - `instantly`: {reply_rate, total_replies, total_bounces, total_sent} from Instantly scan (step 14)
-    - `calendar`: array of {id, summary, start, end} from Calendar scan (step 11)
-    The script auto-diffs against the previous snapshot and writes brain/morning-brief.md. Surface the pipeline waterfall in the startup output if there are changes. This runs every session automatically — no manual trigger needed.
+16. **Daily snapshot (silent)** — After all MCP scans complete, assemble the data into a snapshot JSON and run `python brain/scripts/snapshot.py save '{...}'` silently in the background. Include deals, gmail, instantly, calendar data from steps 10-14. The script auto-diffs and writes brain/morning-brief.md. Do NOT surface snapshot results in the startup output — the statusline reads from the snapshot data automatically. This is infrastructure, not user-facing output.
 
 8. **Surface findings as checklist summary:**
 ```
 STARTUP: [N]/[N] scans complete ✓
   Gmail: [N] new replies | Calendar: [N] meetings today | Pipedrive: [N] deals changed
   Fireflies: [N] new recordings | Instantly: [campaign] reply rate [X]%
-  Snapshot: [saved/failed] | Waterfall: [+/-$X pipeline change]
   Auto-fixed: [tool] → [fallback] → [result] (if any)
   REPLIES: [who replied, sentiment]
   OVERDUE: [touches past due]
