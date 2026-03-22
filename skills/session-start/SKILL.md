@@ -129,9 +129,17 @@ Load these ONLY when the task requires them. Do not preload.
 **Load:** "domain/playbooks/sales-methodology.txt", "domain/prep/Demo Threads.txt", domain/carl/demo-prep
 **Then:** Check calendar to identify which demo, find/create prospect note in "docs/Demo Prep/" and Obsidian brain
 
-### Prospecting / list building
-**Intent:** Oliver wants to find leads, build lists, research companies, enrich contacts, run sweeps, or score prospects.
+### Prospecting / list building / contact finding
+**Intent:** Oliver wants to find leads, build lists, research companies, enrich contacts, find employees at a company, get contact info, run sweeps, or score prospects. Triggers on: "find me", "give me a list", "get contacts", "who works at", "employees at", "[company] team", "find leads", "build a list", "prospect", "enrich", or any request to discover companies or people.
 **Load:** "domain/playbooks/prospecting-instructions.txt"
+**Tools -- waterfall approach (try free first, escalate to paid):**
+1. **Free scripts first** (`brain/scripts/prospecting/`):
+   - Company discovery: `google_maps.py` (by location), `meta_ads.py` (by ad activity), `job_boards.py` (by hiring signals)
+   - Qualification: `tech_scanner.full_scan(domain)` -- ad pixels, marketing stack, DNS intel
+   - Contact finding: `contact_finder.find_contacts(domain)` -- team page scraping + email patterns
+   - Full pipeline: `pipeline.py --config sample_config.json`
+2. **Apollo (free tier)** -- fall back here when free scraping returns no contacts. Use `apollo_contacts_search` or `apollo_mixed_people_api_search` for employee lookup.
+3. **Never tell Oliver to run scripts manually.** Import Python functions and call them inline, or use Apollo MCP tools directly.
 
 ### Product knowledge / case studies
 **Intent:** Oliver needs Sprites product details, pricing, ICP deep-dive, case study specifics, objection handling, or competitive positioning.
@@ -145,6 +153,10 @@ Load these ONLY when the task requires them. Do not preload.
 ### Prospect history / notes
 **Intent:** Oliver mentions a specific person or company and needs context on prior interactions.
 **Load:** Check Obsidian brain (C:/Users/olive/SpritesWork/brain/prospects/), check Apollo Activities tab
+
+### Problem-solving / debugging / stuck
+**Intent:** Oliver is stuck, debugging, asks "why isn't this working", "figure out", "is this possible", "how do I", or presents a problem requiring research and iteration rather than a simple lookup.
+**Load:** skills/fitfo/SKILL.md
 
 ### General rule
 If the task spans multiple intents (e.g., "prep for Tim's demo and draft the follow-up for Hassan"), load context for ALL relevant intents. When in doubt about whether to load something, load it — a few extra thousand tokens is cheaper than missing context and producing bad output.
