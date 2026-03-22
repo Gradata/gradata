@@ -55,9 +55,17 @@ Not just CATEGORY (DRAFTING, CRM, PROCESS) — that's what went wrong. Error TYP
 | COMMUNICATION_ERROR | Right work, wrong delivery | Used jargon Oliver doesn't want |
 | NOVEL_SITUATION | No pattern existed yet | First time encountering this prospect type |
 
-**Step 2: Trend the error types across the 10-session window.**
+**Step 2: Split by track, then trend.**
 
-For each type: count in first 5 sessions vs last 5 sessions. Decreasing = learning is working. Flat = fixes aren't sticking. Increasing = something is degrading.
+Read the `type:` field from each metrics file (architecture / execution / hybrid). Group sessions into two tracks:
+- **Sales track:** execution + hybrid sessions (prospect work happened)
+- **System track:** architecture sessions (no prospect work)
+
+Trend error types WITHIN each track separately. Don't compare systems sessions against sales sessions — that's apples to oranges. A systems-only session with 0 corrections doesn't mean sales skills improved.
+
+For each track: count in first half vs last half. Decreasing = learning is working. Flat = fixes aren't sticking. Increasing = something is degrading.
+
+Also compute **corrections per output** (not per session) for each track — this normalizes for session length.
 
 **Step 3: Detect double-loop candidates.**
 
@@ -82,7 +90,9 @@ Correction clusters (3+ similar) that should become permanent CLAUDE.md rules. S
 ```
 ERROR PATTERN ANALYSIS (Sessions [N] through [N])
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Error Type Trends (first 5 → last 5 sessions):
+
+SALES TRACK ([N] sessions, [N] outputs):
+  Corrections/output:   [ratio] (first half → last half)
   DATA_GAP:           [N] → [N]  [↓ ↑ →]
   PATTERN_FAILURE:    [N] → [N]  [↓ ↑ →]
   CONFIDENCE_ERROR:   [N] → [N]  [↓ ↑ →]
@@ -90,8 +100,12 @@ Error Type Trends (first 5 → last 5 sessions):
   COMMUNICATION_ERROR:[N] → [N]  [↓ ↑ →]
   NOVEL_SITUATION:    [N] → [N]  [↓ ↑ →]
 
-Eliminated error types: [any that hit 0 in the last 5 sessions]
-Persistent error types: [any flat or increasing despite fixes]
+SYSTEM TRACK ([N] sessions, [N] outputs):
+  Corrections/output:   [ratio] (first half → last half)
+  [same error types]
+
+Eliminated error types: [any that hit 0 in the last 5 sessions, by track]
+Persistent error types: [any flat or increasing despite fixes, by track]
 
 Double-loop candidates: [N] (details below if any)
 Promotion candidates:   [N] (details below if any)
@@ -115,9 +129,9 @@ All promotion candidates wait for Oliver's explicit approval. Never auto-edit.
 
 ### Process
 
-**Step 1: Win/loss by decision type.**
+**Step 1: Win/loss by decision type (sales track only).**
 
-Group outcomes by category (outreach angle, follow-up timing, demo approach, objection handling). For each: win rate, sample size, confidence tier.
+Group outcomes by category (outreach angle, follow-up timing, demo approach, objection handling). For each: win rate, sample size, confidence tier. System track doesn't have win/loss — measure by regressions introduced, leverage ratio, and debt retired instead.
 
 **Step 2: Confidence calibration.**
 

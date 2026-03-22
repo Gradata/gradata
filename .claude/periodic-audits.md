@@ -31,7 +31,7 @@ the `last_run` session number here immediately.
 ## Self-Audit — Compounding Intelligence Review
 - **Frequency:** Every 10 sessions
 - **When to run:** Reminder surfaces at wrap-up. Run before closing or first thing next session.
-- **Last run:** S0
+- **Last run:** S30 (first ever — baselines established, 1 double-loop candidate approved, 3 self-model updates applied)
 - **Action:** Run skills/self-audit/SKILL.md. Three lenses: error pattern analysis, outcome retrospective, judgment calibration. Each lens can run independently. Outputs append to brain/vault/outcome-retrospectives.md and brain/vault/judgment-calibration.md. Never auto-edits core files. All promotions require Oliver's approval.
 
 ## Config Bloat Scan

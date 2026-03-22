@@ -1,4 +1,5 @@
 # Sprites.ai Sales Domain Configuration
+Talent: Sales
 
 > Domain-specific rules for Sprites.ai sales operations.
 > Loaded by AIOS at startup via CLAUDE.md domain loading section.
@@ -58,7 +59,7 @@ Multi-brand ecom, PE rollups, franchise, solo consultants, lean DTC, agencies. 1
 ## Loop (Closed-Loop Sales Intelligence)
 Universal learning engine for ALL sales activities — emails, calls, demos, proposals, closes.
 Every interaction tagged → outcomes tracked → patterns aggregated → next action smarter.
-- CARL: domain/carl/loop (ALWAYS_ON, 60 rules) | Patterns: brain/emails/PATTERNS.md | Audit: .claude/loop-audit.md | Prospect template: brain/prospects/_TEMPLATE.md
+- CARL: .carl/loop (ALWAYS_ON, 62 rules) | Patterns: brain/emails/PATTERNS.md | Audit: .claude/loop-audit.md | Prospect template: brain/prospects/_TEMPLATE.md
 - Two tiers: COLD (Instantly bulk, read-only) and PIPELINE (Claude-written personalized via Gmail). **No auto-sequences for CRM leads.** Instantly is for cold strangers only.
 - Call scoring: after every Fireflies transcript, score talk ratio, questions asked, next steps clarity, objection handling.
 - Pre-action: always read PATTERNS.md. Never repeat a failed angle. 70/30 proven/experimental.
@@ -83,4 +84,4 @@ Signature: see domain/soul.md. Reference files (load on demand, Tier 2): domain/
 - Lead campaign index: domain/leads/STATUS.md
 - NotebookLM registry: domain/notebooks/registry.md
 - Obsidian brain: C:/Users/olive/SpritesWork/
-- CARL domains: domain/carl/
+- CARL domains: .carl/ (loop + manifest + safety)

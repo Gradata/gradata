@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "wappalyzer": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "C:/Users/olive/OneDrive/Desktop/Sprites Work/mcp/wappalyzer/index.js"
+      ],
+      "env": {}
+    }
+  }
+}

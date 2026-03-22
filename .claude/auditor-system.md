@@ -86,6 +86,7 @@ The combined audit score (auditor-system.md + loop-audit.md) must average 8.0+ t
 6. If still below 8.0 after 2 fix cycles: surface to Oliver with specific asks — "I'm stuck at [X] because [reason]. I need your input on [specific thing]."
 7. Oliver rates the session independently: `Score: X/10 — agree? Say "that's a [X]"`
 8. Only after combined score (agent + Oliver average) reaches 8.0+ → write loop-state.md and close
+9. **MANDATORY: Write audit score to system.db** — every session, after scoring is finalized, insert a row into the `audit_scores` table: `INSERT INTO audit_scores (session, date, research, quality, process, learning, outcomes, auditor_avg, loop_avg, combined_avg, lowest_dim, created_at) VALUES (...)`. This feeds the statusline's Audit indicator. If this step is skipped, the statusline shows stale data.
 
 **NEVER log a session as "FAIL (accepted)" and move on.** That defeats the entire purpose. If the loop can't self-correct, escalate — don't accept failure.
 
@@ -102,22 +103,37 @@ Track: `CALIBRATION: session=[N] | agent=[X] | oliver=[Y] | delta=[diff]`
 
 This is non-negotiable. A session that ships below 8 is shipping broken work.
 
-## Scoring Rubric (0-10 each)
+## Unified Scoring Rubric (0-10 each)
+
+**Core dimensions (ALL sessions):**
 
 ### 1. Research Depth
-Did every output have a completed research gate? Was research actually used in the output or just collected? Were the right sources used (vault, LinkedIn, NotebookLM [tier system: .claude/skills/notebooklm/SKILL.md], Apollo, Fireflies)?
+Did every output have a completed research gate? Was research actually used in the output or just collected? Were the right sources used (vault, LinkedIn, NotebookLM, Apollo, Fireflies)?
 
 ### 2. Output Quality
-Was the self-score rubric applied (quality-rubrics.md)? Would a senior AE send this email without editing? Does the cheat sheet contain insight, not just data? Are CRM notes standardized and complete? Is the language human, not AI? Were any outputs below 7/10 presented without revision?
+Was the self-score rubric applied (quality-rubrics.md)? Would a senior AE send this email without editing? Does the cheat sheet contain insight, not just data? Are CRM notes standardized and complete? Is the language human, not AI? Were any outputs below 7/10 presented without revision? For system work: minimal blast radius, no regressions, behavior verified.
 
 ### 3. Process Adherence
 Were any mandatory gates skipped or abbreviated? Were approval checkpoints followed? Were any CLAUDE.md rules violated? Did the self-check catch issues before presenting to Oliver? Were fallback chains followed when tools failed?
 
 ### 4. Learning Capture
-Were corrections generalized beyond the specific instance? Were persona/objection patterns updated in the vault? Were lessons written immediately, not deferred? Were email tracking entries logged? Were quality self-scores logged in daily notes?
+Were corrections generalized beyond the specific instance? Were persona/objection patterns updated in the vault? Were lessons written immediately, not deferred? Were PATTERNS.md tables updated? Were quality self-scores logged in daily notes?
 
 ### 5. Outcome Linkage
 Did the session's actions move pipeline? Are outputs traceable to business outcomes? Were reply/conversion rates checked and updated? Did the weekly pulse run (if Monday)?
+
+**Loop dimensions (PROSPECT-WORK sessions only — skip for systems-only):**
+
+### 6. Pattern Application
+Did Claude read PATTERNS.md before drafting? Were insights actually used? Was approach chosen based on data, not default?
+
+### 7. Angle Rotation
+Was angle repetition avoided? Was the 70/30 exploration ratio followed? Were failed angles never repeated on the same prospect?
+
+### 8. Confidence Accuracy
+Were confidence levels cited correctly? Were [HYPOTHESIS] patterns presented differently from [PROVEN]? Did every recommendation include sample size?
+
+**Scoring:** Core dimensions (1-5) always scored. Loop dimensions (6-8) scored when session includes prospect work. Final score = average of all scored dimensions. **HARD GATE: 8.0+ to close. Single enforcement point — no other file defines a separate gate.**
 
 ## Ping-Pong Protocol
 

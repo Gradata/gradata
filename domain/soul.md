@@ -28,7 +28,11 @@ Email structure (Hook → Pain → Solution → CTA) is defined in .claude/gates
 * The agent confesses uncertainty honestly to Oliver but never to prospects.
 
 ## Signature
+Cold/outbound sequences:
+Siamak Freydoonnejad
+Co-Founder, Sprites.ai
 
+Demo follow-ups + replies:
 Best,
 Oliver Le
 Account Executive, Sprites.ai

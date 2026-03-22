@@ -11,14 +11,10 @@
             "id": "9475484202fed928",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "agents/registry.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "registry"
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
             }
           }
         ]
@@ -182,7 +178,49 @@
   },
   "active": "9475484202fed928",
   "lastOpenFiles": [
-    "Untitled.canvas",
-    "ARCHITECTURE.md"
+    "node_modules/ws/index.js",
+    "node_modules/ws/package.json",
+    "node_modules/ws/wrapper.mjs",
+    "node_modules/ws/README.md",
+    "node_modules/ws/lib/websocket.js",
+    "node_modules/ws/lib/websocket-server.js",
+    "node_modules/ws/lib/validation.js",
+    "node_modules/ws/lib/subprotocol.js",
+    "node_modules/ws/lib/stream.js",
+    "node_modules/ws/lib/sender.js",
+    "node_modules/ws/lib/receiver.js",
+    "node_modules/ws/lib/permessage-deflate.js",
+    "runtime/compiled/rules.md",
+    "runtime/compiled/claude-rules.md",
+    "runtime/README.md",
+    "agents/systems/brain/updates/2026-03-21-S30.md",
+    "node_modules/playwright-core/README.md",
+    "node_modules/playwright/README.md",
+    "node_modules/playwright-core/lib/vite/traceViewer/playwright-logo.svg",
+    "node_modules/playwright-core/lib/vite/recorder/playwright-logo.svg",
+    "node_modules/playwright-core/lib/server/chromium/appIcon.png",
+    "node_modules/playwright/lib/agents/playwright-test-planner.agent.md",
+    "node_modules/playwright/lib/agents/playwright-test-plan.prompt.md",
+    "node_modules/playwright/lib/agents/playwright-test-healer.agent.md",
+    "node_modules/playwright/lib/agents/playwright-test-heal.prompt.md",
+    "node_modules/playwright/lib/agents/playwright-test-generator.agent.md",
+    "node_modules/playwright/lib/agents/playwright-test-generate.prompt.md",
+    "node_modules/playwright/lib/agents/playwright-test-coverage.prompt.md",
+    "mcp/yelp-fusion/node_modules/ajv/README.md",
+    "mcp/wappalyzer/node_modules/happy-dom/README.md",
+    "mcp/wappalyzer/node_modules/@modelcontextprotocol/sdk/README.md",
+    "mcp/wappalyzer/node_modules/tldts-core/README.md",
+    "mcp/wappalyzer/node_modules/@types/whatwg-mimetype/README.md",
+    "mcp/wappalyzer/node_modules/@types/ws/README.md",
+    "mcp/wappalyzer/node_modules/@types/http-cache-semantics/README.md",
+    "mcp/wappalyzer/node_modules/@types/keyv/README.md",
+    "mcp/wappalyzer/node_modules/@types/cacheable-request/README.md",
+    "mcp/wappalyzer/node_modules/@types/responselike/README.md",
+    "mcp/wappalyzer/node_modules/get-intrinsic/README.md",
+    "skills/playwright-skill/node_modules/playwright-core/lib/server/chromium/appIcon.png",
+    "skills/playwright-skill/node_modules/playwright-core/lib/vite/recorder/playwright-logo.svg",
+    "skills/playwright-skill/node_modules/playwright-core/lib/vite/traceViewer/playwright-logo.svg",
+    "Untitled 1.canvas",
+    "Untitled.canvas"
   ]
 }

@@ -77,7 +77,8 @@ Load `domain/carl/loop` rules for this phase.
 11. **Calendar scan** — today + tomorrow + next 7 days. Surface demos, calls, meetings with times.
 12. **Fireflies scan** — check for new recordings since last session.
 13. **Pipedrive scan** — pull Oliver-tagged deals. Check for: (a) stage changes since last session, (b) newly closed deals (won or lost) for forecasting calibration, (c) deals with zero upcoming activities.
-14. **Instantly scan** — check campaign analytics for reply rate changes, new replies, bounces.
+14. **Instantly scan** — use Instantly MCP tools: `list_campaigns` to get active campaigns, then `get_campaign_analytics` for each. Compare reply rates to PATTERNS.md benchmarks. Surface: campaigns with reply rate change >0.5% since last session, new replies, bounces. Format: `[campaign]: [reply_rate]% ([+/-change]) | [new_replies] new replies`.
+15. **Follow-up drafting trigger** — read brain/Follow-Up Tracker.md. For every prospect with a touch due today or tomorrow: auto-draft the email per the cadence track (A or B) using data from Fireflies transcript + brain prospect file + PATTERNS.md. Present drafts to Oliver for review. Never auto-send.
 
 **PARALLEL BATCH B (after batch A — fire all Gmail searches at once):**
 6. **Outcome check** — for EVERY prospect with `outcome: pending`, search Gmail `from:[prospect_email] after:[last_touch_date]` in parallel. Reply found → update outcome. No reply + next_touch passed → "no-reply".

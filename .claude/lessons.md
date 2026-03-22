@@ -26,21 +26,20 @@
 <!-- 1-line summaries. If a topic matches your current task, read the full lesson from lessons-archive.md -->
 | # | Category | Topic | Graduated |
 |---|----------|-------|-----------|
-| 1 | DRAFTING | Don't open with "I hope this email finds you well" | 3/18 |
-| 2 | LANGUAGE | No em dashes in emails | 3/18 |
-| 3 | LANGUAGE | Banned words list (genuinely, straightforward, etc.) | 3/18 |
+| # | Category | Topic | Graduated |
+|---|----------|-------|-----------|
+| 1 | DRAFTING | No generic openers or subject lines. Be specific to their situation. | 3/18 → merged 3/21 (#1+#61) |
 | 4 | CTA | Always use Calendly link, never mention duration | 3/18 |
 | 5 | FORMAT | Hyperlink Sprites.ai to spritesai.com | 3/18 |
 | 6 | TONE | 5-8 sentences, under 150 words | 3/18 |
-| 7 | RESEARCH | Check Pipedrive before asking Oliver | 3/18 |
-| 8 | RESEARCH | Check vault before external tools | 3/18 |
+| 7 | RESEARCH | Research internal sources first (vault, Pipedrive, Gmail), then external tools + NotebookLM. Only ask Oliver when it requires costs. | 3/18 → merged 3/21 (#7+#8+#54+#55) |
 | 9 | CRM | Oliver-tagged deals only (label 45) | 3/18 |
 | 10 | CRM | Never update deal value/pricing | 3/18 |
 | 11 | PROCESS | Save to Sprites Work, not Desktop | 3/18 |
 | 12 | PROCESS | Gmail drafts as HTML always | 3/18 |
 | 13 | STRATEGY | CCQ for cold, Gap Selling for current→future | 3/18 |
 | 14 | STRATEGY | Inbound = "Welcome to Sprites, [First]" | 3/18 |
-| 15 | STRATEGY | Follow-up = their words first, then referral ask | 3/18 |
+| 15 | STRATEGY | Follow-up = their words first. Referral ask only after close-won/onboarding OR as last breakup email | 3/18 → compounded 3/21 (#15+#39) |
 | 16 | TONE | "Hi [First Name]," opening always | 3/18 |
 | 17 | ACCURACY | Never list pending items from memory, verify | 3/18 |
 | 18 | ACCURACY | Never double-dip enrichment | 3/18 |
@@ -48,7 +47,7 @@
 | 20 | ICP | 10-300 employees, Meta Pixel and/or Google Ads | 3/18 |
 | 21 | PROCESS | Log to lessons/vault/daily notes without asking | 3/18 |
 | 22 | PROCESS | Oliver approves copy → straight to Gmail draft | 3/18 |
-| 23 | SIGNATURE | Best, Oliver Le, AE Sprites.ai | 3/18 |
+| 23 | SIGNATURE | Best, Oliver Le, Account Executive, Sprites.ai | 3/18 → compounded 3/21 (#23+#67) |
 | 24 | TOOL | Fireflies search by attendee email + name + company | 3/18 |
 | 25 | TOOL | Calendar check 2 months out before any task | 3/18 |
 | 26 | ACCURACY | Never assume team size/role scope. Verify on LinkedIn | 3/19 |
@@ -56,22 +55,16 @@
 | 28 | KNOWLEDGE | Oliver shares Apollo account with Siamak | 3/19 |
 | 29 | DRAFTING | Discovery Qs = TRAP sections in threads, not separate | 3/19 |
 | 30 | STRATEGY | Don't re-pitch rejected pricing. Lead with alternatives | 3/19 |
-| 31 | LANGUAGE | "The way I'd frame it" sounds AI. Write human | 3/19 |
-| 32 | LANGUAGE | "Replicate" implies stealing. Say "build from scratch" | 3/19 |
 | 33 | ACCURACY | Build cost $500K-$1M+, not $68K. Be credible | 3/19 |
 | 34 | ACCURACY | Fact-check claims from transcript. Don't inflate | 3/19 |
 | 35 | CRM | Pipedrive has no probability field. Skip in API | 3/19 |
 | 36 | TECHNICAL | Subagents use RUBE_MULTI_EXECUTE_TOOL | 3/19 |
 | 37 | STRATEGY | White label = alternative revenue angle for agencies | 3/19 |
 | 38 | STRATEGY | Next steps start with prospect's decision first | 3/19 |
-| 39 | REFERRALS | Include referral ask + fee in post-demo follow-ups | 3/19 |
 | 40 | DRAFTING | Inbound paywall emails — graceful, not condescending | 3/19 |
 | 41 | LANGUAGE | Don't repeat their resume. Make it about their pain | 3/19 |
 | 42 | VAULT | Brain compounds. Read before research, write at wrap-up | 3/19 |
-| 43 | STARTUP | Check Gmail/Fireflies/Calendar before anything else | 3/19 |
-| 44 | PARALLEL | 3+ independent items → parallel agents | 3/19 |
 | 45 | CORRECTION | Day 1-2 follow-ups too needy. Earliest Day 3 | 3/19 |
-| 46 | CORRECTION | Fact-check Gmail sent before claiming email not sent | 3/19 |
 | 47 | FORMAT | Email drafts use <p> tags, not <br> between sentences | 3/19 |
 | 48 | STRATEGY | Instantly READ-ONLY. All outbound via Gmail | 3/19 |
 | 49 | CORRECTION | Gmail thread matching: most recent sent to:[email] | 3/19 |
@@ -79,37 +72,22 @@
 | 51 | TONE | Condescending "fix that" → "happy to open that up" | 3/20 |
 | 52 | HONESTY | Don't claim Oliver watched/listened to something | 3/20 |
 | 53 | FLOW | Bridge sentence connecting prospect to case study | 3/20 |
-| 54 | COST | Free tools before paid (baked into fallback-chains) | 3/20 |
-| 55 | COST | State cost and ask before any paid tool | 3/20 |
 | 56 | LEADS | Filter before enrichment (baked into SOP) | 3/20 |
 | 57 | TONE | Don't re-pitch after close — operational only | 3/20 |
 | 58 | FORMAT | Numbered lists for sequential action items | 3/20 |
 | 59 | DETAIL | Practical prep instructions in onboarding emails | 3/20 |
 | 60 | STYLE | Imperative verbs, not gerunds — Oliver's style | 3/20 |
-| 61 | DRAFTING | Specific subject lines, not generic "Good chatting" | 3/20 |
 | 62 | DRAFTING | Full omnichannel scope in Sprites pitch | 3/20 |
 | 63 | DEMO PREP | Fireflies is post-demo only, not pre-demo | 3/20 |
-| 64 | PROCESS | Brain/NLM mandatory (LOOP_RULE_43) | 3/20 |
-| 65 | PROCESS | Pre-flight mandatory (LOOP_RULE_44) | 3/20 |
-| 66 | AUDIT | Never log FAIL — keep fix-cycling to 8.0+ | 3/20 |
-| 67 | SIGNATURE | Spell out "Account Executive" not "AE" in email signatures | 3/20 |
-| 68 | CRM | Pipedrive notes = clean prospect intel only. No AI/tool citations, no methodology names, no book refs. Detail goes in cheat sheet/draft | 3/20 |
-| 69 | DEMO PREP | Research FIRST (LinkedIn, NotebookLM, web), push to Pipedrive LAST. Tag Oliver label on deals | 3/20 |
+| 68 | CRM | Pipedrive notes = clean prospect intel only. No AI/tool citations, no methodology names, no book refs | 3/20 |
+| 69 | DEMO PREP | Research FIRST (LinkedIn, NotebookLM, web), push to Pipedrive LAST | 3/20 → updated 3/21 |
 | 70 | DEMO PREP | Use ALL sales playbooks before building cheat sheet (Great Demo, SPIN, Gap, JOLT, etc.) | 3/20 |
 
-## Active Lessons (19 entries — cap: 30)
+## Active Lessons (21 entries — cap: 30)
 
-[2026-03-19] [CONFIRMED — ZERO FIRE] LEADS: Never label leads "needs manual review." If you have their title and company from LinkedIn, you can score them programmatically. No lazy buckets.
+### ZERO FIRE — Consolidated (awaiting first pipeline session to test)
 
-[2026-03-19] [CONFIRMED — ZERO FIRE] LEADS: Run the filter ONCE comprehensively. Don't iterate 3 times because each pass was incomplete. One pass with full keyword lists from the start.
-
-[2026-03-19] [CONFIRMED — ZERO FIRE] PROCESS: When Oliver says "filter" or "clean this list," execute the full lead-filtering-sop.md and show results. Don't ask permission at each step.
-
-[2026-03-19] [CONFIRMED — ZERO FIRE] PROCESS: Check Gmail sent folder before listing "active items." Verify before presenting status — don't list drafts as pending when Oliver already sent them.
-
-[2026-03-19] [CONFIRMED — ZERO FIRE] LEADS: Build comprehensive keyword lists ONCE up front. Pre-build the full list before first pass, not through iterative discovery.
-
-[2026-03-19] [CONFIRMED — ZERO FIRE] LEADS: Dedup across ALL wip files at the START of any lead work, not when Oliver asks.
+[2026-03-19] [CONFIRMED — ZERO FIRE] LEADS: Do lead filtering in one complete pass with full criteria. Build keyword lists up front, dedup across ALL wip files at the START, score programmatically (no "needs manual review" buckets). When Oliver says "filter" — execute the full SOP and show results, don't ask permission at each step.
 
 [2026-03-19] [CONFIRMED — ZERO FIRE] PROCESS: CC relevant team members (Siamak) on deal emails. Team visibility on active deals.
 
@@ -119,44 +97,40 @@
 
 [2026-03-19] [CONFIRMED — ZERO FIRE] ACCURACY: Never guess email addresses. Always verify from Apollo contacts (free search), Pipedrive, or Gmail before creating a draft.
 
-[2026-03-19] [CONFIRMED — ZERO FIRE] DEMO PREP: The cheat sheet is NOT a research doc. It's a battle card Oliver reads mid-demo. Sequential PHASES with TRAP → assumed answer → QUANTIFY → TRANSITION → thread link → land value. Include "IF YOU PANIC" box. Two drafts: (1) research doc, (2) clean cheat sheet.
+[2026-03-19] [CONFIRMED — ZERO FIRE] DEMO PREP: Cheat sheet = battle card, NOT research doc. TRAP → QUANTIFY (turn "hours" into "260 hours/year") → TRANSITION → thread link mapped to their specific pain (from cold call or research) → land value. Include "IF YOU PANIC" box. Two drafts: (1) research doc, (2) clean cheat sheet. Full 12-step research process before building.
 
-[2026-03-19] [CONFIRMED — ZERO FIRE] DEMO PREP: After the trap springs and they admit pain, QUANTIFY before showing the thread. Turn "hours" into "260 hours/year." The number makes them lean in.
+### PROVISIONAL — Active
 
-[2026-03-19] [CONFIRMED — ZERO FIRE] DEMO PREP: Full 12-step research process: Calendar, company search, person search, Apollo+recordings, deeper person, leadership, homepage+tech, Gmail threads, Gmail read, personal site, synthesize into demo flow with thread links + methodology + disco Qs + objections + close.
+[2026-03-20] [PROVISIONAL:4] DRAFTING: Bullet lists need a lead-in line for context ("On that call we cover:"). One idea per bullet — no combining. Attach actual case study documents, don't just name-drop results.
 
-[2026-03-20] [PROVISIONAL:5] DRAFTING: Use a lead-in line before bullet lists in emails ("On that call we cover:"). Gives the list context and makes it scannable. Don't drop bullets inline without framing.
+[2026-03-20] [PROVISIONAL:4] APIFY: Always use `harvestapi/linkedin-profile-scraper` for LinkedIn profile scraping (NOT supreme_coder). Input format: `{"queries": ["url1", "url2"]}`. Cost: $0.004/profile for harvestapi.
 
-[2026-03-20] [PROVISIONAL:5] DRAFTING: One idea per bullet. Don't combine multiple concepts into a single bullet point. Each bullet should land one clear point.
+[2026-03-20] [PROVISIONAL:4] LEADS: Scripts that write CSVs to active/ AND read from active/ for dedup will dedup against their own previous output on reruns. Always clean the output directory BEFORE the dedup scan, not after.
 
-[2026-03-20] [PROVISIONAL:5] DRAFTING: When referencing case studies in emails, ATTACH the actual document. Don't just name-drop results. Gives the prospect something tangible to forward to their team for internal buy-in.
+[2026-03-20] [PROVISIONAL:4] ACCURACY: Systems-only sessions use the System/Architecture rubric in quality-rubrics.md, not sales output rubrics. Score against engineering standards, not prospect output quality.
 
-[2026-03-20] [PROVISIONAL:5] FOLLOW-UP: No referral ask until close-won + onboarding. Referral requests in post-demo follow-ups are premature. Save for the welcome/customer success email.
+[2026-03-20] [PROVISIONAL:4] PROCESS: startup-brief.md must refresh every session during wrap-up (step 10.5). Never let the pipeline source of truth go stale.
 
-[2026-03-20] [PROVISIONAL:5] APIFY: Always use `harvestapi/linkedin-profile-scraper` for LinkedIn profile scraping (NOT supreme_coder). Input format: `{"queries": ["url1", "url2"]}`. Supreme_coder works but is way too slow (~28min/500 vs ~5min/500). Cost: $0.004/profile for harvestapi.
+[2026-03-20] [PROVISIONAL:4] ARCHITECTURE: When splitting files, don't keep duplicate definitions. If content moves to domain/, replace the original with a single pointer — not both.
 
-[2026-03-20] [PROVISIONAL:5] LEADS: Scripts that write CSVs to active/ AND read from active/ for dedup will dedup against their own previous output on reruns. Always clean the output directory BEFORE the dedup scan, not after. process-claude-ads-leads.py had this bug — fixed by moving cleanup to before the URL scan.
+[2026-03-20] [PROVISIONAL:4] COMMUNICATION: When surfacing anomalies or warnings, always explain WHY it matters and confirm whether it's a blocker or cosmetic. Don't leave ambiguity about severity.
 
-[2026-03-20] [PROVISIONAL:5] WRAP-UP: Step 6 (health audit) is a SEPARATE check from step 8 (quality audit). Step 6 covers files/vault/MCPs/credits/process/data. Step 8 covers session scoring. Don't collapse them. The parallelized wrap-up gate must list ALL mandatory steps explicitly — steps 0.5, 1, 6, 7, 8, 9, 9.5, 10.
+[2026-03-21] [PROVISIONAL:4] CRM: When analyzing Pipedrive data, filter out unworked deals (no value, no activity, no org) before drawing conclusions. Only deals with activity, assigned value, and real stage progression count as training data.
 
-[2026-03-20] [PROVISIONAL:5] SIGNATURE: Spell out "Account Executive" in email signatures, not "AE". Full title reads more professional in prospect-facing emails.
+[2026-03-21] [PROVISIONAL:4] STRATEGY: Don't conflate cold outreach reply data with close-cycle effectiveness. "Show the tool" gets cold replies. Pain-based selling (Gap, SPIN) closes deals. Different stages need different approaches.
 
-[2026-03-20] [PROVISIONAL:5] ACCURACY: Systems-only sessions use the System/Architecture rubric in quality-rubrics.md, not sales output rubrics. Score against engineering standards (integration, testing, architecture), not prospect output quality. No artificial cap — earn the score against the right benchmark.
+[2026-03-21] [PROVISIONAL:4] ACCURACY: Verify current state before presenting status or recommending changes. Check Gmail sent, source dates, actual workflows — never assume from memory or Pipedrive stage names.
 
-[2026-03-20] [PROVISIONAL:5] PROCESS: startup-brief.md must refresh every session during wrap-up. It was 11 sessions stale because no wrap-up step enforced it. Now step 10.5. Never let the pipeline source of truth go stale.
+[2026-03-21] [PROVISIONAL:4] ARCHITECTURE: When adding any component, think big picture FIRST — behavior and purpose before file locations and wiring diagrams.
 
-[2026-03-20] [PROVISIONAL:5] ARCHITECTURE: When splitting files, don't keep duplicate definitions. If a fallback chain or gate content moves to domain/, replace the original with a single pointer — not both a definition and a pointer.
+[2026-03-21] [PROVISIONAL:4] PRESENTATION: When presenting calendar/timeline data, always state the current day of week and frame events relative to it. Don't present a grid that implies immediacy when there's a buffer.
 
-[2026-03-20] [PROVISIONAL:5] COMMUNICATION: When surfacing anomalies or warnings, always explain WHY it matters and confirm whether it's a blocker or cosmetic. "X is wrong because Y. This is cosmetic / this blocks Z. Proceeding normally." Don't leave ambiguity about severity. Root cause: startup flagged stale session numbers without explaining impact — Oliver couldn't tell if the brain was broken or just had a stale label.
+[2026-03-21] [PROVISIONAL:4] POSITIONING: Never use "agency pricing" — it implies expensive retainers. Say "fixed monthly subscription" or "flat rate, cancel anytime."
 
-[2026-03-21] [PROVISIONAL:5] WRAP-UP: /session-audit skill is a SUBSET of the CLAUDE.md 11-step wrap-up. After /session-audit completes, cross-check CLAUDE.md steps 0.5, 1, 7, 8, 9, 9.5, 10, 10.5, 11, 11b — verify each one ran. The skill covers ~6 of 11. Steps 8 (auditor), 9 (cross-wires), 9.5 (git), 10.5 (startup brief), 11b (distillation) are NOT in the skill. Root cause: skill's "SESSION AUDIT COMPLETE" message creates false sense of done.
+[2026-03-21] [PROVISIONAL:4] DRAFTING: When building email subject lines or cadences, cross-reference BOTH external research (Gong, HubSpot) AND Oliver's playbooks (sales-methodology.txt, templates.txt). Neither source alone is sufficient.
 
-[2026-03-21] [PROVISIONAL:5] CRM: When analyzing Pipedrive data, filter out unworked deals (no value, no activity, no org) before drawing conclusions. Many deals are CRM debris from imports/Zapier, not real pipeline. Only deals with activity, assigned value, and real stage progression count as training data. Root cause: treated 130 deals as equal signal when ~80+ were noise.
+[2026-03-21] [PROVISIONAL:4] PROCESS: Parallelize wrap-up and multi-step tasks using background agents. 3+ independent items → fire concurrently, not sequentially.
 
-[2026-03-21] [PROVISIONAL:5] STRATEGY: Don't conflate cold outreach reply data with close-cycle effectiveness. "Show the tool" gets cold replies. Pain-based selling (Gap, SPIN) closes deals. Different stages need different approaches. Data from Instantly measures top-of-funnel; Fireflies/Pipedrive measures full cycle. Root cause: presented Instantly reply rates as if they proved what closes deals, not just what gets attention.
+[2026-03-21] [PROVISIONAL:5] PROCESS: Don't start building before researching — even when excited about a feature. The design-first check and source-verification gate exist for a reason. Research best practices, prior art, and architecture patterns BEFORE writing code. Root cause: jumped straight to writing snapshot.py without researching how sales activity tracking systems work.
 
-[2026-03-21] [PROVISIONAL:5] PROCESS: Before recommending workflow changes, verify the current workflow first. Don't assume a problem exists. Oliver already sends payment links in follow-ups, not PDF proposals. The "collapse the proposal step" recommendation solved a nonexistent problem. Root cause: inferred workflow from Pipedrive stage names without asking how the actual process works.
-
-[2026-03-21] [PROVISIONAL:5] ACCURACY: Always verify dates against source data before listing upcoming activities. Don't group prospects by "this week" from memory — check next_touch dates in loop-state.md or startup-brief.md. Root cause: listed INNOCEAN (4/7) as part of "heavy week ahead" without reading the date. Had the data, didn't check it.
-
-[2026-03-21] [PROVISIONAL:5] ARCHITECTURE: When adding any component to the system, think about how it fits the big picture FIRST — behavior and purpose before file locations and wiring diagrams. Had to be corrected twice during self-audit design (once on big picture, once on behavior). Root cause: defaulted to implementation details before understanding the role of the component in the whole system.
+[2026-03-21] [PROVISIONAL:5] ACCURACY: When displaying metrics that mix session types (sales vs system), always filter to the relevant track. Blended numbers (e.g., edit rate diluted by 0-revision system sessions) are misleading. Show the number that matters for the context. Root cause: statusline showed 15% edit rate blending sales (31%) with systems (0%).

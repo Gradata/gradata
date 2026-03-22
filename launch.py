@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 ROOT = Path(__file__).parent
-BRAIN = ROOT / "brain"
+BRAIN = Path("C:/Users/olive/SpritesWork/brain")
 HOOKS = ROOT / ".claude" / "hooks"
 
 def check(name, cmd):

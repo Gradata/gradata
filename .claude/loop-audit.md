@@ -20,64 +20,11 @@ Format: `Loop: [PATTERNS age] | [X pending outcomes] | [X% tagged] — [OK/ATTEN
 
 ---
 
-## Full Audit Scoring (0-10 each)
+## Full Audit Scoring
 
-### 1. Tag Completeness
-Were ALL interactions this session tagged with the full taxonomy (type, channel, intent, tone, angle, framework, sequence_position)?
-- 10: Every interaction has every tag, values are from the standard taxonomy
-- 7: All interactions tagged, minor inconsistencies in values
-- 4: Some interactions tagged, some skipped
-- 0: Tags routinely skipped
+**CONSOLIDATED:** Loop scoring dimensions (Pattern Application, Angle Rotation, Confidence Accuracy) are now in auditor-system.md as dimensions 6-8. They score there alongside the 5 core dimensions. Single 8.0+ gate in auditor-system.md.
 
-### 2. Outcome Tracking
-Were pending outcomes checked against Gmail? Were outcomes updated accurately?
-- 10: Every pending outcome resolved, Gmail checked for all, dates logged
-- 7: Most outcomes resolved, 1-2 still pending from previous sessions
-- 4: Outcomes checked but not all updated in prospect notes
-- 0: Outcomes not checked
-
-### 3. Pattern Application
-Did Claude read PATTERNS.md before drafting? Were insights actually used in the output?
-- 10: PATTERNS.md read, specific insights cited, approach chosen based on data
-- 7: PATTERNS.md read, approach generally aligned with data but not explicitly cited
-- 4: PATTERNS.md referenced but insights not clearly applied
-- 0: PATTERNS.md not read before drafting
-
-### 4. Learning Capture
-Were new data points added to the system? Were PATTERNS.md tables updated at wrap-up?
-- 10: Every interaction created a trackable data point. Tables recalculated. New patterns surfaced.
-- 7: Data points created but tables not fully recalculated
-- 4: Some data logged, tables not updated
-- 0: No learning captured
-
-### 5. Angle Rotation
-Was angle repetition avoided? Was the 70/30 exploration ratio followed?
-- 10: No repeated failed angles. Mix of proven + experimental approaches. Rotation documented.
-- 7: No repeated failed angles. Mostly proven approaches, minimal experimentation.
-- 4: Some angle repetition. No conscious rotation strategy.
-- 0: Same angle repeated despite previous failure.
-
-### 6. Confidence Accuracy
-Were confidence levels cited correctly? Were [HYPOTHESIS] patterns presented differently from [PROVEN]?
-- 10: Every recommendation includes sample size + confidence level. Hypotheses clearly caveated.
-- 7: Confidence levels mentioned but not always with sample sizes
-- 4: Confidence levels occasionally cited
-- 0: Patterns presented without confidence context
-
----
-
-## Scoring Thresholds
-
-| Average Score | Rating | Action |
-|--------------|--------|--------|
-| 9-10 | EXCELLENT | Loop is compounding. Keep going. |
-| 8+ | PASS | Session can close. Minor improvements for next session. |
-| 7 | BORDERLINE | Fix the lowest dimension before closing. One more cycle. |
-| 5-6 | ATTENTION | Multiple fixes needed. Do not close session. |
-| 3-4 | CRITICAL | Learning loop is broken. Pause and repair. |
-| 0-2 | FAILED | Loop is not running. Rebuild. |
-
-**HARD GATE: Combined score (loop-audit + auditor-system) must average 8.0+ to close session. Below 8 = fix before wrap.**
+This file retains: startup quick-check (above), deep audit (below), and common failure reference.
 
 ---
 

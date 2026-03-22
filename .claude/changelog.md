@@ -2,6 +2,35 @@
 # Every rule change gets logged here with date, what changed, and why.
 # If a change makes things worse, roll back by reversing the entry.
 
+## 2026-03-21 — Self-Audit Baseline + Double-Loop Fix (Session 30)
+- **CLAUDE.md**: Added source-verification gate (prove inputs loaded before generating). From self-audit double-loop finding: PROCESS_SKIP pattern persisted across 4 corrections despite individual fixes.
+- **CLAUDE.md ACCURACY rule**: Added cross-source hypothesis framing default. From self-audit Lens 3: overconfidence when combining data sources for the first time.
+- **periodic-audits.md**: Self-audit last_run updated S0→S30.
+- **brain/vault/**: Created judgment-calibration.md (8 decisions, 62.5% optimal baseline) and outcome-retrospectives.md (5 insights, sparse pipeline data acknowledged).
+
+## 2026-03-21 — Full System Audit Optimizations (Session 30)
+- **Scoring consolidation (P5):** Merged 3 separate scoring systems (quality-rubrics self-score, auditor 5-dim, loop-audit 6-dim) into unified 8-dimension rubric in auditor-system.md. Core dims 1-5 (all sessions) + loop dims 6-8 (prospect-work only). Single 8.0+ gate. loop-audit.md retains startup check + deep audit only.
+- **Duplicate skills (P2):** Removed 52 byte-for-byte duplicate skills from .claude/skills/ (canonical source: skills/). 9 unique skills preserved.
+- **Startup-brief (P1):** System State updated S21→S30 with verified counts (brain v1.3.3, 86 skills, 21 lessons, 156 wikilinks).
+- **Lessons (P3):** Decremented 15 [PROVISIONAL:5] → [PROVISIONAL:4].
+- **Signatures (P4):** Resolved contradiction across soul.md + templates.txt (Siamak=cold/outbound, Oliver=follow-up).
+- **Cross-wires (P6):** Archived dormant CW-10, CW-11 (depend on unbuilt Genus OS).
+- **Loop exit (P8):** Added LOOP_RULE_22 — stop following up after 5 no-replies, explicit rejection, or deal closed-lost.
+- **HOME.md (P7):** Fixed brain version v1.3.2→v1.3.3.
+
+## 2026-03-21 — Behavioral Guidelines Adaptation (Session 30)
+- **CLAUDE.md Work Style**: Added 4 new rules — design-first check (pre-execution elegance), replan on failure (STOP and rewrite plan mid-task), autonomous bug resolution (fix without escalating), no temporary fixes (explicit tech debt ban)
+- **.carl/global GLOBAL_RULE_2**: Strengthened from "announce the plan" to "write a spec with failure modes, use as execution checklist, replan if blocked"
+- **.claude/action-waterfall.md Layer 3**: Added checkpoint protocol — state what changed after each subtask, flag if replanning needed
+- **.claude/quality-rubrics.md System/Architecture 9-10**: Added minimal blast radius + regression verification (behavioral diff, log checks) to top-tier criteria
+- **Source**: External behavioral guidelines compared against existing system. 6 genuinely additive adaptations applied. No conflicts with existing rules.
+
+## 2026-03-21 — Accuracy Rule + System Updates (Session 29)
+- **CLAUDE.md Work Style Rules:** Added permanent ACCURACY rule (SDK-portable). "Never report unverified numbers/files/counts. Say 'unverified' explicitly. Confident fabrication is critical failure. Show raw output when in doubt." Reinforces GLOBAL_RULE_0 (truth protocol) at behavioral level. Oliver's direct instruction.
+- **CLAUDE.md Step 3:** Vault sync now includes NotebookLM feeding. Always runs (moved from conditional to mandatory).
+- **session-start/SKILL.md:** Step 14 (Instantly) made specific with MCP tool calls + PATTERNS.md comparison. Step 15 added: follow-up drafting trigger (reads Follow-Up Tracker, auto-drafts due emails).
+- **Skills added:** playwright-skill (browser automation for prospecting), xlsx/pdf/pptx (document skills — pending agent install).
+
 ## 2026-03-21 — Self-Audit: Compounding Intelligence Review (Session 28)
 - **Purpose:** The mechanism that closes the loop between logging data and developing expertise. Without this, the brain accumulates data. With this, the brain compounds judgment. This is the core differentiator for the marketplace — a renter pays for demonstrated expertise, not data volume.
 - **skills/self-audit/SKILL.md:** Three-lens periodic review. Lens 1: Error pattern analysis (classify corrections by error type, detect double-loop candidates, find persistent vs eliminated error types). Lens 2: Outcome retrospective (win/loss by decision type, confidence calibration, sustain/improve split — max 5 insights). Lens 3: Judgment calibration (evaluate past decisions against brain state at time of decision, counterfactual analysis, confidence accuracy). Each lens runs independently.

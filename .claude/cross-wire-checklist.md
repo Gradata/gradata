@@ -122,22 +122,6 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 **TRACK:** safety_block_fires, false_positives
 **SOURCE:** Nova-tracer pattern — every safety event gets a verdict, not just a log line
 
-## CW-10: Tool Violation → Manifest Fix (DORMANT — wakes on first TOOL_DENIED signal)
-**TRIGGER:** Neural bus has TOOL_DENIED signal this session
-**CHECK:** Was the agent's manifest too restrictive (legitimate tool need) or did the agent overstep?
-**ACTION TOO RESTRICTIVE:** Update the agent's manifest tools_allowed list. Log the addition.
-**ACTION OVERSTEPPED:** Log the violation. If repeated, tighten trust_level.
-**TRACK:** tool_denied_fires, manifest_updates
-**SOURCE:** Genus OS — agent tool registry with allow/deny filtering
-
-## CW-11: Correction Rate → Autonomy Scope
-**TRIGGER:** Agent's correction_rate updated at wrap-up (from CORRECTION signals)
-**CHECK:** Compare correction_rate against thresholds: <0.10 = eligible for trust promotion, >0.25 = trust demotion
-**ACTION PROMOTE:** Flag for Oliver: "[agent] correction rate [X] over 5 sessions — eligible for trust_level increase from [current] to [next]"
-**ACTION DEMOTE:** Auto-demote trust_level by one tier. Emit SYSTEM_PAUSE if consecutive_rejections >= auto_pause_threshold.
-**TRACK:** trust_promotions, trust_demotions, pause_events
-**SOURCE:** Genus OS Nightwatch — graduated trust based on merge rate
-
 ## CW-12: Escalation → Lessons
 **TRIGGER:** Neural bus has ESCALATION_TRIGGERED signal at REDUCE_SCOPE or STOP level
 **CHECK:** What broke? What was the root cause?
@@ -242,3 +226,25 @@ CQ: building baseline ([N]/5 data points) | Next: [what's needed]
 **OUTPUT:** `ANTIFRAGILE: [failure] → [3 components tested] → [N/3 passed] → [hardening: Y/N]`
 **TRACK:** hardening_fires, neighbors_tested, neighbors_hardened
 **SOURCE:** Nassim Taleb (Antifragile) — failure should strengthen the neighborhood, not just log a lesson
+
+---
+
+## Archived Cross-Wires (Reactivate When Infrastructure Exists)
+
+> Archived Session 30: CW-10 and CW-11 depend on Genus OS and agent trust graduation. Reactivate when those systems are built.
+
+## CW-10: Tool Violation → Manifest Fix (DORMANT — wakes on first TOOL_DENIED signal)
+**TRIGGER:** Neural bus has TOOL_DENIED signal this session
+**CHECK:** Was the agent's manifest too restrictive (legitimate tool need) or did the agent overstep?
+**ACTION TOO RESTRICTIVE:** Update the agent's manifest tools_allowed list. Log the addition.
+**ACTION OVERSTEPPED:** Log the violation. If repeated, tighten trust_level.
+**TRACK:** tool_denied_fires, manifest_updates
+**SOURCE:** Genus OS — agent tool registry with allow/deny filtering
+
+## CW-11: Correction Rate → Autonomy Scope
+**TRIGGER:** Agent's correction_rate updated at wrap-up (from CORRECTION signals)
+**CHECK:** Compare correction_rate against thresholds: <0.10 = eligible for trust promotion, >0.25 = trust demotion
+**ACTION PROMOTE:** Flag for Oliver: "[agent] correction rate [X] over 5 sessions — eligible for trust_level increase from [current] to [next]"
+**ACTION DEMOTE:** Auto-demote trust_level by one tier. Emit SYSTEM_PAUSE if consecutive_rejections >= auto_pause_threshold.
+**TRACK:** trust_promotions, trust_demotions, pause_events
+**SOURCE:** Genus OS Nightwatch — graduated trust based on merge rate

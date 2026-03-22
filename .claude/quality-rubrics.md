@@ -46,7 +46,7 @@ Benchmark: Would this pass review at a team shipping AI infrastructure at OpenAI
 
 | Score | Criteria |
 |-------|----------|
-| 9-10 | Clean architecture with clear separation of concerns. Wired into nervous system (bus signals, cross-wires, component map). Tested and verified working. No dead code, no orphan components. Delta-aware (doesn't rebuild what hasn't changed). Error handling covers failure modes. Documentation matches implementation. Would merge in a production codebase. |
+| 9-10 | Clean architecture with clear separation of concerns. Wired into nervous system (bus signals, cross-wires, component map). Tested and verified working. No dead code, no orphan components. Delta-aware (doesn't rebuild what hasn't changed). Error handling covers failure modes. Documentation matches implementation. Minimal blast radius (changes affect only intended component, rollback is simple). Behavior verified: no regressions (git diff shows only intended changes), logs show expected signals. Would merge in a production codebase. |
 | 7-8 | Architecture is sound. Wired into the system. Works correctly. Minor gaps: missing edge case handling, incomplete error paths, or one integration point not fully tested. Would merge with minor comments. |
 | 5-6 | Works but standalone — not wired into nervous system. Or wired in but brittle (hardcoded paths, no error handling, breaks on edge cases). Would get "needs work" in review. |
 | 3-4 | Doesn't integrate. Duplicates existing functionality. Untested. Hardcoded assumptions. Would be rejected in review. |
@@ -66,7 +66,7 @@ Benchmark: Would this pass review at a team shipping AI infrastructure at OpenAI
 | Pipeline Effect | Did pipeline value increase? Deals move stages? | 0.20 | 1-10 |
 | Conversion Signal | Response rates, meetings booked, stage advances | 0.15 | 1-10 |
 | Gate Compliance | Mandatory gates fired and completed correctly | 0.15 | 1-10 |
-| Correction Density | Corrections per output (lower = better, invert for score) | 0.10 | 1-10 |
+| Correction Density | Corrections per output (lower = better, invert for score). **Primary growth metric for sales track.** | 0.10 | 1-10 |
 
 ### Type A — Architecture Session Scorecard
 

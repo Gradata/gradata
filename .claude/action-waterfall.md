@@ -95,6 +95,8 @@ This is where the email gets drafted, the demo prep gets built, the CRM note get
 
 Rules from Layer 1 are active. Memory from Layer 2 informs decisions. Simulation from 2.5 selected the approach. Lessons from 1.3 prevent known mistakes.
 
+**Checkpoint protocol (STANDARD and DEEP tasks):** After completing each major subtask: (1) State what changed and why (1-2 sentences), (2) note unexpected findings, (3) confirm alignment with the plan from Layer 1 or flag if replanning is needed. If blocked, STOP — replan before continuing. Do not push through a bad path. Checkpoint data feeds the "What Changed" summary at wrap-up.
+
 ## Layer 4: QUALITY (always runs)
 
 **Purpose:** Polish the output before presenting.
