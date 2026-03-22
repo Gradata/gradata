@@ -327,7 +327,7 @@ Before git commit can run, verify ALL of these. If any fails, resolve before com
 - [ ] **/reflect has run this session** — check .claude/micro-reflections.md for today's date entry. If no entry exists, run /reflect now (even if queue is empty — it logs the empty run).
 - [ ] **All instinct confidence scores updated** — wrap_up.py update_confidence() handles this. Verify no [INSTINCT:0.60+] entries remain (should auto-promote to [PATTERN]).
 - [ ] **No blocked outputs shipped without override** — check session history for any output with self-score <7. If any were presented to Oliver without his explicit "ship it anyway" override, flag it as a process violation and log to lessons.md.
-- [ ] **Run session gate** — `python brain/scripts/wrap_up_validator.py --session N --date YYYY-MM-DD --session-type [full|systems]`. Must PASS (80%+ checks) before Phase 6.
+- [ ] **Run session gate** — `python brain/scripts/wrap_up_validator.py --session N --date YYYY-MM-DD --session-type [full|systems]`. Auto-fix runs by default. Target: 100%. If any checks still fail after auto-fix, fix manually and re-run until clean. Commit follows AFTER validator passes.
 - [ ] **Collect Growth metrics (prospect sessions only)** — Query MCP tools and write to session_metrics:
   ```python
   # 1. Reply rate from Instantly (Oliver-only campaigns)
