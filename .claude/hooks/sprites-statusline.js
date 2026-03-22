@@ -431,7 +431,7 @@ process.stdin.on('end', () => {
     if (fs.existsSync(briefPath)) {
       try {
         const briefContent = fs.readFileSync(briefPath, 'utf8');
-        const rrMatch = briefContent.match(/Oliver's Instantly reply rate:\s*([\d.]+)%/);
+        const rrMatch = briefContent.match(/Oliver.s Instantly reply rate:\*{0,2}\s*([\d.]+)%/);
         if (rrMatch) {
           replyRateNum = parseFloat(rrMatch[1]);
           replyRate = replyRateNum.toFixed(1) + '%';
@@ -481,7 +481,18 @@ process.stdin.on('end', () => {
       outcomesCount = parseInt(outcomesOut) || 0;
     }
 
-    // Tier thresholds: Seed=20, Growth=75, Proven=150 (use currentSession from loop-state)
+    // -- Current Session Number (from loop-state.md) --
+    let currentSession = 0;
+    const loopStatePath = 'C:/Users/olive/SpritesWork/brain/loop-state.md';
+    if (fs.existsSync(loopStatePath)) {
+      try {
+        const lsContent = fs.readFileSync(loopStatePath, 'utf8').substring(0, 200);
+        const sessMatch = lsContent.match(/Session\s+(\d+)/);
+        if (sessMatch) currentSession = parseInt(sessMatch[1]);
+      } catch (e) {}
+    }
+
+    // Tier thresholds: Seed=20, Growth=75, Proven=150
     let tierName = 'Seed';
     if (currentSession >= 150) tierName = 'Proven';
     else if (currentSession >= 75) tierName = 'Growth';
@@ -536,17 +547,6 @@ process.stdin.on('end', () => {
 
     const salesEditColor = salesEditRate && parseInt(salesEditRate) <= 10 ? c.green : parseInt(salesEditRate) <= 25 ? c.yellow : c.orange;
     const sysEditColor = sysEditRate && parseInt(sysEditRate) <= 10 ? c.green : parseInt(sysEditRate) <= 25 ? c.yellow : c.orange;
-    // -- Current Session Number (from loop-state.md, not audit) --
-    let currentSession = 0;
-    const loopStatePath = 'C:/Users/olive/SpritesWork/brain/loop-state.md';
-    if (fs.existsSync(loopStatePath)) {
-      try {
-        const lsContent = fs.readFileSync(loopStatePath, 'utf8').substring(0, 200);
-        const sessMatch = lsContent.match(/Session\s+(\d+)/);
-        if (sessMatch) currentSession = parseInt(sessMatch[1]);
-      } catch (e) {}
-    }
-
     // -- Events count (v2.0 backbone health) --
     let eventsCount = 0;
     const eventsPath = 'C:/Users/olive/SpritesWork/brain/events.jsonl';
