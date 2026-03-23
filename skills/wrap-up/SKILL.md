@@ -145,6 +145,30 @@ No action needed:
 4. Knowledge: Sprites now offers LinkedIn ads
    Already noted in CLAUDE.md product description.
 
+## Phase 3b: Capture Deferred Items (MANDATORY — all session types)
+
+Scan the conversation for items Oliver mentioned as deferred, future-session, or "do later":
+- "Next session we'll..."
+- "Put that on the list"
+- "We'll handle that later"
+- "Deferred for future..."
+- Any task Oliver or the system flagged but explicitly chose not to do this session
+
+**For each deferred item found:**
+1. Emit a DEFER event:
+```python
+python -c "
+import sys; sys.path.insert(0, 'C:/Users/olive/SpritesWork/brain/scripts')
+from events import emit
+emit('DEFER', 'wrap_up:phase3b', {'item': 'EXACT_WORDING', 'reason': 'WHY_DEFERRED', 'source': 'oliver|system'}, session=SESSION_NUMBER)
+"
+```
+2. The handoff agent reads DEFER events from the DB and writes them to loop-state.md § Deferred
+
+**Also check:** existing Deferred items in loop-state.md. If any were resolved this session, emit a DEFER_RESOLVED event so the handoff agent can clean them.
+
+**If nothing deferred:** emit nothing. The validator passes on zero DEFER events. But if items WERE mentioned and you skip this step, the next session loses context.
+
 ## Phase 4: Anti-Bloat Sweep
 
 Run EVERY wrap-up. Automated via `brain/scripts/anti_bloat.py`.

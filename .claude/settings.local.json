@@ -173,7 +173,9 @@
       "Bash(uv tool:*)",
       "Bash(nlm:*)",
       "Bash(node:*)",
-      "mcp__claude_ai_Fireflies__fireflies_get_transcripts"
+      "mcp__claude_ai_Fireflies__fireflies_get_transcripts",
+      "Skill(gsd:pause-work)",
+      "Skill(gsd:pause-work:*)"
     ]
   }
 }

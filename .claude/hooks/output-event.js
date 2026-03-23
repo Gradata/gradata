@@ -62,6 +62,37 @@ function shellEscape(str) {
   return '"' + str.replace(/"/g, '\\"').replace(/\n/g, " ").substring(0, 200) + '"';
 }
 
+// Prospect names loaded from brain/prospects/ filenames
+let _prospectNames = null;
+function getProspectNames() {
+  if (_prospectNames) return _prospectNames;
+  _prospectNames = [];
+  try {
+    const prospectsDir = "C:/Users/olive/SpritesWork/brain/prospects";
+    const fs = require("fs");
+    if (fs.existsSync(prospectsDir)) {
+      for (const f of fs.readdirSync(prospectsDir)) {
+        if (f.startsWith("_") || !f.endsWith(".md")) continue;
+        // "Hassan Ali — Ugly Ads.md" → "Hassan Ali"
+        const name = f.replace(".md", "").split(/\s*[—–-]\s*/)[0].trim();
+        if (name) _prospectNames.push(name);
+      }
+    }
+  } catch { /* silent */ }
+  return _prospectNames;
+}
+
+function extractProspect(filePath, content) {
+  const text = ((filePath || "") + " " + (content || "")).toLowerCase();
+  const names = getProspectNames();
+  // Check longest names first (avoid "Tim" matching before "Tim Sok")
+  const sorted = [...names].sort((a, b) => b.length - a.length);
+  for (const name of sorted) {
+    if (text.includes(name.toLowerCase())) return name;
+  }
+  return null;
+}
+
 function extractSelfScore(text) {
   if (!text) return null;
   // Check first and last 2500 chars (scores appear at boundaries)
@@ -102,6 +133,9 @@ function main() {
   const resultText = (data.tool_result && typeof data.tool_result === "string") ? data.tool_result : "";
   const selfScore = extractSelfScore(content) || extractSelfScore(resultText);
 
+  // Extract prospect name from file path and content
+  const prospect = extractProspect(filePath, content);
+
   const cmdParts = [
     '"' + PYTHON + '"',
     '"' + EMIT_SCRIPT + '"',
@@ -110,6 +144,9 @@ function main() {
   ];
   if (selfScore !== null) {
     cmdParts.push("--self-score", String(selfScore));
+  }
+  if (prospect) {
+    cmdParts.push("--prospect", shellEscape(prospect));
   }
   const cmd = cmdParts.join(" ");
   try {
@@ -131,6 +168,7 @@ function main() {
     manifest[normalizedPath] = {
       agent: "unknown", // Will be enriched by spawn.py when available
       output_type: outputType,
+      prospect: prospect || null,
       written_at: new Date().toISOString(),
       self_score: selfScore,
     };

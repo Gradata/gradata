@@ -72,3 +72,13 @@
 [2026-03-19] [UNTESTABLE] PIPEDRIVE: ALWAYS schedule a next activity when creating a deal. Check calendar 1 month out first, then log the activity. No deal should ever have the warning icon.
 [2026-03-19] [UNTESTABLE] ACCURACY: Never guess email addresses. Always verify from Apollo contacts (free search), Pipedrive, or Gmail before creating a draft.
 [2026-03-19] [UNTESTABLE] DEMO PREP: Cheat sheet = battle card, NOT research doc. TRAP → QUANTIFY → TRANSITION → thread link mapped to pain → land value. Include "IF YOU PANIC" box. Two drafts: (1) research doc, (2) clean cheat sheet.
+
+## Graduated 2026-03-22 (Session 39 — PATTERN:0.70 stagnation fix, 7 fully covered)
+
+[2026-03-20] ACCURACY: Systems-only sessions use System/Architecture rubric → Now in quality-rubrics.md "System / Architecture Work" section
+[2026-03-20] PROCESS: startup-brief.md must refresh every session → Now in wrap-up/SKILL.md Phase 4 Step 3 + Phase 5
+[2026-03-21] CRM: Filter out unworked deals before analysis → Now in domain/DOMAIN.md
+[2026-03-21] STRATEGY: Don't conflate outreach reply data with close-cycle → Now in .carl/loop LOOP_RULE_10 (COLD TIER vs PIPELINE TIER)
+[2026-03-21] ARCHITECTURE: Think big picture FIRST → Now in work-style.md Big-picture gate
+[2026-03-21] PROCESS: Parallelize wrap-up with background agents → Now in wrap-up/SKILL.md Phase 5b2 (5 concurrent agents)
+[2026-03-21] PROCESS: Don't start building before researching → Now in work-style.md Design-first check + GLOBAL_RULE_2

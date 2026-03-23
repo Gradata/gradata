@@ -60,7 +60,47 @@ try {
   // Silent
 }
 
-// 2. Run overnight review if morning-brief is stale (> 12 hours old)
+// 3. Delta embed changed files into ChromaDB (keeps semantic search current)
+try {
+  execSync(
+    `"${PYTHON}" "${path.join(SCRIPTS, 'embed.py')}"`,
+    { timeout: 45000, stdio: 'ignore' }
+  );
+} catch (e) {
+  // Silent — embedding is best-effort, FTS5 already rebuilt above
+}
+
+// 4. Update PATTERNS.md from tagged events (closes the learning loop)
+try {
+  execSync(
+    `"${PYTHON}" "${path.join(SCRIPTS, 'patterns_updater.py')}"`,
+    { timeout: 10000, stdio: 'ignore' }
+  );
+} catch (e) {
+  // Silent
+}
+
+// 5. Extract facts from any prospect files modified this session
+try {
+  execSync(
+    `"${PYTHON}" "${path.join(SCRIPTS, 'fact_extractor.py')}" extract`,
+    { timeout: 15000, stdio: 'ignore' }
+  );
+} catch (e) {
+  // Silent
+}
+
+// 5. Generate brain.manifest.json (keeps manifest fresh for SDK/marketplace)
+try {
+  execSync(
+    `"${PYTHON}" "${path.join(SCRIPTS, 'brain_manifest.py')}"`,
+    { timeout: 10000, stdio: 'ignore' }
+  );
+} catch (e) {
+  // Silent
+}
+
+// 6. Run overnight review if morning-brief is stale (> 12 hours old)
 try {
   const briefPath = path.join(BRAIN, 'morning-brief.md');
   let shouldRun = true;

@@ -22,3 +22,6 @@ SAFETY_RULE_4_PRIORITY=CRITICAL
 
 SAFETY_RULE_5=RECOVERY BRANCH PROTECTION: Never merge into, reset, or delete the recovery branch under any circumstances unless the user's message contains both "CONFIRMED GIT" and "CONFIRMED RECOVERY". The recovery branch is the nuclear restore point — it moves only with dual confirmation.
 SAFETY_RULE_5_PRIORITY=CRITICAL
+
+SAFETY_RULE_6=OLIVER DATA ISOLATION: Only work on Oliver-tagged deals, contacts, emails, and recordings. Never modify or act on Anna's or Siamak's data without explicit permission in the current session. Filter: Pipedrive (label 45), Fireflies (oliver@spritesai.com attendee), Gmail (Oliver inbox only), Apollo (Oliver account only). If a recording, deal, or contact belongs to teammates, surface as FYI only — do not create follow-ups, update notes, or schedule activities. Testable failure: acting on a teammate's deal or including teammate data in Oliver's metrics.
+SAFETY_RULE_6_PRIORITY=CRITICAL

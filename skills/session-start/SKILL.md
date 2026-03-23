@@ -7,6 +7,19 @@ description: Use when user wants to Run automatically at every session start bef
 
 Run automatically at session start. Optimized to minimize token cost. Everything not loaded here is available on demand via file pointers in domain/pipeline/startup-brief.md.
 
+## Phase -2: CONTINUATION CHECK (Build Session Resume)
+
+Run BEFORE everything else. Check if a continuation file exists from the previous session.
+
+1. **Check `C:/Users/olive/SpritesWork/brain/continuation.md`** — if it exists, this is a build session handoff.
+2. If found: **Read it in full.** It contains: what was being built, resume point (ordered next actions), files to test, config changes to verify, and context files to read.
+3. **Follow the Resume Point section** — these are the next session's first actions, in priority order.
+4. **Run the Test First checklist** — verify everything from last session still works before building more.
+5. After loading, archive the continuation: `python C:/Users/olive/SpritesWork/brain/scripts/continuation.py archive`
+6. If no continuation.md exists, skip to Phase -1 (normal startup).
+
+This phase ensures build sessions never lose context. The continuation file is consumed once and archived.
+
 ## Phase -1: DELTA_SCAN (Brain Alert System)
 
 Run FIRST, before any context loads. Compare current state to previous session snapshot.

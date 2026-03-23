@@ -34,6 +34,9 @@ CONSTITUTION_4_PRIORITY=HIGH
 CONSTITUTION_5=Rules with zero fires and zero prevented-repeats across 20+ sessions are automatically flagged for deletion at the next meta-loop cycle. Unfired rules are dead weight until proven otherwise.
 CONSTITUTION_5_PRIORITY=HIGH
 
+GLOBAL_RULE_6=QUALITY FIX CYCLING: At wrap-up audit, never accept below 8.0. (1) Score output. (2) If <8.0, identify gaps and fix. (3) Re-score. (4) Repeat until ≥8.0. (5) If stuck after 2 fix cycles, escalate to Oliver with specific asks: "I'm at [X] because [reason]. I need input on [specific blocker]." (6) Always surface Oliver's rating alongside agent score — Oliver's score is ground truth. Never log FAIL and stop — the loop must complete. Testable failure: a session note or wrap-up output with score <8.0 and no fix cycle attempted.
+GLOBAL_RULE_6_PRIORITY=HIGH
+
 # ── Research Quality Standard ───────────────────────────────────
 # Governs all research tasks: gap analysis, framework adoption, tool evaluation, methodology sourcing.
 GLOBAL_RULE_5=RESEARCH SOURCING: When citing frameworks, methodologies, or best practices, ONLY use credible sources. Acceptable: peer-reviewed papers, published books by named authors, official documentation from established companies (Google, Netflix, Anthropic, etc.), recognized individual contributors with verifiable credentials (Fowler, Knuth, Brooks, etc.), conference talks from major venues (NeurIPS, ICML, Strange Loop, QCon). Not acceptable: anonymous blog posts, Reddit comments, Medium articles without author credentials, "top 10" listicles, AI-generated summaries without primary sources. Every cited framework must include: author name, publication/company, year. If you cannot name the author, don't cite it.

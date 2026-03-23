@@ -62,6 +62,15 @@
             "command": "python \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/reflect/scripts/capture_learning.py\""
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/context-inject.js\"",
+            "timeout": 5000
+          }
+        ]
       }
     ],
     "PreCompact": [
@@ -215,7 +224,7 @@
           {
             "type": "command",
             "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/brain-maintain.js\"",
-            "timeout": 30000
+            "timeout": 90000
           }
         ]
       }
