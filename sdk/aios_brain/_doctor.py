@@ -234,11 +234,11 @@ def diagnose(brain_dir: str | Path = None) -> dict:
         _check_disk_space(brain_path),
     ]
 
-    # Determine overall status
-    statuses = [c["status"] for c in checks]
-    if any(s == "fail" for s in statuses):
+    # Determine overall status — "skip" means not applicable, not a problem
+    active_statuses = [c["status"] for c in checks if c["status"] != "skip"]
+    if any(s == "fail" for s in active_statuses):
         overall = "broken"
-    elif any(s in ("missing", "error", "warn") for s in statuses):
+    elif any(s in ("missing", "error", "warn") for s in active_statuses):
         overall = "degraded"
     else:
         overall = "healthy"
