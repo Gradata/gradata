@@ -18,7 +18,7 @@ const MAX_BACKOFF_MS = 600000; // 10 minutes
 try {
   let input = '';
   if (!process.stdin.isTTY) {
-    input = fs.readFileSync('/dev/stdin', 'utf8');
+    input = fs.readFileSync(0, 'utf8');
   }
 
   let toolData = {};

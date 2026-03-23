@@ -32,7 +32,7 @@ const SKIP_TOOLS = [
 
 function readStdin() {
   try {
-    return JSON.parse(require("fs").readFileSync("/dev/stdin", "utf8"));
+    return JSON.parse(require("fs").readFileSync(0, "utf8"));
   } catch {
     return null;
   }

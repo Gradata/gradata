@@ -31,7 +31,7 @@ try {
   let filesModified = [];
   try {
     const gitOutput = execSync(
-      `git -C "${path.join('C:', 'Users', 'olive', 'OneDrive', 'Desktop', 'Sprites Work')}" diff --name-only HEAD 2>/dev/null`,
+      `git -C "${path.join('C:', 'Users', 'olive', 'OneDrive', 'Desktop', 'Sprites Work')}" diff --name-only HEAD 2>&1`,
       { encoding: 'utf8', timeout: 5000 }
     ).trim();
     if (gitOutput) filesModified = gitOutput.split('\n').slice(0, 30);
@@ -40,7 +40,7 @@ try {
   // Get brain repo modified files
   try {
     const brainGit = execSync(
-      `git -C "${BRAIN_PATH}" diff --name-only HEAD 2>/dev/null`,
+      `git -C "${BRAIN_PATH}" diff --name-only HEAD 2>&1`,
       { encoding: 'utf8', timeout: 5000 }
     ).trim();
     if (brainGit) {

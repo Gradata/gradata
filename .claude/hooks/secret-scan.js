@@ -23,7 +23,7 @@ try {
   let input = '';
   if (!process.stdin.isTTY) {
     const fs = require('fs');
-    input = fs.readFileSync('/dev/stdin', 'utf8');
+    input = fs.readFileSync(0, 'utf8');
   }
   if (!input) process.exit(0);
 
