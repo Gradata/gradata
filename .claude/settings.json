@@ -35,6 +35,15 @@
             "timeout": 3000
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/session-init-data.js",
+            "timeout": 10000
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -89,12 +98,32 @@
     ],
     "PostToolUse": [
       {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/gate-emit.js",
+            "timeout": 3000
+          }
+        ]
+      },
+      {
         "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
             "command": "node .claude/hooks/secret-scan.js",
             "timeout": 3000
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/output-event.js",
+            "timeout": 5000
           }
         ]
       },
@@ -124,6 +153,16 @@
         ]
       },
       {
+        "matcher": "mcp__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/tool-failure-emit.js",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
         "hooks": [
           {
             "type": "command",
@@ -149,6 +188,15 @@
             "type": "command",
             "command": "node .claude/hooks/session-persist.js",
             "timeout": 5000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/session-close-data.js",
+            "timeout": 15000
           }
         ]
       }

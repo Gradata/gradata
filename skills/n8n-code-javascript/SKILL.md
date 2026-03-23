@@ -1,6 +1,6 @@
 ---
 name: n8n-code-javascript
-description: Write JavaScript code in n8n Code nodes. Use when writing JavaScript in n8n, using $input/$json/$node syntax, making HTTP requests with $helpers, working with dates using DateTime, troubleshooting Code node errors, or choosing between Code node modes.
+description: Use when writing JavaScript in n8n Code nodes — $input/$json/$node syntax, $helpers.httpRequest(), Luxon DateTime, Code node mode selection, or troubleshooting JS Code node errors. For Python in n8n, use n8n-code-python. For expression syntax in non-code fields, use n8n-expression-syntax.
 ---
 
 # JavaScript Code Node
@@ -252,133 +252,9 @@ if (shouldProcess) {
 }
 ```
 
-### Incorrect Return Formats
+**Common mistakes**: returning `{json: {}}` without array wrapper, returning `[{field: value}]` without json key, returning plain strings. All cause workflow failures.
 
-```javascript
-// ❌ WRONG: Object without array wrapper
-return {
-  json: {field: value}
-};
-
-// ❌ WRONG: Array without json wrapper
-return [{field: value}];
-
-// ❌ WRONG: Plain string
-return "processed";
-
-// ❌ WRONG: Raw data without mapping
-return $input.all();  // Missing .map()
-
-// ❌ WRONG: Incomplete structure
-return [{data: value}];  // Should be {json: value}
-```
-
-**Why it matters**: Next nodes expect array format. Incorrect format causes workflow execution to fail.
-
-**See**: [ERROR_PATTERNS.md](ERROR_PATTERNS.md) #3 for detailed error solutions
-
----
-
-## Common Patterns Overview
-
-Based on production workflows, here are the most useful patterns:
-
-### 1. Multi-Source Data Aggregation
-Combine data from multiple APIs, webhooks, or nodes
-
-```javascript
-const allItems = $input.all();
-const results = [];
-
-for (const item of allItems) {
-  const sourceName = item.json.name || 'Unknown';
-  // Parse source-specific structure
-  if (sourceName === 'API1' && item.json.data) {
-    results.push({
-      json: {
-        title: item.json.data.title,
-        source: 'API1'
-      }
-    });
-  }
-}
-
-return results;
-```
-
-### 2. Filtering with Regex
-Extract patterns, mentions, or keywords from text
-
-```javascript
-const pattern = /\b([A-Z]{2,5})\b/g;
-const matches = {};
-
-for (const item of $input.all()) {
-  const text = item.json.text;
-  const found = text.match(pattern);
-
-  if (found) {
-    found.forEach(match => {
-      matches[match] = (matches[match] || 0) + 1;
-    });
-  }
-}
-
-return [{json: {matches}}];
-```
-
-### 3. Data Transformation & Enrichment
-Map fields, normalize formats, add computed fields
-
-```javascript
-const items = $input.all();
-
-return items.map(item => {
-  const data = item.json;
-  const nameParts = data.name.split(' ');
-
-  return {
-    json: {
-      first_name: nameParts[0],
-      last_name: nameParts.slice(1).join(' '),
-      email: data.email,
-      created_at: new Date().toISOString()
-    }
-  };
-});
-```
-
-### 4. Top N Filtering & Ranking
-Sort and limit results
-
-```javascript
-const items = $input.all();
-
-const topItems = items
-  .sort((a, b) => (b.json.score || 0) - (a.json.score || 0))
-  .slice(0, 10);
-
-return topItems.map(item => ({json: item.json}));
-```
-
-### 5. Aggregation & Reporting
-Sum, count, group data
-
-```javascript
-const items = $input.all();
-const total = items.reduce((sum, item) => sum + (item.json.amount || 0), 0);
-
-return [{
-  json: {
-    total,
-    count: items.length,
-    average: total / items.length,
-    timestamp: new Date().toISOString()
-  }
-}];
-```
-
-**See**: [COMMON_PATTERNS.md](COMMON_PATTERNS.md) for 10 detailed production patterns
+**See**: [ERROR_PATTERNS.md](ERROR_PATTERNS.md) and [COMMON_PATTERNS.md](COMMON_PATTERNS.md) for detailed patterns (aggregation, regex filtering, transformation, ranking, reporting).
 
 ---
 
@@ -399,53 +275,16 @@ return items.map(item => ({json: item.json}));
 ```
 
 ### #2: Expression Syntax Confusion
-
-```javascript
-// ❌ WRONG: Using n8n expression syntax in code
-const value = "{{ $json.field }}";
-
-// ✅ CORRECT: Use JavaScript template literals
-const value = `${$json.field}`;
-
-// ✅ CORRECT: Direct access
-const value = $input.first().json.field;
-```
+Use `$input.first().json.field` or template literals `` `${$json.field}` `` — never `{{ }}` in Code nodes.
 
 ### #3: Incorrect Return Wrapper
-
-```javascript
-// ❌ WRONG: Returning object instead of array
-return {json: {result: 'success'}};
-
-// ✅ CORRECT: Array wrapper required
-return [{json: {result: 'success'}}];
-```
+Must return `[{json: {...}}]` — array of objects with json key. No bare objects or arrays.
 
 ### #4: Missing Null Checks
-
-```javascript
-// ❌ WRONG: Crashes if field doesn't exist
-const value = item.json.user.email;
-
-// ✅ CORRECT: Safe access with optional chaining
-const value = item.json?.user?.email || 'no-email@example.com';
-
-// ✅ CORRECT: Guard clause
-if (!item.json.user) {
-  return [];
-}
-const value = item.json.user.email;
-```
+Use optional chaining: `item.json?.user?.email || 'fallback'`
 
 ### #5: Webhook Body Nesting
-
-```javascript
-// ❌ WRONG: Direct access to webhook data
-const email = $json.email;
-
-// ✅ CORRECT: Webhook data under .body
-const email = $json.body.email;
-```
+Webhook data lives under `$json.body`, not `$json` directly.
 
 **See**: [ERROR_PATTERNS.md](ERROR_PATTERNS.md) for comprehensive error guide
 
@@ -554,62 +393,10 @@ try {
 ```
 
 ### 3. Prefer Array Methods Over Loops
+Use `.filter().map()` over manual loops. Filter early, process late.
 
-```javascript
-// ✅ GOOD: Functional approach
-const processed = $input.all()
-  .filter(item => item.json.valid)
-  .map(item => ({json: {id: item.json.id}}));
-
-// ❌ SLOWER: Manual loop
-const processed = [];
-for (const item of $input.all()) {
-  if (item.json.valid) {
-    processed.push({json: {id: item.json.id}});
-  }
-}
-```
-
-### 4. Filter Early, Process Late
-
-```javascript
-// ✅ GOOD: Filter first to reduce processing
-const processed = $input.all()
-  .filter(item => item.json.status === 'active')  // Reduce dataset first
-  .map(item => expensiveTransformation(item));  // Then transform
-
-// ❌ WASTEFUL: Transform everything, then filter
-const processed = $input.all()
-  .map(item => expensiveTransformation(item))  // Wastes CPU
-  .filter(item => item.json.status === 'active');
-```
-
-### 5. Use Descriptive Variable Names
-
-```javascript
-// ✅ GOOD: Clear intent
-const activeUsers = $input.all().filter(item => item.json.active);
-const totalRevenue = activeUsers.reduce((sum, user) => sum + user.json.revenue, 0);
-
-// ❌ BAD: Unclear purpose
-const a = $input.all().filter(item => item.json.active);
-const t = a.reduce((s, u) => s + u.json.revenue, 0);
-```
-
-### 6. Debug with console.log()
-
-```javascript
-// Debug statements appear in browser console
-const items = $input.all();
-console.log(`Processing ${items.length} items`);
-
-for (const item of items) {
-  console.log('Item data:', item.json);
-  // Process...
-}
-
-return result;
-```
+### 4. Debug with console.log()
+Debug statements appear in browser console (F12). Use `console.log()` to inspect data.
 
 ---
 
@@ -633,67 +420,17 @@ Consider other nodes when:
 
 ---
 
-## Integration with Other Skills
-
-### Works With:
-
-**n8n Expression Syntax**:
-- Expressions use `{{ }}` syntax in other nodes
-- Code nodes use JavaScript directly (no `{{ }}`)
-- When to use expressions vs code
-
-**n8n MCP Tools Expert**:
-- How to find Code node: `search_nodes({query: "code"})`
-- Get configuration help: `get_node_essentials("nodes-base.code")`
-- Validate code: `validate_node_operation()`
-
-**n8n Node Configuration**:
-- Mode selection (All Items vs Each Item)
-- Language selection (JavaScript vs Python)
-- Understanding property dependencies
-
-**n8n Workflow Patterns**:
-- Code nodes in transformation step
-- Webhook → Code → API pattern
-- Error handling in workflows
-
-**n8n Validation Expert**:
-- Validate Code node configuration
-- Handle validation errors
-- Auto-fix common issues
-
----
-
 ## Quick Reference Checklist
 
 Before deploying Code nodes, verify:
 
-- [ ] **Code is not empty** - Must have meaningful logic
-- [ ] **Return statement exists** - Must return array of objects
-- [ ] **Proper return format** - Each item: `{json: {...}}`
-- [ ] **Data access correct** - Using `$input.all()`, `$input.first()`, or `$input.item`
-- [ ] **No n8n expressions** - Use JavaScript template literals: `` `${value}` ``
-- [ ] **Error handling** - Guard clauses for null/undefined inputs
-- [ ] **Webhook data** - Access via `.body` if from webhook
-- [ ] **Mode selection** - "All Items" for most cases
-- [ ] **Performance** - Prefer map/filter over manual loops
-- [ ] **Output consistent** - All code paths return same structure
+- [ ] Return statement exists — returns `[{json: {...}}]`
+- [ ] Data access correct — `$input.all()`, `$input.first()`, or `$input.item`
+- [ ] No `{{ }}` expressions — use JS template literals
+- [ ] Null checks with optional chaining
+- [ ] Webhook data accessed via `.body`
+- [ ] Mode set to "All Items" (unless per-item logic needed)
 
----
-
-## Additional Resources
-
-### Related Files
-- [DATA_ACCESS.md](DATA_ACCESS.md) - Comprehensive data access patterns
-- [COMMON_PATTERNS.md](COMMON_PATTERNS.md) - 10 production-tested patterns
-- [ERROR_PATTERNS.md](ERROR_PATTERNS.md) - Top 5 errors and solutions
-- [BUILTIN_FUNCTIONS.md](BUILTIN_FUNCTIONS.md) - Complete built-in reference
-
-### n8n Documentation
-- Code Node Guide: https://docs.n8n.io/code/code-node/
-- Built-in Methods: https://docs.n8n.io/code-examples/methods-variables-reference/
-- Luxon Documentation: https://moment.github.io/luxon/
-
----
-
-**Ready to write JavaScript in n8n Code nodes!** Start with simple transformations, use the error patterns guide to avoid common mistakes, and reference the pattern library for production-ready examples.
+## Related Files
+- [DATA_ACCESS.md](DATA_ACCESS.md) | [COMMON_PATTERNS.md](COMMON_PATTERNS.md) | [ERROR_PATTERNS.md](ERROR_PATTERNS.md) | [BUILTIN_FUNCTIONS.md](BUILTIN_FUNCTIONS.md)
+- n8n docs: https://docs.n8n.io/code/code-node/ | Luxon: https://moment.github.io/luxon/

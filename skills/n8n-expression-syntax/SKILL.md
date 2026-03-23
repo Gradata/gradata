@@ -492,25 +492,4 @@ Hello {{$json.name}}!
 
 ---
 
-## Summary
-
-**Essential Rules**:
-1. Wrap expressions in {{ }}
-2. Webhook data is under `.body`
-3. No {{ }} in Code nodes
-4. Quote node names with spaces
-5. Node names are case-sensitive
-
-**Most Common Mistakes**:
-- Missing {{ }} → Add braces
-- `{{$json.name}}` in webhooks → Use `{{$json.body.name}}`
-- `{{$json.email}}` in Code → Use `$json.email`
-- `{{$node.HTTP Request}}` → Use `{{$node["HTTP Request"]}}`
-
-For more details, see:
-- [COMMON_MISTAKES.md](COMMON_MISTAKES.md) - Complete error catalog
-- [EXAMPLES.md](EXAMPLES.md) - Real workflow examples
-
----
-
-**Need Help?** Reference the n8n expression documentation or use n8n-mcp validation tools to check your expressions.
+**Related Files**: [COMMON_MISTAKES.md](COMMON_MISTAKES.md) - Error catalog | [EXAMPLES.md](EXAMPLES.md) - Workflow examples

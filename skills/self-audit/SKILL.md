@@ -1,6 +1,6 @@
 ---
 name: self-audit
-description: Use when user wants to Compounding intelligence review. Turns accumulated data (PATTERNS.md, prospect notes, email outcomes) into expertise by running statistical analysis across the vault.
+description: Compounding intelligence review — turns accumulated data (PATTERNS.md, prospect notes, email outcomes) into expertise by running statistical analysis across the vault. Use when the user mentions "self-audit", "audit", "run lens", "compounding review", "intelligence review", "pattern analysis", "what's working", "system health check", or needs to analyze accumulated brain data for insights and improvements.
 ---
 
 # Self-Audit — Compounding Intelligence Review

@@ -1,3 +1,8 @@
+---
+name: linkedin
+description: Pre-flight checklist for LinkedIn messages and InMails. Ensures profile visit, personal hook, and persona match are complete before drafting.
+---
+
 # LinkedIn Message Gate (MANDATORY — NO EXCEPTIONS)
 **NO LinkedIn message or InMail may be written until profile has been visited.**
 

@@ -1,3 +1,8 @@
+---
+name: demo-prep
+description: Pre-flight checklist for demo preparation. Verifies all research sources (vault, NotebookLM, LinkedIn, Apollo, Fireflies) are checked and cheat sheet inputs are complete before building the demo brief.
+---
+
 # Demo Prep Research Gate (MANDATORY — NO EXCEPTIONS)
 **NO demo cheat sheet may be built until ALL steps are completed.**
 

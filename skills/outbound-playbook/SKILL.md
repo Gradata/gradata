@@ -1,14 +1,6 @@
 ---
 name: outbound-playbook
-description: Use when user wants to Tactical outbound sales methodology from Outbound Sales No Fluff by Rex Biberston and Ryan Reisert. Use this skill whenever Oliver needs help building outbound sequences, structuring cadences, cleaning lead lists, writing multi-touch campaigns, or improving reply rates. Also trigger when he says things like "my emails aren't getting replies," "how should I structure my sequence," "build me a cadence," "what should I say on the phone," "how many touches should I do," "my list needs work," "help me build my outbound motion," "what metrics should I track," or any discussion about multi-channel outreach structure, email deliverability, or sequence optimization. If Oliver is working on an Instantly campaign, Apollo sequence, or LinkedIn outreach cadence, this skill applies.
-  Tactical outbound sales methodology from Outbound Sales No Fluff by Rex Biberston and Ryan Reisert.
-  Use this skill whenever Oliver needs help building outbound sequences, structuring cadences, cleaning
-  lead lists, writing multi-touch campaigns, or improving reply rates. Also trigger when he says things
-  like "my emails aren't getting replies," "how should I structure my sequence," "build me a cadence,"
-  "what should I say on the phone," "how many touches should I do," "my list needs work," "help me
-  build my outbound motion," "what metrics should I track," or any discussion about multi-channel
-  outreach structure, email deliverability, or sequence optimization. If Oliver is working on an Instantly
-  campaign, Apollo sequence, or LinkedIn outreach cadence, this skill applies.
+description: Tactical outbound sales methodology from Outbound Sales No Fluff by Rex Biberston and Ryan Reisert. Use when the user mentions "outbound sequence", "cadence", "lead list", "multi-touch campaign", "emails aren't getting replies", "structure my sequence", "build me a cadence", "how many touches", "my list needs work", "outbound motion", "what metrics should I track", "multi-channel outreach", "sequence optimization", "Apollo sequence", "LinkedIn outreach cadence", or is building campaigns in Instantly.
 metadata:
   version: 2.0.0
   source: "Outbound Sales No Fluff by Rex Biberston & Ryan Reisert"

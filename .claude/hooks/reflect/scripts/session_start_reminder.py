@@ -42,6 +42,28 @@ def detect_session() -> int:
     return 0
 
 
+def emit_stale_data(file_path: str, age_days: int, threshold_days: int):
+    """Emit a STALE_DATA event for a file that hasn't been updated recently."""
+    try:
+        import subprocess
+        import json as _json
+        python = "C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe"
+        data = _json.dumps({
+            "file": file_path,
+            "age_days": age_days,
+            "threshold_days": threshold_days,
+            "severity": "critical" if age_days > threshold_days * 2 else "warning",
+        })
+        tags = _json.dumps(["staleness:" + str(age_days) + "d", "file:" + Path(file_path).name])
+        subprocess.run(
+            [python, str(BRAIN_PATH / "scripts" / "events.py"),
+             "emit", "STALE_DATA", "hook:session_start_reminder", data, tags],
+            capture_output=True, text=True, timeout=5
+        )
+    except Exception:
+        pass  # Non-blocking
+
+
 def system_health_checks() -> list:
     """Run gap-scanner startup checks. Returns list of (status, message) tuples."""
     alerts = []
@@ -68,8 +90,25 @@ def system_health_checks() -> list:
         age_days = (datetime.now() - datetime.fromtimestamp(patterns.stat().st_mtime)).days
         if age_days > 14:
             alerts.append(("WARNING", f"PATTERNS.md last updated {age_days} days ago"))
+            emit_stale_data(str(patterns), age_days, 14)
     else:
         alerts.append(("WARNING", "PATTERNS.md not found"))
+
+    # 3b. loop-state.md staleness (should update every session)
+    loop_state = BRAIN_PATH / "loop-state.md"
+    if loop_state.exists():
+        ls_age = (datetime.now() - datetime.fromtimestamp(loop_state.stat().st_mtime)).days
+        if ls_age > 7:
+            alerts.append(("WARNING", f"loop-state.md last updated {ls_age} days ago"))
+            emit_stale_data(str(loop_state), ls_age, 7)
+
+    # 3c. startup-brief.md staleness (should update every session)
+    startup_brief = SPRITES_WORK / "domain" / "pipeline" / "startup-brief.md"
+    if startup_brief.exists():
+        sb_age = (datetime.now() - datetime.fromtimestamp(startup_brief.stat().st_mtime)).days
+        if sb_age > 7:
+            alerts.append(("WARNING", f"startup-brief.md last updated {sb_age} days ago"))
+            emit_stale_data(str(startup_brief), sb_age, 7)
 
     # 4. brain/.git active
     if not (BRAIN_PATH / ".git").exists():

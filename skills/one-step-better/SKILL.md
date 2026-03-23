@@ -1,6 +1,6 @@
 ---
 name: one-step-better
-description: Use when user wants to Scans session history for personalized improvement tips. Checks 8 categories (stale tools, unused vault data, lesson stagnation, etc.) and surfaces the single highest-impact recommendation.
+description: Scans session history for personalized improvement tips — checks 8 categories (stale tools, unused vault data, lesson stagnation, etc.) and surfaces the single highest-impact recommendation. Use when the user mentions "one step better", "improvement tip", "what should I improve", "optimization suggestion", "usage patterns", "tip", or wants a personalized recommendation for leveling up their workflow.
 ---
 
 # /one-step-better

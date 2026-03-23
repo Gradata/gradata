@@ -1,6 +1,6 @@
 ---
 name: playwright-skill
-description: Use when user wants to General-purpose browser automation with Playwright. Use for prospect website research, tech stack detection, ad verification, screenshot capture, and any browser-based scraping task. Do NOT use for Google Ads Transparency or Meta Ad Library (use APIs instead). Triggers on "scrape", "check their website", "screenshot", "what tech do they use", "browser automation".
+description: General-purpose browser automation with Playwright — use for prospect website research, tech stack detection, ad verification, screenshot capture, and any browser-based scraping task. Use when the user mentions "scrape", "check their website", "screenshot", "what tech do they use", "browser automation", "visit the site", "browse", "look at their page", "live browsing", "check staging", or needs one-off browser actions on external sites. Do NOT use for Google Ads Transparency or Meta Ad Library (use APIs instead).
 ---
 
 # Playwright Browser Automation Skill

@@ -1,45 +1,7 @@
 ---
 name: obsidian-cli
 version: "1.3.0"
-description: >
-  Use this skill whenever the user wants Claude to directly interact with their
-  Obsidian vault — reading a note or daily note, writing or appending content,
-  searching vault contents, counting or listing notes, managing tasks, moving or
-  renaming files, finding orphaned notes or broken links. Without this skill, Claude
-  has no way to access vault data or execute vault operations. Treat any request that
-  implies "go into my vault and do X" as a trigger — the user is asking Claude to act,
-  not to explain. Also trigger for vault automation, CLI scripting, or cron-based
-  workflows involving Obsidian, managing sync history, querying Bases, restoring file
-  versions via history, managing bookmarks, or running JavaScript against the Obsidian
-  API. Skip for pure conceptual questions: how Obsidian's GUI works, navigating settings
-  menus, theme or plugin installation via the UI, iCloud/third-party sync conflicts,
-  general Dataview query syntax, keyboard shortcuts, or parsing vault files with external
-  scripts — anything where the user needs an explanation rather than Claude performing a
-  vault operation.
-triggers:
-  - "obsidian"
-  - "vault"
-  - "daily note"
-  - "obsidian cli"
-  - "note"
-  - "append to"
-  - "prepend to"
-  - "search my vault"
-  - "create a note"
-  - "read note"
-  - "move note"
-  - "rename note"
-  - "delete note"
-  - "tasks in obsidian"
-  - "open tasks"
-  - "backlinks"
-  - "orphaned notes"
-  - "broken links"
-  - "frontmatter"
-  - "properties"
-  - "sync history"
-  - "obsidian bases"
-  - "file history"
+description: Manage Obsidian vault notes programmatically — create, update, search, and tag prospect notes. Use when the user mentions "obsidian", "vault", "prospect note", "brain note", "update the note", "daily note", "append to", "search my vault", "create a note", "read note", "move note", "rename note", "tasks in obsidian", "open tasks", "backlinks", "orphaned notes", "broken links", "frontmatter", "properties", "sync history", "obsidian bases", "file history", or needs to interact with the Obsidian brain vault via CLI.
 ---
 
 # Obsidian CLI

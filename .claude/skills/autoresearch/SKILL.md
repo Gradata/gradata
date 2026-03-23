@@ -1,6 +1,6 @@
 ---
 name: autoresearch
-description: Autonomous Goal-directed Iteration. Apply Karpathy's autoresearch principles to ANY task. Loops autonomously — modify, verify, keep/discard, repeat. Supports bounded iteration via Iterations: N inline config.
+description: Autonomous Goal-directed Iteration. Apply Karpathy's autoresearch principles to ANY task. Loops autonomously — modify, verify, keep/discard, repeat. Supports bounded iteration via Iterations: N inline config. Use when the user mentions "autoresearch", "autonomous loop", "iterate until", "keep improving", "measure and repeat", "goal-directed iteration", "run overnight", "work autonomously", "iterate until done".
 version: 1.8.2
 ---
 
@@ -80,41 +80,7 @@ Load: `references/security-workflow.md` for full protocol.
 | `--fix` | After audit, auto-fix confirmed Critical/High findings using autoresearch loop |
 | `--fail-on {severity}` | Exit non-zero if findings meet threshold (for CI/CD gating) |
 
-**Usage:**
-```
-# Unlimited — keep finding vulnerabilities until interrupted
-/autoresearch:security
-
-# Bounded — exactly 10 security sweep iterations
-/autoresearch:security
-Iterations: 10
-
-# With focused scope
-/autoresearch:security
-Scope: src/api/**/*.ts, src/middleware/**/*.ts
-Focus: authentication and authorization flows
-
-# Delta mode — only audit changed files since last audit
-/autoresearch:security --diff
-
-# Auto-fix confirmed Critical/High findings after audit
-/autoresearch:security --fix
-Iterations: 15
-
-# CI/CD gate — fail pipeline if any Critical findings
-/autoresearch:security --fail-on critical
-Iterations: 10
-
-# Combined — delta audit + fix + gate
-/autoresearch:security --diff --fix --fail-on critical
-Iterations: 15
-```
-
-**Inspired by:**
-- [Strix](https://github.com/usestrix/strix) — AI-powered security testing with proof-of-concept validation
-- `/plan red-team` — adversarial review with hostile reviewer personas
-- OWASP Top 10 (2021) — industry-standard vulnerability taxonomy
-- STRIDE — Microsoft's threat modeling framework
+**Usage:** `/autoresearch:security` (unlimited) or `/autoresearch:security` + `Iterations: 10` (bounded). Flags: `--diff`, `--fix`, `--fail-on critical`.
 
 ### /autoresearch:ship — Universal Shipping Workflow
 
@@ -159,49 +125,9 @@ Load: `references/ship-workflow.md` for full protocol.
 | `--type <type>` | Override auto-detection with explicit shipment type |
 | `--checklist-only` | Only generate and evaluate checklist (stop at Phase 3) |
 
-**Usage:**
-```
-# Auto-detect and ship (interactive)
-/autoresearch:ship
+**Usage:** `/autoresearch:ship` (interactive) or `/autoresearch:ship --auto`. Flags: `--dry-run`, `--auto`, `--force`, `--rollback`, `--monitor N`, `--type <type>`, `--checklist-only`.
 
-# Ship code PR with auto-approve
-/autoresearch:ship --auto
-
-# Dry-run a deployment before going live
-/autoresearch:ship --type deployment --dry-run
-
-# Ship with post-deployment monitoring
-/autoresearch:ship --monitor 10
-
-# Prepare iteratively then ship
-/autoresearch:ship
-Iterations: 5
-
-# Just check if something is ready to ship
-/autoresearch:ship --checklist-only
-
-# Ship a blog post
-/autoresearch:ship
-Target: content/blog/my-new-post.md
-Type: content
-
-# Ship a sales deck
-/autoresearch:ship --type sales
-Target: decks/q1-proposal.pdf
-
-# Rollback a bad deployment
-/autoresearch:ship --rollback
-```
-
-**Composite metric (for bounded loops):**
-```
-ship_score = (checklist_passing / checklist_total) * 80
-           + (dry_run_passed ? 15 : 0)
-           + (no_blockers ? 5 : 0)
-```
-Score of 100 = fully ready. Below 80 = not shippable.
-
-**Output directory:** Creates `ship/{YYMMDD}-{HHMM}-{ship-slug}/` with `checklist.md`, `ship-log.tsv`, `summary.md`.
+**Output:** `ship/{YYMMDD}-{HHMM}-{ship-slug}/` with `checklist.md`, `ship-log.tsv`, `summary.md`.
 
 ### /autoresearch:scenario — Scenario-Driven Use Case Generator
 
@@ -237,31 +163,7 @@ Load: `references/scenario-workflow.md` for full protocol.
 | `--format <type>` | Output: use-cases, user-stories, test-scenarios, threat-scenarios, mixed |
 | `--focus <area>` | Prioritize dimension: edge-cases, failures, security, scale |
 
-**Usage:**
-```
-# Unlimited — keep exploring until interrupted
-/autoresearch:scenario
-
-# Bounded with context
-/autoresearch:scenario
-Scenario: User attempts checkout with multiple payment methods
-Domain: software
-Depth: standard
-Iterations: 25
-
-# Quick edge case scan
-/autoresearch:scenario --depth shallow --focus edge-cases
-Scenario: File upload feature for profile pictures
-
-# Security-focused
-/autoresearch:scenario --domain security
-Scenario: OAuth2 login flow with third-party providers
-Iterations: 30
-
-# Generate test scenarios
-/autoresearch:scenario --format test-scenarios --domain software
-Scenario: REST API pagination with filtering and sorting
-```
+**Usage:** `/autoresearch:scenario` (unlimited) or bounded with `Iterations: N`. Flags: `--domain`, `--depth`, `--scope`, `--format`, `--focus`.
 
 ### /autoresearch:predict — Multi-Persona Swarm Prediction
 
@@ -302,36 +204,7 @@ Load: `references/predict-workflow.md` for full protocol.
 | `--fail-on <severity>` | Exit non-zero if findings at or above severity (for CI/CD) |
 | `--scope <glob>` | Limit analysis to specific files |
 
-**Usage:**
-```
-# Standard analysis
-/autoresearch:predict
-Scope: src/**/*.ts
-Goal: Find reliability issues
-
-# Quick security scan
-/autoresearch:predict --depth shallow --chain security
-Scope: src/api/**
-
-# Deep analysis with adversarial debate
-/autoresearch:predict --depth deep --adversarial
-Goal: Pre-deployment quality audit
-
-# CI/CD gate
-/autoresearch:predict --fail-on critical --budget 20
-Scope: src/**
-Iterations: 1
-
-# Chain to debug for hypothesis-driven investigation
-/autoresearch:predict --chain debug
-Scope: src/auth/**
-Goal: Investigate intermittent 500 errors
-
-# Multi-chain: predict → scenario → debug → fix (sequential pipeline)
-/autoresearch:predict --chain scenario,debug,fix
-Scope: src/**
-Goal: Full quality pipeline for new feature
-```
+**Usage:** `/autoresearch:predict` with Scope + Goal. Flags: `--chain`, `--personas N`, `--rounds N`, `--depth`, `--adversarial`, `--budget N`, `--fail-on`, `--scope`.
 
 ### /autoresearch:learn — Autonomous Codebase Documentation Engine
 
@@ -381,31 +254,7 @@ Load: `references/learn-workflow.md` for full protocol.
 | `--no-fix` | Skip validation-fix loop |
 | `--format <fmt>` | Output format: markdown (default). Planned: confluence, rst, html |
 
-**Usage:**
-```
-# Auto-detect mode and learn
-/autoresearch:learn
-
-# Initialize docs for new project
-/autoresearch:learn --mode init --depth deep
-
-# Update docs after changes
-/autoresearch:learn --mode update
-Iterations: 3
-
-# Read-only health check
-/autoresearch:learn --mode check
-
-# Quick summary
-/autoresearch:learn --mode summarize --scan
-
-# Selective update of one doc
-/autoresearch:learn --mode update --file system-architecture.md
-
-# Scoped learning
-/autoresearch:learn --scope src/api/**
-Iterations: 5
-```
+**Usage:** `/autoresearch:learn` (auto-detect) or `/autoresearch:learn --mode init|update|check|summarize`. Flags: `--scope`, `--depth`, `--scan`, `--topics`, `--file`, `--no-fix`, `--format`.
 
 ### /autoresearch:plan — Goal → Configuration Wizard
 
@@ -428,17 +277,7 @@ Load: `references/plan-workflow.md` for full protocol.
 - Verify command MUST pass a dry run on the current codebase before accepting
 - Scope MUST resolve to ≥1 file
 
-**Usage:**
-```
-/autoresearch:plan
-Goal: Make the API respond faster
-
-/autoresearch:plan Increase test coverage to 95%
-
-/autoresearch:plan Reduce bundle size below 200KB
-```
-
-After the wizard completes, the user gets a ready-to-paste `/autoresearch` invocation — or can launch it directly.
+**Usage:** `/autoresearch:plan` + Goal (inline or interactive). Outputs a ready-to-paste `/autoresearch` config.
 
 ## When to Activate
 

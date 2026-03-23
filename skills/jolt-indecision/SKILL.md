@@ -1,15 +1,6 @@
 ---
 name: jolt-indecision
-description: Use when user wants to Overcome customer indecision using the JOLT Effect methodology by Matthew Dixon and Ted McKenna. Use this skill whenever Oliver has a prospect who liked the demo but won't commit, deals that are stalling, "think about it" responses, prospects who ghost after positive calls, or pipeline that's stuck in limbo. Also trigger when he says "they liked the demo but went dark," "how do I get them to decide," "the deal is stuck," "they keep pushing the timeline," "they want more case studies," "they said they need to talk to their team," "they're evaluating other options," "I can't get them to pull the trigger," or any discussion about closing stalled deals, overcoming hesitation, or post-demo follow-up strategy. This is about indecision, not objection handling — the prospect WANTS the product but is afraid to commit.
-  Overcome customer indecision using the JOLT Effect methodology by Matthew Dixon and Ted McKenna.
-  Use this skill whenever Oliver has a prospect who liked the demo but won't commit, deals that are
-  stalling, "think about it" responses, prospects who ghost after positive calls, or pipeline that's
-  stuck in limbo. Also trigger when he says "they liked the demo but went dark," "how do I get them
-  to decide," "the deal is stuck," "they keep pushing the timeline," "they want more case studies,"
-  "they said they need to talk to their team," "they're evaluating other options," "I can't get them
-  to pull the trigger," or any discussion about closing stalled deals, overcoming hesitation, or
-  post-demo follow-up strategy. This is about indecision, not objection handling — the prospect
-  WANTS the product but is afraid to commit.
+description: Overcome customer indecision using the JOLT Effect methodology by Matthew Dixon and Ted McKenna. Use when the user mentions "deal stalled", "they went dark", "think about it", "won't commit", "get them to decide", "pushing the timeline", "want more case studies", "need to talk to their team", "evaluating other options", "pull the trigger", "prospect ghosted", "closing stalled deals", "overcoming hesitation", "post-demo follow-up", or has a prospect who liked the demo but is afraid to commit.
 metadata:
   version: 2.0.0
   source: "The JOLT Effect by Matthew Dixon & Ted McKenna"

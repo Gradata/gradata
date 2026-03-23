@@ -1,6 +1,6 @@
 ---
 name: n8n-code-python
-description: Write Python code in n8n Code nodes. Use when writing Python in n8n, using _input/_json/_node syntax, working with standard library, or need to understand Python limitations in n8n Code nodes.
+description: Use when writing Python in n8n Code nodes — _input/_json/_node syntax, standard library only (no external packages), Python Beta vs Native modes. For JavaScript in n8n (preferred for 95% of cases), use n8n-code-javascript.
 ---
 
 # Python Code Node (Beta)
@@ -298,75 +298,19 @@ else:
     return []
 ```
 
-### Incorrect Return Formats
+**Common mistakes**: returning `{"json": {}}` without list wrapper, returning `[{"field": value}]` without json key, returning plain strings. All cause workflow failures.
 
-```python
-# ❌ WRONG: Dictionary without list wrapper
-return {
-    "json": {"field": value}
-}
-
-# ❌ WRONG: List without json wrapper
-return [{"field": value}]
-
-# ❌ WRONG: Plain string
-return "processed"
-
-# ❌ WRONG: Incomplete structure
-return [{"data": value}]  # Should be {"json": value}
-```
-
-**Why it matters**: Next nodes expect list format. Incorrect format causes workflow execution to fail.
-
-**See**: [ERROR_PATTERNS.md](ERROR_PATTERNS.md) #2 for detailed error solutions
+**See**: [ERROR_PATTERNS.md](ERROR_PATTERNS.md) for detailed error solutions
 
 ---
 
 ## Critical Limitation: No External Libraries
 
-**MOST IMPORTANT PYTHON LIMITATION**: Cannot import external packages
+**Standard library ONLY** — no requests, pandas, numpy, scipy, BeautifulSoup, lxml.
 
-### What's NOT Available
+**Available:** json, datetime, re, base64, hashlib, urllib.parse, math, random, statistics.
 
-```python
-# ❌ NOT AVAILABLE - Will raise ModuleNotFoundError
-import requests  # ❌ No
-import pandas  # ❌ No
-import numpy  # ❌ No
-import scipy  # ❌ No
-from bs4 import BeautifulSoup  # ❌ No
-import lxml  # ❌ No
-```
-
-### What IS Available (Standard Library)
-
-```python
-# ✅ AVAILABLE - Standard library only
-import json  # ✅ JSON parsing
-import datetime  # ✅ Date/time operations
-import re  # ✅ Regular expressions
-import base64  # ✅ Base64 encoding/decoding
-import hashlib  # ✅ Hashing functions
-import urllib.parse  # ✅ URL parsing
-import math  # ✅ Math functions
-import random  # ✅ Random numbers
-import statistics  # ✅ Statistical functions
-```
-
-### Workarounds
-
-**Need HTTP requests?**
-- ✅ Use **HTTP Request node** before Code node
-- ✅ Or switch to **JavaScript** and use `$helpers.httpRequest()`
-
-**Need data analysis (pandas/numpy)?**
-- ✅ Use Python **statistics** module for basic stats
-- ✅ Or switch to **JavaScript** for most operations
-- ✅ Manual calculations with lists and dictionaries
-
-**Need web scraping (BeautifulSoup)?**
-- ✅ Use **HTTP Request node** + **HTML Extract node**
-- ✅ Or switch to **JavaScript** with regex/string methods
+**Workarounds:** HTTP requests → use HTTP Request node or switch to JS. Data analysis → use statistics module. Web scraping → HTTP Request + HTML Extract nodes.
 
 **See**: [STANDARD_LIBRARY.md](STANDARD_LIBRARY.md) for complete reference
 
@@ -410,85 +354,7 @@ return [{
 }]
 ```
 
-### 3. String Processing with Regex
-Extract patterns from text
-
-```python
-import re
-
-items = _input.all()
-email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-
-all_emails = []
-for item in items:
-    text = item["json"].get("text", "")
-    emails = re.findall(email_pattern, text)
-    all_emails.extend(emails)
-
-# Remove duplicates
-unique_emails = list(set(all_emails))
-
-return [{
-    "json": {
-        "emails": unique_emails,
-        "count": len(unique_emails)
-    }
-}]
-```
-
-### 4. Data Validation
-Validate and clean data
-
-```python
-items = _input.all()
-validated = []
-
-for item in items:
-    data = item["json"]
-    errors = []
-
-    # Validate fields
-    if not data.get("email"):
-        errors.append("Email required")
-    if not data.get("name"):
-        errors.append("Name required")
-
-    validated.append({
-        "json": {
-            **data,
-            "valid": len(errors) == 0,
-            "errors": errors if errors else None
-        }
-    })
-
-return validated
-```
-
-### 5. Statistical Analysis
-Calculate statistics with statistics module
-
-```python
-from statistics import mean, median, stdev
-
-items = _input.all()
-values = [item["json"].get("value", 0) for item in items if "value" in item["json"]]
-
-if values:
-    return [{
-        "json": {
-            "mean": mean(values),
-            "median": median(values),
-            "stdev": stdev(values) if len(values) > 1 else 0,
-            "min": min(values),
-            "max": max(values),
-            "count": len(values)
-        }
-    }]
-else:
-    return [{"json": {"error": "No values found"}}]
-```
-
-**See**: [COMMON_PATTERNS.md](COMMON_PATTERNS.md) for 10 detailed Python patterns
+**See**: [COMMON_PATTERNS.md](COMMON_PATTERNS.md) for more patterns (regex extraction, data validation, statistical analysis)
 
 ---
 
@@ -505,155 +371,31 @@ import requests  # ModuleNotFoundError!
 # OR switch to JavaScript and use $helpers.httpRequest()
 ```
 
-### #2: Empty Code or Missing Return
-
-```python
-# ❌ WRONG: No return statement
-items = _input.all()
-# Processing...
-# Forgot to return!
-
-# ✅ CORRECT: Always return data
-items = _input.all()
-# Processing...
-return [{"json": item["json"]} for item in items]
-```
+### #2: Missing Return
+Always end with `return [{"json": ...}]`. No return = silent failure.
 
 ### #3: Incorrect Return Format
-
-```python
-# ❌ WRONG: Returning dict instead of list
-return {"json": {"result": "success"}}
-
-# ✅ CORRECT: List wrapper required
-return [{"json": {"result": "success"}}]
-```
+Must return `[{"json": {...}}]` — list of dicts with json key. No bare dicts.
 
 ### #4: KeyError on Dictionary Access
-
-```python
-# ❌ WRONG: Direct access crashes if missing
-name = _json["user"]["name"]  # KeyError!
-
-# ✅ CORRECT: Use .get() for safe access
-name = _json.get("user", {}).get("name", "Unknown")
-```
+Use `.get()`: `_json.get("user", {}).get("name", "Unknown")`
 
 ### #5: Webhook Body Nesting
-
-```python
-# ❌ WRONG: Direct access to webhook data
-email = _json["email"]  # KeyError!
-
-# ✅ CORRECT: Webhook data under ["body"]
-email = _json["body"]["email"]
-
-# ✅ BETTER: Safe access with .get()
-email = _json.get("body", {}).get("email", "no-email")
-```
+Webhook data lives under `_json["body"]`, not `_json` directly. Use `.get("body", {})` for safe access.
 
 **See**: [ERROR_PATTERNS.md](ERROR_PATTERNS.md) for comprehensive error guide
 
 ---
 
-## Standard Library Reference
-
-### Most Useful Modules
-
-```python
-# JSON operations
-import json
-data = json.loads(json_string)
-json_output = json.dumps({"key": "value"})
-
-# Date/time
-from datetime import datetime, timedelta
-now = datetime.now()
-tomorrow = now + timedelta(days=1)
-formatted = now.strftime("%Y-%m-%d")
-
-# Regular expressions
-import re
-matches = re.findall(r'\d+', text)
-cleaned = re.sub(r'[^\w\s]', '', text)
-
-# Base64 encoding
-import base64
-encoded = base64.b64encode(data).decode()
-decoded = base64.b64decode(encoded)
-
-# Hashing
-import hashlib
-hash_value = hashlib.sha256(text.encode()).hexdigest()
-
-# URL parsing
-import urllib.parse
-params = urllib.parse.urlencode({"key": "value"})
-parsed = urllib.parse.urlparse(url)
-
-# Statistics
-from statistics import mean, median, stdev
-average = mean([1, 2, 3, 4, 5])
-```
-
-**See**: [STANDARD_LIBRARY.md](STANDARD_LIBRARY.md) for complete reference
-
----
-
 ## Best Practices
 
-### 1. Always Use .get() for Dictionary Access
+1. **Always use `.get()`** for dictionary access — avoids KeyError
+2. **Handle None explicitly** — `item["json"].get("amount") or 0`
+3. **Use list comprehensions** for filtering and transformation
+4. **Return consistent structure** — all code paths return `[{"json": ...}]`
+5. **Debug with `print()`** — appears in browser console (F12)
 
-```python
-# ✅ SAFE: Won't crash if field missing
-value = item["json"].get("field", "default")
-
-# ❌ RISKY: Crashes if field doesn't exist
-value = item["json"]["field"]
-```
-
-### 2. Handle None/Null Values Explicitly
-
-```python
-# ✅ GOOD: Default to 0 if None
-amount = item["json"].get("amount") or 0
-
-# ✅ GOOD: Check for None explicitly
-text = item["json"].get("text")
-if text is None:
-    text = ""
-```
-
-### 3. Use List Comprehensions for Filtering
-
-```python
-# ✅ PYTHONIC: List comprehension
-valid = [item for item in items if item["json"].get("active")]
-
-# ❌ VERBOSE: Manual loop
-valid = []
-for item in items:
-    if item["json"].get("active"):
-        valid.append(item)
-```
-
-### 4. Return Consistent Structure
-
-```python
-# ✅ CONSISTENT: Always list with "json" key
-return [{"json": result}]  # Single result
-return results  # Multiple results (already formatted)
-return []  # No results
-```
-
-### 5. Debug with print() Statements
-
-```python
-# Debug statements appear in browser console (F12)
-items = _input.all()
-print(f"Processing {len(items)} items")
-print(f"First item: {items[0] if items else 'None'}")
-```
+**See**: [STANDARD_LIBRARY.md](STANDARD_LIBRARY.md) for full standard library reference
 
 ---
 
@@ -679,70 +421,18 @@ print(f"First item: {items[0] if items else 'None'}")
 
 ---
 
-## Integration with Other Skills
-
-### Works With:
-
-**n8n Expression Syntax**:
-- Expressions use `{{ }}` syntax in other nodes
-- Code nodes use Python directly (no `{{ }}`)
-- When to use expressions vs code
-
-**n8n MCP Tools Expert**:
-- How to find Code node: `search_nodes({query: "code"})`
-- Get configuration help: `get_node_essentials("nodes-base.code")`
-- Validate code: `validate_node_operation()`
-
-**n8n Node Configuration**:
-- Mode selection (All Items vs Each Item)
-- Language selection (Python vs JavaScript)
-- Understanding property dependencies
-
-**n8n Workflow Patterns**:
-- Code nodes in transformation step
-- When to use Python vs JavaScript in patterns
-
-**n8n Validation Expert**:
-- Validate Code node configuration
-- Handle validation errors
-- Auto-fix common issues
-
-**n8n Code JavaScript**:
-- When to use JavaScript instead
-- Comparison of JavaScript vs Python features
-- Migration from Python to JavaScript
-
----
-
 ## Quick Reference Checklist
 
 Before deploying Python Code nodes, verify:
 
-- [ ] **Considered JavaScript first** - Using Python only when necessary
-- [ ] **Code is not empty** - Must have meaningful logic
-- [ ] **Return statement exists** - Must return list of dictionaries
-- [ ] **Proper return format** - Each item: `{"json": {...}}`
-- [ ] **Data access correct** - Using `_input.all()`, `_input.first()`, or `_input.item`
-- [ ] **No external imports** - Only standard library (json, datetime, re, etc.)
-- [ ] **Safe dictionary access** - Using `.get()` to avoid KeyError
-- [ ] **Webhook data** - Access via `["body"]` if from webhook
-- [ ] **Mode selection** - "All Items" for most cases
-- [ ] **Output consistent** - All code paths return same structure
+- [ ] Considered JavaScript first — Python only when necessary
+- [ ] Return statement exists — returns `[{"json": {...}}]`
+- [ ] Data access correct — `_input.all()`, `_input.first()`, or `_input.item`
+- [ ] No external imports — standard library only
+- [ ] Safe dictionary access via `.get()`
+- [ ] Webhook data accessed via `["body"]`
+- [ ] Mode set to "All Items" (unless per-item logic needed)
 
----
-
-## Additional Resources
-
-### Related Files
-- [DATA_ACCESS.md](DATA_ACCESS.md) - Comprehensive Python data access patterns
-- [COMMON_PATTERNS.md](COMMON_PATTERNS.md) - 10 Python patterns for n8n
-- [ERROR_PATTERNS.md](ERROR_PATTERNS.md) - Top 5 errors and solutions
-- [STANDARD_LIBRARY.md](STANDARD_LIBRARY.md) - Complete standard library reference
-
-### n8n Documentation
-- Code Node Guide: https://docs.n8n.io/code/code-node/
-- Python in n8n: https://docs.n8n.io/code/builtin/python-modules/
-
----
-
-**Ready to write Python in n8n Code nodes - but consider JavaScript first!** Use Python for specific needs, reference the error patterns guide to avoid common mistakes, and leverage the standard library effectively.
+## Related Files
+- [DATA_ACCESS.md](DATA_ACCESS.md) | [COMMON_PATTERNS.md](COMMON_PATTERNS.md) | [ERROR_PATTERNS.md](ERROR_PATTERNS.md) | [STANDARD_LIBRARY.md](STANDARD_LIBRARY.md)
+- n8n docs: https://docs.n8n.io/code/code-node/ | Python modules: https://docs.n8n.io/code/builtin/python-modules/

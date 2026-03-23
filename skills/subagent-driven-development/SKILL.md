@@ -1,6 +1,6 @@
 ---
 name: subagent-driven-development
-description: Use when executing implementation plans with independent tasks in the current session
+description: Use when executing implementation plans with independent tasks in the current session — dispatches subagents for implementation with two-stage review. NOT about workspace setup (use using-git-worktrees first).
 ---
 
 # Subagent-Driven Development

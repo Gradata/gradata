@@ -27,6 +27,40 @@ from lib.reflect_utils import (
     MAX_CAPTURE_PROMPT_LENGTH,
 )
 
+# Patterns that indicate accuracy/hallucination issues (proxy detection)
+HALLUCINATION_PATTERNS = {
+    "dont-assume", "not-what-i-meant", "already-told",
+}
+HALLUCINATION_KEYWORDS = [
+    r"wrong", r"incorrect", r"inaccurate", r"made.?up",
+    r"hallucin", r"fabricat", r"doesn.?t exist", r"not real",
+    r"that.?s not true", r"never said", r"misquot", r"wrong number",
+    r"wrong.?data", r"stale.?data", r"outdated",
+]
+
+
+def emit_hallucination(prompt: str, matched_patterns: str, confidence: float):
+    """Emit a HALLUCINATION event when accuracy-related correction detected."""
+    try:
+        import subprocess
+        import re as _re
+        python = "C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe"
+        import json as _json
+        data = _json.dumps({
+            "trigger": matched_patterns,
+            "confidence": confidence,
+            "prompt_preview": prompt[:120],
+            "detection_method": "correction_proxy",
+        })
+        tags = _json.dumps(["accuracy:correction_proxy"])
+        subprocess.run(
+            [python, "C:/Users/olive/SpritesWork/brain/scripts/events.py",
+             "emit", "HALLUCINATION", "hook:capture_learning", data, tags],
+            capture_output=True, text=True, timeout=5
+        )
+    except Exception:
+        pass  # Non-blocking
+
 
 def main() -> int:
     """Main entry point."""
@@ -77,6 +111,19 @@ def main() -> int:
         items = load_queue()
         items.append(queue_item)
         save_queue(items)
+
+        # Check if this correction is an accuracy/hallucination proxy
+        import re as _re
+        pattern_set = set(patterns.split()) if patterns else set()
+        is_hallucination = bool(pattern_set & HALLUCINATION_PATTERNS)
+        if not is_hallucination and sentiment == "correction":
+            # Check for hallucination keywords in the prompt
+            for kw in HALLUCINATION_KEYWORDS:
+                if _re.search(kw, prompt, _re.IGNORECASE):
+                    is_hallucination = True
+                    break
+        if is_hallucination:
+            emit_hallucination(prompt, patterns, confidence)
 
         # Output feedback for Claude to acknowledge the capture
         # UserPromptSubmit hooks with exit code 0 add stdout as context

@@ -1,3 +1,8 @@
+---
+name: pre-draft
+description: Pre-flight checklist for email drafts (cold, inbound, follow-up). Ensures vault, PATTERNS, NotebookLM, LinkedIn, and Apollo research are complete before writing.
+---
+
 # Pre-Draft Research Gate (MANDATORY — NO EXCEPTIONS)
 **NO email draft (cold, inbound, or follow-up) may be written until ALL steps are completed.**
 

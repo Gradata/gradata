@@ -1,6 +1,6 @@
 ---
 name: "marketing-skills"
-description: "Use when user wants to 42 marketing agent skills and plugins for Claude Code, Codex, Gemini CLI, Cursor, OpenClaw, and 6 more coding agents. 7 pods: content, SEO, CRO, channels, growth, intelligence, sales. Foundation context + orchestration router. 27 Python tools (stdlib-only)."
+description: "42-skill marketing division across 7 pods — content, SEO, CRO, channels, growth, intelligence, and sales. Use when the user mentions \"marketing\", \"SEO\", \"content strategy\", \"blog post\", \"landing page copy\", \"CRO\", \"conversion rate\", \"pricing strategy\", \"AI SEO\", \"content humanizer\", \"Twitter growth\", \"demand gen\", \"brand voice\", \"marketing context\", or needs marketing analysis, content creation, or growth optimization."
 version: 2.0.0
 author: Alireza Rezvani
 license: MIT

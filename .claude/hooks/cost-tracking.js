@@ -12,7 +12,6 @@ const { execSync } = require('child_process');
 const BRAIN_PATH = 'C:/Users/olive/SpritesWork/brain';
 const COST_FILE = path.join(BRAIN_PATH, 'metrics', 'cost.jsonl');
 const PYTHON = 'C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe';
-const EVENTS_PY = path.join(BRAIN_PATH, 'scripts', 'events.py');
 
 // Model pricing per million tokens (input/output)
 const PRICING = {
@@ -24,7 +23,7 @@ const PRICING = {
 try {
   let input = '';
   if (!process.stdin.isTTY) {
-    input = fs.readFileSync('/dev/stdin', 'utf8');
+    try { input = fs.readFileSync(0, 'utf8'); } catch (_) { /* no stdin */ }
   }
 
   // Parse session info from stdin if available
@@ -53,6 +52,17 @@ try {
 
   // Append to cost.jsonl
   fs.appendFileSync(COST_FILE, JSON.stringify(entry) + '\n');
+
+  // Emit COST_EVENT via events.py CLI
+  const entryStr = JSON.stringify(entry);
+  try {
+    execSync(
+      `"${PYTHON}" "${BRAIN_PATH}/scripts/events.py" emit COST_EVENT hook:cost-tracking '${entryStr}'`,
+      { timeout: 3000, stdio: 'ignore' }
+    );
+  } catch (_) {
+    // COST_EVENT emission is best-effort
+  }
 
 } catch (e) {
   // Silent failure

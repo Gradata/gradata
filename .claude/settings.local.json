@@ -172,7 +172,8 @@
       "Bash(claude plugin:*)",
       "Bash(uv tool:*)",
       "Bash(nlm:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "mcp__claude_ai_Fireflies__fireflies_get_transcripts"
     ]
   }
 }

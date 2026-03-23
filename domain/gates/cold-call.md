@@ -1,3 +1,8 @@
+---
+name: cold-call
+description: Pre-flight checklist for cold calls. Ensures prospect research, script prep, and CRM logging are complete before dialing.
+---
+
 # Cold Call Script Gate (MANDATORY — NO EXCEPTIONS)
 **NO cold call script may be written until LinkedIn has been visited.**
 

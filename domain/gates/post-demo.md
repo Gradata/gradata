@@ -1,3 +1,8 @@
+---
+name: post-demo
+description: Pre-flight checklist for post-demo follow-ups. Ensures Fireflies transcript is pulled, key quotes extracted, and CRM updated before drafting the follow-up email.
+---
+
 # Post-Demo Follow-Up Gate (MANDATORY — NO EXCEPTIONS)
 **NO post-demo follow-up email may be drafted until Fireflies transcript is pulled and reviewed.**
 

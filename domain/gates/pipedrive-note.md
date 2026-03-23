@@ -1,3 +1,8 @@
+---
+name: pipedrive-note
+description: Quality gate for CRM notes. Verifies all data is source-tagged, schema-validated, and free of pending flags before publishing to Pipedrive or the vault.
+---
+
 # Pipedrive Note Quality Gate (MANDATORY — NO EXCEPTIONS)
 **NO note may be published until all sources checked and data verified.**
 

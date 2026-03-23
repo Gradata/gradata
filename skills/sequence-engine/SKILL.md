@@ -1,10 +1,6 @@
 ---
----
-DEPRECATED: Replaced by Loop. See skills/loop/SKILL.md
-
----
 name: sequence-engine
-description: Closed-loop sales intelligence system. Manages personalized email sequences, tracks outcomes, aggregates patterns, and gets smarter over time. Use when writing outbound emails, checking for replies, reviewing what's working, or prepping any prospect interaction. Also triggers on "sequence", "what's due", "follow-up check", "what's working", "pattern", "learning loop", "touch", or any email/call/demo prep for a specific prospect.
+description: "DEPRECATED: Replaced by Loop. See skills/loop/SKILL.md. Closed-loop sales intelligence system for personalized email sequences, outcome tracking, and pattern aggregation. Use when the user mentions \"sequence engine\", \"what's due\", \"follow-up check\", \"what's working\", \"pattern review\", \"learning loop\", \"touch\", \"check replies\", \"sequence status\", or needs email/call/demo prep for a specific prospect."
 ---
 
 # Sequence Engine — Closed-Loop Sales Intelligence

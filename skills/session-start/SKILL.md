@@ -62,73 +62,56 @@ This takes <2 seconds. It catches file corruption, accidental deletions, and sys
 3. **Read .claude/lessons.md** — mistakes log. Scan every entry. Never repeat a logged mistake.
 4. **Check Google Calendar for today + tomorrow** — surface demos, calls, meetings.
 
-## Phase 1.5: Full Tool Scan (~15 seconds with parallel calls)
+## Phase 1.5: Tool Data + Pipeline Prep
 
-> Replaces the overnight agent. Scans ALL connected tools at session start.
-> If any scan fails: auto-fix via fallback chain FIRST, then surface result.
-> Oliver sees results, not problems. Only escalate if fix also fails.
+> Data is pulled automatically by the SessionStart hook (api_sync.py → Pipedrive, Gmail,
+> Calendar, Instantly, Fireflies). DO NOT re-query these via MCP — read from sync_state/system.db.
+> MCP is the FALLBACK if api_sync.py failed (check sync_state timestamps).
 
 Load `domain/carl/loop` rules for this phase.
 
-**PARALLEL BATCH A (all independent — fire all at once):**
-5+7. **Prospect loading (two tiers)** — Read startup-brief pipeline section. Prospects with meeting/demo/follow-up due within 48h = **Tier 1** (read full brain/prospects/ file). All others = **Tier 2** (load on demand when Oliver names them). For Tier 1, check: (a) `next_touch` dates <= today, (b) untagged touches.
-9. **Check brain/signals.md** — unprocessed signals with `relevance >= 7`.
-10. **Gmail scan** — search for new replies since last session. `gmail_search_messages after:[last_session_date]`.
-11. **Calendar scan** — today + tomorrow + next 7 days. Surface demos, calls, meetings with times.
-12. **Fireflies scan** — check for new recordings since last session.
-13. **Pipedrive scan** — pull Oliver-tagged deals. Check for: (a) stage changes since last session, (b) newly closed deals (won or lost) for forecasting calibration, (c) deals with zero upcoming activities.
-14. **Instantly scan** — use Instantly MCP tools: `list_campaigns` to get active campaigns, then `get_campaign_analytics` for each. Compare reply rates to PATTERNS.md benchmarks. Surface: campaigns with reply rate change >0.5% since last session, new replies, bounces. Format: `[campaign]: [reply_rate]% ([+/-change]) | [new_replies] new replies`.
-15. **Follow-up drafting trigger** — read brain/Follow-Up Tracker.md. For every prospect with a touch due today or tomorrow: auto-draft the email per the cadence track (A or B) using data from Fireflies transcript + brain prospect file + PATTERNS.md. Present drafts to Oliver for review. Never auto-send.
+**Step 5+7: Prospect loading (two tiers)** — Read startup-brief pipeline section. Prospects with meeting/demo/follow-up due within 48h = **Tier 1** (read full brain/prospects/ file). All others = **Tier 2** (load on demand when Oliver names them). For Tier 1, check: (a) `next_touch` dates <= today, (b) untagged touches.
 
-**PARALLEL BATCH B (after batch A — fire all Gmail searches at once):**
-6. **Outcome check** — for EVERY prospect with `outcome: pending`, search Gmail `from:[prospect_email] after:[last_touch_date]` in parallel. Reply found → update outcome. No reply + next_touch passed → "no-reply".
+**Step 9: Check brain/signals.md** — unprocessed signals with `relevance >= 7`.
 
-   When a reply is found, also run:
-     `python brain/scripts/delta_tag.py log-outcome --prospect "[NAME]" --prep-type "email_draft" --outcome "reply" --days [DAYS_SINCE_LAST_TOUCH]`
+**Step 10: Read api_sync results** — Run `python brain/scripts/api_sync.py status` to check last sync. If sync ran this session (session-init-data.js hook), read results from sync_state table:
+```python
+import sys; sys.path.insert(0, 'C:/Users/olive/SpritesWork/brain/scripts')
+from api_sync import sync_all, format_summary, get_last_sync
+syncs = get_last_sync()
+# If any source is stale (>24h), re-sync just that source
+```
+Only fall back to MCP tools if api_sync.py failed or sync_state is missing.
 
-   When no reply is found and next_touch has passed:
-     `python brain/scripts/delta_tag.py log-outcome --prospect "[NAME]" --prep-type "email_draft" --outcome "no_reply" --days [DAYS_SINCE_LAST_TOUCH]`
+**Step 11: Outcome check** — for EVERY prospect with `outcome: pending`, check Gmail sync results for replies from prospect emails. Reply found → update outcome via delta_tag.py. No reply + next_touch passed → "no-reply". Log outcomes:
+   `python brain/scripts/delta_tag.py log-outcome --prospect "[NAME]" --prep-type "email_draft" --outcome "reply|no_reply" --days [DAYS]`
 
-   When a deal stage change is detected (from Pipedrive scan step 13):
-     `python brain/scripts/delta_tag.py log-outcome --prospect "[NAME]" --prep-type "research" --outcome "deal_advanced" --days [DAYS]`
-
-   This auto-links prep work to outcomes without manual intervention.
-
-**AUTO-FIX PROTOCOL:** If any scan fails (MCP timeout, connection error), run fallback chain immediately. Log: `Auto-fixed: [tool] [error] → [fallback] → [result]`. Only escalate to Oliver if fallback also fails.
-
-**THEN (sequential):**
-
-16. **Daily snapshot (silent)** — After all MCP scans complete, assemble the data into a snapshot JSON and run `python brain/scripts/snapshot.py save '{...}'` silently in the background. Include deals, gmail, instantly, calendar data from steps 10-14. The script auto-diffs and writes brain/morning-brief.md. Do NOT surface snapshot results in the startup output — the statusline reads from the snapshot data automatically. This is infrastructure, not user-facing output.
-
-17. **Delta tagging: detect manual activities** — After snapshot completes, run manual activity detection. Compare Gmail sent count and Pipedrive activity count from MCP scans against today's activity_log entries. Call `python brain/scripts/delta_tag.py detect-manual --gmail-sent [N] --crm-updates [N] --session-logged [N]` silently. This tags activities that happened outside Claude sessions as `source: manual`. Do NOT surface results — this is background bookkeeping for the delta report.
-
-18. **Auto-draft follow-ups** — Read brain/Follow-Up Tracker.md. For every prospect with a touch due TODAY:
+**Step 12: Auto-draft follow-ups** — Read brain/Follow-Up Tracker.md (materialized by hook). For every prospect with a touch due TODAY:
     a. Load the prospect file from brain/prospects/
     b. Determine which cadence track (A or B) and which touch number
-    c. Auto-draft the follow-up email using the cadence playbook + prospect context + PATTERNS.md best angle for their persona
-    d. Present the draft to Oliver for review. Never auto-send.
-    e. Log the prep via delta_tag.py: `log-prep --prospect "[NAME]" --type email_draft --prep 2`
+    c. Auto-draft the follow-up email using cadence playbook + prospect context + PATTERNS.md
+    d. Present drafts to Oliver for review. Never auto-send.
+    e. Log prep: `delta_tag.py log-prep --prospect "[NAME]" --type email_draft --prep 2`
 
-19. **Auto-prep demos** — Check Calendar for demos/calls within 48 hours. For each:
-    a. Check if a cheat sheet exists in docs/Demo Prep/ or brain/demos/
-    b. If NO cheat sheet exists: auto-load demo prep skill, start building cheat sheet from prospect file + LinkedIn + NotebookLM + Fireflies history
-    c. If cheat sheet EXISTS: surface it with any updates needed (new info since last prep)
-    d. Log the prep via delta_tag.py: `log-prep --prospect "[NAME]" --type cheat_sheet --prep 3`
-    e. Present prep to Oliver. Don't skip -- even if cheat sheet exists, surface it so Oliver sees it.
+**Step 13: Auto-prep demos** — Check Calendar sync results for demos/calls within 48 hours. For each:
+    a. Check if cheat sheet exists in docs/Demo Prep/ or brain/demos/
+    b. If NO cheat sheet: auto-build from prospect file + LinkedIn + NotebookLM + Fireflies
+    c. If cheat sheet EXISTS: surface it with any updates needed
+    d. Log prep: `delta_tag.py log-prep --prospect "[NAME]" --type cheat_sheet --prep 3`
+    e. Present prep to Oliver. Don't skip.
 
-8. **Surface findings as checklist summary:**
+**Step 14: Surface findings:**
 ```
-STARTUP: [N]/[N] scans complete ✓
-  Gmail: [N] new replies | Calendar: [N] meetings today | Pipedrive: [N] deals changed
-  Fireflies: [N] new recordings | Instantly: [campaign] reply rate [X]%
-  Auto-fixed: [tool] → [fallback] → [result] (if any)
+SYNC: [N]/5 sources fresh | [api_sync status]
+  Pipedrive: [N] deals ($X) | [N] stage changes
+  Gmail: [N] sent, [N] replies | Calendar: [N] meetings 7d
+  Instantly: [N] replies ([rate]%) | Fireflies: [N] recordings
   REPLIES: [who replied, sentiment]
   OVERDUE: [touches past due]
   DUE TODAY: [touches due, suggested angle from PATTERNS.md]
   UPCOMING: [next 3 days]
-  CLOSED DEALS: [any newly closed → logged to forecasting.md for calibration]
 ```
-If all scans pass and nothing is overdue: keep to 3 lines. Details only expand on findings.
+If all sources fresh and nothing overdue: keep to 3 lines.
 
 ## Phase 2: CARL (lightweight)
 

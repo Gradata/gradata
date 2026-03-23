@@ -1,6 +1,6 @@
 ---
 name: "business-growth-skills"
-description: "Use when user wants to 4 business growth agent skills and plugins for Claude Code, Codex, Gemini CLI, Cursor, OpenClaw. Customer success (health scoring, churn), sales engineer (RFP), revenue operations (pipeline, GTM), contract & proposal writer. Python tools (stdlib-only)."
+description: "4 business growth skills — customer success (health scoring, churn prediction), sales engineer (RFP analysis, competitive positioning), revenue operations (pipeline, GTM metrics), and contract & proposal writer. Use when the user mentions \"customer health\", \"churn risk\", \"health score\", \"RFP\", \"competitive matrix\", \"POC plan\", \"pipeline analysis\", \"forecast accuracy\", \"GTM efficiency\", \"revenue ops\", \"expansion opportunity\", \"sales engineering\", or needs business growth analysis tools."
 version: 1.1.0
 author: Alireza Rezvani
 license: MIT

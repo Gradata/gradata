@@ -1,15 +1,6 @@
 ---
 name: cold-email-manifesto
-description: Use when user wants to Cold email conversion methodology from The Cold Email Manifesto by Alex Berman and Robert Indries. Use this skill whenever Oliver needs help writing cold emails, improving open or reply rates, crafting subject lines, structuring email offers, or scaling cold email campaigns without killing deliverability. Also trigger when he says "my cold emails aren't working," "how do I write better subject lines," "what's a good cold email offer," "how do I scale outreach," "my reply rate is low," "write me a cold email for [prospect]," "CCQ format," "help me with email copy," "what should my breakup email say," or any discussion about cold email structure, A/B testing email copy, or Instantly campaign creation. This skill focuses specifically on cold email craft — for full multi-channel cadences, see outbound-playbook. For warm/lifecycle emails, see email-sequence.
-  Cold email conversion methodology from The Cold Email Manifesto by Alex Berman and Robert Indries.
-  Use this skill whenever Oliver needs help writing cold emails, improving open or reply rates, crafting
-  subject lines, structuring email offers, or scaling cold email campaigns without killing deliverability.
-  Also trigger when he says "my cold emails aren't working," "how do I write better subject lines,"
-  "what's a good cold email offer," "how do I scale outreach," "my reply rate is low," "write me a cold
-  email for [prospect]," "CCQ format," "help me with email copy," "what should my breakup email say,"
-  or any discussion about cold email structure, A/B testing email copy, or Instantly campaign creation.
-  This skill focuses specifically on cold email craft — for full multi-channel cadences, see outbound-playbook.
-  For warm/lifecycle emails, see email-sequence.
+description: Cold email conversion methodology from The Cold Email Manifesto by Alex Berman and Robert Indries. Use when the user mentions "cold email", "subject lines", "email offer", "scale outreach", "reply rate", "write me an email", "CCQ format", "email copy", "breakup email", "cold emails aren't working", "open rate", "A/B test email", "Instantly campaign", "deliverability", or needs help writing, structuring, or improving cold email campaigns.
 metadata:
   version: 2.0.0
   source: "The Cold Email Manifesto by Alex Berman & Robert Indries"

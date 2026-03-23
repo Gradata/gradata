@@ -390,100 +390,36 @@ See [WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md) for:
 
 ## Template Usage
 
-### Search Templates
-
 ```javascript
-// Search by keyword (default mode)
-search_templates({
-  query: "webhook slack",
-  limit: 20
-});
+// Search by keyword
+search_templates({query: "webhook slack", limit: 20});
 
 // Search by node types
-search_templates({
-  searchMode: "by_nodes",
-  nodeTypes: ["n8n-nodes-base.httpRequest", "n8n-nodes-base.slack"]
-});
+search_templates({searchMode: "by_nodes", nodeTypes: ["n8n-nodes-base.httpRequest", "n8n-nodes-base.slack"]});
 
-// Search by task type
-search_templates({
-  searchMode: "by_task",
-  task: "webhook_processing"
-});
+// Search by task type or metadata
+search_templates({searchMode: "by_task", task: "webhook_processing"});
+search_templates({searchMode: "by_metadata", complexity: "simple", maxSetupMinutes: 15});
 
-// Search by metadata (complexity, setup time)
-search_templates({
-  searchMode: "by_metadata",
-  complexity: "simple",
-  maxSetupMinutes: 15
-});
-```
+// Get template details
+get_template({templateId: 2947, mode: "structure"});  // nodes+connections
+get_template({templateId: 2947, mode: "full"});        // complete JSON
 
-### Get Template Details
-
-```javascript
-get_template({
-  templateId: 2947,
-  mode: "structure"  // nodes+connections only
-});
-
-get_template({
-  templateId: 2947,
-  mode: "full"  // complete workflow JSON
-});
-```
-
-### Deploy Template Directly
-
-```javascript
-// Deploy template to your n8n instance
-n8n_deploy_template({
-  templateId: 2947,
-  name: "My Weather to Slack",  // Custom name (optional)
-  autoFix: true,  // Auto-fix common issues (default)
-  autoUpgradeVersions: true  // Upgrade node versions (default)
-});
-// Returns: workflow ID, required credentials, fixes applied
+// Deploy template directly
+n8n_deploy_template({templateId: 2947, name: "My Workflow", autoFix: true, autoUpgradeVersions: true});
 ```
 
 ---
 
 ## Self-Help Tools
 
-### Get Tool Documentation
-
 ```javascript
-// Overview of all tools
-tools_documentation()
-
-// Specific tool details
-tools_documentation({
-  topic: "search_nodes",
-  depth: "full"
-})
-
-// Code node guides
-tools_documentation({topic: "javascript_code_node_guide", depth: "full"})
-tools_documentation({topic: "python_code_node_guide", depth: "full"})
-```
-
-### AI Agent Guide
-
-```javascript
-// Comprehensive AI workflow guide
-ai_agents_guide()
-// Returns: Architecture, connections, tools, validation, best practices
-```
-
-### Health Check
-
-```javascript
-// Quick health check
-n8n_health_check()
-
-// Detailed diagnostics
-n8n_health_check({mode: "diagnostic"})
-// → Returns: status, env vars, tool status, API connectivity
+tools_documentation()                                          // Overview of all tools
+tools_documentation({topic: "search_nodes", depth: "full"})    // Specific tool docs
+tools_documentation({topic: "javascript_code_node_guide", depth: "full"})  // Code guides
+ai_agents_guide()                                              // AI workflow guide
+n8n_health_check()                                             // Quick health check
+n8n_health_check({mode: "diagnostic"})                         // Detailed diagnostics
 ```
 
 ---
@@ -511,132 +447,32 @@ If API tools unavailable, use templates and validation-only workflows.
 
 ---
 
-## Unified Tool Reference
+## Quick Tool Reference
 
-### get_node (Unified Node Information)
+**get_node** -- Detail: `minimal` (~200 tok) | `standard` (~1-2K, DEFAULT) | `full` (~3-8K). Modes: `info` (default), `docs`, `search_properties`, `versions`, `compare`, `breaking`, `migrations`.
 
-**Detail Levels** (mode="info", default):
-- `minimal` (~200 tokens) - Basic metadata only
-- `standard` (~1-2K tokens) - Essential properties + operations (RECOMMENDED)
-- `full` (~3-8K tokens) - Complete schema (use sparingly)
-
-**Operation Modes**:
-- `info` (default) - Node schema with detail level
-- `docs` - Readable markdown documentation
-- `search_properties` - Find specific properties (use with propertyQuery)
-- `versions` - List all versions with breaking changes
-- `compare` - Compare two versions
-- `breaking` - Show only breaking changes
-- `migrations` - Show auto-migratable changes
-
-```javascript
-// Standard (recommended)
-get_node({nodeType: "nodes-base.httpRequest"})
-
-// Get documentation
-get_node({nodeType: "nodes-base.webhook", mode: "docs"})
-
-// Search for properties
-get_node({nodeType: "nodes-base.httpRequest", mode: "search_properties", propertyQuery: "auth"})
-
-// Check versions
-get_node({nodeType: "nodes-base.executeWorkflow", mode: "versions"})
-```
-
-### validate_node (Unified Validation)
-
-**Modes**:
-- `full` (default) - Comprehensive validation with errors/warnings/suggestions
-- `minimal` - Quick required fields check only
-
-**Profiles** (for mode="full"):
-- `minimal` - Very lenient
-- `runtime` - Standard (default, recommended)
-- `ai-friendly` - Balanced for AI workflows
-- `strict` - Most thorough (production)
-
-```javascript
-// Full validation with runtime profile
-validate_node({nodeType: "nodes-base.slack", config: {...}, profile: "runtime"})
-
-// Quick required fields check
-validate_node({nodeType: "nodes-base.webhook", config: {}, mode: "minimal"})
-```
-
----
-
-## Performance Characteristics
-
-| Tool | Response Time | Payload Size |
-|------|---------------|--------------|
-| search_nodes | <20ms | Small |
-| get_node (standard) | <10ms | ~1-2KB |
-| get_node (full) | <100ms | 3-8KB |
-| validate_node (minimal) | <50ms | Small |
-| validate_node (full) | <100ms | Medium |
-| validate_workflow | 100-500ms | Medium |
-| n8n_create_workflow | 100-500ms | Medium |
-| n8n_update_partial_workflow | 50-200ms | Small |
-| n8n_deploy_template | 200-500ms | Medium |
+**validate_node** -- Modes: `full` (default) | `minimal`. Profiles: `minimal` | `runtime` (DEFAULT) | `ai-friendly` | `strict`.
 
 ---
 
 ## Best Practices
 
 ### Do
-- Use `get_node({detail: "standard"})` for most use cases
+- Use `get_node({detail: "standard"})` for most use cases (95% coverage, 1-2K tokens)
 - Specify validation profile explicitly (`profile: "runtime"`)
-- Use smart parameters (`branch`, `case`) for clarity
+- Use smart parameters (`branch`, `case`) for multi-output connections
 - Include `intent` parameter in workflow updates
-- Follow search → get_node → validate workflow
-- Iterate workflows (avg 56s between edits)
+- Follow search -> get_node -> validate -> create -> iterate workflow
 - Validate after every significant change
-- Use `includeExamples: true` for real configs
 - Use `n8n_deploy_template` for quick starts
 
 ### Don't
-- Use `detail: "full"` unless necessary (wastes tokens)
-- Forget nodeType prefix (`nodes-base.*`)
-- Skip validation profiles
+- Use `detail: "full"` unless necessary (3-8K tokens)
+- Forget nodeType prefix format: `nodes-base.*` (search/validate) vs `n8n-nodes-base.*` (workflow tools)
 - Try to build workflows in one shot (iterate!)
 - Ignore auto-sanitization behavior
-- Use full prefix (`n8n-nodes-base.*`) with search/validate tools
 - Forget to activate workflows after building
 
 ---
 
-## Summary
-
-**Most Important**:
-1. Use **get_node** with `detail: "standard"` (default) - covers 95% of use cases
-2. nodeType formats differ: `nodes-base.*` (search/validate) vs `n8n-nodes-base.*` (workflows)
-3. Specify **validation profiles** (`runtime` recommended)
-4. Use **smart parameters** (`branch="true"`, `case=0`)
-5. Include **intent parameter** in workflow updates
-6. **Auto-sanitization** runs on ALL nodes during updates
-7. Workflows can be **activated via API** (`activateWorkflow` operation)
-8. Workflows are built **iteratively** (56s avg between edits)
-
-**Common Workflow**:
-1. search_nodes → find node
-2. get_node → understand config
-3. validate_node → check config
-4. n8n_create_workflow → build
-5. n8n_validate_workflow → verify
-6. n8n_update_partial_workflow → iterate
-7. activateWorkflow → go live!
-
-For details, see:
-- [SEARCH_GUIDE.md](SEARCH_GUIDE.md) - Node discovery
-- [VALIDATION_GUIDE.md](VALIDATION_GUIDE.md) - Configuration validation
-- [WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md) - Workflow management
-
----
-
-**Related Skills**:
-- n8n Expression Syntax - Write expressions in workflow fields
-- n8n Workflow Patterns - Architectural patterns from templates
-- n8n Validation Expert - Interpret validation errors
-- n8n Node Configuration - Operation-specific requirements
-- n8n Code JavaScript - Write JavaScript in Code nodes
-- n8n Code Python - Write Python in Code nodes
+**Detailed Guides**: [SEARCH_GUIDE.md](SEARCH_GUIDE.md) | [VALIDATION_GUIDE.md](VALIDATION_GUIDE.md) | [WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md)

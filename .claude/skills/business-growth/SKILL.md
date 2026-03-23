@@ -1,6 +1,6 @@
 ---
 name: "business-growth-skills"
-description: "Use when user wants to 4 production-ready business and growth skills: customer success manager with health scoring and churn prediction, sales engineer with RFP analysis, revenue operations with pipeline and GTM metrics, and contract & proposal writer. Python tools included (all stdlib-only). Works with Claude Code, Codex CLI, and OpenClaw."
+description: 4 business growth skills — customer success (health scoring, churn prediction), sales engineer (RFP analysis, competitive positioning), revenue operations (pipeline, GTM metrics), and contract & proposal writer. Use when the user mentions "customer health", "churn risk", "health score", "RFP", "competitive matrix", "POC plan", "pipeline analysis", "forecast accuracy", "GTM efficiency", "revenue ops", "expansion opportunity", "sales engineering", or needs business growth analysis tools.
 version: 1.1.0
 author: Alireza Rezvani
 license: MIT

@@ -1,14 +1,6 @@
 ---
 name: fanatical-prospecting
-description: Use when user wants to Prospecting discipline and pipeline management using Jeb Blount's Fanatical Prospecting methodology. Use this skill whenever Oliver mentions prospecting, cold calling, pipeline, outreach volume, call blocks, or activity tracking. Also trigger when he says things like "I'm not making enough calls," "my pipeline is thin," "I need more meetings," "I keep putting off outreach," "how many calls should I make," "what do I say when they pick up," "voicemail script," "they keep brushing me off on the phone," or any discussion about daily prospecting habits, discipline, or call reluctance. Even if Oliver doesn't name the book, any conversation about prospecting volume, activity metrics, or phone-based outreach should pull from this skill.
-  Prospecting discipline and pipeline management using Jeb Blount's Fanatical Prospecting methodology.
-  Use this skill whenever Oliver mentions prospecting, cold calling, pipeline, outreach volume, call blocks,
-  or activity tracking. Also trigger when he says things like "I'm not making enough calls," "my pipeline
-  is thin," "I need more meetings," "I keep putting off outreach," "how many calls should I make,"
-  "what do I say when they pick up," "voicemail script," "they keep brushing me off on the phone,"
-  or any discussion about daily prospecting habits, discipline, or call reluctance. Even if Oliver doesn't
-  name the book, any conversation about prospecting volume, activity metrics, or phone-based outreach
-  should pull from this skill.
+description: Prospecting discipline and pipeline management using Jeb Blount's Fanatical Prospecting methodology. Use when the user mentions "prospecting", "cold calling", "pipeline", "outreach volume", "call blocks", "activity tracking", "not making enough calls", "pipeline is thin", "need more meetings", "putting off outreach", "how many calls", "what do I say when they pick up", "voicemail script", "brushing me off on the phone", "call reluctance", or any discussion about daily prospecting habits, dial counts, or phone-based outreach.
 metadata:
   version: 2.0.0
   source: "Fanatical Prospecting by Jeb Blount"

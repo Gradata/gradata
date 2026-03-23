@@ -1,3 +1,8 @@
+---
+name: win-loss
+description: Post-close checklist for win/loss debriefs. Ensures transcript pull, pattern documentation, persona updates, and NotebookLM feed are complete after every deal closure.
+---
+
 # Win/Loss Analysis Gate (MANDATORY — NO EXCEPTIONS)
 **When a deal closes (won OR lost), debrief MUST be written.**
 

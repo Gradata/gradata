@@ -218,6 +218,20 @@ This is the MOST IMPORTANT part of wrap-up. A bad handoff means the next session
 
 Mark each relevant item. Skip irrelevant ones. Fix any failures before closing.
 
+## Phase 5a: Delta Sync (MANDATORY — runs every session)
+
+Ensure sales data is fresh before writing the handoff. The SessionStart hook (api_sync.py)
+already syncs all 5 sources automatically. This step VERIFIES and PATCHES if needed.
+
+1. Run `python brain/scripts/api_sync.py status` — check last sync timestamps
+2. If all 5 sources synced THIS session: skip re-sync, read results from sync_state
+3. If any source is stale: run `python brain/scripts/api_sync.py sync --session [N]` (direct API, no MCP)
+4. Show Oliver the compact delta summary (3-5 lines). Only expand on findings.
+5. If any prospect replies detected → update that prospect's brain file immediately
+6. If any new Fireflies recordings → flag for next session's prep mining
+
+Do NOT use MCP tools here — api_sync.py calls APIs directly. This is a 5-second check, not a 15-second scan.
+
 ## Phase 5b: Session Note (HARD GATE — cannot commit or close without this)
 
 **Path:** docs/Session Notes/[YYYY-MM-DD]-S[N].md
