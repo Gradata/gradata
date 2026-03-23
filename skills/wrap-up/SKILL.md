@@ -341,10 +341,11 @@ Spawn these 5 agents in a single parallel batch. They have NO cross-dependencies
 | wrapup-session-scorer | .claude/agents/wrapup-session-scorer.md | Compute objective 0-10 session score | No (score only) |
 
 **After all 5 complete:**
-1. Apply pattern-scanner's lesson proposals (if any) to lessons.md
-2. Record session-scorer's composite score in session_metrics
-3. Act on events-auditor's flags (if critical)
-4. Use metrics agent's confidence updates for self-improvement pipeline
+1. **CHECK SESSION SCORE (HARD GATE).** If session-scorer returns < 9.0/10: identify weak components, fix them, re-run scorer. Repeat until 9.0+ or Oliver overrides. Session cannot close below 9.0.
+2. Apply pattern-scanner's lesson proposals (if any) to lessons.md
+3. Record session-scorer's composite score in session_metrics
+4. Act on events-auditor's flags (if critical)
+5. Use metrics agent's confidence updates for self-improvement pipeline
 
 **Context packet for all agents:** Pass session number, session type, date, and current session's key activities.
 

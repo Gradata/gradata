@@ -177,6 +177,23 @@ The composite score is 0-10, computed from 4 weighted components:
 
 If no prior metrics exist: "First scored session — establishing baseline. No trend available."
 
+## Quality Gate: 9.0 / 10 Minimum
+
+**The composite score must reach 9.0/10 or the session is not done.**
+
+If score < 9.0:
+1. Report the score and identify which components are dragging it down.
+2. Output `VERDICT: BLOCKED — [X.XX]/10 (need 9.0)` with specific actions to raise each weak component.
+3. The orchestrator must address the weak components and re-run the scorer until 9.0 is reached.
+
+If score >= 9.0:
+1. Output `VERDICT: CLEAR — [X.XX]/10`
+
+**Exceptions (do NOT penalize):**
+- Systems sessions with 0 OUTPUT/CORRECTION events: score event completeness against systems-expected types only (GATE_RESULT, STEP_COMPLETE), not all 8.
+- First 3 sessions: baseline period, CLEAR at 7.0+ with a note.
+- Components with no data (e.g., no outputs to measure acceptance): exclude from weighted average and redistribute weight, do NOT use placeholders that inflate or deflate.
+
 ## HARD BOUNDARIES — You Cannot:
 - Write session notes or update loop-state (that's wrapup-handoff)
 - Analyze correction patterns or propose lessons (that's pattern-scanner)
