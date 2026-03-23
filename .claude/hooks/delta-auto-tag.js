@@ -158,11 +158,61 @@ function shellEscape(str) {
   return '"' + str.replace(/"/g, '\\"').replace(/\n/g, " ").substring(0, 200) + '"';
 }
 
+/**
+ * Check if this Edit touches a file that was recently written by an agent.
+ * If so, auto-emit a HUMAN_JUDGMENT event (Oliver is editing agent output = calibration signal).
+ */
+function checkAgentOutputEdit(toolName, toolInput) {
+  if (toolName !== "Edit") return;
+
+  const filePath = (toolInput && (toolInput.file_path || toolInput.path)) || "";
+  if (!filePath) return;
+
+  const os = require("os");
+  const path = require("path");
+  const fs = require("fs");
+  const manifestPath = path.join(os.tmpdir(), "agent-written-files.json");
+
+  if (!fs.existsSync(manifestPath)) return;
+
+  let manifest = {};
+  try { manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")); } catch { return; }
+
+  const normalizedPath = filePath.replace(/\\/g, "/");
+
+  // Check if this file was recently agent-written
+  const entry = manifest[normalizedPath];
+  if (!entry) return;
+
+  // File was agent-written and Oliver is now editing it → HUMAN_JUDGMENT
+  const agentName = entry.agent || "unknown";
+  const taskId = `auto_${agentName}_${entry.written_at || "unknown"}`;
+
+  try {
+    const pyCmd = [
+      `"${PYTHON}"`,
+      "-c",
+      `"import sys; sys.path.insert(0, r'C:/Users/olive/SpritesWork/brain/scripts'); from spawn import log_human_judgment; log_human_judgment('${taskId.replace(/'/g, "")}', '${agentName.replace(/'/g, "")}', accepted=True, edited=True)"`,
+    ].join(" ");
+
+    execSync(pyCmd, { timeout: 5000, stdio: "ignore" });
+  } catch {
+    // Silent
+  }
+
+  // Remove from manifest so we don't double-log
+  delete manifest[normalizedPath];
+  try { fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2)); } catch {}
+}
+
 function main() {
   const data = readStdin();
   if (!data || !data.tool_name) return;
 
   const toolName = data.tool_name;
+
+  // Check for agent output edits (HUMAN_JUDGMENT auto-emission)
+  checkAgentOutputEdit(toolName, data.tool_input);
 
   // Skip read-only tools
   if (SKIP_TOOLS.includes(toolName)) return;

@@ -14,6 +14,12 @@ const PROSPECT_PATHS = [
   'domain/pipeline/',
   'docs/Demo Prep/',
   'brain/demos/',
+  '/prospects/',
+  '/emails/',
+  '/templates/',
+  '/demos/',
+  '/Email Templates/',
+  '/messages/',
 ];
 
 try {
@@ -32,6 +38,7 @@ try {
 
   if (isProspectFacing) {
     process.stderr.write(`[quality-gate] Writing to prospect-facing path: ${filePath}. Ensure pre-flight gate completed.\n`);
+    process.stderr.write(`[quality-gate] MANDATORY: Run adversarial review (skills/adversarial-review/SKILL.md) before marking output as done.\n`);
   }
 } catch (e) {
   // Silent failure

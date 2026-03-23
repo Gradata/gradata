@@ -86,6 +86,16 @@
         ]
       },
       {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/brain-recall.js\"",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
         "matcher": "mcp__*",
         "hooks": [
           {
@@ -197,6 +207,15 @@
             "type": "command",
             "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/session-close-data.js\"",
             "timeout": 15000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/brain-maintain.js\"",
+            "timeout": 30000
           }
         ]
       }

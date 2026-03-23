@@ -83,6 +83,19 @@ syncs = get_last_sync()
 ```
 Only fall back to MCP tools if api_sync.py failed or sync_state is missing.
 
+**Step 10b: Channel metrics sync (best-effort)** — Pull live Instantly + Gmail metrics via MCP and feed to sync_channels.py. If either MCP call fails, log a warning and continue startup — never block on this.
+1. Call `mcp__claude_ai_Instantly_MCP__get_campaign_analytics` (no params = all campaigns). Extract `sent`, `replies`, `bounces`, `reply_rate` from the response.
+2. Call `mcp__claude_ai_Gmail__gmail_get_profile` (no params). Extract `sent_count` and `received_count` from mailbox stats (map `messagesTotal` → `received_count`, derive `sent_count` from labels or use 0 if unavailable).
+3. Run:
+   ```bash
+   python C:/Users/olive/SpritesWork/brain/scripts/sync_channels.py \
+     --instantly '{"sent": <N>, "replies": <N>, "bounces": <N>, "reply_rate": <N>}' \
+     --gmail '{"sent_count": <N>, "received_count": <N>}' \
+     --session <CURRENT_SESSION_NUMBER>
+   ```
+4. On success, the data feeds into daily_metrics (SQLite) and surfaces in the Step 14 status block under the Instantly/Gmail lines.
+5. On MCP failure: print `CHANNEL SYNC: [Instantly|Gmail] MCP unavailable — skipped` and move on.
+
 **Step 11: Outcome check** — for EVERY prospect with `outcome: pending`, check Gmail sync results for replies from prospect emails. Reply found → update outcome via delta_tag.py. No reply + next_touch passed → "no-reply". Log outcomes:
    `python brain/scripts/delta_tag.py log-outcome --prospect "[NAME]" --prep-type "email_draft" --outcome "reply|no_reply" --days [DAYS]`
 

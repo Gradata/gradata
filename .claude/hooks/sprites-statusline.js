@@ -531,6 +531,19 @@ process.stdin.on('end', () => {
     const tierTarget = 150;
     const tierDisplay = `${tierName}(${currentSession}/${tierTarget})`;
 
+    // Fallback: if reply rate is 0 from daily snapshot, pull cumulative from all non-zero days
+    if (replyRateNum === 0 && dbOk) {
+      const cumOut = safeExec(`python -c "import sqlite3; c=sqlite3.connect('C:/Users/olive/SpritesWork/brain/system.db'); rows=c.execute('SELECT instantly_reply_rate, instantly_sent FROM daily_metrics WHERE instantly_reply_rate > 0 OR instantly_sent > 0 ORDER BY date DESC LIMIT 30').fetchall(); total_sent=sum(r[1] or 0 for r in rows); rates=[r[0] for r in rows if r[0] and r[0]>0]; avg=sum(rates)/len(rates) if rates else 0; print(f'{avg:.2f}|{total_sent}')"`);
+      if (cumOut && cumOut !== '') {
+        const [avgRate, totalSent] = cumOut.split('|');
+        const avgNum = parseFloat(avgRate);
+        if (avgNum > 0) {
+          replyRateNum = avgNum;
+          replyRate = avgNum.toFixed(1) + '%';
+        }
+      }
+    }
+
     // Delta line colors
     // Reply: red < 1% (below industry), yellow 1-2% (baseline), green > 2% (beating industry)
     const replyColor = replyRateNum >= 2 ? c.green : replyRateNum >= 1 ? c.yellow : c.red;
