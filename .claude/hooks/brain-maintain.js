@@ -10,6 +10,7 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const PYTHON = 'C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe';
 const BRAIN = 'C:/Users/olive/SpritesWork/brain';

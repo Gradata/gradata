@@ -259,6 +259,7 @@ After loading, give Oliver a concise status (plus freshness alerts if any):
 ```
 [check] Context loaded (brief, lessons, CARL, vault) | ~XXk tokens
 [morning] [Morning brief status — fresh/stale/not available]
+[tasks] [Next session tasks from loop-state.md "Next Session Tasks" section — show verbatim]
 [calendar] [Today's demos/meetings if any]
 [clipboard] [Active campaign one-liner]
 [vault] [Prospects needing follow-up from brain/ scan]

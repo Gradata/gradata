@@ -61,13 +61,13 @@ Then proceed to Phase 1.
    - Link in Demo Notes section of prospect note
 
 **CRM hygiene:**
-7. Check if any Apollo contact records need updating (stage changes, notes, tags)
-8. Flag any contacts discussed this session that are missing from Apollo
+10. Check if any Apollo contact records need updating (stage changes, notes, tags)
+11. Flag any contacts discussed this session that are missing from Apollo
 
 **Task cleanup:**
-8. Check the todo list for in-progress or stale items
-9. Mark completed tasks as done, flag orphaned ones
-10. Surface any promised follow-ups that haven't been sent
+12. Check the todo list for in-progress or stale items
+13. Mark completed tasks as done, flag orphaned ones
+14. Surface any promised follow-ups that haven't been sent
 
 ## Phase 1b: Feed the Notebooks (tier system: .claude/skills/notebooklm/SKILL.md)
 
@@ -327,6 +327,26 @@ Tags: [2-5 topic tags]
 **Brain prospect notes** (if any prospects were touched this session):
 - Create or update notes in `brain/prospects/[Name] — [Company].md`
 - Don't defer this to "later" — write it now while context is fresh
+
+## Phase 5b2: Parallel Wrap-Up Agents (spawn ALL 5 concurrently)
+
+Spawn these 5 agents in a single parallel batch. They have NO cross-dependencies and run simultaneously:
+
+| Agent | File | Role | Writes? |
+|-------|------|------|---------|
+| wrapup-handoff | .claude/agents/wrapup-handoff.md | Write loop-state, session note, morning brief | Yes (state files) |
+| wrapup-metrics | .claude/agents/wrapup-metrics.md | Compute raw metrics, confidence updates | No (numbers only) |
+| wrapup-events-auditor | .claude/agents/wrapup-events-auditor.md | Audit event emission completeness | No (report only) |
+| wrapup-pattern-scanner | .claude/agents/wrapup-pattern-scanner.md | Detect recurring patterns, propose lessons | No (proposals only) |
+| wrapup-session-scorer | .claude/agents/wrapup-session-scorer.md | Compute objective 0-10 session score | No (score only) |
+
+**After all 5 complete:**
+1. Apply pattern-scanner's lesson proposals (if any) to lessons.md
+2. Record session-scorer's composite score in session_metrics
+3. Act on events-auditor's flags (if critical)
+4. Use metrics agent's confidence updates for self-improvement pipeline
+
+**Context packet for all agents:** Pass session number, session type, date, and current session's key activities.
 
 ## Phase 5c: Pre-Commit Reflection Gate (HARD GATE — blocks Phase 6)
 

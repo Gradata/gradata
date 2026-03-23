@@ -62,4 +62,6 @@
 
 [2026-03-22] [INSTINCT:0.30] CONTEXT: Oliver does prospect work on weekdays, systems work on weekends. Never frame weekend systems sessions as "drift" or imply pipeline is being neglected. Check the day of week before commenting on session type balance. Root cause: lectured Oliver about 6 consecutive non-prospect sessions when it was Saturday — his normal schedule.
 
+[2026-03-22] [INSTINCT:0.30] STARTUP: Surface the "Next Session Tasks" from loop-state.md FIRST at startup — before any cleanup, formatting, or system checks. The handoff tells you what to work on. Don't burn 10 minutes on tasks Oliver didn't ask for while ignoring the handoff. Root cause: cleaned up loop-state formatting and chased gate failures instead of surfacing the S37 handoff (integration test, wrap-up agents, judgment decay).
+
 [2026-03-22] [INSTINCT:0.30] THOROUGHNESS: Never recommend "park" or "skip" as a first response to a deferred item. If the work can be done with subagents, do it. If it takes 30 minutes, take the 30 minutes. "Park" is only valid when Oliver explicitly says to defer, or when the task genuinely requires external input (API keys, Oliver's decisions, third-party approvals). Spawning agents is free — laziness is not. Root cause: recommended parking 3 of 6 S34 deferred items to avoid work, then Oliver had to push back twice.

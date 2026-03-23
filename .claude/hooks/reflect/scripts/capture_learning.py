@@ -62,6 +62,44 @@ def emit_hallucination(prompt: str, matched_patterns: str, confidence: float):
         pass  # Non-blocking
 
 
+def emit_correction(prompt: str, matched_patterns: str, confidence: float):
+    """Emit a CORRECTION event when Oliver corrects output.
+
+    This is the critical producer that feeds the entire self-improvement loop:
+    update_confidence → lesson_applications → judgment_decay.
+    """
+    try:
+        import subprocess
+        import re as _re
+        python = "C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe"
+        import json as _json
+        # Detect category from patterns (DRAFTING, PROCESS, ACCURACY, etc.)
+        category = "GENERAL"
+        category_map = {
+            "dont-assume": "ACCURACY", "not-what-i-meant": "COMMUNICATION",
+            "already-told": "PROCESS", "wrong-approach": "PROCESS",
+            "too-verbose": "COMMUNICATION", "missed-context": "ACCURACY",
+        }
+        for pat in (matched_patterns or "").split():
+            if pat in category_map:
+                category = category_map[pat]
+                break
+        data = _json.dumps({
+            "category": category,
+            "detail": prompt[:200],
+            "confidence": confidence,
+            "patterns": matched_patterns,
+        })
+        tags = _json.dumps([f"category:{category}"])
+        subprocess.run(
+            [python, "C:/Users/olive/SpritesWork/brain/scripts/events.py",
+             "emit", "CORRECTION", "hook:capture_learning", data, tags],
+            capture_output=True, text=True, timeout=5
+        )
+    except Exception:
+        pass  # Non-blocking
+
+
 def main() -> int:
     """Main entry point."""
     # Read JSON from stdin
@@ -124,6 +162,11 @@ def main() -> int:
                     break
         if is_hallucination:
             emit_hallucination(prompt, patterns, confidence)
+
+        # Emit CORRECTION event for ALL corrections (not just hallucinations)
+        # This feeds: update_confidence, lesson_applications, judgment_decay, validator checks
+        if sentiment == "correction":
+            emit_correction(prompt, patterns, confidence)
 
         # Output feedback for Claude to acknowledge the capture
         # UserPromptSubmit hooks with exit code 0 add stdout as context
