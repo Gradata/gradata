@@ -40,7 +40,7 @@ Confidence updates at wrap-up via events.jsonl queries. Kill switches by maturit
 | **MATURE** | 100-200 | LOW | 5 cycles zero value | Auto-delete, Oliver notified |
 | **STABLE** | 200+ | MINIMAL | 3 cycles zero value | Aggressive pruning |
 
-Current phase: **INFANT (Session 36/50).** Transition at session 50.
+Current phase: **INFANT (Session 38/50).** Transition at session 50.
 
 ## Trust Layers (marketplace)
 1. **Brain trusts itself** — maturity schedule (self-awareness of own confidence)
