@@ -12,6 +12,10 @@ Usage:
     aios-brain audit                              # Data flow audit
     aios-brain export                             # Export for marketplace
     aios-brain context "draft email to Hassan"    # Compile context
+    aios-brain validate                           # Verify brain quality
+    aios-brain validate --strict                  # Fail if trust < C
+    aios-brain install brain-archive.zip          # Install from marketplace
+    aios-brain install --list                     # List installed brains
 """
 
 import argparse
@@ -29,10 +33,18 @@ def _get_brain(args):
 
 def cmd_init(args):
     from aios_brain import Brain
-    brain = Brain.init(args.path, domain=args.domain)
-    print(f"Brain initialized at {brain.dir}")
-    stats = brain.stats()
-    print(f"  Files: {stats['markdown_files']} | DB: {stats['db_size_mb']}MB")
+    kwargs = {}
+    if args.domain:
+        kwargs["domain"] = args.domain
+    if args.name:
+        kwargs["name"] = args.name
+    if args.company:
+        kwargs["company"] = args.company
+    if args.embedding:
+        kwargs["embedding"] = args.embedding
+    if args.no_interactive:
+        kwargs["interactive"] = False
+    Brain.init(args.path, **kwargs)
 
 
 def cmd_search(args):
@@ -83,8 +95,7 @@ def cmd_stats(args):
 def cmd_audit(args):
     brain = _get_brain(args)
     try:
-        sys.path.insert(0, str(brain.dir / "scripts"))
-        from data_flow_audit import run_audit
+        from aios_brain._data_flow_audit import run_audit
         report = run_audit()
         if args.json:
             print(json.dumps(report, indent=2))
@@ -96,7 +107,7 @@ def cmd_audit(args):
                 for f in failures:
                     print(f"  FAIL: {f['name']} -- {f['detail'][:80]}")
     except ImportError:
-        print("Audit requires brain scripts in brain/scripts/")
+        print("Audit module not available.")
 
 
 def cmd_export(args):
@@ -114,6 +125,54 @@ def cmd_context(args):
         print("No relevant context found.")
 
 
+def cmd_validate(args):
+    brain = _get_brain(args)
+    from aios_brain._validator import validate_brain, print_report
+    manifest_path = Path(args.manifest) if args.manifest else brain.dir / "brain.manifest.json"
+    report = validate_brain(manifest_path)
+    if args.json:
+        print(json.dumps(report, indent=2, default=str))
+    else:
+        print_report(report)
+    if args.strict and report.get("trust", {}).get("grade", "F") in ("D", "F"):
+        sys.exit(1)
+
+
+def cmd_doctor(args):
+    from aios_brain._doctor import diagnose, print_diagnosis
+    brain_dir = getattr(args, "brain_dir", None)
+    report = diagnose(brain_dir=brain_dir)
+    if getattr(args, "json", False):
+        print(json.dumps(report, indent=2))
+    else:
+        print_diagnosis(report)
+    if report["status"] == "broken":
+        sys.exit(1)
+
+
+def cmd_install(args):
+    from aios_brain._installer import install, list_installed
+
+    if args.list:
+        brains = list_installed()
+        if brains:
+            print(f"Installed brains ({len(brains)}):")
+            for b in brains:
+                print(f"  {b.get('domain', '?')}/{b.get('version', '?')} — {b['path']}")
+        else:
+            print("No brains installed.")
+        return
+
+    if not args.archive:
+        print("Archive path required (or use --list)")
+        sys.exit(1)
+
+    target = Path(args.target) if args.target else None
+    report = install(Path(args.archive), target, dry_run=args.dry_run)
+    if report["status"] == "failed":
+        sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="aios-brain",
@@ -126,7 +185,13 @@ def main():
     # init
     p_init = sub.add_parser("init", help="Bootstrap a new brain")
     p_init.add_argument("path", type=Path, help="Directory to create brain in")
-    p_init.add_argument("--domain", default="General", help="Brain domain (e.g., Sales)")
+    p_init.add_argument("--name", default=None, help="Brain name (default: directory name)")
+    p_init.add_argument("--domain", default=None, help="Brain domain (e.g., Sales, Engineering)")
+    p_init.add_argument("--company", default=None, help="Company name (creates company.md)")
+    p_init.add_argument("--embedding", choices=["local", "gemini"], default=None,
+                         help="Embedding provider: local (default) or gemini")
+    p_init.add_argument("--no-interactive", action="store_true",
+                         help="Skip interactive prompts, use defaults")
 
     # search
     p_search = sub.add_parser("search", help="Search the brain")
@@ -158,6 +223,23 @@ def main():
     p_ctx = sub.add_parser("context", help="Compile context for a message")
     p_ctx.add_argument("message", help="User message")
 
+    # validate
+    p_validate = sub.add_parser("validate", help="Verify brain quality independently")
+    p_validate.add_argument("--manifest", type=str, help="Path to brain.manifest.json")
+    p_validate.add_argument("--json", action="store_true")
+    p_validate.add_argument("--strict", action="store_true", help="Exit 1 on trust grade D or F")
+
+    # doctor
+    p_doctor = sub.add_parser("doctor", help="Check environment and brain health")
+    p_doctor.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # install
+    p_install = sub.add_parser("install", help="Install a brain from marketplace archive")
+    p_install.add_argument("archive", nargs="?", help="Path to brain archive (.zip)")
+    p_install.add_argument("--target", type=str, help="Installation directory")
+    p_install.add_argument("--dry-run", action="store_true")
+    p_install.add_argument("--list", action="store_true", help="List installed brains")
+
     args = parser.parse_args()
 
     commands = {
@@ -169,6 +251,9 @@ def main():
         "audit": cmd_audit,
         "export": cmd_export,
         "context": cmd_context,
+        "validate": cmd_validate,
+        "doctor": cmd_doctor,
+        "install": cmd_install,
     }
 
     if args.command in commands:

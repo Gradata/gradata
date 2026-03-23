@@ -1,43 +1,252 @@
-# What This Is
+# aios-brain
 
-This is a professional assistant that gets better at your job the longer you use it.
+Portable AI brain SDK. Gives any AI agent persistent memory, semantic retrieval, event logging, and compounding learning across sessions.
 
-It starts with your answers to five questions — your role, your most common task, who you serve, what bad work looks like in your field, and what tools you use. From those answers, it builds a working system configured for your domain.
+## Installation
 
-Then you use it to do your actual work. Not practice work. Real work — the tasks you do every week that require judgment, attention, and quality.
+```bash
+pip install aios-brain
+```
 
-## How It Works
+For semantic search with Gemini embeddings:
 
-Every time you work together, three things happen:
+```bash
+pip install aios-brain[gemini]
+```
 
-1. **It does the task.** Research, drafting, review, whatever you asked for.
-2. **It checks its own work.** Before showing you anything, it runs quality checks calibrated to your standards.
-3. **It learns from the result.** If you correct something, it logs the correction and applies it next time. If a pattern works, it reinforces it. If something fails, it stops using that approach.
+Requires Python 3.11+.
 
-This is the compounding loop. It runs automatically. You don't manage it.
+## Quick Start
 
-## Setup vs Working
+```python
+from aios_brain import Brain
 
-**Setup** is answering the onboarding questions and reviewing what the system generates. Takes one session, maybe two.
+# Create a new brain
+brain = Brain.init("./my-brain", domain="Sales")
 
-**Working** is doing your job with the system present. Writing, researching, reviewing, preparing, responding — whatever your role requires. This is where the learning happens.
+# Search it (keyword fallback if no embeddings yet)
+results = brain.search("budget objections")
+results = brain.search("Hassan Ali", mode="keyword")
 
-Spend your time on working sessions. The system improves from real work, not from configuration.
+# Log an event
+brain.emit("CORRECTION", "user", {
+    "category": "DRAFTING",
+    "detail": "Too formal for this persona"
+})
 
-## What to Expect
+# Embed files for semantic search
+brain.embed()          # delta — only changed files
+brain.embed(full=True) # full re-embed
 
-**Week 1:** The system knows your role, tools, and basic quality bar. It will make mistakes. Correct them — every correction makes it smarter.
+# Generate brain manifest
+manifest = brain.manifest()
 
-**Week 2:** Common patterns emerge. The system starts suggesting workflows and catching recurring errors before you see them. You'll get a personalized tip each session on one thing you can improve.
+# Export for sharing
+brain.export("./my-brain-export.zip")
+```
 
-**Week 4:** Routine tasks run at your standard with minimal intervention. Quality scores stabilize. The system anticipates what you need before you ask. Corrections become rare because the system has already internalized them.
+## CLI
 
-**After 30 days:** The system handles the predictable parts of your work so you can focus on the parts that require your expertise. It's not a replacement — it's a multiplier on the work you already do well.
+Every SDK method has a CLI equivalent:
 
-## What It Will Never Do
+```bash
+# Bootstrap a new brain
+aios-brain init ./my-brain --domain Sales
 
-- Send anything to anyone without your approval
-- Make claims it can't verify
-- Skip steps in a process you've defined
-- Guess when it should ask
-- Stop learning
+# Search
+aios-brain search "budget objections"
+aios-brain search "competitor pricing" --mode semantic --top 10
+
+# Embed files into vector store
+aios-brain embed
+aios-brain embed --full
+
+# Generate brain.manifest.json
+aios-brain manifest
+aios-brain manifest --json
+
+# Stats
+aios-brain stats
+
+# Data flow audit
+aios-brain audit
+aios-brain audit --json
+
+# Export for marketplace
+aios-brain export
+aios-brain export --mode domain-only
+```
+
+Use `--brain-dir` / `-b` to point at a brain directory other than cwd:
+
+```bash
+aios-brain -b /path/to/brain search "query"
+```
+
+## Architecture
+
+### Brain Directory Structure
+
+```
+my-brain/
+├── brain.manifest.json      # Machine-readable brain spec
+├── system.db                # SQLite — events, facts, metrics
+├── .vectorstore/            # ChromaDB embeddings
+├── .embed-manifest.json     # File hash tracking for delta embeds
+├── loop-state.md            # Episodic state between sessions
+├── VERSION.md
+├── prospects/               # Per-prospect knowledge files
+├── sessions/                # Session logs
+├── personas/                # Buyer persona definitions
+├── objections/              # Objection handling patterns
+├── competitors/             # Competitive intelligence
+├── emails/                  # Email patterns and templates
+│   └── PATTERNS.md
+├── learnings/               # Graduated lessons
+├── metrics/                 # Session quality metrics
+├── pipeline/                # Deal tracking
+├── demos/                   # Demo prep and notes
+├── vault/                   # Protected files
+└── scripts/                 # Brain scripts (embed, query, etc.)
+```
+
+### Memory Types
+
+Every file in the brain has a memory type, declared via frontmatter comment:
+
+```markdown
+<!-- memory_type: episodic -->
+```
+
+| Type | Purpose | Examples |
+|------|---------|----------|
+| **episodic** | What happened — session logs, interaction history | `sessions/`, `loop-state.md`, prospect timelines |
+| **semantic** | What is known — facts, research, profiles | `prospects/`, `competitors/`, `personas/` |
+| **procedural** | How to do things — workflows, scripts, patterns | `emails/PATTERNS.md`, `scripts/`, gate definitions |
+| **strategic** | Why — positioning, lessons, quality rules | `learnings/`, quality rubrics, strategy docs |
+
+### Event System
+
+The brain logs structured events to `system.db`:
+
+```python
+# Emit
+brain.emit("CORRECTION", "user", {
+    "category": "ACCURACY",
+    "detail": "Revenue figure was wrong"
+})
+
+# Query
+events = brain.query_events(event_type="CORRECTION", last_n_sessions=3)
+```
+
+### Fact Store
+
+Structured facts extracted from knowledge files:
+
+```python
+facts = brain.get_facts(prospect="Hassan Ali")
+brain.extract_facts()  # Re-extract from all prospect files
+```
+
+### Context Compilation
+
+Get relevant brain context for any user message:
+
+```python
+context = brain.context_for("draft a follow-up email to Hassan")
+```
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `BRAIN_DIR` | No | Default brain directory path |
+| `GEMINI_API_KEY` | For semantic search | Gemini API key (free tier) |
+| `PIPEDRIVE_API_KEY` | No | CRM sync |
+| `INSTANTLY_API_KEY` | No | Email automation sync |
+
+### brain.manifest.json
+
+Machine-readable spec generated by `brain.manifest()`. Schema:
+
+```json
+{
+  "schema_version": "1.0.0",
+  "metadata": {
+    "brain_version": "v2.0.0",
+    "domain": "Sales",
+    "maturity_phase": "INFANT",
+    "sessions_trained": 34
+  },
+  "quality": {
+    "correction_rate": null,
+    "lessons_graduated": 63,
+    "lessons_active": 20,
+    "first_draft_acceptance": null
+  },
+  "memory_composition": {
+    "episodic": 50,
+    "semantic": 29,
+    "procedural": 3,
+    "strategic": 16
+  },
+  "rag": {
+    "active": true,
+    "provider": "gemini",
+    "model": "gemini-embedding-2-preview",
+    "dimensions": 768,
+    "chunks_indexed": 226,
+    "hybrid_search": true
+  },
+  "compatibility": {
+    "python": ">=3.11",
+    "chromadb": ">=0.5.0",
+    "platform": "any"
+  }
+}
+```
+
+### Maturity Phases
+
+Brains progress through maturity phases based on session count:
+
+| Phase | Sessions | Description |
+|-------|----------|-------------|
+| INFANT | 0-50 | High tolerance, learning fast |
+| ADOLESCENT | 50-100 | Patterns stabilizing |
+| MATURE | 100-200 | Low tolerance, pruning begins |
+| STABLE | 200+ | Minimal tolerance, aggressive pruning |
+
+## Python API Reference
+
+```python
+Brain.init(path, domain="General") -> Brain   # Bootstrap new brain
+Brain(path) -> Brain                           # Open existing brain
+
+brain.search(query, mode=None, top_k=5)       # Search (keyword/semantic/hybrid)
+brain.embed(full=False)                        # Embed files into ChromaDB
+brain.emit(event_type, source, data, tags)     # Log event
+brain.query_events(event_type, last_n_sessions)# Query events
+brain.get_facts(prospect, fact_type)           # Query facts
+brain.extract_facts()                          # Extract facts from files
+brain.manifest()                               # Generate manifest
+brain.export(output_path, mode="full")         # Export brain archive
+brain.context_for(message)                     # Compile context for a message
+brain.stats()                                  # Brain statistics dict
+```
+
+## Contributing
+
+1. Fork the repo
+2. Create a feature branch: `git checkout -b feat/my-feature`
+3. Make changes and add tests
+4. Submit a PR against `main`
+
+Brain layer code (`aios_brain/`) must stay runtime-agnostic. No dependencies on Claude Code, specific LLM providers, or host OS features. The SDK should work with any agent framework.
+
+## License
+
+MIT

@@ -40,6 +40,48 @@ import sqlite3
 import sys
 from pathlib import Path
 
+# ── Graceful optional dependency handling ─────────────────────────────
+# These are checked at method call time, not import time, so the Brain
+# class is always importable even without chromadb or sentence-transformers.
+
+_chromadb = None
+_chromadb_error = None
+try:
+    import chromadb as _chromadb
+except ImportError:
+    _chromadb_error = (
+        "chromadb is not installed. Install it with:\n"
+        "  pip install chromadb\n"
+        "Semantic search and embedding features require chromadb."
+    )
+except Exception as _e:
+    _chromadb_error = f"chromadb failed to import: {_e}"
+
+_sentence_transformers = None
+_sentence_transformers_error = None
+try:
+    import sentence_transformers as _sentence_transformers
+except ImportError:
+    _sentence_transformers_error = (
+        "sentence-transformers is not installed. Install it with:\n"
+        "  pip install sentence-transformers\n"
+        "Local embedding features require sentence-transformers."
+    )
+except Exception as _e:
+    _sentence_transformers_error = f"sentence-transformers failed to import: {_e}"
+
+
+def _require_chromadb():
+    """Raise a clear error if chromadb is unavailable."""
+    if _chromadb is None:
+        raise ImportError(_chromadb_error)
+
+
+def _require_sentence_transformers():
+    """Raise a clear error if sentence-transformers is unavailable."""
+    if _sentence_transformers is None:
+        raise ImportError(_sentence_transformers_error)
+
 
 class Brain:
     """A personal AI brain backed by a directory of knowledge files."""
@@ -54,107 +96,60 @@ class Brain:
         self.manifest_path = self.dir / "brain.manifest.json"
         self.embed_manifest_path = self.dir / ".embed-manifest.json"
 
-        # Add scripts to path for imports
-        scripts_dir = self.dir / "scripts"
-        if scripts_dir.exists() and str(scripts_dir) not in sys.path:
-            sys.path.insert(0, str(scripts_dir))
+        # Point all SDK modules to this brain directory
+        from aios_brain._paths import set_brain_dir
+        set_brain_dir(self.dir)
 
     @classmethod
-    def init(cls, brain_dir: str | Path, domain: str = "General") -> "Brain":
-        """Bootstrap a new brain directory with empty structure."""
-        brain_dir = Path(brain_dir).resolve()
-        brain_dir.mkdir(parents=True, exist_ok=True)
+    def init(
+        cls,
+        brain_dir: str | Path,
+        *,
+        domain: str = None,
+        name: str = None,
+        company: str = None,
+        embedding: str = None,
+        interactive: bool = None,
+    ) -> "Brain":
+        """Bootstrap a new brain directory with the onboarding wizard.
 
-        # Create subdirectories
-        for sub in ["prospects", "sessions", "personas", "objections",
-                     "competitors", "emails", "learnings", "metrics",
-                     "pipeline", "demos", "vault", "scripts"]:
-            (brain_dir / sub).mkdir(exist_ok=True)
+        Args:
+            brain_dir: Path to create the brain in.
+            domain: Brain domain (e.g. "Sales", "Engineering").
+            name: Brain name for the manifest.
+            company: Company name (creates company.md if provided).
+            embedding: "local" (default) or "gemini".
+            interactive: If True, prompts for missing values. Auto-detected
+                         from terminal if not specified.
 
-        # Create empty system.db with schema
-        db_path = brain_dir / "system.db"
-        conn = sqlite3.connect(str(db_path))
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA busy_timeout=5000")
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ts TEXT NOT NULL,
-                session INTEGER,
-                type TEXT NOT NULL,
-                source TEXT,
-                data_json TEXT,
-                tags_json TEXT,
-                valid_from TEXT,
-                valid_until TEXT
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS facts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                prospect TEXT NOT NULL,
-                company TEXT,
-                fact_type TEXT NOT NULL,
-                fact_value TEXT NOT NULL,
-                confidence REAL DEFAULT 0.5,
-                source TEXT,
-                extracted_at TEXT,
-                last_verified TEXT,
-                session INTEGER,
-                stale BOOLEAN DEFAULT 0
-            )
-        """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_events_type ON events(type)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_events_session ON events(session)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_facts_prospect ON facts(prospect)")
-        conn.commit()
-        conn.close()
+        Returns:
+            Brain instance pointing at the new directory.
+        """
+        from aios_brain.onboard import onboard
 
-        # Create VERSION.md
-        version_file = brain_dir / "VERSION.md"
-        if not version_file.exists():
-            version_file.write_text(
-                f"# Brain Version\n\nCurrent Version: v0.1.0\n"
-                f"Domain: {domain}\nSession 0 — INFANT phase\n",
-                encoding="utf-8",
-            )
+        if interactive is None:
+            interactive = hasattr(sys, "stdin") and sys.stdin.isatty()
 
-        # Create empty embed manifest
-        manifest_file = brain_dir / ".embed-manifest.json"
-        if not manifest_file.exists():
-            manifest_file.write_text("{}", encoding="utf-8")
-
-        # Create empty PATTERNS.md
-        patterns = brain_dir / "emails" / "PATTERNS.md"
-        if not patterns.exists():
-            patterns.write_text(
-                "# Email Patterns\n\nNo patterns yet. They emerge from real interactions.\n",
-                encoding="utf-8",
-            )
-
-        # Create loop-state.md
-        loop_state = brain_dir / "loop-state.md"
-        if not loop_state.exists():
-            loop_state.write_text(
-                "<!-- memory_type: episodic -->\n"
-                "# Loop State -- Last Updated (never)\n\n"
-                "## Pipeline Summary\n0 active prospects | $0 pipeline value\n\n"
-                "## What Changed\nBrain initialized. No sessions yet.\n\n"
-                "## Next Session Tasks\n- Start your first work session\n\n"
-                "## Deferred\n(none)\n\n"
-                "## Loop Health\nScore: 0/10 -- Fresh brain, no data yet.\n",
-                encoding="utf-8",
-            )
-
-        return cls(brain_dir)
+        return onboard(
+            brain_dir,
+            name=name,
+            domain=domain,
+            company=company,
+            embedding=embedding,
+            interactive=interactive,
+        )
 
     # ── Search ─────────────────────────────────────────────────────────
 
     def search(self, query: str, mode: str = None, top_k: int = 5,
                file_type: str = None) -> list[dict]:
         """Search the brain using keyword, semantic, or hybrid mode."""
+        if mode in ("semantic", "hybrid") and _chromadb is None:
+            raise ImportError(
+                f"Semantic search requires chromadb.\n{_chromadb_error}"
+            )
         try:
-            from query import brain_search
+            from aios_brain._query import brain_search
             return brain_search(
                 query, file_type=file_type, top_k=top_k, mode=mode
             )
@@ -192,15 +187,15 @@ class Brain:
 
     def embed(self, full: bool = False) -> int:
         """Embed brain files into ChromaDB. Returns chunks embedded."""
+        _require_chromadb()
         try:
-            from embed import main as embed_main
-            # Set args for embed.py
-            sys.argv = ["embed.py"]
-            if full:
-                sys.argv.append("--full")
-            # Capture the result
-            embed_main()
-            return 0  # embed_main doesn't return count cleanly
+            from aios_brain._embed import main as embed_main
+            return embed_main(brain_dir=self.dir, full=full)
+        except ImportError as e:
+            raise ImportError(
+                f"Embedding requires additional dependencies: {e}\n"
+                "Run: pip install chromadb sentence-transformers"
+            ) from e
         except Exception as e:
             print(f"Embed error: {e}")
             return -1
@@ -211,14 +206,14 @@ class Brain:
              tags: list = None, session: int = None) -> dict:
         """Emit an event to the brain's event log."""
         try:
-            from events import emit
+            from aios_brain._events import emit
             return emit(event_type, source, data or {}, tags or [], session)
         except ImportError:
             # Fallback: direct SQLite write
             return self._emit_direct(event_type, source, data, tags, session)
 
     def _emit_direct(self, event_type, source, data, tags, session):
-        """Direct SQLite event emission without events.py."""
+        """Direct SQLite event emission without events module."""
         from datetime import datetime, timezone
         conn = sqlite3.connect(str(self.db_path))
         ts = datetime.now(timezone.utc).isoformat()
@@ -235,7 +230,7 @@ class Brain:
                      last_n_sessions: int = None, limit: int = 100) -> list[dict]:
         """Query events from the brain's event log."""
         try:
-            from events import query
+            from aios_brain._events import query
             return query(event_type=event_type, session=session,
                          last_n_sessions=last_n_sessions, limit=limit)
         except ImportError:
@@ -246,7 +241,7 @@ class Brain:
     def get_facts(self, prospect: str = None, fact_type: str = None) -> list[dict]:
         """Query structured facts from the brain."""
         try:
-            from fact_extractor import query_facts
+            from aios_brain._fact_extractor import query_facts
             return query_facts(prospect=prospect, fact_type=fact_type)
         except ImportError:
             return []
@@ -254,7 +249,7 @@ class Brain:
     def extract_facts(self) -> int:
         """Extract structured facts from all prospect files."""
         try:
-            from fact_extractor import extract_all, store_facts
+            from aios_brain._fact_extractor import extract_all, store_facts
             facts = extract_all()
             store_facts(facts)
             return len(facts)
@@ -266,12 +261,12 @@ class Brain:
     def manifest(self) -> dict:
         """Generate brain.manifest.json and return it."""
         try:
-            from brain_manifest import generate_manifest, write_manifest
+            from aios_brain._brain_manifest import generate_manifest, write_manifest
             m = generate_manifest()
             write_manifest(m)
             return m
         except ImportError:
-            # Minimal manifest without brain_manifest.py
+            # Minimal manifest without brain_manifest module
             return {
                 "schema_version": "1.0.0",
                 "metadata": {
@@ -285,20 +280,20 @@ class Brain:
     def export(self, output_path: str = None, mode: str = "full") -> Path:
         """Export brain as a shareable archive."""
         try:
-            from export_brain import export_brain
+            from aios_brain._export_brain import export_brain
             return export_brain(
                 include_prospects=(mode != "no-prospects"),
                 domain_only=(mode == "domain-only"),
             )
         except ImportError as e:
-            raise RuntimeError(f"Export requires brain scripts: {e}")
+            raise RuntimeError(f"Export requires brain modules: {e}")
 
     # ── Context ────────────────────────────────────────────────────────
 
     def context_for(self, message: str) -> str:
         """Compile relevant context for a user message."""
         try:
-            from context_compile import compile_context
+            from aios_brain._context_compile import compile_context
             return compile_context(message)
         except ImportError:
             # Fallback: basic search

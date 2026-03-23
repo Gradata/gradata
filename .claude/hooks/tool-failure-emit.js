@@ -10,7 +10,7 @@
  * Silent on failure — never breaks the tool chain.
  */
 
-const { execSync } = require("child_process");
+const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
@@ -159,19 +159,18 @@ function main() {
     };
     const tags = ["tool:" + toolName, "server:" + serverPrefix];
 
-    // Use events.py CLI interface
-    const dataArg = JSON.stringify(JSON.stringify(eventData));
-    const tagsArg = JSON.stringify(JSON.stringify(tags));
-
-    const cmd = [
-      '"' + PYTHON + '"',
-      '"C:/Users/olive/SpritesWork/brain/scripts/events.py"',
-      "emit", "TOOL_FAILURE", "hook:tool_failure_emit",
-      dataArg, tagsArg,
-    ].join(" ");
-
+    // Use events.py CLI interface — execFileSync avoids shell escaping issues on Windows
     try {
-      execSync(cmd, { timeout: 5000, stdio: "ignore" });
+      execFileSync(PYTHON, [
+        "C:/Users/olive/SpritesWork/brain/scripts/events.py",
+        "emit", "TOOL_FAILURE", "hook:tool_failure_emit",
+        JSON.stringify(eventData),
+        JSON.stringify(tags),
+      ], {
+        timeout: 5000,
+        stdio: "ignore",
+        cwd: "C:/Users/olive/SpritesWork/brain/scripts",
+      });
     } catch {
       // Silent — never break the tool chain
     }

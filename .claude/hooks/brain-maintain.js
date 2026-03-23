@@ -100,7 +100,17 @@ try {
   // Silent
 }
 
-// 6. Run overnight review if morning-brief is stale (> 12 hours old)
+// 6. Calibrate deal health scores
+try {
+  execSync(
+    `"${PYTHON}" "${path.join(SCRIPTS, 'deal_calibration.py')}"`,
+    { timeout: 15000, stdio: 'ignore' }
+  );
+} catch (e) {
+  // Silent
+}
+
+// 7. Run overnight review if morning-brief is stale (> 12 hours old)
 try {
   const briefPath = path.join(BRAIN, 'morning-brief.md');
   let shouldRun = true;
