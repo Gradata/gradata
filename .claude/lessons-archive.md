@@ -63,3 +63,12 @@
 [2026-03-19] PIPEDRIVE: Stage IDs (15=Replied, 3=Demo Scheduled, etc.) → Reference data, not behavioral
 [2026-03-19] TECHNICAL: Apify 20 URL limit per call → Technical reference
 [2026-03-19] TECHNICAL: Prospeo API bulk-enrich needs all data points → Technical reference
+
+## Archived 2026-03-22 (Session 36 — UNTESTABLE: 25+ sessions with zero hits)
+
+[2026-03-19] [UNTESTABLE] LEADS: Do lead filtering in one complete pass with full criteria. Build keyword lists up front, dedup across ALL wip files at the START, score programmatically (no "needs manual review" buckets). When Oliver says "filter" — execute the full SOP and show results, don't ask permission at each step.
+[2026-03-19] [UNTESTABLE] PROCESS: CC relevant team members (Siamak) on deal emails. Team visibility on active deals.
+[2026-03-19] [UNTESTABLE] PIPEDRIVE: Deal titles use company name ONLY (e.g., "Cosprite"), not "Cosprite - Matt Rajcok". Person name already linked via person_id.
+[2026-03-19] [UNTESTABLE] PIPEDRIVE: ALWAYS schedule a next activity when creating a deal. Check calendar 1 month out first, then log the activity. No deal should ever have the warning icon.
+[2026-03-19] [UNTESTABLE] ACCURACY: Never guess email addresses. Always verify from Apollo contacts (free search), Pipedrive, or Gmail before creating a draft.
+[2026-03-19] [UNTESTABLE] DEMO PREP: Cheat sheet = battle card, NOT research doc. TRAP → QUANTIFY → TRANSITION → thread link mapped to pain → land value. Include "IF YOU PANIC" box. Two drafts: (1) research doc, (2) clean cheat sheet.

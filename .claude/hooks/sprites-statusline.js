@@ -509,15 +509,18 @@ process.stdin.on('end', () => {
     }
 
     // -- Current Session Number (from loop-state.md) --
-    let currentSession = 0;
+    // loop-state.md records the LAST COMPLETED session (e.g. "Session 35 Close")
+    // Active session = last completed + 1 (so S36 is the live session)
+    let lastLoggedSession = 0;
     const loopStatePath = 'C:/Users/olive/SpritesWork/brain/loop-state.md';
     if (fs.existsSync(loopStatePath)) {
       try {
         const lsContent = fs.readFileSync(loopStatePath, 'utf8').substring(0, 200);
         const sessMatch = lsContent.match(/Session\s+(\d+)/);
-        if (sessMatch) currentSession = parseInt(sessMatch[1]);
+        if (sessMatch) lastLoggedSession = parseInt(sessMatch[1]);
       } catch (e) {}
     }
+    const currentSession = lastLoggedSession > 0 ? lastLoggedSession + 1 : 0;
 
     // Tier thresholds: Seed=20, Growth=75, Proven=150
     let tierName = 'Seed';

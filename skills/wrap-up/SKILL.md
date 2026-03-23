@@ -147,36 +147,30 @@ No action needed:
 
 ## Phase 4: Anti-Bloat Sweep
 
-Run EVERY wrap-up. This prevents memory rot and token waste. Auto-fix without asking.
+Run EVERY wrap-up. Automated via `brain/scripts/anti_bloat.py`.
 
-**4a. Daily note rotation:**
-- If today's date ≠ the current daily note's date, start a fresh `YYYY-MM-DD.md`
-- Carry forward ONLY pending items from yesterday. Everything else stays in yesterday's file.
-- Yesterday's daily note should NOT be appended to again.
+**Step 1: Run the sweep script:**
+```bash
+python C:/Users/olive/SpritesWork/brain/scripts/anti_bloat.py
+```
 
-**4b. Lessons graduation (every 5 sessions, aligned with quality loop):**
-- Scan `.claude/lessons.md` for entries that are now baked into a skill, CARL domain, or CLAUDE.md rule
-- If the lesson is redundant (the fix is already enforced by the system), move it to `.claude/lessons-archive.md`
-- Only keep unresolved/active lessons in the main file
-- Target: lessons.md stays under 30 active entries
+The script checks:
+- **File line caps**: CLAUDE.md (150), startup-brief.md (80)
+- **Lessons count**: Active [PATTERN] + [INSTINCT] entries vs 30-cap
+- **Prospect staleness**: 14+ days untouched = stale, 30+ days = archive candidate
+- **Startup-brief freshness**: Flags if >3 days old
 
-**4c. Prospect staleness:**
-- Scan `brain/prospects/` for notes with no updates in 14+ days → add `#stale` tag
-- Any prospect tagged `#stale` for 30+ days → move to `brain/archive/`
-- Update domain/pipeline/startup-brief.md pipeline section to remove archived prospects
+**Step 2: Act on findings:**
+- Line cap exceeded → trim the file (archive old sections, remove completed items)
+- Lessons over cap → graduate entries already baked into skills/CARL/CLAUDE.md to `lessons-archive.md`
+- Stale prospects → confirm with Oliver before archiving (don't auto-archive active deals)
+- Brief stale → refresh pipeline section with current data
 
-**4d. File line caps (enforce hard limits):**
-- `domain/pipeline/startup-brief.md` > 60 lines → trim completed campaigns, archived prospects, old handoff details
-- `CLAUDE.md` > 150 lines → archive old sections to `.claude/CLAUDE-archive.md` (protect: Rules Index, ICP, Writing Rules, Email Frameworks, Tool Stack)
-- `lessons.md` > 30 active entries → force graduation check (4b)
-- Daily note > 100 lines → you're logging too much detail. Summarize, don't transcribe.
-
-**4e. Startup-brief freshness:**
-- Remove any prospect from pipeline section that moved to brain/archive/
+**Step 3: Refresh startup-brief.md:**
 - Update credit balances if enrichment happened this session
-- Update quality loop counter
+- Remove archived prospects from pipeline section
 
-Report: "Anti-bloat: [X files trimmed, Y lessons graduated, Z prospects marked stale]" or "Anti-bloat: clean, no action needed."
+Report: "Anti-bloat: [X issues found]" or "Anti-bloat: clean, no action needed."
 
 ## Phase 5: Health Check + Smoke Test
 

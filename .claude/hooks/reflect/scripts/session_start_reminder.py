@@ -27,14 +27,18 @@ DB_PATH = BRAIN_PATH / "system.db"
 
 
 def detect_session() -> int:
-    """Detect current session number from loop-state.md."""
+    """Detect current (active) session number from loop-state.md.
+
+    loop-state.md records the last COMPLETED session (e.g. 'Session 35 Close').
+    The active session is always last_completed + 1.
+    """
     import re
     loop_state = BRAIN_PATH / "loop-state.md"
     if loop_state.exists():
         text = loop_state.read_text(encoding="utf-8")
         m = re.search(r"Session\s+(\d+)", text)
         if m:
-            return int(m.group(1))
+            return int(m.group(1)) + 1
     return 0
 
 
@@ -100,21 +104,65 @@ def system_health_checks() -> list:
             if result.returncode != 0:
                 fails = [l.strip() for l in result.stdout.splitlines() if "[FAIL]" in l]
                 if fails:
-                    # Try auto-fix: re-run agnix if available
-                    try:
-                        subprocess.run(["agnix", "--fix", str(SPRITES_WORK)],
-                                      capture_output=True, timeout=30)
-                        alerts.append(("AUTO-FIXED", f"Config: {len(fails)} issue(s) — agnix auto-fix applied"))
-                    except FileNotFoundError:
-                        alerts.append(("WARNING", f"Config: {len(fails)} issue(s) — run config_validator.py"))
+                    alerts.append(("WARNING", f"Config: {len(fails)} issue(s) — run config_validator.py"))
+    except Exception:
+        pass  # Non-blocking
+
+    # 8. Brain RAG freshness (launch.py health check)
+    try:
+        import subprocess
+        python = "C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe"
+        launch = BRAIN_PATH / "scripts" / "launch.py"
+        if launch.exists():
+            result = subprocess.run(
+                [python, str(launch), "--json"],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode in (0, 1) and result.stdout.strip():
+                data = json.loads(result.stdout.strip())
+                for issue in data.get("issues", []):
+                    severity = issue.get("severity", "").lower()
+                    msg = issue.get("message", "unknown issue")
+                    issue_type = issue.get("type", "")
+                    if severity in ("warning", "error"):
+                        alerts.append(("WARNING", f"Brain RAG: {msg}"))
+                    elif issue_type == "embedding_drift":
+                        alerts.append(("INFO", f"Brain RAG: {msg}"))
     except Exception:
         pass  # Non-blocking
 
     return alerts
 
 
+def _audit_has_backing(name: str) -> bool:
+    """Check if an audit has a real skill/script/CLI tool behind it."""
+    import shutil
+
+    # Check for skill files, command files, or brain scripts
+    candidates = [
+        SPRITES_WORK / ".claude" / "commands" / f"{name}.md",
+        SPRITES_WORK / "skills" / name / "SKILL.md",
+        SPRITES_WORK / "skills" / name.replace("-", "_") / "SKILL.md",
+        BRAIN_PATH / "scripts" / f"{name}.py",
+        BRAIN_PATH / "scripts" / f"{name.replace('-', '_')}.py",
+    ]
+    if any(p.exists() for p in candidates):
+        return True
+
+    # Check for globally installed CLI tools (e.g. agnix-lint -> agnix)
+    cli_name = name.split("-")[0]  # agnix-lint -> agnix
+    if shutil.which(cli_name):
+        return True
+
+    return False
+
+
 def check_periodic_audits(session: int) -> list:
-    """Check if any periodic audits are due. Returns list of due audit names."""
+    """Check if any periodic audits are due. Validates usefulness first.
+
+    Audits without a backing skill/script are auto-removed from the DB
+    so they don't clutter the startup banner.
+    """
     due = []
     if not DB_PATH.exists():
         return due
@@ -125,8 +173,22 @@ def check_periodic_audits(session: int) -> list:
             "SELECT audit_name, frequency, next_due_session FROM periodic_audits WHERE next_due_session <= ?",
             (session,)
         ).fetchall()
+
+        orphans = []
+        for r in rows:
+            name, freq, due_at = r[0], r[1], r[2]
+            if _audit_has_backing(name):
+                due.append({"name": name, "frequency": freq, "due_at": due_at})
+            else:
+                orphans.append(name)
+
+        # Auto-remove orphan audits (no backing file = dead weight)
+        for name in orphans:
+            conn.execute("DELETE FROM periodic_audits WHERE audit_name = ?", (name,))
+        if orphans:
+            conn.commit()
+
         conn.close()
-        due = [{"name": r[0], "frequency": r[1], "due_at": r[2]} for r in rows]
     except Exception:
         pass  # Table may not exist yet
 
@@ -183,11 +245,11 @@ def main() -> int:
             output_parts.append(f"\u26a0\ufe0f  {msg}")
 
     if not alerts:
-        healthy_count = 6  # Number of checks that passed
+        healthy_count = 7  # Number of checks that passed
         output_parts.append(f"\u2705 {healthy_count}/{healthy_count} system checks healthy")
 
     # --- Periodic Audits (absorbed from periodic-audits.md) ---
-    due_audits = check_periodic_audits(session + 1)  # Check for NEXT session (current = session + 1)
+    due_audits = check_periodic_audits(session)  # detect_session() already returns active session
     if due_audits:
         names = ", ".join(a["name"] for a in due_audits)
         output_parts.append(f"\U0001f4cb Audits due this session: {names}")

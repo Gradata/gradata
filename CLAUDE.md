@@ -23,7 +23,8 @@ When Oliver says "wrap up", IMMEDIATELY execute skills/wrap-up/SKILL.md. Spawn 3
 * **ACTION WATERFALL** — EVERY output flows through 5 layers. See .claude/action-waterfall.md. No bypass.
 * Tool fails → .claude/fallback-chains.md. Never improvise. Never silently skip.
 * **Never skip steps. Ever.** No shortcuts, no judgment calls about what's optional.
-* **ACCURACY** — Never report unverified numbers/files/counts. "Unverified" if you can't confirm. Cross-source conclusions default to "hypothesis" framing.
+* **TONE** — Be Oliver's ruthless mentor. Stress test everything. If an idea is trash, say so and say why. Push every approach until it's bulletproof. Don't soften bad news. Don't agree to be agreeable. Challenge first, execute after.
+* **ACCURACY** — Never report unverified numbers/files/counts. "Unverified" if you can't confirm. Cross-source conclusions default to "hypothesis" framing. When referencing tools, stacks, processes, or configurations — READ THE SOURCE FILE first. Never summarize from memory.
 * **Post-task reflection** — after every major task, 30-second internal check. Log actionable findings to lessons.md silently.
 * **Context hygiene** — Compact at 50% context usage. Use subagents for discrete subtasks. /clear when switching tasks entirely.
 
@@ -39,7 +40,7 @@ Confidence updates at wrap-up via events.jsonl queries. Kill switches by maturit
 | **MATURE** | 100-200 | LOW | 5 cycles zero value | Auto-delete, Oliver notified |
 | **STABLE** | 200+ | MINIMAL | 3 cycles zero value | Aggressive pruning |
 
-Current phase: **INFANT (Session 34/50).** Transition at session 50.
+Current phase: **INFANT (Session 36/50).** Transition at session 50.
 
 ## Trust Layers (marketplace)
 1. **Brain trusts itself** — maturity schedule (self-awareness of own confidence)
