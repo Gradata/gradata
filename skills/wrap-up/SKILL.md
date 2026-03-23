@@ -240,6 +240,12 @@ Run silently. Only surface to Oliver if errors remain after auto-fix.
 
 This is the MOST IMPORTANT part of wrap-up. A bad handoff means the next session wastes 10 minutes figuring out where we left off.
 
+**Write continuation.md (ALL session types):** Write `C:/Users/olive/SpritesWork/brain/continuation.md` using `python C:/Users/olive/SpritesWork/brain/scripts/continuation.py create`. Content varies by session type:
+- **Build sessions:** What was built, resume points (ordered next actions), test-first checklist, files created/modified, config changes to verify, deferred items.
+- **Pipeline sessions:** Prospect interactions logged, emails sent/drafted, demos prepped, follow-ups due, pipeline changes, deals advanced/stalled, unfinished prospect work to pick up.
+- **Mixed sessions:** Both sections.
+The continuation file lives in the brain vault (`brain/continuation.md`), NOT in the working directory. Session startup (Phase -2) reads and archives it automatically. If SDK work was done this session, also write a copy to `sdk/CONTINUATION.md` so the SDK environment has its own handoff state. This ensures every session — build or pipeline — hands off cleanly to the next, in both environments.
+
 Mark each relevant item. Skip irrelevant ones. Fix any failures before closing.
 
 ## Phase 5a: Delta Sync (MANDATORY — runs every session)
