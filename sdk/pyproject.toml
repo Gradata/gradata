@@ -22,17 +22,19 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-dependencies = [
-    "chromadb>=0.5.0",
-]
+dependencies = []  # Zero required deps — base patterns are pure Python + stdlib
 
 [project.optional-dependencies]
-gemini = ["google-genai>=1.0.0"]
-local = []  # chromadb includes sentence-transformers as transitive dep
+memory = ["chromadb>=0.5.0"]  # Vector search for memory + RAG
+embeddings = ["sentence-transformers>=2.0.0"]  # Local embeddings
+gemini = ["google-genai>=1.0.0"]  # Gemini embeddings (free tier)
+all = ["chromadb>=0.5.0", "sentence-transformers>=2.0.0", "google-genai>=1.0.0"]
 dev = [
     "pytest>=8.0",
+    "hypothesis>=6.0",
     "pyright>=1.1",
     "bandit>=1.7",
+    "coverage>=7.0",
 ]
 
 [project.scripts]
