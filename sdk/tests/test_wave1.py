@@ -163,24 +163,23 @@ class TestFailureDetectors:
 # ---------------------------------------------------------------------------
 
 class TestMigrations:
-    def test_creates_tables_fresh_db(self, tmp_path):
+    def test_creates_events_table(self, tmp_path):
+        """Migrations ensure events table exists with all columns."""
         from aios_brain._migrations import run_migrations
         db_path = tmp_path / "test.db"
-        # Create empty DB
         conn = sqlite3.connect(str(db_path))
         conn.close()
-        # Run migrations
         run_migrations(db_path)
-        # Verify tables
         conn = sqlite3.connect(str(db_path))
         tables = {r[0] for r in conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table'"
         ).fetchall()}
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(events)").fetchall()}
         conn.close()
-        assert "outputs" in tables
-        assert "corrections" in tables
-        assert "rule_applications" in tables
-        assert "patterns" in tables
+        assert "events" in tables
+        assert "valid_from" in cols
+        assert "valid_until" in cols
+        assert "scope" in cols
 
     def test_idempotent(self, tmp_path):
         from aios_brain._migrations import run_migrations
@@ -190,18 +189,3 @@ class TestMigrations:
         # Run twice — should not error
         run_migrations(db_path)
         run_migrations(db_path)
-
-    def test_patterns_has_scope_columns(self, tmp_path):
-        from aios_brain._migrations import run_migrations
-        db_path = tmp_path / "test.db"
-        conn = sqlite3.connect(str(db_path))
-        conn.close()
-        run_migrations(db_path)
-        conn = sqlite3.connect(str(db_path))
-        cols = {r[1] for r in conn.execute("PRAGMA table_info(patterns)").fetchall()}
-        conn.close()
-        assert "domain" in cols
-        assert "task_type" in cols
-        assert "audience" in cols
-        assert "channel" in cols
-        assert "stakes" in cols
