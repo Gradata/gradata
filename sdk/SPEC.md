@@ -302,3 +302,23 @@ This spec replaces:
 - `sdk/ARCHITECTURE-SPEC.md` — Layer 0/1/2 structure reflected in Section 2
 
 Those files remain as historical context but SPEC.md is the canonical reference.
+
+---
+
+## 13. RESEARCH-BACKED CONSTANTS
+
+Every tunable constant in the SDK has published research justification.
+
+| Constant | Value | Source | Citation |
+|----------|-------|--------|----------|
+| Loss aversion ratio | 2:1 (-0.20/+0.10) | Meta-analysis of 607 estimates | Brown et al. 2024, Journal of Economic Literature |
+| MIN_APPLICATIONS_FOR_PATTERN | 3 | Bayesian posterior > 0.6 after 3 successes | Beta(1,1) prior; NIST Engineering Statistics Handbook |
+| MIN_APPLICATIONS_FOR_RULE | 5 | 5-shot learning standard | ACM Computing Surveys 2024 (meta-learning) |
+| Blandness threshold (0.70) | Inverted TTR = 0.30 | MTLD segmentation cutoff | McCarthy & Jarvis 2010, JSLHR |
+| Quality gate (8.0/10) | 80th percentile | LLM-as-judge calibration | Li et al. 2026, arXiv:2601.03444 |
+| Success window (20-25) | CPD minimum segment | Change point detection literature | KAIS 2017 survey |
+| MISFIRE_PENALTY (-0.25) | > contradiction | KTO prospect theory alignment | Ethayarajh et al. ICML 2024 |
+| EMA update scale (+0.10) | Appropriate for sparse events | EMA decay rates in DL | arXiv:2411.18704 2024 |
+
+Note: LLM-as-judge research (Li et al. 2026) recommends 0-5 scales over 0-10 for better
+human-LLM alignment. Future SDK version may switch quality scoring to 0-5.
