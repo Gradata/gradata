@@ -17,7 +17,7 @@ An AI brain is a behavioral configuration that sits on top of any LLM and makes 
 3. Corrections are logged, classified, and graduated into behavioral rules
 4. Over time: fewer corrections, higher first-draft acceptance, domain expertise that compounds
 
-The brain is portable (one SQLite file), verifiable (quality scores from real data), and domain-specific (trained over hundreds of sessions).
+The brain is portable (a self-contained directory with SQLite + markdown), verifiable (quality scores from real data), and domain-specific (trained over hundreds of sessions).
 
 ### The Graduation Pipeline (core innovation)
 
@@ -30,11 +30,14 @@ Promotion requires:
   - Aggressive demotion on misfire (-0.25)
   - Scoped per domain/task_type/audience/channel/stakes
 
-Kill switches by maturity:
-  INFANT (0-50 sessions): 10 cycles zero value
-  ADOLESCENT (50-100): 7 cycles
-  MATURE (100-200): 5 cycles
-  STABLE (200+): 3 cycles
+Kill switches by maturity (RELEVANT cycles only — irrelevant sessions don't count):
+  INFANT (0-50 sessions): 15 relevant cycles zero value
+  ADOLESCENT (50-100): 12 relevant cycles
+  MATURE (100-200): 10 relevant cycles
+  STABLE (200+): 8 relevant cycles
+
+Renter mode: lessons are FROZEN. No confidence changes, no auto-kills.
+Renters can flag lessons as unhelpful (misfired) but compound knowledge is preserved.
 ```
 
 ---
@@ -65,7 +68,7 @@ Rules:
 | Evaluator | evaluator.py | Score-gated optimize loop |
 | Memory | memory.py | 3 types: episodic/semantic/procedural |
 | Guardrails | guardrails.py | Input/output guards (PII, injection, banned phrases) |
-| RAG | rag.py | Cascade: FTS→Vector→Hybrid, graduation-aware scoring |
+| RAG | rag.py | Cascade: FTS→Vector→Hybrid→Two-Pass expansion, graduation-aware scoring (RULE=1.2x, INSTINCT=0.8x) |
 | Rule Engine | rule_engine.py | Scope-aware rule selection + prompt injection |
 | Rule Tracker | rule_tracker.py | RULE_APPLICATION event logging |
 | Tools | tools.py | Tool registry + plan-before-execute |
@@ -94,7 +97,9 @@ brain/
   system.db              — SQLite: events table (event-sourced, all data)
   events.jsonl           — Append-only portable event log
   brain.manifest.json    — Quality + capability declaration
-  prospects/             — Semantic memory (domain entities)
+  taxonomy.json          — Domain-specific tag vocabulary (optional, sales defaults if absent)
+  lessons.md             — Active lessons (INSTINCT/PATTERN/RULE with confidence scores)
+  prospects/             — Semantic memory: domain entities (or candidates/, projects/, etc.)
   sessions/              — Episodic memory (session notes)
   emails/PATTERNS.md     — Procedural memory (what works)
 ```
@@ -105,19 +110,43 @@ brain/
 
 ```
 User Prompt
-  → AI Draft (brain.log_output)
+  → AI Draft (brain.log_output)          ← caller invokes
   → User Edits / Corrections
   → Final Output
-  → Diff Engine (compute_diff)
-  → Edit Classifier (classify_edits)
-  → Pattern Extraction (extract_patterns)
-  → Scoped Graduation (update_confidence)
-  → Rule Application (apply_rules)
-  → Metrics Update (compute_metrics)
+  → Diff Engine (compute_diff)           ← brain.correct() handles automatically
+  → Edit Classifier (classify_edits)     ← brain.correct() handles automatically
+  → CORRECTION event emitted             ← brain.correct() handles automatically
+  → Pattern Extraction (extract_patterns)← brain.correct() handles automatically
+  → Scoped Graduation (update_confidence)← caller invokes separately (or wrap-up)
+  → Rule Application (apply_rules)       ← brain.apply_brain_rules() before next draft
+  → Metrics Update (compute_metrics)     ← on-demand via brain.health() or CLI report
 ```
 
-Entry point: `brain.correct(draft, final)` — captures the full loop.
-Rule injection: `brain.apply_brain_rules(task, context)` — returns formatted rules.
+### What's automatic vs manual
+
+| Step | Method | When |
+|------|--------|------|
+| Log output | `brain.log_output(text, type, score)` | Before user sees draft |
+| Record correction + extract patterns | `brain.correct(draft, final)` | After user edits (auto-extracts patterns) |
+| Apply rules | `brain.apply_brain_rules(task, ctx)` | Before next draft (prompt injection) |
+| Graduate rules | `update_confidence(lessons, corrections)` | Session wrap-up |
+| Compute metrics | `compute_metrics(db_path, window)` | On-demand or wrap-up |
+
+The host runtime (Claude Code, Cursor, etc.) is responsible for calling these at the right time.
+The SDK provides the functions; it does NOT auto-run the full loop in a single call.
+The MCP server exposes `brain_correct` and `brain_log_output` as tools for host integration.
+
+### Correction Detection (known challenge)
+
+MCP protocol has NO concept of user feedback or corrections. Correction signals vary by host:
+- Claude Code: partial (hooks exist for PostToolUse)
+- Cursor: partial (hooks in beta)
+- Claude Desktop: zero correction detection
+
+**Solution:** `sidecar/watcher.py` — an out-of-band file watcher that detects edits independently
+of the MCP stdio channel. Content hash dedup with 30-second window prevents double-counting.
+Falls back to explicit `brain_correct()` tool calls for hosts without hooks.
+The `<private>` tag convention (`rag.py:strip_private()`) excludes marked content from tracking.
 
 ---
 
@@ -139,6 +168,14 @@ All data lives in the `events` table. No separate domain tables.
 | LESSON_CHANGE | Lesson transition | from_state, to_state, confidence |
 | HEALTH_CHECK | System liveness | stale_files, brain_alerts |
 | SESSION_CLOSE | Session end marker | session_type, duration |
+| STEP_COMPLETE | Task step finished | step_name, duration_ms |
+| AGENT_SPAWN | Sub-agent launched | agent_type, task |
+| AGENT_VERIFY | Agent output verified | agent_id, verdict |
+| TOOL_FAILURE | Tool call failed | tool_name, error, fallback_used |
+| VERIFICATION | Output verified | method, passed, detail |
+| DEFER | Task deferred | reason, deferred_to |
+| COST_EVENT | Credit/cost tracking | tool, credits_used, balance |
+| REFLECT_PROCESSED | Reflection completed | lessons_updated, corrections_reviewed |
 
 ### Output Classification (5 levels)
 | Level | Edit Distance | Meaning |
@@ -196,7 +233,23 @@ All data lives in the `events` table. No separate domain tables.
 
 ## 7. DOMAIN AGNOSTIC
 
-The SDK works for ANY domain. Current supported intents:
+The SDK works for ANY domain. The architecture separates:
+- **Core tags** (always present): category, session, gate, tone — describe the learning system
+- **Domain tags** (configurable): output types, personas, frameworks, channels — describe the business domain
+
+### Domain Configuration
+
+Each brain can include a `taxonomy.json` in its root directory to define domain-specific tag vocabulary. If absent, sales defaults are used (first domain built).
+
+```json
+{
+  "entity": {"desc": "Primary entity", "mode": "dynamic", "required_on": ["OUTPUT"]},
+  "output": {"desc": "Output type", "mode": "closed", "values": ["code_review", "design_doc", "test_plan"]},
+  "extra_categories": ["CODE_QUALITY", "PERFORMANCE", "SECURITY"]
+}
+```
+
+### Supported Intents (default task types)
 
 | Domain | Task Types |
 |--------|-----------|
@@ -207,6 +260,33 @@ The SDK works for ANY domain. Current supported intents:
 
 Custom domains register via `register_task_type(name, keywords, domain_hint)`.
 CARL behavioral contracts are per-domain and travel with the brain.
+
+### Entity Abstraction
+
+The SDK uses "entity" as the generic concept for the primary subject of brain knowledge:
+- Sales: entity = prospect (brain/prospects/)
+- Recruiting: entity = candidate (brain/candidates/)
+- Engineering: entity = project (brain/projects/)
+- The `prospect:` tag prefix is accepted as an alias for `entity:` in sales brains.
+
+### Domain Coupling Audit (Session 43)
+
+14 files had sales-specific hardcoding. Status after S43 refactor:
+- `_tag_taxonomy.py`: **FIXED** — taxonomy loads from brain config, sales is default fallback
+- `_events.py`: **FIXED** — dual-write raises on total failure (no silent data loss)
+- `patterns/rag.py`: **FIXED** — cascade errors tracked and surfaced in result.mode
+- `_events.py`: **FIXED** — start date auto-detected from first event (no hardcoded date), pipeline baseline configurable via `BRAIN_PIPELINE_BASELINE` env var
+- `_fact_extractor.py`: **FIXED** — entity directory scans prospects/candidates/customers/entities, fact types loadable from taxonomy.json
+- `onboard.py`: **FIXED** — subdirectories are domain-aware (sales→prospects/, recruiting→candidates/, engineering→projects/)
+- `brain.py`: **FIXED** — taxonomy reloaded from brain config on Brain init
+- **Verified:** Engineering brain with custom taxonomy.json passes all lifecycle checks (code_review output type, SECURITY category, no sales leakage)
+
+### Error Handling Policy (Session 43)
+
+Event emission (the core learning pipeline) must never silently fail:
+- Dual-write to JSONL + SQLite; at least one must succeed or RuntimeError raised
+- RAG cascade errors tracked in result metadata (no silent `pass`)
+- Session detection failures logged to stderr (not silently defaulted)
 
 ---
 
@@ -226,6 +306,11 @@ Install:
 
 Dev:
   uv (build), pytest + hypothesis (testing), pyright (types), ruff + bandit (lint)
+
+Known limitation:
+  MCP stdio transport: 0.64 RPS under load (Stacklok testing, 96% failure at 20 connections).
+  Real-time correction logging is NOT viable through MCP transport alone.
+  Solution: sidecar/watcher.py writes to SQLite out-of-band, independent of MCP channel.
 ```
 
 ---
@@ -271,24 +356,43 @@ Dev:
 
 ---
 
-## 11. WHAT'S BUILT (Session 42)
+## 11. WHAT'S BUILT (Session 43)
 
 | Component | Status | Files | Lines |
 |-----------|--------|-------|-------|
-| patterns/ (Layer 0) | 15/15 complete | 15 | ~5,000 |
-| enhancements/ (Layer 1) | 13/13 complete | 13 | ~4,500 |
-| Core (brain.py, cli.py, etc) | Complete | 30 | ~9,000 |
-| Tests | 32 passing | 2 | ~600 |
-| **Total** | **Functional SDK** | **60** | **~18,800** |
+| patterns/ (Layer 0) | 15/15 complete | 15 | ~5,600 |
+| enhancements/ (Layer 1) | 13/13 complete | 13 | ~3,800 |
+| Core (brain.py, cli.py, mcp_server.py, etc) | Complete | 31 | ~9,500 |
+| Tests | 537 passing | 9 | ~5,800 |
+| **Total** | **Functional SDK** | **~66** | **~20,000+** |
+
+### What's Done (Session 43)
+- [x] 537 tests (9 test files + audit_data_flow.py + test_bug_fixes.py)
+- [x] File watcher sidecar (586-line FileWatcher + CLI `aios-brain watch`)
+- [x] Wire patterns into Brain class API (14/14 methods + 40+ top-level exports)
+- [x] Full MCP server (438-line stdio transport, JSON-RPC 2.0, 37 tests, 5 tools)
+- [x] Shim architecture audit (7 thin re-exports, 17 canonical internals, 0 duplicates)
+- [x] Second-machine install test (18/18 lifecycle checks in clean venv)
+- [x] Gate 0 correction density analysis (GATE0-PROOF.md + scripts/density_graph.py)
+- [x] Domain-agnostic taxonomy (`taxonomy.json` config, sales as default)
+- [x] Event persistence safety (dual-write raises on total failure)
+- [x] All `edited_by_oliver` references removed (domain-agnostic `major_edit` flag)
+- [x] End-to-end data flow audit (10 flows verified, DB/JSONL sync confirmed)
+- [x] Kill switches by maturity (INFANT=10, ADOLESCENT=7, MATURE=5, STABLE=3 cycles)
+- [x] Custom exception hierarchy (BrainError, BrainNotFoundError, EventPersistenceError, etc.)
+- [x] Structured logging via `AIOS_BRAIN_LOG=debug` env var
+- [x] py.typed marker (PEP 561) + LICENSE file
+- [x] Pattern extraction auto-wired into brain.correct()
+- [x] examples/quickstart.py for external users
+- [x] SDK root cleanup (12 superseded docs archived, stray DB/vectorstore removed)
+- [x] correction_rate manifest bug fixed (was always 0.0)
+- [x] FACTUAL/CONTENT/TONE/STRUCTURE/STYLE added to core taxonomy
 
 ### What's Next
-- [ ] 120+ tests (patterns + enhancements)
-- [ ] Wire patterns into Brain class API
-- [ ] Clean up backward-compat shims
-- [ ] Full MCP server (transport layer)
-- [ ] File watcher sidecar (observation capture)
-- [ ] Second-machine install test
-- [ ] Graph correction density over 200 sessions (Gate 0 proof)
+- [ ] 10+ external users
+- [ ] 3+ users with 50+ sessions showing improvement
+- [ ] Statistically significant correction density decrease (need ~200 sessions, at 42)
+- [ ] Remaining domain coupling: `_config.py` FILE_TYPE_MAP + MEMORY_TYPE_WEIGHTS
 
 ---
 

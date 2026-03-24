@@ -175,7 +175,8 @@
       "Bash(node:*)",
       "mcp__claude_ai_Fireflies__fireflies_get_transcripts",
       "Skill(gsd:pause-work)",
-      "Skill(gsd:pause-work:*)"
+      "Skill(gsd:pause-work:*)",
+      "mcp__9a453a01-9088-4fae-93c9-2888fe478b34__gmail_create_draft"
     ]
   }
 }

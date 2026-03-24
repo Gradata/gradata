@@ -399,8 +399,8 @@ class TestEventsModule:
 
     def test_compute_leading_indicators_with_data(self, tmp_path):
         brain = _init_brain(tmp_path)
-        brain.emit("OUTPUT", "pytest", {"output_type": "email", "edited_by_oliver": False}, session=10)
-        brain.emit("OUTPUT", "pytest", {"output_type": "email", "edited_by_oliver": True}, session=10)
+        brain.emit("OUTPUT", "pytest", {"output_type": "email", "major_edit": False}, session=10)
+        brain.emit("OUTPUT", "pytest", {"output_type": "email", "major_edit": True}, session=10)
         brain.emit("GATE_RESULT", "pytest", {"gate": "demo", "sources_complete": True}, session=10)
 
         from aios_brain._events import compute_leading_indicators
@@ -595,13 +595,13 @@ class TestSelfImprovement:
         updated = update_confidence(lessons, [{"category": "TONE"}])
         assert updated[0].state == LessonState.RULE
 
-    def test_update_confidence_rule_skipped(self):
-        from aios_brain._self_improvement import parse_lessons, update_confidence, LessonState
-        lessons = parse_lessons("[2026-01-01] [RULE] PROCESS: Wrap-up mandatory.\n")
+    def test_update_confidence_rule_demoted_on_contradiction(self):
+        from aios_brain._self_improvement import parse_lessons, update_confidence, LessonState, CONTRADICTION_PENALTY
+        lessons = parse_lessons("[2026-01-01] [RULE:0.95] PROCESS: Wrap-up mandatory.\n")
         conf_before = lessons[0].confidence
         updated = update_confidence(lessons, [{"category": "PROCESS"}])
-        # RULE is never modified
-        assert updated[0].confidence == conf_before
+        # RULE CAN be demoted — contradiction penalty applies
+        assert updated[0].confidence == round(conf_before - CONTRADICTION_PENALTY, 2)
 
     def test_update_confidence_untestable_flag(self):
         from aios_brain._self_improvement import parse_lessons, update_confidence, LessonState
@@ -1070,8 +1070,8 @@ class TestExportBrainModule:
         empty = tmp_path / "empty_prospects"
         empty.mkdir()
         result = build_prospect_map(empty)
-        # "Oliver" is always added
-        assert result.get("Oliver") == "[OWNER]"
+        # Owner name is auto-detected from manifest, not hardcoded
+        assert isinstance(result, dict)
 
     def test_build_prospect_map_with_files(self, tmp_path):
         from aios_brain._export_brain import build_prospect_map
@@ -1087,7 +1087,6 @@ class TestExportBrainModule:
         assert "Alice Johnson" in result
         assert "Acme Corp" in result
         assert "Bob Smith" in result
-        assert result["Oliver"] == "[OWNER]"
 
     def test_build_prospect_map_skips_underscore_files(self, tmp_path):
         from aios_brain._export_brain import build_prospect_map

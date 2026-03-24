@@ -185,14 +185,14 @@ class TestUpdateConfidence:
         result = self.update([lesson], [{"category": "ACCURACY"}])
         assert result[0].state == self.LessonState.RULE
 
-    def test_rule_lessons_are_skipped(self):
-        """RULE-state lessons are not modified."""
-        from aios_brain._self_improvement import LessonState
+    def test_rule_lessons_demoted_on_contradiction(self):
+        """RULE-state lessons CAN be demoted if contradicted (not immortal)."""
+        from aios_brain._self_improvement import LessonState, CONTRADICTION_PENALTY
         lesson = self._lesson("DRAFTING", 0.95, LessonState.RULE)
         original_conf = lesson.confidence
         result = self.update([lesson], [{"category": "DRAFTING"}])
-        assert result[0].confidence == original_conf
-        assert result[0].state == LessonState.RULE
+        # Contradiction penalty applies even to RULES
+        assert result[0].confidence == round(original_conf - CONTRADICTION_PENALTY, 2)
 
     def test_untestable_after_20_sessions_no_fires(self):
         """Lesson flagged UNTESTABLE after 20 sessions_since_fire with fire_count==0."""

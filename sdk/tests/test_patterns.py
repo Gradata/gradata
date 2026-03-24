@@ -1005,7 +1005,7 @@ class TestRag:
         from aios_brain.patterns.rag import cascade_retrieve
         result = cascade_retrieve("query")
         assert result.chunks == []
-        assert result.mode == "cascade"
+        assert result.mode == "empty"
 
 
 # ---------------------------------------------------------------------------
