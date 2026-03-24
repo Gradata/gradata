@@ -391,3 +391,35 @@ class TestExport:
             assert "john.smith" not in prospect_content.lower(), (
                 "Email fragment still present"
             )
+
+
+# ---------------------------------------------------------------------------
+# 8. Core Learning Loop (correction capture)
+# ---------------------------------------------------------------------------
+
+class TestCoreLearningLoop:
+    def test_correct_produces_diff(self, tmp_path):
+        """brain.correct() computes diff and emits CORRECTION event."""
+        brain = _init_brain(tmp_path)
+        result = brain.correct(
+            draft="Hello, I wanted to reach out about our product pricing.",
+            final="Hi, quick note about pricing.",
+            session=1,
+        )
+        assert result["type"] == "CORRECTION"
+        assert result["data"]["severity"] in ("minor", "moderate", "major", "discarded")
+        assert result["data"]["edit_distance"] > 0
+        assert "classifications" in result
+
+    def test_log_output(self, tmp_path):
+        """brain.log_output() emits OUTPUT event."""
+        brain = _init_brain(tmp_path)
+        result = brain.log_output(
+            text="Draft email about pricing",
+            output_type="email",
+            self_score=7.5,
+            session=1,
+        )
+        assert result["type"] == "OUTPUT"
+        assert result["data"]["output_type"] == "email"
+        assert result["data"]["self_score"] == 7.5
