@@ -5,8 +5,15 @@ Work style: .claude/work-style.md | Output flow: .claude/action-waterfall.md
 Self-check before output: gate complete? self-score >= 7? fallback chain followed?
 Never skip steps. Never report unverified numbers. Never summarize from memory.
 Quality: .claude/quality-rubrics.md | Fallbacks: .claude/fallback-chains.md
-Self-improvement: .claude/self-improvement.md (INSTINCT -> PATTERN -> RULE). Phase: INFANT (S41/50).
-SDK: brain/ = universal portable layer. sdk/src/aios_brain/ = source. Build: uv. Tests: pytest sdk/tests/
+Self-improvement: .claude/self-improvement.md (INSTINCT -> PATTERN -> RULE). Phase: INFANT (S42/50).
+
+## SDK Architecture (3 layers)
+Layer 0 — patterns/: orchestrator, pipeline, reflection, guardrails, memory, scope, rule_engine, rag. Never import from enhancements/.
+Layer 1 — enhancements/: self_improvement, diff_engine, edit_classifier, pattern_extractor, metrics, failure_detectors, reports. Imports from patterns/.
+Layer 2 — brain/: trained data (events.jsonl, system.db, prospects/, sessions/). Event-sourced: all data = events, no domain tables.
+Core loop: User Prompt -> AI Draft -> User Edits -> brain.correct(draft, final) -> Diff -> Classify -> Pattern Extract -> Graduate -> Apply Rules -> Metrics.
+Source: sdk/src/aios_brain/ | Build: uv | Tests: pytest sdk/tests/ | Spec: sdk/ARCHITECTURE-SPEC.md
+
 Environment: Windows 11. Python: C:/Users/olive/AppData/Local/Programs/Python/Python312/. Node available.
 Brain vault: C:/Users/olive/SpritesWork/brain/ (NOT inside OneDrive working dir).
 Prospecting: enrich before tiering, CEO != auto-T1, counts in filenames. Rules: domain/playbooks/prospecting-instructions.txt
