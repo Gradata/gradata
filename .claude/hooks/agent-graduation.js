@@ -62,18 +62,28 @@ try {
   if (!data || data.tool_name !== 'Agent') process.exit(0);
 
   const agentType = extractAgentType(data);
-  const output = (data.tool_output || '').toString();
-  const preview = output.substring(0, 200).replace(/"/g, "'");
+  // Handle both inline output and background agent output (file path or summary)
+  let output = '';
+  const rawOutput = data.tool_output || data.tool_result || '';
+  if (typeof rawOutput === 'object' && rawOutput !== null) {
+    // Background agents return structured result with summary/output_file
+    output = rawOutput.summary || rawOutput.result || rawOutput.output || JSON.stringify(rawOutput).substring(0, 500);
+  } else {
+    output = rawOutput.toString();
+  }
+  const preview = output.substring(0, 200).replace(/"/g, "'").replace(/\n/g, ' ');
 
-  // Skip if no meaningful output
-  if (!preview || preview.length < 20) process.exit(0);
+  // Skip if no meaningful output — but be lenient for background agents
+  // Background agents may have short summaries like "Agent completed"
+  if (!preview || preview.length < 10) process.exit(0);
 
-  // Detect session number
+  // Detect session number from loop-state (current session, not +1)
+  // loop-state is updated at wrap-up to the CURRENT session number
   let session = 0;
   try {
-    const ls = fs.readFileSync(cfg.LOOP_STATE, 'utf8').substring(0, 200);
+    const ls = fs.readFileSync(cfg.LOOP_STATE, 'utf8').substring(0, 300);
     const m = ls.match(/Session\s+(\d+)/);
-    if (m) session = parseInt(m[1]) + 1;
+    if (m) session = parseInt(m[1]);
   } catch {}
 
   // Record outcome via dedicated script (avoids inline Python quoting issues)
