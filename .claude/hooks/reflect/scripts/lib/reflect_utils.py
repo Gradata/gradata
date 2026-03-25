@@ -590,10 +590,8 @@ NON_CORRECTION_PHRASES = [
     r"^no\s+worries",        # "No worries" - agreement
     r"^no\s+need\b",         # "No need" - acknowledgment
     r"^no\s+way\b",          # "No way!" - surprise/exclamation
-    r"^no\s+just\b",         # "No just install/do/use..." - instruction, not correction
     r"^no\s+that's?\s+(?:fine|good|great|ok|perfect)", # "No that's fine" - agreement
     r"^no\s+(?:go ahead|keep going|continue)", # "No go ahead" - agreement
-    r"^no\s+I\s+(?:mean|want|need)\b",  # "No I mean..." - clarification, handled separately
     r"^don't\s+worry",       # "Don't worry" - reassurance
     r"^don't\s+mind",        # "Don't mind" - agreement
     r"^don't\s+bother",      # "Don't bother" - polite decline
