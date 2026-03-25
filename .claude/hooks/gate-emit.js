@@ -13,7 +13,8 @@
 const { execSync } = require("child_process");
 const fs = require("fs");
 
-const PYTHON = "C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe";
+const cfg = require('./config.js');
+const PYTHON = cfg.PYTHON;
 
 function readStdin() {
   try {
@@ -69,7 +70,7 @@ function main() {
   // Use a Python one-liner to call emit_gate_result
   const pyCode = [
     "import sys",
-    "sys.path.insert(0, 'C:/Users/olive/SpritesWork/brain/scripts')",
+    `sys.path.insert(0, '${cfg.SCRIPTS}')`,
     "from events import emit_gate_result",
     "emit_gate_result('" + gateName + "', 'PASS', ['" + safePath + "'], 'Gate loaded via Read')",
   ].join("; ");

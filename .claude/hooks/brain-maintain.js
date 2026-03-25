@@ -12,9 +12,10 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const PYTHON = 'C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe';
-const BRAIN = 'C:/Users/olive/SpritesWork/brain';
-const SCRIPTS = path.join(BRAIN, 'scripts');
+const cfg = require('./config.js');
+const PYTHON = cfg.PYTHON;
+const BRAIN = cfg.BRAIN_DIR;
+const SCRIPTS = cfg.SCRIPTS;
 
 // 0. Auto-accept: agent-written files that Oliver never edited = accepted without changes
 try {
@@ -60,17 +61,11 @@ try {
   // Silent
 }
 
-// 3. Delta embed changed files into ChromaDB (keeps semantic search current)
-try {
-  execSync(
-    `"${PYTHON}" "${path.join(SCRIPTS, 'embed.py')}"`,
-    { timeout: 45000, stdio: 'ignore' }
-  );
-} catch (e) {
-  // Silent — embedding is best-effort, FTS5 already rebuilt above
-}
+// 3. [REMOVED] ChromaDB embedding — killed per S42 research decision (sqlite-vec replacement).
+//    FTS5 (step 2) handles keyword search. Semantic search via sqlite-vec is future work.
+//    Saves ~45s per session.
 
-// 4. Update PATTERNS.md from tagged events (closes the learning loop)
+// 3. Update PATTERNS.md from tagged events (closes the learning loop)
 try {
   execSync(
     `"${PYTHON}" "${path.join(SCRIPTS, 'patterns_updater.py')}"`,
@@ -80,7 +75,7 @@ try {
   // Silent
 }
 
-// 5. Extract facts from any prospect files modified this session
+// 4. Extract facts from any prospect files modified this session
 try {
   execSync(
     `"${PYTHON}" "${path.join(SCRIPTS, 'fact_extractor.py')}" extract`,
@@ -90,7 +85,7 @@ try {
   // Silent
 }
 
-// 5. Generate brain.manifest.json (keeps manifest fresh for SDK/marketplace)
+// 5. Generate brain.manifest.json
 try {
   execSync(
     `"${PYTHON}" "${path.join(SCRIPTS, 'brain_manifest.py')}"`,
@@ -100,7 +95,7 @@ try {
   // Silent
 }
 
-// 6. Calibrate deal health scores
+// 6. Calibrate deal health
 try {
   execSync(
     `"${PYTHON}" "${path.join(SCRIPTS, 'deal_calibration.py')}"`,
@@ -110,7 +105,17 @@ try {
   // Silent
 }
 
-// 7. Run overnight review if morning-brief is stale (> 12 hours old)
+// 7. Dream consolidation (cooldown-gated: 24h + 5 sessions)
+try {
+  execSync(
+    `"${PYTHON}" "${path.join(SCRIPTS, 'dream.py')}" run`,
+    { timeout: 30000, stdio: 'ignore' }
+  );
+} catch (e) {
+  // Silent — dream is best-effort maintenance
+}
+
+// 8. Regen morning brief if stale (> 12h old)
 try {
   const briefPath = path.join(BRAIN, 'morning-brief.md');
   let shouldRun = true;

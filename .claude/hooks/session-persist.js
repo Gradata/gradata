@@ -9,7 +9,8 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const BRAIN_PATH = 'C:/Users/olive/SpritesWork/brain';
+const cfg = require('./config.js');
+const BRAIN_PATH = cfg.BRAIN_DIR;
 const PERSIST_DIR = path.join(BRAIN_PATH, 'sessions', 'persist');
 
 try {
@@ -27,13 +28,13 @@ try {
     if (match) sessionNum = parseInt(match[1]);
   }
 
-  const SPRITES_WORK = 'C:/Users/olive/OneDrive/Desktop/Sprites Work';
+  const SPRITES_WORK = cfg.WORKING_DIR;
 
   // Get modified files from git
   let filesModified = [];
   try {
     const gitOutput = execSync(
-      `git -C "${SPRITES_WORK}" diff --name-only HEAD 2>nul`,
+      `git -C "${SPRITES_WORK}" diff --name-only HEAD 2>/dev/null`,
       { encoding: 'utf8', timeout: 5000 }
     ).trim();
     if (gitOutput) filesModified = gitOutput.split('\n').slice(0, 30);
@@ -42,7 +43,7 @@ try {
   // Get brain repo modified files
   try {
     const brainGit = execSync(
-      `git -C "${BRAIN_PATH}" diff --name-only HEAD 2>nul`,
+      `git -C "${BRAIN_PATH}" diff --name-only HEAD 2>/dev/null`,
       { encoding: 'utf8', timeout: 5000 }
     ).trim();
     if (brainGit) {
@@ -57,7 +58,7 @@ try {
   try {
     // Last 3 commit messages = what was done
     const log = execSync(
-      `git -C "${SPRITES_WORK}" log --oneline -3 2>nul`,
+      `git -C "${SPRITES_WORK}" log --oneline -3 2>/dev/null`,
       { encoding: 'utf8', timeout: 5000 }
     ).trim();
     if (log) handoff += 'Recent commits:\n' + log + '\n';

@@ -13,8 +13,9 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const PYTHON = 'C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe';
-const SCRIPTS = 'C:/Users/olive/SpritesWork/brain/scripts';
+const cfg = require('./config.js');
+const PYTHON = cfg.PYTHON;
+const SCRIPTS = cfg.SCRIPTS;
 
 // Read tool input from stdin
 let input = '';

@@ -11,7 +11,8 @@ const path = require('path');
 const PROFILE = process.env.AIOS_HOOK_PROFILE || 'standard';
 if (PROFILE === 'minimal') process.exit(0);
 
-const BRAIN_PATH = 'C:/Users/olive/SpritesWork/brain';
+const cfg = require('./config.js');
+const BRAIN_PATH = cfg.BRAIN_DIR;
 const HEALTH_CACHE = path.join(BRAIN_PATH, '.mcp-health.json');
 const MAX_BACKOFF_MS = 600000; // 10 minutes
 

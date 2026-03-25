@@ -9,9 +9,10 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const BRAIN_PATH = 'C:/Users/olive/SpritesWork/brain';
+const cfg = require('./config.js');
+const BRAIN_PATH = cfg.BRAIN_DIR;
 const COST_FILE = path.join(BRAIN_PATH, 'metrics', 'cost.jsonl');
-const PYTHON = 'C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe';
+const PYTHON = cfg.PYTHON;
 
 // Model pricing per million tokens (input/output)
 const PRICING = {

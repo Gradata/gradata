@@ -8,7 +8,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const SPRITES_WORK = 'C:/Users/olive/OneDrive/Desktop/Sprites Work';
+const cfg = require('./config.js');
+const SPRITES_WORK = cfg.WORKING_DIR;
 
 // Files loaded every message (Tier 0)
 const TIER_0 = [

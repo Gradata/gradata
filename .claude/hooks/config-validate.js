@@ -10,7 +10,8 @@
 const fs = require("fs");
 const path = require("path");
 
-const WORKING_DIR = "C:/Users/olive/OneDrive/Desktop/Sprites Work";
+const cfg = require('./config.js');
+const WORKING_DIR = cfg.WORKING_DIR;
 const SETTINGS_PATH = path.join(WORKING_DIR, ".claude/settings.json");
 const MANIFEST_PATH = path.join(WORKING_DIR, ".claude/agent-manifests.json");
 

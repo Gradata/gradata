@@ -10,8 +10,9 @@
 const { execSync } = require('child_process');
 const path = require('path');
 
-const PYTHON = 'C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe';
-const SCRIPTS = 'C:/Users/olive/SpritesWork/brain/scripts';
+const cfg = require('./config.js');
+const PYTHON = cfg.PYTHON;
+const SCRIPTS = cfg.SCRIPTS;
 
 // Read user message from stdin (hook protocol)
 let input = '';
@@ -49,6 +50,28 @@ for (const pat of skipPatterns) {
     process.exit(0);
   }
 }
+
+// Check for post-compaction snapshot (Audrey PostCompact pattern)
+const SNAPSHOT_FILE = path.join(require('os').tmpdir(), 'aios-compact-snapshot.json');
+try {
+  if (require('fs').existsSync(SNAPSHOT_FILE)) {
+    const snap = JSON.parse(require('fs').readFileSync(SNAPSHOT_FILE, 'utf-8'));
+    // Only use if fresh (< 30 min old)
+    const age = (Date.now() - new Date(snap.ts).getTime()) / 60000;
+    if (age < 30) {
+      const parts = [];
+      if (snap.session) parts.push(`Session: S${snap.session}`);
+      if (snap.tasks && snap.tasks.length) parts.push(`Tasks: ${snap.tasks.slice(0, 3).join(' | ')}`);
+      if (snap.halfDone) parts.push(`Half-done: ${snap.halfDone}`);
+      if (snap.overdue) parts.push(`OVERDUE: ${snap.overdue}`);
+      if (parts.length) {
+        process.stdout.write('CONTEXT RESTORED (post-compaction):\n  ' + parts.join('\n  ') + '\n');
+      }
+    }
+    // Consume the snapshot (one-shot)
+    require('fs').unlinkSync(SNAPSHOT_FILE);
+  }
+} catch (e) { /* silent */ }
 
 // Call context compiler
 try {

@@ -18,7 +18,8 @@ process.stdin.on('end', () => {
   try {
     const data = JSON.parse(input);
     const model = (data.model && data.model.display_name) || data.model || 'Claude';
-    const SPRITES_ROOT = 'C:/Users/olive/OneDrive/Desktop/Sprites Work';
+    const cfg = require('./config.js');
+    const SPRITES_ROOT = cfg.WORKING_DIR;
     const dir = (data.workspace && data.workspace.current_dir) || data.cwd || process.env.SPRITES_ROOT || SPRITES_ROOT;
     const session = data.session_id || '';
     const remaining = data.context_window ? data.context_window.remaining_percentage : (data.remaining_context_percentage || null);
@@ -83,9 +84,9 @@ process.stdin.on('end', () => {
 
     // -- Session Number --
     let currentSession = 0;
-    if (fs.existsSync('C:/Users/olive/SpritesWork/brain/loop-state.md')) {
+    if (fs.existsSync(cfg.LOOP_STATE)) {
       try {
-        const m = fs.readFileSync('C:/Users/olive/SpritesWork/brain/loop-state.md', 'utf8').substring(0, 200).match(/Session\s+(\d+)/);
+        const m = fs.readFileSync(cfg.LOOP_STATE, 'utf8').substring(0, 200).match(/Session\s+(\d+)/);
         if (m) currentSession = parseInt(m[1]) + 1;
       } catch (e) {}
     }
@@ -95,7 +96,7 @@ process.stdin.on('end', () => {
 
     // -- Git Age (brain repo — the "save file") --
     let gitAge = '?';
-    const gitTs = safeExec('git -C "C:/Users/olive/SpritesWork/brain" log -1 --format=%ct');
+    const gitTs = safeExec(`git -C "${cfg.BRAIN_DIR}" log -1 --format=%ct`);
     if (gitTs) {
       const diffMins = Math.floor((Date.now() - parseInt(gitTs) * 1000) / 60000);
       if (diffMins < 60) gitAge = `${diffMins}m ago`;
@@ -107,8 +108,8 @@ process.stdin.on('end', () => {
     // SINGLE PYTHON CALL — all brain data in ~0.1s
     // ══════════════════════════════════════════════════════════════════
     let bd = {};
-    if (fs.existsSync('C:/Users/olive/SpritesWork/brain/system.db')) {
-      const out = safeExec(`python "C:/Users/olive/SpritesWork/brain/scripts/brain_scores_cli.py"`);
+    if (fs.existsSync(cfg.SYSTEM_DB)) {
+      const out = safeExec(`python "${path.join(cfg.SCRIPTS, 'brain_scores_cli.py')}"`);
       if (out) { try { bd = JSON.parse(out); } catch (e) {} }
     }
 
@@ -203,7 +204,7 @@ process.stdin.on('end', () => {
     // SAVED: Two save files — brain (trained data) + code (the game itself)
     // Brain repo = your progress save. Code repo = the game build.
     let brainAge = '?', codeAge = '?';
-    const brainTs = safeExec('git -C "C:/Users/olive/SpritesWork/brain" log -1 --format=%ct');
+    const brainTs = safeExec(`git -C "${cfg.BRAIN_DIR}" log -1 --format=%ct`);
     if (brainTs) {
       const m = Math.floor((Date.now() - parseInt(brainTs) * 1000) / 60000);
       brainAge = m < 60 ? `${m}m` : m < 1440 ? `${Math.floor(m / 60)}h` : `${Math.floor(m / 1440)}d`;
@@ -221,7 +222,7 @@ process.stdin.on('end', () => {
 
     // ── LINE 3: What needs attention ────────────────────────────────
     let overdueCount = 0, dueTodayCount = 0, activeDealsCount = 0;
-    const brainPath = 'C:/Users/olive/SpritesWork/brain/prospects';
+    const brainPath = cfg.PROSPECTS_DIR;
     if (fs.existsSync(brainPath)) {
       try {
         const now = new Date(); now.setHours(0,0,0,0);

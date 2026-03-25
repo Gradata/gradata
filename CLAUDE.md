@@ -1,4 +1,5 @@
 # AIOS v2.0 — Agent Operating System
+This file boots YOU as the orchestrator. Every instruction here configures your behavior, tools, and self-improvement loop.
 Startup: execute skills/session-start/SKILL.md before responding. Wrap-up: execute skills/wrap-up/SKILL.md when Oliver says "wrap up". Both mandatory.
 Domain: domain/DOMAIN.md | CARL: .carl/ | Gates: domain/gates/ | Voice: domain/soul.md
 Work style: .claude/work-style.md | Output flow: .claude/action-waterfall.md
@@ -7,7 +8,8 @@ Never skip steps. Never report unverified numbers. Never summarize from memory.
 Quality: .claude/quality-rubrics.md | Fallbacks: .claude/fallback-chains.md
 Self-improvement: .claude/self-improvement.md (INSTINCT -> PATTERN -> RULE). Phase: INFANT (S42/50).
 
-## SDK Architecture (3 layers)
+## SDK Architecture (3 layers — what you can do)
+You are the top-level orchestrator. You can delegate to sub-orchestrators (subagents that manage their own agent teams).
 Layer 0 — patterns/: orchestrator, pipeline, reflection, guardrails, memory, scope, rule_engine, rag. Never import from enhancements/.
 Layer 1 — enhancements/: self_improvement, diff_engine, edit_classifier, pattern_extractor, metrics, failure_detectors, reports. Imports from patterns/.
 Layer 2 — brain/: trained data (events.jsonl, system.db, prospects/, sessions/). Event-sourced: all data = events, no domain tables.

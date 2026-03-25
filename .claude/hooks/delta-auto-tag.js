@@ -12,8 +12,9 @@
 
 const { execSync } = require("child_process");
 
-const DELTA_SCRIPT = "C:/Users/olive/SpritesWork/brain/scripts/delta_tag.py";
-const PYTHON = "C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe";
+const cfg = require('./config.js');
+const DELTA_SCRIPT = require("path").join(cfg.SCRIPTS, "delta_tag.py");
+const PYTHON = cfg.PYTHON;
 
 // Tool patterns to skip (read-only, not prospect-facing)
 const SKIP_TOOLS = [
@@ -192,7 +193,7 @@ function checkAgentOutputEdit(toolName, toolInput) {
     const pyCmd = [
       `"${PYTHON}"`,
       "-c",
-      `"import sys; sys.path.insert(0, r'C:/Users/olive/SpritesWork/brain/scripts'); from spawn import log_human_judgment; log_human_judgment('${taskId.replace(/'/g, "")}', '${agentName.replace(/'/g, "")}', accepted=True, edited=True)"`,
+      `"import sys; sys.path.insert(0, r'${cfg.SCRIPTS}'); from spawn import log_human_judgment; log_human_judgment('${taskId.replace(/'/g, "")}', '${agentName.replace(/'/g, "")}', accepted=True, edited=True)"`,
     ].join(" ");
 
     execSync(pyCmd, { timeout: 5000, stdio: "ignore" });

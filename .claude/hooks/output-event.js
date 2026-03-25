@@ -9,8 +9,9 @@
 const { execSync } = require("child_process");
 const path = require("path");
 
-const PYTHON = "C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe";
-const EMIT_SCRIPT = "C:/Users/olive/SpritesWork/brain/scripts/emit_output.py";
+const cfg = require('./config.js');
+const PYTHON = cfg.PYTHON;
+const EMIT_SCRIPT = path.join(cfg.SCRIPTS, "emit_output.py");
 
 const PROSPECT_PATHS = [
   "brain/prospects/",
@@ -68,7 +69,7 @@ function getProspectNames() {
   if (_prospectNames) return _prospectNames;
   _prospectNames = [];
   try {
-    const prospectsDir = "C:/Users/olive/SpritesWork/brain/prospects";
+    const prospectsDir = cfg.PROSPECTS_DIR;
     const fs = require("fs");
     if (fs.existsSync(prospectsDir)) {
       for (const f of fs.readdirSync(prospectsDir)) {

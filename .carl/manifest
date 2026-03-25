@@ -72,7 +72,7 @@ CONTEXT_ALWAYS_ON=true
 # COMMANDS - Star-commands like *dev, *review, *brief
 # Detected via *pattern matching, rules in commands file
 # ============================================================================
-COMMANDS_STATE=active
+COMMANDS_STATE=inactive
 
 # ============================================================================
 # DEMO-PREP - Automated demo prep workflow
@@ -130,14 +130,19 @@ LINKEDIN_RECALL=LinkedIn,connect,DM,InMail,connection request,LinkedIn message,L
 LINKEDIN_EXCLUDE=email,demo,deck
 
 # ============================================================================
-# LOOP - Universal closed-loop sales intelligence
-# Covers all activities: emails, calls, demos, proposals, closes
-# Every interaction tagged → tracked → learned → next action smarter
+# LOOP CORE — Critical guardrails (always on, data integrity)
 # ============================================================================
-LOOP_STATE=active
-LOOP_ALWAYS_ON=true
-LOOP_FILE=domain/carl/loop
-LOOP_RECALL=loop,sequence,touch,follow-up,what's due,check replies,what's working,pattern,learning loop,cadence,re-engage,nurture,next touch,due today,overdue,pipeline,deals,stale,nurture
+LOOPCORE_STATE=active
+LOOPCORE_ALWAYS_ON=true
+LOOPCORE_FILE=domain/carl/loop-core
+
+# ============================================================================
+# LOOP ADVANCED — Optimization, analytics, meta-loop (recall-triggered)
+# ============================================================================
+LOOPADV_STATE=active
+LOOPADV_ALWAYS_ON=false
+LOOPADV_FILE=domain/carl/loop-advanced
+LOOPADV_RECALL=loop,sequence,touch,follow-up,what's due,check replies,what's working,pattern,learning loop,cadence,re-engage,nurture,next touch,due today,overdue,pipeline,deals,stale,what's next
 
 # ============================================================================
 # AGENTS - Multi-agent specialization architecture
@@ -172,10 +177,15 @@ DEMOPREP_READS=brain/prospects/*,brain/emails/PATTERNS.md,brain/personas/*,.clau
 DEMOPREP_WRITES=brain/prospects/*,docs/Demo Prep/*
 DEMOPREP_REQUIRES=calendar_confirmed,vault_note_exists_or_created,gate_complete
 
-# LOOP contract:
-LOOP_READS=brain/prospects/*,brain/emails/PATTERNS.md,brain/system-patterns.md,.claude/audit-log.md
-LOOP_WRITES=brain/prospects/*,brain/emails/PATTERNS.md,brain/system-patterns.md
-LOOP_REQUIRES=prospect_notes_scanned,outcomes_checked
+# LOOPCORE contract:
+LOOPCORE_READS=brain/prospects/*,brain/emails/PATTERNS.md
+LOOPCORE_WRITES=brain/prospects/*
+LOOPCORE_REQUIRES=prospect_notes_scanned
+
+# LOOPADV contract:
+LOOPADV_READS=brain/prospects/*,brain/emails/PATTERNS.md,brain/system-patterns.md,.claude/audit-log.md
+LOOPADV_WRITES=brain/prospects/*,brain/emails/PATTERNS.md,brain/system-patterns.md
+LOOPADV_REQUIRES=prospect_notes_scanned,outcomes_checked
 
 # COLDCALL contract:
 COLDCALL_READS=brain/prospects/*,brain/personas/*,.claude/lessons.md

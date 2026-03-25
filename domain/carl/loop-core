@@ -1,0 +1,72 @@
+# CARL Loop Core — CRITICAL Guardrails (ALWAYS ON)
+# =================================================
+# Split from domain/carl/loop at S60. These 13 rules are the data integrity
+# guardrails that must be active in EVERY session regardless of type.
+# The remaining ~47 rules live in domain/carl/loop-advanced (recall-triggered).
+# NEVER turn these off. If prospect work happens without these, data gets corrupted.
+
+# ============================================================================
+# PRE-ACTION: Query patterns before any activity
+# ============================================================================
+LOOP_RULE_0=Before ANY outbound activity (email, call prep, demo prep, proposal, follow-up), read brain/emails/PATTERNS.md. Check: (1) What angle/approach works best for this persona? (2) What tone gets results at this deal stage? (3) What framework converts for this scenario? (4) What approaches have FAILED for similar prospects? (5) What's the confidence level for each recommendation? Apply insights. If no data exists, use best judgment and tag carefully for future learning.
+LOOP_RULE_0_PRIORITY=CRITICAL
+
+LOOP_RULE_1=When choosing an approach for any follow-up touch, NEVER repeat the same angle that failed. Check the prospect's sequence history in brain/prospects/[Name].md. If Touch 1 used "case-study" and got no reply, Touch 2 must use a different angle. If a demo thread fell flat, don't lead with it next time. Repetition = ghosted. This is Loop's most important rule.
+LOOP_RULE_1_PRIORITY=CRITICAL
+
+# ============================================================================
+# DURING ACTION: Tag everything
+# ============================================================================
+LOOP_RULE_3=Every interaction MUST include a tag block in the prospect note BEFORE Oliver approves output. Email tags: type, channel, intent, tone, angle, framework, sequence_position, subject. Call tags: add opener, talk_track, duration, connected_with. Demo tags: add threads_shown, resonated, fell_flat, buying_signals, objections. Proposal tags: add pricing_tier, packaging, discount. No untagged activity leaves the system — if you skip tags, the learning loop breaks.
+LOOP_RULE_3_PRIORITY=CRITICAL
+
+LOOP_RULE_4=Tag taxonomy (use these values consistently): type: cold|warm|follow-up|inbound|re-engage|post-demo|proposal|referral|breakup|nurture. channel: email|call|linkedin|demo|meeting|proposal. intent: book-call|get-reply|nurture|close|discover|deliver-value|handle-objection|push-decision|get-referral. tone: direct|casual|consultative|formal|curious|empathetic. angle: [CLOSED SET — must use one of these. Add new angles to PATTERNS.md table BEFORE first use] direct|pain-point|case-study|competitor-pain|roi-calc|trigger-event|personal-connection|industry-trend|their-own-words|trial-results|white-label|breakup-referral|research-invite|time-savings|revenue-lift|cost-reduction|ad-automation|skill-offer|productivity|seo-automation|advisor-feedback|burnout|onboarding-support.
+LOOP_RULE_4_PRIORITY=CRITICAL
+
+# ============================================================================
+# POST-ACTION: Track outcomes
+# ============================================================================
+LOOP_RULE_5=At session startup, scan brain/prospects/ for any touch where outcome = "pending". Cross-reference Gmail for replies from that prospect. If reply found: update outcome (positive-reply, negative-reply, meeting-booked, deal-advanced), set reply_sentiment, record outcome_date. If no reply and next_touch date has passed: update outcome to "no-reply" and calculate next touch from cadence rules. For demos: check if deal stage changed in Pipedrive.
+LOOP_RULE_5_PRIORITY=CRITICAL
+
+# ============================================================================
+# LEARNING: Confidence tiers
+# ============================================================================
+LOOP_RULE_9=Confidence tiers: <3 data points = [INSUFFICIENT] (never present as guidance). 3-9 = [HYPOTHESIS] (mention but caveat heavily). 10-25 = [EMERGING] (directional signal, use as guidance). 25-50 = [PROVEN] (statistically meaningful for large effects). 50-100 = [HIGH CONFIDENCE] (can detect moderate effects). 100+ = [DEFINITIVE] (safe for playbook-level rules). Always tell Oliver the confidence level AND sample size when recommending an approach.
+LOOP_RULE_9_PRIORITY=CRITICAL
+
+# ============================================================================
+# GUARDS: Prevent bad data
+# ============================================================================
+LOOP_RULE_17=Never fabricate outcome data. If unknown whether an email got a reply, set outcome to "pending" and check Gmail. If Gmail returns nothing AND next_touch passed, set "no-reply". Bad data poisons the learning loop. Variables with <3 data points = [INSUFFICIENT], never present as guidance.
+LOOP_RULE_17_PRIORITY=CRITICAL
+
+LOOP_RULE_19=When presenting pattern insights, ALWAYS cite data: "Agency owners respond 40% to case-study angles (8/20 emails, [EMERGING])." Never present raw percentages without sample size and confidence level. If Oliver asks "what works?" and the answer is [HYPOTHESIS], say so.
+LOOP_RULE_19_PRIORITY=CRITICAL
+
+# ============================================================================
+# ENFORCEMENT: CRM sync
+# ============================================================================
+LOOP_RULE_20=If a prospect note has stage >= demo-scheduled and pipedrive_deal_id is empty, flag as CRITICAL at session startup. Do not draft follow-ups or proposals for this prospect until the deal ID is populated. This ensures CRM-to-brain bidirectional sync.
+LOOP_RULE_20_PRIORITY=CRITICAL
+
+# ============================================================================
+# BRAIN + NOTEBOOKLM: Mandatory institutional memory
+# ============================================================================
+LOOP_RULE_43=Before ANY prospect interaction (email, call, demo, proposal), THREE mandatory checks in this order: (1) brain/prospects/[Name].md — read existing note, check what angles were tried, what worked, what failed. (2) brain/personas/[type].md — check persona-level patterns. (3) NotebookLM query — pull case studies, proof points, objection counters for this persona/industry. These are FREE and compound. Skipping them is like a doctor ignoring the patient's chart. If no prospect note exists, create one from the template BEFORE drafting.
+LOOP_RULE_43_PRIORITY=CRITICAL
+
+LOOP_RULE_44=PRE-FLIGHT BLOCKER: Before presenting ANY prospect-related output to Oliver, complete the pre-flight checklist (.claude/preflight.md). Show the verification block above the output. Every check must show PASS or TOOL FAILED (with explanation). No prospect output may bypass pre-flight. This is not a rule to follow — it's a gate that blocks. If you find yourself about to present output without pre-flight, STOP and run it first.
+LOOP_RULE_44_PRIORITY=CRITICAL
+
+# ============================================================================
+# WRAP-UP GATE: Mandatory steps cannot be skipped
+# ============================================================================
+LOOP_RULE_45=WRAP-UP GATE: When Oliver says "wrap up" or the session is ending, steps 1, 7, 8, 9, 9.5, 10 are NON-NEGOTIABLE. Execution order: PARALLEL BATCH [1 + 7 + 8] (daily notes, anti-bloat, and audit have no dependencies — run simultaneously) → THEN [9] system loop (needs audit scores from step 8) → THEN [9.5] git checkpoint (needs all file changes from 1+7+8+9 complete) → THEN [10] handoff (always last). Before writing loop-state.md (step 10), verify ALL mandatory steps completed. Show proof: "WRAP-UP GATE: [1] daily notes [x] | [7] anti-bloat [x] | [8] audit [x] scored [X/10] | [9] system loop [x] | [9.5] git [x] | [10] handoff [x]". If any show [ ] instead of [x], STOP and complete them before closing. Context pressure is not an excuse to skip the learning loop.
+LOOP_RULE_45_PRIORITY=CRITICAL
+
+# ============================================================================
+# PIPELINE-FIRST: Real deals before architecture when both are due
+# ============================================================================
+LOOP_RULE_46=PIPELINE-FIRST: When loop-state.md shows pipeline touches due today AND system/architecture work is planned, pipeline touches MUST complete first. No exceptions. Architecture work fills remaining session time. The system exists to close deals. Architecture that never touches real pipeline data is a hypothesis, not an improvement.
+LOOP_RULE_46_PRIORITY=CRITICAL

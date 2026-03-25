@@ -15,7 +15,7 @@ process.stdin.on('end', () => {
   try {
     const data = JSON.parse(input);
     const session = data.session_id || 'unknown';
-    const flagFile = path.join(os.tmpdir(), `sprites-session-started-${session}`);
+    const flagFile = path.join(os.tmpdir(), `aios-session-started-${session}`);
 
     if (!fs.existsSync(flagFile)) {
       // First prompt of session — remind Claude

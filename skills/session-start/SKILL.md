@@ -53,7 +53,7 @@ Quick health pulse before loading context. **Run steps 1-4 + 7 as a single paral
 **PARALLEL BATCH (all at once):**
 1. Check brain/system.db exists and is readable (SQLite backing store)
 2. Check brain/.git exists (version control active)
-3. Check domain/carl/loop file size hasn't changed unexpectedly (rule tampering detection)
+3. Check domain/carl/loop-core + domain/carl/loop-advanced file sizes haven't changed unexpectedly (rule tampering detection)
 4. Check CLAUDE.md line count is under 150 (bloat detection)
 7. **System Health** — session_start_reminder.py hook runs 6 automated checks (vault, DB, PATTERNS, git, CLAUDE.md lines, events.jsonl). Surfaces CRITICAL/WARNING alerts automatically.
 8. **Brain launch check** — run `python brain/scripts/launch.py --json`. Validates header consistency (session numbers match across loop-state + startup-brief), staleness, inter-session modifications, and RAG graduation status. Surface any issues in startup output. If `rag_graduation_ready`, prompt user to activate embedding layer.
@@ -81,7 +81,7 @@ This takes <2 seconds. It catches file corruption, accidental deletions, and sys
 > Calendar, Instantly, Fireflies). DO NOT re-query these via MCP — read from sync_state/system.db.
 > MCP is the FALLBACK if api_sync.py failed (check sync_state timestamps).
 
-Load `domain/carl/loop` rules for this phase.
+Load `domain/carl/loop-core` rules (always on). Also load `domain/carl/loop-advanced` if this is a pipeline session or prospect keywords matched.
 
 **Step 5+7: Prospect loading (two tiers)** — Read startup-brief pipeline section. Prospects with meeting/demo/follow-up due within 48h = **Tier 1** (read full brain/prospects/ file). All others = **Tier 2** (load on demand when Oliver names them). For Tier 1, check: (a) `next_touch` dates <= today, (b) untagged touches.
 
@@ -189,6 +189,10 @@ Load these ONLY when the task requires them. Do not preload.
 ### Prospect history / notes
 **Intent:** Oliver mentions a specific person or company and needs context on prior interactions.
 **Load:** Check Obsidian brain (C:/Users/olive/SpritesWork/brain/prospects/), check Apollo Activities tab
+
+### Design / visual output / one-pagers / PDFs
+**Intent:** Oliver wants something designed: a one-pager, PDF, landing page, presentation slide, champion deck, visual asset, leave-behind, or any output where layout, typography, and visual polish matter. Triggers on: "design", "one-pager", "PDF", "layout", "make it look good", "visual", "leave-behind", "deck", "slide", "branded", "polished".
+**Load:** The ui-ux-pro-max plugin auto-activates. Run `python3 .claude/skills/ui-ux-pro-max/scripts/search.py "[industry/context]" --design-system` to get industry-appropriate design system (colors, fonts, styles) before building. Apply the design system output to the visual asset.
 
 ### Problem-solving / debugging / stuck
 **Intent:** Oliver is stuck, debugging, asks "why isn't this working", "figure out", "is this possible", "how do I", or presents a problem requiring research and iteration rather than a simple lookup.

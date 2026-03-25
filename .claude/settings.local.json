@@ -176,7 +176,9 @@
       "mcp__claude_ai_Fireflies__fireflies_get_transcripts",
       "Skill(gsd:pause-work)",
       "Skill(gsd:pause-work:*)",
-      "mcp__9a453a01-9088-4fae-93c9-2888fe478b34__gmail_create_draft"
+      "mcp__9a453a01-9088-4fae-93c9-2888fe478b34__gmail_create_draft",
+      "mcp__2f34239a-047b-48b3-8710-97b0187c1e81__get_themes",
+      "mcp__2f34239a-047b-48b3-8710-97b0187c1e81__generate"
     ]
   }
 }

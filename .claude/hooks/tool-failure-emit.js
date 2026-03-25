@@ -14,8 +14,9 @@ const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
-const PYTHON = "C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe";
-const BRAIN_PATH = "C:/Users/olive/SpritesWork/brain";
+const cfg = require('./config.js');
+const PYTHON = cfg.PYTHON;
+const BRAIN_PATH = cfg.BRAIN_DIR;
 const HEALTH_CACHE = path.join(BRAIN_PATH, ".mcp-health.json");
 const MAX_BACKOFF_MS = 600000; // 10 minutes
 
@@ -162,14 +163,14 @@ function main() {
     // Use events.py CLI interface — execFileSync avoids shell escaping issues on Windows
     try {
       execFileSync(PYTHON, [
-        "C:/Users/olive/SpritesWork/brain/scripts/events.py",
+        path.join(cfg.SCRIPTS, "events.py"),
         "emit", "TOOL_FAILURE", "hook:tool_failure_emit",
         JSON.stringify(eventData),
         JSON.stringify(tags),
       ], {
         timeout: 5000,
         stdio: "ignore",
-        cwd: "C:/Users/olive/SpritesWork/brain/scripts",
+        cwd: cfg.SCRIPTS,
       });
     } catch {
       // Silent — never break the tool chain
