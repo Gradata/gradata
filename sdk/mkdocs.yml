@@ -1,0 +1,73 @@
+site_name: AIOS Brain SDK
+site_description: AI behavioral adaptation engine. Corrections graduate into rules.
+repo_url: https://github.com/sprites-ai/aios-brain
+repo_name: sprites-ai/aios-brain
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Light mode
+    - scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Dark mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - content.code.annotate
+    - search.highlight
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/install.md
+    - Quick Start: getting-started/quickstart.md
+    - Core Concepts: getting-started/concepts.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - Layer 0 - Patterns: architecture/patterns.md
+    - Layer 1 - Enhancements: architecture/enhancements.md
+    - Layer 2 - Trained Brain: architecture/brain.md
+    - Agent Graduation: architecture/agent-graduation.md
+  - API Reference:
+    - Brain Class: api/brain.md
+    - Patterns: api/patterns.md
+    - Enhancements: api/enhancements.md
+    - CLI: api/cli.md
+  - Guides:
+    - Training a Brain: guides/training.md
+    - Agent Graduation: guides/agent-graduation.md
+    - Custom Domains: guides/custom-domains.md
+    - MCP Integration: guides/mcp.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            show_source: false
+            show_root_heading: true
+            heading_level: 2
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true

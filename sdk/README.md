@@ -1,20 +1,29 @@
 # aios-brain
 
-Portable AI brain SDK. Gives any AI agent persistent memory, semantic retrieval, event logging, and compounding learning across sessions.
+**AI that gets better the more you use it.** Not memory. Not fine-tuning. Behavioral adaptation that compounds.
+
+Most AI tools forget everything between sessions. Memory tools store facts but never learn *how* you work. AIOS Brain is different: it watches how you correct AI output, graduates those corrections into behavioral rules, and proves the improvement with real data.
+
+```
+Session 1:   AI drafts email → you rewrite the subject line
+Session 10:  AI notices the pattern → [INSTINCT] "Short subject lines preferred"
+Session 50:  Pattern proven → [PATTERN] "Subject lines under 5 words"
+Session 100: Rule locked → [RULE] "Subject = company name only. Always."
+```
+
+Your CLAUDE.md grows over time. A brain *shrinks* as behaviors graduate from written rules into proven patterns. That's the compound proof.
+
+**Zero dependencies. One SQLite file. Works with any LLM.**
 
 ## Installation
 
 ```bash
-pip install aios-brain
+pip install aios-brain              # zero deps, works instantly
+pip install aios-brain[gemini]      # adds Gemini embeddings (free tier)
+pip install aios-brain[all]         # full stack with vector search
 ```
 
-For semantic search with Gemini embeddings:
-
-```bash
-pip install aios-brain[gemini]
-```
-
-Requires Python 3.11+.
+Requires Python 3.11+. 605 tests passing.
 
 ## Quick Start
 
@@ -22,27 +31,59 @@ Requires Python 3.11+.
 from aios_brain import Brain
 
 # Create a new brain
-brain = Brain.init("./my-brain", domain="Sales")
+brain = Brain.init("./my-brain", domain="engineering")
 
-# Search it (keyword fallback if no embeddings yet)
-results = brain.search("budget objections")
-results = brain.search("Hassan Ali", mode="keyword")
+# Log AI output (before user sees it)
+brain.log_output("Here's the API design...", output_type="design_doc", self_score=7)
 
-# Log an event
-brain.emit("CORRECTION", "user", {
-    "category": "DRAFTING",
-    "detail": "Too formal for this persona"
-})
+# Record correction (after user edits)
+brain.correct(
+    draft="Here's the API design with REST endpoints...",
+    final="Here's the API design with gRPC endpoints..."
+)
+# Automatically: diffs, classifies edit (factual), extracts pattern, logs event
 
-# Embed files for semantic search
-brain.embed()          # delta — only changed files
-brain.embed(full=True) # full re-embed
+# Apply learned rules to next prompt
+rules = brain.apply_brain_rules(task="design_doc", context={"audience": "backend_team"})
+# Returns graduated PATTERN/RULE lessons scoped to this task type
 
-# Generate brain manifest
-manifest = brain.manifest()
+# Search brain knowledge
+results = brain.search("API design patterns")
 
-# Export for sharing
-brain.export("./my-brain-export.zip")
+# Check brain health
+health = brain.health()
+print(f"FDA: {health['first_draft_acceptance']}%")
+print(f"Correction rate: {health['correction_rate']}")
+
+# Agent graduation (agents learn too)
+brain.agent_graduation.record_outcome("research", "found 3 papers", "approved")
+brain.agent_graduation.record_outcome("writer", "draft was too formal", "edited",
+                                       edits="Tone was wrong for this audience",
+                                       task_type="email_draft")
+print(brain.agent_graduation.format_dashboard())
+```
+
+## How It Works
+
+```
+User corrects AI output
+    → Diff engine computes edit distance + severity
+    → Edit classifier categorizes (tone/content/structure/factual/style)
+    → Pattern extractor finds behavioral pattern
+    → Pattern scoped to context (domain/task_type/audience/channel/stakes)
+    → Confidence starts at 0.30 (INSTINCT)
+    → Each session it survives: +0.10
+    → Each session it's contradicted: -0.25
+    → At 0.60: graduates to PATTERN (applied by default)
+    → At 0.90: graduates to RULE (enforced)
+    → Zero fires for 15+ sessions: killed (UNTESTABLE)
+
+Same pipeline applies to agents:
+    → Orchestrator evaluates agent output
+    → Edits become agent-level corrections
+    → Agent develops its own behavioral profile
+    → Approval gate graduates: CONFIRM → PREVIEW → AUTO
+    → Agent learnings distill upward to brain level
 ```
 
 ## CLI

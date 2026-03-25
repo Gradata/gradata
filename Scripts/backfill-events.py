@@ -5,7 +5,9 @@ Sources: audit-log.md, session notes, brain/sessions, lessons.md
 import sqlite3
 import json
 
-DB_PATH = "C:/Users/olive/SpritesWork/brain/system.db"
+import os
+BRAIN_DIR = os.environ.get("BRAIN_DIR", "C:/Users/olive/SpritesWork/brain")
+DB_PATH = os.path.join(BRAIN_DIR, "system.db")
 
 conn = sqlite3.connect(DB_PATH)
 cur = conn.cursor()

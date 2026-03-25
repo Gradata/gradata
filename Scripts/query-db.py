@@ -11,7 +11,8 @@ import sqlite3
 import sys
 import os
 
-DB_PATH = r"C:\Users\olive\SpritesWork\brain\system.db"
+BRAIN_DIR = os.environ.get("BRAIN_DIR", "C:/Users/olive/SpritesWork/brain")
+DB_PATH = os.path.join(BRAIN_DIR, "system.db")
 
 
 def format_table(headers, rows):

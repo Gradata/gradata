@@ -39,12 +39,16 @@ HALLUCINATION_KEYWORDS = [
 ]
 
 
+BRAIN_DIR = os.environ.get("BRAIN_DIR", "C:/Users/olive/SpritesWork/brain")
+PYTHON = os.environ.get("PYTHON_PATH", "C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe")
+EVENTS_PY = os.path.join(BRAIN_DIR, "scripts", "events.py")
+
+
 def emit_hallucination(prompt: str, matched_patterns: str, confidence: float):
     """Emit a HALLUCINATION event when accuracy-related correction detected."""
     try:
         import subprocess
         import re as _re
-        python = "C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe"
         import json as _json
         data = _json.dumps({
             "trigger": matched_patterns,
@@ -54,7 +58,7 @@ def emit_hallucination(prompt: str, matched_patterns: str, confidence: float):
         })
         tags = _json.dumps(["accuracy:correction_proxy"])
         subprocess.run(
-            [python, "C:/Users/olive/SpritesWork/brain/scripts/events.py",
+            [PYTHON, EVENTS_PY,
              "emit", "HALLUCINATION", "hook:capture_learning", data, tags],
             capture_output=True, text=True, timeout=5
         )
@@ -70,8 +74,6 @@ def emit_correction(prompt: str, matched_patterns: str, confidence: float):
     """
     try:
         import subprocess
-        import re as _re
-        python = "C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe"
         import json as _json
         # Detect category from patterns (DRAFTING, PROCESS, ACCURACY, etc.)
         category = "GENERAL"
@@ -92,7 +94,7 @@ def emit_correction(prompt: str, matched_patterns: str, confidence: float):
         })
         tags = _json.dumps([f"category:{category}"])
         subprocess.run(
-            [python, "C:/Users/olive/SpritesWork/brain/scripts/events.py",
+            [PYTHON, EVENTS_PY,
              "emit", "CORRECTION", "hook:capture_learning", data, tags],
             capture_output=True, text=True, timeout=5
         )

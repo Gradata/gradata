@@ -21,6 +21,16 @@ const PROSPECT_PATHS = [
   "brain/emails/",
 ];
 
+// Code output paths — for Gate 0 tracking, we need to count system work too
+const CODE_OUTPUT_PATHS = [
+  "sdk/src/",
+  "sdk/tests/",
+  "brain/scripts/",
+  ".claude/hooks/",
+  "enhancements/",
+  "patterns/",
+];
+
 const OUTPUT_PATTERNS = {
   email: [/email/i, /draft/i, /outreach/i, /follow.?up/i, /sequence/i],
   cheat_sheet: [/cheat/i, /prep/i, /battlecard/i, /objection/i, /talk.?track/i],
@@ -124,8 +134,11 @@ function main() {
   if (toolName !== "Write" && toolName !== "Edit") return;
   const toolInput = data.tool_input || {};
   const filePath = toolInput.file_path || toolInput.path || "";
-  if (!isProspectFacing(filePath)) return;
-  const outputType = classifyOutput(filePath);
+  const normalized = filePath.replace(/\\/g, "/");
+  const isProspect = isProspectFacing(filePath);
+  const isCode = CODE_OUTPUT_PATHS.some(p => normalized.includes(p));
+  if (!isProspect && !isCode) return;
+  const outputType = isProspect ? classifyOutput(filePath) : "code";
   if (!outputType) return;
   const fileName = path.basename(filePath);
 

@@ -19,11 +19,12 @@ const CODE_EXTENSIONS = new Set([
   '.go', '.rs', '.rb', '.php', '.java', '.c', '.cpp',
 ]);
 
-// Skip files that aren't code
+// Skip files that aren't code (data files, markdown prose, DBs)
 const SKIP_PATHS = [
-  'node_modules', '.git', 'brain/events.jsonl', 'system.db',
+  'node_modules', '.git', 'events.jsonl', 'system.db',
   'lessons-archive.md', 'loop-state.md', 'morning-brief.md',
-  'startup-brief.md', 'MEMORY.md', 'prospects/',
+  'startup-brief.md', 'MEMORY.md', 'prospects/', 'sessions/',
+  '.vectorstore', 'system.db-shm', 'system.db-wal',
 ];
 
 function readStdin() {
@@ -43,10 +44,18 @@ function isCodeFile(filePath) {
 
 function getFileDiff(filePath) {
   try {
+    // Detect which git repo the file belongs to
+    const normalized = filePath.replace(/\\/g, '/');
+    let cwd;
+    if (normalized.includes('SpritesWork/brain')) {
+      cwd = 'C:/Users/olive/SpritesWork/brain';
+    } else {
+      cwd = process.env.WORKING_DIR || 'C:/Users/olive/OneDrive/Desktop/Sprites Work';
+    }
     const diff = execSync(`git diff HEAD -- "${filePath}"`, {
       encoding: 'utf8',
       timeout: 5000,
-      cwd: process.env.WORKING_DIR || 'C:/Users/olive/OneDrive/Desktop/Sprites Work',
+      cwd,
     });
     return diff || null;
   } catch { return null; }
@@ -103,6 +112,6 @@ try {
     }
   }
 } catch (e) {
-  // Silent failure -- hooks must not block workflow
-  // Uncomment for debugging: process.stderr.write(`[codex-review] error: ${e.message}\n`);
+  // Surface errors so we know when codex isn't running
+  process.stderr.write(`[codex-review] error: ${e.message}\n`);
 }

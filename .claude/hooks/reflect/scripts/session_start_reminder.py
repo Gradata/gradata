@@ -21,8 +21,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from lib.reflect_utils import load_queue, get_cleanup_period_days
 
-BRAIN_PATH = Path("C:/Users/olive/SpritesWork/brain")
-SPRITES_WORK = Path("C:/Users/olive/OneDrive/Desktop/Sprites Work")
+BRAIN_PATH = Path(os.environ.get("BRAIN_DIR", "C:/Users/olive/SpritesWork/brain"))
+SPRITES_WORK = Path(os.environ.get("WORKING_DIR", "C:/Users/olive/OneDrive/Desktop/Sprites Work"))
+PYTHON = os.environ.get("PYTHON_PATH", "C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe")
 DB_PATH = BRAIN_PATH / "system.db"
 
 
@@ -47,7 +48,7 @@ def emit_stale_data(file_path: str, age_days: int, threshold_days: int):
     try:
         import subprocess
         import json as _json
-        python = "C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe"
+        python = PYTHON
         data = _json.dumps({
             "file": file_path,
             "age_days": age_days,
@@ -133,7 +134,7 @@ def system_health_checks() -> list:
     # 7. Config validation (settings.json, agent manifests, codebase health)
     try:
         import subprocess
-        python = "C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe"
+        python = PYTHON
         validator = BRAIN_PATH / "scripts" / "config_validator.py"
         if validator.exists():
             result = subprocess.run(
@@ -150,7 +151,7 @@ def system_health_checks() -> list:
     # 8. Brain RAG freshness (launch.py health check)
     try:
         import subprocess
-        python = "C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe"
+        python = PYTHON
         launch = BRAIN_PATH / "scripts" / "launch.py"
         if launch.exists():
             result = subprocess.run(

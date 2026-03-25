@@ -20,9 +20,10 @@ from datetime import datetime
 from pathlib import Path
 
 # Defaults
-DEFAULT_DB = r"C:\Users\olive\SpritesWork\brain\system.db"
+BRAIN_DIR = os.environ.get("BRAIN_DIR", "C:/Users/olive/SpritesWork/brain")
+DEFAULT_DB = os.path.join(BRAIN_DIR, "system.db")
 DEFAULT_OUTPUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
-SYSTEM_PATTERNS = r"C:\Users\olive\SpritesWork\brain\system-patterns.md"
+SYSTEM_PATTERNS = os.path.join(BRAIN_DIR, "system-patterns.md")
 
 
 def parse_args():

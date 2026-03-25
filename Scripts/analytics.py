@@ -14,7 +14,9 @@ from datetime import datetime, timezone, timedelta
 def utcnow():
     return datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
 
-DB_PATH = "C:/Users/olive/SpritesWork/brain/system.db"
+import os
+BRAIN_DIR = os.environ.get("BRAIN_DIR", "C:/Users/olive/SpritesWork/brain")
+DB_PATH = os.path.join(BRAIN_DIR, "system.db")
 
 
 def get_connection():

@@ -74,10 +74,11 @@ Rules:
 | Tools | tools.py | Tool registry + plan-before-execute |
 | MCP | mcp.py | Brain-to-host protocol bridge |
 
-### Layer 1: Enhancements (13 modules)
+### Layer 1: Enhancements (16 modules)
 | Enhancement | Module | Purpose |
 |-------------|--------|---------|
-| Self-Improvement | self_improvement.py | INSTINCT→PATTERN→RULE graduation |
+| Self-Improvement | self_improvement.py | INSTINCT→PATTERN→RULE graduation (user corrections) |
+| **Agent Graduation** | **agent_graduation.py** | **Same graduation pipeline applied to agent/subagent outputs. Human approval gate that graduates from CONFIRM→PREVIEW→AUTO. Upward distillation of agent learnings to brain level.** |
 | Diff Engine | diff_engine.py | Edit distance + 5-level severity |
 | Edit Classifier | edit_classifier.py | 5-category classification (tone/content/structure/factual/style) |
 | Pattern Extractor | pattern_extractor.py | Extract patterns from classified edits |
@@ -90,6 +91,8 @@ Rules:
 | Truth Protocol | truth_protocol.py | Evidence-based output validation |
 | Correction Tracking | correction_tracking.py | Density, half-life, MTBF/MTTR |
 | Brain Scores | brain_scores.py | Compound health metric (report card) |
+| **Judgment Decay** | **judgment_decay.py** | **Confidence decay for idle lessons, reinforcement for applied ones, UNTESTABLE archival** |
+| **Rules Distillation** | **rules_distillation.py** | **Cross-lesson pattern detection, rule promotion proposals with evidence scoring** |
 
 ### Layer 2: Trained Brain (user's data)
 ```
@@ -147,6 +150,80 @@ MCP protocol has NO concept of user feedback or corrections. Correction signals 
 of the MCP stdio channel. Content hash dedup with 30-second window prevents double-counting.
 Falls back to explicit `brain_correct()` tool calls for hosts without hooks.
 The `<private>` tag convention (`rag.py:strip_private()`) excludes marked content from tracking.
+
+---
+
+## 3B. AGENT GRADUATION (compounding agent behavioral adaptation)
+
+The graduation pipeline applies at THREE levels, not just user corrections:
+
+```
+Level 0: User trains brain           (user corrects AI → lessons graduate)
+Level 1: Brain trains its agents     (orchestrator evaluates agent output → agent lessons graduate)
+Level 2: Agents train subagents      (agent evaluates subagent → subagent lessons graduate)
+```
+
+### How It Works
+
+Each agent type (research, writer, critic, etc.) maintains its own behavioral profile:
+- lessons.md (INSTINCT→PATTERN→RULE, same graduation mechanics)
+- profile.json (FDA rate, approval gate state, quality history)
+- outcomes.jsonl (append-only evaluation log)
+
+When an agent produces output:
+1. Orchestrator (or user) evaluates: approved / edited / rejected
+2. Edits become CORRECTION signals feeding the agent's graduation pipeline
+3. Approvals boost lesson confidence (+0.05 per approval)
+4. Rejections penalize (-0.25, same loss aversion as user-level)
+
+### Human Approval Gate Graduation
+
+The approval gate ITSELF graduates based on the agent's track record:
+
+```
+CONFIRM (sessions 0-10):  Oliver must review every agent output
+  → After 70% FDA across 10+ outputs:
+PREVIEW (sessions 10-25): Oliver sees summary, quick approve/reject
+  → After 90% FDA across 25+ outputs:
+AUTO (sessions 25+):      Agent auto-executes, spot-check only
+  → 3 consecutive rejections: DEMOTE one level
+```
+
+New agent types ALWAYS start at CONFIRM. Trust is earned, not assumed.
+
+### Upward Distillation
+
+Agent learnings that prove valuable (reach PATTERN or RULE) distill upward:
+- Subagent PATTERN → offered to parent agent
+- Agent RULE → offered to brain-level lessons
+- Cross-agent patterns propagate through the brain layer
+
+```python
+# API
+brain.agent_graduation.record_outcome("research", output, "approved")
+brain.agent_graduation.record_outcome("writer", output, "edited", edits="...")
+gate = brain.agent_graduation.get_approval_gate("research")  # "auto"
+rules = brain.agent_graduation.get_agent_rules("research")   # for prompt injection
+distilled = brain.agent_graduation.distill_upward()           # brain-level enrichment
+```
+
+### Agent Manifest
+
+Each trained agent gets quality proof (per-agent brain.manifest):
+```json
+{
+  "agent_type": "research",
+  "sessions_trained": 47,
+  "maturity_phase": "ADOLESCENT",
+  "fda_rate": 0.89,
+  "approval_gate": "auto",
+  "proven_rules": 12,
+  "lessons": {"RULE": 3, "PATTERN": 5, "INSTINCT": 4}
+}
+```
+
+This makes trained agents independently rentable — not just the brain, but the
+specialized agents within it, each with provable quality metrics.
 
 ---
 
@@ -216,7 +293,7 @@ All data lives in the `events` table. No separate domain tables.
 - Corrections drop but edits don't → brain being ignored
 - Acceptance rises but quality flat → brain playing safe
 - Rules increase but misfires increase → brain overfitting
-- Output becomes bland → regression to mean
+- Output becomes bland (blandness score > 0.70 inverted TTR) → regression to mean
 
 ---
 
@@ -348,6 +425,7 @@ Known limitation:
 | Advantage | Strength | Duration |
 |-----------|----------|----------|
 | Graduation pipeline concept | Medium | 6-12 months (copyable) |
+| **Agent-level graduation** | **Strong** | **12-18 months (requires trained agents + data)** |
 | Tuned graduation thresholds | Strong | 18-24 months (needs data) |
 | Meta-learning across brains | Very Strong | Permanent (data can't be cloned) |
 | Domain expertise library | Strong | Permanent (built through agency work) |
@@ -361,9 +439,9 @@ Known limitation:
 | Component | Status | Files | Lines |
 |-----------|--------|-------|-------|
 | patterns/ (Layer 0) | 15/15 complete | 15 | ~5,600 |
-| enhancements/ (Layer 1) | 13/13 complete | 13 | ~3,800 |
+| enhancements/ (Layer 1) | 16/16 complete | 16 | ~5,400 |
 | Core (brain.py, cli.py, mcp_server.py, etc) | Complete | 31 | ~9,500 |
-| Tests | 537 passing | 9 | ~5,800 |
+| Tests | 605 passing | 12 | ~6,600 |
 | **Total** | **Functional SDK** | **~66** | **~20,000+** |
 
 ### What's Done (Session 43)
@@ -387,12 +465,26 @@ Known limitation:
 - [x] SDK root cleanup (12 superseded docs archived, stray DB/vectorstore removed)
 - [x] correction_rate manifest bug fixed (was always 0.0)
 - [x] FACTUAL/CONTENT/TONE/STRUCTURE/STYLE added to core taxonomy
+- [x] Agent graduation pipeline (S62): per-agent behavioral profiles, human approval gate graduation (CONFIRM→PREVIEW→AUTO), upward distillation, 27 tests passing
+- [x] Statusline gate fix (S62): dedup query, auto-fix for 4 failing checks, 19/19 = 100%
+- [x] Path DI (S62): 10 files migrated to env-var pattern (BRAIN_DIR, WORKING_DIR, PYTHON_PATH)
+- [x] Hook timeout budget (S62): 3 missing timeouts added, 2 mega-timeouts halved
+- [x] Judgment decay algorithm (S62): extracted from brain/scripts to SDK enhancements/
+- [x] Rules distillation algorithm (S62): cross-lesson pattern detection extracted to SDK
+- [x] Domain coupling fix (S62): reload_config() loads FILE_TYPE_MAP/MEMORY_TYPE_WEIGHTS from taxonomy.json
+- [x] Spawn.py migration Wave 1 (S62): route_by_keywords, load_agent_definition, handoff management extracted to SDK. spawn.py now thin shim.
+- [x] Scoped agent graduation (S62): agent lessons scoped by task_type, filtered at rule selection
+- [x] Wrap-up compacted (S62): 15 phases/21 steps → 9 steps. Codex-verified, /reflect mandatory.
+- [x] Full 8-phase audit (S62): AUDIT.md as living North Star reference
+- [x] Competitive research (S62): nobody has graduation pipeline. Mem0 48K stars, no behavioral learning.
 
 ### What's Next
 - [ ] 10+ external users
 - [ ] 3+ users with 50+ sessions showing improvement
-- [ ] Statistically significant correction density decrease (need ~200 sessions, at 42)
-- [ ] Remaining domain coupling: `_config.py` FILE_TYPE_MAP + MEMORY_TYPE_WEIGHTS
+- [ ] Statistically significant correction density decrease (need ~200 sessions, at 62)
+- [ ] MkDocs documentation setup
+- [ ] README rewrite for external developers
+- [ ] memory_scope.py migration (Wave 2)
 
 ---
 

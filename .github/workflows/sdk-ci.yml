@@ -40,17 +40,17 @@ jobs:
 
       - name: Lint (ruff)
         working-directory: sdk
-        run: ruff check aios_brain/
+        run: ruff check src/aios_brain/
 
       - name: Type check (pyright)
         working-directory: sdk
         continue-on-error: true
-        run: pyright aios_brain/
+        run: pyright src/aios_brain/
 
       - name: Security scan (bandit)
         working-directory: sdk
         continue-on-error: true
-        run: bandit -r aios_brain/ -c pyproject.toml
+        run: bandit -r src/aios_brain/ -c pyproject.toml
 
       - name: Test suite
         working-directory: sdk

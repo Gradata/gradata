@@ -140,6 +140,16 @@
             "timeout": 3000
           }
         ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/agent-precontext.js\"",
+            "timeout": 5000
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -179,7 +189,7 @@
           {
             "type": "command",
             "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/codex-review.js\"",
-            "timeout": 60000
+            "timeout": 30000
           }
         ]
       },
@@ -197,7 +207,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/gsd-context-monitor.js\""
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/gsd-context-monitor.js\"",
+            "timeout": 3000
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/agent-graduation.js\"",
+            "timeout": 10000
           }
         ]
       },
@@ -206,7 +227,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/reflect/scripts/post_commit_reminder.py\""
+            "command": "python \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/reflect/scripts/post_commit_reminder.py\"",
+            "timeout": 5000
           }
         ]
       },
@@ -214,7 +236,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/delta-auto-tag.js\""
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/delta-auto-tag.js\"",
+            "timeout": 5000
           }
         ]
       },
@@ -271,7 +294,16 @@
           {
             "type": "command",
             "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/brain-maintain.js\"",
-            "timeout": 90000
+            "timeout": 30000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/session-checklist.js\"",
+            "timeout": 10000
           }
         ]
       }

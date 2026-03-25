@@ -25,7 +25,9 @@ from datetime import datetime, timezone
 def _now():
     return datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
 
-DB_PATH = "C:/Users/olive/SpritesWork/brain/system.db"
+import os as _os
+BRAIN_DIR = _os.environ.get("BRAIN_DIR", "C:/Users/olive/SpritesWork/brain")
+DB_PATH = _os.path.join(BRAIN_DIR, "system.db")
 
 VALID_ENTITY_TYPES = {
     'prospect', 'company', 'industry', 'persona',

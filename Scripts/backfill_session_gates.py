@@ -4,15 +4,17 @@ import os
 import re
 import glob
 
-DB = "C:/Users/olive/SpritesWork/brain/system.db"
-DOCS_DIR = "C:/Users/olive/OneDrive/Desktop/Sprites Work/docs/Session Notes"
-BRAIN_DIR = "C:/Users/olive/SpritesWork/brain/sessions"
-STARTUP_BRIEF = "C:/Users/olive/OneDrive/Desktop/Sprites Work/domain/pipeline/startup-brief.md"
-LOOP_STATE = "C:/Users/olive/SpritesWork/brain/loop-state.md"
-VERSION_MD = "C:/Users/olive/SpritesWork/brain/VERSION.md"
-AGENTS_DIR = "C:/Users/olive/OneDrive/Desktop/Sprites Work/agents"
-LESSONS_FILE = "C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/lessons.md"
-LESSONS_ARCHIVE = "C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/lessons-archive.md"
+_BRAIN = os.environ.get("BRAIN_DIR", "C:/Users/olive/SpritesWork/brain")
+_WORK = os.environ.get("WORKING_DIR", "C:/Users/olive/OneDrive/Desktop/Sprites Work")
+DB = os.path.join(_BRAIN, "system.db")
+DOCS_DIR = os.path.join(_WORK, "docs", "Session Notes")
+BRAIN_DIR = os.path.join(_BRAIN, "sessions")
+STARTUP_BRIEF = os.path.join(_WORK, "domain", "pipeline", "startup-brief.md")
+LOOP_STATE = os.path.join(_BRAIN, "loop-state.md")
+VERSION_MD = os.path.join(_BRAIN, "VERSION.md")
+AGENTS_DIR = os.path.join(_WORK, "agents")
+LESSONS_FILE = os.path.join(_WORK, ".claude", "lessons.md")
+LESSONS_ARCHIVE = os.path.join(_WORK, ".claude", "lessons-archive.md")
 
 
 def find_docs_file(session_num):
