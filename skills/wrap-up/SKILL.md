@@ -7,7 +7,7 @@ description: Use when user says "wrap up", "close session", "end session",
 
 # Session Wrap-Up (v3 — Lean, S62)
 
-9 steps. ~5 minutes. Everything else is hooks or periodic.
+10 steps. ~5 minutes. Everything else is hooks or periodic.
 
 The brain learns from 3 things: corrections routed to lessons (/reflect),
 confidence updates (graduation), and handoff continuity (next session starts
@@ -120,7 +120,7 @@ Review distilled lessons. Promote worthy ones to brain-level lessons.md.
 ## Step 8: Summary (show Oliver)
 
 ```
-WRAP-UP: [N]/9 steps | [session_type]
+WRAP-UP: [N]/10 steps | [session_type]
   Gate: [X]/[Y] ([Z]%)
   Learned: [N] lessons | [N] graduated | [N] corrections
   Agents: [N] types | [avg FDA]% | gate changes: [list]
@@ -138,13 +138,13 @@ cd "C:/Users/olive/OneDrive/Desktop/Sprites Work" && git add -A && git commit -m
 
 ## Step 10: Wrap-Up Reviewer (background, non-blocking)
 
-Spawn the `wrapup-reviewer` agent in background AFTER commit. It verifies all 9 steps
+Spawn the `wrapup-reviewer` agent in background AFTER commit. It verifies all 10 steps
 ran correctly and catches skipped steps. Its findings feed into agent graduation,
 so wrap-up quality compounds over time.
 
 ```
 Spawn agent: wrapup-reviewer (background, haiku)
-Prompt: "Review the wrap-up for session [N]. Check all 9 steps executed.
+Prompt: "Review the wrap-up for session [N]. Check all 10 steps executed.
          Report any skipped steps or missing data."
 ```
 

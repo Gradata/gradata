@@ -204,6 +204,16 @@
         ]
       },
       {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/arch-review.js\"",
+            "timeout": 45000
+          }
+        ]
+      },
+      {
         "hooks": [
           {
             "type": "command",

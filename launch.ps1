@@ -38,4 +38,4 @@ Write-Host ""
 
 # Launch Claude Code
 Set-Location "C:\Users\olive\OneDrive\Desktop\Sprites Work"
-claude .
+claude --permission-mode auto .

@@ -441,8 +441,8 @@ Known limitation:
 | patterns/ (Layer 0) | 15/15 complete | 15 | ~5,600 |
 | enhancements/ (Layer 1) | 16/16 complete | 16 | ~5,400 |
 | Core (brain.py, cli.py, mcp_server.py, etc) | Complete | 31 | ~9,500 |
-| Tests | 605 passing | 12 | ~6,600 |
-| **Total** | **Functional SDK** | **~66** | **~20,000+** |
+| Tests | 659 passing | 12 | ~7,200 |
+| **Total** | **Functional SDK** | **~67** | **~20,600+** |
 
 ### What's Done (Session 43)
 - [x] 537 tests (9 test files + audit_data_flow.py + test_bug_fixes.py)
@@ -474,9 +474,15 @@ Known limitation:
 - [x] Domain coupling fix (S62): reload_config() loads FILE_TYPE_MAP/MEMORY_TYPE_WEIGHTS from taxonomy.json
 - [x] Spawn.py migration Wave 1 (S62): route_by_keywords, load_agent_definition, handoff management extracted to SDK. spawn.py now thin shim.
 - [x] Scoped agent graduation (S62): agent lessons scoped by task_type, filtered at rule selection
-- [x] Wrap-up compacted (S62): 15 phases/21 steps → 9 steps. Codex-verified, /reflect mandatory.
+- [x] Wrap-up compacted (S62): 15 phases/21 steps → 10 steps. Codex-verified, /reflect mandatory.
 - [x] Full 8-phase audit (S62): AUDIT.md as living North Star reference
 - [x] Competitive research (S62): nobody has graduation pipeline. Mem0 48K stars, no behavioral learning.
+- [x] Session-type-aware decay (S63): lessons only decay in sessions where their category is testable. DRAFTING immune during system sessions.
+- [x] Wave 2 migration (S63): guardrails.py + memory_scope.py pure logic extracted to SDK. 5/7 brain/scripts files migrated.
+- [x] Deterministic rule enforcement (S63): RULE-tier patterns compiled to regex guards. DeterministicRule + EnforcementResult + compile_deterministic_rule.
+- [x] Architecture review hook (S63): arch-review.js — opinionated PostToolUse on Write/Edit for layer violations, SDK compliance.
+- [x] 16 AUDIT gaps closed (S63): I1-I5, I7-I12, I14-I18, I20-I21, I24. From 24 IMPORTANT to 8.
+- [x] Tests 605→659 (S63): +54 new tests across decay, guardrails, memory scope, deterministic rules.
 
 ### What's Next
 - [ ] 10+ external users

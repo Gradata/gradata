@@ -44,12 +44,38 @@ try {
   process.stderr.write(`[session-close] SESSION_END emit failed: ${e.message}\n`);
 }
 
-// --- 1. Confidence scoring (skip if wrap-up skill already ran) ---
+// --- 1. Detect session type (needed for both confidence scoring and gate validation) ---
+// Maps to SDK categories: "sales" | "system" | "pipeline" | "mixed"
+let sessionType = 'system'; // default to system
+try {
+  const lsPath = `${BRAIN}/loop-state.md`;
+  if (fs.existsSync(lsPath)) {
+    const lsContent = fs.readFileSync(lsPath, 'utf8').substring(0, 1000);
+    const typeMatch = lsContent.match(/session[_-]?type:\s*(full|systems?|sales|prospect|pipeline|mixed)/i);
+    if (typeMatch) {
+      const raw = typeMatch[1].toLowerCase();
+      // Normalize: "full"/"prospect"/"sales" -> "sales", "systems" -> "system"
+      sessionType = (raw === 'full' || raw === 'prospect' || raw === 'sales') ? 'sales'
+        : (raw === 'systems') ? 'system' : raw;
+    }
+  }
+} catch (e) {}
+
+// Fallback: query OUTPUT events for prospect field
+if (sessionType === 'system' && sessionNum > 0) {
+  try {
+    const checkCmd = `"${PYTHON}" -c "import sys; sys.path.insert(0, r'${BRAIN}/scripts'); import sqlite3; from paths import DB_PATH; conn = sqlite3.connect(str(DB_PATH)); rows = conn.execute(\\"SELECT data_json FROM events WHERE type='OUTPUT' AND session=${sessionNum}\\").fetchall(); conn.close(); import json; prospect = any(json.loads(r[0]).get('prospect') for r in rows if r[0]); print('sales' if prospect else 'system')"`;
+    const detected = execSync(checkCmd, { timeout: 5000 }).toString().trim();
+    if (detected === 'sales') sessionType = 'sales';
+  } catch (e) {}
+}
+
+// --- 2. Confidence scoring (skip if wrap-up skill already ran) ---
 if (!wrapUpAlreadyRan) try {
   const pyCmd = [
     'import sys; sys.path.insert(0, r"' + BRAIN + '/scripts")',
     'from wrap_up import update_confidence',
-    'result = update_confidence()',
+    'result = update_confidence(session_type="' + sessionType + '")',
     'import json; print(json.dumps(result, default=str))',
   ].join('; ');
 
@@ -61,30 +87,8 @@ if (!wrapUpAlreadyRan) try {
   // Silent — confidence scoring is best-effort
 }
 
-// --- 2. Session gate validator (skip if wrap-up skill already ran) ---
+// --- 3. Session gate validator (skip if wrap-up skill already ran) ---
 if (sessionNum > 0 && !wrapUpAlreadyRan) {
-  // Detect session type: check if any OUTPUT events have prospect data
-  let sessionType = 'systems'; // default to systems
-  try {
-    const lsPath = `${BRAIN}/loop-state.md`;
-    if (fs.existsSync(lsPath)) {
-      const lsContent = fs.readFileSync(lsPath, 'utf8').substring(0, 1000);
-      const typeMatch = lsContent.match(/session[_-]?type:\s*(full|systems|sales|prospect|mixed)/i);
-      if (typeMatch) {
-        sessionType = typeMatch[1].toLowerCase() === 'systems' ? 'systems' : 'full';
-      }
-    }
-  } catch (e) {}
-
-  // Fallback: query OUTPUT events for prospect field
-  if (sessionType === 'systems') {
-    try {
-      const checkCmd = `"${PYTHON}" -c "import sys; sys.path.insert(0, r'${BRAIN}/scripts'); import sqlite3; from paths import DB_PATH; conn = sqlite3.connect(str(DB_PATH)); rows = conn.execute(\\"SELECT data_json FROM events WHERE type='OUTPUT' AND session=${sessionNum}\\").fetchall(); conn.close(); import json; prospect = any(json.loads(r[0]).get('prospect') for r in rows if r[0]); print('full' if prospect else 'systems')"`;
-      const detected = execSync(checkCmd, { timeout: 5000 }).toString().trim();
-      if (detected === 'full') sessionType = 'full';
-    } catch (e) {}
-  }
-
   try {
     execSync(
       `"${PYTHON}" "${BRAIN}/scripts/wrap_up_validator.py" --session ${sessionNum} --date ${today} --session-type ${sessionType}`,

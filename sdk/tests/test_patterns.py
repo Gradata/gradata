@@ -366,9 +366,178 @@ class TestGuardrails:
         assert check.result == "fail"
 
 
+class TestManifestGuardrails:
+    """Tests for manifest-based agent security (extracted from brain/scripts)."""
+
+    def test_check_write_path_allowed(self):
+        from aios_brain.patterns.guardrails import check_write_path
+        result = check_write_path("brain/prospects/test.md", ["brain/prospects/*"])
+        assert result.allowed
+        assert "ALLOWED" in result.reason
+
+    def test_check_write_path_denied_by_global(self):
+        from aios_brain.patterns.guardrails import check_write_path
+        result = check_write_path(".env", [], global_deny=["*.env", ".env"])
+        assert not result.allowed
+        assert "global policy" in result.reason
+
+    def test_check_write_path_denied_not_in_allowlist(self):
+        from aios_brain.patterns.guardrails import check_write_path
+        result = check_write_path("secrets/keys.json", ["brain/**"])
+        assert not result.allowed
+
+    def test_check_write_path_denied_by_tools_denied(self):
+        from aios_brain.patterns.guardrails import check_write_path
+        # tools_denied only applies when path is NOT in the allowlist
+        result = check_write_path(
+            "docs/internal.md",
+            [],  # no allowlist entries
+            agent_tools_denied=["Write docs/internal*"],
+        )
+        assert not result.allowed
+
+    def test_check_exec_command_allowed(self):
+        from aios_brain.patterns.guardrails import check_exec_command
+        result = check_exec_command("git status", ["rm -rf", "format c:"])
+        assert result.allowed
+
+    def test_check_exec_command_denied(self):
+        from aios_brain.patterns.guardrails import check_exec_command
+        result = check_exec_command("rm -rf /", ["rm -rf", "format c:"])
+        assert not result.allowed
+
+    def test_scan_for_secrets_clean(self):
+        from aios_brain.patterns.guardrails import scan_for_secrets
+        findings = scan_for_secrets("hello world", [r"sk-[a-zA-Z0-9]{20,}"])
+        assert len(findings) == 0
+
+    def test_scan_for_secrets_found(self):
+        from aios_brain.patterns.guardrails import scan_for_secrets
+        findings = scan_for_secrets(
+            "key is sk-abcdefghijklmnopqrstuvwxyz",
+            [r"sk-[a-zA-Z0-9]{20,}"],
+            {"sk-[a-zA-Z0-9]{20,}": "api_key"},
+        )
+        assert len(findings) == 1
+        assert findings[0][0] == "api_key"
+
+    def test_validate_spawn_no_budget(self):
+        from aios_brain.patterns.guardrails import validate_agent_spawn
+        result = validate_agent_spawn(30000, budget_enabled=False)
+        assert result.allowed
+        assert result.budget == 30000
+
+    def test_validate_spawn_within_budget(self):
+        from aios_brain.patterns.guardrails import validate_agent_spawn
+        result = validate_agent_spawn(
+            20000, budget_enabled=True, parent_budget_remaining=100000
+        )
+        assert result.allowed
+        assert result.budget == 20000
+
+    def test_validate_spawn_denied_hard_limit(self):
+        from aios_brain.patterns.guardrails import validate_agent_spawn
+        result = validate_agent_spawn(
+            95000, budget_enabled=True, parent_budget_remaining=100000,
+            child_hard_limit_percent=95,
+        )
+        assert not result.allowed
+
+    def test_validate_spawn_warning(self):
+        from aios_brain.patterns.guardrails import validate_agent_spawn
+        result = validate_agent_spawn(
+            85000, budget_enabled=True, parent_budget_remaining=100000,
+            child_warning_threshold_percent=80, child_hard_limit_percent=95,
+        )
+        assert result.allowed
+        assert "WARNING" in result.reason
+
+    def test_write_path_normalizes_backslashes(self):
+        from aios_brain.patterns.guardrails import check_write_path
+        result = check_write_path("brain\\prospects\\test.md", ["brain/prospects/*"])
+        assert result.allowed
+
+
 # ---------------------------------------------------------------------------
 # 5. memory — MemoryManager, InMemoryStore, EpisodicMemory, SemanticMemory
 # ---------------------------------------------------------------------------
+
+class TestMemoryScope:
+    """Tests for memory scope classification (extracted from brain/scripts/memory_scope.py)."""
+
+    def test_prospect_file_is_local(self):
+        from aios_brain.patterns.memory import classify_memory_scope
+        assert classify_memory_scope(source_path="prospects/Hassan.md") == "local"
+
+    def test_patterns_file_is_project(self):
+        from aios_brain.patterns.memory import classify_memory_scope
+        assert classify_memory_scope(source_path="emails/PATTERNS.md") == "project"
+
+    def test_metrics_file_is_user(self):
+        from aios_brain.patterns.memory import classify_memory_scope
+        assert classify_memory_scope(source_path="metrics/daily.json") == "user"
+
+    def test_loop_state_is_user(self):
+        from aios_brain.patterns.memory import classify_memory_scope
+        assert classify_memory_scope(source_path="loop-state.md") == "user"
+
+    def test_scripts_dir_is_local(self):
+        from aios_brain.patterns.memory import classify_memory_scope
+        assert classify_memory_scope(source_path="scripts/events.py") == "local"
+
+    def test_event_type_correction_is_user(self):
+        from aios_brain.patterns.memory import classify_memory_scope
+        assert classify_memory_scope(event_type="CORRECTION") == "user"
+
+    def test_event_type_output_is_local(self):
+        from aios_brain.patterns.memory import classify_memory_scope
+        assert classify_memory_scope(event_type="OUTPUT") == "local"
+
+    def test_tag_prospect_is_local(self):
+        from aios_brain.patterns.memory import classify_memory_scope
+        assert classify_memory_scope(tags=["prospect:hassan"]) == "local"
+
+    def test_tag_pattern_is_project(self):
+        from aios_brain.patterns.memory import classify_memory_scope
+        assert classify_memory_scope(tags=["pattern:drafting"]) == "project"
+
+    def test_default_is_local(self):
+        from aios_brain.patterns.memory import classify_memory_scope
+        assert classify_memory_scope() == "local"
+
+    def test_path_takes_priority_over_event_type(self):
+        from aios_brain.patterns.memory import classify_memory_scope
+        # Path says "user" (metrics/), event_type says "local" (OUTPUT)
+        assert classify_memory_scope(source_path="metrics/daily.json", event_type="OUTPUT") == "user"
+
+    def test_absolute_path_with_brain_dir(self):
+        from aios_brain.patterns.memory import classify_memory_scope
+        result = classify_memory_scope(
+            source_path="C:/Users/test/brain/prospects/test.md",
+            brain_dir="C:/Users/test/brain",
+        )
+        assert result == "local"
+
+    def test_scope_filter_valid(self):
+        from aios_brain.patterns.memory import get_memory_scope_filter
+        f = get_memory_scope_filter("project")
+        assert f["clause"] == "scope = ?"
+        assert f["params"] == ("project",)
+
+    def test_scope_filter_invalid_raises(self):
+        import pytest
+        from aios_brain.patterns.memory import get_memory_scope_filter
+        with pytest.raises(ValueError):
+            get_memory_scope_filter("invalid")
+
+    def test_personas_is_project(self):
+        from aios_brain.patterns.memory import classify_memory_scope
+        assert classify_memory_scope(source_path="personas/sales.md") == "project"
+
+    def test_sessions_is_local(self):
+        from aios_brain.patterns.memory import classify_memory_scope
+        assert classify_memory_scope(source_path="sessions/2026-03-25.md") == "local"
+
 
 class TestMemory:
     """Tests for aios_brain.patterns.memory"""

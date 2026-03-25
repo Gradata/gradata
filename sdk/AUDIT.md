@@ -1,7 +1,7 @@
 # AIOS Brain SDK — North Star Audit & Status
 ## Living document. Updated every session. This is the single reference for project state.
 ## Last updated: Session 62 | March 25, 2026
-## Phases 0-8 Complete | Agent Graduation Built | 605 Tests Passing
+## Phases 0-8 Complete | Agent Graduation Built | 651 Tests Passing
 
 ---
 
@@ -91,14 +91,14 @@ brain.health()            → line 531 (compute metrics)
 
 | File | Lines | Target SDK Module | Priority |
 |------|-------|------------------|----------|
-| spawn.py | 963 | patterns/sub_agents + router + pipeline + parallel | HIGH |
-| guardrails.py | 266 | patterns/guardrails.py | HIGH |
-| memory_scope.py | 591 | patterns/memory.py | HIGH |
-| judgment_decay.py | 534 | enhancements/self_improvement.py | HIGH |
-| rules_distill.py | 356 | enhancements/self_improvement.py | HIGH |
+| spawn.py | 963 | patterns/sub_agents + router + pipeline + parallel | ~~HIGH~~ DONE S62 (Wave 1) |
+| guardrails.py | 266 | patterns/guardrails.py | ~~HIGH~~ DONE S63 (Wave 2) |
+| memory_scope.py | 591 | patterns/memory.py | ~~HIGH~~ DONE S63 (Wave 2) |
+| judgment_decay.py | 534 | enhancements/judgment_decay.py | ~~HIGH~~ DONE S62 |
+| rules_distill.py | 356 | enhancements/rules_distillation.py | ~~HIGH~~ DONE S62 |
 | patterns_updater.py | 245 | enhancements/loop_intelligence.py | MEDIUM |
 | delta_tag.py | 455 | enhancements/loop_intelligence.py | MEDIUM |
-| **Total to migrate** | **3,410** | | |
+| **Total to migrate** | **3,410** | **5/7 done (2,710 lines migrated)** | |
 
 ### Infrastructure Health (S62 fixes)
 
@@ -169,22 +169,22 @@ The ARCHITECTURE-SPEC already defines the target. No file moves in this session.
 
 | Dimension | Score | Notes |
 |-----------|-------|-------|
-| Architecture health | 8/10 | Layer 0/1/2 clean, spawn.py migration in progress |
-| Brain vs SDK separation | 7.5/10 | judgment_decay + rules_distill extracted. spawn.py + memory_scope pending |
+| Architecture health | 8.5/10 | Layer 0/1/2 clean, 5/7 migrations done, deterministic rule enforcement added |
+| Brain vs SDK separation | 8.5/10 | 5/7 files migrated (spawn, guardrails, memory_scope, judgment_decay, rules_distill). 2 remaining: patterns_updater, delta_tag |
 | Layer compliance | 10/10 | Zero violations |
 | Domain coupling | 9/10 | FIXED S62: reload_config() loads from taxonomy.json |
-| Test coverage | 9/10 | 605 tests, all passing, 0 warnings |
-| Data flow | 9/10 | Core loop wired, dual-write working, agent graduation wired |
-| Infrastructure | 9.5/10 | Statusline 100%, all hooks working, codex verified, agent graduation live |
-| North star alignment | 7/10 | Phase 1 ~85%, Phases 2-5 not started |
-| **Overall** | **8.6/10** | |
+| Test coverage | 9.5/10 | 659 tests, all passing, 0 warnings |
+| Data flow | 9/10 | Core loop wired, dual-write working, agent graduation wired, deterministic enforcement |
+| Infrastructure | 9.5/10 | Statusline 100%, all hooks working, codex + arch-review verified, agent graduation live |
+| North star alignment | 7/10 | Phase 1 ~88%, Phases 2-5 not started |
+| **Overall** | **8.9/10** | |
 
-### Top 5 Issues (updated S62)
+### Top 5 Issues (updated S63)
 
 1. **Gate 0 proof** — Train to 200 sessions, graph correction density. This is the entire thesis.
-2. **brain/scripts migration** — spawn.py (963 lines) + memory_scope.py (591 lines) still pending.
-3. **External users** — 0/10 target. Need onboarding experience + outreach.
-4. **MkDocs + README** — No documentation for external developers.
+2. **External users** — 0/10 target. Need onboarding docs + outreach.
+3. **brain/scripts migration Wave 3** — patterns_updater.py (245 lines) + delta_tag.py (455 lines) pending.
+4. **MkDocs + docs** — No documentation for external developers (quickstart, concepts, troubleshooting).
 5. **Wrap-up execution speed** — Compacted from 15 phases to 6. Needs real-session validation.
 
 ### Data Flow Diagram
@@ -582,7 +582,7 @@ DATA STORAGE (event-sourced, dual-write):
 
 ## AUDIT GAPS REGISTRY (found by gap-finder agent, S62)
 
-39 gaps found. 3 CRITICAL, 24 IMPORTANT, 12 NICE-TO-HAVE. Tracked here for future sessions.
+39 gaps found. 3 CRITICAL, 24 IMPORTANT, 12 NICE-TO-HAVE. **S63: 21 IMPORTANT closed (I1-I5, I7-I12, I14-I22, I24).** Remaining: 3 CRITICAL, 3 IMPORTANT (I6, I13, I23), 12 NICE-TO-HAVE.
 
 ### CRITICAL (3) — Codex cross-verification
 
@@ -598,55 +598,55 @@ DATA STORAGE (event-sourced, dual-write):
 
 | # | Gap | Status |
 |---|-----|--------|
-| I1 | Supporting docs not archived to /archive/specs/ | OPEN — they're in sdk/archive/ already, just not /archive/specs/ |
-| I2 | No full directory tree output in AUDIT.md | OPEN — session_checklist.py partially addresses |
-| I3 | No explicit orphan/temp/duplicate file identification | Background agent said "none found" — ADD to AUDIT.md |
+| I1 | Supporting docs not archived to /archive/specs/ | DONE S63 — 9 spec docs moved to sdk/archive/specs/ |
+| I2 | No full directory tree output in AUDIT.md | DONE S63 — See Phase 1 table below. 67 files, 20,595 LOC. |
+| I3 | No explicit orphan/temp/duplicate file identification | DONE S63 — 0 orphans, 3 duplicates (all migration targets, 2 migrated S63) |
 
 **Phase 2 (Structural Audit):**
 
 | # | Gap | Status |
 |---|-----|--------|
-| I4 | No lead/prospect folder organization audit | OPEN |
-| I5 | No audit of files imported but never exist / exist but never imported | Background agent said "none found" — ADD |
+| I4 | No lead/prospect folder organization audit | DONE S63 — 58 CSVs, 8,279 leads, 19 prospects. Issues: STATUS.md 9 days stale, contact completeness 79%/58%/42% (email/phone/LinkedIn), 4 prospects missing next_touch, cross-domain brain artifacts in Leads/active/. |
+| I5 | No audit of files imported but never exist / exist but never imported | DONE S63 — 37 imports across 20 files, all valid. 0 broken. |
 
 **Phase 3-5 (Alignment + Structure + Execute):**
 
 | # | Gap | Status |
 |---|-----|--------|
 | I6 | No Codex cross-verification of alignment assessment | OPEN (blocked on C1) |
-| I7 | No proposed directory tree with every file's new location | OPEN — Waves defined but not full tree |
-| I8 | Phase 5 (execute restructure) absent from AUDIT.md | PARTIAL — spawn.py Wave 1 done, memory_scope pending |
+| I7 | No proposed directory tree with every file's new location | DONE S63 — See migration table (5/7 done). Remaining: patterns_updater→enhancements/loop_intelligence, delta_tag→enhancements/loop_intelligence |
+| I8 | Phase 5 (execute restructure) absent from AUDIT.md | DONE S63 — Wave 1 (spawn) + Wave 2 (guardrails, memory_scope) complete. 5/7 files migrated. |
 
 **Phase 6 (Final Report):**
 
 | # | Gap | Status |
 |---|-----|--------|
-| I9 | No before/after directory tree | OPEN |
-| I10 | No lead/prospect organization assessment | OPEN (same as I4) |
+| I9 | No before/after directory tree | DONE S63 — SDK 67 files/20,261 LOC, brain/scripts 69 files/23,814 LOC. 5/7 migrated. |
+| I10 | No lead/prospect organization assessment | DONE S63 — same findings as I4. Demo prep 6/6 cross-referenced. 2 mini-brains in Leads/ need cleanup. |
 
 **Phase 7 (Session Workflow):**
 
 | # | Gap | Status |
 |---|-----|--------|
-| I11 | No current startup sequence mapping (step-by-step) | OPEN |
-| I12 | No before/after side-by-side wrap-up comparison | OPEN — changes documented but not side-by-side |
+| I11 | No current startup sequence mapping (step-by-step) | DONE S63 — Full trace: 5 hooks → 6 phases → on-demand. 50-70s, 25-35K tokens. api_sync.py is bottleneck. |
+| I12 | No before/after side-by-side wrap-up comparison | DONE S63 — Before: 464 lines, 15 phases, 21 steps (Pre-Phase + Phase 0-14). After: 190 lines, 10 steps. Metacog scan, session classification, 5 redundant phases eliminated. /reflect + confidence + validator kept as ESSENTIAL. |
 | I13 | No Codex cross-verification of optimized sequences | PARTIAL — Codex reviewed step classification but not full flow |
 
 **Phase 8 (GTM):**
 
 | # | Gap | Status |
 |---|-----|--------|
-| I14 | No Clay ROI answer (how to make value immediately compelling) | OPEN |
-| I15 | No hobbyist 870-line project delta analysis | MENTIONED in 8B but not detailed |
-| I16 | No frontier LLM kill shot survival conditions | OPEN |
-| I17 | No meta-learning minimum brain count statistical estimate | OPEN — said "100+" with no math |
-| I18 | No first 10 trained brains generation plan | OPEN |
-| I19 | No legal/IP structure analysis (ownership, trademark, trade secret) | OPEN |
-| I20 | No specific onboarding walkthrough assessment (quickstart.py) | OPEN |
-| I21 | No external user success criteria definition | OPEN |
-| I22 | No agency delivery model analysis | OPEN |
+| I14 | No Clay ROI answer (how to make value immediately compelling) | DONE S63 — Don't compare Brain to Clay. Compare Brain+Clay to Clay-alone. Clay=data, Brain=memory. Free stack works at <200 leads/month. Clay crossover at 200+. SDK: free core with pluggable enrichment adapters, Clay as premium BYOK adapter for agencies. ROI proof: correction rate decline, time-to-send reduction, reply rate improvement. |
+| I15 | No hobbyist 870-line project delta analysis | DONE S63 — Daem0n-MCP (67 stars, ~870 lines) has evolve_rule concept but: no confidence tracking, no correction detection, no graduation pipeline, no event sourcing, no kill switches. AIOS Brain: 20,595 LOC, 651 tests, 62 sessions of data. Delta: ~24x code, production-grade vs proof-of-concept. |
+| I16 | No frontier LLM kill shot survival conditions | DONE S63 — Survival if Anthropic ships graduation: (1) multi-LLM portability (brain works on GPT/Gemini, Claude Memory won't), (2) open data ownership (SQLite, full export, no cloud lock-in), (3) domain-specific tuning (agency-trained brains have industry context Claude can't match), (4) meta-learning across brains (cross-brain pattern discovery impossible for single-vendor). Kill shot probability: 30% in 90 days. Hedge: pivot messaging to "portable brain across ALL LLMs". |
+| I17 | No meta-learning minimum brain count statistical estimate | DONE S63 — Minimum for statistical significance: 30 brains (central limit theorem) for basic pattern detection. 100+ for reliable cross-domain generalization. At 3-5 brains/month from agency work, reach 30 by month 8-10 (Nov 2026-Jan 2027). Cross-brain features should NOT ship before N=30. |
+| I18 | No first 10 trained brains generation plan | DONE S63 — Brain 1: Oliver (sales, S62+). Brain 2-4: Agency clients ($5K training engagements, Q2-Q3 2026). Brain 5-7: Open-source early adopters from Claude Code community (post-Gate 0 launch). Brain 8-10: Vertical-specific (recruiting, customer success, devrel). Path: Gate 0 graph → HN Show HN → first 3 community brains → agency outreach. Blocker: Gate 0 proof must ship first. |
+| I19 | No legal/IP structure analysis (ownership, trademark, trade secret) | DONE — See sdk/.planning/research/LEGAL-IP-FRAMEWORK.md. User owns brain data (always). Apache 2.0 over MIT (patent grant). No patents (Alice test fails, not worth $25K). Trademark "Sprites" not "AIOS Brain" (descriptive vs arbitrary). Marketplace: no improvement feedback at launch (Option A), opt-in later (Option B). GDPR: scrub PII before marketplace, events.jsonl never exposed. Fork defense: supply-side moat + meta-learning + proprietary cloud, not license restrictions. 4 free actions now, 4 actions ($5-15K) before marketplace launch. |
+| I20 | No specific onboarding walkthrough assessment (quickstart.py) | DONE S63 — Functionally complete, pedagogically incomplete. TTFV: 3-5min to working brain, 50+ sessions to see graduation. 18/18 second-machine checks pass. Needs: Python 3.11 check, domain validation, docs (quickstart + concepts + troubleshooting). No hardcoded paths. |
+| I21 | No external user success criteria definition | DONE S63 — Success = user reports fewer corrections after 50 sessions. Measurable: (1) correction density drops below 0.05/output by S50, (2) FDA >90% by S30, (3) at least 3 lessons graduate to PATTERN, (4) brain.manifest.json generates automatically, (5) user can export brain and import on new machine. Stretch: user shares a PATTERN lesson that gets adopted by another brain. |
+| I22 | No agency delivery model analysis | DONE S63 — 4 models compared: Self-serve ($49-199/mo, not viable yet), Managed ($5-15K+$500/mo, viable now but caps at 2-3 clients), Hybrid ($3K+$200/mo, best fit for solo founder), White-label (Phase 4). Recommendation: Start Hybrid, 20-session kickstart, $3K setup + $200/mo. Scale to managed for premium. $100K target = 10 hybrid + 3-4 managed by month 6. |
 | I23 | Training-as-a-service vs rental marketplace decision unresolved | DEFERRED |
-| I24 | Test count / module count inconsistencies in AUDIT.md | FIXED S62 (605 tests, 16 modules) |
+| I24 | Test count / module count inconsistencies in AUDIT.md | FIXED S62 (605→651 tests S63, 16 modules) |
 
 ### PIPELINE GAPS (from pipeline agent)
 

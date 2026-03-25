@@ -5,6 +5,9 @@ from pathlib import Path
 from aios_brain.enhancements.agent_graduation import (
     AgentGraduationTracker,
     AgentProfile,
+    DeterministicRule,
+    EnforcementResult,
+    compile_deterministic_rule,
     GATE_CONFIRM_TO_PREVIEW,
     GATE_MIN_OUTPUTS_PREVIEW,
     GATE_MIN_OUTPUTS_AUTO,
@@ -256,3 +259,121 @@ class TestMultipleAgentTypes:
         assert len(profiles) == 3
         types = {p.agent_type for p in profiles}
         assert types == {"research", "writer", "critic"}
+
+
+class TestDeterministicRules:
+    """Tests for deterministic rule enforcement from graduated patterns."""
+
+    def test_compile_positioning_rule(self):
+        """POSITIONING rule with 'agency pricing' should compile to regex guard."""
+        from aios_brain.enhancements.self_improvement import Lesson
+        lesson = Lesson(
+            date="2026-03-25", state=LessonState.RULE, confidence=0.95,
+            category="POSITIONING",
+            description="Never use 'agency pricing' — it implies expensive retainers",
+            fire_count=10,
+        )
+        rule = compile_deterministic_rule(lesson)
+        assert rule is not None
+        assert rule.pattern is not None
+        # Should catch "agency pricing" in output
+        result = rule.check("Our agency pricing starts at $5K/month")
+        assert not result["passed"]
+        # Should pass clean output
+        result = rule.check("Fixed monthly subscription, cancel anytime")
+        assert result["passed"]
+
+    def test_compile_non_enforceable_returns_none(self):
+        """DRAFTING rules can't be enforced deterministically."""
+        from aios_brain.enhancements.self_improvement import Lesson
+        lesson = Lesson(
+            date="2026-03-25", state=LessonState.RULE, confidence=0.95,
+            category="DRAFTING",
+            description="Lead with empathy in follow-up emails",
+            fire_count=10,
+        )
+        rule = compile_deterministic_rule(lesson)
+        assert rule is None
+
+    def test_compile_requires_rule_tier(self):
+        """Only RULE-tier lessons can be compiled."""
+        from aios_brain.enhancements.self_improvement import Lesson
+        lesson = Lesson(
+            date="2026-03-25", state=LessonState.PATTERN, confidence=0.75,
+            category="POSITIONING",
+            description="Never use 'agency pricing'",
+            fire_count=5,
+        )
+        rule = compile_deterministic_rule(lesson)
+        assert rule is None
+
+    def test_data_integrity_rule(self):
+        """DATA_INTEGRITY rule blocks references to other users' data."""
+        from aios_brain.enhancements.self_improvement import Lesson
+        lesson = Lesson(
+            date="2026-03-25", state=LessonState.RULE, confidence=0.95,
+            category="DATA_INTEGRITY",
+            description="Oliver only — never include Anna's or Siamak's data",
+            fire_count=10,
+        )
+        rule = compile_deterministic_rule(lesson)
+        assert rule is not None
+        result = rule.check("Anna's campaign sent 84K emails last month")
+        assert not result["passed"]
+        result = rule.check("Oliver's pipeline has 12 active prospects")
+        assert result["passed"]
+
+    def test_pricing_rule(self):
+        """PRICING rule blocks starter tier multi-account claims."""
+        from aios_brain.enhancements.self_improvement import Lesson
+        lesson = Lesson(
+            date="2026-03-25", state=LessonState.RULE, confidence=0.95,
+            category="PRICING",
+            description="Starter tier multi-brand not supported, only one account",
+            fire_count=10,
+        )
+        rule = compile_deterministic_rule(lesson)
+        assert rule is not None
+        result = rule.check("With Starter you can connect two accounts")
+        assert not result["passed"]
+
+    def test_enforce_rules_on_tracker(self, tracker):
+        """enforce_rules() returns violations for non-compliant output."""
+        # Manually create a profile with a RULE lesson
+        profile = tracker._load_profile("writer")
+        from aios_brain.enhancements.self_improvement import Lesson
+        profile.lessons.append(Lesson(
+            date="2026-03-25", state=LessonState.RULE, confidence=0.95,
+            category="POSITIONING",
+            description="Never use 'agency pricing' — it implies expensive retainers",
+            fire_count=10,
+        ))
+        tracker._save_profile(profile)
+
+        result = tracker.enforce_rules("writer", "Check out our agency pricing model")
+        assert not result.passed
+        assert len(result.violations) == 1
+        assert result.violations[0]["category"] == "POSITIONING"
+
+    def test_enforce_rules_clean_output(self, tracker):
+        """enforce_rules() passes clean output."""
+        profile = tracker._load_profile("writer")
+        from aios_brain.enhancements.self_improvement import Lesson
+        profile.lessons.append(Lesson(
+            date="2026-03-25", state=LessonState.RULE, confidence=0.95,
+            category="POSITIONING",
+            description="Never use 'agency pricing'",
+            fire_count=10,
+        ))
+        tracker._save_profile(profile)
+
+        result = tracker.enforce_rules("writer", "Flat monthly rate, cancel anytime")
+        assert result.passed
+        assert len(result.violations) == 0
+
+    def test_enforce_rules_no_rules(self, tracker):
+        """enforce_rules() with no RULE-tier lessons returns passed."""
+        tracker.record_outcome("research", "output", "approved")
+        result = tracker.enforce_rules("research", "any output here")
+        assert result.passed
+        assert result.rules_checked == 0
