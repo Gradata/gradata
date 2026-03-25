@@ -135,3 +135,14 @@ try {
 } catch (e) {
   // Silent
 }
+
+// 9. Auto-commit brain repo (prevents stale/backdated data next session)
+try {
+  const brainStatus = execSync(`git -C "${BRAIN}" status --porcelain`, { encoding: 'utf8', timeout: 5000 }).trim();
+  if (brainStatus) {
+    execSync(`git -C "${BRAIN}" add -A`, { timeout: 5000, stdio: 'ignore' });
+    execSync(`git -C "${BRAIN}" commit -m "Auto-save session end"`, { timeout: 10000, stdio: 'ignore' });
+  }
+} catch (e) {
+  // Silent — git commit is best-effort
+}

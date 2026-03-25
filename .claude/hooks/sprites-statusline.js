@@ -114,11 +114,23 @@ process.stdin.on('end', () => {
     }
 
     // ── LINE 1: Identity + Context ──────────────────────────────────
+    // Context grade: A (fresh, <35%), B (moderate, 35-50%), C (heavy, 50-65%), D (depleted, 65-80%), F (critical, 80%+)
+    let ctxGrade = '', ctxGradeColor = c.green;
+    if (typeof usedPct === 'number') {
+      if (usedPct < 35) { ctxGrade = 'A'; ctxGradeColor = c.green; }
+      else if (usedPct < 50) { ctxGrade = 'B'; ctxGradeColor = c.green; }
+      else if (usedPct < 65) { ctxGrade = 'C'; ctxGradeColor = c.yellow; }
+      else if (usedPct < 80) { ctxGrade = 'D'; ctxGradeColor = c.orange; }
+      else { ctxGrade = 'F'; ctxGradeColor = c.red; }
+    }
+    const gradeDisplay = ctxGrade ? `${ctxGradeColor}${c.bold}${ctxGrade}${c.reset}` : '';
+
     const line1 = [
       `${c.bold}${c.cyan}AIOS${c.reset}`,
       currentSession > 0 ? `${c.bold}${c.white}S${currentSession}${c.reset}` : '',
       `${c.dim}${model}${c.reset}`,
       ctxDisplay,
+      gradeDisplay,
       `${c.dim}${timeStr}${c.reset}`,
     ].filter(Boolean);
 
