@@ -11,10 +11,14 @@
             "id": "9475484202fed928",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "type": "markdown",
+              "state": {
+                "file": "CLAUDE.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "CLAUDE"
             }
           }
         ]
@@ -176,8 +180,14 @@
       "bases:Create new base": false
     }
   },
-  "active": "9475484202fed928",
+  "active": "a82d91e2aa4d9bce",
   "lastOpenFiles": [
+    "system.db-wal",
+    "system.db-shm",
+    "soul.md",
+    "docs/Sales Playbooks/node_modules/pdf-parse/README.md",
+    "Untitled.canvas",
+    "mcp/wappalyzer/node_modules/jose/README.md",
     "node_modules/ws/index.js",
     "node_modules/ws/package.json",
     "node_modules/ws/wrapper.mjs",
@@ -188,8 +198,6 @@
     "node_modules/ws/lib/subprotocol.js",
     "node_modules/ws/lib/stream.js",
     "node_modules/ws/lib/sender.js",
-    "node_modules/ws/lib/receiver.js",
-    "node_modules/ws/lib/permessage-deflate.js",
     "runtime/compiled/rules.md",
     "runtime/compiled/claude-rules.md",
     "runtime/README.md",
@@ -214,13 +222,9 @@
     "mcp/wappalyzer/node_modules/@types/ws/README.md",
     "mcp/wappalyzer/node_modules/@types/http-cache-semantics/README.md",
     "mcp/wappalyzer/node_modules/@types/keyv/README.md",
-    "mcp/wappalyzer/node_modules/@types/cacheable-request/README.md",
-    "mcp/wappalyzer/node_modules/@types/responselike/README.md",
-    "mcp/wappalyzer/node_modules/get-intrinsic/README.md",
     "skills/playwright-skill/node_modules/playwright-core/lib/server/chromium/appIcon.png",
     "skills/playwright-skill/node_modules/playwright-core/lib/vite/recorder/playwright-logo.svg",
     "skills/playwright-skill/node_modules/playwright-core/lib/vite/traceViewer/playwright-logo.svg",
-    "Untitled 1.canvas",
-    "Untitled.canvas"
+    "Untitled 1.canvas"
   ]
 }
