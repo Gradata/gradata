@@ -29,6 +29,12 @@ const HOOKS_DIR = path.join(WORKING_DIR, '.claude', 'hooks');
 const LESSONS_FILE = path.join(WORKING_DIR, '.claude', 'lessons.md');
 const COMPACT_SNAPSHOT = path.join(os.tmpdir(), 'aios-compact-snapshot.json');
 
+// ── Multi-LLM Provider Paths ──
+const CODEX_CMD = process.env.CODEX_CMD || 'codex';
+const GEMINI_CMD = process.env.GEMINI_CMD || 'gemini';
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5-coder:14b';
+
 module.exports = {
   BRAIN_DIR,
   WORKING_DIR,
@@ -45,4 +51,9 @@ module.exports = {
   HOOKS_DIR,
   LESSONS_FILE,
   COMPACT_SNAPSHOT,
+  // Multi-LLM
+  CODEX_CMD,
+  GEMINI_CMD,
+  OLLAMA_URL,
+  OLLAMA_MODEL,
 };

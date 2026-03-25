@@ -22,3 +22,7 @@ DEMOPREP_RULE_1=Read the docs/Demo Prep/ folder for any existing files matching 
 
 # Step 3: Use ALL sales playbooks — CW-3 promoted from lesson #70 (Session 14, 3 corrections)
 DEMOPREP_RULE_2=Before building any cheat sheet, load ALL sales playbooks (Great Demo, SPIN, Gap Selling, JOLT, Challenger). Apply each framework's structure to the prospect's specific situation. Do not use a single framework — synthesize across all of them. The cheat sheet must show which framework maps to which discovery question and which thread.
+
+# Step 4: MANDATORY Gemini research layer (multi-LLM)
+DEMOPREP_RULE_3=BEFORE Claude builds any demo prep output, run Gemini research via: node .claude/hooks/gemini-research.js "[company name] marketing stack, team size, recent news, competitors, ad channels, pain points". Feed Gemini's findings INTO the cheat sheet alongside NotebookLM results. Gemini adds a second research perspective with its 1M context window at zero cost. If Gemini fails or is unavailable, log "[GEMINI SKIP]" in the cheat sheet and proceed with NotebookLM only. This step is NON-OPTIONAL: skipping it without a failure is a violation. Testable failure: a cheat sheet presented to Oliver with no Gemini research section and no [GEMINI SKIP] tag.
+DEMOPREP_RULE_3_PRIORITY=HIGH

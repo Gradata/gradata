@@ -22,3 +22,10 @@ DUPLICATE_OUTREACH_RULE_PRIORITY=CRITICAL
 
 CREDIT_GATE_RULE=CREDIT APPROVAL GATE: Before executing any research or list-build task, estimate the total credit cost. If estimated cost exceeds 50 credits, STOP and present the estimate to Oliver. Log actual credits used after completion in domain/pipeline/startup-brief.md.
 CREDIT_GATE_RULE_PRIORITY=CRITICAL
+
+# ── Multi-LLM Orchestration ──────────────────────────────────
+MULTI_LLM_RULE=MULTI-LLM WORKFLOW ENFORCEMENT: When executing demo-prep, prospecting, email-outreach, or research workflows, consult the model router (.claude/hooks/model-router.js) for the optimal pipeline. Each workflow has mandatory model assignments: (1) Gemini handles research steps (free, 1M context). (2) Claude handles generation (emails, cheat sheets, code). (3) Codex handles code verification (read-only sandbox). (4) Qwen handles batch/classification tasks (free, local). Gemini research steps are NON-OPTIONAL in demo-prep and email workflows. Run Gemini BEFORE Claude generates output. If a model is unavailable, tag the skip reason in the output (e.g., [GEMINI SKIP: CLI timeout]) and proceed. Never silently skip a multi-LLM step. The router is the source of truth for which model handles which step.
+MULTI_LLM_RULE_PRIORITY=HIGH
+
+CODEX_REVIEW_RULE=CODEX CROSS-VERIFICATION: When the code-review plugin (5 Sonnet agents) produces findings on a PR, those findings MUST be passed through the review-loop plugin (Codex agents) for adversarial verification before presenting to Oliver. Sonnet identifies issues, Codex confirms or challenges them. If Codex disagrees with a Sonnet finding, flag it as [CONTESTED] and present both perspectives. Single-model review is not sufficient for PRs. This only applies to PR reviews, not to the PostToolUse auto-review hooks (those run independently as lightweight checks).
+CODEX_REVIEW_RULE_PRIORITY=HIGH

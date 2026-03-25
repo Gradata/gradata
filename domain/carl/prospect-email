@@ -22,3 +22,7 @@ PROSPECTEMAIL_RULE_1=Detect email type and adjust format: INBOUND — use the In
 
 # Step 3: Offer to draft in Gmail
 PROSPECTEMAIL_RULE_2=After generating the email, create a Gmail draft using gmail_create_draft (HTML format, contentType: text/html). Present to Oliver for review. Do NOT ask "should I draft this?" — just draft it.
+
+# Step 4: MANDATORY Gemini fact-check layer (multi-LLM)
+PROSPECTEMAIL_RULE_3=AFTER Claude drafts any prospect email, run Gemini verification via: node .claude/hooks/gemini-research.js "Fact-check this email for accuracy. Verify: company details, role title, any claims about their business. Flag anything that looks fabricated or outdated. Email: [paste draft]". Surface Gemini's findings to Oliver alongside the draft. If Gemini catches a factual error, fix it before presenting. If Gemini is unavailable, tag "[NO CROSS-CHECK]" above the draft. This step is NON-OPTIONAL for cold and follow-up emails. Skip only for simple internal emails. Testable failure: a prospect email presented without Gemini verification and no [NO CROSS-CHECK] tag.
+PROSPECTEMAIL_RULE_3_PRIORITY=HIGH
