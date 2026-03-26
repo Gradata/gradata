@@ -19,6 +19,9 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
+# Obsidian workspace (user-specific)
+.obsidian/
+
 # Auto-generated (regenerated each session)
 .vectorstore/
 brain.manifest.json
