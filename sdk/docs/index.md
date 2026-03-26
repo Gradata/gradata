@@ -1,34 +1,45 @@
 # AIOS Brain SDK
 
-**AI that gets better the more you use it.**
+**Your AI gets better the more you use it. Prove it. Share it. Take it anywhere.**
 
-AIOS Brain is a behavioral adaptation engine that sits on top of any LLM. It watches how users correct AI output, graduates those corrections into behavioral rules, and proves the improvement with real data.
+Every AI tool forgets between sessions. Memory tools store facts but never learn *how* you work. AIOS Brain is different: it watches how you correct AI output, compounds those corrections over time, and produces a quality manifest that proves the improvement with real data.
 
-## The Graduation Pipeline
+One brain. Works across Claude Code, Cursor, VS Code, and any MCP-compatible tool. Not locked to a single vendor.
+
+## The Problem
+
+You use Claude Code every day. You correct the same mistakes over and over. Maybe you maintain a growing CLAUDE.md full of rules you wrote by hand. Session 1, session 100, the AI still doesn't know how you work.
+
+## The Solution
+
+AIOS Brain captures your corrections automatically. Over sessions, it identifies what you consistently change and builds behavioral rules that apply to future output. Your AI stops making the same mistakes.
 
 ```
-INSTINCT (0.0-0.59) → PATTERN (0.60-0.89) → RULE (0.90+)
+Session 1:    You rewrite every email subject line
+Session 20:   Brain notices the pattern, starts adjusting
+Session 50:   Pattern proven — AI gets it right without your help
+Session 100:  Correction rate dropped 40%. Brain proves it with data.
 ```
 
-Every correction follows a lifecycle. Patterns that survive get promoted. Patterns that misfire get demoted. Patterns that never fire get killed. The brain compounds over sessions, not just stores data.
+## Three Things No LLM Vendor Will Give You
 
-## Key Features
+**Portable.** Your brain works across Claude, GPT, Cursor, and any MCP host. Not locked to one vendor. Switch tools, keep your brain.
 
-- **Zero dependencies** - pure Python + stdlib for base patterns
-- **One file = one brain** - SQLite stores everything
-- **Domain agnostic** - sales, engineering, recruiting, anything
-- **Agent graduation** - agents learn and improve over sessions too
-- **MCP compatible** - works with Claude Code, Cursor, and any MCP tool
-- **605 tests** - comprehensive test coverage
+**Provable.** The brain generates a quality manifest: sessions trained, correction rate, active rules, improvement trends. Real metrics computed from real data, not self-reported.
+
+**Shareable.** Package your expertise and let others rent it. A senior engineer's code review brain. A top AE's email brain. Expertise as a product.
 
 ## Quick Install
 
 ```bash
 pip install aios-brain
+aios-brain init ./my-brain
 ```
+
+Zero dependencies. One SQLite file. Works immediately.
 
 ## Next Steps
 
-- [Quick Start](getting-started/quickstart.md) - get your first brain running in 5 minutes
-- [Core Concepts](getting-started/concepts.md) - understand how graduation works
-- [Architecture](architecture/overview.md) - 3-layer design explained
+- [Quick Start](getting-started/quickstart.md) -- get your first brain running in 5 minutes
+- [Core Concepts](getting-started/concepts.md) -- understand how brains compound
+- [Gradata Cloud](cloud/overview.md) -- server-side intelligence and marketplace

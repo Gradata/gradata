@@ -596,12 +596,14 @@ class TestSelfImprovement:
         assert updated[0].state == LessonState.RULE
 
     def test_update_confidence_rule_demoted_on_contradiction(self):
-        from aios_brain._self_improvement import parse_lessons, update_confidence, LessonState, CONTRADICTION_PENALTY
+        from aios_brain._self_improvement import parse_lessons, update_confidence, LessonState
+        from aios_brain.enhancements.self_improvement import fsrs_penalty
         lessons = parse_lessons("[2026-01-01] [RULE:0.95] PROCESS: Wrap-up mandatory.\n")
         conf_before = lessons[0].confidence
         updated = update_confidence(lessons, [{"category": "PROCESS"}])
-        # RULE CAN be demoted — contradiction penalty applies
-        assert updated[0].confidence == round(conf_before - CONTRADICTION_PENALTY, 2)
+        # RULE CAN be demoted — FSRS penalty applies (confidence-dependent)
+        expected_penalty = fsrs_penalty(conf_before)
+        assert updated[0].confidence == round(conf_before - expected_penalty, 2)
 
     def test_update_confidence_untestable_flag(self):
         from aios_brain._self_improvement import parse_lessons, update_confidence, LessonState

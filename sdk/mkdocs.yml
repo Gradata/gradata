@@ -1,7 +1,7 @@
 site_name: AIOS Brain SDK
 site_description: AI behavioral adaptation engine. Corrections graduate into rules.
-repo_url: https://github.com/sprites-ai/aios-brain
-repo_name: sprites-ai/aios-brain
+repo_url: https://github.com/gradata/aios-brain
+repo_name: gradata/aios-brain
 
 theme:
   name: material
@@ -33,22 +33,27 @@ nav:
     - Installation: getting-started/install.md
     - Quick Start: getting-started/quickstart.md
     - Core Concepts: getting-started/concepts.md
-  - Architecture:
-    - Overview: architecture/overview.md
-    - Layer 0 - Patterns: architecture/patterns.md
-    - Layer 1 - Enhancements: architecture/enhancements.md
-    - Layer 2 - Trained Brain: architecture/brain.md
-    - Agent Graduation: architecture/agent-graduation.md
-  - API Reference:
-    - Brain Class: api/brain.md
-    - Patterns: api/patterns.md
-    - Enhancements: api/enhancements.md
-    - CLI: api/cli.md
+  - Gradata Cloud:
+    - Overview: cloud/overview.md
+    - Getting Started: cloud/quickstart.md
+    - API Reference: cloud/api.md
+    - Marketplace: cloud/marketplace.md
   - Guides:
     - Training a Brain: guides/training.md
-    - Agent Graduation: guides/agent-graduation.md
     - Custom Domains: guides/custom-domains.md
     - MCP Integration: guides/mcp.md
+  - API Reference:
+    - Brain Class: api/brain.md
+    - CLI: api/cli.md
+  - Contributing:
+    - Architecture: architecture/overview.md
+    - Patterns: architecture/patterns.md
+    - Enhancements: architecture/enhancements.md
+    - Brain Data: architecture/brain.md
+    - Agent Adaptation: architecture/agent-graduation.md
+    - Patterns API: api/patterns.md
+    - Enhancements API: api/enhancements.md
+    - Agent Adaptation Guide: guides/agent-graduation.md
 
 plugins:
   - search

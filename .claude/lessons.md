@@ -87,3 +87,13 @@
 [2026-03-25] [INSTINCT:0.30] ACCURACY: Never publish "TO VERIFY" or unverified metrics in audit documents. Either run the query and get the real number, or don't include the row. The reviewer caught a Gate 0 metric marked "TO VERIFY" that was published as if factual. Root cause: updated Gate 0 section in a rush, left placeholder instead of querying system.db.
 
 [2026-03-25] [INSTINCT:0.30] ARCHITECTURE: When building a review/critic terminal, it must run verification commands (pytest, DB queries, grep) not just read files. A reviewer that reviews from vibes catches surface issues but misses the real bugs. The first version of reviewer CLAUDE.md had no tool usage instructions. Root cause: wrote reviewer role as "judge and critique" without specifying it should run code to verify claims.
+
+[2026-03-25] [INSTINCT:0.30] PROCESS: Launch a code review agent on the FIRST code write of the session, not when Oliver reminds you. Oliver had to say "make sure codex is reviewing" twice in S67. If you write code, a reviewer should already be running. Root cause: no automatic trigger for code review — relies on memory/habit instead of a systematic check.
+
+[2026-03-25] [INSTINCT:0.30] THOROUGHNESS: When given a numbered list of tasks (e.g., "items 1-10"), do ALL of them. Don't stop at 4 and move on. Oliver had to push back twice in S67 ("what about 5-10?", "7 & 10 need data but we need structure"). If something seems premature, build the infrastructure anyway. Root cause: optimizing for speed over completeness, cherry-picking easy items.
+
+[2026-03-25] [INSTINCT:0.30] THOROUGHNESS: If you recommend something in a research report, build it. Don't present ideas you won't execute. Oliver caught this on framework integrations: "Are you going to steal it?" after I listed it as a recommendation but wasn't building it. Root cause: treating research output as advisory when Oliver expects it as a build list.
+
+[2026-03-25] [INSTINCT:0.30] VERIFICATION: Never declare work "ready" or "done" without running a verification step. In S67, I was about to say MkDocs was GitHub-ready. Oliver asked "Are you sure?" and the code review found 15 inaccuracies. Root cause: completion bias — wanting to report progress instead of verifying quality.
+
+[2026-03-25] [INSTINCT:0.30] IP_PROTECTION: Public-facing docs should sell outcomes, not expose mechanisms. Oliver caught that "graduate" language in docs hands competitors the architecture. Docs should say "your AI gets better" not "corrections promote through INSTINCT to PATTERN to RULE at +0.10 per session." Root cause: engineering mindset (explain how it works) vs product mindset (explain what it does).

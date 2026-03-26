@@ -90,6 +90,15 @@
             "timeout": 3000
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/implicit-feedback.js\"",
+            "timeout": 3000
+          }
+        ]
       }
     ],
     "PreCompact": [

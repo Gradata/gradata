@@ -131,12 +131,13 @@ class TestUpdateConfidence:
             INITIAL_CONFIDENCE, SURVIVAL_BONUS, CONTRADICTION_PENALTY,
             PATTERN_THRESHOLD, RULE_THRESHOLD,
         )
+        from aios_brain.enhancements.self_improvement import fsrs_bonus, fsrs_penalty
         self.update = update_confidence
         self.Lesson = Lesson
         self.LessonState = LessonState
         self.INITIAL = INITIAL_CONFIDENCE
-        self.BONUS = SURVIVAL_BONUS
-        self.PENALTY = CONTRADICTION_PENALTY
+        self.fsrs_bonus = fsrs_bonus
+        self.fsrs_penalty = fsrs_penalty
         self.PATTERN_T = PATTERN_THRESHOLD
         self.RULE_T = RULE_THRESHOLD
 
@@ -155,13 +156,15 @@ class TestUpdateConfidence:
         """Lesson survives session where corrections exist in another category."""
         lessons = [self._lesson("DRAFTING", 0.30)]
         result = self.update(lessons, [{"category": "ACCURACY"}])
-        assert result[0].confidence == round(0.30 + self.BONUS, 2)
+        expected_bonus = self.fsrs_bonus(0.30)
+        assert result[0].confidence == round(0.30 + expected_bonus, 2)
 
     def test_contradiction_decreases_confidence(self):
         """Same-category correction lowers confidence."""
         lessons = [self._lesson("DRAFTING", 0.50)]
         result = self.update(lessons, [{"category": "DRAFTING"}])
-        assert result[0].confidence == round(0.50 - self.PENALTY, 2)
+        expected_penalty = self.fsrs_penalty(0.50)
+        assert result[0].confidence == round(0.50 - expected_penalty, 2)
 
     def test_no_corrections_does_not_change_confidence(self):
         """Zero corrections — cannot evaluate, confidence unchanged."""
@@ -187,12 +190,13 @@ class TestUpdateConfidence:
 
     def test_rule_lessons_demoted_on_contradiction(self):
         """RULE-state lessons CAN be demoted if contradicted (not immortal)."""
-        from aios_brain._self_improvement import LessonState, CONTRADICTION_PENALTY
+        from aios_brain._self_improvement import LessonState
         lesson = self._lesson("DRAFTING", 0.95, LessonState.RULE)
         original_conf = lesson.confidence
         result = self.update([lesson], [{"category": "DRAFTING"}])
-        # Contradiction penalty applies even to RULES
-        assert result[0].confidence == round(original_conf - CONTRADICTION_PENALTY, 2)
+        # FSRS penalty applies even to RULES — penalty is confidence-dependent
+        expected_penalty = self.fsrs_penalty(0.95)
+        assert result[0].confidence == round(original_conf - expected_penalty, 2)
 
     def test_untestable_after_20_sessions_no_fires(self):
         """Lesson flagged UNTESTABLE after 20 sessions_since_fire with fire_count==0."""

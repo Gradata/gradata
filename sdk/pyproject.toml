@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
-    { name = "Oliver", email = "oliver@spritesai.com" },
+    { name = "Gradata", email = "hello@gradata.com" },
 ]
 keywords = ["ai", "brain", "sdk", "memory", "agents", "claude"]
 classifiers = [
@@ -28,6 +28,7 @@ dependencies = []  # Zero required deps — base patterns are pure Python + stdl
 # ChromaDB removed S66 — FTS5 is primary search, sqlite-vec planned
 embeddings = ["sentence-transformers>=2.0.0"]  # Local embeddings
 gemini = ["google-genai>=1.0.0"]  # Gemini embeddings (free tier)
+cloud = []  # Cloud client uses stdlib only (urllib). Enhancements included in base package.
 all = ["sentence-transformers>=2.0.0", "google-genai>=1.0.0"]
 dev = [
     "pytest>=8.0",
@@ -41,8 +42,8 @@ dev = [
 aios-brain = "aios_brain.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/spritesai/aios-brain"
-Documentation = "https://github.com/spritesai/aios-brain#readme"
+Homepage = "https://github.com/gradata/aios-brain"
+Documentation = "https://github.com/gradata/aios-brain#readme"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aios_brain"]
