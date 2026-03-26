@@ -45,6 +45,15 @@
             "timeout": 3000
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "start /b node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/cache-warmer.js\"",
+            "timeout": 3000
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
