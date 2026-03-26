@@ -25,10 +25,10 @@ classifiers = [
 dependencies = []  # Zero required deps — base patterns are pure Python + stdlib
 
 [project.optional-dependencies]
-memory = ["chromadb>=0.5.0"]  # Vector search for memory + RAG
+# ChromaDB removed S66 — FTS5 is primary search, sqlite-vec planned
 embeddings = ["sentence-transformers>=2.0.0"]  # Local embeddings
 gemini = ["google-genai>=1.0.0"]  # Gemini embeddings (free tier)
-all = ["chromadb>=0.5.0", "sentence-transformers>=2.0.0", "google-genai>=1.0.0"]
+all = ["sentence-transformers>=2.0.0", "google-genai>=1.0.0"]
 dev = [
     "pytest>=8.0",
     "hypothesis>=6.0",

@@ -61,7 +61,7 @@ def _init_brain(tmp_path: Path, name: str = "GapBrain", domain: str = "Testing")
 
     _q.DB_PATH = _p.DB_PATH
     _q.BRAIN_DIR = _p.BRAIN_DIR
-    _q.CHROMA_DIR = _p.CHROMA_DIR
+    # ChromaDB removed S66 — no CHROMA_DIR needed in _query
     _tt.PROSPECTS_DIR = _p.PROSPECTS_DIR
     return brain
 
@@ -952,31 +952,18 @@ class TestBrainClass:
         assert isinstance(result, list)
         assert len(result) >= 1
 
-    def test_search_semantic_without_chromadb_raises(self, tmp_path):
-        """search() in semantic mode raises ImportError when chromadb is missing."""
+    def test_search_semantic_falls_back_to_fts5(self, tmp_path):
+        """search() in semantic mode uses FTS5 (ChromaDB removed S66)."""
         brain = _init_brain(tmp_path)
-        import aios_brain.brain as _brain_mod
-        original = _brain_mod._chromadb
-        _brain_mod._chromadb = None
-        _brain_mod._chromadb_error = "chromadb not installed"
-        try:
-            with pytest.raises(ImportError, match="chromadb"):
-                brain.search("test query", mode="semantic")
-        finally:
-            _brain_mod._chromadb = original
+        # Semantic mode should work without errors, falling back to FTS5
+        results = brain.search("test query", mode="semantic")
+        assert isinstance(results, list)
 
-    def test_embed_without_chromadb_raises(self, tmp_path):
-        """embed() raises ImportError when chromadb is missing."""
+    def test_search_hybrid_falls_back_to_fts5(self, tmp_path):
+        """search() in hybrid mode uses FTS5 (ChromaDB removed S66)."""
         brain = _init_brain(tmp_path)
-        import aios_brain.brain as _brain_mod
-        original = _brain_mod._chromadb
-        _brain_mod._chromadb = None
-        _brain_mod._chromadb_error = "chromadb not installed"
-        try:
-            with pytest.raises(ImportError):
-                brain.embed()
-        finally:
-            _brain_mod._chromadb = original
+        results = brain.search("test query", mode="hybrid")
+        assert isinstance(results, list)
 
     def test_manifest_fallback_on_import_error(self, tmp_path):
         """manifest() returns minimal dict when _brain_manifest is unavailable."""

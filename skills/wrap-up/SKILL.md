@@ -89,15 +89,26 @@ next session tasks, deferred items.
 **5d — Prospect notes** (only if prospects were touched): Update
 `brain/prospects/[Name] — [Company].md` while context is fresh.
 
-## Step 6: Validator (ESSENTIAL — catches broken pipes)
+## Step 6: Validator (ESSENTIAL — MUST reach 100%)
 
 ```bash
 python brain/scripts/wrap_up_validator.py --session N --date YYYY-MM-DD --session-type [full|systems]
 ```
 
 19 binary checks. Auto-fix handles: session note, STEP_COMPLETE events,
-agent distillation, startup-brief/loop-state headers. Target: 19/19 (100%).
-Re-run until clean.
+agent distillation, startup-brief/loop-state headers.
+
+**GUARDRAIL: 100% gate pass is MANDATORY. The session CANNOT end below 100%.**
+1. Run validator.
+2. If any gate fails, fix the issue (auto-fix handles most).
+3. Re-run validator.
+4. Repeat up to 3 cycles. If still <100% after 3 cycles, escalate to Oliver with the specific failing gates.
+5. Only proceed to Step 7 when validator shows 19/19 (100%).
+6. After 100% confirmed, write the completion marker:
+```bash
+python -c "from pathlib import Path; import tempfile; Path(tempfile.gettempdir(), 'aios-wrapup-done-S{SESSION}.marker').write_text('done')"
+```
+This marker tells the Stop hook to skip re-running the validator (which would show false failures since it runs before wrap-up is done).
 
 ## Step 7: Agent Distillation (IMPORTANT — agents compound too)
 

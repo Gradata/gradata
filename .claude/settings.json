@@ -86,8 +86,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/review-ingest.js\"",
-            "timeout": 5000
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/prospect-autoload.js\"",
+            "timeout": 3000
           }
         ]
       }
@@ -170,6 +170,16 @@
           {
             "type": "command",
             "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/secret-scan.js\"",
+            "timeout": 3000
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/obsidian-autolink.js\"",
             "timeout": 3000
           }
         ]

@@ -56,3 +56,13 @@ try {
 } catch (e) {
   // Silent — MCP fallback still available during session
 }
+
+// 5. Auto-compute deal health after sync (uses fresh Pipedrive data)
+try {
+  execSync(
+    `"${PYTHON}" "${BRAIN}/scripts/deal_calibration.py" --quiet`,
+    { timeout: 8000, stdio: 'ignore' }
+  );
+} catch (e) {
+  // Silent — deal health is informational, not critical
+}

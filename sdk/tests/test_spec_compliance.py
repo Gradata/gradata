@@ -213,7 +213,7 @@ class TestZeroDeps:
     """SPEC Section 8: pip install aios-brain works with no external deps."""
 
     def test_core_import_no_chromadb(self):
-        """Brain class imports without chromadb installed."""
+        """Brain class imports without chromadb (removed S66)."""
         from aios_brain.brain import Brain
         assert Brain is not None
 

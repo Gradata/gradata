@@ -76,7 +76,7 @@ def _init_brain(tmp_path: Path, name: str = "TestBrain", domain: str = "Testing"
     import aios_brain._query as _q
     _q.DB_PATH = _p.DB_PATH
     _q.BRAIN_DIR = _p.BRAIN_DIR
-    _q.CHROMA_DIR = _p.CHROMA_DIR
+    # ChromaDB removed S66 — no CHROMA_DIR needed in _query
     # Tag taxonomy caches PROSPECTS_DIR
     import aios_brain._tag_taxonomy as _tt
     _tt.PROSPECTS_DIR = _p.PROSPECTS_DIR

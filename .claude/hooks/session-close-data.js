@@ -87,14 +87,35 @@ if (!wrapUpAlreadyRan) try {
   // Silent — confidence scoring is best-effort
 }
 
-// --- 3. Session gate validator (skip if wrap-up skill already ran) ---
+// --- 3. Session gate validator ---
+// If wrap-up skill ran (marker exists), it already validated to 100%.
+// Only re-validate if wrap-up was skipped (safety net).
 if (sessionNum > 0 && !wrapUpAlreadyRan) {
   try {
-    execSync(
-      `"${PYTHON}" "${BRAIN}/scripts/wrap_up_validator.py" --session ${sessionNum} --date ${today} --session-type ${sessionType}`,
-      { timeout: 30000, stdio: 'ignore' }
-    );
+    const result = execSync(
+      `"${PYTHON}" "${BRAIN}/scripts/wrap_up_validator.py" --session ${sessionNum} --date ${today} --session-type ${sessionType} --json`,
+      { timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] }
+    ).toString().trim();
+
+    // Parse result and warn if not 100%
+    try {
+      const parsed = JSON.parse(result);
+      const passed = parsed.passed || 0;
+      const total = parsed.total || 0;
+      if (total > 0 && passed < total) {
+        const failed = (parsed.failures || []).slice(0, 3).join(', ');
+        process.stderr.write(
+          `\n⚠️  GATE WARNING: ${passed}/${total} passed. Wrap-up may have been skipped.\n` +
+          `   Failing: ${failed}\n` +
+          `   Run wrap-up before ending session for 100% gates.\n`
+        );
+      }
+    } catch (parseErr) {
+      // Validator ran but output wasn't JSON — still OK
+    }
   } catch (e) {
-    // Silent — gate validation is best-effort, never blocks exit
+    // Silent — gate validation is best-effort on exit
   }
+} else if (wrapUpAlreadyRan) {
+  // Wrap-up already validated to 100% — no re-run needed
 }
