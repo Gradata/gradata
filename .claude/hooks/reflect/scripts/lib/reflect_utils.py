@@ -551,6 +551,25 @@ CORRECTION_PATTERNS = [
     (r"^I meant\b|^I said\b", "I-meant/said", True),  # Clarification
     (r"^I told you\b|^I already told\b", "I-told-you", True),  # Higher confidence
     (r"use .{1,30} not\b", "use-X-not-Y", True),  # "use X not Y" - limited gap
+    # Implicit corrections - Oliver's natural correction style (added S64)
+    (r"is wrong\b|are wrong\b|time is wrong\b", "wrong", True),  # "the onboarding time is wrong"
+    (r"should (be|have|always|never)\b", "should-be", False),  # "should be monthly not annual"
+    (r"(always|every time|each time) .{1,40}(make sure|ensure|include|add|put|label)", "always-do", True),  # "always label Oliver"
+    (r"^(also|i also) need", "also-need", True),  # "i also need to label oliver" - missing step
+    (r"only edit.{1,20}(change|would)", "edit-correction", True),  # "only edit I would change"
+    (r"(the|that) .{1,30} (has to|must|should) (always|never)", "must-always", True),  # "has to always be"
+    (r"convention.{1,20}(is|should be)", "convention", True),  # "the name convention is just"
+    (r"save (this|these|so we|the).{0,20}(workflow|flow|rule|for next)", "save-workflow", True),  # "save these workflows"
+    (r"remember this\b|dont forget\b|don't forget\b", "remember-this", True),  # explicit remember
+    (r"make sure.{1,40}(correct|right|proper|fires|works)", "make-sure", False),  # "make sure it fires"
+    (r"(not|never) (annual|yearly)\b.{0,20}(month|subscription)", "not-annual", True),  # pricing correction
+    (r"^wait\b", "wait-stop", True),  # "wait stop" - interruption/correction
+    (r"you need to\b", "you-need-to", True),  # "you need to label oliver" - missing step
+    (r"i already\b.{1,30}(have|did|done|sent|completed|uploaded)", "already-done", True),  # "i already have the prospeo list"
+    (r"make sure.{1,40}(put|add|include|schedule|create|set)", "make-sure-do", True),  # "make sure to put in the activity"
+    (r"(i edited|i changed|i fixed).{1,40}(from|to|because)", "i-fixed", True),  # "i edited it from 24k to 2k"
+    (r"are you sure\b", "are-you-sure", True),  # "are you sure you refreshed?" - questioning accuracy
+    (r"(month.to.month|monthly|not annual)", "monthly-not-annual", False),  # pricing model correction
 ]
 
 # Guardrail patterns - "don't do X unless" constraints (highest confidence for corrections)
@@ -666,9 +685,15 @@ def detect_patterns(text: str) -> Tuple[Optional[str], str, float, str, int]:
             return ("guardrail", name, confidence, "correction", decay)
 
     # Check for FALSE POSITIVE patterns - skip these messages
-    for fp_pattern in FALSE_POSITIVE_PATTERNS:
-        if re.search(fp_pattern, text, re.IGNORECASE):
-            return (None, "", 0.0, "correction", 90)
+    # BUT: don't skip if a strong correction pattern is also present (e.g., "are you sure you X?")
+    has_strong_correction = any(
+        re.search(pat, text, re.IGNORECASE)
+        for pat, _, is_strong in CORRECTION_PATTERNS if is_strong
+    )
+    if not has_strong_correction:
+        for fp_pattern in FALSE_POSITIVE_PATTERNS:
+            if re.search(fp_pattern, text, re.IGNORECASE):
+                return (None, "", 0.0, "correction", 90)
 
     # Check for non-correction English phrases (before correction patterns)
     # Prevents "No problem", "Don't worry" etc. from being caught as corrections

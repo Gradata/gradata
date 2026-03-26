@@ -65,3 +65,19 @@
 [2026-03-24] [INSTINCT:0.30] DRAFTING: Follow-up emails must lead with empathy for the prospect's hesitation, not features. Structure: quick call recap, acknowledge their specific concern (budget, commitment, timing), explain how we remove that barrier (free trial, low-risk entry), then next steps. Never draft a follow-up that reads like a sales pitch. The prospect already sat through the demo. Root cause: first Kathleen follow-up draft was feature-heavy and didn't acknowledge her $500 budget concern or frame the free trial as the answer.
 
 [2026-03-25] [INSTINCT:0.30] PROCESS: When a simple configuration change is requested, do it in one step. Don't try multiple approaches, fail on the first, then iterate. Read the schema or docs FIRST, find the correct field, apply it once. "Just install as is" means stop overcomplicating. Root cause: tried to add auto mode via a nonexistent top-level field (defaultPermissionMode), got a schema error, then had to read the full schema to find the correct path (permissions.defaultMode). Should have checked the schema before the first edit.
+
+[2026-03-25] [INSTINCT:0.30] EMAIL_THREADING: Never reply to Calendly notification threads or system-generated emails. Always reply on Oliver's own sent email thread or create a new thread. Root cause: drafted Drew reschedule as reply to Calendly "New Event" notification instead of Oliver's "Sprites Demo Booking" sent thread.
+
+[2026-03-25] [INSTINCT:0.30] EMAIL_FORMAT: Always use contentType text/html and hyperlink Calendly booking links as "Book a time". Never leave Calendly as a raw URL. Root cause: first Drew draft had raw URL, Oliver had to ask for hyperlink fix.
+
+[2026-03-25] [INSTINCT:0.30] PIPEDRIVE_DEALS: Mandatory 6-step deal creation: org → person → deal (company name only, monthly value) → Oliver label (45) → pinned note → activity with next step. Never skip label, note, or activity. Never use annual values. Never use "Sprites <> Company" format. Root cause: created XDO deal as "Sprites <> XDO" with no label, no activity. Had to fix all three separately.
+
+[2026-03-25] [INSTINCT:0.30] DEMO_FOLLOWUP: Demo follow-up email subject must be `Sprites<>CompanyName: Demo Follow Up`. Never use freeform subjects for post-demo emails. Root cause: drafted Ivan follow-up with "Great meeting today, Ivan" instead of standard format.
+
+[2026-03-25] [INSTINCT:0.30] CALENDAR_VERIFY: When referencing meeting times in emails or Pipedrive activities, always search calendar for the SPECIFIC person's events. Don't assume one meeting belongs to someone else. Root cause: used Matthew Rajcok's onboarding time (3 PM PT) for Ivan Zinkov's email and Pipedrive activity.
+
+[2026-03-25] [INSTINCT:0.30] PRICING_IN_EMAILS: Never include pricing in demo follow-up or prospect emails unless Oliver explicitly asks. Pricing discussions happen on calls, not in writing. Root cause: Oliver had to explicitly say "do not include any pricing" when asking for email drafts.
+
+[2026-03-25] [INSTINCT:0.30] DEAL_VALUES: Sprites is month-to-month subscription. Deal values in Pipedrive are MONTHLY, not annual. Don't multiply by 12. Root cause: set OneNotary deal to $24K (annual) instead of $2K (monthly).
+
+[2026-03-25] [INSTINCT:0.30] TOOL_AWARENESS: When Oliver says to use a specific tool (OpenCLI, Rube), check if it's installed and learn how it works before saying "I can't do that." Don't give up and ask for manual workarounds when the tool exists. Root cause: tried Playwright/Chrome debugging for 20 minutes instead of using OpenCLI which was already installed.

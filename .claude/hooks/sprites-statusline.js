@@ -232,37 +232,77 @@ process.stdin.on('end', () => {
 
     const line2 = [gatesDisplay, sysDisplay, brainDisplay, qualDisplay, savedDisplay];
 
-    // ── LINE 3: What needs attention ────────────────────────────────
+    // ── LINE 3: What needs attention (LIVE from Pipedrive) ─────────
+    // Cache Pipedrive data to tmpfile, refresh every 5 minutes
+    const PIPEDRIVE_TOKEN = 'REDACTED_PIPEDRIVE_TOKEN';
+    const PIPEDRIVE_CACHE = path.join(os.tmpdir(), 'aios-pipedrive-cache.json');
+    const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
     let overdueCount = 0, dueTodayCount = 0, activeDealsCount = 0;
-    const brainPath = cfg.PROSPECTS_DIR;
-    if (fs.existsSync(brainPath)) {
+    let pipelineVal = '--', replyRate = '?', replyRateNum = 0;
+
+    function loadPipedriveCache() {
       try {
-        const now = new Date(); now.setHours(0,0,0,0);
-        const tomorrow = new Date(now.getTime() + 86400000);
-        for (const f of fs.readdirSync(brainPath).filter(f => f.endsWith('.md') && !f.startsWith('_'))) {
-          try {
-            const content = fs.readFileSync(path.join(brainPath, f), 'utf8');
-            const stage = (content.match(/stage:\s*(.+)/i) || [])[1]?.trim() || '';
-            if (stage === 'closed-won' || stage === 'closed-lost') continue;
-            if (stage.includes('proposal')) activeDealsCount++;
-            const touchRaw = (content.match(/next_touch:\s*(.+)/i) || [])[1]?.trim();
-            if (!touchRaw) continue;
-            let td = new Date(touchRaw);
-            if (isNaN(td.getTime())) {
-              const p = touchRaw.match(/^(\d{1,2})\/(\d{1,2})$/);
-              if (p) td = new Date(now.getFullYear(), parseInt(p[1]) - 1, parseInt(p[2]));
-            }
-            if (isNaN(td.getTime())) continue;
-            td.setHours(0,0,0,0);
-            if (td < now) overdueCount++;
-            else if (td < tomorrow) dueTodayCount++;
-          } catch (e) {}
+        if (fs.existsSync(PIPEDRIVE_CACHE)) {
+          const cached = JSON.parse(fs.readFileSync(PIPEDRIVE_CACHE, 'utf8'));
+          if (Date.now() - cached.ts < CACHE_TTL_MS) return cached;
         }
       } catch (e) {}
+      return null;
     }
 
-    // Reply rate
-    let replyRateNum = 0, replyRate = '?';
+    function fetchPipedriveLive() {
+      try {
+        const https = require('https');
+        const url = `https://api.pipedrive.com/v1/deals?status=open&limit=500&api_token=${PIPEDRIVE_TOKEN}`;
+        const raw = execSync(`node -e "const https=require('https');https.get('${url}',r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>process.stdout.write(d))})"`, { timeout: 4000 }).toString();
+        const data = JSON.parse(raw);
+        const deals = data.data || [];
+
+        const now = new Date(); now.setHours(0,0,0,0);
+        const tomorrow = new Date(now.getTime() + 86400000);
+        let overdue = 0, dueToday = 0, activeCount = 0, totalValue = 0;
+
+        // Oliver's label ID = 45. Only count deals tagged with Oliver.
+        const OLIVER_LABEL = '45';
+        for (const d of deals) {
+          const labels = String(d.label || '').split(',').map(s => s.trim());
+          if (!labels.includes(OLIVER_LABEL)) continue;
+
+          const val = d.value || 0;
+          totalValue += val;
+          activeCount++;
+
+          // Check next activity date for overdue/due today
+          const nextAct = d.next_activity_date;
+          if (nextAct) {
+            const actDate = new Date(nextAct); actDate.setHours(0,0,0,0);
+            if (actDate < now) overdue++;
+            else if (actDate < tomorrow) dueToday++;
+          } else {
+            // No next activity = overdue (stale deal)
+            overdue++;
+          }
+        }
+
+        const result = { overdue, dueToday, activeCount, totalValue, ts: Date.now() };
+        try { fs.writeFileSync(PIPEDRIVE_CACHE, JSON.stringify(result)); } catch (e) {}
+        return result;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    const pdData = loadPipedriveCache() || fetchPipedriveLive();
+    if (pdData) {
+      overdueCount = pdData.overdue || 0;
+      dueTodayCount = pdData.dueToday || 0;
+      activeDealsCount = pdData.activeCount || 0;
+      const pv = pdData.totalValue || 0;
+      pipelineVal = pv >= 1000 ? '$' + (pv / 1000).toFixed(1) + 'K' : pv > 0 ? '$' + pv.toFixed(0) : '--';
+    }
+
+    // Reply rate — still from startup brief or brain scores (Instantly doesn't have a quick endpoint)
     const briefPath = path.join(dir, 'domain', 'pipeline', 'startup-brief.md');
     if (fs.existsSync(briefPath)) {
       try {
@@ -277,10 +317,6 @@ process.stdin.on('end', () => {
       replyRateNum = bd.reply_rate_cum; replyRate = replyRateNum.toFixed(1) + '%';
     }
     const replyColor = replyRateNum >= 2 ? c.green : replyRateNum >= 1 ? c.yellow : c.red;
-
-    // Pipeline value
-    const pv = bd.pipeline_value || 0;
-    const pipelineVal = pv >= 1000 ? '$' + (pv / 1000).toFixed(1) + 'K' : pv > 0 ? '$' + pv.toFixed(0) : '--';
 
     // Build line 3
     const line3parts = [];

@@ -7,6 +7,18 @@
         "C:/Users/olive/OneDrive/Desktop/Sprites Work/mcp/wappalyzer/index.js"
       ],
       "env": {}
+    },
+    "pipedrive": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "--directory",
+        "C:/Users/olive/AppData/Local/Temp/pipedrive-mcp",
+        "run",
+        "python",
+        "server.py"
+      ],
+      "env": {}
     }
   }
 }
