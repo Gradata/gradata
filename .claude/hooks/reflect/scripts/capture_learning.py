@@ -9,6 +9,10 @@ import sys
 import os
 import json
 
+# Skip in reviewer terminal — reviewer corrections are not training data
+if os.environ.get("AIOS_ROLE") == "reviewer":
+    sys.exit(0)
+
 # Fix Windows encoding for emoji output
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")

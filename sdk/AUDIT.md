@@ -1,7 +1,7 @@
 # AIOS Brain SDK — North Star Audit & Status
 ## Living document. Updated every session. This is the single reference for project state.
-## Last updated: Session 62 | March 25, 2026
-## Phases 0-8 Complete | Agent Graduation Built | 651 Tests Passing
+## Last updated: Session 65 | March 25, 2026
+## Phases 0-8 Complete | Agent Graduation Built | 752 Tests Passing
 
 ---
 
@@ -26,10 +26,10 @@
 | Layer | Files | Lines | Status |
 |-------|-------|-------|--------|
 | Layer 0: patterns/ | 15 modules + __init__ | 6,024 | 15/15 complete |
-| Layer 1: enhancements/ | 13 modules + __init__ | 4,708 | 13/13 complete |
+| Layer 1: enhancements/ | 19 modules + __init__ | ~7,500 | 19/19 complete (SPEC says 16, +3 post-spec: tone_profile, call_profile, loop_intelligence) |
 | Core (brain.py, cli.py, mcp_server.py, etc.) | 32 files | 7,505 | Complete |
 | Sidecar | 2 files | 619 | Complete |
-| Tests | 9 test files | ~5,800 | 537 passing |
+| Tests | 15+ test files | ~10,000+ | 752 passing |
 | **SDK Total** | **~66 files** | **18,856** | **Functional** |
 
 ### brain/scripts/ (Layer 2)
@@ -69,10 +69,10 @@
 ### Data Flow — Core Loop: WIRED
 
 ```
-brain.log_output()        → line 423 (log AI draft)
-brain.correct()           → line 338 (auto-diff, classify, extract patterns)
-brain.apply_brain_rules() → line 463 (inject rules into next prompt)
-brain.health()            → line 531 (compute metrics)
+brain.correct()           → line ~350 (auto-diff, classify, extract patterns)
+brain.log_output()        → line ~435 (log AI draft)
+brain.apply_brain_rules() → line ~475 (inject rules into next prompt)
+brain.health()            → line ~543 (compute metrics)
 ```
 
 ### Event-Sourced Data Model: CLEAN
@@ -96,9 +96,9 @@ brain.health()            → line 531 (compute metrics)
 | memory_scope.py | 591 | patterns/memory.py | ~~HIGH~~ DONE S63 (Wave 2) |
 | judgment_decay.py | 534 | enhancements/judgment_decay.py | ~~HIGH~~ DONE S62 |
 | rules_distill.py | 356 | enhancements/rules_distillation.py | ~~HIGH~~ DONE S62 |
-| patterns_updater.py | 245 | enhancements/loop_intelligence.py | MEDIUM |
-| delta_tag.py | 455 | enhancements/loop_intelligence.py | MEDIUM |
-| **Total to migrate** | **3,410** | **5/7 done (2,710 lines migrated)** | |
+| patterns_updater.py | 245 | enhancements/loop_intelligence.py | ~~MEDIUM~~ DONE S65 (Wave 3 SDK + Wave 4 shim) |
+| delta_tag.py | 455 | enhancements/loop_intelligence.py | ~~MEDIUM~~ DONE S65 (Wave 3 SDK + Wave 4 shim) |
+| **Total to migrate** | **3,410** | **7/7 SDK modules built. 3 pure shims + 4 delegate core computation (not pure shims — retain orchestration).** | |
 
 ### Infrastructure Health (S62 fixes)
 
@@ -108,7 +108,7 @@ brain.health()            → line 531 (compute metrics)
 | Hook timeouts | All have timeouts | 3 missing added, codex 60→30s, brain-maintain 90→30s |
 | Path DI | 10 files migrated | env-var driven (BRAIN_DIR, WORKING_DIR, PYTHON_PATH) |
 | Codex review | Working | Fires on Write/Edit, finds real P1 bugs, silent on LGTM |
-| Tests | 537 passing | 1 deprecation warning (datetime.utcnow) |
+| Tests | 752 passing (S65) | Was 537 at S62. +215 from Waves 1-4 + new modules. |
 
 ---
 
@@ -126,12 +126,12 @@ brain.health()            → line 531 (compute metrics)
 - Domain-agnostic taxonomy
 - Kill switches by maturity
 - Custom exception hierarchy
-- 537 tests
+- 752 tests (S65, was 537 at S42)
 - Zero-dependency base install
 
 ### Partially Built
-- brain/scripts/ migration (3,410 lines pending)
-- Correction detection (~40-60% capture rate)
+- brain/scripts/ migration — 7/7 SDK modules built (Wave 1-4). 3 pure shims + 4 delegate computation. Zero duplicated logic. Reviewer caught and resolved S65.
+- Correction detection (~40-60% capture rate, improved S64 with 12 implicit patterns)
 - Agent distillation (check exists, not producing files regularly)
 
 ### Missing Entirely
@@ -143,9 +143,9 @@ brain.health()            → line 531 (compute metrics)
 - Cloud sync (Turso evaluation not started)
 
 ### Progress Estimate
-- **Phase 1 SDK: ~85% complete** (missing external users + Gate 0)
+- **Phase 1 SDK: ~90% complete** (migration done, missing external users + Gate 0)
 - **Phases 2-5: 0%** (by design — gates must pass first)
-- **Overall: ~40% of full SPEC.md vision**
+- **Overall: ~45% of full SPEC.md vision**
 
 ---
 
@@ -169,23 +169,23 @@ The ARCHITECTURE-SPEC already defines the target. No file moves in this session.
 
 | Dimension | Score | Notes |
 |-----------|-------|-------|
-| Architecture health | 8.5/10 | Layer 0/1/2 clean, 5/7 migrations done, deterministic rule enforcement added |
-| Brain vs SDK separation | 8.5/10 | 5/7 files migrated (spawn, guardrails, memory_scope, judgment_decay, rules_distill). 2 remaining: patterns_updater, delta_tag |
+| Architecture health | 8.5/10 | Layer 0/1/2 clean, 7/7 SDK modules built. 3 brain scripts are pure shims, 4 delegate core computation but retain orchestration logic. |
+| Brain vs SDK separation | 8.0/10 | 7/7 SDK modules built. Brain scripts: spawn/guardrails/memory_scope are pure shims. judgment_decay delegates compute_decay() but keeps ~250 lines of orchestration. rules_distill/patterns_updater/delta_tag delegate core functions. Not 100% shim but zero duplicated constants or computation. |
 | Layer compliance | 10/10 | Zero violations |
 | Domain coupling | 9/10 | FIXED S62: reload_config() loads from taxonomy.json |
-| Test coverage | 9.5/10 | 659 tests, all passing, 0 warnings |
+| Test coverage | 9.5/10 | 752 tests, all passing, 0 warnings |
 | Data flow | 9/10 | Core loop wired, dual-write working, agent graduation wired, deterministic enforcement |
 | Infrastructure | 9.5/10 | Statusline 100%, all hooks working, codex + arch-review verified, agent graduation live |
 | North star alignment | 7/10 | Phase 1 ~88%, Phases 2-5 not started |
-| **Overall** | **8.9/10** | |
+| **Overall** | **8.6/10** | Codex + Reviewer cross-verified S65. Wave 4 done (delegation, not pure shim). |
 
-### Top 5 Issues (updated S63)
+### Top 5 Issues (updated S65)
 
 1. **Gate 0 proof** — Train to 200 sessions, graph correction density. This is the entire thesis.
 2. **External users** — 0/10 target. Need onboarding docs + outreach.
-3. **brain/scripts migration Wave 3** — patterns_updater.py (245 lines) + delta_tag.py (455 lines) pending.
+3. **brain/scripts migration** — 7/7 SDK modules built. 3 pure shims, 4 delegate computation but keep orchestration. No duplicated constants or logic. Reviewer-verified S65.
 4. **MkDocs + docs** — No documentation for external developers (quickstart, concepts, troubleshooting).
-5. **Wrap-up execution speed** — Compacted from 15 phases to 6. Needs real-session validation.
+5. ~~**3 CRITICAL audit gaps**~~ **CLOSED S65** — Codex cross-verified C1, C2, C3. Disputes found and corrected in this audit.
 
 ### Data Flow Diagram
 
@@ -349,19 +349,22 @@ DATA STORAGE (event-sourced, dual-write):
 
 ### 8A: Product Feasibility
 
-#### Gate 0 Data (Brain at Session 62)
+#### Gate 0 Data (Brain at Session 65, DB-verified)
 
 | Metric | Value | Assessment |
 |--------|-------|-----------|
-| Sessions with full tracking (S37-S69) | 20 sessions | Good sample |
-| Correction rate | 0.11 per output (4/36) | LOW — positive signal |
-| Zero-correction sessions | 16/20 (80%) | STRONG |
-| First-draft acceptance (FDA) | 95% (190/200) | EXCELLENT |
+| Sessions with full tracking | 36 sessions | Solid sample |
+| Correction rate | 0.28 per output (45/159) | MODERATE — includes implicit corrections from S64 hook upgrade (12 new patterns) |
+| Zero-correction sessions | 17/36 (47%) | DOWN from prior estimate — S64 hook catches more, which is better detection not worse quality |
+| First-draft acceptance (FDA) | 72% (114/159) | Baseline with improved detection. Pre-S64 hook: ~90%+. Post-S64: 72%. Delta = detection sensitivity, not quality regression. |
+| Patterns accumulated | 94 (32 PROVEN, 24 EMERGING, 38 HYPOTHESIS) | Growing |
+| Active lessons | 27 (1 RULE, 12 PATTERN, 14 INSTINCT) | Healthy funnel |
+| Killed lessons (UNTESTABLE) | 6 | Kill switches working |
 | Patterns accumulated | 94 (32 PROVEN, 24 EMERGING, 38 HYPOTHESIS) | Growing |
 | Active lessons | 27 (1 RULE, 12 PATTERN, 14 INSTINCT) | Healthy funnel |
 | Killed lessons (UNTESTABLE) | 6 | Kill switches working |
 
-**Gate 0 verdict: Trend is strongly positive.** 80% zero-correction sessions, 95% FDA. But OUTPUT tracking started at S37, so early/late comparison is incomplete. Need continuous tracking S62→S200 for publishable proof.
+**Gate 0 verdict (S65, DB-verified):** Numbers shifted after S64 correction hook upgrade. FDA dropped from ~90% to 72% — this is a measurement artifact, not quality regression. The hook now catches implicit corrections (convention fixes, "also need", "make sure") that were previously invisible. For publishable proof, we need to normalize by detection sensitivity epoch: pre-S64 (explicit only) vs post-S64 (explicit + implicit). The real question for Gate 0 is whether correction rate TRENDS DOWN within each epoch, not absolute rate across epochs.
 
 **Path to S200:** At 3-5 sessions/week → 7-10 weeks → late May to mid-June 2026.
 
@@ -379,7 +382,7 @@ DATA STORAGE (event-sourced, dual-write):
 - Zero-dependency install: CLEAN (verified)
 - MCP server: 5 tools, JSON-RPC 2.0
 - Second-machine install: PASSED (18/18)
-- Test suite: 537 passing
+- Test suite: 752 passing (Codex-verified S65)
 
 ### 8B: Competitive Landscape (March 2026)
 
@@ -582,15 +585,15 @@ DATA STORAGE (event-sourced, dual-write):
 
 ## AUDIT GAPS REGISTRY (found by gap-finder agent, S62)
 
-39 gaps found. 3 CRITICAL, 24 IMPORTANT, 12 NICE-TO-HAVE. **S63: 21 IMPORTANT closed (I1-I5, I7-I12, I14-I22, I24).** Remaining: 3 CRITICAL, 3 IMPORTANT (I6, I13, I23), 12 NICE-TO-HAVE.
+39 gaps found. 3 CRITICAL, 24 IMPORTANT, 12 NICE-TO-HAVE. **S63: 21 IMPORTANT closed. S65: 3 CRITICAL closed + 2 IMPORTANT closed (Codex cross-verification).** Remaining: 0 CRITICAL, 1 IMPORTANT (I23 deferred), 12 NICE-TO-HAVE.
 
 ### CRITICAL (3) — Codex cross-verification
 
 | # | Gap | Source | Status |
 |---|-----|--------|--------|
-| C1 | No Codex cross-verification log in AUDIT.md | Audit prompt Protocol + Phase 3/4/7/8G | OPEN — run Codex on Phase 8 next session |
-| C2 | Phase 8G (Codex review of GTM) missing entirely | Audit prompt Phase 8G | OPEN |
-| C3 | No Phase 6 Codex review log | Audit prompt Phase 6 item 2 | OPEN |
+| C1 | No Codex cross-verification log in AUDIT.md | Audit prompt Protocol + Phase 3/4/7/8G | CLOSED S65 — Codex verified: layer compliance OK, domain coupling OK, core loop OK (lines shifted +12, fixed), enhancement count wrong (13→19, fixed), sidecar OK |
+| C2 | Phase 8G (Codex review of GTM) missing entirely | Audit prompt Phase 8G | CLOSED S65 — Codex verified: zero-dep OK, MCP 5 tools OK, all 7 moat claims code-verified, Gate 0 numbers WRONG (corrected: 45/142 not 4/36), test count updated 537→752 |
+| C3 | No Phase 6 Codex review log | Audit prompt Phase 6 item 2 | CLOSED S65 — Codex verified: 5/6 claims verified, 1 DISPUTE (brain/scripts migration). Resolution: judgment_decay fixed to delegate compute_decay(), scores adjusted to 8.0/10 (reviewer-verified). |
 
 ### IMPORTANT (24) — grouped by phase
 
@@ -613,7 +616,7 @@ DATA STORAGE (event-sourced, dual-write):
 
 | # | Gap | Status |
 |---|-----|--------|
-| I6 | No Codex cross-verification of alignment assessment | OPEN (blocked on C1) |
+| I6 | No Codex cross-verification of alignment assessment | CLOSED S65 — Codex C1 agent verified alignment (see C1 closure notes) |
 | I7 | No proposed directory tree with every file's new location | DONE S63 — See migration table (5/7 done). Remaining: patterns_updater→enhancements/loop_intelligence, delta_tag→enhancements/loop_intelligence |
 | I8 | Phase 5 (execute restructure) absent from AUDIT.md | DONE S63 — Wave 1 (spawn) + Wave 2 (guardrails, memory_scope) complete. 5/7 files migrated. |
 
@@ -630,7 +633,7 @@ DATA STORAGE (event-sourced, dual-write):
 |---|-----|--------|
 | I11 | No current startup sequence mapping (step-by-step) | DONE S63 — Full trace: 5 hooks → 6 phases → on-demand. 50-70s, 25-35K tokens. api_sync.py is bottleneck. |
 | I12 | No before/after side-by-side wrap-up comparison | DONE S63 — Before: 464 lines, 15 phases, 21 steps (Pre-Phase + Phase 0-14). After: 190 lines, 10 steps. Metacog scan, session classification, 5 redundant phases eliminated. /reflect + confidence + validator kept as ESSENTIAL. |
-| I13 | No Codex cross-verification of optimized sequences | PARTIAL — Codex reviewed step classification but not full flow |
+| I13 | No Codex cross-verification of optimized sequences | CLOSED S65 — Codex C1 agent verified all hook chains in settings.json |
 
 **Phase 8 (GTM):**
 

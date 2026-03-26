@@ -6,6 +6,9 @@
  * Silent on failure -- never breaks the tool chain.
  */
 
+// Skip in reviewer terminal — reviewer outputs are not brain training data
+if (process.env.AIOS_ROLE === 'reviewer') { process.exit(0); }
+
 const { execSync } = require("child_process");
 const path = require("path");
 

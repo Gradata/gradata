@@ -81,3 +81,9 @@
 [2026-03-25] [INSTINCT:0.30] DEAL_VALUES: Sprites is month-to-month subscription. Deal values in Pipedrive are MONTHLY, not annual. Don't multiply by 12. Root cause: set OneNotary deal to $24K (annual) instead of $2K (monthly).
 
 [2026-03-25] [INSTINCT:0.30] TOOL_AWARENESS: When Oliver says to use a specific tool (OpenCLI, Rube), check if it's installed and learn how it works before saying "I can't do that." Don't give up and ask for manual workarounds when the tool exists. Root cause: tried Playwright/Chrome debugging for 20 minutes instead of using OpenCLI which was already installed.
+
+[2026-03-25] [INSTINCT:0.30] ARCHITECTURE: When claiming "migration complete" or "X/Y done" in AUDIT.md, verify with code inspection that the brain scripts actually import from SDK. Don't conflate "SDK module exists" with "brain script delegates to it." Codex caught 4/7 were standalone despite audit claiming 7/7 shimmed. Root cause: wrote AUDIT.md migration status based on what was planned, not what was verified.
+
+[2026-03-25] [INSTINCT:0.30] ACCURACY: Never publish "TO VERIFY" or unverified metrics in audit documents. Either run the query and get the real number, or don't include the row. The reviewer caught a Gate 0 metric marked "TO VERIFY" that was published as if factual. Root cause: updated Gate 0 section in a rush, left placeholder instead of querying system.db.
+
+[2026-03-25] [INSTINCT:0.30] ARCHITECTURE: When building a review/critic terminal, it must run verification commands (pytest, DB queries, grep) not just read files. A reviewer that reviews from vibes catches surface issues but misses the real bugs. The first version of reviewer CLAUDE.md had no tool usage instructions. Root cause: wrote reviewer role as "judge and critique" without specifying it should run code to verify claims.

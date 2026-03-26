@@ -15,14 +15,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/gsd-check-update.js\""
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "python \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/reflect/scripts/session_start_reminder.py\""
           }
         ]
@@ -87,6 +79,15 @@
             "type": "command",
             "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/gate-inject.js\"",
             "timeout": 3000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/review-ingest.js\"",
+            "timeout": 5000
           }
         ]
       }
@@ -210,15 +211,6 @@
             "type": "command",
             "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/arch-review.js\"",
             "timeout": 45000
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/gsd-context-monitor.js\"",
-            "timeout": 3000
           }
         ]
       },

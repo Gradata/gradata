@@ -18,3 +18,11 @@ token.json
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Auto-generated (regenerated each session)
+.vectorstore/
+brain.manifest.json
+system.db
+*.db-wal
+__pycache__/
+*.pyc

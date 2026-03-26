@@ -82,9 +82,14 @@ process.stdin.on('end', () => {
       ctxDisplay = `${color}${bar} ${usedPct}%${burnInfo}${c.reset}`;
     }
 
-    // -- Session Number --
+    // -- Session Number (from git: last committed S## + 1) --
     let currentSession = 0;
-    if (fs.existsSync(cfg.LOOP_STATE)) {
+    const gitSubject = safeExec(`git -C "${dir}" log -1 --format=%s`);
+    const sMatch = gitSubject.match(/^S(\d+):/);
+    if (sMatch) {
+      currentSession = parseInt(sMatch[1]) + 1;
+    } else if (fs.existsSync(cfg.LOOP_STATE)) {
+      // Fallback to loop-state if git doesn't have S## prefix
       try {
         const m = fs.readFileSync(cfg.LOOP_STATE, 'utf8').substring(0, 200).match(/Session\s+(\d+)/);
         if (m) currentSession = parseInt(m[1]) + 1;

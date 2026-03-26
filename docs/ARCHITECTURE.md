@@ -1,3 +1,5 @@
+> **DEPRECATED (S65):** This is a pre-v2.0 overview. For the canonical architecture reference, see `sdk/SPEC.md`. This file is kept for historical context only.
+
 # Sprites.ai Sales Agent — System Architecture (v2.1)
 
 ## Overview
