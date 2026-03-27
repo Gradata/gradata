@@ -1,14 +1,116 @@
-"""Post-hoc rule verification: checks whether AI outputs follow injected rules.
+"""Rule verification: pre-execution filtering and post-hoc output checking.
 
-Scans output text for checkable patterns (em dashes, pricing, links) and
-reports violations. Feeds results back into confidence scoring.
+Pre-execution: TOOL_RULE_MATRIX maps tool/task types to relevant rule
+categories so irrelevant rules are skipped before verification runs.
+
+Post-hoc: scans output text for checkable patterns (em dashes, pricing,
+links) and reports violations. Feeds results back into confidence scoring.
 """
+
+from __future__ import annotations
 
 import re
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
+
+# ---------------------------------------------------------------------------
+# Pre-execution decision tree
+# ---------------------------------------------------------------------------
+
+# Maps tool/task types to the rule categories that are relevant for them.
+# If a tool_type is not in the matrix, all categories are checked (safe default).
+# Extend this dict at runtime via update_tool_rule_matrix() — no code changes needed.
+TOOL_RULE_MATRIX: dict[str, list[str]] = {
+    "Write": ["DRAFTING", "ARCHITECTURE", "IP_PROTECTION", "ACCURACY"],
+    "Edit": ["DRAFTING", "ARCHITECTURE", "ACCURACY"],
+    "Bash": ["PROCESS", "VERIFICATION", "CONSTRAINT"],
+    "email_draft": ["DRAFTING", "COMMUNICATION", "POSITIONING", "PRICING"],
+    "demo_prep": ["DEMO_PREP", "ACCURACY", "PRESENTATION"],
+    "prospecting": ["LEADS", "CONSTRAINT", "DATA_INTEGRITY"],
+    "code": ["ARCHITECTURE", "THOROUGHNESS", "VERIFICATION"],
+}
+
+
+def update_tool_rule_matrix(extensions: dict[str, list[str]]) -> None:
+    """Extend or override TOOL_RULE_MATRIX entries at runtime.
+
+    Args:
+        extensions: Mapping of tool_type -> list of relevant category strings.
+            Existing keys are replaced; new keys are added.
+    """
+    TOOL_RULE_MATRIX.update(extensions)
+
+
+def should_verify(tool_type: str, rule_category: str) -> bool:
+    """Pre-execution gate: is this rule relevant for this tool/task?
+
+    If *tool_type* is not in TOOL_RULE_MATRIX, returns ``True`` (verify
+    everything by default — safe fallback for unknown tools).
+
+    Args:
+        tool_type: The current tool or task type (e.g. "email_draft", "Bash").
+        rule_category: The category of the rule being considered.
+
+    Returns:
+        ``True`` if the rule should be checked, ``False`` to skip it.
+    """
+    relevant = TOOL_RULE_MATRIX.get(tool_type)
+    if relevant is None:
+        return True  # unknown tool -> check everything
+    return rule_category.upper() in (c.upper() for c in relevant)
+
+
+def get_relevant_rules(tool_type: str, all_rules: list[dict]) -> list[dict]:
+    """Filter rules to only those relevant for the current tool/task.
+
+    Each rule dict must have a ``"category"`` key. Rules whose category is
+    not relevant for *tool_type* (per TOOL_RULE_MATRIX) are dropped.
+
+    Args:
+        tool_type: The current tool or task type.
+        all_rules: Full list of rule dicts (each with at least ``"category"``).
+
+    Returns:
+        Filtered list of rule dicts relevant to the tool type.
+    """
+    return [
+        rule for rule in all_rules
+        if should_verify(tool_type, rule.get("category", "UNKNOWN"))
+    ]
+
+
+def build_decision_context(tool_type: str, tool_input: str = "") -> dict[str, Any]:
+    """Build a context dict suitable for evaluate_conditions() calls.
+
+    Translates a tool invocation into the key-value context that meta-rule
+    condition evaluation expects (keys like ``task``, ``tool``, ``domain``).
+
+    Args:
+        tool_type: The tool or task type string.
+        tool_input: Optional raw input/arguments for the tool.
+
+    Returns:
+        Context dict with ``tool``, ``task``, and ``input_length`` keys.
+    """
+    # Map tool types to broad task domains for condition matching
+    _TOOL_TO_TASK: dict[str, str] = {
+        "Write": "code",
+        "Edit": "code",
+        "Bash": "code",
+        "email_draft": "sales",
+        "demo_prep": "sales",
+        "prospecting": "sales",
+        "code": "code",
+    }
+    return {
+        "tool": tool_type,
+        "task": _TOOL_TO_TASK.get(tool_type, tool_type),
+        "input_length": len(tool_input),
+    }
+
 
 # ---------------------------------------------------------------------------
 # Verification pattern registry
@@ -59,14 +161,25 @@ def verify_rules(
 ) -> list[RuleVerification]:
     """Check output against applied rules for verifiable violations.
 
+    When *context* contains a ``"tool_type"`` key, pre-execution filtering
+    via :func:`should_verify` is applied first — rules whose category is
+    irrelevant for the tool are skipped entirely, making verification both
+    faster and less prone to false positives from mismatched rules.
+
     Args:
         output: The AI-generated text to check.
         applied_rules: List of dicts with at least 'category' and 'description'.
-        context: Optional context (e.g., task_type) to scope checks.
+        context: Optional context dict. Recognized keys:
+            - ``tool_type``: enables pre-execution category filtering.
 
     Returns:
         List of RuleVerification results (one per checkable rule).
     """
+    # Pre-execution filter: skip rules irrelevant to the current tool
+    tool_type = (context or {}).get("tool_type", "")
+    if tool_type:
+        applied_rules = get_relevant_rules(tool_type, applied_rules)
+
     results = []
     for rule in applied_rules:
         desc = rule.get("description", "")

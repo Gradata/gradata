@@ -119,23 +119,46 @@ process.stdin.on('end', () => {
     }
 
     // ── LINE 1: Identity + Context ──────────────────────────────────
-    // Context grade: A (fresh, <35%), B (moderate, 35-50%), C (heavy, 50-65%), D (depleted, 65-80%), F (critical, 80%+)
-    let ctxGrade = '', ctxGradeColor = c.green;
+    // CARL context brackets mapped to used%:
+    // FRESH (0-35%), MODERATE (35-65%), DEPLETED (65-80%), CRITICAL (80%+)
+    let ctxBracket = '', ctxBracketColor = c.green;
     if (typeof usedPct === 'number') {
-      if (usedPct < 35) { ctxGrade = 'A'; ctxGradeColor = c.green; }
-      else if (usedPct < 50) { ctxGrade = 'B'; ctxGradeColor = c.green; }
-      else if (usedPct < 65) { ctxGrade = 'C'; ctxGradeColor = c.yellow; }
-      else if (usedPct < 80) { ctxGrade = 'D'; ctxGradeColor = c.orange; }
-      else { ctxGrade = 'F'; ctxGradeColor = c.red; }
+      if (usedPct < 35) { ctxBracket = 'FRESH'; ctxBracketColor = c.green; }
+      else if (usedPct < 65) { ctxBracket = 'MODERATE'; ctxBracketColor = c.yellow; }
+      else if (usedPct < 80) { ctxBracket = 'DEPLETED'; ctxBracketColor = c.orange; }
+      else { ctxBracket = 'CRITICAL'; ctxBracketColor = c.red; }
     }
-    const gradeDisplay = ctxGrade ? `${ctxGradeColor}${c.bold}${ctxGrade}${c.reset}` : '';
+    const bracketDisplay = ctxBracket ? `${ctxBracketColor}${c.bold}${ctxBracket}${c.reset}` : '';
+
+    // -- Rule injection count (from CARL + lessons injected this session) --
+    let rulesDisplay = '';
+    try {
+      const carlDir = path.join(dir, '.carl');
+      let ruleCount = 0;
+      if (fs.existsSync(carlDir)) {
+        const carlFiles = fs.readdirSync(carlDir).filter(f => !f.startsWith('.') && !fs.statSync(path.join(carlDir, f)).isDirectory());
+        for (const f of carlFiles) {
+          try {
+            const content = fs.readFileSync(path.join(carlDir, f), 'utf8');
+            const matches = content.match(/^[A-Z_]+_RULE_\d+=/gm);
+            if (matches) ruleCount += matches.length;
+          } catch (e) {}
+        }
+      }
+      if (ruleCount > 0) {
+        const maxRules = 10;
+        const rColor = ruleCount >= maxRules ? c.green : c.yellow;
+        rulesDisplay = `${rColor}rules: ${Math.min(ruleCount, maxRules)}/${maxRules}${c.reset}`;
+      }
+    } catch (e) {}
 
     const line1 = [
       `${c.bold}${c.cyan}Gradata${c.reset}`,
       currentSession > 0 ? `${c.bold}${c.white}S${currentSession}${c.reset}` : '',
       `${c.dim}${model}${c.reset}`,
       ctxDisplay,
-      gradeDisplay,
+      bracketDisplay,
+      rulesDisplay,
       `${c.dim}${timeStr}${c.reset}`,
     ].filter(Boolean);
 

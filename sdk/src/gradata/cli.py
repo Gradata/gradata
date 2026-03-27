@@ -133,7 +133,7 @@ def cmd_validate(args):
         print(json.dumps(report, indent=2, default=str))
     else:
         print_report(report)
-    if args.strict and report.get("trust", {}).get("grade", "F") in ("D", "F"):
+    if args.strict and report.get("trust", {}).get("grade", "F") in ("C", "D", "F"):
         sys.exit(1)
 
 

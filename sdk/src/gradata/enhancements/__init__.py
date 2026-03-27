@@ -33,4 +33,6 @@ PROPRIETARY modules (also available via gradata_cloud when installed):
   collaborative_filter -- Cross-brain pattern sharing
   rules_distillation  -- Pattern-to-rule distillation
   meta_rules           -- Emergent meta-rule discovery (compound learning)
+  rule_integrity       -- HMAC signing for tamper detection on graduated rules
+  contradiction_detector -- Semantic contradiction detection before graduation
 """

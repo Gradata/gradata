@@ -59,6 +59,7 @@ Quick health pulse before loading context. **Run steps 1-4 + 7 as a single paral
 8. **Brain launch check** — run `python brain/scripts/launch.py --json`. Validates header consistency (session numbers match across loop-state + startup-brief), staleness, inter-session modifications, and RAG graduation status. Surface any issues in startup output. If `rag_graduation_ready`, prompt user to activate embedding layer.
 
 9. **Periodic audit check** — session_start_reminder.py hook queries `periodic_audits` SQLite table automatically. Due audits surfaced in startup output. After running an audit, update: `UPDATE periodic_audits SET last_run_session=N, next_due_session=N+frequency WHERE audit_name='...'`
+10. **Ablation check** — run `python C:/Users/olive/SpritesWork/brain/scripts/ablation_lifecycle.py check --session <N>`. If due, call `schedule` subcommand to flag the rule. Surface: `ABLATION: [CATEGORY] scheduled for validation this session`. The rule engine should skip injecting that rule so we can measure if errors recur without it. At wrap-up, `finalize_ablation()` runs automatically via wrap_up.py step 13.
 
 **THEN (sequential, after batch completes):**
 5. If any check fails -> surface immediately: "SYSTEM ALERT: [what failed]"
@@ -338,6 +339,7 @@ After loading, give Oliver a concise status (plus freshness alerts if any):
 [vault] [Prospects needing follow-up from brain/ scan]
 [signal] [Unprocessed signals with relevance >= 7 — only show if any exist]
 [heartbeat] [X/4 systems healthy] [list any failures]
+[ablation] [If due: "ABLATION: [CATEGORY] under validation" | else: omit line]
 [health] [Deal health alerts — any deals below 40 health score]
 [alert] [Files changed since last session — only show if something changed]
 ```

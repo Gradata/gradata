@@ -17,6 +17,7 @@
  *   11. tool-failure-emit.js   (mcp__*)
  *   12. suggest-compact.js     (no matcher — all tools)
  *   13. behavior-triggers.js   (Write|Edit|Bash) — behavioral skill triggers
+ *   14. rule-verify-post-tool.py (Write|Edit|Bash) — rule verifier advisory checks
  */
 const path = require('path');
 const cfg = require('./config.js');
@@ -37,6 +38,7 @@ const hooks = [
   { matcher: 'mcp__*',     type: 'node',   script: path.join(HOOKS_DIR, 'tool-failure-emit.js'),  timeout: 5000 },
   { matcher: null,         type: 'node',   script: path.join(HOOKS_DIR, 'suggest-compact.js'),    timeout: 3000 },
   { matcher: 'Write|Edit|Bash', type: 'node', script: path.join(HOOKS_DIR, 'behavior-triggers.js'), timeout: 5000 },
+  { matcher: 'Write|Edit|Bash', type: 'python', script: path.join(HOOKS_DIR, 'rule-verify-post-tool.py'), timeout: 5000 },
 ];
 
 function matchesTool(matcher, toolName) {

@@ -123,7 +123,7 @@ class TestVerifyRules:
         assert "Calendly" in violations[0].violation_detail
 
     def test_calendly_present_passes(self):
-        rules = [{"category": "DRAFTING", "description": "Always include Calendly hyperlink"}]
+        rules = [{"category": "DRAFTING", "description": "Always include Calendly link"}]
         output = "Book a time here: calendly.com/oliver-spritesai/30min"
         results = verify_rules(output, rules)
         assert all(r.passed for r in results)
@@ -224,6 +224,7 @@ class TestVerificationPersistence:
             assert stats["violations_by_category"]["DRAFTING"] == 1
             assert stats["violations_by_category"]["PRICING"] == 1
         finally:
+            import gc; gc.collect()  # release SQLite connections on Windows
             db_path.unlink(missing_ok=True)
 
     def test_empty_db_stats(self):
@@ -237,6 +238,7 @@ class TestVerificationPersistence:
             assert stats["pass_rate"] == 1.0
             assert stats["violations_by_category"] == {}
         finally:
+            import gc; gc.collect()
             db_path.unlink(missing_ok=True)
 
     def test_multiple_sessions(self):
@@ -252,4 +254,5 @@ class TestVerificationPersistence:
             assert stats["total_checks"] == 2
             assert stats["passed"] == 1
         finally:
+            import gc; gc.collect()
             db_path.unlink(missing_ok=True)

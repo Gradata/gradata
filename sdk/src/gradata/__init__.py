@@ -42,7 +42,7 @@ from gradata.exceptions import (
     ValidationError,
 )
 from gradata._paths import BrainContext  # noqa: F401
-from gradata._types import Lesson, LessonState  # noqa: F401
+from gradata._types import Lesson, LessonState, RuleTransferScope  # noqa: F401
 from gradata._self_improvement import (
     compute_learning_velocity,
     format_lessons,
@@ -73,6 +73,7 @@ __all__ = [
     "BrainContext",
     "Lesson",
     "LessonState",
+    "RuleTransferScope",
     "__version__",
     "compute_learning_velocity",
     "format_lessons",

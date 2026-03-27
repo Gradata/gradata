@@ -10,16 +10,14 @@ Gradata watches your corrections, stores them as events in a local SQLite databa
 
 ## Real results
 
-All numbers from a single user (n=1) over 71 sessions. This is early data, not a peer-reviewed study.
+All numbers below are from a single-user study (N=1) over 71 sessions across 9 days. Multi-user validation pending. Each claim cites its data source so you can verify independently.
 
-| Metric | Value |
-|---|---|
-| Correction rate | 5.0 -> 0.004 per output (1,000x reduction) |
-| Error categories extinct | 13 of 14 categories stopped recurring |
-| Lessons graduated to rules | 48 of 107 (46%) |
-| Adaptation Score | 96/100 |
-| First Draft Acceptance | 100% for last 10 sessions |
-| Correction severity | 0.40 -> 0.27 (trending down) |
+| Metric | Value | Source |
+|---|---|---|
+| Correction rate | 5.0 per output (S31) to 0.004 per output (S70) | `events.jsonl` CORRECTION + OUTPUT event counts per session |
+| Error categories eliminated | 13 of 14 correction categories stopped recurring (10+ session gap) | `events.jsonl` CORRECTION events grouped by `data.category` |
+| Corrections analyzed | 59 total: 35 moderate, 24 major, 0 rewrite severity | `events.jsonl` edit-distance severity classification |
+| Lessons graduated to rules | 48 of 107 (45%) reached RULE confidence threshold | `lessons.md` + `lessons-archive.md` status counts |
 
 The graduation engine that produced these numbers runs server-side. The open source SDK handles correction logging, event storage, brain search, and the manifest that proves improvement happened.
 
@@ -144,7 +142,7 @@ All data is event-sourced. Every correction, output log, and state change is an 
 ## Caveats
 
 - This is v0.1.0. The API will change.
-- The impressive numbers above come from one power user over 9 days. Your results will vary.
+- The numbers above come from one power user over 9 days. Your results will vary. Ablation testing (disabling rules to verify causal effect) is in progress.
 - The graduation engine (the part that turns corrections into permanent rules) is not in the open source SDK yet. It's coming via gradata.ai.
 - Local-only for now. Cloud sync is planned.
 

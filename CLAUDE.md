@@ -24,4 +24,4 @@ Dashboard: brain/scripts/learning_dashboard.py (adaptation score, correction rat
 Windows 11. Python: C:/Users/olive/AppData/Local/Programs/Python/Python312/. Node available.
 Prospecting: enrich before tiering, CEO != auto-T1, counts in filenames. Rules: domain/playbooks/prospecting-instructions.txt
 Truth protocol: .carl/global GLOBAL_RULE_0 + .claude/truth-protocol.md
-Tests: pytest sdk/tests/ (295 pass, 22 skip open-source mode). Build: uv.
+Tests: pytest sdk/tests/ (363 pass, 23 skip) + brain/gradata_cloud_backup/tests/ (523 pass) = 886 total. Build: uv.

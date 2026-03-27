@@ -23,10 +23,18 @@ Enhancements:
 
 from __future__ import annotations
 
+import hashlib
+import json
+from collections import defaultdict
 from dataclasses import dataclass
 
+import logging
+
 from gradata._scope import RuleScope, scope_matches
-from gradata._types import Lesson, LessonState
+from gradata._types import ELIGIBLE_STATES, Lesson, LessonState, RuleTransferScope
+from gradata.enhancements.meta_rules import evaluate_conditions  # noqa: F401
+
+_log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Data Model
@@ -66,9 +74,7 @@ _STATE_PRIORITY: dict[LessonState, int] = {
     LessonState.UNTESTABLE: -1,
 }
 
-_ELIGIBLE_STATES: frozenset[LessonState] = frozenset(
-    {LessonState.RULE, LessonState.PATTERN}
-)
+_ELIGIBLE_STATES = ELIGIBLE_STATES
 
 
 # ---------------------------------------------------------------------------
@@ -77,13 +83,70 @@ _ELIGIBLE_STATES: frozenset[LessonState] = frozenset(
 
 _TASK_TYPE_PATTERNS: list[tuple[str, list[str]]] = [
     ("email", ["email", "draft", "compose", "reply", "follow-up", "followup", "subject line"]),
-    ("demo_prep", ["demo", "prep", "presentation", "deck", "slide"]),
+    ("demo_prep", ["demo", "demo prep", "presentation", "deck", "slide"]),
     ("code", ["code", "implement", "refactor", "debug", "fix bug", "test", "function"]),
     ("prospecting", ["prospect", "lead", "enrich", "icp", "outreach", "campaign"]),
     ("research", ["research", "analyze", "investigate", "compare", "evaluate"]),
     ("call", ["call", "meeting", "agenda", "talking points"]),
     ("document", ["document", "readme", "spec", "guide", "report", "write up"]),
 ]
+
+
+# ---------------------------------------------------------------------------
+# Transfer Scope Classification
+# ---------------------------------------------------------------------------
+
+# Keywords signaling universal scope (AI quality issues, not personal style)
+_UNIVERSAL_SIGNALS: list[str] = [
+    "em dash", "em dashes",
+    "verify", "verification",
+    "fabricat", "hallucin",
+    "bold mid-paragraph",
+    "rule of three",
+    "promotional language",
+    "never skip",
+    "don't assume", "never assume",
+    "check before", "verify before",
+    "superficial analysis",
+]
+
+# Keywords signaling team/org scope (tool or company specific)
+_TEAM_SIGNALS: list[str] = [
+    "pipedrive", "instantly", "calendly", "sprites",
+    "apollo", "zerobounce", "prospeo",
+    "brain/", ".carl/", "domain/",
+    "notebooklm", "apify", "opencli",
+    "gmail", "fireflies",
+]
+
+
+def classify_transfer_scope(rule_text: str) -> RuleTransferScope:
+    """Auto-classify a rule's transfer scope based on content.
+
+    Scans the rule text for known signal keywords:
+      - Universal signals (AI tells, data integrity) -> UNIVERSAL
+      - Team signals (tool/vendor/company specific) -> TEAM
+      - Otherwise -> PERSONAL (conservative default)
+
+    Args:
+        rule_text: The rule description or principle text.
+
+    Returns:
+        The inferred :class:`RuleTransferScope`.
+    """
+    lower = rule_text.lower()
+
+    # Check universal signals first (AI quality > team tooling)
+    for signal in _UNIVERSAL_SIGNALS:
+        if signal in lower:
+            return RuleTransferScope.UNIVERSAL
+
+    # Check team signals
+    for signal in _TEAM_SIGNALS:
+        if signal in lower:
+            return RuleTransferScope.TEAM
+
+    return RuleTransferScope.PERSONAL
 
 
 # ---------------------------------------------------------------------------
@@ -223,7 +286,79 @@ def _make_rule_id(lesson: Lesson) -> str:
     Returns:
         Rule identifier string.
     """
-    return f"{lesson.category}:{hash(lesson.description) % 10000:04d}"
+    desc_hash = int(hashlib.sha256(lesson.description.encode()).hexdigest(), 16)
+    return f"{lesson.category}:{desc_hash % 10000:04d}"
+
+
+# ---------------------------------------------------------------------------
+# Assumption Invalidation
+# ---------------------------------------------------------------------------
+
+
+def validate_assumptions(
+    lesson: Lesson,
+    context: dict,
+) -> tuple[bool, str]:
+    """Check if a rule's dynamic runtime assumptions still hold.
+
+    Unlike :func:`~gradata.enhancements.meta_rules.evaluate_conditions`
+    (which checks static preconditions on meta-rules), this validates
+    *runtime* state that can change mid-session:
+
+    (a) Confidence hasn't decayed below the eligibility threshold for
+        the lesson's current state.
+    (b) The lesson's category hasn't been contradicted this session
+        (indicated by ``"contradicted_categories"`` in *context*).
+    (c) The lesson's scope matches the current task type (if one is
+        active in *context*).
+
+    Args:
+        lesson: The lesson to validate.
+        context: Runtime context dict. Recognised keys:
+
+            - ``"contradicted_categories"`` — set or list of category
+              strings that received contradicting corrections this session.
+            - ``"current_task_type"`` — the active task type string
+              (e.g. ``"email"``, ``"code"``).
+
+    Returns:
+        ``(True, "")`` if all assumptions hold, otherwise
+        ``(False, reason)`` explaining which check failed.
+    """
+    # (a) Confidence floor: PATTERN >= 0.60, RULE >= 0.90
+    min_conf = {LessonState.RULE: 0.90, LessonState.PATTERN: 0.60}
+    floor = min_conf.get(lesson.state, 0.0)
+    if lesson.confidence < floor:
+        return (
+            False,
+            f"confidence {lesson.confidence:.2f} below {lesson.state.value} "
+            f"floor {floor:.2f}",
+        )
+
+    # (b) Category contradiction
+    contradicted = context.get("contradicted_categories", set())
+    if lesson.category.upper() in {c.upper() for c in contradicted}:
+        return (
+            False,
+            f"category {lesson.category} contradicted this session",
+        )
+
+    # (c) Scope / task-type mismatch
+    current_tt = context.get("current_task_type", "")
+    if current_tt and lesson.scope_json:
+        try:
+            scope_dict = json.loads(lesson.scope_json)
+            rule_tt = scope_dict.get("task_type", "")
+            if rule_tt and rule_tt != current_tt:
+                return (
+                    False,
+                    f"rule scoped to '{rule_tt}' but current task is "
+                    f"'{current_tt}'",
+                )
+        except Exception:
+            pass  # malformed scope_json — don't block on it
+
+    return (True, "")
 
 
 # ---------------------------------------------------------------------------
@@ -259,10 +394,9 @@ def filter_by_scope(
         # provides.  When lessons gain explicit scope metadata in a future
         # iteration, this derivation logic should be updated.
         # Use lesson's stored scope if available, otherwise wildcard
-        import json as _json
         if lesson.scope_json:
             try:
-                scope_dict = _json.loads(lesson.scope_json)
+                scope_dict = json.loads(lesson.scope_json)
                 lesson_scope = RuleScope(**{k: v for k, v in scope_dict.items() if k in RuleScope.__dataclass_fields__})
             except Exception:
                 lesson_scope = RuleScope()
@@ -280,6 +414,7 @@ def apply_rules(
     max_rules: int = 10,
     events: list[dict[str, str]] | None = None,
     user_message: str = "",
+    _context: str = "",
 ) -> list[AppliedRule]:
     """Select and rank lessons relevant to the given scope.
 
@@ -301,6 +436,10 @@ def apply_rules(
             event should have ``"category"`` and ``"type"`` keys.
         user_message: Optional raw user message for task-type detection.
             When provided, enriches the scope's task_type if not already set.
+        context: Optional task-context label (e.g. ``"drafting"``,
+            ``"code"``). Reserved for future use with context-dependent
+            weighting of meta-rules (see
+            :func:`~gradata.enhancements.meta_rules.rank_meta_rules_by_context`).
 
     Returns:
         Ordered list of :class:`AppliedRule` objects, most relevant first.
@@ -328,10 +467,9 @@ def apply_rules(
     scored: list[tuple[Lesson, float]] = []
     for lesson in eligible:
         # Use lesson's stored scope if available, otherwise wildcard
-        import json as _json
         if lesson.scope_json:
             try:
-                scope_dict = _json.loads(lesson.scope_json)
+                scope_dict = json.loads(lesson.scope_json)
                 lesson_scope = RuleScope(**{k: v for k, v in scope_dict.items() if k in RuleScope.__dataclass_fields__})
             except Exception:
                 lesson_scope = RuleScope()
@@ -341,6 +479,29 @@ def apply_rules(
         relevance = compute_scope_weight(lesson_scope, scope)
         if relevance >= 0.3:
             scored.append((lesson, relevance))
+
+    # Step 3.5 — assumption invalidation (dynamic runtime checks)
+    if _context:
+        runtime_ctx = {"current_task_type": scope.task_type}
+        # Allow caller to pass contradicted categories via _context as JSON
+        try:
+            ctx_data = json.loads(_context) if _context.startswith("{") else {}
+        except (json.JSONDecodeError, AttributeError):
+            ctx_data = {}
+        if "contradicted_categories" in ctx_data:
+            runtime_ctx["contradicted_categories"] = ctx_data["contradicted_categories"]
+
+        validated: list[tuple[Lesson, float]] = []
+        for lesson, relevance in scored:
+            valid, reason = validate_assumptions(lesson, runtime_ctx)
+            if valid:
+                validated.append((lesson, relevance))
+            else:
+                _log.debug(
+                    "Skipping rule %s: assumption invalid — %s",
+                    lesson.category, reason,
+                )
+        scored = validated
 
     # Step 4 — compute difficulty per rule
     # Step 5 — sort: state priority DESC, difficulty DESC, relevance DESC, confidence DESC
@@ -382,8 +543,6 @@ def merge_related_rules(rules: list[AppliedRule], min_group_size: int = 2) -> li
     Merged rules use the highest confidence from the group and combine
     descriptions into one compressed instruction, saving tokens.
     """
-    from collections import defaultdict
-
     by_cat: dict[str, list[AppliedRule]] = defaultdict(list)
     for rule in rules:
         by_cat[rule.lesson.category].append(rule)
@@ -408,7 +567,11 @@ def merge_related_rules(rules: list[AppliedRule], min_group_size: int = 2) -> li
     return result
 
 
-def format_rules_for_prompt(rules: list[AppliedRule], merge: bool = True) -> str:
+def format_rules_for_prompt(
+    rules: list[AppliedRule],
+    merge: bool = True,
+    scope_filter: RuleTransferScope | None = None,
+) -> str:
     """Format applied rules into an XML-tagged LLM-injectable block.
 
     Uses XML tags for unambiguous constraint signaling (Claude best practice).
@@ -418,13 +581,21 @@ def format_rules_for_prompt(rules: list[AppliedRule], merge: bool = True) -> str
     If *merge* is True, related rules in the same category are compressed
     into single blocks to save tokens.
 
+    When *scope_filter* is provided, only rules whose lesson's
+    ``transfer_scope`` matches are included. This lets the SDK demo
+    surface only universal rules.
+
     Args:
         rules: Output from :func:`apply_rules`.
         merge: Whether to merge same-category rules (default True).
+        scope_filter: When set, only include rules with this transfer scope.
 
     Returns:
         Formatted XML block, or ``""`` if *rules* is empty.
     """
+    if scope_filter is not None:
+        rules = [r for r in rules if r.lesson.transfer_scope == scope_filter]
+
     if not rules:
         return ""
 
