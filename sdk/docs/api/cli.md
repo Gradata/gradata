@@ -1,6 +1,6 @@
 # CLI Reference
 
-The `aios-brain` CLI provides command-line access to all brain operations.
+The `gradata` CLI provides command-line access to all brain operations.
 
 ## Commands
 
@@ -9,10 +9,10 @@ The `aios-brain` CLI provides command-line access to all brain operations.
 Bootstrap a new brain directory.
 
 ```bash
-aios-brain init ./my-brain
-aios-brain init ./my-brain --domain Sales --name "My Brain"
-aios-brain init ./my-brain --company "Acme Corp" --embedding gemini
-aios-brain init ./my-brain --no-interactive
+gradata init ./my-brain
+gradata init ./my-brain --domain Sales --name "My Brain"
+gradata init ./my-brain --company "Acme Corp" --embedding gemini
+gradata init ./my-brain --no-interactive
 ```
 
 | Flag | Description |
@@ -28,9 +28,9 @@ aios-brain init ./my-brain --no-interactive
 Search the brain.
 
 ```bash
-aios-brain search "budget objections"
-aios-brain search "Hassan Ali" --mode keyword
-aios-brain search "email tone" --top 10
+gradata search "budget objections"
+gradata search "Hassan Ali" --mode keyword
+gradata search "email tone" --top 10
 ```
 
 | Flag | Description |
@@ -43,8 +43,8 @@ aios-brain search "email tone" --top 10
 Embed brain files for semantic search.
 
 ```bash
-aios-brain embed          # Delta (only changed files)
-aios-brain embed --full   # Full re-embed
+gradata embed          # Delta (only changed files)
+gradata embed --full   # Full re-embed
 ```
 
 ### `manifest`
@@ -52,8 +52,8 @@ aios-brain embed --full   # Full re-embed
 Generate and display the brain manifest.
 
 ```bash
-aios-brain manifest
-aios-brain manifest --json    # Raw JSON output
+gradata manifest
+gradata manifest --json    # Raw JSON output
 ```
 
 ### `stats`
@@ -61,7 +61,7 @@ aios-brain manifest --json    # Raw JSON output
 Display brain statistics.
 
 ```bash
-aios-brain stats
+gradata stats
 ```
 
 Output includes: markdown file count, database size, embedding chunk count, manifest status.
@@ -71,7 +71,7 @@ Output includes: markdown file count, database size, embedding chunk count, mani
 Run a data flow audit.
 
 ```bash
-aios-brain audit
+gradata audit
 ```
 
 ### `context`
@@ -79,7 +79,7 @@ aios-brain audit
 Compile relevant context for a message.
 
 ```bash
-aios-brain context "draft email to the CFO about pricing"
+gradata context "draft email to the CFO about pricing"
 ```
 
 Returns formatted context from the brain's knowledge, suitable for prompt injection.
@@ -89,8 +89,8 @@ Returns formatted context from the brain's knowledge, suitable for prompt inject
 Verify brain quality and integrity.
 
 ```bash
-aios-brain validate
-aios-brain validate --strict    # Fail if trust grade < C
+gradata validate
+gradata validate --strict    # Fail if trust grade < C
 ```
 
 ### `export`
@@ -98,9 +98,9 @@ aios-brain validate --strict    # Fail if trust grade < C
 Export the brain as a shareable archive.
 
 ```bash
-aios-brain export
-aios-brain export --mode no-prospects    # Exclude prospect data
-aios-brain export --mode domain-only     # Patterns and rules only
+gradata export
+gradata export --mode no-prospects    # Exclude prospect data
+gradata export --mode domain-only     # Patterns and rules only
 ```
 
 ### `install`
@@ -108,8 +108,8 @@ aios-brain export --mode domain-only     # Patterns and rules only
 Install a brain from a marketplace archive.
 
 ```bash
-aios-brain install brain-archive.zip
-aios-brain install --list    # List installed brains
+gradata install brain-archive.zip
+gradata install --list    # List installed brains
 ```
 
 ## Global Options
@@ -123,10 +123,10 @@ aios-brain install --list    # List installed brains
 
 ```bash
 # Full workflow
-aios-brain init ./sales-brain --domain Sales
-aios-brain embed --full
-aios-brain search "cold email best practices"
-aios-brain manifest --json
-aios-brain validate --strict
-aios-brain export
+gradata init ./sales-brain --domain Sales
+gradata embed --full
+gradata search "cold email best practices"
+gradata manifest --json
+gradata validate --strict
+gradata export
 ```

@@ -7,12 +7,12 @@
  */
 
 // Skip in reviewer terminal — reviewer outputs are not brain training data
-if (process.env.AIOS_ROLE === 'reviewer') { process.exit(0); }
+if (process.env.GRADATA_ROLE === 'reviewer') { process.exit(0); }
 
-const { execSync } = require("child_process");
 const path = require("path");
 
 const cfg = require('./config.js');
+const { execSafe } = cfg;
 const PYTHON = cfg.PYTHON;
 const EMIT_SCRIPT = path.join(cfg.SCRIPTS, "emit_output.py");
 
@@ -167,7 +167,7 @@ function main() {
   }
   const cmd = cmdParts.join(" ");
   try {
-    execSync(cmd, { timeout: 5000, stdio: "ignore" });
+    execSafe(cmd, { timeout: 5000, stdio: "ignore" });
   } catch {
     // Silent failure -- never break the tool chain
   }

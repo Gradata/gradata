@@ -2,7 +2,7 @@
 
 **Researched:** 2026-03-24
 **Confidence:** MEDIUM-HIGH (primary sources verified for 6/7 frameworks)
-**Purpose:** Inform how AIOS Brain SDK separates generic engine from domain-specific behaviors
+**Purpose:** Inform how Gradata separates generic engine from domain-specific behaviors
 
 ---
 
@@ -16,7 +16,7 @@ Every production agent framework solves the domain-agnostic problem the same way
 
 The "prospect vs candidate vs customer" problem is universally solved by **not hardcoding entity types into the core.** Every framework treats entities as opaque typed data that flows through a generic pipeline. The domain layer defines what "prospect" means; the core layer only knows it's a dict/model with a schema.
 
-**Key finding for AIOS Brain:** Our current `_tag_taxonomy.py` and `_config.py` hardcode sales concepts (`prospect`, `angle`, `persona`, `framework`) directly into the SDK core. This is the #1 thing that prevents domain-agnosticism. Every framework studied avoids this.
+**Key finding for Gradata:** Our current `_tag_taxonomy.py` and `_config.py` hardcode sales concepts (`prospect`, `angle`, `persona`, `framework`) directly into the SDK core. This is the #1 thing that prevents domain-agnosticism. Every framework studied avoids this.
 
 ---
 
@@ -342,7 +342,7 @@ Context A (Sales)          Context B (Recruiting)
     └──────────────────────────────────┘
 ```
 
-**Key insights for AIOS Brain:**
+**Key insights for Gradata:**
 
 1. **Events are typed but the store is generic.** The event store doesn't know what `ProspectCreated` means. It stores `{type: "ProspectCreated", data: {...}, context: "sales"}`. This is exactly what `_events.py` should do -- but currently our event types are hardcoded.
 
@@ -350,10 +350,10 @@ Context A (Sales)          Context B (Recruiting)
 
 3. **Multi-tenancy via context isolation.** Axon Server EE creates separate storage per context. Each context gets its own event stream, its own projections, its own aggregate roots. The server infrastructure is shared; the data is isolated.
 
-**Direct mapping to AIOS Brain:**
-| ES Concept | AIOS Brain Equivalent |
+**Direct mapping to Gradata:**
+| ES Concept | Gradata Equivalent |
 |-----------|----------------------|
-| Bounded Context | Domain package (e.g., `aios-brain-sales`) |
+| Bounded Context | Domain package (e.g., `gradata-sales`) |
 | Event Type | `event_type` in `_events.py` |
 | Aggregate Root | Brain instance |
 | Event Store | `system.db` events table |
@@ -386,8 +386,8 @@ Context A (Sales)          Context B (Recruiting)
 3. **API surface control** -- extensions can only call the public API. No DOM access, no internal state. The core is completely protected from plugin misbehavior.
 4. **Manifest-driven discovery** -- `package.json` declares capabilities. No runtime introspection needed.
 
-**Direct mapping to AIOS Brain:**
-| VS Code Concept | AIOS Brain Equivalent |
+**Direct mapping to Gradata:**
+| VS Code Concept | Gradata Equivalent |
 |----------------|----------------------|
 | package.json contributes | `brain.manifest.json` domain section |
 | Contribution points | Tag prefixes, event types, entity schemas |
@@ -432,41 +432,41 @@ This is the simplest domain-agnostic pattern: the core emits named events at key
 ### Pattern 1: Generic Core, Typed Boundaries
 **Used by:** PydanticAI, LangGraph, Atomic Agents
 **How:** Core engine is parameterized by type variables (`Agent[DepsType, OutputType]`). Domain types are defined outside the core and injected.
-**Apply to AIOS Brain:** Make `Brain` generic over a `DomainConfig` type. `Brain[SalesConfig]` vs `Brain[RecruitingConfig]`.
+**Apply to Gradata:** Make `Brain` generic over a `DomainConfig` type. `Brain[SalesConfig]` vs `Brain[RecruitingConfig]`.
 
 ### Pattern 2: YAML/JSON Declarative Domain Config
 **Used by:** CrewAI, Google ADK
 **How:** Domain roles, goals, tools, and vocabulary live in config files. Core reads them at runtime.
-**Apply to AIOS Brain:** Move taxonomy, entity types, and event vocabularies to a `domain.yaml` file loaded at brain init.
+**Apply to Gradata:** Move taxonomy, entity types, and event vocabularies to a `domain.yaml` file loaded at brain init.
 
 ### Pattern 3: Plugin Registry with Entry Points
 **Used by:** Semantic Kernel, VS Code, pytest (via pluggy)
 **How:** Domain packages register via entry points / contribution points. Core discovers and loads them.
-**Apply to AIOS Brain:** `pip install aios-brain-sales` registers via `pyproject.toml` entry point. Core discovers domain config, taxonomy, tools.
+**Apply to Gradata:** `pip install gradata-sales` registers via `pyproject.toml` entry point. Core discovers domain config, taxonomy, tools.
 
 ### Pattern 4: Dependency Injection for Domain Services
 **Used by:** PydanticAI (`RunContext[DepsType]`), Semantic Kernel (constructor injection)
 **How:** Domain-specific services (CRM client, database, API keys) are injected at runtime, not imported at module level.
-**Apply to AIOS Brain:** Replace direct imports of domain services with a DI container passed through the pipeline.
+**Apply to Gradata:** Replace direct imports of domain services with a DI container passed through the pipeline.
 
 ### Pattern 5: Schema-Driven Entity Definitions
 **Used by:** Atomic Agents, PydanticAI, LangGraph
 **How:** Entities (prospect, candidate, customer) are Pydantic BaseModel subclasses. The core only knows about BaseModel.
-**Apply to AIOS Brain:** Define a `DomainEntity` protocol. Sales domain provides `Prospect(DomainEntity)`. Recruiting provides `Candidate(DomainEntity)`. Core references `DomainEntity` only.
+**Apply to Gradata:** Define a `DomainEntity` protocol. Sales domain provides `Prospect(DomainEntity)`. Recruiting provides `Candidate(DomainEntity)`. Core references `DomainEntity` only.
 
 ### Pattern 6: Progressive Disclosure for Domain Knowledge
 **Used by:** Semantic Kernel Agent Skills
 **How:** Advertise capabilities cheaply (name + description). Load full instructions only on demand.
-**Apply to AIOS Brain:** `brain.manifest.json` advertises domain capabilities. Full domain knowledge loads into context only when relevant query hits.
+**Apply to Gradata:** `brain.manifest.json` advertises domain capabilities. Full domain knowledge loads into context only when relevant query hits.
 
 ### Pattern 7: Bounded Context Event Isolation
 **Used by:** Axon Framework, EventStoreDB
 **How:** Each domain gets its own event types, its own aggregate roots, its own projections. The infrastructure is shared.
-**Apply to AIOS Brain:** Events table adds a `domain` column. Each domain package declares its own event types. Core event bus routes by domain.
+**Apply to Gradata:** Events table adds a `domain` column. Each domain package declares its own event types. Core event bus routes by domain.
 
 ---
 
-## What AIOS Brain Must Change
+## What Gradata Must Change
 
 ### Current State (Hardcoded Sales Domain)
 
@@ -483,20 +483,20 @@ These files embed sales concepts directly in the SDK core:
 ### Target State (Domain-Agnostic Core)
 
 ```
-aios-brain/                          # Core SDK (domain-agnostic)
+gradata/                          # Core SDK (domain-agnostic)
   _events.py                         # Generic: emit(type, source, data, tags)
   _tag_taxonomy.py                   # Generic: load_taxonomy(domain_config)
   _config.py                         # Generic: BrainConfig(domain=DomainConfig)
   domain.py                          # DomainConfig protocol + registry
   patterns/                          # Generic execution patterns
 
-aios-brain-sales/                    # Domain package (pip installable)
+gradata-sales/                    # Domain package (pip installable)
   domain.yaml                        # Tag taxonomy, entity types, event types
   entities.py                        # Prospect, Deal, Company models
   tools.py                           # CRM tools, enrichment tools
   validators.py                      # Sales-specific validation rules
 
-aios-brain-recruiting/               # Another domain package
+gradata-recruiting/               # Another domain package
   domain.yaml
   entities.py                        # Candidate, Position, Interview models
   tools.py
@@ -587,10 +587,10 @@ file_types:
 - brain.manifest.json gets `domain` field
 
 **Phase 3: Package** (1 session)
-- Extract sales config into `aios-brain-sales` package
+- Extract sales config into `gradata-sales` package
 - Register via entry_points in pyproject.toml
 - Core discovers installed domain packages
-- `pip install aios-brain && pip install aios-brain-sales` = current behavior
+- `pip install gradata && pip install gradata-sales` = current behavior
 
 ---
 

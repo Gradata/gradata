@@ -5,3 +5,12 @@ __pycache__/
 dist/
 build/
 .vectorstore/
+
+# Sensitive files — never commit to public repo
+system.db
+brain.manifest.json
+*.db
+SPEC.md
+AUDIT.md
+GATE0-PROOF.md
+.planning/

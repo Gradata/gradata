@@ -1,5 +1,5 @@
 """
-Integration tests for the AIOS Brain SDK.
+Integration tests for the Gradata.
 
 Each test creates an isolated brain in a temp directory to verify that the SDK
 works correctly for any new user — not just Oliver's environment.
@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from aios_brain import Brain
+from gradata import Brain
 
 
 # ---------------------------------------------------------------------------
@@ -38,13 +38,13 @@ def _init_brain(tmp_path: Path, name: str = "TestBrain", domain: str = "Testing"
         interactive=False,
     )
     # SDK modules import path variables at module level (e.g.
-    # ``from aios_brain._paths import DB_PATH``).  Brain.__init__ calls
+    # ``from gradata._paths import DB_PATH``).  Brain.__init__ calls
     # set_brain_dir() which updates _paths globals, but any module that
     # already imported those names holds stale references.  Force the
     # dependent modules to re-read the current values.
-    import aios_brain._paths as _p
-    import aios_brain._events as _ev
-    import aios_brain._brain_manifest as _bm
+    import gradata._paths as _p
+    import gradata._events as _ev
+    import gradata._brain_manifest as _bm
     _ev.BRAIN_DIR = _p.BRAIN_DIR
     _ev.EVENTS_JSONL = _p.EVENTS_JSONL
     _ev.DB_PATH = _p.DB_PATH
@@ -54,7 +54,7 @@ def _init_brain(tmp_path: Path, name: str = "TestBrain", domain: str = "Testing"
     _bm.WORKING_DIR = _p.WORKING_DIR
     _bm.MANIFEST_PATH = _p.BRAIN_DIR / "brain.manifest.json"
     # Export module also caches paths and derived vars at module level
-    import aios_brain._export_brain as _ex
+    import gradata._export_brain as _ex
     _ex.BRAIN_DIR = _p.BRAIN_DIR
     _ex.WORKING_DIR = _p.WORKING_DIR
     _ex.PROSPECTS_DIR = _p.PROSPECTS_DIR
@@ -73,12 +73,12 @@ def _init_brain(tmp_path: Path, name: str = "TestBrain", domain: str = "Testing"
     _ex.CARL_LOOP = _p.CARL_DIR / "loop"
     _ex.CARL_GLOBAL = _p.CARL_DIR / "global"
     # Query module caches DB_PATH / BRAIN_DIR
-    import aios_brain._query as _q
+    import gradata._query as _q
     _q.DB_PATH = _p.DB_PATH
     _q.BRAIN_DIR = _p.BRAIN_DIR
     # ChromaDB removed S66 — no CHROMA_DIR needed in _query
     # Tag taxonomy caches PROSPECTS_DIR
-    import aios_brain._tag_taxonomy as _tt
+    import gradata._tag_taxonomy as _tt
     _tt.PROSPECTS_DIR = _p.PROSPECTS_DIR
     return brain
 
@@ -237,7 +237,7 @@ class TestSearch:
         )
 
         # Rebuild FTS5 index
-        from aios_brain._query import fts_rebuild
+        from gradata._query import fts_rebuild
         count = fts_rebuild()
         assert count >= 1, f"FTS rebuild indexed 0 documents (expected >= 1)"
 
@@ -312,7 +312,7 @@ class TestValidator:
         brain.manifest()
 
         # Validate
-        from aios_brain._brain_manifest import validate_manifest
+        from gradata._brain_manifest import validate_manifest
         issues = validate_manifest()
 
         assert isinstance(issues, list)
@@ -325,7 +325,7 @@ class TestValidator:
         # Delete the manifest that onboard created
         brain.manifest_path.unlink()
 
-        from aios_brain._brain_manifest import validate_manifest
+        from gradata._brain_manifest import validate_manifest
         issues = validate_manifest()
 
         assert len(issues) > 0

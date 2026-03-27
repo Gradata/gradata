@@ -8,7 +8,7 @@
 ## Install
 
 ```bash
-pip install aios-brain
+pip install gradata
 ```
 
 This installs the core SDK with zero external dependencies. All base patterns, the event system, and the graduation pipeline work out of the box using only Python's standard library and SQLite.
@@ -19,20 +19,20 @@ For embedding and semantic search features, install extras:
 
 ```bash
 # Local embeddings (sentence-transformers)
-pip install aios-brain[embeddings]
+pip install gradata[embeddings]
 
 # Google Gemini embeddings
-pip install aios-brain[gemini]
+pip install gradata[gemini]
 
 # Everything
-pip install aios-brain[all]
+pip install gradata[all]
 ```
 
 ## Development Install
 
 ```bash
-git clone https://github.com/sprites-ai/aios-brain.git
-cd aios-brain
+git clone https://github.com/gradata-systems/gradata.git
+cd gradata
 pip install -e ".[dev]"
 ```
 
@@ -41,13 +41,13 @@ The `dev` extra includes pytest, hypothesis, pyright, bandit, and coverage.
 ## Verify Installation
 
 ```bash
-aios-brain --help
+gradata --help
 ```
 
 Or from Python:
 
 ```python
-from aios_brain import Brain
+from gradata import Brain
 
 brain = Brain.init("./test-brain")
 print(brain)  # Brain('./test-brain')

@@ -13,13 +13,13 @@
  */
 
 // Skip in reviewer terminal — reviewer's review agents don't graduate in the work brain
-if (process.env.AIOS_ROLE === 'reviewer') { process.exit(0); }
+if (process.env.GRADATA_ROLE === 'reviewer') { process.exit(0); }
 
-const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
 const cfg = require('./config.js');
+const { execSafe } = cfg;
 const PYTHON = cfg.PYTHON;
 const SCRIPT = path.join(cfg.SCRIPTS, 'record_agent_outcome.py');
 
@@ -99,7 +99,7 @@ try {
     `--session ${session}`,
   ].join(' ');
 
-  execSync(cmd, {
+  execSafe(cmd, {
     timeout: 10000,
     stdio: ['pipe', 'pipe', 'pipe'],
   });

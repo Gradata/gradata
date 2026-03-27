@@ -15,9 +15,10 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync, spawn } = require('child_process');
+const { spawn } = require('child_process');
+const { execSafe } = require('./config.js');
 
-const PID_FILE = path.join(os.tmpdir(), 'aios-cache-warmer.pid');
+const PID_FILE = path.join(os.tmpdir(), 'gradata-cache-warmer.pid');
 
 // When called without --worker, spawn a detached child and exit immediately
 if (!process.argv.includes('--worker')) {
@@ -46,14 +47,14 @@ process.on('exit', () => { try { fs.unlinkSync(PID_FILE); } catch {} });
 
 const INTERVAL_MS = 60_000;       // 60 seconds
 const MAX_RUNTIME_MS = 4 * 60 * 60 * 1000; // 4 hours
-const PIPEDRIVE_CACHE = path.join(os.tmpdir(), 'aios-pipedrive-cache.json');
-const BRAIN_SCORES_CACHE = path.join(os.tmpdir(), 'aios-brain-scores-cache.json');
+const PIPEDRIVE_CACHE = path.join(os.tmpdir(), 'gradata-pipedrive-cache.json');
+const BRAIN_SCORES_CACHE = path.join(os.tmpdir(), 'gradata-brain-scores-cache.json');
 
 const startTime = Date.now();
 
 function refreshPipedrive() {
   try {
-    const result = execSync(
+    const result = execSafe(
       'python "C:/Users/olive/SpritesWork/brain/scripts/api_sync.py" pipedrive --json',
       { timeout: 15000, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
     );
@@ -64,7 +65,7 @@ function refreshPipedrive() {
 
 function refreshBrainScores() {
   try {
-    const result = execSync(
+    const result = execSafe(
       'python "C:/Users/olive/SpritesWork/brain/scripts/brain_scores_cli.py" --json',
       { timeout: 10000, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
     );

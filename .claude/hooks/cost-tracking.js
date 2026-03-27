@@ -7,9 +7,8 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
-
 const cfg = require('./config.js');
+const { execSafe } = cfg;
 const BRAIN_PATH = cfg.BRAIN_DIR;
 const COST_FILE = path.join(BRAIN_PATH, 'metrics', 'cost.jsonl');
 const PYTHON = cfg.PYTHON;
@@ -57,7 +56,7 @@ try {
   // Emit COST_EVENT via events.py CLI
   const entryStr = JSON.stringify(entry);
   try {
-    execSync(
+    execSafe(
       `"${PYTHON}" "${BRAIN_PATH}/scripts/events.py" emit COST_EVENT hook:cost-tracking '${entryStr}'`,
       { timeout: 3000, stdio: 'ignore' }
     );

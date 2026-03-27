@@ -8,16 +8,15 @@
  *   4. API Delta Sync
  * All run silently — failures never block startup.
  */
-const { execSync } = require('child_process');
-
 const cfg = require('./config.js');
+const { execSafe } = cfg;
 const PYTHON = cfg.PYTHON;
 const BRAIN = cfg.BRAIN_DIR;
 const SCRIPTS = cfg.SCRIPTS;
 
 // 1. Emit HEALTH_CHECK event — proves event pipeline works this session
 try {
-  execSync(
+  execSafe(
     `"${PYTHON}" "${SCRIPTS}/events.py" emit HEALTH_CHECK "hook:session-init" "{\\"status\\":\\"ok\\",\\"hook\\":\\"session-init-data\\"}" "[\\"system:startup\\"]"`,
     { timeout: 5000, stdio: 'ignore' }
   );
@@ -27,7 +26,7 @@ try {
 
 // 2. Snapshot: ensure at least one daily_metrics row
 try {
-  execSync(
+  execSafe(
     `"${PYTHON}" "${BRAIN}/scripts/snapshot.py" save-minimal --session 0`,
     { timeout: 8000, stdio: 'ignore' }
   );
@@ -37,7 +36,7 @@ try {
 
 // 3. Materialize Follow-Up Tracker
 try {
-  execSync(
+  execSafe(
     `"${PYTHON}" "${BRAIN}/scripts/materialize_tracker.py" --write`,
     { timeout: 8000, stdio: 'ignore' }
   );
@@ -49,7 +48,7 @@ try {
 // Only runs if .env has API keys configured. Skips missing sources silently.
 // Timeout 30s — network calls to 5 APIs.
 try {
-  execSync(
+  execSafe(
     `"${PYTHON}" "${BRAIN}/scripts/api_sync.py" sync --quiet`,
     { timeout: 30000, stdio: 'ignore' }
   );
@@ -59,7 +58,7 @@ try {
 
 // 5. Auto-compute deal health after sync (uses fresh Pipedrive data)
 try {
-  execSync(
+  execSafe(
     `"${PYTHON}" "${BRAIN}/scripts/deal_calibration.py" --quiet`,
     { timeout: 8000, stdio: 'ignore' }
   );

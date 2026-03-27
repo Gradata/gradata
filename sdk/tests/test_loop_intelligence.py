@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from aios_brain.enhancements.loop_intelligence import (
+from gradata.enhancements.loop_intelligence import (
     aggregate_by_key,
     confidence_label,
     detect_manual,
@@ -274,16 +274,16 @@ class TestUpdatePatternsFile:
 class TestRegistries:
     def test_register_activity_types(self):
         register_activity_types("webinar", "podcast")
-        from aios_brain.enhancements.loop_intelligence import _ACTIVITY_TYPES
+        from gradata.enhancements.loop_intelligence import _ACTIVITY_TYPES
         assert "webinar" in _ACTIVITY_TYPES
         assert "podcast" in _ACTIVITY_TYPES
 
     def test_register_prep_types(self):
         register_prep_types("presentation", "proposal")
-        from aios_brain.enhancements.loop_intelligence import _PREP_TYPES
+        from gradata.enhancements.loop_intelligence import _PREP_TYPES
         assert "presentation" in _PREP_TYPES
 
     def test_register_positive_outcomes(self):
         register_outcomes("referral", positive=True)
-        from aios_brain.enhancements.loop_intelligence import _POSITIVE_OUTCOMES
+        from gradata.enhancements.loop_intelligence import _POSITIVE_OUTCOMES
         assert "referral" in _POSITIVE_OUTCOMES

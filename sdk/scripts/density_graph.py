@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-density_graph.py — Correction density analysis for AIOS Brain SDK.
+density_graph.py — Correction density analysis for Gradata.
 
 Reads from system.db, computes correction density per session,
 outputs CSV and ASCII chart. Zero external dependencies (pure stdlib).
@@ -306,7 +306,7 @@ def main(argv: list[str] | None = None) -> None:
 
     # Print report
     print("=" * 70)
-    print(f"  AIOS Brain SDK — Correction Density Report")
+    print(f"  Gradata — Correction Density Report")
     print(f"  Database: {db_path}")
     print(f"  Track: {track_label}")
     print("=" * 70)

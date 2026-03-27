@@ -97,3 +97,9 @@
 [2026-03-25] [INSTINCT:0.30] VERIFICATION: Never declare work "ready" or "done" without running a verification step. In S67, I was about to say MkDocs was GitHub-ready. Oliver asked "Are you sure?" and the code review found 15 inaccuracies. Root cause: completion bias — wanting to report progress instead of verifying quality.
 
 [2026-03-25] [INSTINCT:0.30] IP_PROTECTION: Public-facing docs should sell outcomes, not expose mechanisms. Oliver caught that "graduate" language in docs hands competitors the architecture. Docs should say "your AI gets better" not "corrections promote through INSTINCT to PATTERN to RULE at +0.10 per session." Root cause: engineering mindset (explain how it works) vs product mindset (explain what it does).
+
+[2026-03-26] [INSTINCT:0.30] ICP_BREADTH: Don't filter ICP too narrowly on strict ecom/DTC. Include anyone managing paid ads with execution bandwidth pain: fractional CMOs, growth marketers, agency owners, solo founders. The signal is hands-on paid media management, not industry vertical. Root cause: over-indexing on closed-won patterns instead of the underlying pain point.
+
+[2026-03-26] [INSTINCT:0.30] LEAD_LIST_OVERLAP: Output lead lists should overlap, not be mutually exclusive. Call list = everyone with a phone (even if also has email). Email list = everyone with email. Oliver wants to both email AND call the same person. Root cause: assuming channels are either/or when they're both/and.
+
+[2026-03-26] [INSTINCT:0.30] SCRAPE_FIRST: Full-profile scrape then ICP filter beats headline-filter then scrape. Headlines miss 40%+ of ICP leads whose About/Experience/Skills reveal relevance. Worth extra Apify cost. Root cause: premature optimization on API costs instead of lead quality.

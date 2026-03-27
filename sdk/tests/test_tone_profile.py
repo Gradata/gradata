@@ -1,6 +1,6 @@
 """Tests for tone profile extraction, diffing, and graduation."""
 import pytest
-from aios_brain.enhancements.tone_profile import (
+from gradata.enhancements.tone_profile import (
     ToneFeatures,
     ToneProfile,
     ToneDiff,

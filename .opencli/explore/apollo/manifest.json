@@ -1,0 +1,16 @@
+{
+  "site": "apollo",
+  "target_url": "https://app.apollo.io",
+  "final_url": "https://app.apollo.io/#/home",
+  "title": "Home - Apollo",
+  "framework": {
+    "nextjs": false,
+    "nuxt": false,
+    "react": false,
+    "vue2": false,
+    "vue3": false
+  },
+  "stores": [],
+  "top_strategy": "public",
+  "explored_at": "2026-03-25T23:22:59.592Z"
+}

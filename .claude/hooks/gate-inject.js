@@ -68,7 +68,7 @@ for (const intent of intents) {
   if (!matched) continue;
 
   // ── Already injected this intent this session? ──
-  const marker = path.join(os.tmpdir(), 'aios-gate-' + intent.id + '.marker');
+  const marker = path.join(os.tmpdir(), 'gradata-gate-' + intent.id + '.marker');
   if (fs.existsSync(marker)) {
     process.exit(0);
   }

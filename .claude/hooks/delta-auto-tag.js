@@ -11,11 +11,10 @@
  */
 
 // Skip in reviewer terminal — reviewer actions are not prospect activities
-if (process.env.AIOS_ROLE === 'reviewer') { process.exit(0); }
-
-const { execSync } = require("child_process");
+if (process.env.GRADATA_ROLE === 'reviewer') { process.exit(0); }
 
 const cfg = require('./config.js');
+const { execSafe } = cfg;
 const DELTA_SCRIPT = require("path").join(cfg.SCRIPTS, "delta_tag.py");
 const PYTHON = cfg.PYTHON;
 
@@ -199,7 +198,7 @@ function checkAgentOutputEdit(toolName, toolInput) {
       `"import sys; sys.path.insert(0, r'${cfg.SCRIPTS}'); from spawn import log_human_judgment; log_human_judgment('${taskId.replace(/'/g, "")}', '${agentName.replace(/'/g, "")}', accepted=True, edited=True)"`,
     ].join(" ");
 
-    execSync(pyCmd, { timeout: 5000, stdio: "ignore" });
+    execSafe(pyCmd, { timeout: 5000, stdio: "ignore" });
   } catch {
     // Silent
   }
@@ -246,7 +245,7 @@ function main() {
   ].join(" ");
 
   try {
-    execSync(cmd, { timeout: 5000, stdio: "ignore" });
+    execSafe(cmd, { timeout: 5000, stdio: "ignore" });
   } catch {
     // Silent failure -- never break the tool chain
   }

@@ -1,5 +1,5 @@
 """Tests for call profile — behavioral graduation from call transcripts."""
-from aios_brain.enhancements.call_profile import (
+from gradata.enhancements.call_profile import (
     Utterance,
     CallFeatures,
     CallOutcome,

@@ -23,7 +23,7 @@ CONFIRM → PREVIEW → AUTO
 1. **Agent produces output** -- logged as an event with the agent's ID.
 2. **Human reviews** -- accepts, edits, or rejects the output.
 3. **Correction tracked** -- if edited, the correction is recorded against the agent's profile.
-4. **Confidence updated** -- same +0.10/-0.15 scoring as lesson graduation.
+4. **Confidence updated** -- corrections lower confidence, accepted outputs raise it.
 5. **Tier promotion** -- when confidence crosses threshold, agent moves to next tier.
 
 ## Upward Distillation

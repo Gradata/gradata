@@ -1,7 +1,7 @@
-site_name: AIOS Brain SDK
+site_name: Gradata
 site_description: AI behavioral adaptation engine. Corrections graduate into rules.
-repo_url: https://github.com/gradata/aios-brain
-repo_name: gradata/aios-brain
+repo_url: https://github.com/gradata-systems/gradata
+repo_name: gradata-systems/gradata
 
 theme:
   name: material

@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "aios-brain"
+name = "gradata"
 version = "0.1.0"
 description = "Personal AI Brain SDK — build, train, and share AI brains that compound knowledge over time"
 readme = "README.md"
@@ -39,14 +39,14 @@ dev = [
 ]
 
 [project.scripts]
-aios-brain = "aios_brain.cli:main"
+gradata = "gradata.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/gradata/aios-brain"
-Documentation = "https://github.com/gradata/aios-brain#readme"
+Homepage = "https://github.com/gradata-systems/gradata"
+Documentation = "https://github.com/gradata-systems/gradata#readme"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/aios_brain"]
+packages = ["src/gradata"]
 
 # --- Ruff (linter + formatter) ---
 [tool.ruff]
@@ -72,7 +72,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["aios_brain"]
+known-first-party = ["gradata"]
 
 # --- Pyright (type checker) ---
 [tool.pyright]

@@ -10,10 +10,10 @@
  * Silent on failure -- never break the tool chain.
  */
 
-const { execSync } = require("child_process");
 const fs = require("fs");
 
 const cfg = require('./config.js');
+const { execSafe } = cfg;
 const PYTHON = cfg.PYTHON;
 
 function readStdin() {
@@ -76,7 +76,7 @@ function main() {
   ].join("; ");
 
   try {
-    execSync('"' + PYTHON + '" -c "' + pyCode + '"', { timeout: 5000, stdio: "ignore" });
+    execSafe('"' + PYTHON + '" -c "' + pyCode + '"', { timeout: 5000, stdio: "ignore" });
   } catch {
     // Silent failure -- never break the tool chain
   }

@@ -1,6 +1,6 @@
 """Tests for judgment decay and rules distillation."""
 import pytest
-from aios_brain.enhancements.judgment_decay import (
+from gradata.enhancements.judgment_decay import (
     compute_decay,
     compute_batch_decay,
     DecayResult,
@@ -13,13 +13,13 @@ from aios_brain.enhancements.judgment_decay import (
     is_category_testable,
     CATEGORY_SESSION_TYPES,
 )
-from aios_brain.enhancements.rules_distillation import (
+from gradata.enhancements.rules_distillation import (
     find_distillation_candidates,
     format_proposals,
     LessonEntry,
     DistillationProposal,
 )
-from aios_brain.enhancements.self_improvement import Lesson, LessonState
+from gradata.enhancements.self_improvement import Lesson, LessonState
 
 
 # ---------------------------------------------------------------------------

@@ -8,8 +8,8 @@
  * Novel signal source — neither Mem0 nor Letta captures this.
  */
 
-const { execSync } = require('child_process');
 const fs = require('fs');
+const { execSafe } = require('./config.js');
 
 // Read user prompt from stdin (Claude Code passes it as JSON)
 let input = '';
@@ -64,13 +64,16 @@ const snippet = text.slice(0, 100).replace(/["\\\n]/g, ' ');
 
 // Log event to brain
 try {
-  execSync(
-    `python "C:/Users/olive/SpritesWork/brain/scripts/events.py" ` +
-    `--type IMPLICIT_FEEDBACK --source implicit-feedback-hook ` +
-    `--data "{\\"signals\\": \\"${unique.join(',')}\\", \\"snippet\\": \\"${snippet}\\"}"`,
-    { timeout: 5000, stdio: 'ignore' }
-  );
+  const cfg2 = require('./config.js');
+  cfg2.spawnSafe(cfg2.PYTHON, [
+    'C:/Users/olive/SpritesWork/brain/scripts/events.py',
+    'emit', 'IMPLICIT_FEEDBACK', 'implicit-feedback-hook',
+    JSON.stringify({ signals: unique.join(','), snippet }),
+    ''
+  ], { timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf8' });
 } catch { /* best-effort */ }
 
-// Output for Claude to see
-console.log(`IMPLICIT FEEDBACK [${unique.join(', ')}]: Check if this signals a missed lesson.`);
+// Output for Claude to see (JSON protocol for dispatcher)
+process.stdout.write(JSON.stringify({
+  result: `IMPLICIT FEEDBACK [${unique.join(', ')}]: Check if this signals a missed lesson.`
+}));

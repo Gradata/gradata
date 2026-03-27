@@ -7,10 +7,10 @@
  * Silent on failure — never blocks user input.
  * Target: <5s latency, <1500 tokens output.
  */
-const { execSync } = require('child_process');
 const path = require('path');
 
 const cfg = require('./config.js');
+const { execSafe } = cfg;
 const PYTHON = cfg.PYTHON;
 const SCRIPTS = cfg.SCRIPTS;
 
@@ -52,7 +52,7 @@ for (const pat of skipPatterns) {
 }
 
 // Check for post-compaction snapshot (Audrey PostCompact pattern)
-const SNAPSHOT_FILE = path.join(require('os').tmpdir(), 'aios-compact-snapshot.json');
+const SNAPSHOT_FILE = path.join(require('os').tmpdir(), 'gradata-compact-snapshot.json');
 try {
   if (require('fs').existsSync(SNAPSHOT_FILE)) {
     const snap = JSON.parse(require('fs').readFileSync(SNAPSHOT_FILE, 'utf-8'));
@@ -82,7 +82,7 @@ try {
     .replace(/\n/g, ' ')
     .replace(/\r/g, '');
 
-  const result = execSync(
+  const result = execSafe(
     `"${PYTHON}" "${path.join(SCRIPTS, 'context_compile.py')}" --message "${safeMsg}"`,
     {
       timeout: 5000,

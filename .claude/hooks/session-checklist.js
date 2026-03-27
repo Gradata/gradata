@@ -6,9 +6,9 @@
  * Silent on failure — never blocks session close.
  */
 
-const { execSync } = require('child_process');
 const fs = require('fs');
 const cfg = require('./config.js');
+const { execSafe } = cfg;
 
 try {
   const input = fs.readFileSync(0, 'utf8');
@@ -18,7 +18,7 @@ try {
   const script = `${cfg.SCRIPTS}/session_checklist.py`;
   if (!fs.existsSync(script)) process.exit(0);
 
-  const result = execSync(
+  const result = execSafe(
     `"${cfg.PYTHON}" "${script}" --json`,
     { encoding: 'utf8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] }
   );

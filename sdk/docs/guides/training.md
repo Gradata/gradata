@@ -7,7 +7,7 @@ This guide walks through the full training workflow, from first session to gradu
 A session is a bounded unit of work. The brain tracks session numbers to measure correction density and pattern survival.
 
 ```python
-from aios_brain import Brain
+from gradata import Brain
 
 brain = Brain("./my-brain")
 session = 1  # Increment each session
@@ -94,7 +94,7 @@ Track these over time:
 - **Lessons graduated**: Total lessons that reached RULE status
 
 ```python
-from aios_brain.enhancements.metrics import compute_metrics
+from gradata.enhancements.metrics import compute_metrics
 
 metrics = compute_metrics(brain.db_path, window=20)
 ```

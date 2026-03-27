@@ -9,7 +9,6 @@
  * Lightweight: reads 2 files + 1 MCP call. Target <3s.
  */
 const fs = require('fs');
-const { execSync } = require('child_process');
 const cfg = require('./config.js');
 
 // Detect session number
@@ -47,7 +46,7 @@ const summary = `${sessionNum} [${sessionType}] ${handoff}`.trim().slice(0, 200)
 // The MCP server exposes set_summary tool — we call it indirectly by writing
 // a marker file that context-inject.js can pick up to prompt Claude to call it
 try {
-  const markerPath = require('path').join(require('os').tmpdir(), 'aios-peer-summary.txt');
+  const markerPath = require('path').join(require('os').tmpdir(), 'gradata-peer-summary.txt');
   fs.writeFileSync(markerPath, summary);
 } catch (e) { /* silent */ }
 

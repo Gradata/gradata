@@ -7,7 +7,7 @@ The cloud client handles all communication with Gradata Cloud.
 ### Constructor
 
 ```python
-from aios_brain.cloud import CloudClient
+from gradata.cloud import CloudClient
 
 client = CloudClient(
     brain_dir="./my-brain",
@@ -83,7 +83,7 @@ status = client.marketplace_status()
 Configuration management with 4-layer cascade.
 
 ```python
-from aios_brain.cloud.config import CloudConfig
+from gradata.cloud.config import CloudConfig
 
 # Load config (merges all sources)
 config = CloudConfig.load(brain_dir="./my-brain")

@@ -50,7 +50,7 @@ SAFETY_FILE=.carl/safety
 SAFETY_PRIORITY=CRITICAL
 
 # ============================================================================
-# GLOBAL - AIOS universal rules (always loaded from .carl/global)
+# GLOBAL - Gradata universal rules (always loaded from .carl/global)
 # ============================================================================
 GLOBAL_STATE=active
 GLOBAL_ALWAYS_ON=true

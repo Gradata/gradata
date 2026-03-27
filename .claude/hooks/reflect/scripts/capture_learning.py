@@ -10,7 +10,7 @@ import os
 import json
 
 # Skip in reviewer terminal — reviewer corrections are not training data
-if os.environ.get("AIOS_ROLE") == "reviewer":
+if os.environ.get("GRADATA_ROLE") == "reviewer":
     sys.exit(0)
 
 # Fix Windows encoding for emoji output

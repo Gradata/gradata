@@ -1,5 +1,5 @@
 """
-AIOS Brain SDK — Quickstart Example
+Gradata — Quickstart Example
 ====================================
 Creates a brain, logs outputs, records corrections, and shows
 how the brain learns from feedback over time.
@@ -7,7 +7,7 @@ how the brain learns from feedback over time.
 Run:  python examples/quickstart.py
 """
 
-from aios_brain import Brain
+from gradata import Brain
 
 # 1. Create a new brain
 brain = Brain.init("./my-brain", domain="Sales", name="Demo Brain")

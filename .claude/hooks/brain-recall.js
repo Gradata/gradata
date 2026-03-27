@@ -8,12 +8,12 @@
  *
  * Runs fast (FTS5 keyword, no API calls) — <200ms typical.
  */
-const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
 const cfg = require('./config.js');
+const { execSafe } = cfg;
 const PYTHON = cfg.PYTHON;
 const SCRIPTS = cfg.SCRIPTS;
 
@@ -65,7 +65,7 @@ for r in results[:3]:
 `);
 
 try {
-  const output = execSync(
+  const output = execSafe(
     `"${PYTHON}" "${tmpScript}"`,
     { timeout: 5000, encoding: 'utf8' }
   ).trim();

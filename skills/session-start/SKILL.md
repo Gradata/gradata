@@ -194,9 +194,65 @@ Load these ONLY when the task requires them. Do not preload.
 **Intent:** Oliver wants something designed: a one-pager, PDF, landing page, presentation slide, champion deck, visual asset, leave-behind, or any output where layout, typography, and visual polish matter. Triggers on: "design", "one-pager", "PDF", "layout", "make it look good", "visual", "leave-behind", "deck", "slide", "branded", "polished".
 **Load:** The ui-ux-pro-max plugin auto-activates. Run `python3 .claude/skills/ui-ux-pro-max/scripts/search.py "[industry/context]" --design-system` to get industry-appropriate design system (colors, fonts, styles) before building. Apply the design system output to the visual asset.
 
+### Prompt engineering / writing prompts for other AI tools
+**Intent:** Oliver wants to create, optimize, fix, or adapt a prompt for any AI tool — Cursor, Midjourney, ChatGPT, Copilot, DALL-E, v0, Bolt, Devin, Stable Diffusion, or any other. Triggers on: "write a prompt", "prompt for", "optimize this prompt", "make a prompt", "Cursor prompt", "Midjourney prompt", "image prompt", "agent prompt", "fix this prompt", "improve this prompt".
+**Load:** skills/prompt-master/SKILL.md
+
 ### Problem-solving / debugging / stuck
 **Intent:** Oliver is stuck, debugging, asks "why isn't this working", "figure out", "is this possible", "how do I", or presents a problem requiring research and iteration rather than a simple lookup.
 **Load:** skills/fitfo/SKILL.md
+
+### Deep fix / whole module broken
+**Intent:** An entire feature or module is broken end-to-end, not a single bug. Dependency tracing needed. "The whole auth is broken", "nothing works in X", "trace what's breaking".
+**Load:** skills/focused-fix/SKILL.md
+
+### Agent design / multi-agent workflow
+**Intent:** Designing how agents should coordinate, choosing orchestration patterns, scaffolding agent workflows. "How should agents work together", "which pattern", "design the agent pipeline".
+**Load:** skills/agent-workflow-designer/SKILL.md
+
+### Spec writing / requirements
+**Intent:** Writing specifications before code, acceptance criteria, functional requirements. "Write a spec", "requirements doc", "what should this do before we build it".
+**Load:** skills/spec-driven-workflow/SKILL.md
+
+### PR review / merge review
+**Intent:** Reviewing a pull request for blast radius, breaking changes, security, test coverage. "Review this PR", "what could break if we merge", "PR review".
+**Load:** skills/pr-review-expert/SKILL.md
+
+### Code quality / code audit
+**Intent:** Scanning code for quality issues, complexity, SOLID violations, secrets, dead code. "Scan the codebase", "code quality check", "audit this code".
+**Load:** skills/code-reviewer-team/SKILL.md
+
+### Memory curation / self-improvement
+**Intent:** Reviewing, pruning, promoting memory entries. Curating MEMORY.md. "Clean up memories", "review memory", "promote patterns".
+**Load:** skills/self-improving-agent/SKILL.md
+
+### MCP server building
+**Intent:** Building MCP tool servers from APIs or OpenAPI specs. "Build an MCP server", "expose this as MCP", "convert OpenAPI to MCP".
+**Load:** skills/mcp-server-builder/SKILL.md
+
+### Dependency audit / license check
+**Intent:** Scanning dependencies for vulnerabilities, license compliance, outdated packages. "Audit dependencies", "check licenses", "CVE scan".
+**Load:** skills/dependency-auditor/SKILL.md
+
+### Release management / versioning
+**Intent:** Cutting releases, semantic versioning, changelogs, rollback planning. "Prepare a release", "bump version", "write changelog".
+**Load:** skills/release-manager/SKILL.md
+
+### Tech debt tracking
+**Intent:** Identifying, scoring, and prioritizing technical debt. "What's our tech debt", "code rot", "what needs refactoring".
+**Load:** skills/tech-debt-tracker/SKILL.md
+
+### Competitive teardown
+**Intent:** Structured competitive analysis with scoring, feature matrices, positioning maps. "Compare us to X", "competitive teardown", "how do we stack up against".
+**Load:** skills/competitive-teardown/SKILL.md
+
+### Experiment design
+**Intent:** Designing valid experiments with hypotheses, sample sizes, stopping rules. "Design an experiment", "hypothesis", "A/B test plan".
+**Load:** skills/experiment-designer/SKILL.md
+
+### Product discovery
+**Intent:** Validating product ideas before building. Opportunity solution trees, assumption mapping, discovery sprints. "Should we build X", "validate this idea", "product discovery".
+**Load:** skills/product-discovery/SKILL.md
 
 ### General rule
 If the task spans multiple intents (e.g., "prep for Tim's demo and draft the follow-up for Hassan"), load context for ALL relevant intents. When in doubt about whether to load something, load it — a few extra thousand tokens is cheaper than missing context and producing bad output.

@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const PROFILE = process.env.AIOS_HOOK_PROFILE || 'standard';
+const PROFILE = process.env.GRADATA_HOOK_PROFILE || 'standard';
 if (PROFILE === 'minimal') process.exit(0);
 
 const cfg = require('./config.js');

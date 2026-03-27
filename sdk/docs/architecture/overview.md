@@ -101,7 +101,7 @@ my-brain/
 The SDK exposes brain tools via the Model Context Protocol (MCP), so any MCP-compatible host can use the brain:
 
 ```bash
-python -m aios_brain.mcp_server --brain-dir ./my-brain
+python -m gradata.mcp_server --brain-dir ./my-brain
 ```
 
 See [MCP Integration Guide](../guides/mcp.md) for details.

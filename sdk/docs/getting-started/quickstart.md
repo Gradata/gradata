@@ -5,7 +5,7 @@ Get a brain learning from your corrections in under 5 minutes.
 ## 1. Create a Brain
 
 ```python
-from aios_brain import Brain
+from gradata import Brain
 
 brain = Brain.init("./my-brain", domain="Sales", name="My Brain")
 ```
@@ -13,7 +13,7 @@ brain = Brain.init("./my-brain", domain="Sales", name="My Brain")
 Or from the CLI:
 
 ```bash
-aios-brain init ./my-brain --domain Sales
+gradata init ./my-brain --domain Sales
 ```
 
 ## 2. Log an AI Output

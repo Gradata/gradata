@@ -9,12 +9,12 @@
  * even if the wrap-up skill gets skipped or rushed.
  * Silent on failure — never blocks session end.
  */
-const { execSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
 const cfg = require('./config.js');
+const { execSafe } = cfg;
 const PYTHON = cfg.PYTHON;
 const BRAIN = cfg.BRAIN_DIR;
 const SCRIPTS = cfg.SCRIPTS;
@@ -30,13 +30,13 @@ try {
 const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
 // --- Check wrap-up-completed marker (P1-5 guard) ---
-const markerPath = path.join(os.tmpdir(), `aios-wrapup-done-S${sessionNum}.marker`);
+const markerPath = path.join(os.tmpdir(), `gradata-wrapup-done-S${sessionNum}.marker`);
 const wrapUpAlreadyRan = sessionNum > 0 && fs.existsSync(markerPath);
 
 // --- 0. Emit SESSION_END event --- guarantees every session shows in event log
 try {
   const data = JSON.stringify({ session: sessionNum, date: today, hook: 'session-close-data' }).replace(/"/g, '\\"');
-  execSync(
+  execSafe(
     `"${PYTHON}" "${SCRIPTS}/events.py" emit SESSION_END "hook:session-close" "${data}" "[\\"system:shutdown\\"]"`,
     { timeout: 5000, stdio: 'ignore' }
   );
@@ -65,7 +65,7 @@ try {
 if (sessionType === 'system' && sessionNum > 0) {
   try {
     const checkCmd = `"${PYTHON}" -c "import sys; sys.path.insert(0, r'${BRAIN}/scripts'); import sqlite3; from paths import DB_PATH; conn = sqlite3.connect(str(DB_PATH)); rows = conn.execute(\\"SELECT data_json FROM events WHERE type='OUTPUT' AND session=${sessionNum}\\").fetchall(); conn.close(); import json; prospect = any(json.loads(r[0]).get('prospect') for r in rows if r[0]); print('sales' if prospect else 'system')"`;
-    const detected = execSync(checkCmd, { timeout: 5000 }).toString().trim();
+    const detected = execSafe(checkCmd, { timeout: 5000 }).toString().trim();
     if (detected === 'sales') sessionType = 'sales';
   } catch (e) {}
 }
@@ -79,7 +79,7 @@ if (!wrapUpAlreadyRan) try {
     'import json; print(json.dumps(result, default=str))',
   ].join('; ');
 
-  execSync(
+  execSafe(
     `"${PYTHON}" -c "${pyCmd}"`,
     { timeout: 12000, stdio: 'ignore' }
   );
@@ -92,7 +92,7 @@ if (!wrapUpAlreadyRan) try {
 // Only re-validate if wrap-up was skipped (safety net).
 if (sessionNum > 0 && !wrapUpAlreadyRan) {
   try {
-    const result = execSync(
+    const result = execSafe(
       `"${PYTHON}" "${BRAIN}/scripts/wrap_up_validator.py" --session ${sessionNum} --date ${today} --session-type ${sessionType} --json`,
       { timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] }
     ).toString().trim();

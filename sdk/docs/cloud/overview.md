@@ -1,6 +1,6 @@
 # Gradata Cloud
 
-Gradata Cloud is the hosted intelligence layer for AIOS Brain. It runs the adaptation engine, quality scoring, and cross-brain learning that makes brains compound faster than local-only mode.
+Gradata Cloud is the hosted intelligence layer for Gradata. It runs the adaptation engine, quality scoring, and cross-brain learning that makes brains compound faster than local-only mode.
 
 ## Local vs Cloud
 
@@ -56,7 +56,7 @@ This cross-brain signal accelerates your brain's improvement. Patterns that alre
 │  Cloud Sync (urllib, zero deps)             │
 │  brain.connect_cloud() · auto-sync          │
 ├─────────────────────────────────────────────┤
-│  AIOS Brain SDK (open source)               │
+│  Gradata (open source)               │
 │  Patterns · Events · Search · MCP           │
 └─────────────────────────────────────────────┘
 ```

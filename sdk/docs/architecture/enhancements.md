@@ -9,12 +9,12 @@ Layer 1 modules wire into Layer 0 patterns to make brains compound over time. Th
 The core graduation pipeline. Parses lessons from corrections and promotes them through confidence tiers:
 
 ```
-INSTINCT (0.0-0.59) → PATTERN (0.60-0.89) → RULE (0.90+)
+INSTINCT → PATTERN → RULE
 ```
 
-- **+0.10** confidence per surviving session
-- **-0.15** per contradiction/misfire
-- **UNTESTABLE** archival after 20+ sessions with 0 fires
+Corrections that recur get promoted through confidence tiers. Each surviving session raises confidence; contradictions and misfires lower it. Lessons that never fire are archived as untestable.
+
+Exact thresholds and scoring deltas are configurable per brain.
 
 ### Agent Graduation
 

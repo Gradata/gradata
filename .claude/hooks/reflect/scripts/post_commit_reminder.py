@@ -9,7 +9,7 @@ import sys
 import os
 
 # Skip in reviewer terminal
-if os.environ.get("AIOS_ROLE") == "reviewer":
+if os.environ.get("GRADATA_ROLE") == "reviewer":
     sys.exit(0)
 
 # Fix Windows encoding for emoji output

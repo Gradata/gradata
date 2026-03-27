@@ -9,7 +9,7 @@ The `Brain` class is the primary interface to the SDK. All operations go through
 Open an existing brain.
 
 ```python
-from aios_brain import Brain
+from gradata import Brain
 
 brain = Brain("./my-brain")
 ```
@@ -127,7 +127,7 @@ brain.embed()           # Delta (only changed files)
 brain.embed(full=True)  # Full re-embed
 ```
 
-Requires `pip install aios-brain[embeddings]`.
+Requires `pip install gradata[embeddings]`.
 
 **Returns:** Number of chunks embedded.
 

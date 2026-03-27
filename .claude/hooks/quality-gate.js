@@ -6,7 +6,7 @@
  * Profile: strict only
  */
 
-const PROFILE = process.env.AIOS_HOOK_PROFILE || 'standard';
+const PROFILE = process.env.GRADATA_HOOK_PROFILE || 'standard';
 if (PROFILE !== 'strict') process.exit(0);
 
 const PROSPECT_PATHS = [

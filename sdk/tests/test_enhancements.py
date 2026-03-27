@@ -1,5 +1,5 @@
 """
-Enhancement module tests for the AIOS Brain SDK.
+Enhancement module tests for the Gradata.
 
 Tests all pure-logic SDK modules in isolation — no file I/O, no DB,
 no Brain instance required (unless the module inherently needs one).
@@ -44,7 +44,7 @@ def _make_lesson_text(*entries: str) -> str:
 
 class TestParseLessons:
     def setup_method(self):
-        from aios_brain._self_improvement import parse_lessons, LessonState
+        from gradata._self_improvement import parse_lessons, LessonState
         self.parse = parse_lessons
         self.LessonState = LessonState
 
@@ -126,12 +126,12 @@ class TestParseLessons:
 
 class TestUpdateConfidence:
     def setup_method(self):
-        from aios_brain._self_improvement import (
+        from gradata._self_improvement import (
             update_confidence, Lesson, LessonState,
             INITIAL_CONFIDENCE, SURVIVAL_BONUS, CONTRADICTION_PENALTY,
             PATTERN_THRESHOLD, RULE_THRESHOLD,
         )
-        from aios_brain.enhancements.self_improvement import fsrs_bonus, fsrs_penalty
+        from gradata.enhancements.self_improvement import fsrs_bonus, fsrs_penalty
         self.update = update_confidence
         self.Lesson = Lesson
         self.LessonState = LessonState
@@ -142,7 +142,7 @@ class TestUpdateConfidence:
         self.RULE_T = RULE_THRESHOLD
 
     def _lesson(self, category="DRAFTING", confidence=0.30, state=None):
-        from aios_brain._self_improvement import LessonState
+        from gradata._self_improvement import LessonState
         state = state or LessonState.INSTINCT
         return self.Lesson(
             date="2026-01-01",
@@ -182,7 +182,7 @@ class TestUpdateConfidence:
 
     def test_promotion_pattern_to_rule(self):
         """PATTERN at 0.85 + survival + sufficient applications -> RULE."""
-        from aios_brain._self_improvement import LessonState
+        from gradata._self_improvement import LessonState
         lesson = self._lesson("DRAFTING", 0.85, LessonState.PATTERN)
         lesson.fire_count = 5  # MIN_APPLICATIONS_FOR_RULE
         result = self.update([lesson], [{"category": "ACCURACY"}])
@@ -190,7 +190,7 @@ class TestUpdateConfidence:
 
     def test_rule_lessons_demoted_on_contradiction(self):
         """RULE-state lessons CAN be demoted if contradicted (not immortal)."""
-        from aios_brain._self_improvement import LessonState
+        from gradata._self_improvement import LessonState
         lesson = self._lesson("DRAFTING", 0.95, LessonState.RULE)
         original_conf = lesson.confidence
         result = self.update([lesson], [{"category": "DRAFTING"}])
@@ -223,7 +223,7 @@ class TestUpdateConfidence:
 
 class TestFormatLessons:
     def setup_method(self):
-        from aios_brain._self_improvement import (
+        from gradata._self_improvement import (
             format_lessons, parse_lessons, Lesson, LessonState,
         )
         self.format = format_lessons
@@ -282,7 +282,7 @@ class TestFormatLessons:
 
 class TestGraduate:
     def setup_method(self):
-        from aios_brain._self_improvement import graduate, Lesson, LessonState
+        from gradata._self_improvement import graduate, Lesson, LessonState
         self.graduate = graduate
         self.Lesson = Lesson
         self.LessonState = LessonState
@@ -325,7 +325,7 @@ class TestGraduate:
 
 class TestComputeLearningVelocity:
     def setup_method(self):
-        from aios_brain._self_improvement import compute_learning_velocity, Lesson, LessonState
+        from gradata._self_improvement import compute_learning_velocity, Lesson, LessonState
         self.compute = compute_learning_velocity
         self.Lesson = Lesson
         self.LessonState = LessonState
@@ -373,7 +373,7 @@ class TestComputeLearningVelocity:
 
 class TestBrierScore:
     def setup_method(self):
-        from aios_brain._stats import brier_score
+        from gradata._stats import brier_score
         self.brier = brier_score
 
     def test_perfect_predictions(self):
@@ -415,7 +415,7 @@ class TestBrierScore:
 
 class TestRollingComparison:
     def setup_method(self):
-        from aios_brain._stats import rolling_comparison
+        from gradata._stats import rolling_comparison
         self.compare = rolling_comparison
 
     def test_empty_returns_no_data(self):
@@ -459,7 +459,7 @@ class TestRollingComparison:
 
 class TestWilsonCI:
     def setup_method(self):
-        from aios_brain._stats import wilson_ci
+        from gradata._stats import wilson_ci
         self.wilson = wilson_ci
 
     def test_zero_total_returns_no_data(self):
@@ -495,7 +495,7 @@ class TestWilsonCI:
 
 class TestCorrectionHalfLife:
     def setup_method(self):
-        from aios_brain._stats import correction_half_life
+        from gradata._stats import correction_half_life
         self.half_life = correction_half_life
 
     def test_empty_returns_no_data(self):
@@ -552,7 +552,7 @@ class TestCorrectionHalfLife:
 
 class TestBetaPosterior:
     def setup_method(self):
-        from aios_brain._stats import beta_posterior
+        from gradata._stats import beta_posterior
         self.posterior = beta_posterior
 
     def test_zero_trials_uniform(self):
@@ -588,7 +588,7 @@ class TestBetaPosterior:
 
 class TestEwmaControl:
     def setup_method(self):
-        from aios_brain._stats import ewma_control
+        from gradata._stats import ewma_control
         self.ewma = ewma_control
 
     def test_insufficient_data(self):
@@ -623,7 +623,7 @@ class TestEwmaControl:
 
 class TestTaskSuccessRate:
     def setup_method(self):
-        from aios_brain._stats import task_success_rate
+        from gradata._stats import task_success_rate
         self.success_rate = task_success_rate
 
     def test_empty_returns_none(self):
@@ -663,7 +663,7 @@ class TestTaskSuccessRate:
 
 class TestMtbfMttr:
     def setup_method(self):
-        from aios_brain._stats import mtbf_mttr
+        from gradata._stats import mtbf_mttr
         self.mtbf = mtbf_mttr
 
     def test_empty_returns_none(self):
@@ -696,7 +696,7 @@ class TestMtbfMttr:
 
 class TestValidateTag:
     def setup_method(self):
-        from aios_brain._tag_taxonomy import validate_tag
+        from gradata._tag_taxonomy import validate_tag
         self.validate = validate_tag
 
     def test_valid_output_tag(self):
@@ -745,7 +745,7 @@ class TestValidateTag:
 
 class TestValidateTags:
     def setup_method(self):
-        from aios_brain._tag_taxonomy import validate_tags
+        from gradata._tag_taxonomy import validate_tags
         self.validate_tags = validate_tags
 
     def test_empty_tags_no_issues(self):
@@ -778,7 +778,7 @@ class TestValidateTags:
 
 class TestEnrichTags:
     def setup_method(self):
-        from aios_brain._tag_taxonomy import enrich_tags
+        from gradata._tag_taxonomy import enrich_tags
         self.enrich = enrich_tags
 
     def test_correction_event_adds_category(self):
@@ -819,7 +819,7 @@ class TestEnrichTags:
 
 class TestQualityGate:
     def setup_method(self):
-        from aios_brain._fact_extractor import _quality_gate
+        from gradata._fact_extractor import _quality_gate
         self.gate = _quality_gate
 
     def test_valid_fact_passes(self):
@@ -835,7 +835,7 @@ class TestQualityGate:
         assert self.gate("social_media_followers", "50000") is False
 
     def test_all_valid_types_pass(self):
-        from aios_brain._fact_extractor import VALID_FACT_TYPES
+        from gradata._fact_extractor import VALID_FACT_TYPES
         for fact_type in VALID_FACT_TYPES:
             assert self.gate(fact_type, "some valid text") is True
 
@@ -846,7 +846,7 @@ class TestQualityGate:
 
 class TestCleanValue:
     def setup_method(self):
-        from aios_brain._fact_extractor import _clean_value
+        from gradata._fact_extractor import _clean_value
         self.clean = _clean_value
 
     def test_strips_bold_markdown(self):
@@ -871,7 +871,7 @@ class TestCleanValue:
 
 class TestParseFrontmatter:
     def setup_method(self):
-        from aios_brain._fact_extractor import _parse_frontmatter
+        from gradata._fact_extractor import _parse_frontmatter
         self.parse = _parse_frontmatter
 
     def test_basic_yaml_parsing(self):
@@ -902,7 +902,7 @@ class TestParseFrontmatter:
 
 class TestExtractFromFile:
     def test_extracts_company_size(self, tmp_path):
-        from aios_brain._fact_extractor import extract_from_file
+        from gradata._fact_extractor import extract_from_file
         prospect_file = tmp_path / "Jane Smith -- Acme Corp.md"
         prospect_file.write_text(
             "---\nname: Jane Smith\ncompany: Acme Corp\n---\n"
@@ -914,7 +914,7 @@ class TestExtractFromFile:
         assert "company_size" in types
 
     def test_extracts_tech_stack_keywords(self, tmp_path):
-        from aios_brain._fact_extractor import extract_from_file
+        from gradata._fact_extractor import extract_from_file
         prospect_file = tmp_path / "Bob Jones -- Tech Inc.md"
         prospect_file.write_text(
             "---\nname: Bob Jones\n---\n"
@@ -927,12 +927,12 @@ class TestExtractFromFile:
         assert any("Shopify" in v for v in values)
 
     def test_nonexistent_file_returns_empty(self):
-        from aios_brain._fact_extractor import extract_from_file
+        from gradata._fact_extractor import extract_from_file
         facts = extract_from_file("/nonexistent/path/file.md")
         assert facts == []
 
     def test_extracts_budget_from_deal_value(self, tmp_path):
-        from aios_brain._fact_extractor import extract_from_file
+        from gradata._fact_extractor import extract_from_file
         prospect_file = tmp_path / "Alice Brown.md"
         prospect_file.write_text(
             "---\nname: Alice Brown\ndeal_value: $50,000\n---\n",
@@ -949,7 +949,7 @@ class TestExtractFromFile:
 
 class TestComputeTrustScore:
     def setup_method(self):
-        from aios_brain._validator import _compute_trust_score
+        from gradata._validator import _compute_trust_score
         self.compute = _compute_trust_score
 
     def _dim(self, name, score):
@@ -1023,7 +1023,7 @@ class TestComputeTrustScore:
 
 class TestPaths:
     def setup_method(self):
-        from aios_brain._paths import make_paths, resolve_brain_dir
+        from gradata._paths import make_paths, resolve_brain_dir
         self.make_paths = make_paths
         self.resolve = resolve_brain_dir
 
@@ -1031,7 +1031,7 @@ class TestPaths:
         result = self.make_paths("/some/brain/dir")
         required_keys = [
             "BRAIN_DIR", "DB_PATH", "EVENTS_JSONL", "PROSPECTS_DIR",
-            "SESSIONS_DIR", "CHROMA_DIR",
+            "SESSIONS_DIR",
         ]
         for k in required_keys:
             assert k in result, f"Missing key: {k}"
@@ -1064,39 +1064,39 @@ class TestConfig:
     def test_default_provider_is_local(self):
         """Default embedding provider is 'local' (no API key needed)."""
         import importlib
-        import aios_brain._config as cfg
+        import gradata._config as cfg
         # Test that defaults are sensible (without env var forcing gemini)
         assert cfg.EMBEDDING_PROVIDER in ("local", "gemini")
 
     def test_local_model_has_correct_dims(self):
-        from aios_brain._config import LOCAL_MODEL, LOCAL_DIMS
+        from gradata._config import LOCAL_MODEL, LOCAL_DIMS
         assert LOCAL_DIMS == 384
         assert "MiniLM" in LOCAL_MODEL or "minilm" in LOCAL_MODEL.lower()
 
     def test_gemini_model_has_correct_dims(self):
-        from aios_brain._config import GEMINI_MODEL, GEMINI_DIMS
+        from gradata._config import GEMINI_MODEL, GEMINI_DIMS
         assert GEMINI_DIMS == 768
         assert "gemini" in GEMINI_MODEL.lower()
 
     def test_similarity_threshold_is_between_zero_and_one(self):
-        from aios_brain._config import SIMILARITY_THRESHOLD
+        from gradata._config import SIMILARITY_THRESHOLD
         assert 0.0 < SIMILARITY_THRESHOLD < 1.0
 
     def test_file_type_map_contains_expected_dirs(self):
-        from aios_brain._config import FILE_TYPE_MAP
+        from gradata._config import FILE_TYPE_MAP
         for dirname in ("prospects", "sessions", "emails"):
             assert dirname in FILE_TYPE_MAP
 
     def test_memory_type_map_covers_all_file_types(self):
-        from aios_brain._config import FILE_TYPE_MAP, MEMORY_TYPE_MAP
+        from gradata._config import FILE_TYPE_MAP, MEMORY_TYPE_MAP
         for file_type in FILE_TYPE_MAP.values():
             assert file_type in MEMORY_TYPE_MAP, f"File type '{file_type}' not in MEMORY_TYPE_MAP"
 
     def test_skip_dirs_does_not_include_prospects(self):
         """prospects/ must NOT be skipped during indexing."""
-        from aios_brain._config import SKIP_DIRS
+        from gradata._config import SKIP_DIRS
         assert "prospects" not in SKIP_DIRS
 
     def test_rag_activation_threshold_positive(self):
-        from aios_brain._config import RAG_ACTIVATION_THRESHOLD
+        from gradata._config import RAG_ACTIVATION_THRESHOLD
         assert RAG_ACTIVATION_THRESHOLD > 0

@@ -11,11 +11,11 @@
  * Output: JSON to stdout with modified tool_input (prompt prepended with rules)
  */
 
-const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
 const cfg = require('./config.js');
+const { execSafe } = cfg;
 const PYTHON = cfg.PYTHON;
 
 function readStdin() {
@@ -67,7 +67,7 @@ try {
   const script = path.join(cfg.SCRIPTS, 'get_agent_context.py');
   if (!fs.existsSync(script)) process.exit(0);
 
-  const result = execSync(
+  const result = execSafe(
     `"${PYTHON}" "${script}" --agent-type "${agentType}"`,
     { encoding: 'utf8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }
   ).trim();

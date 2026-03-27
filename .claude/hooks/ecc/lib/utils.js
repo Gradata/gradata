@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync, spawnSync } = require('child_process');
+const { execSafe, spawnSafe } = require('../../config.js');
 
 // Platform detection
 const isWindows = process.platform === 'win32';
@@ -317,10 +317,10 @@ function commandExists(cmd) {
   try {
     if (isWindows) {
       // Use spawnSync to avoid shell interpolation
-      const result = spawnSync('where', [cmd], { stdio: 'pipe' });
+      const result = spawnSafe('where', [cmd], { stdio: 'pipe' });
       return result.status === 0;
     } else {
-      const result = spawnSync('which', [cmd], { stdio: 'pipe' });
+      const result = spawnSafe('which', [cmd], { stdio: 'pipe' });
       return result.status === 0;
     }
   } catch {
@@ -354,7 +354,7 @@ function runCommand(cmd, options = {}) {
   }
 
   try {
-    const result = execSync(cmd, {
+    const result = execSafe(cmd, {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
       ...options

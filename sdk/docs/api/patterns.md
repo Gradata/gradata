@@ -5,7 +5,7 @@ Layer 0 patterns are accessible both through the `Brain` class and directly via 
 ## Orchestrator
 
 ```python
-from aios_brain.patterns.orchestrator import classify_request
+from gradata.patterns.orchestrator import classify_request
 
 result = classify_request("draft a cold email to the VP of Marketing")
 # result.intent = "draft"
@@ -16,7 +16,7 @@ result = classify_request("draft a cold email to the VP of Marketing")
 ## Pipeline
 
 ```python
-from aios_brain.patterns.pipeline import Pipeline, Stage
+from gradata.patterns.pipeline import Pipeline, Stage
 
 def research(ctx):
     ctx["data"] = fetch_data()
@@ -36,7 +36,7 @@ result = pipeline.run({"query": "budget objections"})
 ## Parallel
 
 ```python
-from aios_brain.patterns.parallel import DependencyGraph, ParallelTask
+from gradata.patterns.parallel import DependencyGraph, ParallelTask
 
 graph = DependencyGraph([
     ParallelTask("task_a", "Run task A", fn_a),
@@ -49,7 +49,7 @@ results = graph.run()  # task_a and task_b run in the same wave
 ## Reflection
 
 ```python
-from aios_brain.patterns.reflection import reflect, EMAIL_CHECKLIST, default_evaluator
+from gradata.patterns.reflection import reflect, EMAIL_CHECKLIST, default_evaluator
 
 result = reflect(
     output="Draft email text...",
@@ -64,7 +64,7 @@ result = reflect(
 ## Evaluator
 
 ```python
-from aios_brain.patterns.evaluator import Evaluator
+from gradata.patterns.evaluator import Evaluator
 
 evaluator = Evaluator(scorer=my_scorer, threshold=8.0, max_iterations=3)
 result = evaluator.run(initial_draft)
@@ -73,7 +73,7 @@ result = evaluator.run(initial_draft)
 ## Memory
 
 ```python
-from aios_brain.patterns.memory import MemoryManager
+from gradata.patterns.memory import MemoryManager
 
 mm = MemoryManager()
 mm.store("semantic", "Prefers bullet points in emails")
@@ -85,7 +85,7 @@ print(results[0].content)
 ## Guardrails
 
 ```python
-from aios_brain.patterns.guardrails import (
+from gradata.patterns.guardrails import (
     InputGuard, OutputGuard,
     pii_detector, injection_detector,
     banned_phrases, destructive_action,
@@ -101,7 +101,7 @@ checks = output_guard.check("AI output text")
 ## Human Loop
 
 ```python
-from aios_brain.patterns.human_loop import assess_risk
+from gradata.patterns.human_loop import assess_risk
 
 result = assess_risk("delete all prospect files", {"domain": "sales"})
 # result.tier = "high"
@@ -111,7 +111,7 @@ result = assess_risk("delete all prospect files", {"domain": "sales"})
 ## Scope
 
 ```python
-from aios_brain.patterns.scope import classify_scope, register_task_type
+from gradata.patterns.scope import classify_scope, register_task_type
 
 scope = classify_scope({"task": "draft cold email", "audience": "CTO"})
 # scope.task_type = "email_draft"
@@ -124,7 +124,7 @@ register_task_type("proposal", ["proposal", "rfp", "bid"], "sales")
 ## Rule Engine
 
 ```python
-from aios_brain.patterns.rule_engine import apply_rules, format_rules_for_prompt
+from gradata.patterns.rule_engine import apply_rules, format_rules_for_prompt
 
 matched = apply_rules(lessons, scope)
 prompt_text = format_rules_for_prompt(matched)
@@ -133,7 +133,7 @@ prompt_text = format_rules_for_prompt(matched)
 ## Rule Tracker
 
 ```python
-from aios_brain.patterns.rule_tracker import log_application
+from gradata.patterns.rule_tracker import log_application
 
 log_application(
     rule_id="TONE_001",
@@ -146,7 +146,7 @@ log_application(
 ## Tools
 
 ```python
-from aios_brain.patterns.tools import ToolRegistry, ToolSpec
+from gradata.patterns.tools import ToolRegistry, ToolSpec
 
 registry = ToolRegistry()
 registry.register(
@@ -158,7 +158,7 @@ registry.register(
 ## MCP
 
 ```python
-from aios_brain.patterns.mcp import MCPBridge
+from gradata.patterns.mcp import MCPBridge
 
 bridge = MCPBridge("my-brain")  # string name, not Brain instance
 result = bridge.handle_call("brain_search", {"query": "email tone"})

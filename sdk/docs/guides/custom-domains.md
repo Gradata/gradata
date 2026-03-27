@@ -7,7 +7,7 @@ Brains are domain-agnostic by default. This guide shows how to configure a brain
 Set the domain during initialization:
 
 ```bash
-aios-brain init ./my-brain --domain "Customer Support"
+gradata init ./my-brain --domain "Customer Support"
 ```
 
 Or programmatically:
@@ -42,7 +42,7 @@ Now when the brain encounters "draft a ticket response", it correctly scopes it 
 CARL (Contracts for Agent Reinforcement Learning) lets you define behavioral rules per domain:
 
 ```python
-from aios_brain.enhancements.carl import BehavioralContract
+from gradata.enhancements.carl import BehavioralContract
 
 support_contract = BehavioralContract(
     name="support_rules",

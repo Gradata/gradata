@@ -7,9 +7,8 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
-
 const cfg = require('./config.js');
+const { execSafe } = cfg;
 const BRAIN_PATH = cfg.BRAIN_DIR;
 const PERSIST_DIR = path.join(BRAIN_PATH, 'sessions', 'persist');
 
@@ -33,7 +32,7 @@ try {
   // Get modified files from git
   let filesModified = [];
   try {
-    const gitOutput = execSync(
+    const gitOutput = execSafe(
       `git -C "${SPRITES_WORK}" diff --name-only HEAD 2>/dev/null`,
       { encoding: 'utf8', timeout: 5000 }
     ).trim();
@@ -42,7 +41,7 @@ try {
 
   // Get brain repo modified files
   try {
-    const brainGit = execSync(
+    const brainGit = execSafe(
       `git -C "${BRAIN_PATH}" diff --name-only HEAD 2>/dev/null`,
       { encoding: 'utf8', timeout: 5000 }
     ).trim();
@@ -57,7 +56,7 @@ try {
   let handoff = '';
   try {
     // Last 3 commit messages = what was done
-    const log = execSync(
+    const log = execSafe(
       `git -C "${SPRITES_WORK}" log --oneline -3 2>/dev/null`,
       { encoding: 'utf8', timeout: 5000 }
     ).trim();

@@ -16,7 +16,7 @@ Use it when your system delegates to sub-agents (research, drafting, analysis, e
 Agent graduation initializes automatically when you create a Brain:
 
 ```python
-from aios_brain import Brain
+from gradata import Brain
 
 brain = Brain("./my-brain")
 tracker = brain.agent_graduation
@@ -69,16 +69,9 @@ elif gate == "auto":
 
 ## Promotion Thresholds
 
-| Transition | Confidence Required |
-|------------|-------------------|
-| CONFIRM → PREVIEW | 0.60+ |
-| PREVIEW → AUTO | 0.90+ |
-| Any → demotion | Drops below tier threshold |
+Agents promote through tiers as confidence grows from consistent accepted output. Corrections and rejections lower confidence. When confidence drops below a tier threshold, the agent demotes.
 
-Confidence scoring:
-
-- **+0.10** per session with accepted output
-- **-0.15** per correction or rejection
+Exact thresholds and scoring deltas are configurable per brain.
 
 ## Upward Distillation
 

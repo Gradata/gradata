@@ -15,43 +15,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/reflect/scripts/session_start_reminder.py\""
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/context-budget.js\"",
-            "timeout": 3000
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/session-init-data.js\"",
-            "timeout": 10000
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/peer-announce.js\"",
-            "timeout": 3000
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/cache-warmer.js\"",
-            "timeout": 3000
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/dispatcher-session-start.js\"",
+            "timeout": 30000
           }
         ]
       }
@@ -61,51 +26,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/session-start-reminder.js\""
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/reflect/scripts/capture_learning.py\""
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/context-inject.js\"",
-            "timeout": 5000
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/gate-inject.js\"",
-            "timeout": 3000
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/prospect-autoload.js\"",
-            "timeout": 3000
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/implicit-feedback.js\"",
-            "timeout": 3000
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/dispatcher-user-prompt.js\"",
+            "timeout": 30000
           }
         ]
       }
@@ -115,178 +37,30 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/reflect/scripts/check_learnings.py\""
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/post-compact.js\"",
-            "timeout": 3000
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/dispatcher-pre-compact.js\"",
+            "timeout": 15000
           }
         ]
       }
     ],
     "PreToolUse": [
       {
-        "matcher": "Write",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/quality-gate.js\"",
-            "timeout": 3000
-          }
-        ]
-      },
-      {
-        "matcher": "Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/brain-recall.js\"",
-            "timeout": 5000
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/mcp-health.js\"",
-            "timeout": 3000
-          }
-        ]
-      },
-      {
-        "matcher": "Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/agent-precontext.js\"",
-            "timeout": 5000
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/dispatcher-pre-tool.js\"",
+            "timeout": 25000
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Read",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/gate-emit.js\"",
-            "timeout": 3000
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/secret-scan.js\"",
-            "timeout": 3000
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/obsidian-autolink.js\"",
-            "timeout": 3000
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/output-event.js\"",
-            "timeout": 5000
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/codex-review.js\"",
-            "timeout": 30000
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/qwen-lint.js\"",
-            "timeout": 20000
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/arch-review.js\"",
-            "timeout": 45000
-          }
-        ]
-      },
-      {
-        "matcher": "Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/agent-graduation.js\"",
-            "timeout": 10000
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/reflect/scripts/post_commit_reminder.py\"",
-            "timeout": 5000
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/delta-auto-tag.js\"",
-            "timeout": 5000
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/tool-failure-emit.js\"",
-            "timeout": 5000
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/suggest-compact.js\"",
-            "timeout": 3000
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/dispatcher-post-tool.js\"",
+            "timeout": 120000
           }
         ]
       }
@@ -296,44 +70,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/cost-tracking.js\"",
-            "timeout": 5000
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/session-persist.js\"",
-            "timeout": 5000
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/session-close-data.js\"",
-            "timeout": 15000
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/brain-maintain.js\"",
-            "timeout": 30000
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/session-checklist.js\"",
-            "timeout": 10000
+            "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/dispatcher-stop.js\"",
+            "timeout": 90000
           }
         ]
       }
@@ -344,6 +82,6 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "node .claude/hooks/sprites-statusline.js"
+    "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/sprites-statusline.js\""
   }
 }

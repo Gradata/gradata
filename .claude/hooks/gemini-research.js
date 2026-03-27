@@ -12,7 +12,7 @@
  *   node gemini-research.js "Research topic here"
  */
 
-const { execSync } = require('child_process');
+const { execSafe } = require('./config.js');
 
 const DEFAULT_MODEL = 'gemini-2.5-pro';
 const TIMEOUT = 120000; // 2 minutes
@@ -31,7 +31,7 @@ function geminiResearch(query, opts = {}) {
     // Build command -- -p for headless, --output-format text for clean output
     const cmd = `gemini -p "${query.replace(/"/g, '\\"')}" -m ${model}`;
 
-    const result = execSync(cmd, {
+    const result = execSafe(cmd, {
       encoding: 'utf8',
       timeout,
       stdio: ['pipe', 'pipe', 'pipe'],

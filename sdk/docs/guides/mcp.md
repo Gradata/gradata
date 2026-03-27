@@ -9,7 +9,7 @@ The [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) is a standa
 ## Starting the MCP Server
 
 ```bash
-python -m aios_brain.mcp_server --brain-dir ./my-brain
+python -m gradata.mcp_server --brain-dir ./my-brain
 ```
 
 The server communicates over stdin/stdout using JSON-RPC 2.0 with Content-Length framing.
@@ -31,9 +31,9 @@ Add to your Claude Code MCP settings:
 ```json
 {
   "mcpServers": {
-    "aios-brain": {
+    "gradata": {
       "command": "python",
-      "args": ["-m", "aios_brain.mcp_server", "--brain-dir", "/path/to/brain"]
+      "args": ["-m", "gradata.mcp_server", "--brain-dir", "/path/to/brain"]
     }
   }
 }
@@ -48,9 +48,9 @@ Add to your Cursor MCP configuration:
 ```json
 {
   "mcpServers": {
-    "aios-brain": {
+    "gradata": {
       "command": "python",
-      "args": ["-m", "aios_brain.mcp_server", "--brain-dir", "/path/to/brain"]
+      "args": ["-m", "gradata.mcp_server", "--brain-dir", "/path/to/brain"]
     }
   }
 }
@@ -68,7 +68,7 @@ The MCP server implements:
 ## Using the MCP Bridge Programmatically
 
 ```python
-from aios_brain.patterns.mcp import MCPBridge
+from gradata.patterns.mcp import MCPBridge
 
 bridge = MCPBridge("my-brain")  # string name, not Brain instance
 

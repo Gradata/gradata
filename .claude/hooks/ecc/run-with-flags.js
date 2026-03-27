@@ -10,8 +10,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
 const { isHookEnabled } = require('../lib/hook-flags');
+const { spawnSafe } = require('../config.js');
 
 const MAX_STDIN = 1024 * 1024;
 
@@ -99,7 +99,7 @@ async function main() {
   }
 
   // Legacy path: spawn a child Node process for hooks without run() export
-  const result = spawnSync('node', [scriptPath], {
+  const result = spawnSafe('node', [scriptPath], {
     input: raw,
     encoding: 'utf8',
     env: process.env,

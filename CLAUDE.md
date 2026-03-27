@@ -1,4 +1,4 @@
-# AIOS v2.0 — Agent Operating System
+# Gradata — Agent Operating System
 This file boots YOU as the orchestrator. Every instruction here configures your behavior, tools, and self-improvement loop.
 Startup: execute skills/session-start/SKILL.md before responding. Wrap-up: execute skills/wrap-up/SKILL.md when Oliver says "wrap up". Both mandatory.
 Domain: domain/DOMAIN.md | CARL: .carl/ | Gates: domain/gates/ | Voice: domain/soul.md
@@ -14,7 +14,7 @@ Layer 0 — patterns/: orchestrator, pipeline, reflection, guardrails, memory, s
 Layer 1 — enhancements/: self_improvement, diff_engine, edit_classifier, pattern_extractor, metrics, failure_detectors, reports. Imports from patterns/.
 Layer 2 — brain/: trained data (events.jsonl, system.db, prospects/, sessions/). Event-sourced: all data = events, no domain tables.
 Core loop: User Prompt -> AI Draft -> User Edits -> brain.correct(draft, final) -> Diff -> Classify -> Pattern Extract -> Graduate -> Apply Rules -> Metrics.
-Source: sdk/src/aios_brain/ | Build: uv | Tests: pytest sdk/tests/ | Spec: sdk/ARCHITECTURE-SPEC.md
+Source: sdk/src/gradata/ | Build: uv | Tests: pytest sdk/tests/ | Spec: sdk/ARCHITECTURE-SPEC.md
 
 Environment: Windows 11. Python: C:/Users/olive/AppData/Local/Programs/Python/Python312/. Node available.
 Brain vault: C:/Users/olive/SpritesWork/brain/ (NOT inside OneDrive working dir).

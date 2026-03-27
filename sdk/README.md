@@ -1,8 +1,8 @@
-# aios-brain
+# Gradata
 
 **Your AI gets better the more you use it. Prove it. Share it. Take it anywhere.**
 
-Most AI tools forget everything between sessions. Memory tools store facts but never learn *how* you work. AIOS Brain is different: it watches how you correct AI output, compounds those corrections into behavioral rules, and proves the improvement with real data.
+Most AI tools forget everything between sessions. Memory tools store facts but never learn *how* you work. Gradata is different: it watches how you correct AI output, compounds those corrections into behavioral rules, and proves the improvement with real data.
 
 ```
 Session 1:    You rewrite every email subject line
@@ -17,7 +17,7 @@ Session 100:  Correction rate dropped 40%. Brain proves it with data.
 
 You use Claude Code every day. You correct the same mistakes over and over. Maybe you maintain a growing CLAUDE.md full of rules you wrote by hand.
 
-AIOS Brain captures your corrections automatically. Over sessions, it builds behavioral rules that apply to future output. Your AI stops making the same mistakes. And you can prove it.
+Gradata captures your corrections automatically. Over sessions, it builds behavioral rules that apply to future output. Your AI stops making the same mistakes. And you can prove it.
 
 Three things no LLM vendor will give you:
 
@@ -28,10 +28,10 @@ Three things no LLM vendor will give you:
 ## Installation
 
 ```bash
-pip install aios-brain              # zero deps, works instantly
-pip install aios-brain[embeddings]  # adds local embeddings
-pip install aios-brain[gemini]      # adds Gemini embeddings (free tier)
-pip install aios-brain[all]         # everything
+pip install gradata              # zero deps, works instantly
+pip install gradata[embeddings]  # adds local embeddings
+pip install gradata[gemini]      # adds Gemini embeddings (free tier)
+pip install gradata[all]         # everything
 ```
 
 Requires Python 3.11+. 752 tests passing.
@@ -39,7 +39,7 @@ Requires Python 3.11+. 752 tests passing.
 ## Quick Start
 
 ```python
-from aios_brain import Brain
+from gradata import Brain
 
 # Create a new brain
 brain = Brain.init("./my-brain", domain="Engineering")
@@ -62,19 +62,19 @@ results = brain.search("API design patterns")
 # Quality manifest (the proof)
 manifest = brain.manifest()
 print(f"Sessions: {manifest['metadata']['sessions_trained']}")
-print(f"Active rules: {manifest['quality']['rules_active']}")
+print(f"Active rules: {manifest['quality']['lessons_active']}")
 ```
 
 ## CLI
 
 ```bash
-aios-brain init ./my-brain --domain Sales
-aios-brain search "budget objections"
-aios-brain embed                    # index knowledge files
-aios-brain manifest --json          # quality proof
-aios-brain stats
-aios-brain validate --strict        # verify brain quality
-aios-brain export                   # package for sharing
+gradata init ./my-brain --domain Sales
+gradata search "budget objections"
+gradata embed                    # index knowledge files
+gradata manifest --json          # quality proof
+gradata stats
+gradata validate --strict        # verify brain quality
+gradata export                   # package for sharing
 ```
 
 ## MCP Integration
@@ -84,9 +84,9 @@ Works with any MCP-compatible host (Claude Code, Cursor, VS Code):
 ```json
 {
   "mcpServers": {
-    "aios-brain": {
+    "gradata": {
       "command": "python",
-      "args": ["-m", "aios_brain.mcp_server", "--brain-dir", "./my-brain"]
+      "args": ["-m", "gradata.mcp_server", "--brain-dir", "./my-brain"]
     }
   }
 }
@@ -102,7 +102,7 @@ brain.connect_cloud()  # set GRADATA_API_KEY env var
 
 ## Documentation
 
-Full docs at [gradata.github.io/aios-brain](https://gradata.github.io/aios-brain).
+Full docs at [gradata.github.io/gradata](https://gradata.github.io/gradata).
 
 ## Contributing
 

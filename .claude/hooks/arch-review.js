@@ -8,11 +8,13 @@
  * Uses codex exec for the review, with a different prompt focused on architecture.
  */
 
-const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-const PROFILE = process.env.AIOS_HOOK_PROFILE || 'standard';
+const cfg = require('./config.js');
+const { execSafe } = cfg;
+
+const PROFILE = process.env.GRADATA_HOOK_PROFILE || 'standard';
 if (PROFILE === 'minimal') process.exit(0);
 
 // Only review code files in these paths
@@ -55,7 +57,7 @@ function getFileDiff(filePath) {
     } else {
       cwd = process.env.WORKING_DIR || 'C:/Users/olive/OneDrive/Desktop/Sprites Work';
     }
-    return execSync(`git diff HEAD -- "${filePath}"`, {
+    return execSafe(`git diff HEAD -- "${filePath}"`, {
       encoding: 'utf8', timeout: 5000, cwd,
     }) || null;
   } catch { return null; }
@@ -82,13 +84,13 @@ try {
 
   // Determine context for the review
   let context = 'general';
-  if (normalized.includes('sdk/src/aios_brain/patterns/')) context = 'Layer 0 pattern';
-  else if (normalized.includes('sdk/src/aios_brain/enhancements/')) context = 'Layer 1 enhancement';
+  if (normalized.includes('sdk/src/gradata/patterns/')) context = 'Layer 0 pattern';
+  else if (normalized.includes('sdk/src/gradata/enhancements/')) context = 'Layer 1 enhancement';
   else if (normalized.includes('brain/scripts/')) context = 'brain script (should be thin shim over SDK)';
   else if (normalized.includes('.claude/hooks/')) context = 'hook (should be lightweight, <30s timeout)';
 
   const prompt = [
-    `You are an opinionated architecture reviewer for the AIOS Brain SDK.`,
+    `You are an opinionated architecture reviewer for the Gradata SDK.`,
     `Context: ${context}`,
     `File: ${fileName}`,
     ``,
@@ -115,7 +117,7 @@ try {
     reviewContent.slice(0, 6000),
   ].join('\n');
 
-  const result = execSync(
+  const result = execSafe(
     `codex exec --ephemeral --sandbox read-only -`,
     {
       input: prompt,

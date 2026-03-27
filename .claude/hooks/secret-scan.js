@@ -6,17 +6,36 @@
  * Profile: standard + strict (skip minimal)
  */
 
-const PROFILE = process.env.AIOS_HOOK_PROFILE || 'standard';
+const PROFILE = process.env.GRADATA_HOOK_PROFILE || 'standard';
 if (PROFILE === 'minimal') process.exit(0);
 
 // Patterns from agent-manifests.json guardrails.sensitive_data_patterns + extras
 const SECRET_PATTERNS = [
-  { name: 'api_key (sk-...)', regex: /sk-[a-zA-Z0-9]{20,}/g },
+  // Cloud / AI providers
+  { name: 'openai_key (sk-...)', regex: /sk-[a-zA-Z0-9]{20,}/g },
   { name: 'aws_access_key', regex: /AKIA[A-Z0-9]{16}/g },
   { name: 'private_key', regex: /-----BEGIN[A-Z ]*PRIVATE KEY-----/g },
   { name: 'github_pat', regex: /ghp_[a-zA-Z0-9]{36}/g },
   { name: 'jwt_token', regex: /eyJ[a-zA-Z0-9_-]{20,}\.eyJ[a-zA-Z0-9_-]{20,}\.[a-zA-Z0-9_-]{20,}/g },
-  { name: 'generic_secret (password=)', regex: /(?:password|api_key|token|secret)\s*[=:]\s*["']?[^\s"']{8,}/gi },
+  // Slack
+  { name: 'slack_token', regex: /xox[bpsa]-[a-zA-Z0-9-]{10,}/g },
+  // Stripe
+  { name: 'stripe_key', regex: /[sr]k_live_[a-zA-Z0-9]{20,}/g },
+  { name: 'stripe_publishable', regex: /pk_live_[a-zA-Z0-9]{20,}/g },
+  // SendGrid
+  { name: 'sendgrid_key', regex: /SG\.[a-zA-Z0-9_-]{22,}\.[a-zA-Z0-9_-]{22,}/g },
+  // Twilio
+  { name: 'twilio_sid', regex: /AC[a-f0-9]{32}/g },
+  // Database connection strings with embedded passwords
+  { name: 'db_connection_string', regex: /(?:postgres|mysql|mongodb|redis):\/\/[^:]+:[^@]+@[^\s"']+/gi },
+  // Sales tools (Oliver's stack)
+  { name: 'pipedrive_api_key', regex: /(?:pipedrive)[_-]?(?:api)?[_-]?(?:key|token)\s*[=:]\s*["']?[a-f0-9]{40}/gi },
+  { name: 'zerobounce_key', regex: /(?:zerobounce|zb)[_-]?(?:api)?[_-]?key\s*[=:]\s*["']?[^\s"']{8,}/gi },
+  { name: 'instantly_key', regex: /(?:instantly)[_-]?(?:api)?[_-]?key\s*[=:]\s*["']?[^\s"']{8,}/gi },
+  { name: 'apollo_key', regex: /(?:apollo)[_-]?(?:api)?[_-]?key\s*[=:]\s*["']?[^\s"']{8,}/gi },
+  { name: 'prospeo_key', regex: /(?:prospeo)[_-]?(?:api)?[_-]?key\s*[=:]\s*["']?[^\s"']{8,}/gi },
+  // Generic catch-all (last resort)
+  { name: 'generic_secret', regex: /(?:password|api_key|token|secret|apikey|api_secret)\s*[=:]\s*["']?[^\s"']{8,}/gi },
 ];
 
 try {
@@ -53,9 +72,17 @@ try {
 
   if (findings.length > 0) {
     const filePath = toolInput.file_path || 'unknown';
-    process.stderr.write(`[secret-scan] WARNING: ${findings.length} potential secret(s) detected in ${filePath}:\n`);
-    for (const f of findings) {
-      process.stderr.write(`  - ${f.name}: ${f.preview}\n`);
+    const msg = `SECRET DETECTED: ${findings.length} potential secret(s) in ${filePath}: ${findings.map(f => f.name).join(', ')}. Move secrets to .env or brain config.`;
+    process.stderr.write(`[secret-scan] ${msg}\n`);
+
+    // In PreToolUse context, BLOCK the write. In PostToolUse, just warn.
+    // PreToolUse passes tool_name in the input; PostToolUse passes tool_output.
+    const isPreTool = !toolData.tool_output && !toolData.output;
+    if (isPreTool) {
+      process.stdout.write(JSON.stringify({
+        decision: 'block',
+        reason: msg,
+      }));
     }
   }
 } catch (e) {

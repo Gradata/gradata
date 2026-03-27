@@ -1,5 +1,5 @@
 """
-Tests for aios_brain.mcp_server — JSON-RPC 2.0 stdio MCP transport.
+Tests for gradata.mcp_server — JSON-RPC 2.0 stdio MCP transport.
 
 Run:
     cd sdk && python -m pytest tests/test_mcp_server.py -v
@@ -20,7 +20,7 @@ import pytest
 # Helpers — import the module under test
 # ---------------------------------------------------------------------------
 
-from aios_brain.mcp_server import (
+from gradata.mcp_server import (
     INTERNAL_ERROR,
     INVALID_PARAMS,
     METHOD_NOT_FOUND,
@@ -176,7 +176,7 @@ class TestHandlers:
     def test_initialize_returns_server_info(self):
         resp = _handle_initialize(1)
         info = resp["result"]["serverInfo"]
-        assert info["name"] == "aios-brain"
+        assert info["name"] == "gradata"
         assert "version" in info
 
     def test_initialize_advertises_tools_capability(self):
@@ -350,7 +350,7 @@ class TestServerLifecycle:
         mock_brain.correct.return_value = {"ts": "t", "type": "CORRECTION", "source": "s"}
         mock_brain.log_output.return_value = {"ts": "t", "type": "OUTPUT", "source": "s"}
 
-        with patch("aios_brain.mcp_server.Brain", return_value=mock_brain):
+        with patch("gradata.mcp_server.Brain", return_value=mock_brain):
             run_server(brain_dir or "/fake/brain", stdin=in_buf, stdout=out_buf)
 
         return _read_all_responses(out_buf)

@@ -115,11 +115,14 @@ process.stdin.on('end', () => {
 
     if (result.exitCode === 2) {
       process.stderr.write(result.stderr + '\n');
-      process.exit(2);
+      // Output JSON block decision for dispatcher protocol
+      process.stdout.write(JSON.stringify({
+        decision: 'block',
+        reason: result.stderr,
+      }));
+      return;
     }
   } catch {
     // Keep hook non-blocking on parse errors.
   }
-
-  process.stdout.write(raw);
 });

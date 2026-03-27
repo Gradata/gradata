@@ -24,7 +24,7 @@ echo '{"api_key": "pk_live_..."}' > ~/.gradata/config.json
 ## 3. Connect Your Brain
 
 ```python
-from aios_brain import Brain
+from gradata import Brain
 
 brain = Brain("./my-brain")
 brain.connect_cloud()
@@ -87,9 +87,9 @@ If you use the MCP server, connect to cloud in the server config:
 ```json
 {
   "mcpServers": {
-    "aios-brain": {
+    "gradata": {
       "command": "python",
-      "args": ["-m", "aios_brain.mcp_server", "--brain-dir", "/path/to/brain", "--cloud"],
+      "args": ["-m", "gradata.mcp_server", "--brain-dir", "/path/to/brain", "--cloud"],
       "env": {
         "GRADATA_API_KEY": "pk_live_..."
       }

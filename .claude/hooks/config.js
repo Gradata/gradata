@@ -27,13 +27,32 @@ const STARTUP_BRIEF = path.join(DOMAIN_DIR, 'pipeline', 'startup-brief.md');
 const GATES_DIR = path.join(DOMAIN_DIR, 'gates');
 const HOOKS_DIR = path.join(WORKING_DIR, '.claude', 'hooks');
 const LESSONS_FILE = path.join(WORKING_DIR, '.claude', 'lessons.md');
-const COMPACT_SNAPSHOT = path.join(os.tmpdir(), 'aios-compact-snapshot.json');
+const COMPACT_SNAPSHOT = path.join(os.tmpdir(), 'gradata-compact-snapshot.json');
 
 // ── Multi-LLM Provider Paths ──
 const CODEX_CMD = process.env.CODEX_CMD || 'codex';
 const GEMINI_CMD = process.env.GEMINI_CMD || 'gemini';
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5-coder:14b';
+
+// ── Windows-safe exec wrappers (prevent CMD window flash) ──
+const { execSync: _execSync, spawnSync: _spawnSync } = require('child_process');
+
+/**
+ * execSync wrapper that always sets windowsHide: true.
+ * Drop-in replacement — same signature as child_process.execSync.
+ */
+function execSafe(cmd, opts = {}) {
+  return _execSync(cmd, { windowsHide: true, ...opts });
+}
+
+/**
+ * spawnSync wrapper that always sets windowsHide: true.
+ * Drop-in replacement — same signature as child_process.spawnSync.
+ */
+function spawnSafe(cmd, args = [], opts = {}) {
+  return _spawnSync(cmd, args, { windowsHide: true, ...opts });
+}
 
 module.exports = {
   BRAIN_DIR,
@@ -56,4 +75,7 @@ module.exports = {
   GEMINI_CMD,
   OLLAMA_URL,
   OLLAMA_MODEL,
+  // Windows-safe exec (use these instead of child_process directly)
+  execSafe,
+  spawnSafe,
 };

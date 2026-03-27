@@ -22,7 +22,7 @@ def _make_brain(tmp_path, taxonomy=None):
         (brain_dir / "taxonomy.json").write_text(
             json.dumps(taxonomy), encoding="utf-8"
         )
-    from aios_brain.brain import Brain
+    from gradata.brain import Brain
     return Brain(brain_dir)
 
 
@@ -72,7 +72,7 @@ class TestBug1CorrectionRateManifest:
 class TestBug2MCPCorrectDispatch:
     def test_dispatch_correct_returns_content(self, tmp_path):
         brain = _make_brain(tmp_path)
-        from aios_brain.mcp_server import _dispatch
+        from gradata.mcp_server import _dispatch
         result = _dispatch(brain, "brain_correct", {
             "draft": "Old text here",
             "final": "New text here"
@@ -82,7 +82,7 @@ class TestBug2MCPCorrectDispatch:
 
     def test_dispatch_correct_content_is_valid_json(self, tmp_path):
         brain = _make_brain(tmp_path)
-        from aios_brain.mcp_server import _dispatch
+        from gradata.mcp_server import _dispatch
         result = _dispatch(brain, "brain_correct", {
             "draft": "Original", "final": "Modified"
         })
@@ -93,7 +93,7 @@ class TestBug2MCPCorrectDispatch:
 
     def test_dispatch_all_tools_no_crash(self, tmp_path):
         brain = _make_brain(tmp_path)
-        from aios_brain.mcp_server import _dispatch
+        from gradata.mcp_server import _dispatch
         tools = {
             "brain_search": {"query": "test"},
             "brain_correct": {"draft": "a", "final": "b"},
@@ -149,7 +149,7 @@ class TestBug3EventPersistence:
 
 class TestBug4FactualCategory:
     def test_factual_in_core_taxonomy(self):
-        from aios_brain._tag_taxonomy import TAXONOMY
+        from gradata._tag_taxonomy import TAXONOMY
         categories = TAXONOMY["category"]["values"]
         assert "FACTUAL" in categories
         assert "CONTENT" in categories
@@ -195,7 +195,7 @@ class TestBug5ApplyBrainRulesPath:
 class TestBug6EditedByOliverRemoved:
     def test_no_edited_by_oliver_in_sdk(self):
         """Grep entire SDK source for edited_by_oliver — must find zero."""
-        sdk_src = Path(__file__).parent.parent / "src" / "aios_brain"
+        sdk_src = Path(__file__).parent.parent / "src" / "gradata"
         hits = []
         for py_file in sdk_src.rglob("*.py"):
             text = py_file.read_text(encoding="utf-8", errors="replace")
@@ -227,7 +227,7 @@ class TestBug7DomainAgnostic:
         }
         brain = _make_brain(tmp_path, taxonomy=eng_taxonomy)
 
-        from aios_brain._tag_taxonomy import TAXONOMY
+        from gradata._tag_taxonomy import TAXONOMY
         output_vals = TAXONOMY.get("output", {}).get("values", set())
         assert "code_review" in output_vals
         assert "email" not in output_vals  # Sales value NOT present
@@ -242,12 +242,12 @@ class TestBug7DomainAgnostic:
         }
         brain = _make_brain(tmp_path, taxonomy=recruit_taxonomy)
 
-        from aios_brain._tag_taxonomy import TAXONOMY
+        from gradata._tag_taxonomy import TAXONOMY
         output_vals = TAXONOMY.get("output", {}).get("values", set())
         assert "interview_prep" in output_vals
 
     def test_onboard_creates_domain_dirs(self):
-        from aios_brain.onboard import _DOMAIN_SUBDIRS
+        from gradata.onboard import _DOMAIN_SUBDIRS
         assert "sales" in _DOMAIN_SUBDIRS
         assert "recruiting" in _DOMAIN_SUBDIRS
         assert "engineering" in _DOMAIN_SUBDIRS
@@ -262,7 +262,7 @@ class TestBug7DomainAgnostic:
 
 class TestBug8RagCascadeErrors:
     def test_cascade_tracks_fts_error(self):
-        from aios_brain.patterns.rag import cascade_retrieve
+        from gradata.patterns.rag import cascade_retrieve
 
         def bad_fts(query, limit):
             raise RuntimeError("FTS engine crashed")
@@ -272,7 +272,7 @@ class TestBug8RagCascadeErrors:
         assert "cascade_failed" in result.mode or "fts" in result.mode
 
     def test_cascade_tracks_vector_error(self):
-        from aios_brain.patterns.rag import cascade_retrieve
+        from gradata.patterns.rag import cascade_retrieve
 
         def bad_vec(query, limit):
             raise RuntimeError("Vector DB unreachable")
@@ -281,7 +281,7 @@ class TestBug8RagCascadeErrors:
         assert "cascade_failed" in result.mode or "vector" in result.mode
 
     def test_cascade_no_error_when_no_retrievers(self):
-        from aios_brain.patterns.rag import cascade_retrieve
+        from gradata.patterns.rag import cascade_retrieve
         result = cascade_retrieve("test")
         assert result.mode == "empty"
         assert result.chunks == []
@@ -293,37 +293,37 @@ class TestBug8RagCascadeErrors:
 
 class TestBug9MissingClasses:
     def test_smart_rag_importable_and_functional(self):
-        from aios_brain.patterns.rag import SmartRAG
+        from gradata.patterns.rag import SmartRAG
         rag = SmartRAG()
         result = rag.retrieve("test")
         assert result.chunks == []
         assert result.mode == "empty"
 
     def test_naive_rag_importable_and_functional(self):
-        from aios_brain.patterns.rag import NaiveRAG
+        from gradata.patterns.rag import NaiveRAG
         rag = NaiveRAG()
         result = rag.retrieve("test")
         assert result.chunks == []
 
     def test_human_loop_gate_importable(self):
-        from aios_brain.patterns.human_loop import HumanLoopGate
+        from gradata.patterns.human_loop import HumanLoopGate
         gate = HumanLoopGate()
         risk = gate.assess("delete database")
         assert risk.tier in ("low", "medium", "high", "critical")
 
     def test_rule_application_importable(self):
-        from aios_brain.patterns.rule_tracker import RuleApplication
+        from gradata.patterns.rule_tracker import RuleApplication
         ra = RuleApplication(rule_id="test_001", accepted=True)
         assert ra.rule_id == "test_001"
         assert ra.accepted is True
 
     def test_compute_density_importable(self):
-        from aios_brain.enhancements.correction_tracking import compute_density
+        from gradata.enhancements.correction_tracking import compute_density
         # Should not crash on missing DB
         assert callable(compute_density)
 
     def test_top_level_exports(self):
-        from aios_brain import (
+        from gradata import (
             SmartRAG, NaiveRAG, HumanLoopGate,
             RuleApplication, Pipeline, Stage,
             ParallelBatch, EpisodicMemory,

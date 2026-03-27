@@ -451,7 +451,7 @@ Our free tier is actually more generous than Mem0's because it's local. That's a
 
 **How to implement**:
 ```python
-from aios_brain import brain_context
+from gradata import brain_context
 
 with brain_context(brain="./my-brain", user="oliver"):
     # Any LLM call inside here gets:

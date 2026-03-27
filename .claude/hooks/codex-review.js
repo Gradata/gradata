@@ -7,13 +7,15 @@
  * SKILL.md, playbooks, templates) — skips routine data files.
  */
 
-const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
 const os = require('os');
 
-const PROFILE = process.env.AIOS_HOOK_PROFILE || 'standard';
+const cfg = require('./config.js');
+const { execSafe, spawnSafe } = cfg;
+
+const PROFILE = process.env.GRADATA_HOOK_PROFILE || 'standard';
 if (PROFILE === 'minimal') process.exit(0);
 
 // Bug 5 fix: check codex exists once, bail fast if not installed
@@ -21,7 +23,7 @@ let codexAvailable = null;
 function hasCodex() {
   if (codexAvailable !== null) return codexAvailable;
   try {
-    execSync('codex --version', { timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] });
+    execSafe('codex --version', { timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] });
     codexAvailable = true;
   } catch {
     codexAvailable = false;
@@ -92,7 +94,7 @@ function getFileDiff(filePath) {
     } else {
       cwd = process.env.WORKING_DIR || 'C:/Users/olive/OneDrive/Desktop/Sprites Work';
     }
-    const diff = execSync(`git diff HEAD -- "${filePath}"`, {
+    const diff = execSafe(`git diff HEAD -- "${filePath}"`, {
       encoding: 'utf8',
       timeout: 5000,
       cwd,
@@ -158,7 +160,7 @@ try {
   // Bug 7: capture both stdout and stderr from codex
   let result = '';
   try {
-    const child = require('child_process').spawnSync(
+    const child = spawnSafe(
       'codex', ['exec', '--ephemeral', '--sandbox', 'read-only', '-'],
       {
         input: prompt,
@@ -172,7 +174,7 @@ try {
   } catch { process.exit(0); }
 
   // Write structured review to a file Claude can read and act on
-  const REVIEW_DIR = path.join(os.tmpdir(), 'aios-codex-reviews');
+  const REVIEW_DIR = path.join(os.tmpdir(), 'gradata-codex-reviews');
   if (!fs.existsSync(REVIEW_DIR)) fs.mkdirSync(REVIEW_DIR, { recursive: true });
 
   // Bug 6: clean up old reviews (keep last 50)

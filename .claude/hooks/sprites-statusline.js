@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// AIOS Statusline v7 — Dashboard you can read at a glance
+// Gradata Statusline v7 — Dashboard you can read at a glance
 // Line 1: Identity + runway
 // Line 2: Gates | System | Brain | Quality | Last save
 // Line 3: Pipeline attention items
@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync } = require('child_process');
+const { execSafe } = require('./config.js');
 
 const stdinTimeout = setTimeout(() => process.exit(0), 3000);
 let input = '';
@@ -31,7 +31,7 @@ process.stdin.on('end', () => {
     };
 
     function safeExec(cmd, timeout = 2000) {
-      try { return execSync(cmd, { timeout, stdio: ['pipe','pipe','pipe'] }).toString().trim(); } catch (e) { return ''; }
+      try { return execSafe(cmd, { timeout, stdio: ['pipe','pipe','pipe'] }).toString().trim(); } catch (e) { return ''; }
     }
 
     // -- Context Bar --
@@ -131,7 +131,7 @@ process.stdin.on('end', () => {
     const gradeDisplay = ctxGrade ? `${ctxGradeColor}${c.bold}${ctxGrade}${c.reset}` : '';
 
     const line1 = [
-      `${c.bold}${c.cyan}AIOS${c.reset}`,
+      `${c.bold}${c.cyan}Gradata${c.reset}`,
       currentSession > 0 ? `${c.bold}${c.white}S${currentSession}${c.reset}` : '',
       `${c.dim}${model}${c.reset}`,
       ctxDisplay,
@@ -240,7 +240,7 @@ process.stdin.on('end', () => {
     // ── LINE 3: What needs attention (LIVE from Pipedrive) ─────────
     // Cache Pipedrive data to tmpfile, refresh every 5 minutes
     const PIPEDRIVE_TOKEN = 'REDACTED_PIPEDRIVE_TOKEN';
-    const PIPEDRIVE_CACHE = path.join(os.tmpdir(), 'aios-pipedrive-cache.json');
+    const PIPEDRIVE_CACHE = path.join(os.tmpdir(), 'gradata-pipedrive-cache.json');
     const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
     let overdueCount = 0, dueTodayCount = 0, activeDealsCount = 0;
@@ -260,7 +260,7 @@ process.stdin.on('end', () => {
       try {
         const https = require('https');
         const url = `https://api.pipedrive.com/v1/deals?status=open&limit=500&api_token=${PIPEDRIVE_TOKEN}`;
-        const raw = execSync(`node -e "const https=require('https');https.get('${url}',r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>process.stdout.write(d))})"`, { timeout: 4000 }).toString();
+        const raw = execSafe(`node -e "const https=require('https');https.get('${url}',r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>process.stdout.write(d))})"`, { timeout: 4000 }).toString();
         const data = JSON.parse(raw);
         const deals = data.data || [];
 
@@ -339,6 +339,6 @@ process.stdin.on('end', () => {
     process.stdout.write(line1.join(sep) + '\n' + line2.join(sep) + '\n' + line3parts.join(sep));
 
   } catch (e) {
-    process.stdout.write('\x1b[36mAIOS\x1b[0m');
+    process.stdout.write('\x1b[36mGradata\x1b[0m');
   }
 });

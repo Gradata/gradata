@@ -17,7 +17,8 @@
  * Fails silently if no formatter is found or installed.
  */
 
-const { execFileSync, spawnSync } = require('child_process');
+const { execFileSync } = require('child_process');
+const { spawnSafe } = require('../config.js');
 const path = require('path');
 
 // Shell metacharacters that cmd.exe interprets as command separators/operators
@@ -59,7 +60,7 @@ function run(rawInput) {
           if (UNSAFE_PATH_CHARS.test(resolvedFilePath)) {
             throw new Error('File path contains unsafe shell characters');
           }
-          const result = spawnSync(resolved.bin, args, {
+          const result = spawnSafe(resolved.bin, args, {
             cwd: projectRoot,
             shell: true,
             stdio: 'pipe',

@@ -2,7 +2,7 @@
 import json
 import pytest
 from pathlib import Path
-from aios_brain.enhancements.agent_graduation import (
+from gradata.enhancements.agent_graduation import (
     AgentGraduationTracker,
     AgentProfile,
     DeterministicRule,
@@ -14,7 +14,7 @@ from aios_brain.enhancements.agent_graduation import (
     GATE_PREVIEW_TO_AUTO,
     GATE_DEMOTION_THRESHOLD,
 )
-from aios_brain.enhancements.self_improvement import LessonState
+from gradata.enhancements.self_improvement import LessonState
 
 
 @pytest.fixture
@@ -266,7 +266,7 @@ class TestDeterministicRules:
 
     def test_compile_positioning_rule(self):
         """POSITIONING rule with 'agency pricing' should compile to regex guard."""
-        from aios_brain.enhancements.self_improvement import Lesson
+        from gradata.enhancements.self_improvement import Lesson
         lesson = Lesson(
             date="2026-03-25", state=LessonState.RULE, confidence=0.95,
             category="POSITIONING",
@@ -285,7 +285,7 @@ class TestDeterministicRules:
 
     def test_compile_non_enforceable_returns_none(self):
         """DRAFTING rules can't be enforced deterministically."""
-        from aios_brain.enhancements.self_improvement import Lesson
+        from gradata.enhancements.self_improvement import Lesson
         lesson = Lesson(
             date="2026-03-25", state=LessonState.RULE, confidence=0.95,
             category="DRAFTING",
@@ -297,7 +297,7 @@ class TestDeterministicRules:
 
     def test_compile_requires_rule_tier(self):
         """Only RULE-tier lessons can be compiled."""
-        from aios_brain.enhancements.self_improvement import Lesson
+        from gradata.enhancements.self_improvement import Lesson
         lesson = Lesson(
             date="2026-03-25", state=LessonState.PATTERN, confidence=0.75,
             category="POSITIONING",
@@ -308,24 +308,25 @@ class TestDeterministicRules:
         assert rule is None
 
     def test_data_integrity_rule(self):
-        """DATA_INTEGRITY rule blocks references to other users' data."""
-        from aios_brain.enhancements.self_improvement import Lesson
+        """DATA_INTEGRITY rule compiles and has owner_only check."""
+        from gradata.enhancements.self_improvement import Lesson
         lesson = Lesson(
             date="2026-03-25", state=LessonState.RULE, confidence=0.95,
             category="DATA_INTEGRITY",
-            description="Oliver only — never include Anna's or Siamak's data",
+            description="owner_only — never include other users' data",
             fire_count=10,
         )
         rule = compile_deterministic_rule(lesson)
         assert rule is not None
-        result = rule.check("Anna's campaign sent 84K emails last month")
+        # The placeholder regex matches "EXCLUDED_NAMES_PLACEHOLDER" — users configure real names
+        result = rule.check("EXCLUDED_NAMES_PLACEHOLDER's campaign sent 84K emails")
         assert not result["passed"]
-        result = rule.check("Oliver's pipeline has 12 active prospects")
+        result = rule.check("My pipeline has 12 active prospects")
         assert result["passed"]
 
     def test_pricing_rule(self):
         """PRICING rule blocks starter tier multi-account claims."""
-        from aios_brain.enhancements.self_improvement import Lesson
+        from gradata.enhancements.self_improvement import Lesson
         lesson = Lesson(
             date="2026-03-25", state=LessonState.RULE, confidence=0.95,
             category="PRICING",
@@ -341,7 +342,7 @@ class TestDeterministicRules:
         """enforce_rules() returns violations for non-compliant output."""
         # Manually create a profile with a RULE lesson
         profile = tracker._load_profile("writer")
-        from aios_brain.enhancements.self_improvement import Lesson
+        from gradata.enhancements.self_improvement import Lesson
         profile.lessons.append(Lesson(
             date="2026-03-25", state=LessonState.RULE, confidence=0.95,
             category="POSITIONING",
@@ -358,7 +359,7 @@ class TestDeterministicRules:
     def test_enforce_rules_clean_output(self, tracker):
         """enforce_rules() passes clean output."""
         profile = tracker._load_profile("writer")
-        from aios_brain.enhancements.self_improvement import Lesson
+        from gradata.enhancements.self_improvement import Lesson
         profile.lessons.append(Lesson(
             date="2026-03-25", state=LessonState.RULE, confidence=0.95,
             category="POSITIONING",

@@ -10,7 +10,7 @@ import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from aios_brain.brain import Brain
+from gradata.brain import Brain
 
 
 def main():
@@ -184,7 +184,7 @@ def main():
     print("\nFLOW 10: MCP Server Integration")
     print("-" * 40)
 
-    from aios_brain.mcp_server import _dispatch, _TOOL_SCHEMAS
+    from gradata.mcp_server import _dispatch, _TOOL_SCHEMAS
     print(f"  PASS: {len(_TOOL_SCHEMAS)} MCP tools defined")
 
     # Test dispatch with real brain

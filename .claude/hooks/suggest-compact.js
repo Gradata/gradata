@@ -8,10 +8,10 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const PROFILE = process.env.AIOS_HOOK_PROFILE || 'standard';
+const PROFILE = process.env.GRADATA_HOOK_PROFILE || 'standard';
 if (PROFILE === 'minimal') process.exit(0);
 
-const COUNTER_FILE = path.join(os.tmpdir(), 'aios-tool-count.json');
+const COUNTER_FILE = path.join(os.tmpdir(), 'gradata-tool-count.json');
 const FIRST_THRESHOLD = 50;
 const REPEAT_INTERVAL = 25;
 
