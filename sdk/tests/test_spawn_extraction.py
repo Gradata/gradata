@@ -8,6 +8,7 @@ brain/scripts/spawn.py into the SDK patterns/ layer.
 from __future__ import annotations
 
 import pytest
+pytest.importorskip('gradata.enhancements.self_improvement', reason='requires gradata_cloud')
 from pathlib import Path
 from typing import Any
 

@@ -25,7 +25,7 @@ The graph layer (Mem0^g) represents memories as directed labeled graphs G = (V, 
 - **Edges (E)**: Relationship triplets (source, relation, destination)
 - **Labels (L)**: Semantic types assigned to nodes
 
-**Data model**: Natural language facts stored as text + embedding. NOT structured records. A memory is literally a string like "Oliver prefers colons over em dashes in emails" with a vector embedding alongside it.
+**Data model**: Natural language facts stored as text + embedding. NOT structured records. A memory is literally a string like "the researcher prefers colons over em dashes in emails" with a vector embedding alongside it.
 
 ### 1.2 Memory Extraction Algorithm
 
@@ -77,7 +77,7 @@ Standard semantic similarity search with configurable limit parameter.
 
 - Vector memories: LLM decides ADD/UPDATE/DELETE/NOOP based on semantic similarity to existing facts
 - Graph memories: Conflict Detector flags overlapping/contradictory nodes/edges, then LLM-powered Update Resolver decides whether to add, merge, invalidate, or skip
-- Critical design choice: **Graph conflicts are marked as invalid, NOT deleted** — this preserves temporal reasoning ("Oliver used to prefer X, now prefers Y")
+- Critical design choice: **Graph conflicts are marked as invalid, NOT deleted** — this preserves temporal reasoning ("the researcher used to prefer X, now prefers Y")
 - This is genuinely smart. We should steal this temporal preservation approach.
 
 ### 1.6 API Surface
@@ -89,13 +89,13 @@ from mem0 import Memory
 memory = Memory()
 
 # Store
-memory.add(messages, user_id="oliver")
+memory.add(messages, user_id="researcher")
 
 # Retrieve
-results = memory.search("budget objections", user_id="oliver")
+results = memory.search("budget objections", user_id="researcher")
 
 # Get all
-all_memories = memory.get_all(user_id="oliver")
+all_memories = memory.get_all(user_id="researcher")
 
 # Delete
 memory.delete(memory_id)
@@ -356,7 +356,7 @@ From **Letta**:
 | **Moat** | Network effects (more users = better extraction) | Academic credibility + runtime lock-in | Correction tracking + graduation + quality proof |
 | **Current Revenue** | Not disclosed (186M API calls/qtr) | $1.4M (June 2025) | $0 |
 | **Funding** | $24M | $10M | $0 |
-| **Team** | Unknown | 13 | 1 (Oliver) |
+| **Team** | Unknown | 13 | 1 (the researcher) |
 
 ### 4.2 Harsh Assessment of Our Model
 
@@ -376,7 +376,7 @@ From **Letta**:
 4. **No research validation**: Mem0 has a published paper with benchmarks. Letta has the MemGPT paper. We have nothing published.
 5. **No community**: 48K stars (Mem0) vs 13K (Letta) vs... our private repo. Zero external validation.
 6. **Marketplace is premature**: Letta's stress test finding ("marketplace is wrong first product") applies to us too. No one will rent a brain they can't verify.
-7. **Single-person risk**: Both competitors have funded teams. We have Oliver. Bus factor = 1.
+7. **Single-person risk**: Both competitors have funded teams. We have the researcher. Bus factor = 1.
 8. **No enterprise story**: No SOC 2, no HIPAA, no on-prem deployment guides. Enterprise buyers won't touch us.
 
 **Mistakes we're making that they've already figured out:**
@@ -384,7 +384,7 @@ From **Letta**:
 1. **Building marketplace before memory**: Mem0 proved that great memory is the product. Get retrieval right FIRST. Our marketplace vision is Phase 4 material being discussed in Phase 1.
 2. **Not publishing**: Both competitors used research papers as distribution. We should write up the correction-graduation pipeline NOW.
 3. **Not wrapping other frameworks**: Letta's learning SDK proves you can add memory to anything with a context manager. We should build `with brain.observe():` that wraps any LLM call and captures corrections.
-4. **Ignoring graph memory**: Mem0's entity-relationship extraction is genuinely useful. "Oliver works at Sprites" -> "Sprites is an AI company" -> multi-hop reasoning. We store flat facts.
+4. **Ignoring graph memory**: Mem0's entity-relationship extraction is genuinely useful. "the researcher works at Sprites" -> "Sprites is an AI company" -> multi-hop reasoning. We store flat facts.
 
 ### 4.3 Pricing Model Comparison
 
@@ -423,7 +423,7 @@ Our free tier is actually more generous than Mem0's because it's local. That's a
 
 **How to implement**: Add an `invalidated_at` timestamp and `superseded_by` foreign key to our facts table. When a new fact contradicts an old one, the old fact is marked invalid but retained.
 
-**Why**: This enables "Oliver used to prefer X but now prefers Y" reasoning, which is critical for behavioral adaptation that evolves over time.
+**Why**: This enables "the researcher used to prefer X but now prefers Y" reasoning, which is critical for behavioral adaptation that evolves over time.
 
 **Effort**: Small. Schema change + query filter.
 
@@ -453,7 +453,7 @@ Our free tier is actually more generous than Mem0's because it's local. That's a
 ```python
 from gradata import brain_context
 
-with brain_context(brain="./my-brain", user="oliver"):
+with brain_context(brain="./my-brain", user="researcher"):
     # Any LLM call inside here gets:
     # 1. Relevant memories injected into context
     # 2. Conversation captured for fact extraction

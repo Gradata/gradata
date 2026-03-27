@@ -14,3 +14,20 @@ SPEC.md
 AUDIT.md
 GATE0-PROOF.md
 .planning/
+
+# Secrets
+.env
+.env.*
+*.secret
+credentials*
+
+# Virtual environments
+.venv/
+venv/
+
+# IDE / editor
+.idea/
+.vscode/
+
+# Node
+node_modules/

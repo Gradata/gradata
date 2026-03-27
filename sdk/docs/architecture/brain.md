@@ -57,7 +57,7 @@ The manifest is a machine-readable quality proof, regenerated from event data ea
     "sessions_trained": 44,
     "maturity_phase": "INFANT",
     "domain": "Sales",
-    "name": "Oliver's Sales Brain"
+    "name": "My Sales Brain"
   },
   "quality": {
     "correction_rate": 0.23,

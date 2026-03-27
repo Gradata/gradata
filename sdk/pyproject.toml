@@ -5,9 +5,9 @@ build-backend = "hatchling.build"
 [project]
 name = "gradata"
 version = "0.1.0"
-description = "Personal AI Brain SDK — build, train, and share AI brains that compound knowledge over time"
+description = "Personal AI Brain SDK: log corrections, store events, and track how your AI stops repeating mistakes"
 readme = "README.md"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 requires-python = ">=3.11"
 authors = [
     { name = "Gradata", email = "hello@gradata.com" },
@@ -16,7 +16,7 @@ keywords = ["ai", "brain", "sdk", "memory", "agents", "claude"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",

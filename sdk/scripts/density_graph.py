@@ -9,7 +9,7 @@ Usage:
     python density_graph.py [--db PATH] [--csv PATH] [--full-only]
 
 Arguments:
-    --db PATH       Path to system.db (default: C:/Users/olive/SpritesWork/brain/system.db)
+    --db PATH       Path to system.db (default: system.db)
     --csv PATH      Path to write CSV output (default: density_report.csv)
     --full-only     Only include full/sales sessions, exclude systems sessions
 """
@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 
-DEFAULT_DB = "C:/Users/olive/SpritesWork/brain/system.db"
+DEFAULT_DB = "system.db"
 DEFAULT_CSV = "density_report.csv"
 
 

@@ -65,19 +65,33 @@ try {
 
   // Get the agent's graduated rules via Python
   const script = path.join(cfg.SCRIPTS, 'get_agent_context.py');
-  if (!fs.existsSync(script)) process.exit(0);
+  let agentRules = '';
+  if (fs.existsSync(script)) {
+    agentRules = execSafe(
+      `"${PYTHON}" "${script}" --agent-type "${agentType}"`,
+      { encoding: 'utf8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }
+    ).trim();
+  }
 
-  const result = execSafe(
-    `"${PYTHON}" "${script}" --agent-type "${agentType}"`,
-    { encoding: 'utf8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }
-  ).trim();
+  // Also inject scope-matched meta-rules from the main brain
+  let metaRules = '';
+  const metaScript = path.join(cfg.SCRIPTS, 'get_meta_rules.py');
+  if (fs.existsSync(metaScript)) {
+    try {
+      metaRules = execSafe(
+        `"${PYTHON}" "${metaScript}" --task-type "${agentType}" --max-rules 5`,
+        { encoding: 'utf8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }
+      ).trim();
+    } catch { /* silent */ }
+  }
 
-  if (!result || result.length < 10) process.exit(0);
+  const combined = [metaRules, agentRules].filter(s => s && s.length > 10).join('\n\n');
+  if (!combined) process.exit(0);
 
   // Prepend agent training context to the prompt
   // PreToolUse hooks can modify tool_input by outputting JSON
   const modifiedInput = { ...input };
-  modifiedInput.prompt = result + '\n\n---\n\n' + (input.prompt || '');
+  modifiedInput.prompt = combined + '\n\n---\n\n' + (input.prompt || '');
 
   // Output the modified tool input
   process.stdout.write(JSON.stringify(modifiedInput));

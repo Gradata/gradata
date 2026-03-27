@@ -175,7 +175,10 @@ def cmd_install(args):
 def cmd_health(args):
     brain = _get_brain(args)
     try:
-        from gradata.enhancements.reports import generate_health_report, format_health_report
+        try:
+            from gradata_cloud.scoring.reports import generate_health_report, format_health_report
+        except ImportError:
+            from gradata.enhancements.reports import generate_health_report, format_health_report
     except ImportError:
         print("Health reports require enhancements: pip install gradata[cloud]")
         sys.exit(1)
@@ -192,13 +195,22 @@ def cmd_health(args):
 def cmd_report(args):
     brain = _get_brain(args)
     try:
-        from gradata.enhancements.reports import (
-            export_session_csv,
-            generate_health_report,
-            format_health_report,
-            generate_metrics_report,
-            generate_rule_audit,
-        )
+        try:
+            from gradata_cloud.scoring.reports import (
+                export_session_csv,
+                generate_health_report,
+                format_health_report,
+                generate_metrics_report,
+                generate_rule_audit,
+            )
+        except ImportError:
+            from gradata.enhancements.reports import (
+                export_session_csv,
+                generate_health_report,
+                format_health_report,
+                generate_metrics_report,
+                generate_rule_audit,
+            )
     except ImportError:
         print("Reports require enhancements: pip install gradata[cloud]")
         sys.exit(1)

@@ -3,7 +3,7 @@ File Watcher Sidecar — Wave 4: Observation Capture.
 =====================================================
 Detects when the user edits an AI-generated file and emits a CORRECTION
 event automatically.  The correction detection problem is the highest-risk
-gap in the AIOS SDK: the MCP protocol has no concept of user feedback, so
+gap in the Gradata SDK: the MCP protocol has no concept of user feedback, so
 we close it here with a polling-based sidecar that requires only stdlib.
 
 Design decisions

@@ -33,6 +33,8 @@ class Lesson:
     sessions_since_fire: int = 0       # Sessions since last application
     misfire_count: int = 0             # Times applied but made output worse
     scope_json: str = ""               # JSON-serialized RuleScope; empty = universal
+    example_draft: str | None = None      # Before: what the AI produced
+    example_corrected: str | None = None  # After: what Oliver changed it to
 
     def __post_init__(self) -> None:
         self.confidence = round(max(0.0, min(1.0, self.confidence)), 2)

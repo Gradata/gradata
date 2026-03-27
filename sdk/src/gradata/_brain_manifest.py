@@ -267,8 +267,9 @@ def generate_manifest(*, domain: str = "General", ctx: "BrainContext | None" = N
                 "required": rag.get("provider") == "gemini",
                 "tier": "free",
             },
-            "pipedrive": {"env_var": "PIPEDRIVE_API_KEY", "required": False},
-            "instantly": {"env_var": "INSTANTLY_API_KEY", "required": False},
+            # Add domain-specific API keys here, e.g.:
+            # "crm": {"env_var": "CRM_API_KEY", "required": False},
+            # "outreach": {"env_var": "OUTREACH_API_KEY", "required": False},
         },
         "bootstrap": [
             {"step": "set_env_vars", "desc": "Set BRAIN_DIR, WORKING_DIR, DOMAIN_DIR", "required": True},
@@ -318,7 +319,7 @@ def generate_manifest(*, domain: str = "General", ctx: "BrainContext | None" = N
     return manifest
 
 
-def write_manifest(manifest: dict = None, ctx: "BrainContext | None" = None):
+def write_manifest(manifest: dict | None = None, ctx: "BrainContext | None" = None):
     """Write manifest to brain/brain.manifest.json."""
     if manifest is None:
         manifest = generate_manifest(ctx=ctx)

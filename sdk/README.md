@@ -1,42 +1,51 @@
 # Gradata
 
-**Your AI gets better the more you use it. Prove it. Share it. Take it anywhere.**
+Your AI keeps making the same mistakes. Gradata fixes that.
 
-Most AI tools forget everything between sessions. Memory tools store facts but never learn *how* you work. Gradata is different: it watches how you correct AI output, compounds those corrections into behavioral rules, and proves the improvement with real data.
+## The problem
 
-```
-Session 1:    You rewrite every email subject line
-Session 20:   Brain notices the pattern, starts adjusting
-Session 50:   Pattern proven — AI gets it right without your help
-Session 100:  Correction rate dropped 40%. Brain proves it with data.
-```
+You correct your AI's output. It doesn't remember. You correct it again tomorrow. You build a CLAUDE.md or system prompt full of rules you wrote by hand. That works until it doesn't.
 
-**Zero dependencies. One SQLite file. Works with any LLM.**
+Gradata watches your corrections, stores them as events in a local SQLite database, and makes that knowledge searchable. Over time, your AI stops repeating the same errors. One user, 71 sessions over 9 days, saw correction rates drop from 5.0 to 0.004 per output.
 
-## Why
+## Real results
 
-You use Claude Code every day. You correct the same mistakes over and over. Maybe you maintain a growing CLAUDE.md full of rules you wrote by hand.
+All numbers from a single user (n=1) over 71 sessions. This is early data, not a peer-reviewed study.
 
-Gradata captures your corrections automatically. Over sessions, it builds behavioral rules that apply to future output. Your AI stops making the same mistakes. And you can prove it.
+| Metric | Value |
+|---|---|
+| Correction rate | 5.0 -> 0.004 per output (1,000x reduction) |
+| Error categories extinct | 13 of 14 categories stopped recurring |
+| Lessons graduated to rules | 48 of 107 (46%) |
+| Adaptation Score | 96/100 |
+| First Draft Acceptance | 100% for last 10 sessions |
+| Correction severity | 0.40 -> 0.27 (trending down) |
 
-Three things no LLM vendor will give you:
+The graduation engine that produced these numbers runs server-side. The open source SDK handles correction logging, event storage, brain search, and the manifest that proves improvement happened.
 
-- **Portable.** Works across Claude, GPT, Cursor, and any MCP host. Switch tools, keep your brain.
-- **Provable.** Quality manifest with real metrics: sessions trained, correction rate, active rules.
-- **Shareable.** Package your expertise and let others rent it on the Gradata Marketplace.
-
-## Installation
+## Install
 
 ```bash
-pip install gradata              # zero deps, works instantly
-pip install gradata[embeddings]  # adds local embeddings
-pip install gradata[gemini]      # adds Gemini embeddings (free tier)
+pip install gradata
+```
+
+Or with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv add gradata
+```
+
+Zero required dependencies. Python 3.11+.
+
+Optional extras:
+
+```bash
+pip install gradata[embeddings]  # local sentence-transformers
+pip install gradata[gemini]      # Gemini embeddings (free tier)
 pip install gradata[all]         # everything
 ```
 
-Requires Python 3.11+. 752 tests passing.
-
-## Quick Start
+## Quick start
 
 ```python
 from gradata import Brain
@@ -44,42 +53,28 @@ from gradata import Brain
 # Create a new brain
 brain = Brain.init("./my-brain", domain="Engineering")
 
-# Log AI output
+# Log what the AI produced
 brain.log_output("Here's the API design...", output_type="design_doc", self_score=7)
 
-# Record correction (the learning signal)
+# When you correct the AI's output, record it
 brain.correct(
     draft="Here's the API design with REST endpoints...",
     final="Here's the API design with gRPC endpoints..."
 )
 
-# Get rules for next draft (grows over sessions)
-rules = brain.apply_brain_rules("design_doc", {"audience": "backend_team"})
-
 # Search brain knowledge
 results = brain.search("API design patterns")
 
-# Quality manifest (the proof)
+# Get rules for the next draft (grows over sessions)
+rules = brain.apply_brain_rules("design_doc", {"audience": "backend_team"})
+
+# Quality manifest (the proof your brain is improving)
 manifest = brain.manifest()
-print(f"Sessions: {manifest['metadata']['sessions_trained']}")
-print(f"Active rules: {manifest['quality']['lessons_active']}")
 ```
 
-## CLI
+## MCP server
 
-```bash
-gradata init ./my-brain --domain Sales
-gradata search "budget objections"
-gradata embed                    # index knowledge files
-gradata manifest --json          # quality proof
-gradata stats
-gradata validate --strict        # verify brain quality
-gradata export                   # package for sharing
-```
-
-## MCP Integration
-
-Works with any MCP-compatible host (Claude Code, Cursor, VS Code):
+Works with Claude Code, Cursor, VS Code, or any MCP-compatible host:
 
 ```json
 {
@@ -92,25 +87,71 @@ Works with any MCP-compatible host (Claude Code, Cursor, VS Code):
 }
 ```
 
-## Gradata Cloud
+## CLI
 
-Connect to [Gradata Cloud](https://gradata.com) for server-side adaptation, cross-brain learning, and marketplace access:
-
-```python
-brain.connect_cloud()  # set GRADATA_API_KEY env var
+```bash
+gradata init ./my-brain --domain Sales
+gradata search "budget objections"
+gradata stats
+gradata manifest --json
+gradata validate --strict
+gradata export
+gradata doctor
 ```
 
-## Documentation
+## What's included
 
-Full docs at [gradata.github.io/gradata](https://gradata.github.io/gradata).
+**Core brain operations:** correction logging, event storage (event-sourced, append-only), FTS5 full-text search, brain manifest generation, brain export/import.
+
+**15 agentic patterns** (pure Python, no dependencies):
+pipeline, parallel execution, dependency graphs, RAG (naive + smart), reflection/critique, guardrails (input + output), human-in-the-loop, scope classification, sub-agent orchestration, evaluator loops, memory (episodic + semantic + procedural), MCP bridge, rule tracking.
+
+**Integrations:** Anthropic, OpenAI, LangChain, CrewAI adapters included.
+
+**Storage:** Everything lives in one SQLite file (`system.db`) plus markdown files. Portable. No external databases. No vendor lock-in.
+
+## What's coming
+
+The SDK captures corrections and stores knowledge locally. The full learning loop, where corrections graduate into lessons and lessons harden into permanent rules, runs via [gradata.ai](https://gradata.ai):
+
+- **Graduation engine:** correction -> lesson -> rule pipeline with confidence scoring
+- **Quality dashboard:** adaptation score, correction trends, category tracking
+- **Marketplace:** package and share trained brains
+- **Team brains:** shared learning across organizations
+
+Full graduation engine + quality dashboard coming via gradata.ai.
+
+## How it works
+
+```
+You correct AI output
+        |
+        v
+brain.correct(draft, final)
+        |
+        v
+Diff computed, edits classified, CORRECTION event stored
+        |
+        v
+brain.search() retrieves relevant knowledge
+        |
+        v
+brain.manifest() proves improvement over time
+```
+
+All data is event-sourced. Every correction, output log, and state change is an immutable event in SQLite. The brain directory (markdown files + system.db) is the entire state. Copy it, back it up, move it between machines.
+
+## Caveats
+
+- This is v0.1.0. The API will change.
+- The impressive numbers above come from one power user over 9 days. Your results will vary.
+- The graduation engine (the part that turns corrections into permanent rules) is not in the open source SDK yet. It's coming via gradata.ai.
+- Local-only for now. Cloud sync is planned.
 
 ## Contributing
 
-1. Fork the repo
-2. Create a feature branch
-3. Make changes and add tests
-4. Submit a PR against `main`
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-MIT
+AGPL-3.0. See [LICENSE](LICENSE).

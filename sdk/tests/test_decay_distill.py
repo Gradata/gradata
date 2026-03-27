@@ -1,3 +1,17 @@
+import pytest; pytest.importorskip('gradata.enhancements.self_improvement', reason='requires gradata_cloud')
+import pytest
+try:
+    import gradata_cloud
+    has_cloud = True
+except ImportError:
+    try:
+        from gradata.enhancements import self_improvement
+        has_cloud = True
+    except ImportError:
+        has_cloud = False
+
+pytestmark = pytest.mark.skipif(not has_cloud, reason='requires gradata_cloud')
+
 """Tests for judgment decay and rules distillation."""
 import pytest
 from gradata.enhancements.judgment_decay import (

@@ -1,3 +1,4 @@
+import pytest; pytest.importorskip('gradata.enhancements.self_improvement', reason='requires gradata_cloud')
 """
 Wave 1 unit tests — Diff Engine, Edit Classifier, Scope Builder,
 Metrics, Failure Detectors, Migrations.

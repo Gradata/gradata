@@ -1,3 +1,17 @@
+import pytest; pytest.importorskip('gradata.enhancements.self_improvement', reason='requires gradata_cloud')
+import pytest
+try:
+    import gradata_cloud
+    has_cloud = True
+except ImportError:
+    try:
+        from gradata.enhancements import self_improvement
+        has_cloud = True
+    except ImportError:
+        has_cloud = False
+
+pytestmark = pytest.mark.skipif(not has_cloud, reason='requires gradata_cloud')
+
 """Tests for tone profile extraction, diffing, and graduation."""
 import pytest
 from gradata.enhancements.tone_profile import (
@@ -77,7 +91,7 @@ class TestExtractTone:
         assert f.exclamation_count == 3
 
     def test_link_cta(self):
-        text = "Book a time here: https://calendly.com/oliver/30min"
+        text = "Book a time here: https://calendly.com/user/30min"
         f = extract_tone(text)
         assert f.cta_style == "link"
 

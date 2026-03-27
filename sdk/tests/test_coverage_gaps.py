@@ -1,3 +1,4 @@
+import pytest; pytest.importorskip('gradata.enhancements.self_improvement', reason='requires gradata_cloud')
 """
 Targeted tests to close coverage gaps in the five lowest-coverage modules.
 

@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-DEFAULT_BRAINS_DIR = Path.home() / ".aios" / "brains"
+DEFAULT_BRAINS_DIR = Path.home() / ".gradata" / "brains"
 
 
 def _check_compatibility(manifest: dict) -> list[str]:
@@ -186,7 +186,7 @@ def list_installed() -> list[dict]:
     return brains
 
 
-def install(archive_path: Path, target_dir: Path = None, dry_run: bool = False) -> dict:
+def install(archive_path: Path, target_dir: Path | None = None, dry_run: bool = False) -> dict:
     """Full installation flow."""
     report = {"status": "pending", "steps": []}
 

@@ -105,10 +105,14 @@ class Brain:
 
         # Initialize pattern registries (lazy — ImportError safe)
         try:
-            from gradata.enhancements.carl import ContractRegistry
+            from gradata_cloud.profiling.carl import ContractRegistry
             self.contracts: ContractRegistry = ContractRegistry()
         except ImportError:
-            self.contracts = None  # type: ignore[assignment]
+            try:
+                from gradata.enhancements.carl import ContractRegistry
+                self.contracts: ContractRegistry = ContractRegistry()
+            except ImportError:
+                self.contracts = None  # type: ignore[assignment]
         try:
             from gradata.patterns.tools import ToolRegistry
             self.tools: ToolRegistry = ToolRegistry()
@@ -117,10 +121,14 @@ class Brain:
 
         # Agent graduation tracker (compounding agent behavioral profiles)
         try:
-            from gradata.enhancements.agent_graduation import AgentGraduationTracker
+            from gradata_cloud.graduation.agent_graduation import AgentGraduationTracker
             self.agent_graduation: AgentGraduationTracker = AgentGraduationTracker(self.dir)
         except ImportError:
-            self.agent_graduation = None  # type: ignore[assignment]
+            try:
+                from gradata.enhancements.agent_graduation import AgentGraduationTracker
+                self.agent_graduation: AgentGraduationTracker = AgentGraduationTracker(self.dir)
+            except ImportError:
+                self.agent_graduation = None  # type: ignore[assignment]
 
         # Cloud connection (None = local-only mode)
         self._cloud = None
@@ -351,9 +359,13 @@ class Brain:
                 self._cloud.connected = False
 
         # Try full enhancement pipeline (diff + classify + extract)
+        # Prefer gradata_cloud (proprietary), fall back to enhancements/ (bundled)
         try:
             from gradata.enhancements.diff_engine import compute_diff
-            from gradata.enhancements.edit_classifier import classify_edits, summarize_edits
+            try:
+                from gradata_cloud.graduation.edit_classifier import classify_edits, summarize_edits
+            except ImportError:
+                from gradata.enhancements.edit_classifier import classify_edits, summarize_edits
         except ImportError:
             # Enhancements not installed — basic correction logging only
             data = {
@@ -416,7 +428,10 @@ class Brain:
 
         # Auto-extract patterns from classifications (step 3 of core loop)
         try:
-            from gradata.enhancements.pattern_extractor import extract_patterns
+            try:
+                from gradata_cloud.graduation.pattern_extractor import extract_patterns
+            except ImportError:
+                from gradata.enhancements.pattern_extractor import extract_patterns
             scope_obj = build_scope(context) if context else None
             patterns = extract_patterns(classifications, scope=scope_obj)
             if patterns:
@@ -486,9 +501,12 @@ class Brain:
                 self._cloud.connected = False
 
         try:
-            from gradata.enhancements.self_improvement import parse_lessons
+            try:
+                from gradata_cloud.graduation.self_improvement import parse_lessons
+            except ImportError:
+                from gradata.enhancements.self_improvement import parse_lessons
         except ImportError:
-            return ""  # Enhancements not installed — no rules available
+            return ""  # Neither cloud nor enhancements installed — no rules available
         from gradata._scope import build_scope
         from gradata.patterns.rule_engine import apply_rules, format_rules_for_prompt
 
@@ -561,7 +579,10 @@ class Brain:
     def health(self) -> dict:
         """Generate brain health report."""
         try:
-            from gradata.enhancements.reports import generate_health_report
+            try:
+                from gradata_cloud.scoring.reports import generate_health_report
+            except ImportError:
+                from gradata.enhancements.reports import generate_health_report
             import dataclasses
             report = generate_health_report(self.db_path)
             return dataclasses.asdict(report)
@@ -571,7 +592,10 @@ class Brain:
     def success_conditions(self, window: int = 20) -> dict:
         """Evaluate success conditions from SPEC.md Section 5."""
         try:
-            from gradata.enhancements.success_conditions import evaluate_success_conditions
+            try:
+                from gradata_cloud.scoring.success_conditions import evaluate_success_conditions
+            except ImportError:
+                from gradata.enhancements.success_conditions import evaluate_success_conditions
             import dataclasses
             report = evaluate_success_conditions(self.db_path, window)
             return dataclasses.asdict(report)
@@ -817,7 +841,10 @@ class Brain:
             List of reconcile action dicts (add/update/invalidate/skip).
         """
         try:
-            from gradata.enhancements.memory_extraction import MemoryExtractor
+            try:
+                from gradata_cloud.scoring.memory_extraction import MemoryExtractor
+            except ImportError:
+                from gradata.enhancements.memory_extraction import MemoryExtractor
         except ImportError:
             return []
 

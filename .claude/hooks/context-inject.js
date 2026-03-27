@@ -73,6 +73,47 @@ try {
   }
 } catch (e) { /* silent */ }
 
+// Inject meta-rules (loaded once per session, cached in temp file)
+try {
+  const metaCachePath = path.join(require('os').tmpdir(), 'gradata-meta-rules-cache.txt');
+  const fs = require('fs');
+  let metaText = '';
+  let cacheAge = Infinity;
+  if (fs.existsSync(metaCachePath)) {
+    const stat = fs.statSync(metaCachePath);
+    cacheAge = (Date.now() - stat.mtimeMs) / 60000; // minutes
+    if (cacheAge < 120) { // 2 hour cache
+      metaText = fs.readFileSync(metaCachePath, 'utf-8').trim();
+    }
+  }
+  if (!metaText || cacheAge >= 120) {
+    // Refresh cache from system.db
+    const metaPyCmd = [
+      'import sys; sys.path.insert(0, r"' + SCRIPTS + '")',
+      'from paths import SDK_SRC, DB_PATH',
+      'sys.path.insert(0, str(SDK_SRC))',
+      'from gradata.enhancements.meta_rules import load_meta_rules, format_meta_rules_for_prompt',
+      'metas = load_meta_rules(DB_PATH)',
+      'print(format_meta_rules_for_prompt(metas))',
+    ].join('; ');
+    const result = execSafe(
+      `"${PYTHON}" -c "${metaPyCmd}"`,
+      { timeout: 5000, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
+    ).trim();
+    if (result) {
+      fs.writeFileSync(metaCachePath, result);
+      metaText = result;
+    }
+  }
+  if (metaText) {
+    process.stdout.write(metaText + '
+
+');
+  }
+} catch (e) {
+  // Silent — meta-rule injection is best-effort
+}
+
 // Call context compiler
 try {
   // Escape message for shell (replace quotes, limit length)

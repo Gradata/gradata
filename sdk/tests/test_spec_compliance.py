@@ -1,3 +1,4 @@
+import pytest; pytest.importorskip('gradata.enhancements.self_improvement', reason='requires gradata_cloud')
 """
 SPEC.md Gold Standard Compliance Tests
 =======================================

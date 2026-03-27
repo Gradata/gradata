@@ -119,3 +119,27 @@ if (sessionNum > 0 && !wrapUpAlreadyRan) {
 } else if (wrapUpAlreadyRan) {
   // Wrap-up already validated to 100% — no re-run needed
 }
+
+// --- 4. Meta-rule discovery (best-effort) ---
+// Discovers compound principles from graduated lessons and persists to system.db.
+// Runs regardless of wrap-up status — meta-rules accumulate across sessions.
+try {
+  const metaPyCmd = [
+    'import sys; sys.path.insert(0, r"' + BRAIN + '/scripts")',
+    'from paths import SDK_SRC, LESSONS_FILE, DB_PATH',
+    'sys.path.insert(0, str(SDK_SRC))',
+    'from gradata.enhancements.meta_rules import discover_meta_rules, save_meta_rules, parse_lessons_from_markdown',
+    'text = LESSONS_FILE.read_text(encoding="utf-8") if LESSONS_FILE.exists() else ""',
+    'lessons = parse_lessons_from_markdown(text)',
+    'metas = discover_meta_rules(lessons, current_session=' + sessionNum + ')',
+    'saved = save_meta_rules(DB_PATH, metas) if metas else 0',
+    'print(f"{len(metas)} meta-rules discovered, {saved} saved")',
+  ].join('; ');
+
+  execSafe(
+    `"${PYTHON}" -c "${metaPyCmd}"`,
+    { timeout: 10000, stdio: 'ignore' }
+  );
+} catch (e) {
+  // Silent — meta-rule discovery is best-effort
+}
