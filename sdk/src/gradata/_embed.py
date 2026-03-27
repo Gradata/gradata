@@ -19,6 +19,7 @@ from gradata._config import (
     INDEXABLE_EXTENSIONS, API_KEY_ENV_VAR, LOCAL_MODEL,
 )
 import gradata._paths as _p
+from gradata._paths import BrainContext
 
 
 def get_file_hash(path: Path) -> str:
@@ -275,7 +276,8 @@ def get_stats(db_path) -> dict:
     return {"collection": "brain_embeddings", "total_chunks": count}
 
 
-def main(brain_dir: Path = None, full: bool = False, dry_run: bool = False, stats_only: bool = False):
+def main(brain_dir: Path = None, full: bool = False, dry_run: bool = False,
+         stats_only: bool = False, ctx: BrainContext | None = None):
     """Run embedding. Called by Brain.embed() or CLI.
 
     Embeddings stored in SQLite (brain_embeddings table).
@@ -283,9 +285,9 @@ def main(brain_dir: Path = None, full: bool = False, dry_run: bool = False, stat
     """
     if brain_dir is not None:
         _p.set_brain_dir(brain_dir)
-    base_dir = _p.BRAIN_DIR
-    db_path = _p.DB_PATH
-    manifest_file = _p.MANIFEST_FILE
+    base_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
+    db_path = ctx.db_path if ctx else _p.DB_PATH
+    manifest_file = ctx.manifest_file if ctx else _p.MANIFEST_FILE
 
     if stats_only:
         s = get_stats(db_path)

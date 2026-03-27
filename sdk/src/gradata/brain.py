@@ -175,7 +175,7 @@ class Brain:
         try:
             from gradata._query import brain_search
             return brain_search(
-                query, file_type=file_type, top_k=top_k, mode=mode
+                query, file_type=file_type, top_k=top_k, mode=mode, ctx=self.ctx
             )
         except ImportError:
             # Fallback: basic file grep
@@ -250,7 +250,7 @@ class Brain:
         """Query structured facts from the brain."""
         try:
             from gradata._fact_extractor import query_facts
-            return query_facts(prospect=prospect, fact_type=fact_type)
+            return query_facts(prospect=prospect, fact_type=fact_type, ctx=self.ctx)
         except ImportError:
             return []
 
@@ -258,8 +258,8 @@ class Brain:
         """Extract structured facts from all prospect files."""
         try:
             from gradata._fact_extractor import extract_all, store_facts
-            facts = extract_all()
-            store_facts(facts)
+            facts = extract_all(ctx=self.ctx)
+            store_facts(facts, ctx=self.ctx)
             return len(facts)
         except ImportError:
             return 0
@@ -270,8 +270,8 @@ class Brain:
         """Generate brain.manifest.json and return it."""
         try:
             from gradata._brain_manifest import generate_manifest, write_manifest
-            m = generate_manifest()
-            write_manifest(m)
+            m = generate_manifest(ctx=self.ctx)
+            write_manifest(m, ctx=self.ctx)
             return m
         except ImportError:
             # Minimal manifest without brain_manifest module
@@ -292,6 +292,7 @@ class Brain:
             return export_brain(
                 include_prospects=(mode != "no-prospects"),
                 domain_only=(mode == "domain-only"),
+                ctx=self.ctx,
             )
         except ImportError as e:
             raise RuntimeError(f"Export requires brain modules: {e}")
@@ -302,7 +303,7 @@ class Brain:
         """Compile relevant context for a user message."""
         try:
             from gradata._context_compile import compile_context
-            return compile_context(message)
+            return compile_context(message, ctx=self.ctx)
         except ImportError:
             # Fallback: basic search
             results = self.search(message[:100], top_k=3)

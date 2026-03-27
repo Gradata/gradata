@@ -229,11 +229,11 @@ def generate_manifest(*, domain: str = "General", ctx: "BrainContext | None" = N
     except Exception:
         pass
 
-    quality = _quality_metrics()
-    memory = _memory_composition()
-    rag = _rag_status()
-    contract = _behavioral_contract()
-    tables = _get_tables()
+    quality = _quality_metrics(ctx=ctx)
+    memory = _memory_composition(ctx=ctx)
+    rag = _rag_status(ctx=ctx)
+    contract = _behavioral_contract(ctx=ctx)
+    tables = _get_tables(ctx=ctx)
 
     manifest = {
         "schema_version": "1.0.0",
@@ -318,24 +318,26 @@ def generate_manifest(*, domain: str = "General", ctx: "BrainContext | None" = N
     return manifest
 
 
-def write_manifest(manifest: dict = None):
+def write_manifest(manifest: dict = None, ctx: "BrainContext | None" = None):
     """Write manifest to brain/brain.manifest.json."""
     if manifest is None:
-        manifest = generate_manifest()
-    (_p.BRAIN_DIR / "brain.manifest.json").write_text(
+        manifest = generate_manifest(ctx=ctx)
+    brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
+    (brain_dir / "brain.manifest.json").write_text(
         json.dumps(manifest, indent=2, default=str),
         encoding="utf-8",
     )
-    return _p.BRAIN_DIR / "brain.manifest.json"
+    return brain_dir / "brain.manifest.json"
 
 
 # Module-level constant for backward compat (resolves at import time)
 MANIFEST_PATH = _p.BRAIN_DIR / "brain.manifest.json"
 
 
-def validate_manifest() -> list[str]:
+def validate_manifest(ctx: "BrainContext | None" = None) -> list[str]:
     """Validate existing manifest against current state."""
-    manifest_path = _p.BRAIN_DIR / "brain.manifest.json"
+    brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
+    manifest_path = brain_dir / "brain.manifest.json"
     issues = []
     if not manifest_path.exists():
         return ["brain.manifest.json does not exist"]

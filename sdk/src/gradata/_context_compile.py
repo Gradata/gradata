@@ -9,6 +9,7 @@ Portable — uses _paths instead of hardcoded paths.
 import re
 
 import gradata._paths as _p
+from gradata._paths import BrainContext
 
 # Task detection keywords
 TASK_KEYWORDS = {
@@ -20,9 +21,9 @@ TASK_KEYWORDS = {
 }
 
 
-def _get_prospect_names() -> dict[str, str]:
+def _get_prospect_names(ctx: "BrainContext | None" = None) -> dict[str, str]:
     names = {}
-    prospects_dir = _p.PROSPECTS_DIR
+    prospects_dir = ctx.prospects_dir if ctx else _p.PROSPECTS_DIR
     if not prospects_dir.exists():
         return names
     for f in prospects_dir.glob("*.md"):
@@ -42,10 +43,10 @@ def _get_prospect_names() -> dict[str, str]:
     return names
 
 
-def extract_entities(message: str) -> dict:
+def extract_entities(message: str, ctx: "BrainContext | None" = None) -> dict:
     result = {"prospect": None, "task_type": None, "topic": None}
     msg_lower = message.lower()
-    prospect_map = _get_prospect_names()
+    prospect_map = _get_prospect_names(ctx=ctx)
     for key in sorted(prospect_map.keys(), key=len, reverse=True):
         if key in msg_lower and len(key) > 2:
             result["prospect"] = prospect_map[key]
@@ -61,8 +62,9 @@ def extract_entities(message: str) -> dict:
     return result
 
 
-def compile_context(message: str, prospect: str = None, task: str = None) -> str:
-    entities = extract_entities(message)
+def compile_context(message: str, prospect: str = None, task: str = None,
+                    ctx: "BrainContext | None" = None) -> str:
+    entities = extract_entities(message, ctx=ctx)
     if prospect:
         entities["prospect"] = prospect
     if task:

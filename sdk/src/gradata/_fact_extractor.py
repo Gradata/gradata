@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import gradata._paths as _p
+from gradata._paths import BrainContext
 
 # Constants — domain-specific fact types can be extended via brain config
 _DEFAULT_FACT_TYPES = (
@@ -41,8 +42,9 @@ CONF_INFERRED = 0.6
 CONF_GUESSED = 0.3
 
 
-def _get_db():
-    conn = sqlite3.connect(str(_p.DB_PATH))
+def _get_db(ctx: "BrainContext | None" = None):
+    db = ctx.db_path if ctx else _p.DB_PATH
+    conn = sqlite3.connect(str(db))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     return conn
@@ -245,10 +247,10 @@ def extract_from_file(filepath):
     return facts
 
 
-def extract_all():
+def extract_all(ctx: BrainContext | None = None):
     all_facts = []
     valid_names = _get_prospect_names()
-    prospects_dir = _p.PROSPECTS_DIR
+    prospects_dir = ctx.prospects_dir if ctx else _p.PROSPECTS_DIR
     for f in sorted(prospects_dir.glob("*.md")):
         if f.name.startswith("_"):
             continue
@@ -259,8 +261,8 @@ def extract_all():
     return all_facts
 
 
-def store_facts(facts_list):
-    conn = _get_db()
+def store_facts(facts_list, ctx: BrainContext | None = None):
+    conn = _get_db(ctx)
     _init_tables(conn)
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     inserted = 0
@@ -291,8 +293,9 @@ def store_facts(facts_list):
     return inserted, updated
 
 
-def query_facts(prospect=None, fact_type=None, min_confidence=0.0):
-    conn = _get_db()
+def query_facts(prospect=None, fact_type=None, min_confidence=0.0,
+                ctx: "BrainContext | None" = None):
+    conn = _get_db(ctx)
     _init_tables(conn)
     sql = "SELECT * FROM facts WHERE stale=0"
     params = []
@@ -311,8 +314,8 @@ def query_facts(prospect=None, fact_type=None, min_confidence=0.0):
     return [dict(r) for r in rows]
 
 
-def mark_stale(days=30):
-    conn = _get_db()
+def mark_stale(days=30, ctx: BrainContext | None = None):
+    conn = _get_db(ctx)
     _init_tables(conn)
     cutoff = (datetime.now(UTC) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
     result = conn.execute("UPDATE facts SET stale=1 WHERE last_verified < ? AND stale=0", (cutoff,))
@@ -322,8 +325,8 @@ def mark_stale(days=30):
     return count
 
 
-def decay_confidence(days=14):
-    conn = _get_db()
+def decay_confidence(days=14, ctx: "BrainContext | None" = None):
+    conn = _get_db(ctx)
     _init_tables(conn)
     now = datetime.now(UTC)
     rows = conn.execute("SELECT id, confidence, last_verified FROM facts WHERE stale=0").fetchall()
@@ -348,8 +351,8 @@ def decay_confidence(days=14):
     return updated
 
 
-def get_stats():
-    conn = _get_db()
+def get_stats(ctx: BrainContext | None = None):
+    conn = _get_db(ctx)
     _init_tables(conn)
     rows = conn.execute(
         """SELECT fact_type, COUNT(*) as count,

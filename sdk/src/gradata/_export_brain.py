@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import gradata._paths as _p
+from gradata._paths import BrainContext
 
 
 def _EXPORTS_DIR(): return _p.BRAIN_DIR / "exports"
@@ -174,7 +175,14 @@ def collect_domain_files() -> list[tuple[str, Path]]:
     return files
 
 
-def export_brain(include_prospects: bool = True, domain_only: bool = False) -> Path:
+def export_brain(include_prospects: bool = True, domain_only: bool = False,
+                  ctx: BrainContext | None = None) -> Path:
+    brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
+    prospects_dir = ctx.prospects_dir if ctx else _p.PROSPECTS_DIR
+    sessions_dir = ctx.sessions_dir if ctx else _p.SESSIONS_DIR
+    version_file = ctx.version_file if ctx else _p.VERSION_FILE
+    working_dir = ctx.working_dir if ctx else _p.WORKING_DIR
+
     version = read_version()
     domain = read_domain_name()
     sessions = read_session_count()
@@ -196,7 +204,7 @@ def export_brain(include_prospects: bool = True, domain_only: bool = False) -> P
         if _QUALITY_RUBRICS().exists():
             all_files.append(("quality/quality-rubrics.md", _QUALITY_RUBRICS()))
 
-    name_map = build_prospect_map(_p.PROSPECTS_DIR)
+    name_map = build_prospect_map(prospects_dir)
     sanitized: list[tuple[str, str]] = []
     for archive_path, source_path in all_files:
         try:
@@ -210,7 +218,7 @@ def export_brain(include_prospects: bool = True, domain_only: bool = False) -> P
     now = datetime.now(UTC)
     try:
         from gradata._brain_manifest import generate_manifest
-        manifest = generate_manifest()
+        manifest = generate_manifest(ctx=ctx)
         manifest["export"] = {
             "exported_at": now.isoformat(),
             "mode": "domain-only" if domain_only else ("no-prospects" if not include_prospects else "full"),
@@ -228,13 +236,14 @@ def export_brain(include_prospects: bool = True, domain_only: bool = False) -> P
             "export": {"exported_at": now.isoformat(), "files": [path for path, _ in sanitized]},
         }
 
-    _EXPORTS_DIR().mkdir(parents=True, exist_ok=True)
+    exports_dir = brain_dir / "exports"
+    exports_dir.mkdir(parents=True, exist_ok=True)
     date_str = now.strftime("%Y%m%d")
     version_str = version.replace(".", "-")
     domain_lower = domain.lower()
     mode_suffix = "-domain" if domain_only else ("-noprospects" if not include_prospects else "")
     zip_name = f"gradata-{domain_lower}-{version_str}-{date_str}{mode_suffix}.zip"
-    zip_path = _EXPORTS_DIR() / zip_name
+    zip_path = exports_dir / zip_name
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("manifest.json", json.dumps(manifest, indent=2, default=str))

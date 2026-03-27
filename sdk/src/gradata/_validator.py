@@ -19,6 +19,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import gradata._paths as _p
+from gradata._paths import BrainContext
 
 __all__ = [
     "main",
@@ -528,9 +529,10 @@ def _compute_trust_score(dimensions: list[dict]) -> dict:
 
 # ── Main Validation ──────────────────────────────────────────────────
 
-def validate_brain(manifest_path: Path = None) -> dict:
+def validate_brain(manifest_path: Path = None, ctx: BrainContext | None = None) -> dict:
     """Run full brain validation. Returns structured report."""
-    path = manifest_path or (_p.BRAIN_DIR / "brain.manifest.json")
+    brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
+    path = manifest_path or (brain_dir / "brain.manifest.json")
 
     if not path.exists():
         return {"error": f"Manifest not found: {path}", "trust": {"score": 0, "grade": "F", "verdict": "UNTRUSTED"}}
@@ -543,7 +545,7 @@ def validate_brain(manifest_path: Path = None) -> dict:
     # Connect to DB
     db_path = path.parent / "system.db"
     if not db_path.exists():
-        db_path = _p.DB_PATH
+        db_path = ctx.db_path if ctx else _p.DB_PATH
     try:
         conn = sqlite3.connect(str(db_path))
     except Exception as e:
@@ -583,9 +585,10 @@ def validate_brain(manifest_path: Path = None) -> dict:
     return report
 
 
-def save_validation(report: dict):
+def save_validation(report: dict, ctx: "BrainContext | None" = None):
     """Save validation report to brain/validations/."""
-    validations_dir = _p.BRAIN_DIR / "validations"
+    brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
+    validations_dir = brain_dir / "validations"
     validations_dir.mkdir(parents=True, exist_ok=True)
     date_str = datetime.now().strftime("%Y-%m-%d")
     path = validations_dir / f"{date_str}.json"

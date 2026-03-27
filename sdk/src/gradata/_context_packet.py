@@ -11,6 +11,7 @@ from datetime import datetime, date
 from pathlib import Path
 
 import gradata._paths as _p
+from gradata._paths import BrainContext
 
 
 # Lazy imports
@@ -47,8 +48,8 @@ def _safe_read_lines(path: Path, max_lines: int) -> str:
         return ""
 
 
-def _fuzzy_match_prospect(name: str) -> Path | None:
-    prospects_dir = _p.PROSPECTS_DIR
+def _fuzzy_match_prospect(name: str, ctx: "BrainContext | None" = None) -> Path | None:
+    prospects_dir = ctx.prospects_dir if ctx else _p.PROSPECTS_DIR
     if not prospects_dir.exists():
         return None
     name_lower = name.lower()
@@ -66,9 +67,10 @@ def _fuzzy_match_prospect(name: str) -> Path | None:
     return None
 
 
-def _load_user_scope() -> dict:
+def _load_user_scope(ctx: "BrainContext | None" = None) -> dict:
     result = {"voice_summary": "", "recent_corrections": [], "frameworks": ""}
-    soul_path = _p.DOMAIN_DIR / "soul.md"
+    domain_dir = ctx.domain_dir if ctx else _p.DOMAIN_DIR
+    soul_path = domain_dir / "soul.md"
     result["voice_summary"] = _safe_read_lines(soul_path, 50)
     try:
         corrections = _events_query(event_type="CORRECTION", limit=5)
@@ -79,15 +81,16 @@ def _load_user_scope() -> dict:
         ]
     except Exception:
         pass
-    if _p.PATTERNS_FILE.exists():
-        result["frameworks"] = _safe_read_lines(_p.PATTERNS_FILE, 30)
+    patterns_file = ctx.patterns_file if ctx else _p.PATTERNS_FILE
+    if patterns_file.exists():
+        result["frameworks"] = _safe_read_lines(patterns_file, 30)
     return result
 
 
-def _load_prospect_context(prospect_name: str) -> dict:
+def _load_prospect_context(prospect_name: str, ctx: "BrainContext | None" = None) -> dict:
     result = {"file_content": "", "search_results": [], "recent_interactions": [],
               "stage": "", "company": "", "persona": ""}
-    prospect_file = _fuzzy_match_prospect(prospect_name)
+    prospect_file = _fuzzy_match_prospect(prospect_name, ctx=ctx)
     if prospect_file:
         raw = _safe_read(prospect_file, limit_chars=500)
         result["file_content"] = raw
@@ -136,22 +139,24 @@ def _load_prospect_context(prospect_name: str) -> dict:
     return result
 
 
-def _load_drafting_context() -> dict:
+def _load_drafting_context(ctx: "BrainContext | None" = None) -> dict:
     result = {"patterns": "", "voice_guidelines": "", "frameworks": ""}
-    if _p.PATTERNS_FILE.exists():
+    patterns_file = ctx.patterns_file if ctx else _p.PATTERNS_FILE
+    if patterns_file.exists():
         try:
-            content = _p.PATTERNS_FILE.read_text(encoding="utf-8", errors="replace")
+            content = patterns_file.read_text(encoding="utf-8", errors="replace")
             relevant = [line.strip() for line in content.splitlines()
                         if "[PROVEN]" in line or "[EMERGING]" in line]
             result["patterns"] = "\n".join(relevant[:20])
         except Exception:
             pass
-    soul_path = _p.DOMAIN_DIR / "soul.md"
+    domain_dir = ctx.domain_dir if ctx else _p.DOMAIN_DIR
+    soul_path = domain_dir / "soul.md"
     result["voice_guidelines"] = _safe_read_lines(soul_path, 50)
     return result
 
 
-def _load_debug_context(topic: str) -> dict:
+def _load_debug_context(topic: str, ctx: "BrainContext | None" = None) -> dict:
     result = {"search_results": [], "recent_failures": [], "corrections": []}
     try:
         fts_results = _fts_search(topic, top_k=5)
@@ -187,10 +192,11 @@ def _load_debug_context(topic: str) -> dict:
     return result
 
 
-def _load_audit_context(session: int) -> dict:
+def _load_audit_context(session: int, ctx: "BrainContext | None" = None) -> dict:
     result = {"metrics": {}, "outputs": [], "gates": [], "correction_rate": {}}
     try:
-        conn = sqlite3.connect(str(_p.DB_PATH))
+        db = ctx.db_path if ctx else _p.DB_PATH
+        conn = sqlite3.connect(str(db))
         conn.row_factory = sqlite3.Row
         row = conn.execute("SELECT * FROM session_metrics WHERE session = ?", (session,)).fetchone()
         if row:
@@ -225,7 +231,7 @@ def _load_audit_context(session: int) -> dict:
     return result
 
 
-def _load_wrapup_context(session: int) -> dict:
+def _load_wrapup_context(session: int, ctx: "BrainContext | None" = None) -> dict:
     result = {"session_events": [], "modified_prospects": [], "current_loop_state": ""}
     try:
         events = _events_query(session=session, limit=200)
@@ -238,7 +244,7 @@ def _load_wrapup_context(session: int) -> dict:
         pass
     try:
         today_str = date.today().isoformat()
-        prospects_dir = _p.PROSPECTS_DIR
+        prospects_dir = ctx.prospects_dir if ctx else _p.PROSPECTS_DIR
         if prospects_dir.exists():
             for f in prospects_dir.glob("*.md"):
                 if f.name == "_TEMPLATE.md":
@@ -251,8 +257,9 @@ def _load_wrapup_context(session: int) -> dict:
                     continue
     except Exception:
         pass
-    if _p.LOOP_STATE.exists():
-        result["current_loop_state"] = _safe_read(_p.LOOP_STATE, limit_chars=1500)
+    loop_state = ctx.loop_state if ctx else _p.LOOP_STATE
+    if loop_state.exists():
+        result["current_loop_state"] = _safe_read(loop_state, limit_chars=1500)
     return result
 
 
@@ -332,31 +339,32 @@ def format_as_prompt(packet: dict, task_type: str) -> str:
 
 
 def build_packet(prospect: str = None, task_type: str = None,
-                 topic: str = None, session: int = None) -> str:
+                 topic: str = None, session: int = None,
+                 ctx: "BrainContext | None" = None) -> str:
     packet = {}
     if session is None:
         session = _detect_session()
 
     if task_type in ("prospecting", "meeting_prep"):
-        packet["user_scope"] = _load_user_scope()
+        packet["user_scope"] = _load_user_scope(ctx=ctx)
         if prospect:
-            packet["prospect"] = _load_prospect_context(prospect)
+            packet["prospect"] = _load_prospect_context(prospect, ctx=ctx)
     elif task_type == "drafting":
-        packet["user_scope"] = _load_user_scope()
+        packet["user_scope"] = _load_user_scope(ctx=ctx)
         if prospect:
-            packet["prospect"] = _load_prospect_context(prospect)
-        packet["drafting"] = _load_drafting_context()
+            packet["prospect"] = _load_prospect_context(prospect, ctx=ctx)
+        packet["drafting"] = _load_drafting_context(ctx=ctx)
     elif task_type == "critique":
         if prospect:
-            packet["prospect"] = _load_prospect_context(prospect)
-        packet["drafting"] = _load_drafting_context()
+            packet["prospect"] = _load_prospect_context(prospect, ctx=ctx)
+        packet["drafting"] = _load_drafting_context(ctx=ctx)
     elif task_type == "debug":
-        packet["debug"] = _load_debug_context(topic or "")
+        packet["debug"] = _load_debug_context(topic or "", ctx=ctx)
     elif task_type == "audit":
-        packet["audit"] = _load_audit_context(session)
+        packet["audit"] = _load_audit_context(session, ctx=ctx)
     elif task_type in ("wrap-up", "wrapup"):
-        packet["wrapup"] = _load_wrapup_context(session)
+        packet["wrapup"] = _load_wrapup_context(session, ctx=ctx)
     else:
-        packet["user_scope"] = _load_user_scope()
+        packet["user_scope"] = _load_user_scope(ctx=ctx)
 
     return format_as_prompt(packet, task_type)

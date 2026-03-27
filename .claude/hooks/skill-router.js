@@ -993,6 +993,56 @@ const SKILLS = [
     keywords: ['quality loop', 'system health', 'quality check'],
     intents: [/quality.*(loop|check|health)/i, /system.*(health|quality|check)/i],
   },
+
+  // ── .claude/skills (plugin skills) ──────────────────────────
+  {
+    skill: 'autoresearch',
+    path: '.claude/skills/autoresearch/SKILL.md',
+    keywords: ['autoresearch', 'autonomous iteration', 'iterate autonomously', 'auto improve'],
+    intents: [/autonom.*(iterat|improv|optim|loop)/i, /auto.?research/i, /keep (trying|iterating|improving) until/i],
+  },
+  {
+    skill: 'e2e-testing',
+    path: '.claude/skills/e2e-testing/SKILL.md',
+    keywords: ['e2e test', 'end to end test', 'playwright test', 'write a test'],
+    intents: [/(e2e|end.to.end).*(test|spec)/i, /(write|create|add).*(test|spec).*(flow|page|feature)/i],
+  },
+  {
+    skill: 'frontend-slides',
+    path: '.claude/skills/frontend-slides/SKILL.md',
+    keywords: ['html presentation', 'create slides', 'convert ppt', 'html slides'],
+    intents: [/(create|build|convert).*(slide|presentation|deck).*(html|web)/i, /(ppt|powerpoint).*(html|web|convert)/i],
+  },
+  {
+    skill: 'modern-python',
+    path: '.claude/skills/modern-python/SKILL.md',
+    keywords: ['modern python', 'uv setup', 'ruff setup', 'python project setup'],
+    intents: [/(set up|configure|init).*(python|uv|ruff)/i, /modern.?python/i, /(uv|ruff|ty).*(config|setup|init)/i],
+  },
+  {
+    skill: 'notebooklm',
+    path: '.claude/skills/notebooklm/SKILL.md',
+    keywords: ['notebooklm', 'notebook lm', 'google notebook', 'create podcast'],
+    intents: [/notebook.?lm/i, /(create|generate).*(podcast|audio overview)/i],
+  },
+  {
+    skill: 'property-based-testing',
+    path: '.claude/skills/property-based-testing/SKILL.md',
+    keywords: ['property based testing', 'hypothesis testing', 'fuzz testing', 'property test'],
+    intents: [/property.?based/i, /hypothesis.*(test|framework)/i, /fuzz.*(test|input)/i],
+  },
+  {
+    skill: 'research',
+    path: '.claude/skills/research/SKILL.md',
+    keywords: ['deep research', 'research this', 'investigate', 'deep dive'],
+    intents: [/(deep|thorough).*(research|dive|investigation)/i, /research.*(deep|thorough|comprehensive)/i, /investigate.*(market|competitor|technology|vendor)/i],
+  },
+  {
+    skill: 'security-scan',
+    path: '.claude/skills/security-scan/SKILL.md',
+    keywords: ['security scan', 'scan config', 'agentshield', 'scan claude config'],
+    intents: [/(scan|audit).*(security|config|claude|hooks)/i, /agentshield/i],
+  },
 ];
 
 // ── Matching engine ──────────────────────────────────────────────

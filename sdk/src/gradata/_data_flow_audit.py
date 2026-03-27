@@ -10,6 +10,7 @@ import sqlite3
 from datetime import datetime
 
 import gradata._paths as _p
+from gradata._paths import BrainContext
 
 CHECKS = []
 
@@ -18,7 +19,7 @@ def _check(name: str, passed: bool, detail: str = ""):
     CHECKS.append({"name": name, "passed": passed, "detail": detail})
 
 
-def check_event_pipes():
+def check_event_pipes(ctx: "BrainContext | None" = None):
     known_types = [
         "CORRECTION", "GATE_RESULT", "GATE_OVERRIDE", "OUTPUT",
         "AUDIT_SCORE", "LESSON_CHANGE", "CALIBRATION", "HEALTH_CHECK",
@@ -26,7 +27,8 @@ def check_event_pipes():
         "VERIFICATION", "STEP_COMPLETE", "DEFER",
     ]
     try:
-        conn = sqlite3.connect(str(_p.DB_PATH))
+        db = ctx.db_path if ctx else _p.DB_PATH
+        conn = sqlite3.connect(str(db))
         rows = conn.execute("SELECT DISTINCT type FROM events").fetchall()
         conn.close()
         emitted_types = {r[0] for r in rows}
@@ -37,8 +39,9 @@ def check_event_pipes():
                "has emissions" if t in emitted_types else "no emissions found")
 
 
-def check_index_completeness():
-    manifest_path = _p.BRAIN_DIR / ".embed-manifest.json"
+def check_index_completeness(ctx: BrainContext | None = None):
+    brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
+    manifest_path = brain_dir / ".embed-manifest.json"
     if not manifest_path.exists():
         _check("index:manifest_exists", False, ".embed-manifest.json missing")
         return
@@ -46,12 +49,12 @@ def check_index_completeness():
     indexed_files = set(manifest.keys())
     skip_dirs = {".git", ".vectorstore", "scripts", "cache", "backups", "archive"}
     brain_files = set()
-    for f in _p.BRAIN_DIR.rglob("*.md"):
+    for f in brain_dir.rglob("*.md"):
         if any(part in skip_dirs for part in f.parts):
             continue
         if f.name.startswith("_") or f.name in {"README.md", ".gitkeep"}:
             continue
-        rel = str(f.relative_to(_p.BRAIN_DIR)).replace("\\", "/")
+        rel = str(f.relative_to(brain_dir)).replace("\\", "/")
         brain_files.add(rel)
     missing = brain_files - indexed_files
     if missing:
@@ -60,13 +63,15 @@ def check_index_completeness():
         _check("index:completeness", True, f"{len(brain_files)} files all indexed")
 
 
-def check_facts_freshness():
-    if not _p.PROSPECTS_DIR.exists():
+def check_facts_freshness(ctx: "BrainContext | None" = None):
+    prospects_dir = ctx.prospects_dir if ctx else _p.PROSPECTS_DIR
+    if not prospects_dir.exists():
         _check("facts:prospects_dir", False, "prospects/ not found")
         return
-    prospect_files = [f for f in _p.PROSPECTS_DIR.glob("*.md") if not f.name.startswith("_")]
+    prospect_files = [f for f in prospects_dir.glob("*.md") if not f.name.startswith("_")]
     try:
-        conn = sqlite3.connect(str(_p.DB_PATH))
+        db = ctx.db_path if ctx else _p.DB_PATH
+        conn = sqlite3.connect(str(db))
         tables = [r[0] for r in conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
         if "facts" not in tables:
@@ -92,11 +97,12 @@ def check_facts_freshness():
         _check("facts:coverage", True, f"{len(prospect_files)} prospects all have facts")
 
 
-def check_embeddings():
+def check_embeddings(ctx: BrainContext | None = None):
     """Check SQLite brain_embeddings table for indexed chunks."""
     import sqlite3
+    db = ctx.db_path if ctx else _p.DB_PATH
     try:
-        conn = sqlite3.connect(str(_p.DB_PATH))
+        conn = sqlite3.connect(str(db))
         row = conn.execute("SELECT COUNT(*) FROM brain_embeddings").fetchone()
         count = row[0] if row else 0
         conn.close()
@@ -105,9 +111,10 @@ def check_embeddings():
         _check("embeddings:sqlite", True, "brain_embeddings table not yet created (ok)")
 
 
-def check_fts5():
+def check_fts5(ctx: BrainContext | None = None):
+    db = ctx.db_path if ctx else _p.DB_PATH
     try:
-        conn = sqlite3.connect(str(_p.DB_PATH))
+        conn = sqlite3.connect(str(db))
         tables = [r[0] for r in conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
         if "brain_fts" not in tables:
@@ -121,8 +128,9 @@ def check_fts5():
         _check("fts5:query", False, f"error: {e}")
 
 
-def check_manifest():
-    manifest_path = _p.BRAIN_DIR / "brain.manifest.json"
+def check_manifest(ctx: BrainContext | None = None):
+    brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
+    manifest_path = brain_dir / "brain.manifest.json"
     if not manifest_path.exists():
         _check("manifest:exists", False, "brain.manifest.json not found")
         return
@@ -138,14 +146,14 @@ def check_manifest():
         _check("manifest:parse", False, f"JSON error: {e}")
 
 
-def run_audit() -> dict:
+def run_audit(ctx: "BrainContext | None" = None) -> dict:
     CHECKS.clear()
-    check_event_pipes()
-    check_index_completeness()
-    check_facts_freshness()
-    check_embeddings()
-    check_fts5()
-    check_manifest()
+    check_event_pipes(ctx=ctx)
+    check_index_completeness(ctx=ctx)
+    check_facts_freshness(ctx=ctx)
+    check_embeddings(ctx=ctx)
+    check_fts5(ctx=ctx)
+    check_manifest(ctx=ctx)
     passed = sum(1 for c in CHECKS if c["passed"])
     total = len(CHECKS)
     score = round(passed / total * 100, 1) if total > 0 else 0
