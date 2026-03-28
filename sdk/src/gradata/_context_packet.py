@@ -7,7 +7,7 @@ Portable — uses _paths for all directory references.
 
 import json
 import sqlite3
-from datetime import datetime, date
+from datetime import date, datetime
 from pathlib import Path
 
 import gradata._paths as _p

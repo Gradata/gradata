@@ -10,7 +10,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { isHookEnabled } = require('../lib/hook-flags');
+const { isHookEnabled } = require('./lib/hook-flags');
 const { spawnSafe } = require('../config.js');
 
 const MAX_STDIN = 1024 * 1024;

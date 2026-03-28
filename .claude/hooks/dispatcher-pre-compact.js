@@ -14,7 +14,7 @@ const HOOKS_DIR = path.dirname(__filename);
 
 const hooks = [
   { type: 'python', script: path.join(HOOKS_DIR, 'reflect', 'scripts', 'check_learnings.py'), timeout: 10000 },
-  { type: 'node',   script: path.join(HOOKS_DIR, 'post-compact.js'), timeout: 3000 },
+  { type: 'node',   script: path.join(HOOKS_DIR, 'compact', 'post-compact.js'), timeout: 3000 },
 ];
 
 let stdinBuf = '';

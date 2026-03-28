@@ -49,16 +49,11 @@ Example::
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 from gradata.patterns.scope import (
     AudienceTier,
     classify_scope,
 )
-
-if TYPE_CHECKING:
-    pass
-
 
 # ---------------------------------------------------------------------------
 # Pattern constants

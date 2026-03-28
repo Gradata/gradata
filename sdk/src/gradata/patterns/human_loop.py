@@ -35,12 +35,9 @@ Design principles
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    pass
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Risk keyword tables

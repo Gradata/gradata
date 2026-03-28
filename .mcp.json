@@ -4,7 +4,7 @@
       "type": "stdio",
       "command": "node",
       "args": [
-        "C:/Users/olive/OneDrive/Desktop/Sprites Work/mcp/wappalyzer/index.js"
+        "C:/Users/olive/OneDrive/Desktop/Sprites Work/vendor/wappalyzer/index.js"
       ],
       "env": {}
     },

@@ -55,11 +55,9 @@ Example
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable
-
-if TYPE_CHECKING:
-    pass  # Reserved for annotation-only imports
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

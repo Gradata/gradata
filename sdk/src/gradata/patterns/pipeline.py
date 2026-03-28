@@ -33,12 +33,9 @@ Usage::
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable
-
-if TYPE_CHECKING:
-    pass  # Reserved for future forward-reference imports
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Data classes

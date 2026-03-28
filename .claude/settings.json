@@ -82,6 +82,6 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/sprites-statusline.js\""
+    "command": "node \"C:/Users/olive/OneDrive/Desktop/Sprites Work/.claude/hooks/statusline/sprites-statusline.js\""
   }
 }

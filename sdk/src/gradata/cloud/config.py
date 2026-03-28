@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 CONFIG_DIR = Path.home() / ".gradata"
@@ -30,7 +30,7 @@ class CloudConfig:
     include_prospects: bool = False   # Exclude prospect data from sync by default
 
     @classmethod
-    def load(cls, brain_dir: Path | None = None) -> "CloudConfig":
+    def load(cls, brain_dir: Path | None = None) -> CloudConfig:
         """Load config from all sources, merged by priority."""
         config = cls()
 

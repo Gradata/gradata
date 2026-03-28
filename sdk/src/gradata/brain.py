@@ -33,7 +33,6 @@ Usage:
     brain.export("./exports/my-brain.zip")     # Package for marketplace
 """
 
-import json
 import logging
 import sqlite3
 import sys
@@ -350,6 +349,20 @@ class Brain:
             context: Optional session context dict for scope building.
             session: Session number (auto-detected if omitted).
         """
+        # ── Input validation ──────────────────────────────────────────
+        if not draft and not final:
+            raise ValueError("Both draft and final are empty — nothing to correct.")
+        if draft == final:
+            raise ValueError("draft and final are identical — no correction detected.")
+        max_input = 100_000
+        if len(draft) + len(final) > max_input:
+            raise ValueError(
+                f"Combined input length ({len(draft) + len(final)}) exceeds "
+                f"limit ({max_input}). Truncate inputs before calling correct()."
+            )
+        if session is not None and (not isinstance(session, int) or session < 1):
+            raise ValueError(f"session must be a positive integer, got {session!r}")
+
         # Route to cloud if connected, otherwise run locally
         if self._cloud and self._cloud.connected:
             try:
@@ -437,8 +450,8 @@ class Brain:
             if patterns:
                 event["patterns_extracted"] = len(patterns)
                 logger.debug("Extracted %d patterns from correction", len(patterns))
-        except Exception:
-            pass  # Pattern extraction is best-effort, not critical path
+        except Exception as e:
+            logger.warning("Pattern extraction failed: %s", e)
 
         return event
 
@@ -450,6 +463,7 @@ class Brain:
         self_score: float | None = None,
         scope: dict | None = None,
         session: int | None = None,
+        rules_applied: list[str] | None = None,
     ) -> dict:
         """Log an AI-generated output for tracking.
 
@@ -464,12 +478,15 @@ class Brain:
             self_score: Self-assessment score (0-10). Used for Brier calibration.
             scope: Optional scope dict (domain, task_type, audience, channel, stakes).
             session: Session number (auto-detected if omitted).
+            rules_applied: List of rule IDs active when this output was generated.
+                Enables external signal → rule attribution for outcome feedback.
         """
         data = {
             "output_type": output_type,
             "output_text": text[:5000],
             "outcome": "pending",        # pending -> accepted / minor / moderate / major / discarded
             "major_edit": False,
+            "rules_applied": rules_applied or [],
         }
         if prompt is not None:
             data["prompt"] = prompt[:2000]
@@ -623,8 +640,12 @@ class Brain:
     def guard(self, text: str, direction: str = "input") -> dict:
         """Run guardrail checks on text. direction: ``"input"`` or ``"output"``."""
         from gradata.patterns.guardrails import (
-            InputGuard, OutputGuard,
-            pii_detector, injection_detector, banned_phrases, destructive_action,
+            InputGuard,
+            OutputGuard,
+            banned_phrases,
+            destructive_action,
+            injection_detector,
+            pii_detector,
         )
         if direction == "input":
             guard_obj = InputGuard(pii_detector, injection_detector)
@@ -655,9 +676,11 @@ class Brain:
         Returns dict with ``final_output``, ``cycles_used``, ``converged``, ``critiques``.
         """
         from gradata.patterns.reflection import (
-            reflect as _reflect,
             EMAIL_CHECKLIST,
             default_evaluator,
+        )
+        from gradata.patterns.reflection import (
+            reflect as _reflect,
         )
 
         if checklist is None:
@@ -727,6 +750,22 @@ class Brain:
             misfired=misfired,
             contradicted=contradicted,
         )
+
+    def process_outcome_feedback(self, session: int | None = None) -> dict[str, float]:
+        """Process external signal outcomes (DELTA_TAG) for confidence feedback.
+
+        Returns {rule_id: confidence_delta} dict. Deltas are capped per tier
+        and weighted below user corrections (external attribution is uncertain).
+        Idempotent: processing the same session twice returns empty dict.
+        """
+        try:
+            from gradata.enhancements.outcome_feedback import process_session_outcomes
+            return process_session_outcomes(session, ctx=self.ctx)
+        except ImportError:
+            return {}
+        except Exception as e:
+            logger.warning("Outcome feedback processing failed: %s", e)
+            return {}
 
     def pipeline(self, *stages) -> "Pipeline":
         """Create a Pipeline with the given Stage instances."""

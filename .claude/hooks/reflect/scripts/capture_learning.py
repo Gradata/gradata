@@ -47,6 +47,99 @@ BRAIN_DIR = os.environ.get("BRAIN_DIR", "C:/Users/olive/SpritesWork/brain")
 PYTHON = os.environ.get("PYTHON_PATH", "C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe")
 EVENTS_PY = os.path.join(BRAIN_DIR, "scripts", "events.py")
 
+# Keyword taxonomy for correction classification.
+# Each category maps to keywords that signal that type of correction.
+# classify_correction() matches these in order; ORDER MATTERS — more specific
+# categories must come before broad ones like ACCURACY that contain "wrong".
+# GENERAL is the fallback when nothing matches.
+CATEGORY_KEYWORDS = {
+    # Specific structural categories first to prevent ACCURACY's "wrong" from
+    # swallowing corrections that belong to a more precise bucket.
+    "DATA_INTEGRITY": ["filter", "owner", "oliver only", "anna", "shared",
+                       "duplicate", "overlap", "wrong person", "wrong deal"],
+    "ARCHITECTURE": ["import", "module", "class", "function", "refactor",
+                     "dependency", "structure", "script", "python", "def "],
+    "TOOL": ["tool", "api", "mcp", "install", "config", "command", "endpoint",
+             "token", "integration"],
+    "LEADS": ["lead", "prospect", "enrich", "csv", "campaign", "instantly",
+              "apollo", "linkedin", "icp"],
+    "PRICING": ["price", "cost", "pricing", "monthly", "annual", "$",
+                "starter", "standard", "plan"],
+    "DEMO_PREP": ["demo", "cheat sheet", "battlecard", "prep"],
+    "DRAFTING": ["email", "draft", "subject line", "follow-up", "copy",
+                 "prose", "paragraph", "rewrite", "subject"],
+    # CONTEXT before PROCESS: multi-word context-loading phrases (session type,
+    # startup context) are more specific than bare "forgot"/"skip" and should
+    # classify as CONTEXT, not generic PROCESS.
+    "CONTEXT": ["session type", "startup context", "context window",
+                "already know", "load context", "you loaded"],
+    "PROCESS": ["skip", "forgot", "missing step", "workflow", "told you",
+                "step", "order"],
+    "THOROUGHNESS": ["incomplete", "all of them", "don't stop", "finish",
+                     "remaining", "rest of", "the rest"],
+    "POSITIONING": ["agency", "competitor", "frame", "position", "pitch",
+                    "messaging", "value prop"],
+    "COMMUNICATION": ["unclear", "ambiguous", "severity", "blocker",
+                      "too verbose", "verbose", "too long", "confusing"],
+    "TONE": ["tone", "aggressive", "pushy", "salesy", "formal", "casual",
+             "softer", "harsh"],
+    # ACCURACY is intentionally last among named categories — "wrong"/"incorrect"
+    # are common words that would false-positive on more specific categories above.
+    "ACCURACY": ["incorrect", "inaccurate", "verify", "hallucin", "fabricat",
+                 "made up", "not real", "doesn't exist", "never said",
+                 "misquot", "stale", "wrong number", "wrong data",
+                 "wrong name", "wrong company"],
+}
+
+
+def classify_correction(text: str) -> str:
+    """Classify a correction prompt into the learning taxonomy.
+
+    Checks each category's keywords (case-insensitive, multi-line safe) in
+    the order defined in CATEGORY_KEYWORDS. Returns the first matching category,
+    or "GENERAL" if nothing matches.
+
+    This is intentionally a fast heuristic — 10x better than labeling everything
+    GENERAL, but not a perfect classifier.
+    """
+    import re as _re
+    # Normalise: collapse whitespace so multi-line prompts match single-line patterns
+    normalised = " ".join(text.split()).lower()
+    for category, keywords in CATEGORY_KEYWORDS.items():
+        for kw in keywords:
+            if kw.lower() in normalised:
+                return category
+    return "GENERAL"
+
+
+def infer_session_task_types(text: str) -> list:
+    """Infer which task types were active based on correction text content.
+
+    Returns a list of task type strings that can be stored in the correction
+    event metadata and used by wrap_up.py testability checks.
+    """
+    import re as _re
+    normalised = " ".join(text.split()).lower()
+    task_types = []
+
+    TYPE_SIGNALS = {
+        "sales": ["lead", "prospect", "pipeline", "deal", "pipedrive", "crm",
+                  "campaign", "outreach", "sequence", "instantly"],
+        "drafting": ["email", "draft", "subject", "follow-up", "copy", "prose",
+                     "paragraph", "write"],
+        "code": ["import", "module", "class", "function", "refactor", "script",
+                 "python", "def ", "test", "pytest", "error", "traceback"],
+        "demo_prep": ["demo", "cheat sheet", "battlecard", "meeting", "call"],
+        "research": ["research", "enrich", "scrape", "apollo", "linkedin", "apify"],
+        "system": ["hook", "event", "brain", "session", "config", "startup"],
+    }
+
+    for task_type, signals in TYPE_SIGNALS.items():
+        if any(s in normalised for s in signals):
+            task_types.append(task_type)
+
+    return task_types if task_types else ["general"]
+
 
 def emit_hallucination(prompt: str, matched_patterns: str, confidence: float):
     """Emit a HALLUCINATION event when accuracy-related correction detected."""
@@ -75,26 +168,45 @@ def emit_correction(prompt: str, matched_patterns: str, confidence: float):
 
     This is the critical producer that feeds the entire self-improvement loop:
     update_confidence → lesson_applications → judgment_decay.
+
+    Classification hierarchy:
+    1. classify_correction() keyword taxonomy (14 categories) — primary
+    2. pattern-name fallback for named guardrail/explicit patterns — secondary
+    3. "GENERAL" — last resort when nothing matches
     """
     try:
         import subprocess
         import json as _json
-        # Detect category from patterns (DRAFTING, PROCESS, ACCURACY, etc.)
-        category = "GENERAL"
-        category_map = {
-            "dont-assume": "ACCURACY", "not-what-i-meant": "COMMUNICATION",
-            "already-told": "PROCESS", "wrong-approach": "PROCESS",
-            "too-verbose": "COMMUNICATION", "missed-context": "ACCURACY",
-        }
-        for pat in (matched_patterns or "").split():
-            if pat in category_map:
-                category = category_map[pat]
-                break
+
+        # Primary: full keyword-based classification against 14-category taxonomy
+        category = classify_correction(prompt)
+
+        # Secondary: if keyword classification returned GENERAL, check whether
+        # the matched pattern name itself implies a known category (fast path for
+        # explicit/guardrail hits that may use terse language)
+        if category == "GENERAL":
+            pattern_fallback = {
+                "dont-assume": "ACCURACY",
+                "not-what-i-meant": "COMMUNICATION",
+                "already-told": "PROCESS",
+                "wrong-approach": "PROCESS",
+                "too-verbose": "COMMUNICATION",
+                "missed-context": "ACCURACY",
+            }
+            for pat in (matched_patterns or "").split():
+                if pat in pattern_fallback:
+                    category = pattern_fallback[pat]
+                    break
+
+        # Task-type exposure: inferred from correction text, consumed by wrap_up.py
+        session_task_types = infer_session_task_types(prompt)
+
         data = _json.dumps({
             "category": category,
             "detail": prompt[:200],
             "confidence": confidence,
             "patterns": matched_patterns,
+            "session_task_types": session_task_types,
         })
         tags = _json.dumps([f"category:{category}"])
         subprocess.run(

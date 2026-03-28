@@ -25,10 +25,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
-
-import logging
 
 from gradata._scope import RuleScope, scope_matches
 from gradata._types import ELIGIBLE_STATES, Lesson, LessonState, RuleTransferScope
@@ -112,7 +111,7 @@ _UNIVERSAL_SIGNALS: list[str] = [
 
 # Keywords signaling team/org scope (tool or company specific)
 _TEAM_SIGNALS: list[str] = [
-    "pipedrive", "instantly", "calendly", "sprites",
+    "pipedrive", "instantly", "calendly",
     "apollo", "zerobounce", "prospeo",
     "brain/", ".carl/", "domain/",
     "notebooklm", "apify", "opencli",

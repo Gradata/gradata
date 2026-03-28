@@ -25,20 +25,20 @@ const cfg = require('./config.js');
 const HOOKS_DIR = path.dirname(__filename);
 
 const hooks = [
-  { matcher: 'Read',       type: 'node',   script: path.join(HOOKS_DIR, 'gate-emit.js'),          timeout: 3000 },
-  { matcher: 'Write|Edit', type: 'node',   script: path.join(HOOKS_DIR, 'secret-scan.js'),        timeout: 3000 },
-  { matcher: 'Write|Edit', type: 'node',   script: path.join(HOOKS_DIR, 'obsidian-autolink.js'),  timeout: 3000 },
-  { matcher: 'Write|Edit', type: 'node',   script: path.join(HOOKS_DIR, 'output-event.js'),       timeout: 5000 },
-  { matcher: 'Write|Edit', type: 'node',   script: path.join(HOOKS_DIR, 'codex-review.js'),       timeout: 20000 },
-  { matcher: 'Write|Edit', type: 'node',   script: path.join(HOOKS_DIR, 'qwen-lint.js'),          timeout: 15000 },
-  { matcher: 'Write|Edit', type: 'node',   script: path.join(HOOKS_DIR, 'arch-review.js'),        timeout: 30000 },
-  { matcher: 'Agent',      type: 'node',   script: path.join(HOOKS_DIR, 'agent-graduation.js'),   timeout: 10000 },
+  { matcher: 'Read',       type: 'node',   script: path.join(HOOKS_DIR, 'post-tool', 'gate-emit.js'),          timeout: 3000 },
+  { matcher: 'Write|Edit', type: 'node',   script: path.join(HOOKS_DIR, 'pre-tool', 'secret-scan.js'),         timeout: 3000 },
+  { matcher: 'Write|Edit', type: 'node',   script: path.join(HOOKS_DIR, 'post-tool', 'obsidian-autolink.js'),  timeout: 3000 },
+  { matcher: 'Write|Edit', type: 'node',   script: path.join(HOOKS_DIR, 'post-tool', 'output-event.js'),       timeout: 5000 },
+  { matcher: 'Write|Edit', type: 'node',   script: path.join(HOOKS_DIR, 'post-tool', 'codex-review.js'),       timeout: 20000 },
+  { matcher: 'Write|Edit', type: 'node',   script: path.join(HOOKS_DIR, 'post-tool', 'qwen-lint.js'),          timeout: 15000 },
+  { matcher: 'Write|Edit', type: 'node',   script: path.join(HOOKS_DIR, 'post-tool', 'arch-review.js'),        timeout: 30000 },
+  { matcher: 'Agent',      type: 'node',   script: path.join(HOOKS_DIR, 'post-tool', 'agent-graduation.js'),   timeout: 10000 },
   { matcher: 'Bash',       type: 'python', script: path.join(HOOKS_DIR, 'reflect', 'scripts', 'post_commit_reminder.py'), timeout: 5000 },
-  { matcher: null,         type: 'node',   script: path.join(HOOKS_DIR, 'delta-auto-tag.js'),     timeout: 5000 },
-  { matcher: 'mcp__*',     type: 'node',   script: path.join(HOOKS_DIR, 'tool-failure-emit.js'),  timeout: 5000 },
-  { matcher: null,         type: 'node',   script: path.join(HOOKS_DIR, 'suggest-compact.js'),    timeout: 3000 },
-  { matcher: 'Write|Edit|Bash', type: 'node', script: path.join(HOOKS_DIR, 'behavior-triggers.js'), timeout: 5000 },
-  { matcher: 'Write|Edit|Bash', type: 'python', script: path.join(HOOKS_DIR, 'rule-verify-post-tool.py'), timeout: 5000 },
+  { matcher: null,         type: 'node',   script: path.join(HOOKS_DIR, 'post-tool', 'delta-auto-tag.js'),     timeout: 5000 },
+  { matcher: 'mcp__*',     type: 'node',   script: path.join(HOOKS_DIR, 'post-tool', 'tool-failure-emit.js'),  timeout: 5000 },
+  { matcher: null,         type: 'node',   script: path.join(HOOKS_DIR, 'post-tool', 'suggest-compact.js'),    timeout: 3000 },
+  { matcher: 'Write|Edit|Bash', type: 'node', script: path.join(HOOKS_DIR, 'post-tool', 'behavior-triggers.js'), timeout: 5000 },
+  { matcher: 'Write|Edit|Bash', type: 'python', script: path.join(HOOKS_DIR, 'post-tool', 'rule-verify-post-tool.py'), timeout: 5000 },
 ];
 
 function matchesTool(matcher, toolName) {

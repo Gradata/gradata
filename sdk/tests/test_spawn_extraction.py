@@ -224,6 +224,14 @@ class TestHandoffs:
 # 4. Agent Quality Scores (agent_graduation.py)
 # ---------------------------------------------------------------------------
 
+try:
+    import gradata.enhancements.agent_graduation as _ag  # noqa: F401
+    _HAS_AGENT_GRAD = True
+except ImportError:
+    _HAS_AGENT_GRAD = False
+
+
+@pytest.mark.skipif(not _HAS_AGENT_GRAD, reason="requires gradata.enhancements.agent_graduation")
 class TestComputeQualityScores:
     """Tests for AgentGraduationTracker.compute_quality_scores()."""
 

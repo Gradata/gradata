@@ -63,7 +63,7 @@
       "Bash(rm -rf sequences)",
       "Bash(cp -r research/* \"Sales Playbooks/\")",
       "Bash(rm -rf research)",
-      "Bash(find '/c/Users/olive/OneDrive/Desktop/Sprites Work' \\\\\\(-path */brain/pipeline/* -o -path */brain/prospects/* -o -path */brain/objections/* -o -path */brain/personas/* -o -path */brain/demos/* -o -path */brain/learnings/* -o -path */.claude/auditor-system.md -o -path */.claude/quality-rubrics.md -o -path */.claude/gates.md -o -path */skills/post-call/* -o -path */skills/wrap-up/* -o -path */.carl/* -o -path '*/Email Templates/*' \\\\\\) -type f)",
+      "Bash(find '/c/Users/olive/OneDrive/Desktop/Sprites Work' \\\\\\(-path */brain/pipeline/* -o -path */brain/prospects/* -o -path */brain/objections/* -o -path */brain/personas/* -o -path */brain/demos/* -o -path */brain/learnings/* -o -path */.claude/auditor-system.md -o -path */.claude/quality-rubrics.md -o -path */.claude/gates.md -o -path */skills/sales/post-call/* -o -path */skills/core/wrap-up/* -o -path */.carl/* -o -path '*/Email Templates/*' \\\\\\) -type f)",
       "Bash(C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe -c \":*)",
       "Bash(C:/Users/olive/AppData/Local/Programs/Python/Python312/python.exe \"C:/Users/olive/OneDrive/Desktop/Sprites Work/Scripts/analyze_instantly.py\")",
       "Bash(PYTHONIOENCODING=utf-8 python -c \":*)",

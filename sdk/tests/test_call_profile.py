@@ -1,4 +1,4 @@
-import pytest; pytest.importorskip('gradata.enhancements.self_improvement', reason='requires gradata_cloud')
+import pytest; pytest.importorskip('gradata.enhancements.call_profile', reason='requires gradata_cloud')
 import pytest
 try:
     import gradata_cloud
@@ -37,7 +37,7 @@ def _make_transcript(user_turns: list[str], prospect_turns: list[str]) -> list[U
     t = 0.0
     for i in range(max(len(user_turns), len(prospect_turns))):
         if i < len(user_turns):
-            utts.append(Utterance("Oliver", user_turns[i], t, t + 5.0))
+            utts.append(Utterance("Alice", user_turns[i], t, t + 5.0))
             t += 5.0
         if i < len(prospect_turns):
             utts.append(Utterance("Prospect", prospect_turns[i], t, t + 5.0))
@@ -82,24 +82,24 @@ def _make_discovery_transcript() -> list[Utterance]:
 class TestParseTranscript:
     def test_fireflies_format(self):
         sentences = [
-            {"speaker_name": "Oliver", "text": "Hey how are you?", "start_time": 0.5, "end_time": 2.0},
+            {"speaker_name": "Alice", "text": "Hey how are you?", "start_time": 0.5, "end_time": 2.0},
             {"speaker_name": "Tim", "text": "Good, thanks.", "start_time": 2.1, "end_time": 3.5},
         ]
-        utts, user = parse_transcript(sentences, user_speaker="Oliver")
+        utts, user = parse_transcript(sentences, user_speaker="Alice")
         assert len(utts) == 2
-        assert user == "Oliver"
-        assert utts[0].speaker == "Oliver"
+        assert user == "Alice"
+        assert utts[0].speaker == "Alice"
         assert utts[1].speaker == "Tim"
 
     def test_auto_detect_user(self):
         sentences = [
-            {"speaker_name": "Oliver", "text": "Welcome to the call.", "start_time": 0},
-            {"speaker_name": "Oliver", "text": "Let me start with introductions.", "start_time": 2},
+            {"speaker_name": "Alice", "text": "Welcome to the call.", "start_time": 0},
+            {"speaker_name": "Alice", "text": "Let me start with introductions.", "start_time": 2},
             {"speaker_name": "Tim", "text": "Sure.", "start_time": 4},
-            {"speaker_name": "Oliver", "text": "Great.", "start_time": 5},
+            {"speaker_name": "Alice", "text": "Great.", "start_time": 5},
         ]
         utts, user = parse_transcript(sentences)
-        assert user == "Oliver"  # most turns in first 20%
+        assert user == "Alice"  # most turns in first 20%
 
     def test_empty_transcript(self):
         utts, user = parse_transcript([])
@@ -107,9 +107,9 @@ class TestParseTranscript:
 
     def test_alternative_keys(self):
         sentences = [
-            {"speaker": "Oliver", "sentence": "Hello there.", "start_time": 0, "end_time": 1},
+            {"speaker": "Alice", "sentence": "Hello there.", "start_time": 0, "end_time": 1},
         ]
-        utts, user = parse_transcript(sentences, user_speaker="Oliver")
+        utts, user = parse_transcript(sentences, user_speaker="Alice")
         assert len(utts) == 1
         assert utts[0].text == "Hello there."
 
@@ -121,7 +121,7 @@ class TestParseTranscript:
 class TestExtractFeatures:
     def test_basic_features(self):
         utts = _make_discovery_transcript()
-        f = extract_call_features(utts, "Oliver", "discovery")
+        f = extract_call_features(utts, "Alice", "discovery")
         assert f.call_type == "discovery"
         assert f.total_words > 0
         assert f.user_words > 0
@@ -132,26 +132,26 @@ class TestExtractFeatures:
 
     def test_pain_questions_detected(self):
         utts = _make_discovery_transcript()
-        f = extract_call_features(utts, "Oliver", "discovery")
+        f = extract_call_features(utts, "Alice", "discovery")
         assert f.pain_question_count >= 2  # "how does that impact" + "what would it mean"
 
     def test_story_detected(self):
         utts = _make_discovery_transcript()
-        f = extract_call_features(utts, "Oliver", "discovery")
+        f = extract_call_features(utts, "Alice", "discovery")
         assert f.story_count >= 1  # "We had a client, an agency similar to yours"
 
     def test_close_attempt_detected(self):
         utts = _make_discovery_transcript()
-        f = extract_call_features(utts, "Oliver", "discovery")
+        f = extract_call_features(utts, "Alice", "discovery")
         assert f.close_attempts >= 1  # "set up a demo for Thursday"
 
     def test_specific_commitment(self):
         utts = _make_discovery_transcript()
-        f = extract_call_features(utts, "Oliver", "discovery")
+        f = extract_call_features(utts, "Alice", "discovery")
         assert f.specific_commitments >= 1  # "Thursday at 2pm PT"
 
     def test_empty_transcript(self):
-        f = extract_call_features([], "Oliver", "discovery")
+        f = extract_call_features([], "Alice", "discovery")
         assert f.total_words == 0
         assert f.talk_ratio == 0.0
 
@@ -160,13 +160,13 @@ class TestExtractFeatures:
             user_turns=["What tools have you used?", "I hear that. Our pricing is actually lower than most."],
             prospect_turns=["They're too expensive.", "Hmm, tell me more."],
         )
-        f = extract_call_features(utts, "Oliver", "discovery")
+        f = extract_call_features(utts, "Alice", "discovery")
         assert f.objection_count >= 1
         assert f.objection_responses >= 1
 
     def test_serialization(self):
         utts = _make_discovery_transcript()
-        f = extract_call_features(utts, "Oliver", "discovery")
+        f = extract_call_features(utts, "Alice", "discovery")
         d = f.to_dict()
         f2 = CallFeatures.from_dict(d)
         assert f2.talk_ratio == round(f.talk_ratio, 2)

@@ -13,9 +13,9 @@ Usage:
     )
 """
 
-import json
 import sqlite3
 import sys
+from datetime import UTC
 from enum import Enum
 from pathlib import Path
 
@@ -47,21 +47,40 @@ def _ensure_table(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def _get_db_path() -> Path:
-    """Resolve DB path, supporting both SDK and brain/scripts contexts."""
+def _get_db_path(ctx=None) -> Path | None:
+    """Resolve DB path from context, env var, or relative traversal.
+
+    Resolution order:
+      1. BrainContext.db_path (if ctx provided)
+      2. BRAIN_DIR environment variable + /system.db
+      3. Relative traversal from this file's location
+      4. None (caller must handle)
+    """
+    import os
+
+    # 1. DI context
+    if ctx is not None:
+        db = getattr(ctx, "db_path", None)
+        if db and Path(db).exists():
+            return Path(db)
+
+    # 2. Environment variable
+    env_dir = os.environ.get("BRAIN_DIR")
+    if env_dir:
+        p = Path(env_dir) / "system.db"
+        if p.exists():
+            return p
+
+    # 3. Relative traversal (SDK installed alongside brain)
     try:
         scripts_dir = Path(__file__).resolve().parent.parent.parent.parent.parent / "brain"
-        # Check common locations
-        candidates = [
-            Path("C:/Users/olive/SpritesWork/brain/system.db"),
-            scripts_dir / "system.db",
-        ]
-        for c in candidates:
-            if c.exists():
-                return c
-        return candidates[0]  # default
+        p = scripts_dir / "system.db"
+        if p.exists():
+            return p
     except Exception:
-        return Path("C:/Users/olive/SpritesWork/brain/system.db")
+        pass
+
+    return None
 
 
 def promote_to_canary(rule_category: str, session: int, db_path: Path | None = None) -> None:
@@ -73,8 +92,8 @@ def promote_to_canary(rule_category: str, session: int, db_path: Path | None = N
         conn = sqlite3.connect(str(db_path))
         _ensure_table(conn)
 
-        from datetime import datetime, timezone
-        now = datetime.now(timezone.utc).isoformat()
+        from datetime import datetime
+        now = datetime.now(UTC).isoformat()
 
         conn.execute(
             "INSERT OR REPLACE INTO rule_canary (category, status, start_session, correction_count, updated_at) "
@@ -181,8 +200,8 @@ def rollback_rule(rule_category: str, reason: str, db_path: Path | None = None) 
         conn = sqlite3.connect(str(db_path))
         _ensure_table(conn)
 
-        from datetime import datetime, timezone
-        now = datetime.now(timezone.utc).isoformat()
+        from datetime import datetime
+        now = datetime.now(UTC).isoformat()
 
         conn.execute(
             "UPDATE rule_canary SET status = ?, updated_at = ? WHERE category = ?",
@@ -193,10 +212,13 @@ def rollback_rule(rule_category: str, reason: str, db_path: Path | None = None) 
 
         # Emit RULE_ROLLBACK event
         try:
-            # Try brain/scripts events.py first (fast path)
-            scripts_dir = Path("C:/Users/olive/SpritesWork/brain/scripts")
-            if scripts_dir.exists():
-                sys.path.insert(0, str(scripts_dir))
+            # Try brain/scripts events.py via env or relative path
+            import os
+            scripts_dir = os.environ.get("BRAIN_DIR")
+            if scripts_dir:
+                scripts_dir = Path(scripts_dir) / "scripts"
+                if scripts_dir.exists():
+                    sys.path.insert(0, str(scripts_dir))
             from events import emit
             emit(
                 "RULE_ROLLBACK",
@@ -224,8 +246,8 @@ def promote_to_active(rule_category: str, db_path: Path | None = None) -> None:
         conn = sqlite3.connect(str(db_path))
         _ensure_table(conn)
 
-        from datetime import datetime, timezone
-        now = datetime.now(timezone.utc).isoformat()
+        from datetime import datetime
+        now = datetime.now(UTC).isoformat()
 
         conn.execute(
             "UPDATE rule_canary SET status = ?, updated_at = ? WHERE category = ?",
@@ -236,9 +258,12 @@ def promote_to_active(rule_category: str, db_path: Path | None = None) -> None:
 
         # Emit CANARY_PROMOTED event
         try:
-            scripts_dir = Path("C:/Users/olive/SpritesWork/brain/scripts")
-            if scripts_dir.exists():
-                sys.path.insert(0, str(scripts_dir))
+            import os
+            scripts_dir = os.environ.get("BRAIN_DIR")
+            if scripts_dir:
+                scripts_dir = Path(scripts_dir) / "scripts"
+                if scripts_dir.exists():
+                    sys.path.insert(0, str(scripts_dir))
             from events import emit
             emit(
                 "CANARY_PROMOTED",

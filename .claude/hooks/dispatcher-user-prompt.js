@@ -18,13 +18,13 @@ const cfg = require('./config.js');
 const HOOKS_DIR = path.dirname(__filename);
 
 const hooks = [
-  { type: 'node',   script: path.join(HOOKS_DIR, 'session-start-reminder.js'), timeout: 5000 },
+  { type: 'node',   script: path.join(HOOKS_DIR, 'user-prompt', 'session-start-reminder.js'), timeout: 5000 },
   { type: 'python', script: path.join(HOOKS_DIR, 'reflect', 'scripts', 'capture_learning.py'), timeout: 8000 },
-  { type: 'node',   script: path.join(HOOKS_DIR, 'context-inject.js'),   timeout: 5000 },
-  { type: 'node',   script: path.join(HOOKS_DIR, 'gate-inject.js'),      timeout: 3000 },
-  { type: 'node',   script: path.join(HOOKS_DIR, 'prospect-autoload.js'), timeout: 3000 },
-  { type: 'node',   script: path.join(HOOKS_DIR, 'implicit-feedback.js'), timeout: 3000 },
-  { type: 'node',   script: path.join(HOOKS_DIR, 'skill-router.js'),      timeout: 3000 },
+  { type: 'node',   script: path.join(HOOKS_DIR, 'user-prompt', 'context-inject.js'),   timeout: 5000 },
+  { type: 'node',   script: path.join(HOOKS_DIR, 'user-prompt', 'gate-inject.js'),      timeout: 3000 },
+  { type: 'node',   script: path.join(HOOKS_DIR, 'user-prompt', 'prospect-autoload.js'), timeout: 3000 },
+  { type: 'node',   script: path.join(HOOKS_DIR, 'user-prompt', 'implicit-feedback.js'), timeout: 3000 },
+  { type: 'node',   script: path.join(HOOKS_DIR, 'user-prompt', 'skill-router.js'),      timeout: 3000 },
 ];
 
 let stdinBuf = '';

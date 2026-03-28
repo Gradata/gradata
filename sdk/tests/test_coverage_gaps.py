@@ -562,16 +562,20 @@ class TestSelfImprovement:
 
     def test_update_confidence_contradiction(self):
         from gradata._self_improvement import parse_lessons, update_confidence, LessonState
+        from gradata.enhancements.self_improvement import fsrs_penalty
         lessons = parse_lessons("[2026-01-01] [INSTINCT:0.50] DRAFTING: Hyperlink URLs.\n")
         updated = update_confidence(lessons, [{"category": "DRAFTING"}])
-        assert updated[0].confidence == pytest.approx(0.50 - 0.20)  # CONTRADICTION_PENALTY = 0.20
+        expected = round(0.50 - fsrs_penalty(0.50), 2)
+        assert updated[0].confidence == pytest.approx(expected)
 
     def test_update_confidence_survival_bonus(self):
         from gradata._self_improvement import parse_lessons, update_confidence, LessonState
+        from gradata.enhancements.self_improvement import fsrs_bonus
         lessons = parse_lessons("[2026-01-01] [INSTINCT:0.50] DRAFTING: Hyperlink URLs.\n")
         # Correction in different category — lesson survives
         updated = update_confidence(lessons, [{"category": "ACCURACY"}])
-        assert updated[0].confidence == pytest.approx(0.50 + 0.10)
+        expected = round(0.50 + fsrs_bonus(0.50), 2)
+        assert updated[0].confidence == pytest.approx(expected)
 
     def test_update_confidence_no_corrections(self):
         from gradata._self_improvement import parse_lessons, update_confidence

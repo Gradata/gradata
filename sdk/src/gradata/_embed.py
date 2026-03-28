@@ -13,12 +13,19 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from gradata._config import (
-    EMBEDDING_MODEL, EMBEDDING_DIMS, EMBEDDING_PROVIDER,
-    MAX_TOKENS_PER_CHUNK, FILE_TYPE_MAP, SKIP_FILES, SKIP_DIRS,
-    INDEXABLE_EXTENSIONS, API_KEY_ENV_VAR, LOCAL_MODEL,
-)
 import gradata._paths as _p
+from gradata._config import (
+    API_KEY_ENV_VAR,
+    EMBEDDING_DIMS,
+    EMBEDDING_MODEL,
+    EMBEDDING_PROVIDER,
+    FILE_TYPE_MAP,
+    INDEXABLE_EXTENSIONS,
+    LOCAL_MODEL,
+    MAX_TOKENS_PER_CHUNK,
+    SKIP_DIRS,
+    SKIP_FILES,
+)
 from gradata._paths import BrainContext
 
 
@@ -169,6 +176,7 @@ def embed_texts(texts: list[str], client=None, task_type: str = "RETRIEVAL_DOCUM
 
 def embed_texts_gemini(texts: list[str], client, task_type: str = "RETRIEVAL_DOCUMENT") -> list[list[float]]:
     import time
+
     from google.genai import types
     all_embeddings = []
     batch_size = 20

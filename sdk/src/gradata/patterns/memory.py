@@ -46,12 +46,8 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
-
-if TYPE_CHECKING:
-    pass  # reserved for future type-only imports
-
+from datetime import UTC, datetime
+from typing import Protocol, runtime_checkable
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -78,7 +74,7 @@ _ISO_FORMAT = "%Y-%m-%dT%H:%M:%S.%f+00:00"
 
 def _now_iso() -> str:
     """Return current UTC time as an ISO 8601 string."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _parse_iso(ts: str) -> datetime:
@@ -144,7 +140,7 @@ class Memory:
             Non-negative float representing elapsed days.
         """
         created_dt = _parse_iso(self.created)
-        delta = datetime.now(timezone.utc) - created_dt
+        delta = datetime.now(UTC) - created_dt
         return delta.total_seconds() / 86_400
 
 

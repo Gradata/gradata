@@ -126,7 +126,7 @@ def cmd_context(args):
 
 def cmd_validate(args):
     brain = _get_brain(args)
-    from gradata._validator import validate_brain, print_report
+    from gradata._validator import print_report, validate_brain
     manifest_path = Path(args.manifest) if args.manifest else brain.dir / "brain.manifest.json"
     report = validate_brain(manifest_path)
     if args.json:
@@ -176,9 +176,9 @@ def cmd_health(args):
     brain = _get_brain(args)
     try:
         try:
-            from gradata_cloud.scoring.reports import generate_health_report, format_health_report
+            from gradata_cloud.scoring.reports import format_health_report, generate_health_report
         except ImportError:
-            from gradata.enhancements.reports import generate_health_report, format_health_report
+            from gradata.enhancements.reports import format_health_report, generate_health_report
     except ImportError:
         print("Health reports require enhancements: pip install gradata[cloud]")
         sys.exit(1)
@@ -198,16 +198,16 @@ def cmd_report(args):
         try:
             from gradata_cloud.scoring.reports import (
                 export_session_csv,
-                generate_health_report,
                 format_health_report,
+                generate_health_report,
                 generate_metrics_report,
                 generate_rule_audit,
             )
         except ImportError:
             from gradata.enhancements.reports import (
                 export_session_csv,
-                generate_health_report,
                 format_health_report,
+                generate_health_report,
                 generate_metrics_report,
                 generate_rule_audit,
             )

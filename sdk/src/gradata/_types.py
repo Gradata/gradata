@@ -12,6 +12,20 @@ from dataclasses import dataclass
 from enum import Enum
 
 
+class CorrectionType(Enum):
+    """What kind of correction this is (inspired by EverMemOS MemCell types).
+
+    Classifies corrections by their nature, not just their category.
+    This enables smarter graduation: behavioral rules graduate faster
+    than factual corrections because they generalize better.
+    """
+    BEHAVIORAL = "behavioral"    # Style, tone, format, process (generalizes well)
+    FACTUAL = "factual"          # Wrong data, incorrect API, deprecated method (specific)
+    PROCEDURAL = "procedural"    # Skipped steps, wrong order, missing verification
+    PREFERENCE = "preference"    # User taste (em dashes, bold, Calendly format)
+    DOMAIN = "domain"            # Industry-specific rules (pricing, compliance, ICP)
+
+
 class RuleTransferScope(Enum):
     """How transferable a rule is across users/teams."""
     PERSONAL = "personal"    # One user's style (email tone, formatting preference)
@@ -99,8 +113,9 @@ class Lesson:
     misfire_count: int = 0             # Times applied but made output worse
     scope_json: str = ""               # JSON-serialized RuleScope; empty = universal
     transfer_scope: RuleTransferScope = RuleTransferScope.PERSONAL  # How transferable
+    correction_type: CorrectionType = CorrectionType.BEHAVIORAL  # What kind of correction
     example_draft: str | None = None      # Before: what the AI produced
-    example_corrected: str | None = None  # After: what Oliver changed it to
+    example_corrected: str | None = None  # After: what the user changed it to
 
     def __post_init__(self) -> None:
         self.confidence = round(max(0.0, min(1.0, self.confidence)), 2)

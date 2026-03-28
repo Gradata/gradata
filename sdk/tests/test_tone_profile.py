@@ -1,4 +1,4 @@
-import pytest; pytest.importorskip('gradata.enhancements.self_improvement', reason='requires gradata_cloud')
+import pytest; pytest.importorskip('gradata.enhancements.tone_profile', reason='requires gradata_cloud')
 import pytest
 try:
     import gradata_cloud
@@ -44,7 +44,7 @@ class TestExtractTone:
         assert f.word_count > 10
 
     def test_formal_email(self):
-        text = "Hello Mr. Thompson,\n\nRegarding our previous discussion, I would like to furthermore clarify the proposal details. Accordingly, please find the revised terms.\n\nSincerely,\nOliver"
+        text = "Hello Mr. Thompson,\n\nRegarding our previous discussion, I would like to furthermore clarify the proposal details. Accordingly, please find the revised terms.\n\nSincerely,\nAlice"
         f = extract_tone(text)
         assert f.greeting_style == "hello"
         assert f.formality > 0.5  # formal markers present
@@ -196,7 +196,7 @@ class TestToneDiff:
 
     def test_word_count_change(self):
         draft = "Short."
-        final = "This is a much longer version of the email with additional context and details that Oliver added because the original was too terse."
+        final = "This is a much longer version of the email with additional context and details that the user added because the original was too terse."
         diffs = compute_tone_diff(draft, final)
         wc_diffs = [d for d in diffs if d.field == "word_count"]
         assert len(wc_diffs) == 1

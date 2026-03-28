@@ -90,7 +90,9 @@ def _verify_metrics(manifest: dict, conn: sqlite3.Connection) -> dict:
     # 1e. Session count
     sessions_claimed = manifest.get("metadata", {}).get("sessions_trained", 0)
     try:
-        sessions_actual = conn.execute("SELECT MAX(session) FROM events").fetchone()[0] or 0
+        sessions_actual = conn.execute(
+            "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
+        ).fetchone()[0] or 0
     except Exception:
         sessions_actual = 0
     results.append({

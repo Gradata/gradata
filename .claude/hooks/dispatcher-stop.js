@@ -8,7 +8,6 @@
  *   2. session-persist.js    (Node)
  *   3. session-close-data.js (Node)
  *   4. brain-maintain.js     (Node)
- *   5. session-checklist.js  (Node)
  */
 const path = require('path');
 const cfg = require('./config.js');
@@ -16,11 +15,10 @@ const cfg = require('./config.js');
 const HOOKS_DIR = path.dirname(__filename);
 
 const hooks = [
-  { script: path.join(HOOKS_DIR, 'cost-tracking.js'),      timeout: 5000 },
-  { script: path.join(HOOKS_DIR, 'session-persist.js'),     timeout: 5000 },
-  { script: path.join(HOOKS_DIR, 'session-close-data.js'),  timeout: 15000 },
-  { script: path.join(HOOKS_DIR, 'brain-maintain.js'),      timeout: 30000 },
-  { script: path.join(HOOKS_DIR, 'session-checklist.js'),   timeout: 10000 },
+  { script: path.join(HOOKS_DIR, 'stop', 'cost-tracking.js'),      timeout: 5000 },
+  { script: path.join(HOOKS_DIR, 'stop', 'session-persist.js'),     timeout: 5000 },
+  { script: path.join(HOOKS_DIR, 'stop', 'session-close-data.js'),  timeout: 15000 },
+  { script: path.join(HOOKS_DIR, 'stop', 'brain-maintain.js'),      timeout: 30000 },
 ];
 
 let stdinBuf = '';

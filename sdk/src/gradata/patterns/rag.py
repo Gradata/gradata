@@ -143,13 +143,7 @@ def rrf_merge(
 
 # Common stopwords to filter out during term extraction (pure stdlib)
 _STOPWORDS = frozenset(
-    "a an the is are was were be been being have has had do does did will would "
-    "shall should may might can could of in to for on with at by from as into "
-    "through during before after above below between out off over under again "
-    "further then once here there when where why how all each every both few "
-    "more most other some such no nor not only own same so than too very it its "
-    "and but or if while that this these those i me my we our you your he him "
-    "his she her they them their what which who whom".split()
+    ["a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would", "shall", "should", "may", "might", "can", "could", "of", "in", "to", "for", "on", "with", "at", "by", "from", "as", "into", "through", "during", "before", "after", "above", "below", "between", "out", "off", "over", "under", "again", "further", "then", "once", "here", "there", "when", "where", "why", "how", "all", "each", "every", "both", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "it", "its", "and", "but", "or", "if", "while", "that", "this", "these", "those", "i", "me", "my", "we", "our", "you", "your", "he", "him", "his", "she", "her", "they", "them", "their", "what", "which", "who", "whom"]
 )
 
 

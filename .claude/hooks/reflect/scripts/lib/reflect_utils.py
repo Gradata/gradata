@@ -641,9 +641,10 @@ CJK_CORRECTION_PATTERNS = [
 ]
 
 # Maximum prompt length for live capture (UserPromptSubmit hook)
-# Prompts longer than this are almost certainly system content, not user corrections.
+# Raised from 500 → 2000 (S73 fix): multi-paragraph corrections and "remember:" blocks
+# were silently dropped at 500. User corrections can legitimately be long.
 # Exception: explicit "remember:" markers are always processed regardless of length.
-MAX_CAPTURE_PROMPT_LENGTH = 500
+MAX_CAPTURE_PROMPT_LENGTH = 2000
 
 # Maximum message length for weak patterns (structural heuristic)
 # Long messages are more likely to be context/tasks than corrections
@@ -687,7 +688,7 @@ def detect_patterns(text: str) -> Tuple[Optional[str], str, float, str, int]:
     # Check for FALSE POSITIVE patterns - skip these messages
     # BUT: don't skip if a strong correction pattern is also present (e.g., "are you sure you X?")
     has_strong_correction = any(
-        re.search(pat, text, re.IGNORECASE)
+        re.search(pat, text, re.IGNORECASE | re.MULTILINE)
         for pat, _, is_strong in CORRECTION_PATTERNS if is_strong
     )
     if not has_strong_correction:
@@ -733,13 +734,15 @@ def detect_patterns(text: str) -> Tuple[Optional[str], str, float, str, int]:
         return ("auto", " ".join(matched_cjk), confidence, "correction", decay_days)
 
     # Check for English correction patterns
+    # Use MULTILINE so that ^-anchored patterns (e.g. "^no,", "^don't") fire on
+    # any line of a multi-line correction, not only the very first character of text.
     matched_corrections = []
     pattern_count = 0
     has_strong_pattern = False
     has_i_told_you = False
 
     for pattern, name, is_strong in CORRECTION_PATTERNS:
-        if re.search(pattern, text, re.IGNORECASE):
+        if re.search(pattern, text, re.IGNORECASE | re.MULTILINE):
             # Skip weak patterns in long messages
             if not is_strong and text_length > MAX_WEAK_PATTERN_LENGTH:
                 continue

@@ -32,12 +32,9 @@ Typical usage::
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable
-
-if TYPE_CHECKING:
-    pass  # reserved for forward-reference-only imports
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Data classes

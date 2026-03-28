@@ -16,7 +16,7 @@ Functions promoted from brain shim (S39+):
 import json
 import re
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 # Use module reference so set_brain_dir() updates propagate at call time
 import gradata._paths as _p
@@ -70,37 +70,250 @@ def _get_tables(ctx: "BrainContext | None" = None) -> list[str]:
         return []
 
 
+def _compute_fda(ctx: "BrainContext | None" = None, window: int = 20) -> float | None:
+    """Compute First Draft Acceptance rate from OUTPUT/CORRECTION correlation.
+
+    FDA = sessions where outputs had no major corrections / total measured sessions.
+
+    Returns None if fewer than 3 sessions with outputs (insufficient data).
+    Excludes system sessions to avoid inflation.
+    as-is/minor corrections still count as "accepted".
+    """
+    try:
+        db = ctx.db_path if ctx else _p.DB_PATH
+        conn = sqlite3.connect(str(db))
+
+        # Get the most recent N real sessions with outputs (exclude system sessions)
+        # Uses HAVING COUNT >= 2 to skip phantom sessions with stray events
+        sessions_with_outputs = conn.execute("""
+            SELECT e.session FROM events e
+            LEFT JOIN session_metrics sm ON e.session = sm.session
+            WHERE e.type = 'OUTPUT'
+              AND typeof(e.session) = 'integer'
+              AND (sm.session_type IS NULL OR sm.session_type != 'systems')
+            GROUP BY e.session HAVING COUNT(*) >= 2
+            ORDER BY e.session DESC LIMIT ?
+        """, (window,)).fetchall()
+
+        if len(sessions_with_outputs) < 3:
+            conn.close()
+            return None
+
+        accepted = 0
+        for (session,) in sessions_with_outputs:
+            # Check for corrections — use severity if available, otherwise any correction counts
+            has_severity = conn.execute("""
+                SELECT COUNT(*) FROM events
+                WHERE type = 'CORRECTION' AND session = ?
+                  AND json_extract(data_json, '$.severity') IS NOT NULL
+            """, (session,)).fetchone()[0]
+
+            if has_severity > 0:
+                # Severity data exists: only major/moderate/discarded count against acceptance
+                major_corrections = conn.execute("""
+                    SELECT COUNT(*) FROM events
+                    WHERE type = 'CORRECTION' AND session = ?
+                      AND json_extract(data_json, '$.severity') IN ('moderate', 'major', 'discarded')
+                """, (session,)).fetchone()[0]
+            else:
+                # No severity data: any correction counts against acceptance
+                major_corrections = conn.execute("""
+                    SELECT COUNT(*) FROM events
+                    WHERE type = 'CORRECTION' AND session = ?
+                """, (session,)).fetchone()[0]
+
+            if major_corrections == 0:
+                accepted += 1
+
+        conn.close()
+        total = len(sessions_with_outputs)
+        return round(accepted / total, 3) if total > 0 else None
+    except Exception:
+        return None
+
+
+def _categories_extinct(ctx: "BrainContext | None" = None, window: int = 20) -> list[str]:
+    """Find correction categories with zero corrections in the last N sessions.
+
+    These are error types the brain has eliminated — strongest proof of learning.
+    Uses correction recency (not lesson state) per adversary review.
+    """
+    try:
+        db = ctx.db_path if ctx else _p.DB_PATH
+        conn = sqlite3.connect(str(db))
+        max_session = conn.execute(
+            "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
+        ).fetchone()[0] or 0
+        min_session = max(1, max_session - window + 1)
+
+        # All categories ever
+        all_cats = {r[0] for r in conn.execute("""
+            SELECT DISTINCT json_extract(data_json, '$.category')
+            FROM events WHERE type = 'CORRECTION'
+              AND json_extract(data_json, '$.category') IS NOT NULL
+        """).fetchall()}
+
+        # Categories in recent window
+        recent_cats = {r[0] for r in conn.execute("""
+            SELECT DISTINCT json_extract(data_json, '$.category')
+            FROM events WHERE type = 'CORRECTION' AND session >= ?
+              AND json_extract(data_json, '$.category') IS NOT NULL
+        """, (min_session,)).fetchall()}
+
+        conn.close()
+        extinct = sorted(all_cats - recent_cats)
+        return extinct
+    except Exception:
+        return []
+
+
+def _compound_score(
+    correction_rate: float | None,
+    fda: float | None,
+    lessons_graduated: int,
+    lessons_active: int,
+    sessions: int,
+    total_corrections: int = 0,
+) -> float:
+    """Compute weighted brain health score (0-100).
+
+    Requires min 5 corrections in history before awarding CRO points
+    (prevents gaming by never correcting).
+    """
+    score = 0.0
+    # Correction improvement (0-25 pts)
+    if correction_rate is not None and total_corrections >= 5:
+        score += max(0.0, 1.0 - correction_rate) * 25
+    # FDA (0-30 pts)
+    if fda is not None:
+        score += fda * 30
+    # Graduation (0-20 pts)
+    total_lessons = lessons_graduated + lessons_active
+    if total_lessons > 0:
+        score += min(1.0, lessons_graduated / max(20, total_lessons)) * 20
+    # Active lessons (0-15 pts)
+    score += min(1.0, lessons_active / 10) * 15
+    # Maturity (0-10 pts)
+    score += min(1.0, sessions / 200) * 10
+    return round(score, 1)
+
+
+def _lesson_distribution(ctx: "BrainContext | None" = None) -> dict[str, int]:
+    """Count lessons by state from lessons.md."""
+    dist: dict[str, int] = {}
+    working_dir = ctx.working_dir if ctx else _p.WORKING_DIR
+    lessons_file = working_dir / ".claude" / "lessons.md"
+    try:
+        if lessons_file.exists():
+            text = lessons_file.read_text(encoding="utf-8")
+            for state in ("INSTINCT", "PATTERN", "RULE", "UNTESTABLE"):
+                count = len(re.findall(
+                    rf"^\[20\d{{2}}-\d{{2}}-\d{{2}}\]\s+\[{state}",
+                    text, re.MULTILINE
+                ))
+                if count > 0:
+                    dist[state] = count
+    except Exception:
+        pass
+    return dist
+
+
+def _correction_rate_trend(ctx: "BrainContext | None" = None, window: int = 10) -> dict | None:
+    """Compare current CRO window to baseline window."""
+    try:
+        db = ctx.db_path if ctx else _p.DB_PATH
+        conn = sqlite3.connect(str(db))
+        max_session = conn.execute(
+            "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
+        ).fetchone()[0] or 0
+
+        if max_session < window * 2:
+            conn.close()
+            return None
+
+        def _cro(min_s, max_s):
+            outputs = conn.execute(
+                "SELECT COUNT(*) FROM events WHERE type='OUTPUT' AND session BETWEEN ? AND ?",
+                (min_s, max_s)
+            ).fetchone()[0] or 0
+            corrections = conn.execute(
+                "SELECT COUNT(*) FROM events WHERE type='CORRECTION' AND session BETWEEN ? AND ?",
+                (min_s, max_s)
+            ).fetchone()[0] or 0
+            return round(corrections / outputs, 4) if outputs > 0 else None
+
+        current = _cro(max_session - window + 1, max_session)
+        baseline = _cro(max_session - window * 2 + 1, max_session - window)
+        conn.close()
+
+        if current is None or baseline is None:
+            return None
+
+        direction = "improving" if current < baseline else ("stable" if current == baseline else "degrading")
+        return {
+            "current_window": current,
+            "baseline_window": baseline,
+            "direction": direction,
+            "sessions_in_window": window,
+        }
+    except Exception:
+        return None
+
+
 def _quality_metrics(ctx: "BrainContext | None" = None) -> dict:
     """Compute quality metrics from events.
 
     Uses date-prefix regex for lesson counting to avoid matching format
     descriptions. This is the S39-fixed version promoted from brain shim.
     """
-    result = {
+    result: dict = {
         "correction_rate": None,
         "lessons_graduated": 0,
         "lessons_active": 0,
         "first_draft_acceptance": None,
+        "compound_score": None,
+        "categories_extinct": [],
+        "lesson_distribution": {},
+        "correction_rate_trend": None,
     }
+
+    total_corrections = 0
+    sessions_trained = 0
     try:
-        from gradata._events import correction_rate, compute_leading_indicators, _detect_session
-        cr = correction_rate(last_n_sessions=10)
-        if cr:
-            total_corrections = sum(cr.values())
-            # Get output count for rate calculation
-            event_counts = _count_events()
-            total_outputs = event_counts.get("by_type", {}).get("OUTPUT", 0)
+        # Compute correction rate directly from DB (ctx-aware)
+        # Use top-N real sessions (by event count) to avoid phantom session IDs
+        db = ctx.db_path if ctx else _p.DB_PATH
+        conn = sqlite3.connect(str(db))
+        recent_sessions = [r[0] for r in conn.execute("""
+            SELECT session FROM events
+            WHERE typeof(session)='integer'
+            GROUP BY session HAVING COUNT(*) >= 2
+            ORDER BY session DESC LIMIT 10
+        """).fetchall()]
+        if recent_sessions:
+            placeholders = ",".join("?" * len(recent_sessions))
+            total_corrections = conn.execute(
+                f"SELECT COUNT(*) FROM events WHERE type='CORRECTION' AND session IN ({placeholders})",
+                recent_sessions
+            ).fetchone()[0] or 0
+            total_outputs = conn.execute(
+                f"SELECT COUNT(*) FROM events WHERE type='OUTPUT' AND session IN ({placeholders})",
+                recent_sessions
+            ).fetchone()[0] or 0
             if total_outputs > 0:
                 result["correction_rate"] = round(total_corrections / total_outputs, 3)
-            else:
-                # Fallback: corrections per session
-                result["correction_rate"] = round(total_corrections / max(len(cr), 1), 3)
-        session = _detect_session()
-        indicators = compute_leading_indicators(session)
-        if indicators:
-            result["first_draft_acceptance"] = indicators.get("first_draft_acceptance")
+        conn.close()
     except Exception:
         pass
+
+    # FDA (fixed: correlation-based, excludes system sessions)
+    result["first_draft_acceptance"] = _compute_fda(ctx=ctx)
+
+    # Categories extinct (correction recency, not lesson state)
+    result["categories_extinct"] = _categories_extinct(ctx=ctx)
+
+    # Correction rate trend
+    result["correction_rate_trend"] = _correction_rate_trend(ctx=ctx)
 
     # Count lessons — date-prefix pattern avoids matching format descriptions
     working_dir = ctx.working_dir if ctx else _p.WORKING_DIR
@@ -109,7 +322,6 @@ def _quality_metrics(ctx: "BrainContext | None" = None) -> dict:
     try:
         if lessons_file.exists():
             text = lessons_file.read_text(encoding="utf-8")
-            # Only count lines starting with [YYYY-MM-DD] followed by [PATTERN: or [INSTINCT:
             result["lessons_active"] = len(re.findall(
                 r"^\[20\d{2}-\d{2}-\d{2}\]\s+\[(?:PATTERN|INSTINCT):", text, re.MULTILINE
             ))
@@ -120,6 +332,35 @@ def _quality_metrics(ctx: "BrainContext | None" = None) -> dict:
             ))
     except Exception:
         pass
+
+    # Lesson distribution
+    result["lesson_distribution"] = _lesson_distribution(ctx=ctx)
+
+    # Get sessions count for compound score
+    try:
+        db = ctx.db_path if ctx else _p.DB_PATH
+        conn = sqlite3.connect(str(db))
+        sessions_trained = conn.execute(
+            "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
+        ).fetchone()[0] or 0
+        if total_corrections == 0:
+            total_corrections = conn.execute(
+                "SELECT COUNT(*) FROM events WHERE type='CORRECTION'"
+            ).fetchone()[0] or 0
+        conn.close()
+    except Exception:
+        pass
+
+    # Compound score
+    result["compound_score"] = _compound_score(
+        correction_rate=result["correction_rate"],
+        fda=result["first_draft_acceptance"],
+        lessons_graduated=result["lessons_graduated"],
+        lessons_active=result["lessons_active"],
+        sessions=sessions_trained,
+        total_corrections=total_corrections,
+    )
+
     return result
 
 
@@ -179,7 +420,7 @@ def _rag_status(ctx: "BrainContext | None" = None) -> dict:
         "fts5_enabled": True,
     }
     try:
-        from gradata._config import EMBEDDING_PROVIDER, EMBEDDING_MODEL, EMBEDDING_DIMS, RAG_ACTIVE
+        from gradata._config import EMBEDDING_DIMS, EMBEDDING_MODEL, EMBEDDING_PROVIDER, RAG_ACTIVE
         result["active"] = RAG_ACTIVE
         result["provider"] = EMBEDDING_PROVIDER
         result["model"] = EMBEDDING_MODEL
@@ -222,7 +463,9 @@ def generate_manifest(*, domain: str = "General", ctx: "BrainContext | None" = N
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = sqlite3.connect(str(db))
-        db_max = conn.execute("SELECT MAX(session) FROM events").fetchone()[0] or 0
+        db_max = conn.execute(
+            "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
+        ).fetchone()[0] or 0
         conn.close()
         if db_max > version_info["sessions_trained"]:
             version_info["sessions_trained"] = db_max
@@ -242,7 +485,7 @@ def generate_manifest(*, domain: str = "General", ctx: "BrainContext | None" = N
             "domain": domain,
             "maturity_phase": version_info["maturity_phase"],
             "sessions_trained": version_info["sessions_trained"],
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         },
         "quality": quality,
         "memory_composition": memory,

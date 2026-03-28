@@ -22,4 +22,4 @@ from __future__ import annotations
 
 from gradata.sidecar.watcher import FileChange, FileWatcher, WatchedFile
 
-__all__ = ["FileWatcher", "WatchedFile", "FileChange"]
+__all__ = ["FileChange", "FileWatcher", "WatchedFile"]

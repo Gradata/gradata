@@ -11,7 +11,7 @@ it hasn't been corrected on yet.
 Example:
     "Use colons not dashes" + "No em dashes in emails" + "No bold
     mid-paragraph" + "Tight prose"
-    ->  META-RULE: "Oliver values minimal, clean formatting: no
+    ->  META-RULE: "The user values minimal, clean formatting: no
         decorative punctuation, no inline emphasis, direct sentences"
 
 Integration points:
@@ -242,7 +242,7 @@ _THEME_CLUSTERS: dict[str, set[str]] = {
     },
     "accuracy": {
         "verify", "verified", "check", "confirm", "accurate", "accuracy",
-        "never", "guess", "assume", "assumption", "verify", "validate",
+        "never", "guess", "assume", "assumption", "validate",
         "validated", "source", "evidence", "facts", "factual",
     },
     "research_first": {
@@ -270,7 +270,7 @@ _THEME_CLUSTERS: dict[str, set[str]] = {
         "feature", "outcome", "pain", "acknowledge",
     },
     "data_integrity": {
-        "filter", "owner", "oliver", "anna", "shared", "blended",
+        "filter", "owner", "owner_only", "shared_filter", "shared", "blended",
         "metrics", "measurement", "dedup", "duplicate", "integrity",
     },
     "ip_protection": {
@@ -368,7 +368,7 @@ _UNIVERSAL_SIGNALS: list[str] = [
 ]
 
 _TEAM_SIGNALS: list[str] = [
-    "pipedrive", "instantly", "calendly", "sprites",
+    "pipedrive", "instantly", "calendly",
     "apollo", "zerobounce", "prospeo",
     "brain/", ".carl/", "domain/",
     "notebooklm", "apify", "opencli",
@@ -791,7 +791,7 @@ def _super_meta_id(meta_rule_ids: list[str]) -> str:
     return "SMETA-" + hashlib.sha256(canonical.encode()).hexdigest()[:10]
 
 
-def _merge_context_weights(metas: "list[MetaRule] | list[SuperMetaRule] | list[MetaRule | SuperMetaRule]") -> dict[str, float]:
+def _merge_context_weights(metas: list[MetaRule] | list[SuperMetaRule] | list[MetaRule | SuperMetaRule]) -> dict[str, float]:
     """Merge context weights from multiple rules by averaging per key."""
     all_keys: set[str] = set()
     for m in metas:
@@ -866,7 +866,7 @@ def _group_meta_rules_by_theme(metas: list[MetaRule]) -> dict[str, list[MetaRule
     return dict(theme_groups)
 
 
-def _synthesise_super_principle(metas: "list[MetaRule] | list[SuperMetaRule] | list[MetaRule | SuperMetaRule]", tier: int) -> str:
+def _synthesise_super_principle(metas: list[MetaRule] | list[SuperMetaRule] | list[MetaRule | SuperMetaRule], tier: int) -> str:
     """Generate an abstraction statement from a group of meta-rules.
 
     Higher tiers produce more abstract, principle-level statements.

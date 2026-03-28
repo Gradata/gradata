@@ -32,17 +32,7 @@ if _log_level in ("DEBUG", "INFO", "WARNING", "ERROR"):
     )
     _logging.getLogger("gradata").setLevel(getattr(_logging, _log_level))
 
-from gradata.exceptions import (
-    BrainError,
-    BrainNotFoundError,
-    EventPersistenceError,
-    TaxonomyError,
-    EmbeddingError,
-    ExportError,
-    ValidationError,
-)
-from gradata._paths import BrainContext  # noqa: F401
-from gradata._types import Lesson, LessonState, RuleTransferScope  # noqa: F401
+from gradata._paths import BrainContext
 from gradata._self_improvement import (
     compute_learning_velocity,
     format_lessons,
@@ -50,59 +40,49 @@ from gradata._self_improvement import (
     parse_lessons,
     update_confidence,
 )
+from gradata._types import Lesson, LessonState, RuleTransferScope
 from gradata.brain import Brain
+from gradata.exceptions import (
+    BrainError,
+    BrainNotFoundError,
+    EmbeddingError,
+    EventPersistenceError,
+    ExportError,
+    TaxonomyError,
+    ValidationError,
+)
 from gradata.onboard import onboard
+from gradata.patterns.evaluator import EvalDimension, evaluate_optimize_loop
+from gradata.patterns.guardrails import Guard, GuardCheck, InputGuard, OutputGuard
+from gradata.patterns.human_loop import HumanLoopGate, RiskAssessment, assess_risk
+from gradata.patterns.mcp import MCPBridge, MCPServer, MCPToolSchema
+from gradata.patterns.memory import EpisodicMemory, MemoryManager, ProceduralMemory, SemanticMemory
+from gradata.patterns.parallel import DependencyGraph, ParallelBatch, ParallelTask, merge_results
 
 # ── Pattern exports (standalone utilities) ──────────────────────────────
-from gradata.patterns.pipeline import Pipeline, Stage, GateResult, PipelineResult
-from gradata.patterns.parallel import ParallelBatch, ParallelTask, DependencyGraph, merge_results
-from gradata.patterns.memory import EpisodicMemory, SemanticMemory, ProceduralMemory, MemoryManager
-from gradata.patterns.guardrails import InputGuard, OutputGuard, Guard, GuardCheck
-from gradata.patterns.mcp import MCPBridge, MCPToolSchema, MCPServer
-from gradata.patterns.human_loop import assess_risk, RiskAssessment, HumanLoopGate
-from gradata.patterns.reflection import CritiqueChecklist, Criterion, reflect, EMAIL_CHECKLIST
-from gradata.patterns.evaluator import EvalDimension, evaluate_optimize_loop
+from gradata.patterns.pipeline import GateResult, Pipeline, PipelineResult, Stage
+from gradata.patterns.rag import NaiveRAG, SmartRAG
+from gradata.patterns.reflection import EMAIL_CHECKLIST, Criterion, CritiqueChecklist, reflect
+from gradata.patterns.rule_tracker import RuleApplication
 from gradata.patterns.scope import AudienceTier, TaskType, classify_scope
 from gradata.patterns.sub_agents import Delegation, DelegationResult, orchestrate
-from gradata.patterns.rag import SmartRAG, NaiveRAG
-from gradata.patterns.rule_tracker import RuleApplication
 
 __all__ = [
-    # Core
+    # Core API — these are the public surface
     "Brain",
     "BrainContext",
     "Lesson",
     "LessonState",
     "RuleTransferScope",
     "__version__",
+    # Graduation pipeline
     "compute_learning_velocity",
     "format_lessons",
     "graduate",
     "onboard",
     "parse_lessons",
     "update_confidence",
-    # Pipeline
-    "Pipeline", "Stage", "GateResult", "PipelineResult",
-    # Parallel
-    "ParallelBatch", "ParallelTask", "DependencyGraph", "merge_results",
-    # Memory
-    "EpisodicMemory", "SemanticMemory", "ProceduralMemory", "MemoryManager",
-    # Guardrails
-    "InputGuard", "OutputGuard", "Guard", "GuardCheck",
-    # MCP
-    "MCPBridge", "MCPToolSchema", "MCPServer",
-    # Human Loop
-    "assess_risk", "RiskAssessment", "HumanLoopGate",
-    # Reflection
-    "CritiqueChecklist", "Criterion", "reflect", "EMAIL_CHECKLIST",
-    # Evaluator
-    "EvalDimension", "evaluate_optimize_loop",
-    # Scope
-    "AudienceTier", "TaskType", "classify_scope",
-    # Sub-Agents
-    "Delegation", "DelegationResult", "orchestrate",
-    # RAG
-    "SmartRAG", "NaiveRAG",
-    # Rule Tracker
-    "RuleApplication",
+    # Patterns available via: from gradata.patterns import Pipeline, SmartRAG, etc.
+    # Import lines above are kept for backward compat (from gradata import Pipeline still works)
+    # but patterns are NOT in __all__ — use gradata.patterns for * imports.
 ]

@@ -37,7 +37,7 @@ from typing import Any
 # has missing optional dependencies at collection time.
 try:
     from gradata.brain import Brain
-except Exception:  # noqa: BLE001
+except Exception:
     Brain = None  # type: ignore[assignment,misc]
 
 # ---------------------------------------------------------------------------
@@ -280,7 +280,7 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
         else:
             return {"error": f"Unknown tool: {tool_name}"}
 
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return {"error": str(exc)}
 
 
@@ -362,11 +362,9 @@ def run_server(brain_dir: str | Path | None, *, stdin=None, stdout=None) -> None
             if Brain is None:
                 raise ImportError("gradata.brain.Brain could not be imported")
             brain = Brain(brain_dir)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # Log to stderr so it does not pollute the JSON-RPC channel
             print(f"[mcp_server] Brain init failed: {exc}", file=sys.stderr)
-
-    initialized = False
 
     while True:
         msg = _read_message(in_stream)
@@ -381,7 +379,6 @@ def run_server(brain_dir: str | Path | None, *, stdin=None, stdout=None) -> None
         is_notification = req_id is None
 
         if method == "initialize":
-            initialized = True
             response = _handle_initialize(req_id)
 
         elif method == "notifications/initialized":

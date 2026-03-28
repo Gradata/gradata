@@ -2,13 +2,17 @@
 from dataclasses import dataclass
 
 try:
-    from gradata_cloud.graduation.edit_classifier import (  # noqa: F401
-        EditClassification, classify_edits, summarize_edits,
+    from gradata_cloud.graduation.edit_classifier import (
+        EditClassification,
+        classify_edits,
+        summarize_edits,
     )
 except ImportError:
     try:
-        from gradata.enhancements.edit_classifier import (  # noqa: F401
-            EditClassification, classify_edits, summarize_edits,
+        from gradata.enhancements.edit_classifier import (
+            EditClassification,
+            classify_edits,
+            summarize_edits,
         )
     except ImportError:
         @dataclass

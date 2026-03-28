@@ -10,17 +10,25 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-from gradata._config import (
-    DEFAULT_TOP_K, SIMILARITY_THRESHOLD,
-    RECENCY_DECAY, RECENCY_FLOOR, RECENCY_WINDOW_DAYS,
-    CONFIDENCE_HIGH, CONFIDENCE_MED, CONFIDENCE_LOW,
-    MEMORY_TYPE_MAP, MEMORY_TYPE_WEIGHTS,
-    FILE_TYPE_MAP, INDEXABLE_EXTENSIONS, SKIP_FILES, SKIP_DIRS,
-    MAX_TOKENS_PER_CHUNK,
-)
 import gradata._paths as _p
+from gradata._config import (
+    CONFIDENCE_HIGH,
+    CONFIDENCE_LOW,
+    CONFIDENCE_MED,
+    DEFAULT_TOP_K,
+    FILE_TYPE_MAP,
+    INDEXABLE_EXTENSIONS,
+    MAX_TOKENS_PER_CHUNK,
+    MEMORY_TYPE_MAP,
+    MEMORY_TYPE_WEIGHTS,
+    RECENCY_DECAY,
+    RECENCY_FLOOR,
+    RECENCY_WINDOW_DAYS,
+    SIMILARITY_THRESHOLD,
+    SKIP_DIRS,
+    SKIP_FILES,
+)
 from gradata._paths import BrainContext
-
 
 # ── FTS5 Full-Text Search ────────────────────────────────────────────────
 

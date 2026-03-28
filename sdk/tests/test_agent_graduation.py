@@ -1,4 +1,4 @@
-import pytest; pytest.importorskip('gradata.enhancements.self_improvement', reason='requires gradata_cloud')
+import pytest; pytest.importorskip('gradata.enhancements.agent_graduation', reason='requires gradata_cloud')
 import pytest
 try:
     import gradata_cloud

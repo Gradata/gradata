@@ -587,7 +587,7 @@ class TestMemory:
     def test_memory_manager_store_and_retrieve_episodic(self):
         from gradata.patterns.memory import MemoryManager
         mm = MemoryManager()
-        mid = mm.store("episodic", "Oliver corrected email tone")
+        mid = mm.store("episodic", "User corrected email tone")
         assert mid is not None
         hits = mm.retrieve("email tone")
         assert len(hits) >= 1

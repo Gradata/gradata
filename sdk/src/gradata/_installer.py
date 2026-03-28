@@ -23,9 +23,8 @@ import json
 import subprocess
 import sys
 import zipfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-
 
 DEFAULT_BRAINS_DIR = Path.home() / ".gradata" / "brains"
 
@@ -82,7 +81,7 @@ def _install_brain(archive_path: Path, target_dir: Path, manifest: dict) -> bool
 
     # Write install metadata
     install_meta = {
-        "installed_at": datetime.now(timezone.utc).isoformat(),
+        "installed_at": datetime.now(UTC).isoformat(),
         "source_archive": str(archive_path),
         "brain_version": manifest.get("metadata", {}).get("brain_version"),
         "domain": manifest.get("metadata", {}).get("domain"),

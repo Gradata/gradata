@@ -13,7 +13,6 @@ Logistic Regression, Naive Bayes Lead Scoring.
 import math
 from collections import defaultdict
 
-
 # ============================================================================
 # 1. BAYESIAN BETA-BINOMIAL
 # ============================================================================

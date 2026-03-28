@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -128,7 +128,7 @@ def _build_manifest(name: str, domain: str, embedding: str) -> dict:
             "domain": domain,
             "maturity_phase": "INFANT",
             "sessions_trained": 0,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         },
         "quality": {
             "correction_rate": None,
@@ -238,7 +238,7 @@ def onboard(
     company: str | None = None,
     embedding: str | None = None,
     interactive: bool = True,
-) -> "Brain":
+) -> Brain:
     """
     Bootstrap a new brain with the onboarding wizard.
 

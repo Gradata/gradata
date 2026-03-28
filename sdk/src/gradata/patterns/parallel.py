@@ -34,12 +34,9 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable
-
-if TYPE_CHECKING:
-    pass
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -136,7 +133,7 @@ def _run_task(task: ParallelTask) -> TaskResult:
             output=output,
             duration_ms=round(duration_ms, 2),
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         duration_ms = (time.monotonic() - start) * 1000.0
         return TaskResult(
             task_id=task.id,

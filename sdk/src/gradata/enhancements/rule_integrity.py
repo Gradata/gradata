@@ -24,7 +24,7 @@ import logging
 import os
 import secrets
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 logger = logging.getLogger("gradata.rule_integrity")
@@ -234,7 +234,7 @@ def store_signature(db_path: Path, category: str, signature: str) -> None:
         conn.execute(
             """INSERT OR REPLACE INTO rule_signatures (category, signature, signed_at)
                VALUES (?, ?, ?)""",
-            (category.upper(), signature, datetime.now(timezone.utc).isoformat()),
+            (category.upper(), signature, datetime.now(UTC).isoformat()),
         )
         conn.commit()
     finally:

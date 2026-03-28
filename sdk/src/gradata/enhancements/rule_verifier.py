@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -245,7 +245,7 @@ def log_verification(
 ) -> None:
     """Write verification results to SQLite."""
     ensure_table(db_path)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     with sqlite3.connect(str(db_path)) as conn:
         for r in results:
             conn.execute(

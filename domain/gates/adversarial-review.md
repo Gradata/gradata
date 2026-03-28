@@ -1,7 +1,7 @@
 ---
 name: adversarial-review
 description: Mandatory adversarial two-agent debate before any prospect-facing output is marked done. Fires after draft + self-score, before send/delivery.
-skill: skills/adversarial-review/SKILL.md
+skill: skills/dev/adversarial-review/SKILL.md
 ---
 
 # Adversarial Pre-Send Review Gate (MANDATORY)
@@ -26,7 +26,7 @@ After the draft is written AND self-scored >= 7, before presenting as final to O
 1. Draft written to prospect-facing path
 2. Self-score (quality-rubrics.md) — must be >= 7
 3. >>> ADVERSARIAL REVIEW GATE <<<
-   a. Run skills/adversarial-review/SKILL.md
+   a. Run skills/dev/adversarial-review/SKILL.md
    b. CRITIC + DEFENDER debate (max 3 rounds)
    c. Verdict: PASS / REVISE / KILL
 4. If PASS  → present to Oliver as ready

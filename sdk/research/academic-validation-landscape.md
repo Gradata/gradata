@@ -1,6 +1,82 @@
 # Academic Validation Landscape: AI Memory & Personalization Systems
 ## Research for Gradata Paper Preparation
-### Date: 2026-03-26
+### Date: 2026-03-27 (updated S74)
+
+---
+
+## 0. KEY PRIOR ART: "Distilling Feedback into Memory-as-a-Tool" (ICLR 2026 Workshop)
+
+### Paper: arXiv:2601.05960
+**Author:** Victor Gallego
+**Venue:** ICLR 2026 MemAgents Workshop (OpenReview: U51WxL382H)
+
+### Why This Matters
+This paper **independently validates Gradata's core approach.** It converts transient feedback into retrievable guidelines via a file-based memory system, matching the performance of test-time refinement pipelines while "drastically reducing inference cost."
+
+### Key Findings
+- Feedback distilled into persistent memory matches online refinement quality
+- File-based storage (not vector DB) is sufficient
+- Cost reduction is dramatic vs re-processing feedback each time
+- Gradient-free approach (no fine-tuning needed)
+
+### How Gradata Extends This
+- Gallego stores feedback as flat guidelines. Gradata **graduates** feedback through confidence tiers (INSTINCT → PATTERN → RULE)
+- Gallego treats all feedback equally. Gradata **severity-weights** corrections (trivial → rewrite)
+- Gallego has no decay. Gradata has **session-type-aware decay**
+- Gallego has no quality proof. Gradata has **brain.manifest** with correction rate tracking
+
+### Citation for Paper
+```
+@article{gallego2026distilling,
+  title={Distilling Feedback into Memory-as-a-Tool},
+  author={Gallego, Victor},
+  journal={ICLR 2026 MemAgents Workshop},
+  year={2026},
+  url={https://arxiv.org/abs/2601.05960}
+}
+```
+
+---
+
+## 0b. EverMind / MSA: Memory Sparse Attention (arXiv:2603.23516, March 2026)
+
+### Paper: "MSA: Memory Sparse Attention for Efficient End-to-End Memory Model Scaling to 100M Tokens"
+**Authors:** Yu Chen, Runkai Chen, et al. (EverMind / Shandong Group / Peking University)
+**Backing:** Tianqiao Chen (Shanda Group, $2B+ AI investment)
+
+### Architecture
+- Sparse attention with document-wise RoPE (position IDs reset per document)
+- Offline corpus encoding into compressed K/V chunks (64-token segments)
+- Online routing: top-k document selection via learned routing keys
+- Memory Interleaving for multi-hop reasoning
+- 4B model on 2xA800 GPUs, 169GB for 100M tokens
+
+### Key Results
+- 4B model beats RAG + Qwen3-235B by +7.2% average on 9 QA benchmarks
+- NIAH: 94.84% accuracy at 1M tokens (vs vanilla Qwen3-4B at 24.69%)
+- <9% degradation from 16k training to 100M inference
+
+### Limitations
+- Wins 4/9 benchmarks, loses 5 (MuSiQue gap: -16.5%)
+- No code/weights released yet ("Coming Soon")
+- No latency numbers published
+- Static corpus only (no incremental updates)
+- 169GB GPU memory = $30K+ hardware
+
+### Relationship to Gradata
+**Complementary, not competitive.** MSA solves recall (finding needles in 100M haystacks). Gradata solves learning (graduating corrections into behavioral rules). MSA commoditizes the recall layer, which strengthens Gradata's positioning: "Models are getting better at remembering. They still can't learn from their mistakes."
+
+### What to Steal
+1. **Document-wise RoPE** — apply to rule injection (each rule gets own position context)
+2. **Three-phase lifecycle framing** (from EverMemOS: Episodic Trace → Semantic Consolidation → Reconstructive Recollection)
+3. **MemCell/MemScene abstractions** — typed correction cells for the SDK
+
+### EverMemOS (Product)
+- GitHub: 3.3K stars, Apache 2.0
+- Architecture: Episodic Trace Formation → Semantic Consolidation → Reconstructive Recollection
+- Stack: MongoDB + Elasticsearch + Milvus + Redis
+- Benchmark: 92.3% on LoCoMo (SOTA as of early 2026)
+- Cloud product coming later 2026
 
 ---
 

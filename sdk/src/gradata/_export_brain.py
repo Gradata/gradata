@@ -179,9 +179,6 @@ def export_brain(include_prospects: bool = True, domain_only: bool = False,
                   ctx: BrainContext | None = None) -> Path:
     brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
     prospects_dir = ctx.prospects_dir if ctx else _p.PROSPECTS_DIR
-    sessions_dir = ctx.sessions_dir if ctx else _p.SESSIONS_DIR
-    version_file = ctx.version_file if ctx else _p.VERSION_FILE
-    working_dir = ctx.working_dir if ctx else _p.WORKING_DIR
 
     version = read_version()
     domain = read_domain_name()

@@ -1,15 +1,12 @@
 #!/usr/bin/env node
 /**
  * dispatcher-session-start.js — Consolidates all SessionStart hooks
- * Reduces CMD window flashes from 5 to 1 on Windows.
+ * Reduces CMD window flashes to 1 on Windows.
  *
  * Hooks dispatched:
  *   1. session_start_reminder.py  (Python)
- *   2. context-budget.js          (Node)
- *   3. session-init-data.js       (Node)
- *   4. peer-announce.js           (Node)
- *   5. cache-warmer.js            (Node)
- *   6. config-validate.js         (Node) — validates settings.json integrity
+ *   2. session-init-data.js       (Node)
+ *   3. config-validate.js         (Node) — validates settings.json integrity
  */
 const path = require('path');
 const cfg = require('./config.js');
@@ -18,11 +15,8 @@ const HOOKS_DIR = path.dirname(__filename);
 
 const hooks = [
   { type: 'python', script: path.join(HOOKS_DIR, 'reflect', 'scripts', 'session_start_reminder.py'), timeout: 10000 },
-  { type: 'node',   script: path.join(HOOKS_DIR, 'context-budget.js'),    timeout: 3000 },
-  { type: 'node',   script: path.join(HOOKS_DIR, 'session-init-data.js'), timeout: 10000 },
-  { type: 'node',   script: path.join(HOOKS_DIR, 'peer-announce.js'),     timeout: 3000 },
-  { type: 'node',   script: path.join(HOOKS_DIR, 'cache-warmer.js'),      timeout: 3000 },
-  { type: 'node',   script: path.join(HOOKS_DIR, 'config-validate.js'),  timeout: 3000 },
+  { type: 'node',   script: path.join(HOOKS_DIR, 'session-start', 'session-init-data.js'), timeout: 10000 },
+  { type: 'node',   script: path.join(HOOKS_DIR, 'session-start', 'config-validate.js'),  timeout: 3000 },
 ];
 
 // Read stdin once

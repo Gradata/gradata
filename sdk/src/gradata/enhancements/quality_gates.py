@@ -18,11 +18,9 @@ Design decisions
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable
-
-if TYPE_CHECKING:
-    pass  # Keep TYPE_CHECKING block for future Protocol imports
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Data structures

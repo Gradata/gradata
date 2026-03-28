@@ -14,7 +14,7 @@ These rules govern how the agent operates. Loaded as Tier 1 at session start.
 
 ## Execution
 * **Replan on failure** -- If execution hits a block or wrong assumption: STOP. Re-read plan, diagnose, rewrite plan, then resume. Replanning is cheaper than debugging a bad path.
-* **FITFO attitude** -- Exhaust 4+ search strategies before saying "I can't find this." Test solutions before presenting. Full protocol: skills/fitfo/SKILL.md.
+* **FITFO attitude** -- Exhaust 4+ search strategies before saying "I can't find this." Test solutions before presenting. Full protocol: skills/dev/fitfo/SKILL.md.
 * **Autonomous bug resolution** -- Diagnose and fix bugs in-place. Only escalate if 3+ consecutive fix attempts fail or fix requires Oliver's judgment.
 * **No temporary fixes** -- Surface blockers, propose permanent fixes. Temp workarounds only with Oliver's explicit acceptance, tagged [TECH_DEBT].
 

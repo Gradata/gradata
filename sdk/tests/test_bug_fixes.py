@@ -324,13 +324,19 @@ class TestBug9MissingClasses:
         assert callable(compute_density)
 
     def test_top_level_exports(self):
-        from gradata import (
+        """Core symbols importable from gradata top level."""
+        from gradata import Brain, BrainContext, Lesson, LessonState, __version__
+        assert Brain is not None
+        assert __version__ is not None
+
+    def test_pattern_exports_from_submodule(self):
+        """Pattern symbols importable from gradata.patterns."""
+        from gradata.patterns import (
             SmartRAG, NaiveRAG, HumanLoopGate,
             RuleApplication, Pipeline, Stage,
             ParallelBatch, EpisodicMemory,
             InputGuard, OutputGuard, MCPBridge,
             Delegation, AudienceTier,
         )
-        # All importable without error
         assert SmartRAG is not None
         assert Pipeline is not None

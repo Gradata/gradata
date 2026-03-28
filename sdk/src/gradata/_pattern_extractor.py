@@ -2,13 +2,19 @@
 from dataclasses import dataclass, field
 
 try:
-    from gradata_cloud.graduation.pattern_extractor import (  # noqa: F401
-        ExtractedPattern, extract_patterns, merge_patterns, patterns_to_lessons,
+    from gradata_cloud.graduation.pattern_extractor import (
+        ExtractedPattern,
+        extract_patterns,
+        merge_patterns,
+        patterns_to_lessons,
     )
 except ImportError:
     try:
-        from gradata.enhancements.pattern_extractor import (  # noqa: F401
-            ExtractedPattern, extract_patterns, merge_patterns, patterns_to_lessons,
+        from gradata.enhancements.pattern_extractor import (
+            ExtractedPattern,
+            extract_patterns,
+            merge_patterns,
+            patterns_to_lessons,
         )
     except ImportError:
         @dataclass

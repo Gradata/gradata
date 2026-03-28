@@ -1,5 +1,5 @@
 # Gradata — Agent Operating System
-Startup: skills/session-start/SKILL.md (mandatory). Wrap-up: skills/wrap-up/SKILL.md when Oliver says "wrap up".
+Startup: skills/core/session-start/SKILL.md (mandatory). Wrap-up: skills/core/wrap-up/SKILL.md when Oliver says "wrap up".
 Domain: domain/DOMAIN.md | CARL: .carl/ | Gates: domain/gates/ | Voice: domain/soul.md
 Work style: .claude/work-style.md | Output flow: .claude/action-waterfall.md
 Self-check: gate complete? self-score >= 10? fallback chain followed? Never skip steps. Never report unverified numbers.
@@ -24,4 +24,4 @@ Dashboard: brain/scripts/learning_dashboard.py (adaptation score, correction rat
 Windows 11. Python: C:/Users/olive/AppData/Local/Programs/Python/Python312/. Node available.
 Prospecting: enrich before tiering, CEO != auto-T1, counts in filenames. Rules: domain/playbooks/prospecting-instructions.txt
 Truth protocol: .carl/global GLOBAL_RULE_0 + .claude/truth-protocol.md
-Tests: pytest sdk/tests/ (363 pass, 23 skip) + brain/gradata_cloud_backup/tests/ (523 pass) = 886 total. Build: uv.
+Tests: pytest sdk/tests/ (836 pass, 11 skip) + brain/gradata_cloud_backup/tests/ (523 pass) = 1,359 total. Build: uv.

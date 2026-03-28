@@ -260,9 +260,9 @@ class TestResearchBackedConstants:
     """SPEC Section 13: every constant has published justification."""
 
     def test_loss_aversion_ratio_2_to_1(self):
-        """Brown et al. 2024: lambda ~1.955."""
-        from gradata._self_improvement import CONTRADICTION_PENALTY, SURVIVAL_BONUS
-        ratio = CONTRADICTION_PENALTY / SURVIVAL_BONUS
+        """Brown et al. 2024: lambda ~1.955. Ratio: |contradiction| / acceptance."""
+        from gradata._self_improvement import CONTRADICTION_PENALTY, ACCEPTANCE_BONUS
+        ratio = abs(CONTRADICTION_PENALTY) / ACCEPTANCE_BONUS
         assert 1.8 <= ratio <= 2.2, f"Loss aversion ratio {ratio} outside [1.8, 2.2]"
 
     def test_pattern_threshold_bayesian(self):

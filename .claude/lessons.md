@@ -103,3 +103,5 @@
 [2026-03-26] [INSTINCT:0.30] LEAD_LIST_OVERLAP: Output lead lists should overlap, not be mutually exclusive. Call list = everyone with a phone (even if also has email). Email list = everyone with email. Oliver wants to both email AND call the same person. Root cause: assuming channels are either/or when they're both/and.
 
 [2026-03-26] [INSTINCT:0.30] SCRAPE_FIRST: Full-profile scrape then ICP filter beats headline-filter then scrape. Headlines miss 40%+ of ICP leads whose About/Experience/Skills reveal relevance. Worth extra Apify cost. Root cause: premature optimization on API costs instead of lead quality.
+
+[2026-03-27] [INSTINCT:0.30] PROCESS: Never skip or ignore failing tests. When tests fail, diagnose the root cause and fix it — don't add to an ignore list. "Why skip? Figure out why" — every failing test is a signal about broken contracts or missing modules. Root cause: defaulted to --ignore flags on 5 test files instead of fixing the importorskip guards that were checking the wrong module.
