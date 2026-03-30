@@ -31,3 +31,4 @@ __pycache__/
 *.pyc
 vendor/
 .claude-flow
+autoresearch-results.tsv

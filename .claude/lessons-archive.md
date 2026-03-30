@@ -94,3 +94,94 @@
 [2026-03-21] POSITIONING: Never say "agency pricing" — say "fixed monthly subscription" → RULE:0.90
 [2026-03-21] DRAFTING: Cross-reference BOTH external research AND Oliver's playbooks for cadences → RULE:0.90
 [2026-03-21] ACCURACY: Filter metrics to relevant track, never blend sales + system numbers → RULE:0.90
+
+## Graduated 2026-03-29 (auto)
+[2026-03-29] STRUCTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+
+## Graduated 2026-03-29 (auto)
+[2026-03-29] STRUCTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+
+## Graduated 2026-03-29 (auto)
+[2026-03-29] STRUCTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+
+## Graduated 2026-03-29 (auto)
+[2026-03-29] TONE: 1 edit: 1 CONTENT (discarded) → Auto-graduated (confidence 0.92)
+
+## Graduated 2026-03-29 (auto)
+[2026-03-29] ARCHITECTURE: 1 edit: 1 FACTUAL (major) → Auto-graduated (confidence 0.93)
+[2026-03-29] STRUCTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+
+## Graduated 2026-03-29 (auto)
+[2026-03-29] ACCURACY: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+[2026-03-29] ACCURACY: 1 edit: 1 FACTUAL (moderate) → Auto-graduated (confidence 0.93)
+[2026-03-29] STRUCTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 0.70)
+
+## Graduated 2026-03-29 (auto)
+[2026-03-29] PROCESS: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+[2026-03-29] ACCURACY: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+[2026-03-29] STRUCTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 0.82)
+
+## Graduated 2026-03-29 (auto)
+[2026-03-29] TONE: 1 edit: 1 CONTENT (discarded) → Auto-graduated (confidence 0.95)
+
+## Graduated 2026-03-29 (auto)
+[2026-03-29] PROCESS: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+[2026-03-29] ACCURACY: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+[2026-03-29] STRUCTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 0.82)
+
+## Graduated 2026-03-29 (auto)
+[2026-03-29] PROCESS: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+[2026-03-29] ACCURACY: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+[2026-03-29] STRUCTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+
+## Graduated 2026-03-30 (auto)
+[2026-03-30] STRUCTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+
+## Graduated 2026-03-30 (auto)
+[2026-03-30] STRUCTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+
+## Graduated 2026-03-30 (auto)
+[2026-03-30] STRUCTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+
+## Graduated 2026-03-30 (auto)
+[2026-03-30] TONE: 1 edit: 1 CONTENT (discarded) → Auto-graduated (confidence 0.92)
+
+## Graduated 2026-03-30 (auto)
+[2026-03-30] ARCHITECTURE: 1 edit: 1 FACTUAL (major) → Auto-graduated (confidence 0.93)
+[2026-03-30] STRUCTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+
+## Graduated 2026-03-30 (auto)
+[2026-03-30] ACCURACY: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+[2026-03-30] ACCURACY: 1 edit: 1 FACTUAL (moderate) → Auto-graduated (confidence 0.93)
+[2026-03-30] STRUCTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 0.70)
+
+## Graduated 2026-03-30 (auto)
+[2026-03-30] PROCESS: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+[2026-03-30] ACCURACY: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+[2026-03-30] STRUCTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 0.82)
+
+## Graduated 2026-03-30 (auto)
+[2026-03-30] TONE: 1 edit: 1 CONTENT (discarded) → Auto-graduated (confidence 0.95)
+
+## Graduated 2026-03-30 (auto)
+[2026-03-30] PROCESS: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+[2026-03-30] ACCURACY: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+[2026-03-30] STRUCTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 0.82)
+
+## Graduated 2026-03-30 (auto)
+[2026-03-30] PROCESS: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+[2026-03-30] ACCURACY: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+[2026-03-30] STRUCTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 1.00)
+
+## Graduated 2026-03-30 (auto)
+[2026-03-30] ARCHITECTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 0.95)
+[2026-03-30] PROCESS: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 0.95)
+[2026-03-30] ACCURACY: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 0.95)
+[2026-03-30] TONE: 1 edit: 1 CONTENT (discarded) → Auto-graduated (confidence 0.95)
+[2026-03-30] STRUCTURE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 0.95)
+[2026-03-30] CONTENT: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 0.95)
+[2026-03-30] STYLE: 1 edit: 1 STYLE (discarded) → Auto-graduated (confidence 0.95)
+[2026-03-30] FACTUAL: 1 edit: 1 FACTUAL (minor) → Auto-graduated (confidence 0.95)
+[2026-03-30] TONE: 1 edit: 1 CONTENT (major) → Auto-graduated (confidence 0.95)
+[2026-03-30] TONE: 1 edit: 1 TONE (discarded) → Auto-graduated (confidence 0.95)
+[2026-03-30] TONE: 1 edit: 1 STYLE (discarded) → Auto-graduated (confidence 0.95)
