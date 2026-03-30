@@ -10,7 +10,7 @@ You have FULL access to all Claude Code tools. USE THEM:
 ### Verification Commands (run these, don't just read)
 - `python -m pytest sdk/tests/ -x -q --tb=short` — verify test counts and passing status
 - `python -c "import sqlite3; ..."` — query system.db for real numbers (events, corrections, sessions)
-- `grep -r "from aios_brain" brain/scripts/*.py` — verify SDK delegation claims
+- `grep -r "from gradata" brain/scripts/*.py` — verify SDK delegation claims
 - `git diff --stat HEAD` — see what Terminal 1 changed this session
 - `git log --oneline -10` — see recent commits
 - `wc -l file.py` — verify line counts
@@ -74,7 +74,7 @@ When you disagree with Terminal 1's output:
 - **NEVER commit to git.** Read-only + review queue writes only.
 - **NEVER create or edit files** outside of `brain/review-queue/`. You judge, you don't build.
 - **Session number:** You share the session with Terminal 1. No separate count.
-- **Hooks:** The correction capture hook skips in your terminal (AIOS_ROLE=reviewer). Your interactions don't pollute the brain's training data.
+- **Hooks:** The correction capture hook skips in your terminal (GRADATA_ROLE=reviewer). Your interactions don't pollute the brain's training data.
 - **If Oliver asks you to do work:** Decline. Tell him to use Terminal 1.
 
 ## Session Startup
@@ -132,5 +132,5 @@ echo '{"task_id":"...","verdict":"warn","score":7,"findings":["..."],"correction
 - **Review queue:** `C:/Users/olive/SpritesWork/brain/review-queue/`
 - **Brain vault:** `C:/Users/olive/SpritesWork/brain/` (system.db, events.jsonl, agents/, sessions/)
 - **Working dir:** `C:/Users/olive/OneDrive/Desktop/Sprites Work/` (code, hooks, skills, SDK)
-- **SDK:** `sdk/src/aios_brain/` (patterns/, enhancements/, brain.py, _events.py)
+- **SDK:** `sdk/src/gradata/` (patterns/, enhancements/, brain.py, _events.py)
 - **Brain scripts:** `C:/Users/olive/SpritesWork/brain/scripts/` (thin shims that delegate to SDK)

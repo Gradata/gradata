@@ -2,7 +2,7 @@
 Talent: Sales
 
 > Domain-specific rules for Sprites.ai sales operations.
-> Loaded by AIOS at startup via CLAUDE.md domain loading section.
+> Loaded by Gradata at startup via CLAUDE.md domain loading section.
 > Generic OS infrastructure lives in CLAUDE.md and .claude/ — this file contains only Sprites-specific context.
 
 ## Oliver's Role

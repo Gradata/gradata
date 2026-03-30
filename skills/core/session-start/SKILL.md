@@ -49,7 +49,7 @@ This takes <2 seconds. It catches file corruption, accidental deletions, and sys
 
 ## Phase 1: Core (~5k tokens)
 
-1. **CLAUDE.md** — auto-loaded by Claude Code. AIOS rules, session flow, work style. Domain config in domain/DOMAIN.md (ICP, tool stack, email frameworks).
+1. **CLAUDE.md** — auto-loaded by Claude Code. Gradata rules, session flow, work style. Domain config in domain/DOMAIN.md (ICP, tool stack, email frameworks).
 
 **PARALLEL BATCH (steps 2, 3, 4 — no dependencies between them, fire all at once):**
 2. **Read domain/pipeline/startup-brief.md** — pipeline snapshot, active campaigns, top lessons, file pointers, credit balances. Read the **Handoff** section first — it tells you exactly where last session left off and what to do first.
@@ -111,7 +111,7 @@ If all sources fresh and nothing overdue: keep to 3 lines.
 
 **PARALLEL BATCH (steps 8, 9, 10 — three independent file reads, fire all at once):**
 8. **Read .carl/manifest** — check active domains.
-9. **Read .carl/global** — AIOS universal rules. **Also read domain/carl/global** — domain-specific rules (research protocol, skill loading, CCQ, OOO, channel collision, credit gate).
+9. **Read .carl/global** — Gradata universal rules. **Also read domain/carl/global** — domain-specific rules (research protocol, skill loading, CCQ, OOO, channel collision, credit gate).
 10. **Read .carl/context** — context bracket rules. **Read .carl/safety** — structural protections.
 
 **THEN (sequential, needs manifest loaded):**

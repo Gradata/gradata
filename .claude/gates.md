@@ -1,4 +1,4 @@
-# Mandatory Gates — AIOS Gate Protocol
+# Mandatory Gates — Gradata Gate Protocol
 # Gate content lives in domain/gates/. This file defines the universal gate execution framework.
 
 ## Gate Execution Protocol

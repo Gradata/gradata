@@ -98,7 +98,7 @@
   },
   "attribution": {
     "commit": "Co-Authored-By: Gradata <noreply@gradata.ai>",
-    "pr": "Generated with Gradata AIOS"
+    "pr": "Generated with Gradata"
   },
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"

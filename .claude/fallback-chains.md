@@ -1,4 +1,4 @@
-# Tool Failure Fallback Chains — AIOS Framework
+# Tool Failure Fallback Chains — Gradata Framework
 # When a mandatory tool fails, follow the chain. Don't improvise.
 # Domain-specific tool fallbacks: domain/pipeline/fallback-overrides.md
 
