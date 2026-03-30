@@ -357,6 +357,50 @@ class TestFullLearningLoop:
             profile = brain.agent_profile("nonexistent")
             assert profile["total_lessons"] == 0
 
+    def test_auto_evolve_generates_corrections(self):
+        """auto_evolve() evaluates output and creates corrections for low scores."""
+        from gradata.brain import Brain
+        from gradata.enhancements.self_improvement import parse_lessons
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            brain = Brain.init(tmpdir, domain="Test")
+
+            # Short, bad output should trigger corrections
+            result = brain.auto_evolve(
+                output="ok",
+                task="write a detailed analysis",
+                agent_type="analyst",
+                threshold=7.0,
+            )
+
+            assert "scores" in result
+            assert "corrections_generated" in result
+            assert result["corrections_generated"] > 0, (
+                f"Expected auto-corrections but got 0. Scores: {result['scores']}"
+            )
+
+            # Check corrections went into the brain
+            lessons_path = brain.dir / "lessons.md"
+            if lessons_path.is_file():
+                lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+                auto_lessons = [l for l in lessons if l.agent_type == "analyst"]
+                assert len(auto_lessons) > 0, "No analyst lessons from auto_evolve"
+
+    def test_auto_evolve_no_corrections_for_good_output(self):
+        """auto_evolve() generates no corrections for high-quality output."""
+        from gradata.brain import Brain
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            brain = Brain.init(tmpdir, domain="Test")
+
+            # Set threshold very low so everything passes
+            result = brain.auto_evolve(
+                output="This is a thorough analysis with multiple sections.",
+                task="write analysis",
+                threshold=1.0,
+            )
+            assert result["corrections_generated"] == 0
+
     def test_export_skill_creates_openspace_directory(self):
         """export_skill() creates SKILL.md + .skill_id + provenance.json."""
         from gradata.brain import Brain

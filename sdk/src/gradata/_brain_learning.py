@@ -1,10 +1,29 @@
 """Brain mixin — Core Learning Loop methods."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+# Map evaluator dimension names to correction categories
+_DIMENSION_CATEGORY_MAP = {
+    "task_alignment": "ACCURACY",
+    "completeness": "STRUCTURE",
+    "accuracy": "ACCURACY",
+    "clarity": "DRAFTING",
+    "conciseness": "DRAFTING",
+    "tone": "TONE",
+    "formatting": "FORMAT",
+    "security": "SECURITY",
+}
+
+
+def _dimension_to_category(dim_name: str) -> str:
+    """Map an evaluator dimension name to a correction category."""
+    return _DIMENSION_CATEGORY_MAP.get(dim_name.lower(), "PROCESS")
 
 
 class BrainLearningMixin:
@@ -315,6 +334,100 @@ class BrainLearningMixin:
 
         tags = [f"output:{output_type}"]
         return self.emit("OUTPUT", "brain.log_output", data, tags, session)
+
+    # ── Auto-Evolution (machine-generated corrections) ───────────────────
+
+    def auto_evolve(
+        self,
+        output: str,
+        task: str = "",
+        agent_type: str = "",
+        evaluator: Callable | None = None,
+        dimensions: list | None = None,
+        threshold: float = 7.0,
+    ) -> dict:
+        """Evaluate agent output and auto-generate corrections for failed dimensions.
+
+        This is the machine-speed evolution loop. Instead of waiting for human
+        corrections, an evaluator scores the output against quality dimensions.
+        Dimensions scoring below threshold become automatic corrections fed
+        into the same graduation pipeline as human corrections.
+
+        The evaluator can be:
+        - None: uses the built-in heuristic evaluator (fast, shallow)
+        - A callable: (output, dimension) -> (score, rationale) for LLM-as-judge
+
+        Args:
+            output: The agent's output text to evaluate.
+            task: Task description (for context).
+            agent_type: Agent that produced the output.
+            evaluator: Custom evaluator callable. None = heuristic default.
+            dimensions: Quality dimensions to check. None = QUALITY_DIMENSIONS.
+            threshold: Score below which a dimension triggers a correction (0-10).
+
+        Returns:
+            Dict with scores, corrections_generated, and dimension feedback.
+        """
+        import logging
+        logger = logging.getLogger("gradata")
+
+        from gradata.patterns.evaluator import (
+            evaluate, QUALITY_DIMENSIONS, default_evaluator,
+        )
+
+        dims = dimensions or QUALITY_DIMENSIONS
+        eval_fn = evaluator or default_evaluator
+
+        # Evaluate the output
+        result = evaluate(
+            output=output,
+            evaluator=eval_fn,
+            dimensions=dims,
+        )
+
+        # Generate corrections for failing dimensions
+        corrections = []
+        for dim_name, score in result.scores.items():
+            if score < threshold:
+                feedback = result.feedback.get(dim_name, "")
+                # Map dimension failure to a correction category
+                category = _dimension_to_category(dim_name)
+                # The "draft" is the output; the "final" is the feedback
+                # describing what should have been different
+                correction_desc = (
+                    f"[AUTO] {dim_name} scored {score:.1f}/{threshold:.1f}: {feedback}"
+                )
+                try:
+                    self.correct(
+                        draft=output[:2000],
+                        final=correction_desc[:2000],
+                        category=category,
+                        agent_type=agent_type or "auto-evolve",
+                        context={"task": task, "auto_evolve": True},
+                    )
+                    corrections.append({
+                        "dimension": dim_name,
+                        "score": score,
+                        "category": category,
+                        "feedback": feedback[:200],
+                    })
+                except Exception as e:
+                    logger.warning("Auto-evolve correction failed for %s: %s", dim_name, e)
+
+        if corrections:
+            logger.info(
+                "auto_evolve: %d corrections from %d dimensions (agent=%s)",
+                len(corrections), len(dims), agent_type or "auto",
+            )
+
+        return {
+            "scores": result.scores,
+            "average": result.average,
+            "verdict": result.verdict,
+            "corrections_generated": len(corrections),
+            "corrections": corrections,
+            "threshold": threshold,
+        }
 
     def apply_brain_rules(
         self,
