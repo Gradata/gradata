@@ -52,7 +52,7 @@ sys.path.insert(0, str(SDK_SRC))
 CATEGORIES = ["TONE", "ARCHITECTURE", "PROCESS", "DRAFTING", "ACCURACY", "STRUCTURE", "FORMAT", "SECURITY", "NAMING", "TIMING", "SCOPE", "DEPTH"]
 
 # How many corrections per session (min, max)
-CORRECTIONS_PER_SESSION = (2, 2)
+CORRECTIONS_PER_SESSION = (1, 1)
 
 # Which categories to correct each session. "sparse" = 1-2 categories per session
 # (lets other categories survive and graduate). "dense" = all categories
