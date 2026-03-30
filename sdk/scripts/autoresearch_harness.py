@@ -60,7 +60,7 @@ CORRECTIONS_PER_SESSION = (1, 1)
 CATEGORY_STRATEGY = "sparse"  # "sparse" or "dense"
 
 # How many categories to correct per session (only used if CATEGORY_STRATEGY = "sparse")
-CATEGORIES_PER_SESSION = 3
+CATEGORIES_PER_SESSION = 2
 
 # Correction templates: (draft, final) pairs per category.
 # More realistic pairs = better severity classification = more realistic graduation.
