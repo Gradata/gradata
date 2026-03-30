@@ -37,10 +37,10 @@ MIN_APPLICATIONS_FOR_RULE = 5
 
 # SPEC Section 1+6: misfire > contradiction (misfires are worse — rule was irrelevant)
 MISFIRE_PENALTY = -0.25
-CONTRADICTION_PENALTY = -0.28
+CONTRADICTION_PENALTY = -0.24
 
 # SPEC Section 13: EMA +0.10. v2.3: acceptance bonus kept at 0.10
-ACCEPTANCE_BONUS = 0.14
+ACCEPTANCE_BONUS = 0.12
 # v2.3: survival is flat (no severity scaling)
 SURVIVAL_BONUS = 0.08
 
