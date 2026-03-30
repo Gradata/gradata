@@ -119,6 +119,102 @@ class TestFullLearningLoop:
             )
             assert has_signal, f"No lesson signal. Keys: {list(event.keys())}"
 
+    def test_full_roundtrip_correct_graduate_rules(self):
+        """THE critical test: correct() → end_session() promotes → apply_brain_rules() returns rules."""
+        from gradata.brain import Brain
+        from gradata.enhancements.self_improvement import (
+            parse_lessons, format_lessons, LessonState,
+        )
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            brain = Brain.init(tmpdir, domain="Test")
+
+            # Phase 1: Create corrections to generate a lesson
+            for i in range(3):
+                brain.correct(
+                    draft=f"Dear Sir or Madam, I am writing regarding item {i}",
+                    final=f"Hey, quick note about item {i}",
+                    category="TONE",
+                )
+
+            lessons_path = brain.dir / "lessons.md"
+            assert lessons_path.exists(), "lessons.md not created"
+
+            lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+            assert len(lessons) > 0, "No lessons created from corrections"
+
+            # Phase 2: Manually promote a lesson to PATTERN (simulates surviving sessions)
+            # In production this happens over many sessions via end_session().
+            # Here we set it directly to verify the downstream path works.
+            for lesson in lessons:
+                lesson.state = LessonState.PATTERN
+                lesson.confidence = 0.65
+                lesson.fire_count = 5
+
+            lessons_path.write_text(format_lessons(lessons), encoding="utf-8")
+
+            # Phase 3: Verify apply_brain_rules() returns the promoted lesson
+            rules = brain.apply_brain_rules("writing an email to a prospect")
+            assert rules.strip() != "", (
+                f"apply_brain_rules() returned empty string. "
+                f"Lessons: {[(l.state.value, l.confidence, l.category) for l in lessons]}"
+            )
+            assert "TONE" in rules or "tone" in rules.lower(), (
+                f"TONE lesson not found in rules output: {rules[:200]}"
+            )
+
+    def test_end_session_promotes_lessons(self):
+        """end_session() should bump confidence on surviving lessons."""
+        from gradata.brain import Brain
+        from gradata.enhancements.self_improvement import (
+            parse_lessons, format_lessons, LessonState,
+        )
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            brain = Brain.init(tmpdir, domain="Test")
+
+            # Create lessons via corrections (use valid category)
+            for i in range(3):
+                brain.correct(
+                    draft=f"We are pleased to inform you about update {i}",
+                    final=f"Here is update {i}",
+                    category="TONE",
+                )
+
+            lessons_path = brain.dir / "lessons.md"
+            lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+            assert len(lessons) > 0
+
+            # Give lessons enough fire_count to survive graduation
+            # (otherwise end_session kills low-activity lessons)
+            for lesson in lessons:
+                lesson.fire_count = 3
+                lesson.confidence = 0.30  # INSTINCT — should get bumped
+
+            conf_before = [l.confidence for l in lessons]
+            lessons_path.write_text(format_lessons(lessons), encoding="utf-8")
+
+            # Run end_session with corrections in OTHER categories
+            # — TONE lesson survives (no TONE corrections) → confidence bumps
+            result = brain.end_session(session_corrections=[
+                {"category": "ACCURACY", "severity": "minor"},
+            ])
+
+            text_after = lessons_path.read_text(encoding="utf-8")
+            lessons_after = parse_lessons(text_after)
+            conf_after = [l.confidence for l in lessons_after]
+
+            # Lessons should either be promoted or have higher confidence
+            has_progress = (
+                any(a > b for a, b in zip(conf_after, conf_before))
+                or result.get("promotions", 0) > 0
+                or result.get("graduated", 0) > 0
+            )
+            assert has_progress, (
+                f"end_session() showed no progress. "
+                f"Before: {conf_before}, After: {conf_after}, Result: {result}"
+            )
+
 
 # ===========================================================================
 # PII Sanitization

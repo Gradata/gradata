@@ -998,7 +998,7 @@ class Brain:
                 from datetime import date
                 archive_text = archive_path.read_text(encoding="utf-8")
                 archive_lines = [archive_text.rstrip()]
-                archive_lines.append(f"\n## Graduated {date.today().isoformat()} (S74 auto)")
+                archive_lines.append(f"\n## Graduated {date.today().isoformat()} (auto)")
                 for r in new_rules:
                     archive_lines.append(
                         f"[{r.date}] {r.category}: {r.description} → Auto-graduated (confidence {r.confidence:.2f})"
