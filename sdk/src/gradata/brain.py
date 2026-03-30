@@ -129,6 +129,26 @@ class Brain:
             except ImportError:
                 self.agent_graduation = None  # type: ignore[assignment]
 
+        # Learning pipeline (end-to-end: observe→cluster→discriminate→route→bracket)
+        self._learning_pipeline = None
+        try:
+            from gradata.enhancements.learning_pipeline import LearningPipeline
+            self._learning_pipeline = LearningPipeline(brain_dir=self.dir)
+
+            # Warm-start the Q-Learning router from historical corrections
+            if self._learning_pipeline._router and self.db_path.exists():
+                try:
+                    from gradata.enhancements.router_warmstart import warm_start_router
+                    warm_router = warm_start_router(
+                        db_path=self.db_path,
+                        router_path=self.dir / "q_router.json",
+                    )
+                    self._learning_pipeline._router = warm_router
+                except Exception:
+                    pass  # Warm-start is best-effort
+        except ImportError:
+            pass
+
         # Cloud connection (None = local-only mode)
         self._cloud = None
 
@@ -440,6 +460,7 @@ class Brain:
         event["classifications"] = classifications
 
         # Auto-extract patterns from classifications (step 3 of core loop)
+        patterns = []
         try:
             try:
                 from gradata_cloud.graduation.pattern_extractor import extract_patterns
@@ -452,6 +473,114 @@ class Brain:
                 logger.debug("Extracted %d patterns from correction", len(patterns))
         except Exception as e:
             logger.warning("Pattern extraction failed: %s", e)
+
+        # Step 3b: CLOSE THE LOOP — every correction becomes a lesson candidate
+        # This is the critical link: correction → lesson in lessons.md → rules
+        # Key insight: don't wait for pattern clustering. Each correction with
+        # sufficient severity is a lesson candidate. Graduation handles quality.
+        try:
+            from datetime import date as _date
+            from gradata._types import Lesson, LessonState, CorrectionType
+            try:
+                from gradata_cloud.graduation.self_improvement import (
+                    parse_lessons, format_lessons, update_confidence,
+                    INITIAL_CONFIDENCE,
+                )
+            except ImportError:
+                from gradata.enhancements.self_improvement import (
+                    parse_lessons, format_lessons, update_confidence,
+                    INITIAL_CONFIDENCE,
+                )
+
+            # Only create lessons for meaningful corrections (not trivial typos)
+            if diff.severity not in ("as-is",):
+                lessons_path = self._find_lessons_path(create=True)
+                if lessons_path:
+                    existing_text = ""
+                    if lessons_path.is_file():
+                        existing_text = lessons_path.read_text(encoding="utf-8")
+                    existing_lessons = parse_lessons(existing_text) if existing_text else []
+
+                    # Build lesson description from the correction
+                    cat = (category or "UNKNOWN").upper()
+                    desc = summary if summary else f"Corrected {cat.lower()} ({diff.severity})"
+
+                    # Deduplicate: same category + similar description = same lesson
+                    existing_keys = {
+                        (l.category, l.description[:40]) for l in existing_lessons
+                    }
+                    key = (cat, desc[:40])
+
+                    if key not in existing_keys:
+                        # New lesson — start as INSTINCT
+                        new_lesson = Lesson(
+                            date=_date.today().isoformat(),
+                            state=LessonState.INSTINCT,
+                            confidence=INITIAL_CONFIDENCE,
+                            category=cat,
+                            description=desc,
+                        )
+                        existing_lessons.append(new_lesson)
+                        event["lessons_created"] = 1
+                        logger.info("New lesson: [INSTINCT:%.2f] %s: %s",
+                                   INITIAL_CONFIDENCE, cat, desc[:60])
+
+                    # Update confidence on ALL lessons based on this correction
+                    correction_data = [{
+                        "category": cat,
+                        "severity_label": diff.severity,
+                    }]
+                    severity_data = {cat: diff.severity}
+                    existing_lessons = update_confidence(
+                        existing_lessons,
+                        correction_data,
+                        severity_data=severity_data,
+                    )
+
+                    # Write back
+                    lessons_path.write_text(
+                        format_lessons(existing_lessons),
+                        encoding="utf-8",
+                    )
+                    if "lessons_created" not in event:
+                        event["lessons_updated"] = True
+
+        except Exception as e:
+            logger.warning("Lesson creation failed: %s", e)
+
+        # Step 4: Run through the learning pipeline (observe→cluster→discriminate→route→bracket)
+        if self._learning_pipeline:
+            try:
+                task_type = ""
+                if context:
+                    task_type = context.get("task_type", context.get("task", ""))
+                pipeline_result = self._learning_pipeline.process_correction(
+                    draft=draft,
+                    final=final,
+                    severity=diff.severity,
+                    category=category or "UNKNOWN",
+                    session_id=str(session or ""),
+                    task_type=task_type,
+                    occurrence_count=1,
+                )
+                event["pipeline"] = {
+                    "stages_completed": pipeline_result.stages_completed,
+                    "is_high_value": pipeline_result.is_high_value,
+                    "discriminator_confidence": pipeline_result.discriminator_confidence,
+                    "recommendation": pipeline_result.discriminator_recommendation,
+                    "cluster_id": pipeline_result.cluster_id,
+                    "context_bracket": pipeline_result.context_bracket,
+                    "memory_type": pipeline_result.memory_type,
+                    "processing_time_ms": pipeline_result.processing_time_ms,
+                }
+                logger.debug(
+                    "Pipeline: %d stages, high_value=%s, bracket=%s",
+                    len(pipeline_result.stages_completed),
+                    pipeline_result.is_high_value,
+                    pipeline_result.context_bracket,
+                )
+            except Exception as e:
+                logger.warning("Learning pipeline failed: %s", e)
 
         return event
 
@@ -863,6 +992,108 @@ class Brain:
             "has_feedback": has_feedback,
             "event": event,
         }
+
+    # ── Lessons path resolution ─────────────────────────────────────────
+
+    def _find_lessons_path(self, create: bool = False) -> Path | None:
+        """Find the lessons.md file, optionally creating it.
+
+        Search order: brain_dir/lessons.md, parent/.claude/lessons.md.
+        If create=True and neither exists, creates brain_dir/lessons.md.
+        """
+        candidates = [
+            self.dir / "lessons.md",
+            self.dir.parent / ".claude" / "lessons.md",
+        ]
+        for p in candidates:
+            if p.is_file():
+                return p
+        if create:
+            path = self.dir / "lessons.md"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("", encoding="utf-8")
+            return path
+        return None
+
+    # ── Briefing (portable context for any agent) ──────────────────────
+
+    def briefing(self, output_dir: str | Path = ".") -> str:
+        """Generate a brain briefing and return as markdown.
+
+        The briefing is a single file any AI agent can consume:
+        Claude Code, Cursor, Copilot, or any system prompt.
+
+        Args:
+            output_dir: Where to write export files (optional).
+
+        Returns:
+            Markdown string with rules, anti-patterns, corrections, health.
+        """
+        try:
+            from gradata.enhancements.brain_briefing import generate_briefing
+            b = generate_briefing(self)
+            return b.to_markdown()
+        except ImportError:
+            return "# Brain Briefing\n\nBriefing module not available."
+
+    def export_briefing(
+        self,
+        output_dir: str | Path = ".",
+        formats: list[str] | None = None,
+    ) -> dict:
+        """Export briefing to agent-specific files.
+
+        Writes to BRAIN-RULES.md, .cursorrules, copilot-instructions.md.
+
+        Args:
+            output_dir: Directory to write files to.
+            formats: List of targets ("claude", "cursor", "copilot", "generic").
+        """
+        try:
+            from gradata.enhancements.brain_briefing import export_briefing
+            written = export_briefing(self, output_dir, formats)
+            return {k: str(v) for k, v in written.items()}
+        except ImportError:
+            return {"error": "Briefing module not available."}
+
+    # ── Git Backfill ─────────────────────────────────────────────────────
+
+    def backfill_from_git(
+        self,
+        repo_path: str | Path = ".",
+        lookback_days: int = 90,
+        file_patterns: list[str] | None = None,
+        max_commits: int = 500,
+    ) -> dict:
+        """Bootstrap this brain from git history.
+
+        Walks git log, extracts before/after diffs, and feeds them as
+        corrections. A new brain can start with months of learning.
+
+        Args:
+            repo_path: Path to the git repository.
+            lookback_days: How far back to scan (default 90 days).
+            file_patterns: Glob patterns to filter (default: py, md, ts, js, txt).
+            max_commits: Max commits to process.
+
+        Returns:
+            Dict with backfill statistics.
+        """
+        try:
+            from gradata.enhancements.git_backfill import backfill_from_git
+            stats = backfill_from_git(
+                brain=self,
+                repo_path=repo_path,
+                lookback_days=lookback_days,
+                file_patterns=file_patterns,
+                max_commits=max_commits,
+            )
+            return stats.to_dict()
+        except ImportError:
+            return {"error": "git_backfill module not available"}
+        except Exception as e:
+            logger.warning("Git backfill failed: %s", e)
+            return {"error": str(e)}
 
     # ── Passive Memory Extraction (stolen from Mem0) ────────────────────
 

@@ -104,20 +104,66 @@ gradata doctor
 **15 agentic patterns** (pure Python, no dependencies):
 pipeline, parallel execution, dependency graphs, RAG (naive + smart), reflection/critique, guardrails (input + output), human-in-the-loop, scope classification, sub-agent orchestration, evaluator loops, memory (episodic + semantic + procedural), MCP bridge, rule tracking.
 
+**Learning pipeline** (end-to-end, runs on every correction):
+
+```
+brain.correct(draft, final)
+        |
+        v
+observe (100% tool-use capture)
+        |
+        v
+cluster (group related corrections via cosine similarity + temporal gating)
+        |
+        v
+discriminate (filter noise: is this correction worth learning from?)
+        |
+        v
+classify (5 memory types: narrative, fact, prediction, profile, cross-brain)
+        |
+        v
+route (Q-Learning RL router picks best agent for similar future tasks)
+        |
+        v
+context bracket (FRESH/MODERATE/DEEP/CRITICAL degradation management)
+```
+
+**Graduation engine** (INSTINCT -> PATTERN -> RULE):
+- Severity-weighted confidence scoring (trivial to rewrite)
+- FSRS-inspired diminishing returns (harder to reach RULE threshold)
+- Session-type-aware decay (sales lessons skip system sessions)
+- Ablation-verified causal testing
+- Meta-rule emergence from 3+ graduated rules
+
+**Quality controls:**
+- CARL behavioral contracts with MUST/SHOULD/MAY enforcement tiers
+- Execute/Qualify verification loop (fresh re-reads, 3-attempt recovery)
+- Plan reconciliation (UNIFY: PASS/GAP/DRIFT scoring against acceptance criteria)
+- 4-status task escalation (DONE/DONE_WITH_CONCERNS/NEEDS_CONTEXT/BLOCKED)
+- Context brackets prevent late-session quality degradation
+
 **Integrations:** Anthropic, OpenAI, LangChain, CrewAI adapters included.
+
+**Install profiles:** `lite` (core patterns only), `standard` (recommended), `full` (everything), `research` (RL router + observation hooks + meta-rules).
 
 **Storage:** Everything lives in one SQLite file (`system.db`) plus markdown files. Portable. No external databases. No vendor lock-in.
 
-## What's coming
+## MCP tools
 
-The SDK captures corrections and stores knowledge locally. The full learning loop, where corrections graduate into lessons and lessons harden into permanent rules, runs via [gradata.ai](https://gradata.ai):
+10 tools exposed via MCP:
 
-- **Graduation engine:** correction -> lesson -> rule pipeline with confidence scoring
-- **Quality dashboard:** adaptation score, correction trends, category tracking
-- **Marketplace:** package and share trained brains
-- **Team brains:** shared learning across organizations
-
-Full graduation engine + quality dashboard coming via gradata.ai.
+| Tool | What it does |
+|---|---|
+| `brain_search` | Search brain knowledge |
+| `brain_correct` | Log a correction (triggers full learning pipeline) |
+| `brain_log_output` | Track AI outputs for quality measurement |
+| `brain_manifest` | Generate quality proof manifest |
+| `brain_health` | Health report with compound score |
+| `brain_pipeline_stats` | Learning pipeline stats (stages, router, clusters) |
+| `brain_context_bracket` | Current context degradation level |
+| `brain_route_suggest` | RL-based agent routing suggestion |
+| `brain_capabilities` | SDK module availability with source attribution |
+| `brain_benchmark` | Run standard learning quality benchmark |
 
 ## How it works
 
@@ -131,19 +177,31 @@ brain.correct(draft, final)
 Diff computed, edits classified, CORRECTION event stored
         |
         v
-brain.search() retrieves relevant knowledge
+Learning pipeline: observe → cluster → discriminate → route → bracket
         |
         v
-brain.manifest() proves improvement over time
+Graduation: INSTINCT (0.30) → PATTERN (0.60) → RULE (0.90)
+        |
+        v
+brain.apply_brain_rules() injects graduated rules into next session
+        |
+        v
+brain.manifest() proves improvement over time (compound score 0-100)
 ```
 
 All data is event-sourced. Every correction, output log, and state change is an immutable event in SQLite. The brain directory (markdown files + system.db) is the entire state. Copy it, back it up, move it between machines.
 
+## What's coming
+
+- **Quality dashboard** at [gradata.ai](https://gradata.ai): "fitness tracker for your AI"
+- **Marketplace:** package and share trained brains
+- **Team brains:** shared learning across organizations
+- **Multi-brain orchestration:** compose expert brains via A2A protocol
+
 ## Caveats
 
 - This is v0.1.0. The API will change.
-- The numbers above come from one power user over 9 days. Your results will vary. Ablation testing (disabling rules to verify causal effect) is in progress.
-- The graduation engine (the part that turns corrections into permanent rules) is not in the open source SDK yet. It's coming via gradata.ai.
+- The numbers above come from one power user over 9 days. Your results will vary.
 - Local-only for now. Cloud sync is planned.
 
 ## Contributing

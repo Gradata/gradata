@@ -190,6 +190,42 @@ _TOOL_SCHEMAS: list[dict[str, Any]] = [
         "description": "Return a brain health report.",
         "inputSchema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "brain_pipeline_stats",
+        "description": "Return learning pipeline statistics: stages, router, context bracket, clusters.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "brain_context_bracket",
+        "description": "Get current context degradation bracket (FRESH/MODERATE/DEEP/CRITICAL).",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "brain_route_suggest",
+        "description": "Suggest the best agent for a task using the Q-Learning router.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "task": {"type": "string", "description": "Task description to route"},
+            },
+            "required": ["task"],
+        },
+    },
+    {
+        "name": "brain_capabilities",
+        "description": "List SDK capabilities with source attribution (which modules are active).",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "brain_benchmark",
+        "description": "Run the standard learning quality benchmark.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "brain_briefing",
+        "description": "Generate a portable brain briefing (markdown) that any AI agent can consume.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
 ]
 
 
@@ -277,6 +313,102 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
                 ]
             }
 
+        elif tool_name == "brain_pipeline_stats":
+            if hasattr(brain, "_learning_pipeline") and brain._learning_pipeline:
+                stats = brain._learning_pipeline.stats()
+            else:
+                stats = {"error": "Learning pipeline not initialized"}
+            return {
+                "content": [
+                    {"type": "text", "text": json.dumps(stats, ensure_ascii=False)}
+                ]
+            }
+
+        elif tool_name == "brain_context_bracket":
+            if hasattr(brain, "_learning_pipeline") and brain._learning_pipeline:
+                tracker = brain._learning_pipeline._context_tracker
+                if tracker:
+                    bracket_info = {
+                        "bracket": tracker.bracket.value,
+                        "remaining_ratio": round(tracker.remaining_ratio, 4),
+                        "tokens_used": tracker.tokens_used,
+                        "should_handoff": tracker.should_handoff(),
+                    }
+                else:
+                    bracket_info = {"bracket": "fresh", "remaining_ratio": 1.0}
+            else:
+                bracket_info = {"bracket": "fresh", "remaining_ratio": 1.0}
+            return {
+                "content": [
+                    {"type": "text", "text": json.dumps(bracket_info, ensure_ascii=False)}
+                ]
+            }
+
+        elif tool_name == "brain_route_suggest":
+            task = arguments.get("task", "")
+            if hasattr(brain, "_learning_pipeline") and brain._learning_pipeline:
+                router = brain._learning_pipeline._router
+                if router:
+                    decision = router.route(task)
+                    route_info = {
+                        "suggested_agent": decision.agent,
+                        "confidence": decision.confidence,
+                        "exploiting": decision.exploiting,
+                        "q_values": decision.q_values,
+                    }
+                else:
+                    route_info = {"error": "Router not initialized"}
+            else:
+                route_info = {"error": "Learning pipeline not initialized"}
+            return {
+                "content": [
+                    {"type": "text", "text": json.dumps(route_info, ensure_ascii=False)}
+                ]
+            }
+
+        elif tool_name == "brain_capabilities":
+            try:
+                from gradata._brain_manifest import _sdk_capabilities
+                caps = _sdk_capabilities()
+            except ImportError:
+                caps = {"error": "Manifest module not available"}
+            return {
+                "content": [
+                    {"type": "text", "text": json.dumps(caps, ensure_ascii=False)}
+                ]
+            }
+
+        elif tool_name == "brain_benchmark":
+            try:
+                from gradata.enhancements.eval_benchmark import run_standard_benchmark
+                import dataclasses
+                result = run_standard_benchmark()
+                result_dict = dataclasses.asdict(result)
+                # Remove individual case details for MCP response size
+                result_dict.pop("cases", None)
+                return {
+                    "content": [
+                        {"type": "text", "text": json.dumps(result_dict, ensure_ascii=False)}
+                    ]
+                }
+            except ImportError:
+                return {
+                    "content": [
+                        {"type": "text", "text": json.dumps({"error": "Benchmark not available"}, ensure_ascii=False)}
+                    ]
+                }
+
+        elif tool_name == "brain_briefing":
+            try:
+                md = brain.briefing()
+                return {
+                    "content": [
+                        {"type": "text", "text": md}
+                    ]
+                }
+            except Exception as exc:
+                return {"error": str(exc)}
+
         else:
             return {"error": f"Unknown tool: {tool_name}"}
 
@@ -355,13 +487,27 @@ def run_server(brain_dir: str | Path | None, *, stdin=None, stdout=None) -> None
     in_stream: io.RawIOBase = stdin or sys.stdin.buffer  # type: ignore[assignment]
     out_stream: io.RawIOBase = stdout or sys.stdout.buffer  # type: ignore[assignment]
 
+    # Auto-detect brain dir if not provided
+    if brain_dir is None:
+        import os
+        brain_dir = os.environ.get("BRAIN_DIR")
+        if brain_dir is None:
+            # Default: ~/.gradata/brain
+            brain_dir = str(Path.home() / ".gradata" / "brain")
+
     # Instantiate Brain from the module-level import (patchable in tests).
+    # Auto-initialize if the directory doesn't exist (zero-friction first run).
     brain: Any = None
     if brain_dir is not None:
         try:
             if Brain is None:
                 raise ImportError("gradata.brain.Brain could not be imported")
-            brain = Brain(brain_dir)
+            brain_path = Path(brain_dir)
+            if not brain_path.exists():
+                print(f"[mcp_server] Auto-initializing brain at {brain_dir}", file=sys.stderr)
+                brain = Brain.init(brain_dir, domain="General")
+            else:
+                brain = Brain(brain_dir)
         except Exception as exc:
             # Log to stderr so it does not pollute the JSON-RPC channel
             print(f"[mcp_server] Brain init failed: {exc}", file=sys.stderr)

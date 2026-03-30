@@ -439,6 +439,74 @@ def _rag_status(ctx: "BrainContext | None" = None) -> dict:
     return result
 
 
+def _sdk_capabilities() -> dict:
+    """Enumerate SDK capabilities from adapted modules.
+
+    Probes each module for availability without importing heavy deps.
+    Returns a dict of capability_name -> {available, version, source}.
+    """
+    capabilities: dict[str, dict] = {}
+
+    # Adapted from paul
+    _paul_modules = [
+        ("context_brackets", "gradata.patterns.context_brackets", "paul"),
+        ("reconciliation", "gradata.patterns.reconciliation", "paul"),
+        ("task_escalation", "gradata.patterns.task_escalation", "paul"),
+        ("execute_qualify", "gradata.patterns.execute_qualify", "paul"),
+    ]
+    # Adapted from ruflo
+    _ruflo_modules = [
+        ("q_learning_router", "gradata.patterns.q_learning_router", "ruflo"),
+    ]
+    # Adapted from deer-flow
+    _deerflow_modules = [
+        ("loop_detection", "gradata.patterns.loop_detection", "deer-flow"),
+        ("middleware_chain", "gradata.patterns.middleware", "deer-flow"),
+    ]
+    # Adapted from everything-claude-code
+    _ecc_modules = [
+        ("observation_hooks", "gradata.enhancements.observation_hooks", "ecc"),
+        ("install_manifest", "gradata.enhancements.install_manifest", "ecc"),
+    ]
+    # Adapted from EverOS
+    _everos_modules = [
+        ("memory_taxonomy", "gradata.enhancements.memory_taxonomy", "everos"),
+        ("cluster_manager", "gradata.enhancements.cluster_manager", "everos"),
+        ("lesson_discriminator", "gradata.enhancements.lesson_discriminator", "everos"),
+    ]
+    # Core enhancements
+    _core_modules = [
+        ("carl_priority_tiers", "gradata.enhancements.carl", "paul+gradata"),
+        ("learning_pipeline", "gradata.enhancements.learning_pipeline", "gradata"),
+        ("self_improvement", "gradata.enhancements.self_improvement", "gradata"),
+        ("quality_gates", "gradata.enhancements.quality_gates", "gradata"),
+        ("truth_protocol", "gradata.enhancements.truth_protocol", "gradata"),
+        ("meta_rules", "gradata.enhancements.meta_rules", "gradata"),
+        ("eval_benchmark", "gradata.enhancements.eval_benchmark", "gradata"),
+        ("router_warmstart", "gradata.enhancements.router_warmstart", "gradata"),
+        ("git_backfill", "gradata.enhancements.git_backfill", "gradata"),
+        ("auto_correct_hook", "gradata.hooks.auto_correct", "gradata"),
+        ("brain_briefing", "gradata.enhancements.brain_briefing", "fest.build-inspired"),
+        ("anti_patterns", "gradata.enhancements.anti_patterns", "jarvis-inspired"),
+        ("rule_ab_testing", "gradata.enhancements.rule_ab_testing", "jarvis-inspired"),
+    ]
+
+    all_modules = _paul_modules + _ruflo_modules + _deerflow_modules + _ecc_modules + _everos_modules + _core_modules
+
+    for name, module_path, source in all_modules:
+        try:
+            __import__(module_path)
+            capabilities[name] = {"available": True, "source": source}
+        except ImportError:
+            capabilities[name] = {"available": False, "source": source}
+
+    return {
+        "total": len(capabilities),
+        "available": sum(1 for c in capabilities.values() if c["available"]),
+        "modules": capabilities,
+    }
+
+
 def _tag_taxonomy() -> dict:
     try:
         from gradata._tag_taxonomy import get_taxonomy_summary
@@ -529,6 +597,7 @@ def generate_manifest(*, domain: str = "General", ctx: "BrainContext | None" = N
         # A2A Agent Card (Google Agent-to-Agent protocol, Linux Foundation)
         # Near-zero cost metadata — keeps interface boundary clean for future
         # multi-brain orchestration (Phase 5: Avengers vision)
+        "sdk_capabilities": _sdk_capabilities(),
         "agent_card": {
             "name": f"gradata-{domain.lower()}",
             "description": f"Trained AI brain for {domain} domain",
@@ -540,6 +609,13 @@ def generate_manifest(*, domain: str = "General", ctx: "BrainContext | None" = N
                 "generate_context": True,
                 "apply_rules": True,
                 "export": True,
+                "rl_routing": True,
+                "context_degradation": True,
+                "observation_capture": True,
+                "correction_clustering": True,
+                "lesson_discrimination": True,
+                "memory_taxonomy": True,
+                "plan_reconciliation": True,
             },
             "quality_summary": {
                 "maturity": version_info["maturity_phase"],

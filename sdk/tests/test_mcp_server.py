@@ -188,10 +188,10 @@ class TestHandlers:
         assert resp["result"] == {}
         assert resp["id"] == 7
 
-    def test_tools_list_returns_five_tools(self):
+    def test_tools_list_returns_all_tools(self):
         resp = _handle_tools_list(2)
         tools = resp["result"]["tools"]
-        assert len(tools) == 5
+        assert len(tools) == 11
 
     def test_tools_list_tool_names(self):
         resp = _handle_tools_list(2)
@@ -202,6 +202,12 @@ class TestHandlers:
             "brain_log_output",
             "brain_manifest",
             "brain_health",
+            "brain_pipeline_stats",
+            "brain_context_bracket",
+            "brain_route_suggest",
+            "brain_capabilities",
+            "brain_benchmark",
+            "brain_briefing",
         }
         assert names == expected
 
