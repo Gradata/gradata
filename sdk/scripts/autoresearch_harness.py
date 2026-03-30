@@ -170,6 +170,23 @@ def run_session(brain, session_num: int, rng: random.Random) -> dict:
         brain.correct(draft=draft + suffix, final=final + suffix, category=cat)
         corrections_made.append({"category": cat, "severity": "moderate"})
 
+    # Auto-evolve: simulate machine evaluation of agent output.
+    # This generates additional corrections from quality dimension failures.
+    sample_outputs = [
+        "ok",  # Bad: too short, no structure
+        "The results show improvement.",  # Medium: vague, no specifics
+        "Revenue increased by 15% QoQ driven by enterprise expansion (+23%) "
+        "while SMB declined 4%. Key risk: churn in mid-market segment.",  # Good
+    ]
+    sample_output = rng.choice(sample_outputs)
+    auto_result = brain.auto_evolve(
+        output=sample_output,
+        task="write quarterly analysis",
+        agent_type="analyst",
+        threshold=6.0,
+    )
+    auto_corrections = auto_result.get("corrections_generated", 0)
+
     # Simulate rule application: in real usage, hooks call apply_brain_rules()
     # on every prompt, and rule_verifier.py increments fire_count when rules
     # are applied. The SDK doesn't do this internally, so we simulate it by
@@ -215,6 +232,7 @@ def run_session(brain, session_num: int, rng: random.Random) -> dict:
         "rules_applied": bool(rules_output.strip()),
         "promotions": result.get("promotions", 0),
         "kills": result.get("kills", 0),
+        "auto_corrections": auto_corrections,
     }
 
 
