@@ -213,13 +213,20 @@ class Brain(
     def _find_lessons_path(self, create: bool = False) -> Path | None:
         """Find the lessons.md file, optionally creating it.
 
-        Search order: brain_dir/lessons.md, parent/.claude/lessons.md.
-        If create=True and neither exists, creates brain_dir/lessons.md.
+        Search order: BRAIN_LESSONS_PATH env var, brain_dir/lessons.md,
+        parent/.claude/lessons.md, working_dir/.claude/lessons.md.
+        If create=True and none exists, creates brain_dir/lessons.md.
         """
-        candidates = [
+        import os
+        env_path = os.environ.get("BRAIN_LESSONS_PATH", "")
+        candidates = []
+        if env_path:
+            candidates.append(Path(env_path))
+        candidates.extend([
             self.dir / "lessons.md",
             self.dir.parent / ".claude" / "lessons.md",
-        ]
+            self.ctx.working_dir / ".claude" / "lessons.md",
+        ])
         for p in candidates:
             if p.is_file():
                 return p
