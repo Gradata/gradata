@@ -134,6 +134,22 @@ def run_session(brain, session_num: int, rng: random.Random) -> dict:
         brain.correct(draft=draft + suffix, final=final + suffix, category=cat)
         corrections_made.append({"category": cat, "severity": "moderate"})
 
+    # Simulate rule application: in real usage, hooks call apply_brain_rules()
+    # on every prompt, and rule_verifier.py increments fire_count when rules
+    # are applied. The SDK doesn't do this internally, so we simulate it by
+    # bumping fire_count on lessons that would have been applied.
+    from gradata.enhancements.self_improvement import parse_lessons, format_lessons
+    lessons_path = brain._find_lessons_path()
+    if lessons_path and lessons_path.is_file():
+        text = lessons_path.read_text(encoding="utf-8")
+        lessons = parse_lessons(text)
+        for lesson in lessons:
+            # If this lesson's category wasn't corrected this session, it "fired" (was applied)
+            corrected_cats = {c["category"] for c in corrections_made}
+            if lesson.category not in corrected_cats:
+                lesson.fire_count += 1
+        lessons_path.write_text(format_lessons(lessons), encoding="utf-8")
+
     # Run graduation
     result = brain.end_session(
         session_corrections=corrections_made,
@@ -174,6 +190,11 @@ def run_harness(num_sessions: int = 15, seed: int = 42) -> dict:
 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         with Brain.init(tmp, domain="Autoresearch") as brain:
+            # Clean slate: remove any onboarding-generated lessons
+            lessons_path = brain._find_lessons_path()
+            if lessons_path and lessons_path.is_file():
+                lessons_path.write_text("", encoding="utf-8")
+
             results = []
             total_corrections = 0
 
