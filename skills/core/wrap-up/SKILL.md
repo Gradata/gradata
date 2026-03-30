@@ -106,7 +106,7 @@ agent distillation, startup-brief/loop-state headers.
 5. Only proceed to Step 7 when validator shows 19/19 (100%).
 6. After 100% confirmed, write the completion marker:
 ```bash
-python -c "from pathlib import Path; import tempfile; Path(tempfile.gettempdir(), 'aios-wrapup-done-S{SESSION}.marker').write_text('done')"
+python -c "from pathlib import Path; import tempfile; Path(tempfile.gettempdir(), 'gradata-wrapup-done-S{SESSION}.marker').write_text('done')"
 ```
 This marker tells the Stop hook to skip re-running the validator (which would show false failures since it runs before wrap-up is done).
 
@@ -116,17 +116,41 @@ This marker tells the Stop hook to skip re-running the validator (which would sh
 python -c "
 import sys; sys.path.insert(0, 'C:/Users/olive/SpritesWork/brain/scripts')
 sys.path.insert(0, 'C:/Users/olive/OneDrive/Desktop/Sprites Work/sdk/src')
-from aios_brain.enhancements.agent_graduation import AgentGraduationTracker
-tracker = AgentGraduationTracker('C:/Users/olive/SpritesWork/brain')
-distilled = tracker.distill_upward()
-if distilled:
-    print(f'{len(distilled)} agent lesson(s) ready for brain-level promotion')
-    for d in distilled:
-        print(f'  [{d[\"state\"]}] {d[\"agent_type\"]}: {d[\"description\"][:80]}')
+try:
+    from gradata.enhancements.agent_graduation import AgentGraduationTracker
+    tracker = AgentGraduationTracker('C:/Users/olive/SpritesWork/brain')
+    distilled = tracker.distill_upward()
+    if distilled:
+        print(f'{len(distilled)} agent lesson(s) ready for brain-level promotion')
+        for d in distilled:
+            print(f'  [{d[\"state\"]}] {d[\"agent_type\"]}: {d[\"description\"][:80]}')
+except ImportError:
+    print('Agent graduation module not installed (cloud-only). Skipping distillation.')
 "
 ```
 
 Review distilled lessons. Promote worthy ones to brain-level lessons.md.
+
+**7b — Auto-evolve check**: Run auto_evolve on any agent outputs from this session
+that weren't human-corrected. This generates machine corrections that feed graduation:
+```python
+python -c "
+import sys; sys.path.insert(0, 'C:/Users/olive/OneDrive/Desktop/Sprites Work/sdk/src')
+from gradata.brain import Brain
+b = Brain('C:/Users/olive/SpritesWork/brain')
+# Check lineage for this session's transitions
+transitions = b.lineage(limit=10)
+if transitions:
+    print(f'{len(transitions)} rule transitions this session:')
+    for t in transitions[:5]:
+        print(f'  {t[\"category\"]}: {t[\"old_state\"]} -> {t[\"new_state\"]}')
+"
+```
+
+**7c — Export rules** (if rules graduated this session):
+```python
+brain.export_skill()  # Creates OpenSpace-compatible skill directory in brain/skills/
+```
 
 ## Step 8: Summary (show Oliver)
 
