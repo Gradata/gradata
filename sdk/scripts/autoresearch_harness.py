@@ -49,7 +49,7 @@ sys.path.insert(0, str(SDK_SRC))
 
 # Categories to use. The AI agent can change which categories appear,
 # how many corrections per session, and the distribution.
-CATEGORIES = ["TONE", "ARCHITECTURE", "PROCESS", "DRAFTING", "ACCURACY", "STRUCTURE", "FORMAT", "SECURITY", "NAMING", "TIMING", "SCOPE", "DEPTH", "CLARITY", "EMPATHY", "EVIDENCE", "PRIORITY"]
+CATEGORIES = ["TONE", "ARCHITECTURE", "PROCESS", "DRAFTING", "ACCURACY", "STRUCTURE", "FORMAT", "SECURITY", "NAMING", "TIMING", "SCOPE", "DEPTH"]
 
 # How many corrections per session (min, max)
 CORRECTIONS_PER_SESSION = (1, 1)
