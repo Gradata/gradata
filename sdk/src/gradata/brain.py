@@ -913,6 +913,120 @@ class Brain:
         from gradata.patterns.scope import register_task_type as _register
         _register(name, keywords, domain_hint, prepend=prepend)
 
+    # ── Session-End Graduation (auto-promote survivors) ─────────────────
+
+    def end_session(
+        self,
+        session_corrections: list[dict] | None = None,
+        session_type: str = "full",
+    ) -> dict:
+        """Run full graduation sweep at end of session.
+
+        This is the auto-promotion mechanism. Every lesson that SURVIVED
+        this session (wasn't contradicted) gets a confidence bump. Lessons
+        that cross thresholds (0.60 → PATTERN, 0.90 → RULE) get promoted.
+        Lessons that hit kill limits get archived.
+
+        Should be called at session end (wrap-up, hook, or manually).
+
+        Args:
+            session_corrections: All corrections from this session.
+            session_type: "full", "sales", or "systems" for decay scoping.
+
+        Returns:
+            Dict with promotion/demotion/kill counts.
+        """
+        try:
+            try:
+                from gradata_cloud.graduation.self_improvement import (
+                    parse_lessons, format_lessons, update_confidence, graduate,
+                )
+            except ImportError:
+                from gradata.enhancements.self_improvement import (
+                    parse_lessons, format_lessons, update_confidence, graduate,
+                )
+
+            lessons_path = self._find_lessons_path()
+            if not lessons_path or not lessons_path.is_file():
+                return {"error": "no lessons.md found"}
+
+            text = lessons_path.read_text(encoding="utf-8")
+            lessons = parse_lessons(text)
+            if not lessons:
+                return {"lessons": 0, "promotions": 0, "demotions": 0}
+
+            before_states = {l.description[:40]: l.state.value for l in lessons}
+
+            # Run full confidence update with all session corrections
+            lessons = update_confidence(
+                lessons,
+                session_corrections or [],
+                session_type=session_type,
+            )
+
+            # Run graduation (promote/demote/kill)
+            active, graduated = graduate(lessons)
+
+            # Count changes
+            promotions = 0
+            demotions = 0
+            kills = 0
+            for l in active + graduated:
+                key = l.description[:40]
+                old_state = before_states.get(key, "")
+                new_state = l.state.value
+                if old_state and new_state != old_state:
+                    if new_state in ("PATTERN", "RULE"):
+                        promotions += 1
+                    elif new_state == "INSTINCT" and old_state == "PATTERN":
+                        demotions += 1
+                    elif new_state in ("KILLED", "UNTESTABLE"):
+                        kills += 1
+
+            # Write back
+            all_lessons = active + graduated
+            lessons_path.write_text(
+                format_lessons(all_lessons),
+                encoding="utf-8",
+            )
+
+            # Archive graduated RULE lessons to lessons-archive.md
+            archive_path = lessons_path.parent / "lessons-archive.md"
+            new_rules = [l for l in graduated if l.state.value == "RULE"
+                        and before_states.get(l.description[:40]) != "RULE"]
+            if new_rules and archive_path.exists():
+                from datetime import date
+                archive_text = archive_path.read_text(encoding="utf-8")
+                archive_lines = [archive_text.rstrip()]
+                archive_lines.append(f"\n## Graduated {date.today().isoformat()} (S74 auto)")
+                for r in new_rules:
+                    archive_lines.append(
+                        f"[{r.date}] {r.category}: {r.description} → Auto-graduated (confidence {r.confidence:.2f})"
+                    )
+                archive_path.write_text("\n".join(archive_lines) + "\n", encoding="utf-8")
+
+            result = {
+                "total_lessons": len(all_lessons),
+                "active": len(active),
+                "graduated": len(graduated),
+                "promotions": promotions,
+                "demotions": demotions,
+                "kills": kills,
+                "new_rules": [l.description[:60] for l in new_rules] if new_rules else [],
+            }
+
+            if promotions or demotions or kills:
+                logger.info(
+                    "Graduation sweep: %d promotions, %d demotions, %d kills",
+                    promotions, demotions, kills,
+                )
+
+            return result
+
+        except Exception as e:
+            logger.warning("Graduation sweep failed: %s", e)
+            return {"error": str(e)}
+
     # ── Implicit Feedback Detection (novel — neither Mem0 nor Letta has this)
 
     def detect_implicit_feedback(self, user_message: str, session: int = None) -> dict:

@@ -14,31 +14,9 @@
 # 4 reclassified (knowledge → reference). 13 kept as [CONFIRMED — ZERO FIRE] (no pipeline sessions to test).
 # Session 36 (2026-03-22): Tag migration. 15 [CONFIRMED] → [PATTERN:0.70]. 6 ZERO FIRE → [UNTESTABLE] (25+ sessions, 0 hits). Removed redundant graduated index (archive is canonical). Killed unused SHADOW/TRACK/CONFIRM protocols.
 
-## Active Lessons (13 entries — cap: 30)
+## Active Lessons (36 entries — cap: 30)
 
-### PATTERN — Active (bumped to 0.80: survived 5+ sessions, add specificity beyond existing rules)
-
-[2026-03-20] [PATTERN:0.80] DRAFTING: Bullet lists need a lead-in line for context ("On that call we cover:"). One idea per bullet — no combining. Attach actual case study documents, don't just name-drop results.
-
-[2026-03-20] [PATTERN:0.80] APIFY: Always use `harvestapi/linkedin-profile-scraper` for LinkedIn profile scraping (NOT supreme_coder). Input format: `{"queries": ["url1", "url2"]}`. Cost: $0.004/profile for harvestapi.
-
-[2026-03-20] [PATTERN:0.80] LEADS: Scripts that write CSVs to active/ AND read from active/ for dedup will dedup against their own previous output on reruns. Always clean the output directory BEFORE the dedup scan, not after.
-
-[2026-03-20] [PATTERN:0.80] ARCHITECTURE: When splitting files, don't keep duplicate definitions. If content moves to domain/, replace the original with a single pointer — not both.
-
-[2026-03-20] [PATTERN:0.80] COMMUNICATION: When surfacing anomalies or warnings, always explain WHY it matters and confirm whether it's a blocker or cosmetic. Don't leave ambiguity about severity.
-
-[2026-03-21] [PATTERN:0.80] ACCURACY: Verify current state before presenting status or recommending changes. Check Gmail sent, source dates, actual workflows — never assume from memory or Pipedrive stage names.
-
-[2026-03-21] [PATTERN:0.80] PRESENTATION: When presenting calendar/timeline data, always state the current day of week and frame events relative to it. Don't present a grid that implies immediacy when there's a buffer.
-
-[2026-03-21] [PATTERN:0.80] POSITIONING: Never use "agency pricing" — it implies expensive retainers. Say "fixed monthly subscription" or "flat rate, cancel anytime."
-
-[2026-03-21] [PATTERN:0.80] DRAFTING: When building email subject lines or cadences, cross-reference BOTH external research (Gong, HubSpot) AND Oliver's playbooks (sales-methodology.txt, templates.txt). Neither source alone is sufficient.
-
-[2026-03-21] [PATTERN:0.80] ACCURACY: When displaying metrics that mix session types (sales vs system), always filter to the relevant track. Blended numbers (e.g., edit rate diluted by 0-revision system sessions) are misleading. Show the number that matters for the context. Root cause: statusline showed 15% edit rate blending sales (31%) with systems (0%).
-
-### INSTINCT — New (require root cause, tracking)
+### INSTINCT — Active (require root cause, tracking)
 
 [2026-03-22] [INSTINCT:0.59] CONSTRAINT: Before proposing any tool, API, or service, check if it costs money. If yes, flag it and ask -- don't present it as a solution. Default to free. Oliver wants zero-cost infrastructure. Root cause: proposed Composio (paid) and trial-tier APIs (25/month) twice before being corrected. Technical problem-solving instinct overrides constraint awareness.
 

@@ -82,3 +82,15 @@
 [2026-03-21] ARCHITECTURE: Think big picture FIRST → Now in work-style.md Big-picture gate
 [2026-03-21] PROCESS: Parallelize wrap-up with background agents → Now in wrap-up/SKILL.md Phase 5b2 (5 concurrent agents)
 [2026-03-21] PROCESS: Don't start building before researching → Now in work-style.md Design-first check + GLOBAL_RULE_2
+
+## Graduated 2026-03-29 (S74 auto-promote: 10 PATTERN→RULE at 0.90)
+[2026-03-20] DRAFTING: Bullet lists need lead-in line, one idea per bullet, attach case studies → RULE:0.90
+[2026-03-20] APIFY: Use harvestapi/linkedin-profile-scraper (NOT supreme_coder) → RULE:0.90
+[2026-03-20] LEADS: Clean output dir BEFORE dedup scan to avoid self-dedup on reruns → RULE:0.90
+[2026-03-20] ARCHITECTURE: When splitting files, replace original with pointer, don't keep duplicates → RULE:0.90
+[2026-03-20] COMMUNICATION: Always explain WHY anomaly matters and confirm blocker vs cosmetic → RULE:0.90
+[2026-03-21] ACCURACY: Verify current state before presenting status — check Gmail, source dates, actual workflows → RULE:0.90
+[2026-03-21] PRESENTATION: State current day of week, frame events relative to it → RULE:0.90
+[2026-03-21] POSITIONING: Never say "agency pricing" — say "fixed monthly subscription" → RULE:0.90
+[2026-03-21] DRAFTING: Cross-reference BOTH external research AND Oliver's playbooks for cadences → RULE:0.90
+[2026-03-21] ACCURACY: Filter metrics to relevant track, never blend sales + system numbers → RULE:0.90
