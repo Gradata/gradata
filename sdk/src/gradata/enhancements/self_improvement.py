@@ -32,7 +32,7 @@ _log = logging.getLogger(__name__)
 INITIAL_CONFIDENCE = 0.40
 PATTERN_THRESHOLD = 0.60
 RULE_THRESHOLD = 0.90
-MIN_APPLICATIONS_FOR_PATTERN = 3
+MIN_APPLICATIONS_FOR_PATTERN = 2
 MIN_APPLICATIONS_FOR_RULE = 5
 
 # SPEC Section 1+6: misfire > contradiction (misfires are worse — rule was irrelevant)
