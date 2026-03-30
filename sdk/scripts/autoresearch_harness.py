@@ -49,7 +49,7 @@ sys.path.insert(0, str(SDK_SRC))
 
 # Categories to use. The AI agent can change which categories appear,
 # how many corrections per session, and the distribution.
-CATEGORIES = ["TONE", "ARCHITECTURE", "PROCESS", "DRAFTING", "ACCURACY", "STRUCTURE", "FORMAT", "SECURITY", "NAMING", "TIMING"]
+CATEGORIES = ["TONE", "ARCHITECTURE", "PROCESS", "DRAFTING", "ACCURACY", "STRUCTURE", "FORMAT", "SECURITY", "NAMING", "TIMING", "SCOPE", "DEPTH"]
 
 # How many corrections per session (min, max)
 CORRECTIONS_PER_SESSION = (1, 1)
@@ -130,6 +130,18 @@ CORRECTION_TEMPLATES: dict[str, list[tuple[str, str]]] = {
          "The system queues notifications and delivers during recipient business hours."),
         ("The cache expires after a fixed 24 hours regardless of usage patterns.",
          "The cache uses adaptive TTL based on access frequency and staleness risk."),
+    ],
+    "SCOPE": [
+        ("The function handles user auth, data validation, and sends email notifications.",
+         "The function only validates user credentials. Validation and notifications are separate."),
+        ("The PR changes 47 files across 12 modules with no clear theme.",
+         "The PR changes 3 files in the auth module with a clear single purpose."),
+    ],
+    "DEPTH": [
+        ("The analysis says revenue increased. No breakdown by segment or time period.",
+         "The analysis shows revenue up 12% YoY, driven by enterprise (+23%) offsetting SMB (-4%)."),
+        ("The error message says something went wrong.",
+         "The error message says: ValidationError on field email: expected format user@domain."),
     ],
 }
 
