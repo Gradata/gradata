@@ -72,8 +72,10 @@ def emit(event_type: str, source: str, data: dict = None, tags: list = None,
         enriched_tags = enrich_tags(enriched_tags, event_type, data)
         issues = validate_tags(enriched_tags, event_type)
         if issues:
+            import logging
+            _logger = logging.getLogger("gradata.events")
             for issue in issues[:2]:
-                print(f"[events] tag warning: {issue}")
+                _logger.debug("tag validation: %s", issue)
     except ImportError:
         pass
 

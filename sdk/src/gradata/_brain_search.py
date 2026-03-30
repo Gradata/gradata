@@ -20,12 +20,19 @@ class BrainSearchMixin:
         """
         try:
             from gradata._query import brain_search
-            return brain_search(
+            results = brain_search(
                 query, file_type=file_type, top_k=top_k, mode=mode, ctx=self.ctx
             )
         except ImportError:
             # Fallback: basic file grep
-            return self._grep_search(query, top_k)
+            results = self._grep_search(query, top_k)
+        if not results:
+            import logging
+            logging.getLogger("gradata").debug(
+                "search() returned no results. Brain may be empty — "
+                "add content via correct(), embed(), or create markdown files."
+            )
+        return results
 
     def _grep_search(self, query: str, top_k: int) -> list[dict]:
         """Fallback search: grep through markdown files."""

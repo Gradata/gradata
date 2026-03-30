@@ -352,7 +352,15 @@ class BrainLearningMixin:
         text = lessons_path.read_text(encoding="utf-8")
         lessons = parse_lessons(text)
         applied = apply_rules(lessons, scope)
-        return format_rules_for_prompt(applied)
+        result = format_rules_for_prompt(applied)
+        if not result and lessons:
+            logger.debug(
+                "apply_brain_rules() returned empty: %d lessons exist but none "
+                "at PATTERN/RULE tier yet. Keep correcting — lessons graduate "
+                "after surviving multiple sessions.",
+                len(lessons),
+            )
+        return result
 
     # ── Session-End Graduation (auto-promote survivors) ─────────────────
 

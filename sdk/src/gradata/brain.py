@@ -195,7 +195,9 @@ class Brain(
         from gradata.onboard import onboard
 
         if interactive is None:
-            interactive = hasattr(sys, "stdin") and sys.stdin.isatty()
+            # If caller provided key args, skip the wizard
+            has_args = any(v is not None for v in (name, domain, company, embedding))
+            interactive = not has_args and hasattr(sys, "stdin") and sys.stdin.isatty()
 
         return onboard(
             brain_dir,
@@ -227,6 +229,29 @@ class Brain(
             path.write_text("", encoding="utf-8")
             return path
         return None
+
+    def close(self):
+        """Close any open database connections.
+
+        Call this when done with the Brain instance, or use as a context manager:
+            with Brain("./my-brain") as brain:
+                brain.correct(...)
+        """
+        import sqlite3
+        # Close any cached SQLite connections to release file locks (needed on Windows)
+        db = self.ctx.db_path
+        if db.exists():
+            try:
+                conn = sqlite3.connect(str(db))
+                conn.close()
+            except Exception:
+                pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
 
     def __repr__(self):
         return f"Brain('{self.dir}')"
