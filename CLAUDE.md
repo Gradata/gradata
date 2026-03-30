@@ -8,6 +8,8 @@ Mode: OODA godmode. Observe-Orient-Decide-Act continuously. Never pause to ask. 
 
 ## Architecture (open source SDK + proprietary cloud)
 Open SDK (sdk/src/gradata/): patterns/, enhancements/ (diff_engine, quality_gates, truth_protocol, meta_rules, rule_verifier). AGPL-3.0.
+SDK layers: patterns/ (orchestrator, pipeline, reflection, guardrails, memory, scope, rule_engine, rag) → enhancements/ (diff_engine, quality_gates, truth_protocol, meta_rules, rule_verifier) → brain/ (events.jsonl, system.db).
+Core loop: prompt → draft → correction → diff → classify → graduate → inject rules.
 Proprietary (gradata_cloud_backup/): graduation engine, scoring, profiling. NOT in public repo. Backed up to brain vault.
 Brain vault: C:/Users/olive/SpritesWork/brain/ (events.jsonl, system.db, prospects/, sessions/).
 
