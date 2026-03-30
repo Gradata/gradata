@@ -73,6 +73,13 @@ try {
     ).trim();
   }
 
+  // Get SDK brain rules scoped to this agent type (uses apply_brain_rules with agent_type)
+  let sdkRules = '';
+  try {
+    const sdkCmd = `"${PYTHON}" -c "import sys; sys.path.insert(0, '${cfg.WORKING_DIR.replace(/\\/g, '/')}/sdk/src'); from gradata.brain import Brain; b = Brain('${cfg.BRAIN_DIR.replace(/\\/g, '/')}'); print(b.apply_brain_rules('${agentType} task', agent_type='${agentType}'))"`;
+    sdkRules = execSafe(sdkCmd, { encoding: 'utf8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+  } catch { /* SDK rules are best-effort */ }
+
   // Also inject scope-matched meta-rules from the main brain
   let metaRules = '';
   const metaScript = path.join(cfg.SCRIPTS, 'get_meta_rules.py');
@@ -85,7 +92,7 @@ try {
     } catch { /* silent */ }
   }
 
-  const combined = [metaRules, agentRules].filter(s => s && s.length > 10).join('\n\n');
+  const combined = [sdkRules, metaRules, agentRules].filter(s => s && s.length > 10).join('\n\n');
   if (!combined) process.exit(0);
 
   // Prepend agent training context to the prompt

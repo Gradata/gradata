@@ -104,6 +104,31 @@ try {
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
+  // Auto-evolve: evaluate agent output and generate corrections for failing dimensions.
+  // This is the machine-speed evolution loop — no human needed.
+  const evolveScript = path.join(cfg.SCRIPTS, 'auto_evolve_agent.py');
+  if (fs.existsSync(evolveScript) && output.length > 30) {
+    try {
+      // Sanitize output for shell (truncate, escape quotes)
+      const safeOutput = output.substring(0, 1000).replace(/"/g, "'").replace(/\n/g, ' ');
+      const evolveCmd = [
+        `"${PYTHON}"`,
+        `"${evolveScript}"`,
+        `--agent-type "${agentType}"`,
+        `--output "${safeOutput}"`,
+        `--task "${agentType} task"`,
+      ].join(' ');
+
+      execSafe(evolveCmd, {
+        timeout: 15000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    } catch (e2) {
+      // Auto-evolve is best-effort — never block the pipeline
+      process.stderr.write(`[auto-evolve] ${agentType}: ${e2.message}\n`);
+    }
+  }
+
 } catch (e) {
   // Surface errors so we know when graduation isn't running
   process.stderr.write(`[agent-graduation] error: ${e.message}\n`);
