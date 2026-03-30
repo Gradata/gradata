@@ -171,6 +171,21 @@ def system_health_checks() -> list:
     except Exception:
         pass  # Non-blocking
 
+    # 9. Previous session gates written (catches incomplete wrap-ups)
+    try:
+        session = detect_session()
+        prev = session - 1
+        if prev > 0:
+            conn = sqlite3.connect(str(DB_PATH))
+            count = conn.execute(
+                "SELECT COUNT(*) FROM session_gates WHERE session = ?", (prev,)
+            ).fetchone()[0]
+            conn.close()
+            if count == 0:
+                alerts.append(("WARNING", f"S{prev} wrap-up incomplete — no gates written to DB. Run validator to backfill."))
+    except Exception:
+        pass  # Non-blocking
+
     return alerts
 
 

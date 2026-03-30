@@ -71,15 +71,12 @@ process.stdin.on('end', () => {
         } catch (e) {}
       }
 
-      const total = 20;
-      const filled = Math.round((usedPct / 100) * total);
-      const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(total - filled);
       let color = c.green;
       if (usedPct >= 80) color = c.red;
       else if (usedPct >= 65) color = c.orange;
       else if (usedPct >= 50) color = c.yellow;
       else if (usedPct >= 35) color = c.yellow;
-      ctxDisplay = `${color}${bar} ${usedPct}%${burnInfo}${c.reset}`;
+      ctxDisplay = `${color}ctx: ${usedPct}%${burnInfo}${c.reset}`;
     }
 
     // -- Session Number (from git: last committed S## + 1) --
@@ -262,7 +259,7 @@ process.stdin.on('end', () => {
 
     // ── LINE 3: What needs attention (LIVE from Pipedrive) ─────────
     // Cache Pipedrive data to tmpfile, refresh every 5 minutes
-    const PIPEDRIVE_TOKEN = 'REDACTED_PIPEDRIVE_TOKEN';
+    const PIPEDRIVE_TOKEN = process.env.PIPEDRIVE_TOKEN || '';
     const PIPEDRIVE_CACHE = path.join(os.tmpdir(), 'gradata-pipedrive-cache.json');
     const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -281,9 +278,9 @@ process.stdin.on('end', () => {
 
     function fetchPipedriveLive() {
       try {
-        const https = require('https');
-        const url = `https://api.pipedrive.com/v1/deals?status=open&limit=500&api_token=${PIPEDRIVE_TOKEN}`;
-        const raw = execSafe(`node -e "const https=require('https');https.get('${url}',r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>process.stdout.write(d))})"`, { timeout: 4000 }).toString();
+        if (!PIPEDRIVE_TOKEN) return null;
+        const raw = safeExec(`curl -s "https://api.pipedrive.com/v1/deals?status=open&limit=500&api_token=${PIPEDRIVE_TOKEN}"`, 5000);
+        if (!raw) return null;
         const data = JSON.parse(raw);
         const deals = data.data || [];
 
