@@ -49,7 +49,7 @@ sys.path.insert(0, str(SDK_SRC))
 
 # Categories to use. The AI agent can change which categories appear,
 # how many corrections per session, and the distribution.
-CATEGORIES = ["TONE", "ARCHITECTURE", "PROCESS", "DRAFTING", "ACCURACY", "STRUCTURE", "FORMAT", "SECURITY"]
+CATEGORIES = ["TONE", "ARCHITECTURE", "PROCESS", "DRAFTING", "ACCURACY", "STRUCTURE", "FORMAT", "SECURITY", "NAMING", "TIMING"]
 
 # How many corrections per session (min, max)
 CORRECTIONS_PER_SESSION = (1, 1)
@@ -60,7 +60,7 @@ CORRECTIONS_PER_SESSION = (1, 1)
 CATEGORY_STRATEGY = "sparse"  # "sparse" or "dense"
 
 # How many categories to correct per session (only used if CATEGORY_STRATEGY = "sparse")
-CATEGORIES_PER_SESSION = 1
+CATEGORIES_PER_SESSION = 2
 
 # Correction templates: (draft, final) pairs per category.
 # More realistic pairs = better severity classification = more realistic graduation.
@@ -118,6 +118,18 @@ CORRECTION_TEMPLATES: dict[str, list[tuple[str, str]]] = {
          "The API endpoint validates input types, lengths, and sanitizes before processing."),
         ("Credentials are stored in plaintext in the config file.",
          "Credentials are loaded from environment variables, never stored in code."),
+    ],
+    "NAMING": [
+        ("The variable is named x and the function is named do_stuff.",
+         "The variable is named user_count and the function is named validate_email."),
+        ("The module is called utils.py with 50 unrelated functions.",
+         "Each module has a single responsibility: validators.py, formatters.py, parsers.py."),
+    ],
+    "TIMING": [
+        ("The system sends the notification immediately without checking business hours.",
+         "The system queues notifications and delivers during recipient business hours."),
+        ("The cache expires after a fixed 24 hours regardless of usage patterns.",
+         "The cache uses adaptive TTL based on access frequency and staleness risk."),
     ],
 }
 
