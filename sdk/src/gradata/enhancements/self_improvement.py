@@ -40,7 +40,7 @@ MISFIRE_PENALTY = -0.25
 CONTRADICTION_PENALTY = -0.20
 
 # SPEC Section 13: EMA +0.10. v2.3: acceptance bonus kept at 0.10
-ACCEPTANCE_BONUS = 0.10
+ACCEPTANCE_BONUS = 0.15
 # v2.3: survival is flat (no severity scaling)
 SURVIVAL_BONUS = 0.08
 
