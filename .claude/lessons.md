@@ -105,3 +105,9 @@
 [2026-03-26] [INSTINCT:0.30] SCRAPE_FIRST: Full-profile scrape then ICP filter beats headline-filter then scrape. Headlines miss 40%+ of ICP leads whose About/Experience/Skills reveal relevance. Worth extra Apify cost. Root cause: premature optimization on API costs instead of lead quality.
 
 [2026-03-27] [INSTINCT:0.30] PROCESS: Never skip or ignore failing tests. When tests fail, diagnose the root cause and fix it — don't add to an ignore list. "Why skip? Figure out why" — every failing test is a signal about broken contracts or missing modules. Root cause: defaulted to --ignore flags on 5 test files instead of fixing the importorskip guards that were checking the wrong module.
+
+[2026-03-29] [INSTINCT:0.30] VERIFICATION: Never declare "nothing left to fix" or "ship-ready" without running an adversarial audit first. In S74, declared "done" 3 times, each time an audit found critical bugs (9 bugs, then the broken learning loop). The phrase "nothing left to fix" is a red flag — run the audit THEN say it. Root cause: completion bias + desire to report progress over verifying quality.
+
+[2026-03-29] [INSTINCT:0.30] ARCHITECTURE: Before building features ON TOP of a system, verify the system's core loop actually works end-to-end. In S74, built 25 new modules before discovering brain.correct() never created lessons. The entire product claim was broken. Test the critical path FIRST. Root cause: built infrastructure outward (adapting competitor patterns) instead of verifying inward (does correct→lesson→rule actually fire?).
+
+[2026-03-29] [INSTINCT:0.30] CONSTRAINT: Never cap, truncate, or silently drop user-facing data without explicit approval. Capping rules at 15 would silently drop 33 learned rules — Oliver caught it. If data reduction is needed, compress format instead of removing content. Root cause: assumed bloat was from count when it was from verbosity.
