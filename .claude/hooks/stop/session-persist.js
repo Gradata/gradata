@@ -29,25 +29,21 @@ try {
 
   const SPRITES_WORK = cfg.WORKING_DIR;
 
-  // Get modified files from git
+  // Get modified files from git (use spawnSafe to avoid Windows path quoting issues)
   let filesModified = [];
   try {
-    const gitOutput = execSafe(
-      `git -C "${SPRITES_WORK}" diff --name-only HEAD 2>/dev/null`,
-      { encoding: 'utf8', timeout: 5000 }
-    ).trim();
-    if (gitOutput) filesModified = gitOutput.split('\n').slice(0, 30);
+    const r = cfg.spawnSafe('git', ['-C', SPRITES_WORK, 'diff', '--name-only', 'HEAD'],
+      { encoding: 'utf8', timeout: 5000 });
+    if (r.status === 0 && r.stdout) filesModified = r.stdout.trim().split('\n').filter(Boolean).slice(0, 30);
   } catch (e) { /* git not available or no changes */ }
 
   // Get brain repo modified files
   try {
-    const brainGit = execSafe(
-      `git -C "${BRAIN_PATH}" diff --name-only HEAD 2>/dev/null`,
-      { encoding: 'utf8', timeout: 5000 }
-    ).trim();
-    if (brainGit) {
+    const r = cfg.spawnSafe('git', ['-C', BRAIN_PATH, 'diff', '--name-only', 'HEAD'],
+      { encoding: 'utf8', timeout: 5000 });
+    if (r.status === 0 && r.stdout) {
       filesModified = filesModified.concat(
-        brainGit.split('\n').slice(0, 20).map(f => `brain/${f}`)
+        r.stdout.trim().split('\n').filter(Boolean).slice(0, 20).map(f => `brain/${f}`)
       );
     }
   } catch (e) { /* no brain changes */ }
@@ -55,12 +51,9 @@ try {
   // Build short handoff from git log + loop-state
   let handoff = '';
   try {
-    // Last 3 commit messages = what was done
-    const log = execSafe(
-      `git -C "${SPRITES_WORK}" log --oneline -3 2>/dev/null`,
-      { encoding: 'utf8', timeout: 5000 }
-    ).trim();
-    if (log) handoff += 'Recent commits:\n' + log + '\n';
+    const r = cfg.spawnSafe('git', ['-C', SPRITES_WORK, 'log', '--oneline', '-3'],
+      { encoding: 'utf8', timeout: 5000 });
+    if (r.status === 0 && r.stdout) handoff += 'Recent commits:\n' + r.stdout.trim() + '\n';
   } catch (e) {}
 
   // Pipeline snapshot from loop-state
