@@ -230,6 +230,23 @@ class Brain(
             return path
         return None
 
+    @property
+    def memory(self):
+        """Access the MemoryManager for this brain.
+
+        Provides store/retrieve/update/delete/decay across episodic,
+        semantic, and procedural memory types.
+
+        Usage:
+            brain.memory.store("semantic", "API uses gRPC")
+            brain.memory.store("episodic", "Sent proposal to Acme")
+            results = brain.memory.retrieve("API patterns")
+        """
+        if not hasattr(self, "_memory_manager"):
+            from gradata.patterns.memory import MemoryManager
+            self._memory_manager = MemoryManager()
+        return self._memory_manager
+
     def close(self):
         """Close any open database connections.
 

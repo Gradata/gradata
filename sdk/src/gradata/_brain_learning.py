@@ -362,6 +362,58 @@ class BrainLearningMixin:
             )
         return result
 
+    def forget(
+        self,
+        description: str | None = None,
+        category: str | None = None,
+    ) -> int:
+        """Remove lessons matching description or category.
+
+        Use this to delete specific learned behaviors, e.g. for GDPR
+        right-to-erasure or to undo incorrect lessons.
+
+        Args:
+            description: Substring match against lesson descriptions.
+            category: Exact match against lesson category (e.g. "TONE").
+
+        Returns:
+            Number of lessons removed.
+        """
+        import logging
+        logger = logging.getLogger("gradata")
+
+        if not description and not category:
+            raise ValueError("Provide at least one of description or category")
+
+        lessons_path = self._find_lessons_path()
+        if not lessons_path or not lessons_path.is_file():
+            return 0
+
+        try:
+            from gradata.enhancements.self_improvement import parse_lessons, format_lessons
+        except ImportError:
+            return 0
+
+        text = lessons_path.read_text(encoding="utf-8")
+        lessons = parse_lessons(text)
+        before = len(lessons)
+
+        filtered = []
+        for lesson in lessons:
+            remove = False
+            if description and description.lower() in lesson.description.lower():
+                remove = True
+            if category and lesson.category.upper() == category.upper():
+                remove = True
+            if not remove:
+                filtered.append(lesson)
+
+        removed = before - len(filtered)
+        if removed > 0:
+            lessons_path.write_text(format_lessons(filtered), encoding="utf-8")
+            logger.info("forget(): removed %d lesson(s)", removed)
+        return removed
+
     # ── Session-End Graduation (auto-promote survivors) ─────────────────
 
     def end_session(
