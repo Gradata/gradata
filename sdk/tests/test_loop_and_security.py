@@ -239,9 +239,11 @@ class TestFullLearningLoop:
                 l.fire_count = 5
             lessons_path.write_text(format_lessons(lessons), encoding="utf-8")
 
-            # Export
+            # Export (OpenSpace SKILL.md format)
             result = brain.export_rules(min_state="PATTERN")
-            assert "# Brain Rules Export" in result
+            assert "---" in result  # YAML frontmatter
+            assert "name:" in result
+            assert "description:" in result
             assert "TONE" in result
             assert "PATTERN:75%" in result
 
@@ -354,6 +356,44 @@ class TestFullLearningLoop:
             brain = Brain.init(tmpdir, domain="Test")
             profile = brain.agent_profile("nonexistent")
             assert profile["total_lessons"] == 0
+
+    def test_export_skill_creates_openspace_directory(self):
+        """export_skill() creates SKILL.md + .skill_id + provenance.json."""
+        from gradata.brain import Brain
+        from gradata.enhancements.self_improvement import parse_lessons, format_lessons
+        from gradata._types import LessonState
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            brain = Brain.init(tmpdir, domain="Sales")
+            brain.correct(
+                draft="Dear Sir, formal text here",
+                final="Hey, casual version",
+                category="TONE",
+            )
+            # Force to PATTERN for export
+            lessons_path = brain.dir / "lessons.md"
+            lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+            for l in lessons:
+                l.state = LessonState.PATTERN
+                l.confidence = 0.75
+                l.fire_count = 5
+            lessons_path.write_text(format_lessons(lessons), encoding="utf-8")
+
+            skill_dir = brain.export_skill()
+            assert skill_dir.is_dir()
+            assert (skill_dir / "SKILL.md").is_file()
+            assert (skill_dir / ".skill_id").is_file()
+            assert (skill_dir / "provenance.json").is_file()
+
+            # Check SKILL.md has OpenSpace frontmatter
+            content = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
+            assert content.startswith("---")
+            assert "name:" in content
+            assert "description:" in content
+
+            # Check .skill_id format
+            skill_id = (skill_dir / ".skill_id").read_text(encoding="utf-8")
+            assert "__imp_" in skill_id
 
 
 # ===========================================================================

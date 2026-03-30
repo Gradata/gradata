@@ -438,30 +438,31 @@ class BrainLearningMixin:
             logger.info("forget(): removed %d lesson(s)", removed)
         return removed
 
-    # ── Export Rules (portable brain rules) ───────────────────────────────
+    # ── Export Rules (OpenSpace-compatible SKILL.md) ──────────────────────
 
     def export_rules(
         self,
         min_state: str = "PATTERN",
+        skill_name: str = "",
     ) -> str:
-        """Export graduated brain rules as a portable markdown document.
+        """Export graduated brain rules as an OpenSpace-compatible SKILL.md.
 
-        Produces a standalone file that another agent or system can consume
-        without needing the full Gradata SDK. Inspired by OpenSpace's SKILL.md
-        pattern — portable behavioral rules, not executable code.
+        Produces a file in OpenSpace's SKILL.md format (YAML frontmatter +
+        prose body) that any OpenSpace-compatible agent can consume —
+        Claude Code, Cursor, Codex, OpenClaw.
 
         Args:
             min_state: Minimum lesson state to include ("INSTINCT", "PATTERN",
                 or "RULE"). Default "PATTERN" exports only graduated lessons.
+            skill_name: Skill name for frontmatter. Auto-generated if empty.
 
         Returns:
-            Formatted markdown string with all qualifying rules.
+            OpenSpace-compatible SKILL.md content string.
         """
         try:
             from gradata.enhancements.self_improvement import parse_lessons
         except ImportError:
             return ""
-        from gradata._types import LessonState
 
         state_order = {
             "INSTINCT": 0, "PATTERN": 1, "RULE": 2,
@@ -484,41 +485,169 @@ class BrainLearningMixin:
             return ""
 
         # Read manifest for brain metadata
-        meta_lines = []
+        domain = "general"
         if self.manifest_path.is_file():
             import json
             try:
                 manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
-                meta_lines.append(f"domain: {manifest.get('domain', 'unknown')}")
-                meta_lines.append(f"sessions: {manifest.get('total_sessions', '?')}")
-                meta_lines.append(f"corrections: {manifest.get('total_corrections', '?')}")
+                domain = manifest.get("metadata", {}).get("domain", "general")
             except Exception:
                 pass
 
-        lines = ["# Brain Rules Export", ""]
-        if meta_lines:
-            lines.extend(meta_lines)
-            lines.append("")
+        # Auto-generate skill name from domain
+        if not skill_name:
+            safe_domain = domain.lower().replace(" ", "-")
+            skill_name = f"gradata-{safe_domain}-rules"
 
-        lines.append(f"Exported {len(qualified)} rules (min_state={min_state}).")
-        lines.append("")
-
+        # Group by category
         by_category: dict[str, list] = {}
         for l in qualified:
             by_category.setdefault(l.category, []).append(l)
 
+        categories_str = ", ".join(sorted(by_category.keys())).lower()
+        description = (
+            f"Learned behavioral rules for {domain} tasks covering "
+            f"{categories_str}. Graduated from {len(qualified)} corrections "
+            f"via Gradata's correction-based learning pipeline."
+        )
+
+        # Build OpenSpace SKILL.md format
+        lines = [
+            "---",
+            f"name: {skill_name}",
+            f"description: {description}",
+            "---",
+            "",
+            f"# {skill_name.replace('-', ' ').title()}",
+            "",
+            "## Purpose",
+            "",
+            f"Behavioral rules learned from human corrections in the {domain} domain.",
+            "Apply these rules to avoid repeating past mistakes.",
+            "",
+            "## When to Apply",
+            "",
+        ]
+
+        # List applicable task types
+        lines.append(f"- Any {domain} task involving: {categories_str}")
+        lines.append(f"- {len(qualified)} rules across {len(by_category)} categories")
+        lines.append("")
+
+        # Rules organized by category
+        lines.append("## Rules")
+        lines.append("")
+
         for cat, cat_lessons in sorted(by_category.items()):
-            lines.append(f"## {cat}")
+            lines.append(f"### {cat}")
             lines.append("")
-            for l in cat_lessons:
+            for i, l in enumerate(cat_lessons, 1):
                 conf_pct = int(l.confidence * 100)
-                lines.append(f"- [{l.state.value}:{conf_pct}%] {l.description}")
+                tier = l.state.value
+                lines.append(f"{i}. **[{tier}:{conf_pct}%]** {l.description}")
                 if l.example_draft and l.example_corrected:
-                    lines.append(f"  - Draft: {l.example_draft}")
-                    lines.append(f"  - Corrected: {l.example_corrected}")
+                    lines.append(f"   - Before: {l.example_draft}")
+                    lines.append(f"   - After: {l.example_corrected}")
             lines.append("")
 
+        # Guidelines section (top rules as quick reference)
+        top_rules = qualified[:5]
+        if top_rules:
+            lines.append("## Guidelines")
+            lines.append("")
+            for i, l in enumerate(top_rules, 1):
+                lines.append(f"{i}. {l.category}: {l.description}")
+            lines.append("")
+
+        # Provenance
+        lines.append("## Provenance")
+        lines.append("")
+        lines.append(f"- Source: Gradata correction-based learning")
+        lines.append(f"- Domain: {domain}")
+        lines.append(f"- Rules exported: {len(qualified)}")
+        lines.append(f"- Categories: {len(by_category)}")
+        lines.append(f"- Min graduation tier: {min_state}")
+        lines.append("")
+
         return "\n".join(lines)
+
+    def export_skill(
+        self,
+        output_dir: str | None = None,
+        min_state: str = "PATTERN",
+        skill_name: str = "",
+    ) -> "Path":
+        """Export graduated rules as a full OpenSpace-compatible skill directory.
+
+        Creates:
+            {output_dir}/{skill_name}/
+                SKILL.md      — OpenSpace-format skill file
+                .skill_id     — Persistent unique identifier
+                provenance.json — Gradata metadata (brain hash, sessions, confidence)
+
+        Args:
+            output_dir: Parent directory for the skill folder. Defaults to
+                brain_dir/skills/.
+            min_state: Minimum lesson state ("PATTERN" or "RULE").
+            skill_name: Skill name. Auto-generated if empty.
+
+        Returns:
+            Path to the created skill directory.
+        """
+        from pathlib import Path
+        import json
+        import hashlib
+        from datetime import datetime, UTC
+
+        # Generate SKILL.md content
+        content = self.export_rules(min_state=min_state, skill_name=skill_name)
+        if not content:
+            raise ValueError("No qualified rules to export. Train the brain first.")
+
+        # Extract skill_name from the generated content
+        for line in content.splitlines():
+            if line.startswith("name:"):
+                skill_name = line.split(":", 1)[1].strip()
+                break
+
+        # Create skill directory
+        if output_dir:
+            base = Path(output_dir)
+        else:
+            base = self.dir / "skills"
+        skill_dir = base / skill_name
+        skill_dir.mkdir(parents=True, exist_ok=True)
+
+        # Write SKILL.md
+        (skill_dir / "SKILL.md").write_text(content, encoding="utf-8")
+
+        # Write .skill_id (OpenSpace format: {name}__imp_{hash[:8]})
+        brain_hash = hashlib.sha256(
+            self.dir.name.encode() + skill_name.encode()
+        ).hexdigest()[:8]
+        skill_id = f"{skill_name}__imp_{brain_hash}"
+        (skill_dir / ".skill_id").write_text(skill_id, encoding="utf-8")
+
+        # Write provenance.json (Gradata-specific metadata)
+        provenance = {
+            "source": "gradata",
+            "skill_id": skill_id,
+            "brain_dir": str(self.dir),
+            "exported_at": datetime.now(UTC).isoformat(),
+            "min_state": min_state,
+        }
+        if self.manifest_path.is_file():
+            try:
+                manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+                provenance["domain"] = manifest.get("metadata", {}).get("domain", "")
+                provenance["sessions_trained"] = manifest.get("metadata", {}).get("sessions_trained", 0)
+            except Exception:
+                pass
+        (skill_dir / "provenance.json").write_text(
+            json.dumps(provenance, indent=2), encoding="utf-8"
+        )
+
+        return skill_dir
 
     # ── Lineage (lesson evolution history) ────────────────────────────────
 

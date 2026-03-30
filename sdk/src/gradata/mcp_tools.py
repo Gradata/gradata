@@ -424,3 +424,54 @@ def manifest(
     result["compound_score"] = round(min(10.0, score), 1)
 
     return result
+
+
+def export_skill(
+    *,
+    output_dir: str | Path | None = None,
+    min_state: str = "PATTERN",
+    skill_name: str = "",
+    brain_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    """Export graduated rules as an OpenSpace-compatible skill directory.
+
+    Creates a full skill directory with SKILL.md, .skill_id, and
+    provenance.json that can be uploaded to OpenSpace's skill cloud
+    or consumed by any OpenSpace-compatible agent.
+
+    Args:
+        output_dir: Where to create the skill directory. Defaults to
+            brain_dir/skills/.
+        min_state: Minimum lesson tier ("PATTERN" or "RULE").
+        skill_name: Skill name. Auto-generated from domain if empty.
+        brain_dir: Optional brain directory. If None, uses default.
+
+    Returns:
+        Dict with skill_dir, skill_id, rules_count, and SKILL.md preview.
+    """
+    from gradata.brain import Brain
+    from gradata._paths import get_brain_dir
+
+    bd = Path(brain_dir) if brain_dir else get_brain_dir()
+    if not bd or not bd.exists():
+        return {"error": "No brain directory found. Run Brain.init() first."}
+
+    brain = Brain(bd)
+    try:
+        skill_dir = brain.export_skill(
+            output_dir=str(output_dir) if output_dir else None,
+            min_state=min_state,
+            skill_name=skill_name,
+        )
+    except ValueError as e:
+        return {"error": str(e)}
+
+    skill_id = (skill_dir / ".skill_id").read_text(encoding="utf-8")
+    skill_md = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
+
+    return {
+        "skill_dir": str(skill_dir),
+        "skill_id": skill_id,
+        "skill_md_preview": skill_md[:500],
+        "files": [f.name for f in skill_dir.iterdir()],
+    }
