@@ -46,7 +46,10 @@ process.stdin.on('end', () => {
         try {
           const parsed = JSON.parse(res.stdout.trim());
           if (parsed.result) results.push(parsed.result);
-        } catch (_) {}
+        } catch (_) {
+          // Sub-hook wrote plain text (not JSON) — pass it through
+          results.push(res.stdout.trim());
+        }
       }
       if (res.stderr && res.stderr.trim()) {
         process.stderr.write(`[dispatcher-user-prompt] ${path.basename(hook.script)}: ${res.stderr.trim()}\n`);

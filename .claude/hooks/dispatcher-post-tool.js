@@ -71,7 +71,9 @@ process.stdin.on('end', () => {
         try {
           const parsed = JSON.parse(res.stdout.trim());
           if (parsed.result) results.push(parsed.result);
-        } catch (_) {}
+        } catch (_) {
+          results.push(res.stdout.trim());
+        }
       }
       if (res.stderr && res.stderr.trim()) {
         process.stderr.write(`[dispatcher-post-tool] ${path.basename(hook.script)}: ${res.stderr.trim()}\n`);

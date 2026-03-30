@@ -61,7 +61,9 @@ process.stdin.on('end', () => {
             return;
           }
           if (parsed.result) results.push(parsed.result);
-        } catch (_) {}
+        } catch (_) {
+          results.push(res.stdout.trim());
+        }
       }
       if (res.stderr && res.stderr.trim()) {
         process.stderr.write(`[dispatcher-pre-tool] ${path.basename(hook.script)}: ${res.stderr.trim()}\n`);
