@@ -49,7 +49,7 @@ sys.path.insert(0, str(SDK_SRC))
 
 # Categories to use. The AI agent can change which categories appear,
 # how many corrections per session, and the distribution.
-CATEGORIES = ["TONE", "ARCHITECTURE", "PROCESS", "DRAFTING", "ACCURACY", "STRUCTURE"]
+CATEGORIES = ["TONE", "ARCHITECTURE", "PROCESS", "DRAFTING", "ACCURACY", "STRUCTURE", "FORMAT", "SECURITY"]
 
 # How many corrections per session (min, max)
 CORRECTIONS_PER_SESSION = (1, 1)
@@ -106,6 +106,18 @@ CORRECTION_TEMPLATES: dict[str, list[tuple[str, str]]] = {
          "The document has clear H2 sections: Problem, Solution, Pricing, Next Steps."),
         ("First we discuss pricing, then the problem, then the demo, then pricing again.",
          "Structured: Problem > Demo > Solution > Pricing > Next Steps."),
+    ],
+    "FORMAT": [
+        ("The output is a wall of unformatted text with no visual hierarchy.",
+         "The output uses bullet points, bold headers, and clear spacing."),
+        ("Data is presented as comma-separated inline values.",
+         "Data is presented in a clean markdown table with aligned columns."),
+    ],
+    "SECURITY": [
+        ("The API endpoint accepts any input without validation or sanitization.",
+         "The API endpoint validates input types, lengths, and sanitizes before processing."),
+        ("Credentials are stored in plaintext in the config file.",
+         "Credentials are loaded from environment variables, never stored in code."),
     ],
 }
 
