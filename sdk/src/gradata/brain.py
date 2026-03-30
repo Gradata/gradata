@@ -215,26 +215,40 @@ class Brain(
 
         Search order: BRAIN_LESSONS_PATH env var, brain_dir/lessons.md,
         parent/.claude/lessons.md, working_dir/.claude/lessons.md.
-        If create=True and none exists, creates brain_dir/lessons.md.
+        If create=True and none found in brain dir, creates brain_dir/lessons.md
+        (never writes to external project files from a different brain).
         """
         import os
         env_path = os.environ.get("BRAIN_LESSONS_PATH", "")
-        candidates = []
-        if env_path:
-            candidates.append(Path(env_path))
-        candidates.extend([
-            self.dir / "lessons.md",
+
+        # Env var takes top priority
+        if env_path and Path(env_path).is_file():
+            return Path(env_path)
+
+        # Brain-local paths (preferred for writes)
+        brain_local = self.dir / "lessons.md"
+        if brain_local.is_file():
+            return brain_local
+
+        # Fallback: parent/.claude/ and working_dir/.claude/
+        # Only used for reads — if create=True, we prefer brain-local.
+        fallbacks = [
             self.dir.parent / ".claude" / "lessons.md",
             self.ctx.working_dir / ".claude" / "lessons.md",
-        ])
-        for p in candidates:
+        ]
+        for p in fallbacks:
             if p.is_file():
+                if create:
+                    # Don't write to external project files — create in brain dir
+                    brain_local.parent.mkdir(parents=True, exist_ok=True)
+                    brain_local.write_text("", encoding="utf-8")
+                    return brain_local
                 return p
+
         if create:
-            path = self.dir / "lessons.md"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("", encoding="utf-8")
-            return path
+            brain_local.parent.mkdir(parents=True, exist_ok=True)
+            brain_local.write_text("", encoding="utf-8")
+            return brain_local
         return None
 
     @property

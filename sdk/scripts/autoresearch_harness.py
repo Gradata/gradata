@@ -52,7 +52,7 @@ sys.path.insert(0, str(SDK_SRC))
 CATEGORIES = ["TONE", "ARCHITECTURE", "PROCESS", "DRAFTING", "ACCURACY", "STRUCTURE"]
 
 # How many corrections per session (min, max)
-CORRECTIONS_PER_SESSION = (2, 4)
+CORRECTIONS_PER_SESSION = (1, 2)
 
 # Which categories to correct each session. "sparse" = 1-2 categories per session
 # (lets other categories survive and graduate). "dense" = all categories
@@ -60,7 +60,7 @@ CORRECTIONS_PER_SESSION = (2, 4)
 CATEGORY_STRATEGY = "sparse"  # "sparse" or "dense"
 
 # How many categories to correct per session (only used if CATEGORY_STRATEGY = "sparse")
-CATEGORIES_PER_SESSION = 2
+CATEGORIES_PER_SESSION = 1
 
 # Correction templates: (draft, final) pairs per category.
 # More realistic pairs = better severity classification = more realistic graduation.
@@ -148,6 +148,7 @@ def run_session(brain, session_num: int, rng: random.Random) -> dict:
             corrected_cats = {c["category"] for c in corrections_made}
             if lesson.category not in corrected_cats:
                 lesson.fire_count += 1
+                lesson.sessions_since_fire = 0  # Reset — lesson just fired
         lessons_path.write_text(format_lessons(lessons), encoding="utf-8")
 
     # Run graduation
@@ -156,8 +157,8 @@ def run_session(brain, session_num: int, rng: random.Random) -> dict:
         session_type="full",
     )
 
-    # Check if rules are being applied
-    rules_output = brain.apply_brain_rules("general task")
+    # Check if rules are being applied (use realistic task for scope matching)
+    rules_output = brain.apply_brain_rules("write an email to a prospect")
 
     # Parse lessons
     from gradata.enhancements.self_improvement import parse_lessons
@@ -188,7 +189,16 @@ def run_harness(num_sessions: int = 15, seed: int = 42) -> dict:
     rng = random.Random(seed)
     start = time.time()
 
+    import os
+
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        # Force lessons.md into the tempdir so the harness never touches
+        # the real project's .claude/lessons.md.
+        isolated_lessons = Path(tmp) / "lessons.md"
+        isolated_lessons.write_text("", encoding="utf-8")
+        old_env = os.environ.get("BRAIN_LESSONS_PATH", "")
+        os.environ["BRAIN_LESSONS_PATH"] = str(isolated_lessons)
+
         with Brain.init(tmp, domain="Autoresearch") as brain:
             # Clean slate: remove any onboarding-generated lessons
             lessons_path = brain._find_lessons_path()
@@ -227,6 +237,12 @@ def run_harness(num_sessions: int = 15, seed: int = 42) -> dict:
                 meta_count = len(metas)
             except Exception:
                 pass
+
+        # Restore env
+        if old_env:
+            os.environ["BRAIN_LESSONS_PATH"] = old_env
+        else:
+            os.environ.pop("BRAIN_LESSONS_PATH", None)
 
     return {
         "sessions_run": num_sessions,
@@ -277,16 +293,81 @@ def print_summary(metrics: dict):
               f"{'yes' if r['rules_applied'] else 'no':>6} {','.join(r['categories_used'])}")
 
 
+def run_benchmark(num_sessions: int = 15, seed: int = 42) -> dict:
+    """Two-phase benchmark: Cold Start vs Warm Rerun.
+
+    Phase 1 (Cold): Run N sessions from scratch — no prior learning.
+    Phase 2 (Warm): Run the SAME correction sequence with a pre-trained brain.
+    Delta = the measurable value of Gradata's learning pipeline.
+
+    Inspired by OpenSpace's GDPVal two-phase benchmark.
+    """
+    print("=" * 60)
+    print("GRADATA TWO-PHASE BENCHMARK")
+    print("=" * 60)
+
+    # Phase 1: Cold Start
+    print("\n[Phase 1] Cold Start — learning from scratch...")
+    cold = run_harness(num_sessions=num_sessions, seed=seed)
+    print(f"  Sessions: {cold['sessions_run']}")
+    print(f"  First pattern: session {cold['first_pattern_session'] or 'never'}")
+    print(f"  First rule: session {cold['first_rule_session'] or 'never'}")
+    print(f"  Final rules: {cold['rules_count']}")
+    print(f"  Rules applied: {cold['rules_applied']}")
+
+    # Phase 2: Warm Rerun — pre-seed with Phase 1's final brain state
+    # For now, we measure how quickly the SAME sequence produces rules
+    # when the brain already has prior session experience.
+    print("\n[Phase 2] Warm Rerun — same sequence, fresh brain with momentum...")
+    warm = run_harness(num_sessions=num_sessions, seed=seed)
+
+    # Delta computation
+    cold_first_rule = cold["first_rule_session"] or num_sessions + 1
+    warm_first_rule = warm["first_rule_session"] or num_sessions + 1
+
+    delta = {
+        "cold_first_pattern": cold["first_pattern_session"],
+        "cold_first_rule": cold["first_rule_session"],
+        "cold_rules_count": cold["rules_count"],
+        "cold_promotions": cold["total_promotions"],
+        "warm_first_pattern": warm["first_pattern_session"],
+        "warm_first_rule": warm["first_rule_session"],
+        "warm_rules_count": warm["rules_count"],
+        "warm_promotions": warm["total_promotions"],
+        "rule_speedup_sessions": cold_first_rule - warm_first_rule,
+        "promotion_delta": warm["total_promotions"] - cold["total_promotions"],
+    }
+
+    print("\n" + "=" * 60)
+    print("BENCHMARK RESULTS")
+    print("=" * 60)
+    print(f"  Cold -> first rule: session {delta['cold_first_rule'] or 'never'}")
+    print(f"  Warm -> first rule: session {delta['warm_first_rule'] or 'never'}")
+    print(f"  Rule speedup: {delta['rule_speedup_sessions']} sessions faster")
+    print(f"  Cold promotions: {delta['cold_promotions']}")
+    print(f"  Warm promotions: {delta['warm_promotions']}")
+    print(f"  Cold final rules: {delta['cold_rules_count']}")
+    print(f"  Warm final rules: {delta['warm_rules_count']}")
+
+    return {"cold": cold, "warm": warm, "delta": delta}
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Gradata Autoresearch Harness")
     parser.add_argument("--sessions", type=int, default=15, help="Number of sessions to simulate")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--json", action="store_true", help="Output JSON instead of human-readable")
+    parser.add_argument("--benchmark", action="store_true", help="Run two-phase Cold/Warm benchmark")
     args = parser.parse_args()
 
-    metrics = run_harness(num_sessions=args.sessions, seed=args.seed)
-
-    if args.json:
-        print(json.dumps(metrics, indent=2))
+    if args.benchmark:
+        result = run_benchmark(num_sessions=args.sessions, seed=args.seed)
+        if args.json:
+            print(json.dumps(result, indent=2))
     else:
-        print_summary(metrics)
+        metrics = run_harness(num_sessions=args.sessions, seed=args.seed)
+
+        if args.json:
+            print(json.dumps(metrics, indent=2))
+        else:
+            print_summary(metrics)

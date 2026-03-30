@@ -215,6 +215,146 @@ class TestFullLearningLoop:
                 f"Before: {conf_before}, After: {conf_after}, Result: {result}"
             )
 
+    def test_export_rules_produces_markdown(self):
+        """export_rules() returns portable markdown with graduated rules."""
+        from gradata.brain import Brain
+        from gradata.enhancements.self_improvement import (
+            parse_lessons, format_lessons, LessonState,
+        )
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            brain = Brain.init(tmpdir, domain="Test")
+
+            # Create a lesson and force it to PATTERN state
+            brain.correct(
+                draft="Dear Sir or Madam, I am writing to formally inform you",
+                final="Hey, just wanted to let you know",
+                category="TONE",
+            )
+            lessons_path = brain.dir / "lessons.md"
+            lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+            for l in lessons:
+                l.state = LessonState.PATTERN
+                l.confidence = 0.75
+                l.fire_count = 5
+            lessons_path.write_text(format_lessons(lessons), encoding="utf-8")
+
+            # Export
+            result = brain.export_rules(min_state="PATTERN")
+            assert "# Brain Rules Export" in result
+            assert "TONE" in result
+            assert "PATTERN:75%" in result
+
+    def test_export_rules_empty_for_instinct_only(self):
+        """export_rules() returns empty when only INSTINCT lessons exist."""
+        from gradata.brain import Brain
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            brain = Brain.init(tmpdir, domain="Test")
+            brain.correct(
+                draft="formal text", final="casual text", category="TONE",
+            )
+            result = brain.export_rules(min_state="PATTERN")
+            assert result == ""
+
+    def test_lineage_tracks_state_transitions(self):
+        """lineage() returns state transition history after graduation."""
+        from gradata.brain import Brain
+        from gradata.enhancements.self_improvement import (
+            parse_lessons, format_lessons, LessonState,
+        )
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            brain = Brain.init(tmpdir, domain="Test")
+
+            # Create a lesson and force promotion
+            brain.correct(
+                draft="We are pleased to inform you",
+                final="Hey, here's the update",
+                category="TONE",
+            )
+            lessons_path = brain.dir / "lessons.md"
+            lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+            for l in lessons:
+                l.confidence = 0.65
+                l.fire_count = 4
+            lessons_path.write_text(format_lessons(lessons), encoding="utf-8")
+
+            # Graduate — should promote INSTINCT -> PATTERN
+            brain.end_session(session_corrections=[], session_type="full")
+
+            # Check lineage
+            transitions = brain.lineage()
+            assert len(transitions) > 0, "No transitions logged"
+            assert transitions[0]["old_state"] == "INSTINCT"
+            assert transitions[0]["new_state"] == "PATTERN"
+            assert transitions[0]["category"] == "TONE"
+
+    def test_lineage_empty_for_new_brain(self):
+        """lineage() returns empty list for a brain with no graduations."""
+        from gradata.brain import Brain
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            brain = Brain.init(tmpdir, domain="Test")
+            assert brain.lineage() == []
+
+    def test_correct_with_agent_type_creates_scoped_lesson(self):
+        """correct(agent_type=...) stores agent_type on the lesson."""
+        from gradata.brain import Brain
+        from gradata.enhancements.self_improvement import parse_lessons
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            brain = Brain.init(tmpdir, domain="Test")
+            brain.correct(
+                draft="The system uses global mutable state",
+                final="The system uses dependency injection",
+                category="ARCHITECTURE",
+                agent_type="code-reviewer",
+            )
+            lessons_path = brain.dir / "lessons.md"
+            lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+            agent_lessons = [l for l in lessons if l.agent_type == "code-reviewer"]
+            assert len(agent_lessons) > 0, (
+                f"No agent-typed lessons found. Types: {[l.agent_type for l in lessons]}"
+            )
+
+    def test_agent_profile_returns_skills(self):
+        """agent_profile() returns correction categories and skill state."""
+        from gradata.brain import Brain
+        from gradata.enhancements.self_improvement import parse_lessons, format_lessons
+        from gradata._types import LessonState
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            brain = Brain.init(tmpdir, domain="Test")
+            brain.correct(
+                draft="formal text", final="casual text",
+                category="TONE", agent_type="email-drafter",
+            )
+            # Force one lesson to PATTERN
+            lessons_path = brain.dir / "lessons.md"
+            lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+            for l in lessons:
+                if l.agent_type == "email-drafter":
+                    l.state = LessonState.PATTERN
+                    l.confidence = 0.75
+                    l.fire_count = 5
+            lessons_path.write_text(format_lessons(lessons), encoding="utf-8")
+
+            profile = brain.agent_profile("email-drafter")
+            assert profile["agent_type"] == "email-drafter"
+            assert profile["total_lessons"] > 0
+            assert len(profile["skills_acquired"]) > 0
+            assert profile["skills_acquired"][0]["category"] == "TONE"
+
+    def test_agent_profile_empty_for_unknown_agent(self):
+        """agent_profile() returns 0 lessons for unknown agent type."""
+        from gradata.brain import Brain
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            brain = Brain.init(tmpdir, domain="Test")
+            profile = brain.agent_profile("nonexistent")
+            assert profile["total_lessons"] == 0
+
 
 # ===========================================================================
 # PII Sanitization

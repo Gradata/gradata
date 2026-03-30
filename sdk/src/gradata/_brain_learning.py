@@ -19,6 +19,7 @@ class BrainLearningMixin:
         category: str | None = None,
         context: dict | None = None,
         session: int | None = None,
+        agent_type: str | None = None,
     ) -> dict:
         """Record a correction: the user edited a draft into a final version.
 
@@ -37,6 +38,9 @@ class BrainLearningMixin:
             category: Optional override for correction category.
             context: Optional session context dict for scope building.
             session: Session number (auto-detected if omitted).
+            agent_type: Agent type that produced the draft (e.g. "researcher").
+                When provided, the resulting lesson is scoped to this agent type,
+                enabling agent-specific rule evolution.
         """
         import logging
         logger = logging.getLogger("gradata")
@@ -185,12 +189,25 @@ class BrainLearningMixin:
 
                     if key not in existing_keys:
                         # New lesson — start as INSTINCT
+                        # Build scope with agent_type if provided
+                        lesson_scope = ""
+                        if agent_type or context:
+                            import json as _json
+                            scope_ctx = dict(context or {})
+                            if agent_type:
+                                scope_ctx["agent_type"] = agent_type
+                            scope_obj = build_scope(scope_ctx)
+                            lesson_scope = _json.dumps(
+                                {k: v for k, v in scope_obj.__dict__.items() if v and v != "normal"}
+                            )
                         new_lesson = Lesson(
                             date=_date.today().isoformat(),
                             state=LessonState.INSTINCT,
                             confidence=INITIAL_CONFIDENCE,
                             category=cat,
                             description=desc,
+                            scope_json=lesson_scope,
+                            agent_type=agent_type or "",
                         )
                         existing_lessons.append(new_lesson)
                         event["lessons_created"] = 1
@@ -303,12 +320,17 @@ class BrainLearningMixin:
         self,
         task: str,
         context: dict | None = None,
+        agent_type: str | None = None,
     ) -> str:
         """Get applicable brain rules for a task, formatted for prompt injection.
+
+        When agent_type is provided, rules learned by that agent type are
+        boosted in relevance, enabling agent-specific skill evolution.
 
         Args:
             task: Description of the task being performed.
             context: Optional context dict with domain, prospect info, etc.
+            agent_type: Agent type requesting rules (e.g. "researcher").
         """
         import logging
         logger = logging.getLogger("gradata")
@@ -334,6 +356,8 @@ class BrainLearningMixin:
         from pathlib import Path
         ctx = context or {}
         ctx.setdefault("task", task)
+        if agent_type:
+            ctx.setdefault("agent_type", agent_type)
         scope = build_scope(ctx)
 
         # Load lessons — check env var, brain dir, then parent's .claude/ for compat
@@ -414,6 +438,192 @@ class BrainLearningMixin:
             logger.info("forget(): removed %d lesson(s)", removed)
         return removed
 
+    # ── Export Rules (portable brain rules) ───────────────────────────────
+
+    def export_rules(
+        self,
+        min_state: str = "PATTERN",
+    ) -> str:
+        """Export graduated brain rules as a portable markdown document.
+
+        Produces a standalone file that another agent or system can consume
+        without needing the full Gradata SDK. Inspired by OpenSpace's SKILL.md
+        pattern — portable behavioral rules, not executable code.
+
+        Args:
+            min_state: Minimum lesson state to include ("INSTINCT", "PATTERN",
+                or "RULE"). Default "PATTERN" exports only graduated lessons.
+
+        Returns:
+            Formatted markdown string with all qualifying rules.
+        """
+        try:
+            from gradata.enhancements.self_improvement import parse_lessons
+        except ImportError:
+            return ""
+        from gradata._types import LessonState
+
+        state_order = {
+            "INSTINCT": 0, "PATTERN": 1, "RULE": 2,
+        }
+        min_rank = state_order.get(min_state.upper(), 1)
+
+        lessons_path = self._find_lessons_path()
+        if not lessons_path or not lessons_path.is_file():
+            return ""
+
+        lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+        qualified = [
+            l for l in lessons
+            if state_order.get(l.state.value, -1) >= min_rank
+            and l.confidence > 0.0
+        ]
+        qualified.sort(key=lambda l: (-state_order.get(l.state.value, 0), -l.confidence))
+
+        if not qualified:
+            return ""
+
+        # Read manifest for brain metadata
+        meta_lines = []
+        if self.manifest_path.is_file():
+            import json
+            try:
+                manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+                meta_lines.append(f"domain: {manifest.get('domain', 'unknown')}")
+                meta_lines.append(f"sessions: {manifest.get('total_sessions', '?')}")
+                meta_lines.append(f"corrections: {manifest.get('total_corrections', '?')}")
+            except Exception:
+                pass
+
+        lines = ["# Brain Rules Export", ""]
+        if meta_lines:
+            lines.extend(meta_lines)
+            lines.append("")
+
+        lines.append(f"Exported {len(qualified)} rules (min_state={min_state}).")
+        lines.append("")
+
+        by_category: dict[str, list] = {}
+        for l in qualified:
+            by_category.setdefault(l.category, []).append(l)
+
+        for cat, cat_lessons in sorted(by_category.items()):
+            lines.append(f"## {cat}")
+            lines.append("")
+            for l in cat_lessons:
+                conf_pct = int(l.confidence * 100)
+                lines.append(f"- [{l.state.value}:{conf_pct}%] {l.description}")
+                if l.example_draft and l.example_corrected:
+                    lines.append(f"  - Draft: {l.example_draft}")
+                    lines.append(f"  - Corrected: {l.example_corrected}")
+            lines.append("")
+
+        return "\n".join(lines)
+
+    # ── Lineage (lesson evolution history) ────────────────────────────────
+
+    def lineage(
+        self,
+        category: str | None = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """Query lesson state transition history.
+
+        Returns the evolution path of lessons: when they were created,
+        promoted, demoted, or killed. Useful for quality monitoring
+        and understanding which corrections drive rule formation.
+
+        Args:
+            category: Filter to a specific category (e.g. "TONE").
+            limit: Maximum rows to return.
+
+        Returns:
+            List of transition dicts, most recent first.
+        """
+        if not self.db_path.is_file():
+            return []
+
+        import sqlite3
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            conn.row_factory = sqlite3.Row
+            if category:
+                rows = conn.execute(
+                    "SELECT * FROM lesson_transitions WHERE category = ? "
+                    "ORDER BY transitioned_at DESC LIMIT ?",
+                    (category.upper(), limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM lesson_transitions "
+                    "ORDER BY transitioned_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+            conn.close()
+            return [dict(r) for r in rows]
+        except sqlite3.OperationalError:
+            # Table doesn't exist yet (pre-lineage brain)
+            return []
+
+    # ── Agent Skill Profiles ──────────────────────────────────────────────
+
+    def agent_profile(self, agent_type: str) -> dict:
+        """Get the skill evolution profile for an agent type.
+
+        Returns correction categories, rates, graduated skills, and
+        active weaknesses. This is the agent's "fitness report."
+
+        Args:
+            agent_type: Agent type to profile (e.g. "researcher").
+
+        Returns:
+            Dict with correction_categories, skills_acquired (PATTERN+),
+            active_weaknesses (high correction rate), and total_corrections.
+        """
+        try:
+            from gradata.enhancements.self_improvement import parse_lessons
+        except ImportError:
+            return {"agent_type": agent_type, "error": "enhancements not installed"}
+        from gradata._types import LessonState
+
+        lessons_path = self._find_lessons_path()
+        if not lessons_path or not lessons_path.is_file():
+            return {"agent_type": agent_type, "total_lessons": 0}
+
+        lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+        agent_lessons = [l for l in lessons if l.agent_type == agent_type]
+
+        if not agent_lessons:
+            return {"agent_type": agent_type, "total_lessons": 0}
+
+        # Count by category and state
+        by_category: dict[str, int] = {}
+        skills_acquired = []
+        active_weaknesses = []
+        for l in agent_lessons:
+            by_category[l.category] = by_category.get(l.category, 0) + 1
+            if l.state in (LessonState.PATTERN, LessonState.RULE):
+                skills_acquired.append({
+                    "category": l.category,
+                    "state": l.state.value,
+                    "confidence": l.confidence,
+                    "description": l.description[:80],
+                })
+            elif l.state == LessonState.INSTINCT and l.confidence < 0.40:
+                active_weaknesses.append({
+                    "category": l.category,
+                    "confidence": l.confidence,
+                    "description": l.description[:80],
+                })
+
+        return {
+            "agent_type": agent_type,
+            "total_lessons": len(agent_lessons),
+            "correction_categories": by_category,
+            "skills_acquired": skills_acquired,
+            "active_weaknesses": active_weaknesses,
+        }
+
     # ── Session-End Graduation (auto-promote survivors) ─────────────────
 
     def end_session(
@@ -471,21 +681,55 @@ class BrainLearningMixin:
             # Run graduation (promote/demote/kill)
             active, graduated = graduate(lessons)
 
-            # Count changes
+            # Count changes and log lineage transitions
             promotions = 0
             demotions = 0
             kills = 0
+            transitions = []
             for l in active + graduated:
                 key = l.description[:40]
                 old_state = before_states.get(key, "")
                 new_state = l.state.value
                 if old_state and new_state != old_state:
+                    transitions.append((l, old_state, new_state))
                     if new_state in ("PATTERN", "RULE"):
                         promotions += 1
                     elif new_state == "INSTINCT" and old_state == "PATTERN":
                         demotions += 1
                     elif new_state in ("KILLED", "UNTESTABLE"):
                         kills += 1
+
+            # Persist lineage transitions to system.db
+            if transitions and self.db_path.is_file():
+                try:
+                    import sqlite3
+                    from datetime import datetime, UTC
+                    conn = sqlite3.connect(str(self.db_path))
+                    conn.execute(
+                        "CREATE TABLE IF NOT EXISTS lesson_transitions ("
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                        "lesson_desc TEXT NOT NULL,"
+                        "category TEXT NOT NULL,"
+                        "old_state TEXT NOT NULL,"
+                        "new_state TEXT NOT NULL,"
+                        "confidence REAL,"
+                        "fire_count INTEGER DEFAULT 0,"
+                        "session INTEGER,"
+                        "transitioned_at TEXT NOT NULL)"
+                    )
+                    now = datetime.now(UTC).isoformat()
+                    for l, old_s, new_s in transitions:
+                        conn.execute(
+                            "INSERT INTO lesson_transitions "
+                            "(lesson_desc, category, old_state, new_state, confidence, fire_count, session, transitioned_at) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                            (l.description[:100], l.category, old_s, new_s,
+                             l.confidence, l.fire_count, None, now),
+                        )
+                    conn.commit()
+                    conn.close()
+                except Exception as e:
+                    logger.debug("Lineage logging failed: %s", e)
 
             # Write back
             all_lessons = active + graduated

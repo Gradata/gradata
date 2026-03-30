@@ -45,6 +45,7 @@ class RuleScope:
     audience: str = ""
     channel: str = ""
     stakes: str = "normal"
+    agent_type: str = ""  # Agent type for scoped rule injection (e.g. "researcher", "reviewer")
 
 
 # ---------------------------------------------------------------------------
@@ -182,12 +183,16 @@ def build_scope(context: dict[str, Any]) -> RuleScope:
         inferred_stakes = _classify(task, _STAKES_KEYWORDS)
         stakes = inferred_stakes if inferred_stakes else "normal"
 
+    # ── agent_type ────────────────────────────────────────────────────────
+    agent_type: str = str(context.get("agent_type", "") or "")
+
     return RuleScope(
         domain=domain,
         task_type=task_type,
         audience=audience,
         channel=channel,
         stakes=stakes,
+        agent_type=agent_type,
     )
 
 

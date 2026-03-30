@@ -73,6 +73,20 @@ _TABLES_SQL = [
         success BOOLEAN DEFAULT 1
     )
     """,
+    # Lesson state transitions (version lineage)
+    """
+    CREATE TABLE IF NOT EXISTS lesson_transitions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        lesson_desc TEXT NOT NULL,
+        category TEXT NOT NULL,
+        old_state TEXT NOT NULL,
+        new_state TEXT NOT NULL,
+        confidence REAL,
+        fire_count INTEGER DEFAULT 0,
+        session INTEGER,
+        transitioned_at TEXT NOT NULL
+    )
+    """,
     # Named entities (people, companies, products)
     """
     CREATE TABLE IF NOT EXISTS entities (
@@ -93,6 +107,8 @@ _INDEXES_SQL = [
     "CREATE INDEX IF NOT EXISTS idx_facts_prospect ON facts(prospect)",
     "CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(entity_type)",
     "CREATE INDEX IF NOT EXISTS idx_lesson_apps_lesson ON lesson_applications(lesson_id)",
+    "CREATE INDEX IF NOT EXISTS idx_lesson_transitions_cat ON lesson_transitions(category)",
+    "CREATE INDEX IF NOT EXISTS idx_lesson_transitions_desc ON lesson_transitions(lesson_desc)",
 ]
 
 # ── Subdirectories ────────────────────────────────────────────────────
@@ -368,15 +384,23 @@ def onboard(
         if company:
             print(f"  Company:   {company}")
         print(f"  DB:        {stats['db_size_mb']} MB")
-        print(f"  Files:     {stats['markdown_files']} markdown files")
         print(f"{'='*50}")
-        print("\nNext steps:")
-        print(f"  1. cd {brain_dir}")
-        print("  2. Add prospect files to prospects/")
-        print("  3. Run: gradata embed --full")
-        print("  4. Run: gradata search \"your query\"")
+        print("\nTwo things to try right now:")
+        print()
+        print("  1. CORRECT — teach the brain from a correction:")
+        print('     brain.correct(')
+        print('         draft="We are pleased to inform you about our product",')
+        print('         final="Hey, here is what we built",')
+        print('         category="TONE"')
+        print('     )')
+        print()
+        print("  2. APPLY — get learned rules for any task:")
+        print('     rules = brain.apply_brain_rules("write an email")')
+        print('     # Returns XML rules block for prompt injection')
+        print()
+        print("  That's it. Correct -> graduate -> apply. The brain learns.")
         if embedding == "gemini":
-            print("  5. Set GEMINI_API_KEY in your environment")
+            print(f"\n  Note: Set GEMINI_API_KEY for Gemini embeddings.")
         print()
 
     return brain

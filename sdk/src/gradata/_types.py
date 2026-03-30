@@ -116,6 +116,7 @@ class Lesson:
     correction_type: CorrectionType = CorrectionType.BEHAVIORAL  # What kind of correction
     example_draft: str | None = None      # Before: what the AI produced
     example_corrected: str | None = None  # After: what the user changed it to
+    agent_type: str = ""                  # Agent that produced this lesson (e.g. "researcher", "email-drafter")
 
     def __post_init__(self) -> None:
         self.confidence = round(max(0.0, min(1.0, self.confidence)), 2)

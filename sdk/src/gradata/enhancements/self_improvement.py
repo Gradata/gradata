@@ -178,11 +178,14 @@ def parse_lessons(text: str) -> list[Lesson]:
         fire_count = 0
         sessions_since_fire = 0
         misfire_count = 0
+        agent_type = ""
         j = i + 1
         while j < len(lines) and lines[j].startswith("  "):
             meta_line = lines[j].strip()
             if meta_line.startswith("Root cause:") and not root_cause:
                 root_cause = meta_line[len("Root cause:"):].strip()
+            elif meta_line.startswith("Agent:"):
+                agent_type = meta_line[len("Agent:"):].strip()
             meta_m = _META_RE.search(meta_line)
             if meta_m:
                 fire_count = int(meta_m.group(1))
@@ -200,6 +203,7 @@ def parse_lessons(text: str) -> list[Lesson]:
             fire_count=fire_count,
             sessions_since_fire=sessions_since_fire,
             misfire_count=misfire_count,
+            agent_type=agent_type,
         ))
         i = j if j > i + 1 else i + 1
 
@@ -518,6 +522,9 @@ def format_lessons(lessons: list[Lesson]) -> str:
                 f"Sessions since fire: {lesson.sessions_since_fire} | "
                 f"Misfires: {lesson.misfire_count}"
             )
+
+        if lesson.agent_type:
+            lines.append(f"  Agent: {lesson.agent_type}")
 
         lines.append("")  # blank line between lessons
 
