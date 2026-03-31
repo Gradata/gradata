@@ -201,8 +201,7 @@ def _compound_score(
 def _lesson_distribution(ctx: "BrainContext | None" = None) -> dict[str, int]:
     """Count lessons by state from lessons.md."""
     dist: dict[str, int] = {}
-    working_dir = ctx.working_dir if ctx else _p.WORKING_DIR
-    lessons_file = working_dir / ".claude" / "lessons.md"
+    lessons_file = ctx.lessons_file if ctx else _p.LESSONS_FILE
     try:
         if lessons_file.exists():
             text = lessons_file.read_text(encoding="utf-8")
@@ -316,9 +315,9 @@ def _quality_metrics(ctx: "BrainContext | None" = None) -> dict:
     result["correction_rate_trend"] = _correction_rate_trend(ctx=ctx)
 
     # Count lessons — date-prefix pattern avoids matching format descriptions
-    working_dir = ctx.working_dir if ctx else _p.WORKING_DIR
-    lessons_file = working_dir / ".claude" / "lessons.md"
-    archive_file = working_dir / ".claude" / "lessons-archive.md"
+    lessons_file = ctx.lessons_file if ctx else _p.LESSONS_FILE
+    brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
+    archive_file = brain_dir / "lessons-archive.md"
     try:
         if lessons_file.exists():
             text = lessons_file.read_text(encoding="utf-8")

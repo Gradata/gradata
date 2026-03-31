@@ -17,8 +17,8 @@ from gradata._paths import BrainContext
 
 def _EXPORTS_DIR(): return _p.BRAIN_DIR / "exports"
 def _VAULT_DIR(): return _p.BRAIN_DIR / "vault"
-def _LESSONS_ACTIVE(): return _p.WORKING_DIR / ".claude" / "lessons.md"
-def _LESSONS_ARCHIVE(): return _p.WORKING_DIR / ".claude" / "lessons-archive.md"
+def _LESSONS_ACTIVE(): return _p.LESSONS_FILE
+def _LESSONS_ARCHIVE(): return _p.BRAIN_DIR / "lessons-archive.md"
 def _QUALITY_RUBRICS(): return _p.WORKING_DIR / ".claude" / "quality-rubrics.md"
 def _DOMAIN_CONFIG(): return _p.WORKING_DIR / "domain" / "DOMAIN.md"
 def _DOMAIN_SOUL(): return _p.WORKING_DIR / "domain" / "soul.md"

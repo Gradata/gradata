@@ -255,7 +255,7 @@ def _load_lessons(lessons_path: str | Path | None = None) -> list[Lesson]:
         # Try default paths
         try:
             import gradata._paths as _p
-            path = _p.WORKING_DIR / ".claude" / "lessons.md"
+            path = _p.LESSONS_FILE
         except Exception:
             return []
 

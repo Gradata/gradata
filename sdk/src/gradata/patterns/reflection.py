@@ -541,3 +541,36 @@ def _weighted_average(
         return 0.0
 
     return round(weighted_sum / total_weight, 2)
+
+
+# ---------------------------------------------------------------------------
+# RuleContext integration — graduated rules become reflection criteria
+# ---------------------------------------------------------------------------
+
+
+def criteria_from_graduated_rules(task_type: str = "") -> list[Criterion]:
+    """Build Criterion objects from graduated rules in the RuleContext.
+
+    Graduated PATTERN/RULE-tier lessons automatically become reflection
+    criteria, so the critique checklist grows from corrections.
+
+    Example: A TONE rule "keep it casual in cold emails" becomes a Criterion
+    that checks whether the output uses casual tone.
+    """
+    try:
+        from gradata.patterns.rule_context import get_rule_context
+    except ImportError:
+        return []
+
+    ctx = get_rule_context()
+    rules = ctx.for_reflection(task_type=task_type)
+
+    criteria = []
+    for rule in rules:
+        criteria.append(Criterion(
+            name=f"rule_{rule.category.lower()}_{len(criteria)}",
+            question=f"Does the output follow this rule: {rule.principle}?",
+            required=rule.is_rule_tier,  # RULE tier = required, PATTERN = optional
+            weight=rule.confidence,
+        ))
+    return criteria

@@ -266,18 +266,14 @@ def _parse_lessons_to_rules(text: str) -> list[dict]:
     """Parse a lessons.md file into a list of rule dicts.
 
     Only includes PATTERN and RULE state lessons (graduated enough to matter).
+    Delegates to the authoritative parser and converts to dicts for the
+    detect_contradictions() interface which uses .get() access.
     """
-    pattern = re.compile(
-        r"\[(PATTERN|RULE):(\d+\.\d+)\]\s+(\w+):\s+(.+)"
-    )
-    rules: list[dict] = []
-    for line in text.splitlines():
-        m = pattern.search(line)
-        if m:
-            rules.append({
-                "state": m.group(1),
-                "confidence": float(m.group(2)),
-                "category": m.group(3).upper(),
-                "description": m.group(4).strip(),
-            })
-    return rules
+    from gradata.enhancements.self_improvement import parse_lessons
+    from gradata._types import LessonState
+    return [
+        {"state": l.state.value, "confidence": l.confidence,
+         "category": l.category, "description": l.description}
+        for l in parse_lessons(text)
+        if l.state in (LessonState.PATTERN, LessonState.RULE)
+    ]

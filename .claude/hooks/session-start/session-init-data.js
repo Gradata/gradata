@@ -14,6 +14,19 @@ const PYTHON = cfg.PYTHON;
 const BRAIN = cfg.BRAIN_DIR;
 const SCRIPTS = cfg.SCRIPTS;
 
+// 0. Memory Bridge — sync feedback memories into brain lessons
+// Closes the gap: Anthropic's memory system → Gradata's graduation pipeline
+try {
+  const path = require('path');
+  const bridgeScript = path.join(path.dirname(__filename), 'memory-bridge.py');
+  execSafe(
+    `"${PYTHON}" "${bridgeScript}"`,
+    { timeout: 10000, stdio: 'ignore' }
+  );
+} catch (e) {
+  // Silent — bridge is best-effort, don't block startup
+}
+
 // 1. Emit HEALTH_CHECK event — proves event pipeline works this session
 try {
   execSafe(

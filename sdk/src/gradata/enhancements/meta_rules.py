@@ -1559,56 +1559,10 @@ _LESSON_LINE_RE = re.compile(
 
 
 def parse_lessons_from_markdown(text: str) -> list[Lesson]:
-    """Parse lessons from the markdown format used in lessons.md.
+    """Parse lessons from lessons.md. Delegates to the authoritative parser.
 
-    Handles the format:
-        [DATE] [STATE:CONFIDENCE] CATEGORY: description
-
-    Args:
-        text: Raw markdown text containing lesson entries.
-
-    Returns:
-        List of parsed :class:`Lesson` objects.
+    .. deprecated:: 0.1.0
+        Use ``gradata.enhancements.self_improvement.parse_lessons`` directly.
     """
-    lessons: list[Lesson] = []
-    for line in text.splitlines():
-        line = line.strip()
-        m = _LESSON_LINE_RE.match(line)
-        if not m:
-            continue
-
-        date_str, state_str, conf_str, category, description = m.groups()
-
-        # Map state string to enum
-        state_map = {
-            "INSTINCT": LessonState.INSTINCT,
-            "PATTERN": LessonState.PATTERN,
-            "RULE": LessonState.RULE,
-            "UNTESTABLE": LessonState.UNTESTABLE,
-        }
-        state = state_map.get(state_str.upper(), LessonState.INSTINCT)
-
-        confidence = float(conf_str) if conf_str else 0.50
-        if state == LessonState.RULE and confidence < 0.90:
-            confidence = 0.90
-
-        # Extract root cause if present
-        root_cause = ""
-        if "Root cause:" in description:
-            parts = description.split("Root cause:", 1)
-            description = parts[0].strip()
-            root_cause = parts[1].strip()
-
-        transfer_scope = _classify_meta_transfer_scope(description)
-
-        lessons.append(Lesson(
-            date=date_str,
-            state=state,
-            confidence=confidence,
-            category=category.upper(),
-            description=description,
-            root_cause=root_cause,
-            transfer_scope=transfer_scope,
-        ))
-
-    return lessons
+    from gradata.enhancements.self_improvement import parse_lessons
+    return parse_lessons(text)

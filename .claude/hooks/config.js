@@ -26,7 +26,7 @@ const DOMAIN_DIR = path.join(WORKING_DIR, 'domain');
 const STARTUP_BRIEF = path.join(DOMAIN_DIR, 'pipeline', 'startup-brief.md');
 const GATES_DIR = path.join(DOMAIN_DIR, 'gates');
 const HOOKS_DIR = path.join(WORKING_DIR, '.claude', 'hooks');
-const LESSONS_FILE = path.join(WORKING_DIR, '.claude', 'lessons.md');
+const LESSONS_FILE = path.join(BRAIN_DIR, 'lessons.md');
 const COMPACT_SNAPSHOT = path.join(os.tmpdir(), 'gradata-compact-snapshot.json');
 
 // ── Multi-LLM Provider Paths ──

@@ -33,15 +33,40 @@ try {
   process.stderr.write(`[session-close] SESSION_END emit failed: ${e.message}\n`);
 }
 
-// --- 2. Meta-rule discovery (best-effort, accumulates across sessions) ---
+// --- 2. CAPTURE SESSION CORRECTIONS into lessons pipeline ---
+try {
+  const path = require('path');
+  const captureScript = path.join(path.dirname(__filename), 'capture-session-corrections.py');
+  execSafe(
+    `"${PYTHON}" "${captureScript}"`,
+    { timeout: 10000, stdio: 'ignore' }
+  );
+} catch (e) {
+  // Silent — correction capture is best-effort
+}
+
+// --- 3. GRADUATION SWEEP — promote/demote lessons (the core learning loop) ---
+try {
+  const path = require('path');
+  const gradScript = path.join(path.dirname(__filename), 'graduation-sweep.py');
+  execSafe(
+    `"${PYTHON}" "${gradScript}"`,
+    { timeout: 15000, stdio: 'ignore' }
+  );
+} catch (e) {
+  process.stderr.write(`[session-close] graduation sweep failed: ${e.message}\n`);
+}
+
+// --- 3. Meta-rule discovery (best-effort, accumulates across sessions) ---
 try {
   const metaPyCmd = [
     'import sys; sys.path.insert(0, r"' + BRAIN + '/scripts")',
     'from paths import SDK_SRC, LESSONS_FILE, DB_PATH',
     'sys.path.insert(0, str(SDK_SRC))',
-    'from gradata.enhancements.meta_rules import discover_meta_rules, save_meta_rules, parse_lessons_from_markdown',
+    'from gradata.enhancements.meta_rules import discover_meta_rules, save_meta_rules',
+    'from gradata.enhancements.self_improvement import parse_lessons',
     'text = LESSONS_FILE.read_text(encoding="utf-8") if LESSONS_FILE.exists() else ""',
-    'lessons = parse_lessons_from_markdown(text)',
+    'lessons = parse_lessons(text)',
     'metas = discover_meta_rules(lessons, current_session=' + sessionNum + ')',
     'saved = save_meta_rules(DB_PATH, metas) if metas else 0',
     'print(f"{len(metas)} meta-rules discovered, {saved} saved")',

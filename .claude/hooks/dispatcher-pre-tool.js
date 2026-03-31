@@ -21,6 +21,7 @@ const hooks = [
   { matcher: 'Write',  script: path.join(HOOKS_DIR, 'pre-tool', 'brain-recall.js'),     timeout: 5000 },
   { matcher: 'mcp__*', script: path.join(HOOKS_DIR, 'pre-tool', 'mcp-health.js'),       timeout: 3000 },
   { matcher: 'Agent',  script: path.join(HOOKS_DIR, 'pre-tool', 'agent-precontext.js'), timeout: 5000 },
+  { matcher: 'Write|Edit', script: path.join(HOOKS_DIR, 'pre-tool', 'rule-enforcement.js'),      timeout: 2000 },
   { matcher: 'Write|Edit', script: path.join(HOOKS_DIR, 'pre-tool', 'secret-scan.js'),          timeout: 3000 },
   { matcher: 'Write|Edit', script: path.join(HOOKS_DIR, 'ecc', 'config-protection.js'), timeout: 3000 },
 ];

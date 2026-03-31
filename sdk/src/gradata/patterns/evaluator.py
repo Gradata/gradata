@@ -457,3 +457,35 @@ def evaluate_optimize_loop(
         converged=False,
         total_iterations=max_iterations,
     )
+
+
+# ---------------------------------------------------------------------------
+# RuleContext integration — graduated rules become evaluation dimensions
+# ---------------------------------------------------------------------------
+
+
+def dimensions_from_graduated_rules(task_type: str = "") -> list[EvalDimension]:
+    """Build EvalDimension objects from graduated DRAFTING/STYLE/TONE rules.
+
+    Graduated rules automatically become scoring dimensions, so the
+    evaluator checklist grows from corrections.
+
+    Example: A DRAFTING rule "no em dashes" becomes an EvalDimension
+    that penalizes outputs containing em dashes.
+    """
+    try:
+        from gradata.patterns.rule_context import get_rule_context
+    except ImportError:
+        return []
+
+    ctx = get_rule_context()
+    rules = ctx.for_evaluator(task_type=task_type)
+
+    dims = []
+    for rule in rules:
+        dims.append(EvalDimension(
+            name=f"rule_{rule.category.lower()}_{len(dims)}",
+            weight=rule.confidence,
+            description=f"Check: {rule.principle}",
+        ))
+    return dims

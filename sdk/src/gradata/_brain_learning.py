@@ -237,6 +237,7 @@ class BrainLearningMixin:
                     correction_data = [{
                         "category": cat,
                         "severity_label": diff.severity,
+                        "description": desc,
                     }]
                     severity_data = {cat: diff.severity}
                     existing_lessons = update_confidence(
@@ -289,6 +290,17 @@ class BrainLearningMixin:
                 )
             except Exception as e:
                 logger.warning("Learning pipeline failed: %s", e)
+
+        # Step 5: Feed Q-router with severity reward (agent routing optimization)
+        if agent_type:
+            try:
+                from gradata.enhancements.pattern_integration import feed_q_router
+                task_type = ""
+                if context:
+                    task_type = context.get("task_type", context.get("task", ""))
+                feed_q_router(self, diff.severity, agent_type=agent_type, task_type=task_type)
+            except ImportError:
+                pass  # pattern_integration not available
 
         return event
 

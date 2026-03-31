@@ -338,3 +338,18 @@ class ContextTracker:
     def should_handoff(self) -> bool:
         """Whether the current bracket recommends preparing a handoff."""
         return self.guidance.should_handoff
+
+    @property
+    def rules_budget(self) -> int:
+        """Max rules to inject based on current degradation bracket.
+
+        Throttles rule injection to save context tokens:
+        FRESH=10, MODERATE=5, DEEP=2, CRITICAL=0
+        """
+        budgets = {
+            ContextBracket.FRESH: 10,
+            ContextBracket.MODERATE: 5,
+            ContextBracket.DEEP: 2,
+            ContextBracket.CRITICAL: 0,
+        }
+        return budgets.get(self.bracket, 10)

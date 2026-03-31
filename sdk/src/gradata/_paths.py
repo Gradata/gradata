@@ -62,7 +62,7 @@ class BrainContext:
             outcomes_dir=bd / "learnings",
             working_dir=wd,
             domain_dir=Path(os.environ.get("DOMAIN_DIR", str(wd / "domain"))).resolve(),
-            lessons_file=wd / ".claude" / "lessons.md",
+            lessons_file=bd / "lessons.md",
             carl_dir=wd / ".carl",
             gates_dir=wd / "domain" / "gates",
         )
@@ -123,7 +123,7 @@ METRICS_DIR = _current_paths["METRICS_DIR"]
 # SDK users won't have them; modules that reference them handle None gracefully.
 WORKING_DIR = Path(os.environ.get("WORKING_DIR", ".")).resolve()
 DOMAIN_DIR = Path(os.environ.get("DOMAIN_DIR", ".")).resolve()
-LESSONS_FILE = WORKING_DIR / ".claude" / "lessons.md"
+LESSONS_FILE = BRAIN_DIR / "lessons.md"
 CARL_DIR = WORKING_DIR / ".carl"
 GATES_DIR = WORKING_DIR / "domain" / "gates"
 
@@ -166,7 +166,7 @@ def set_brain_dir(brain_dir: str | Path, working_dir: str | Path | None = None):
     elif os.environ.get("WORKING_DIR"):
         WORKING_DIR = Path(os.environ["WORKING_DIR"]).resolve()
     DOMAIN_DIR = Path(os.environ.get("DOMAIN_DIR", WORKING_DIR / "domain")).resolve()
-    LESSONS_FILE = WORKING_DIR / ".claude" / "lessons.md"
+    LESSONS_FILE = BRAIN_DIR / "lessons.md"
     CARL_DIR = WORKING_DIR / ".carl"
     GATES_DIR = WORKING_DIR / "domain" / "gates"
 

@@ -238,6 +238,62 @@ def fsrs_penalty(confidence: float) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Correction Direction Detection
+# ---------------------------------------------------------------------------
+
+
+def _classify_correction_direction(
+    correction_desc: str,
+    lesson_desc: str,
+) -> str:
+    """Classify whether a correction reinforces or contradicts a lesson.
+
+    Uses keyword overlap and polarity/negation/sentiment detection from
+    the contradiction_detector module to determine direction.
+
+    Returns: "REINFORCING", "CONTRADICTING", or "UNKNOWN"
+    """
+    if not correction_desc or not lesson_desc:
+        return "UNKNOWN"
+
+    try:
+        from gradata.enhancements.contradiction_detector import (
+            _normalize, _extract_topic_words,
+            _check_polarity, _check_negation, _check_opposite_sentiment,
+        )
+    except ImportError:
+        return "UNKNOWN"
+
+    corr_norm = _normalize(correction_desc)
+    lesson_norm = _normalize(lesson_desc)
+
+    corr_topics = _extract_topic_words(correction_desc)
+    lesson_topics = _extract_topic_words(lesson_desc)
+
+    # Must share at least one topic word to be related
+    overlap = corr_topics & lesson_topics
+    if not overlap:
+        return "UNKNOWN"
+
+    # Check for contradiction signals
+    polarity = _check_polarity(corr_norm, lesson_norm)
+    negation = _check_negation(corr_norm, lesson_norm)
+    sentiment = _check_opposite_sentiment(corr_norm, lesson_norm)
+
+    max_contradiction = max(polarity, negation, sentiment)
+
+    if max_contradiction >= 0.5:
+        return "CONTRADICTING"
+
+    # Shared topics + no contradiction = reinforcing
+    overlap_ratio = len(overlap) / max(1, min(len(corr_topics), len(lesson_topics)))
+    if overlap_ratio >= 0.3:
+        return "REINFORCING"
+
+    return "UNKNOWN"
+
+
+# ---------------------------------------------------------------------------
 # Confidence Scoring
 # ---------------------------------------------------------------------------
 
@@ -323,20 +379,45 @@ def update_confidence(
                 )
                 lesson.misfire_count += 1
             elif cat in corrected_categories:
-                # Contradiction: FSRS-based confidence-dependent penalty
-                base_penalty = fsrs_penalty(lesson.confidence)
-                if severity_data and cat in severity_data:
-                    # Severity-weighted: scale by severity label
-                    raw_severity = severity_data[cat]
-                    severity = _normalize_severity(raw_severity)
-                    weight = SEVERITY_WEIGHTS.get(severity, SEVERITY_WEIGHTS["moderate"])
-                    penalty = base_penalty * weight
+                # Determine direction: does this correction reinforce or contradict?
+                direction = "UNKNOWN"
+                for c in corrections:
+                    c_cat = c.get("category", "").upper()
+                    if c_cat == cat:
+                        c_desc = c.get("description", "")
+                        if c_desc and lesson.description:
+                            direction = _classify_correction_direction(
+                                c_desc, lesson.description
+                            )
+                        break
+
+                if direction == "REINFORCING":
+                    # Reinforcing: correction aligns with lesson direction → BONUS
+                    base_bonus = fsrs_bonus(lesson.confidence)
+                    if severity_data and cat in severity_data:
+                        raw_severity = severity_data[cat]
+                        severity = _normalize_severity(raw_severity)
+                        weight = SEVERITY_WEIGHTS.get(severity, SEVERITY_WEIGHTS["moderate"])
+                        bonus = base_bonus * weight
+                    else:
+                        bonus = base_bonus
+                    lesson.confidence = round(
+                        max(0.0, min(1.0, lesson.confidence + bonus)), 2
+                    )
+                    lesson.fire_count += 1
                 else:
-                    # No severity data: apply full FSRS penalty (backward compat)
-                    penalty = base_penalty
-                lesson.confidence = round(
-                    max(0.0, min(1.0, lesson.confidence - penalty)), 2
-                )
+                    # CONTRADICTING or UNKNOWN: FSRS penalty (preserves existing behavior)
+                    base_penalty = fsrs_penalty(lesson.confidence)
+                    if severity_data and cat in severity_data:
+                        raw_severity = severity_data[cat]
+                        severity = _normalize_severity(raw_severity)
+                        weight = SEVERITY_WEIGHTS.get(severity, SEVERITY_WEIGHTS["moderate"])
+                        penalty = base_penalty * weight
+                    else:
+                        penalty = base_penalty
+                    lesson.confidence = round(
+                        max(0.0, min(1.0, lesson.confidence - penalty)), 2
+                    )
             else:
                 # Survived: category was testable, corrections exist elsewhere
                 base_bonus = fsrs_bonus(lesson.confidence)
@@ -435,10 +516,19 @@ def graduate(
     kill_limit = KILL_LIMITS.get(maturity, KILL_LIMITS["INFANT"])
 
     for lesson in lessons:
-        if lesson.state in (LessonState.KILLED, LessonState.ARCHIVED, LessonState.UNTESTABLE):
+        if lesson.state in (LessonState.KILLED, LessonState.ARCHIVED):
             continue
 
-        # Kill: confidence at zero (UNTESTABLE excluded — it has its own lifecycle)
+        # UNTESTABLE lessons: check if they should be killed (enough idle sessions)
+        if lesson.state == LessonState.UNTESTABLE:
+            if lesson.sessions_since_fire >= kill_limit + 5:
+                try:
+                    lesson.state = transition(lesson.state, "kill")
+                except ValueError:
+                    pass
+            continue
+
+        # Kill: confidence at zero
         if lesson.confidence <= 0.0:
             try:
                 lesson.state = transition(lesson.state, "kill")

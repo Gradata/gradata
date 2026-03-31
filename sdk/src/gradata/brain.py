@@ -164,6 +164,17 @@ class Brain(
         except ImportError:
             pass
 
+        # Bootstrap RuleContext — makes graduated rules available to all patterns
+        try:
+            from gradata.enhancements.rule_context_bridge import bootstrap_rule_context
+            lessons_path = self._find_lessons_path()
+            bootstrap_rule_context(
+                lessons_path=lessons_path,
+                db_path=self.db_path,
+            )
+        except ImportError:
+            pass  # Bridge not available (minimal install)
+
         # Cloud connection (None = local-only mode)
         self._cloud = None
 

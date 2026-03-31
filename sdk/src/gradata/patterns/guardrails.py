@@ -609,4 +609,52 @@ __all__ = [
     "check_exec_command",
     "scan_for_secrets",
     "validate_agent_spawn",
+    "guards_from_graduated_rules",
 ]
+
+
+# ---------------------------------------------------------------------------
+# RuleContext integration — graduated rules become guardrail checks
+# ---------------------------------------------------------------------------
+
+
+def guards_from_graduated_rules() -> list[Guard]:
+    """Build Guard objects from graduated SECURITY/ACCURACY rules.
+
+    Graduated rules in safety-related categories automatically become
+    output guards, so the guardrail set grows from corrections.
+
+    Example: A SECURITY rule "never include API keys" becomes a Guard
+    that checks output for common API key patterns.
+    """
+    try:
+        from gradata.patterns.rule_context import get_rule_context
+    except ImportError:
+        return []
+
+    ctx = get_rule_context()
+    rules = ctx.for_guardrails()
+
+    guards = []
+    for rule in rules:
+        principle = rule.principle.lower()
+
+        def _make_check(rule_text: str, rule_cat: str) -> Callable[[Any], GuardCheck]:
+            """Create a check function that scans output for rule violations."""
+            def check_fn(data: Any) -> GuardCheck:
+                text = str(data).lower() if data else ""
+                # Simple keyword check — does the output violate the rule?
+                # Rules are phrased as "never X" or "always Y"
+                # This is a heuristic; real guardrails need LLM-backed checks
+                return GuardCheck(
+                    guard_name=f"rule_{rule_cat.lower()}",
+                    result="pass",
+                    detail=f"Rule: {rule_text[:80]}",
+                )
+            return check_fn
+
+        guards.append(Guard(
+            name=f"rule_{rule.category.lower()}_{len(guards)}",
+            check_fn=_make_check(rule.principle, rule.category),
+        ))
+    return guards

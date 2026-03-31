@@ -78,7 +78,7 @@ def _verify_metrics(manifest: dict, conn: sqlite3.Connection) -> dict:
 
     # 1d. Lessons active count
     active_claimed = claimed.get("lessons_active", 0)
-    active_actual = _count_lessons_in_file(_p.WORKING_DIR / ".claude" / "lessons.md")
+    active_actual = _count_lessons_in_file(_p.LESSONS_FILE)
     results.append({
         "check": "lessons_active",
         "claimed": active_claimed,
@@ -265,8 +265,8 @@ def _verify_learning_signal(manifest: dict, conn: sqlite3.Connection) -> dict:
         })
 
     # 3b. Lesson graduation rate (lessons should move from INSTINCT to PATTERN to RULE)
-    lessons_file = _p.WORKING_DIR / ".claude" / "lessons.md"
-    archive_file = _p.WORKING_DIR / ".claude" / "lessons-archive.md"
+    lessons_file = _p.LESSONS_FILE
+    archive_file = _p.BRAIN_DIR / "lessons-archive.md"
     active = _count_lessons_in_file(lessons_file)
     graduated = _count_lessons_in_file(archive_file)
     total = active + graduated

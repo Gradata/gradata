@@ -46,7 +46,7 @@ except ImportError:
         # Open source mode: graduation not available locally
         ACCEPTANCE_BONUS = 0.10
         CONTRADICTION_PENALTY = -0.18  # v2.3: tightened from -0.15
-        INITIAL_CONFIDENCE = 0.30
+        INITIAL_CONFIDENCE = 0.40  # Aligned with enhancements/self_improvement.py
         MIN_APPLICATIONS_FOR_PATTERN = 3
         MIN_APPLICATIONS_FOR_RULE = 5
         MISFIRE_PENALTY = -0.20

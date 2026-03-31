@@ -21,7 +21,7 @@ try:
 except ImportError:
     from gradata._edit_classifier import EditClassification  # type: ignore[assignment]
 
-INITIAL_CONFIDENCE = 0.30
+INITIAL_CONFIDENCE = 0.40  # Aligned with self_improvement.py (authoritative)
 _STOPWORDS = frozenset({
     "a", "an", "the", "is", "was", "are", "were", "be", "been", "being",
     "have", "has", "had", "do", "does", "did", "will", "would", "could",
