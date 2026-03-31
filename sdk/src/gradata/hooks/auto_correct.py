@@ -108,13 +108,70 @@ def process_hook_input(raw_input: str) -> dict:
     try:
         event = brain.correct(draft, final)
         severity = event.get("data", {}).get("severity", "unknown")
-        return {
+
+        # Build human-friendly progress message
+        progress = _build_progress(brain, event)
+
+        result = {
             "captured": True,
             "severity": severity,
             "edit_distance": event.get("data", {}).get("edit_distance", 0),
         }
+        if progress:
+            result["result"] = progress  # Claude Code displays "result" to the user
+        return result
     except (ValueError, Exception) as e:
         return {"captured": False, "reason": str(e)}
+
+
+def _build_progress(brain, event: dict) -> str:
+    """Build a plain-English progress message after a correction.
+
+    No jargon. No decimals. Just: how close is this to becoming a rule?
+    """
+    try:
+        from gradata.enhancements.self_improvement import parse_lessons
+    except ImportError:
+        return ""
+
+    lessons_path = brain._find_lessons_path()
+    if not lessons_path or not lessons_path.is_file():
+        return ""
+
+    try:
+        text = lessons_path.read_text(encoding="utf-8")
+        lessons = parse_lessons(text)
+    except Exception:
+        return ""
+
+    if not lessons:
+        return ""
+
+    # Find the most relevant lesson (most recently modified or matching category)
+    category = event.get("data", {}).get("category", "")
+    matching = [l for l in lessons if l.category == category] if category else []
+    lesson = matching[-1] if matching else lessons[-1]
+
+    confidence = lesson.confidence
+    description = lesson.description
+
+    # Trim description to something readable
+    if len(description) > 60:
+        description = description[:57] + "..."
+
+    # Calculate progress as "X of 5 corrections"
+    # PATTERN at 0.60, RULE at 0.90. Each correction adds ~0.07-0.10
+    # Approximate: 5 reinforcing corrections to go from 0.40 to 0.90
+    total_rules = sum(1 for l in lessons if l.confidence >= 0.60)
+
+    if confidence >= 0.90:
+        return f"Learned. {total_rules} rules active."
+    elif confidence >= 0.60:
+        steps_left = max(1, round((0.90 - confidence) / 0.08))
+        return f"Learned. {steps_left} more to lock in. {total_rules} rules active."
+    else:
+        steps_left = max(1, round((0.60 - confidence) / 0.08))
+        return f"Noted. {steps_left} more corrections to activate."
 
 
 def generate_hook_config(brain_dir: str | None = None) -> dict:
