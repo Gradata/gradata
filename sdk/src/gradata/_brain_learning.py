@@ -569,20 +569,26 @@ class BrainLearningMixin:
         self,
         min_state: str = "PATTERN",
         skill_name: str = "",
+        output_format: str = "skill",
+        max_rules: int = 0,
     ) -> str:
-        """Export graduated brain rules as an OpenSpace-compatible SKILL.md.
+        """Export graduated brain rules in multiple formats.
 
-        Produces a file in OpenSpace's SKILL.md format (YAML frontmatter +
-        prose body) that any OpenSpace-compatible agent can consume —
-        Claude Code, Cursor, Codex, OpenClaw.
+        Formats:
+            "skill" — OpenSpace-compatible SKILL.md (default, full format)
+            "claude" — XML <brain-rules> for Claude system prompt injection
+            "cursor" — Markdown list for .cursorrules
+            "system" — Plain numbered list for any system prompt
+            "json" — Structured JSON array
 
         Args:
-            min_state: Minimum lesson state to include ("INSTINCT", "PATTERN",
-                or "RULE"). Default "PATTERN" exports only graduated lessons.
-            skill_name: Skill name for frontmatter. Auto-generated if empty.
+            min_state: Minimum lesson state ("INSTINCT", "PATTERN", "RULE").
+            skill_name: Skill name for SKILL.md frontmatter. Auto-generated if empty.
+            output_format: Target format (see above).
+            max_rules: Maximum rules to include (0 = no limit).
 
         Returns:
-            OpenSpace-compatible SKILL.md content string.
+            Formatted string ready for another agent's context.
         """
         try:
             from gradata.enhancements.self_improvement import parse_lessons
@@ -606,8 +612,16 @@ class BrainLearningMixin:
         ]
         qualified.sort(key=lambda l: (-state_order.get(l.state.value, 0), -l.confidence))
 
+        if max_rules > 0:
+            qualified = qualified[:max_rules]
+
         if not qualified:
             return ""
+
+        # Dispatch to compact formats (non-SKILL.md)
+        fmt = output_format.lower()
+        if fmt != "skill":
+            return self._format_rules_compact(qualified, fmt)
 
         # Read manifest for brain metadata
         domain = "general"
@@ -695,6 +709,53 @@ class BrainLearningMixin:
         lines.append("")
 
         return "\n".join(lines)
+
+    @staticmethod
+    def _format_rules_compact(qualified: list, fmt: str) -> str:
+        """Format rules in compact cross-agent formats."""
+        if fmt == "claude":
+            from html import escape
+            lines = ["<brain-rules>"]
+            for l in qualified:
+                lines.append(
+                    f'  <rule category="{escape(l.category)}" confidence="{l.confidence:.2f}" '
+                    f'state="{l.state.value}">{escape(l.description)}</rule>'
+                )
+            lines.append("</brain-rules>")
+            return "\n".join(lines)
+
+        elif fmt == "cursor":
+            lines = ["# Rules learned from corrections", ""]
+            for l in qualified:
+                lines.append(f"- [{l.category}] {l.description}")
+            return "\n".join(lines)
+
+        elif fmt == "system":
+            lines = [
+                "You have learned these rules from past corrections. Follow them:",
+                "",
+            ]
+            for i, l in enumerate(qualified, 1):
+                lines.append(f"{i}. {l.description}")
+            return "\n".join(lines)
+
+        elif fmt == "json":
+            import json
+            return json.dumps([
+                {
+                    "category": l.category,
+                    "description": l.description,
+                    "confidence": l.confidence,
+                    "state": l.state.value,
+                    "fire_count": l.fire_count,
+                }
+                for l in qualified
+            ], indent=2)
+
+        else:
+            raise ValueError(
+                f"Unknown format '{fmt}'. Use: skill, claude, cursor, system, json"
+            )
 
     def export_skill(
         self,

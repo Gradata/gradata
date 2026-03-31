@@ -52,20 +52,8 @@ from gradata.exceptions import (
     ValidationError,
 )
 from gradata.onboard import onboard
-from gradata.patterns.evaluator import EvalDimension, evaluate_optimize_loop
-from gradata.patterns.guardrails import Guard, GuardCheck, InputGuard, OutputGuard
-from gradata.patterns.human_loop import HumanLoopGate, RiskAssessment, assess_risk
-from gradata.patterns.mcp import MCPBridge, MCPServer, MCPToolSchema
-from gradata.patterns.memory import EpisodicMemory, MemoryManager, ProceduralMemory, SemanticMemory
-from gradata.patterns.parallel import DependencyGraph, ParallelBatch, ParallelTask, merge_results
-
-# ── Pattern exports (standalone utilities) ──────────────────────────────
-from gradata.patterns.pipeline import GateResult, Pipeline, PipelineResult, Stage
-from gradata.patterns.rag import NaiveRAG, SmartRAG
-from gradata.patterns.reflection import EMAIL_CHECKLIST, Criterion, CritiqueChecklist, reflect
 from gradata.patterns.rule_tracker import RuleApplication
 from gradata.patterns.scope import AudienceTier, TaskType, classify_scope
-from gradata.patterns.sub_agents import Delegation, DelegationResult, orchestrate
 
 __all__ = [
     # Core API — these are the public surface
@@ -82,6 +70,7 @@ __all__ = [
     "onboard",
     "parse_lessons",
     "update_confidence",
+    # Brain.prove() and Brain.export_rules() are on the Brain class directly
     # Patterns available via: from gradata.patterns import Pipeline, SmartRAG, etc.
     # Import lines above are kept for backward compat (from gradata import Pipeline still works)
     # but patterns are NOT in __all__ — use gradata.patterns for * imports.

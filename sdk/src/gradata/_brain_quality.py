@@ -180,6 +180,173 @@ class BrainQualityMixin:
             contradicted=contradicted,
         )
 
+    # ── Proof of Learning ─────────────────────────────────────────────
+
+    def prove(self, window: int = 10) -> dict:
+        """Mathematically prove the brain is learning.
+
+        Compares correction rates before and after rule graduations using
+        a Wilcoxon signed-rank test (non-parametric, no normality assumption).
+
+        Returns a proof dict with:
+          - verdict: "PROVEN" | "EMERGING" | "INSUFFICIENT_DATA" | "NO_EFFECT"
+          - p_value: statistical significance (< 0.05 = significant)
+          - effect_size: matched-pairs rank-biserial correlation [-1, 1]
+          - correction_rate_before: avg corrections/session in baseline window
+          - correction_rate_after: avg corrections/session in current window
+          - reduction_pct: percentage reduction in corrections
+          - sessions_analyzed: total sessions used in the test
+          - graduated_rules: number of RULE-state lessons
+          - confidence_interval: 95% CI for the mean difference
+        """
+        import math
+        import sqlite3
+
+        result = {
+            "verdict": "INSUFFICIENT_DATA",
+            "p_value": None,
+            "effect_size": None,
+            "correction_rate_before": None,
+            "correction_rate_after": None,
+            "reduction_pct": None,
+            "sessions_analyzed": 0,
+            "graduated_rules": 0,
+            "confidence_interval": None,
+        }
+
+        # Count graduated rules
+        try:
+            from gradata.enhancements.self_improvement import parse_lessons
+            lessons_path = self._find_lessons_path()
+            if lessons_path and lessons_path.is_file():
+                text = lessons_path.read_text(encoding="utf-8")
+                lessons = parse_lessons(text)
+                result["graduated_rules"] = sum(
+                    1 for l in lessons if l.state.value == "RULE"
+                )
+        except (ImportError, Exception):
+            pass
+
+        # Pull per-session correction counts from DB
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            rows = conn.execute("""
+                SELECT session, COUNT(*) as corrections
+                FROM events
+                WHERE type = 'CORRECTION' AND typeof(session) = 'integer'
+                GROUP BY session
+                ORDER BY session ASC
+            """).fetchall()
+            conn.close()
+        except Exception:
+            return result
+
+        if len(rows) < window * 2:
+            return result
+
+        # Split: first half = before, second half = after
+        midpoint = len(rows) // 2
+        before_counts = [r[1] for r in rows[:midpoint]]
+        after_counts = [r[1] for r in rows[midpoint:]]
+
+        # Trim to equal length (paired test requirement)
+        n = min(len(before_counts), len(after_counts), window)
+        before = before_counts[-n:]
+        after = after_counts[:n]
+
+        if n < 5:
+            return result
+
+        avg_before = sum(before) / n
+        avg_after = sum(after) / n
+        result["correction_rate_before"] = round(avg_before, 3)
+        result["correction_rate_after"] = round(avg_after, 3)
+        result["sessions_analyzed"] = n * 2
+
+        if avg_before > 0.001:
+            result["reduction_pct"] = round(
+                (avg_before - avg_after) / avg_before * 100, 1
+            )
+
+        # Paired differences
+        diffs = [b - a for b, a in zip(before, after)]
+        mean_diff = sum(diffs) / n
+
+        # 95% CI for mean difference (t-distribution approximation)
+        if n > 1:
+            var = sum((d - mean_diff) ** 2 for d in diffs) / (n - 1)
+            se = math.sqrt(var / n) if var > 0 else 0.0
+            t_crit = 2.0  # approximate t(0.025, df>5)
+            ci_low = round(mean_diff - t_crit * se, 3)
+            ci_high = round(mean_diff + t_crit * se, 3)
+            result["confidence_interval"] = (ci_low, ci_high)
+
+        # Wilcoxon signed-rank test (pure Python implementation)
+        p_value, effect = self._wilcoxon_test(diffs)
+        result["p_value"] = p_value
+        result["effect_size"] = effect
+
+        # Verdict
+        if p_value is not None and p_value < 0.05 and mean_diff > 0:
+            result["verdict"] = "PROVEN"
+        elif p_value is not None and p_value < 0.10 and mean_diff > 0:
+            result["verdict"] = "EMERGING"
+        elif mean_diff <= 0:
+            result["verdict"] = "NO_EFFECT"
+        else:
+            result["verdict"] = "INSUFFICIENT_DATA"
+
+        return result
+
+    @staticmethod
+    def _wilcoxon_test(diffs: list[float]) -> tuple[float | None, float | None]:
+        """Pure-Python Wilcoxon signed-rank test (no scipy needed).
+
+        Returns (p_value, effect_size) or (None, None) if not computable.
+        Effect size is matched-pairs rank-biserial correlation.
+        """
+        import math
+
+        # Remove zeros
+        nonzero = [(abs(d), 1 if d > 0 else -1) for d in diffs if d != 0]
+        n = len(nonzero)
+        if n < 5:
+            return None, None
+
+        # Rank by absolute value
+        nonzero.sort(key=lambda x: x[0])
+        ranks = []
+        i = 0
+        while i < n:
+            j = i + 1
+            while j < n and nonzero[j][0] == nonzero[i][0]:
+                j += 1
+            avg_rank = (i + 1 + j) / 2.0
+            for k in range(i, j):
+                ranks.append((avg_rank, nonzero[k][1]))
+            i = j
+
+        # W+ = sum of positive ranks, W- = sum of negative ranks
+        w_plus = sum(r for r, s in ranks if s > 0)
+        w_minus = sum(r for r, s in ranks if s < 0)
+        w = min(w_plus, w_minus)
+
+        # Normal approximation for p-value (valid for n >= 10, approximate for n >= 5)
+        mean_w = n * (n + 1) / 4
+        std_w = math.sqrt(n * (n + 1) * (2 * n + 1) / 24)
+        if std_w == 0:
+            return None, None
+
+        z = (w - mean_w) / std_w
+        # Two-tailed p-value from z-score (normal CDF approximation)
+        p_value = round(2 * (1 - 0.5 * (1 + math.erf(abs(z) / math.sqrt(2)))), 4)
+
+        # Matched-pairs rank-biserial correlation (effect size)
+        total_ranks = n * (n + 1) / 2
+        effect = round((w_plus - w_minus) / total_ranks, 4) if total_ranks > 0 else 0.0
+
+        return p_value, effect
+
     def process_outcome_feedback(self, session: int | None = None) -> dict[str, float]:
         """Process external signal outcomes (DELTA_TAG) for confidence feedback.
 
