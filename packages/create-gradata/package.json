@@ -1,0 +1,17 @@
+{
+  "name": "create-gradata",
+  "version": "0.1.0",
+  "description": "Scaffold a Gradata brain in 30 seconds",
+  "bin": {
+    "create-gradata": "./index.js"
+  },
+  "keywords": ["gradata", "ai", "brain", "memory", "agents", "scaffold"],
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gradata-systems/gradata"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

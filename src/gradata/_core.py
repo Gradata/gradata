@@ -1,0 +1,682 @@
+"""Brain core — Heavy methods extracted from mixins for the consolidated Brain class.
+
+These functions take a Brain instance as the first argument and implement
+the heavy logic for correct(), end_session(), auto_evolve(), etc.
+Brain.py delegates to these to stay under 500 lines.
+"""
+
+from __future__ import annotations
+
+import logging
+import re  # used by export functions for slug sanitization
+from collections.abc import Callable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gradata.brain import Brain
+
+_log = logging.getLogger("gradata")
+
+# Lesson state ordering for filtering by minimum state
+_STATE_RANK = {"INSTINCT": 0, "PATTERN": 1, "RULE": 2}
+# Severity ordering for min_severity gating
+_SEV_RANK = {"as-is": 0, "minor": 1, "moderate": 2, "major": 3, "discarded": 4}
+
+# Map evaluator dimension names to correction categories
+_DIMENSION_CATEGORY_MAP = {
+    "task_alignment": "ACCURACY", "completeness": "STRUCTURE",
+    "accuracy": "ACCURACY", "clarity": "DRAFTING", "conciseness": "DRAFTING",
+    "tone": "TONE", "formatting": "FORMAT", "security": "SECURITY",
+}
+
+
+def _filter_lessons_by_state(lessons, min_state: str = "PATTERN"):
+    """Filter lessons by minimum state rank."""
+    min_rank = _STATE_RANK.get(min_state.upper(), 1)
+    return [l for l in lessons
+            if _STATE_RANK.get(l.state.value, -1) >= min_rank and l.confidence > 0.0]
+
+
+# ── correct() ──────────────────────────────────────────────────────────
+
+def brain_correct(
+    brain: Brain, draft: str, final: str, *,
+    category: str | None = None, context: dict | None = None,
+    session: int | None = None, agent_type: str | None = None,
+    approval_required: bool = False, dry_run: bool = False,
+    min_severity: str = "as-is",
+) -> dict:
+    """Record a correction: user edited draft into final version."""
+    # Input validation
+    if not draft and not final:
+        raise ValueError("Both draft and final are empty — nothing to correct.")
+    if draft == final:
+        raise ValueError("draft and final are identical — no correction detected.")
+    max_input = 100_000
+    if len(draft) + len(final) > max_input:
+        raise ValueError(f"Combined input length ({len(draft) + len(final)}) exceeds limit ({max_input}).")
+    if session is not None and (not isinstance(session, int) or session < 1):
+        raise ValueError(f"session must be a positive integer, got {session!r}")
+
+    # Route to cloud if connected
+    if brain._cloud and brain._cloud.connected:
+        try:
+            return brain._cloud.correct(draft, final, category, context, session)
+        except Exception as e:
+            _log.warning("Cloud correct() failed, falling back to local: %s", e)
+            brain._cloud.connected = False
+
+    # Full enhancement pipeline
+    try:
+        from gradata.enhancements.diff_engine import compute_diff
+        from gradata.enhancements.edit_classifier import classify_edits, summarize_edits
+    except ImportError:
+        data = {"draft_text": draft[:2000], "final_text": final[:2000],
+                "edit_distance": 0.0, "severity": "unknown", "outcome": "unknown",
+                "major_edit": False, "category": category or "UNKNOWN",
+                "summary": "", "classifications": []}
+        return brain.emit("CORRECTION", "brain.correct", data,
+                          [f"category:{category or 'UNKNOWN'}"], session)
+
+    from gradata._scope import build_scope
+
+    diff = compute_diff(draft, final)
+    classifications = classify_edits(diff)
+    summary = summarize_edits(classifications)
+
+    if not category and classifications:
+        category = classifications[0].category.upper()
+
+    scope_data = {}
+    if context:
+        from gradata._scope import scope_to_dict
+        scope_data = scope_to_dict(build_scope(context))
+
+    data = {
+        "draft_text": draft[:2000], "final_text": final[:2000],
+        "edit_distance": diff.edit_distance, "severity": diff.severity,
+        "outcome": diff.severity, "major_edit": diff.severity in ("major", "discarded"),
+        "category": category or "UNKNOWN", "summary": summary,
+        "classifications": [{"category": c.category, "severity": c.severity,
+                             "description": c.description} for c in classifications],
+        "lines_added": diff.summary_stats.get("lines_added", 0),
+        "lines_removed": diff.summary_stats.get("lines_removed", 0),
+    }
+    if scope_data:
+        data["scope"] = scope_data
+
+    tags = [f"category:{category or 'UNKNOWN'}", f"severity:{diff.severity}"]
+    if diff.severity in ("major", "discarded"):
+        tags.append("major_edit:true")
+
+    event = brain.emit("CORRECTION", "brain.correct", data, tags, session)
+    event["diff"] = diff
+    event["classifications"] = classifications
+
+    # Auto-extract patterns
+    try:
+        from gradata.enhancements.pattern_extractor import extract_patterns
+        scope_obj = build_scope(context) if context else None
+        patterns = extract_patterns(classifications, scope=scope_obj)
+        if patterns:
+            event["patterns_extracted"] = len(patterns)
+    except Exception as e:
+        _log.warning("Pattern extraction failed: %s", e)
+
+    # Close the loop: correction → lesson
+    try:
+        from datetime import date as _date
+        from gradata._types import Lesson, LessonState
+        from gradata.enhancements.self_improvement import (
+            parse_lessons, format_lessons, update_confidence, INITIAL_CONFIDENCE)
+
+        if _SEV_RANK.get(diff.severity, 0) > _SEV_RANK.get(min_severity, 0):
+            lessons_path = brain._find_lessons_path(create=True)
+            if lessons_path:
+                existing_text = ""
+                if lessons_path.is_file():
+                    existing_text = lessons_path.read_text(encoding="utf-8")
+                existing_lessons = parse_lessons(existing_text) if existing_text else []
+
+                cat = (category or "UNKNOWN").upper()
+                if classifications:
+                    primary = next((c for c in classifications if c.category.upper() == cat),
+                                   classifications[0])
+                    desc = primary.description
+                elif summary:
+                    desc = summary
+                else:
+                    desc = f"Corrected {cat.lower()} ({diff.severity})"
+
+                from gradata.enhancements.similarity import best_similarity
+
+                best_match, best_sim = None, 0.0
+                for existing_l in existing_lessons:
+                    if existing_l.category != cat:
+                        continue
+                    sim = best_similarity(desc, existing_l.description)
+                    if sim > best_sim:
+                        best_sim = sim
+                        best_match = existing_l
+
+                if best_match and best_sim >= 0.35:
+                    best_match.fire_count += 1
+                    if len(desc) > len(best_match.description):
+                        best_match.description = desc
+                    correction_id = str(event.get("id", "")) if event.get("id") else ""
+                    if correction_id and correction_id not in best_match.correction_event_ids:
+                        best_match.correction_event_ids.append(correction_id)
+                    event["lesson_reinforced"] = True
+                    event["lesson_category"] = cat
+                    try:
+                        brain.emit("LESSON_CHANGE", "brain.correct", {
+                            "action": "reinforced", "lesson_category": cat,
+                            "lesson_description": best_match.description[:200],
+                            "fire_count": best_match.fire_count,
+                            "source_correction_id": event.get("id"),
+                        }, [f"category:{cat}", "provenance"], session)
+                    except Exception as e:
+                        _log.debug("Provenance emit failed: %s", e)
+                else:
+                    lesson_scope = ""
+                    if agent_type or context:
+                        import json as _json
+                        scope_ctx = dict(context or {})
+                        if agent_type:
+                            scope_ctx["agent_type"] = agent_type
+                        scope_obj = build_scope(scope_ctx)
+                        lesson_scope = _json.dumps(
+                            {k: v for k, v in scope_obj.__dict__.items() if v and v != "normal"})
+
+                    init_conf = 0.0 if approval_required else INITIAL_CONFIDENCE
+                    correction_id = str(event.get("id", "")) if event.get("id") else ""
+                    new_lesson = Lesson(
+                        date=_date.today().isoformat(), state=LessonState.INSTINCT,
+                        confidence=init_conf, category=cat, description=desc,
+                        scope_json=lesson_scope, agent_type=agent_type or "",
+                        correction_event_ids=[correction_id] if correction_id else [],
+                        pending_approval=approval_required)
+
+                    if dry_run:
+                        event["dry_run"] = True
+                        event["proposed_lesson"] = {
+                            "category": cat, "description": desc,
+                            "state": LessonState.INSTINCT.value, "confidence": init_conf,
+                            "scope": lesson_scope or None, "approval_required": approval_required}
+                        return event
+
+                    existing_lessons.append(new_lesson)
+                    event["lessons_created"] = 1
+                    if approval_required:
+                        event["approval_required"] = True
+                        try:
+                            from gradata._db import get_connection
+                            with get_connection(brain.db_path) as conn:
+                                conn.execute(
+                                    "INSERT INTO pending_approvals "
+                                    "(lesson_category, lesson_description, draft_text, final_text, "
+                                    "severity, correction_event_id, agent_type, created_at) "
+                                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                                    (cat, desc[:500], draft[:2000], final[:2000],
+                                     diff.severity, correction_id, agent_type or "",
+                                     _date.today().isoformat()))
+                        except Exception as e:
+                            _log.debug("pending_approvals insert failed: %s", e)
+                    _log.info("New lesson: [INSTINCT:%.2f] %s", init_conf, cat)
+                    try:
+                        brain.emit("LESSON_CHANGE", "brain.correct", {
+                            "action": "created", "lesson_category": cat,
+                            "lesson_description": desc[:200],
+                            "initial_confidence": INITIAL_CONFIDENCE,
+                            "source_correction_id": event.get("id"),
+                        }, [f"category:{cat}", "provenance"], session)
+                    except Exception as e:
+                        _log.debug("Provenance emit failed: %s", e)
+
+                # Update confidence
+                correction_data = [{"category": cat, "severity_label": diff.severity, "description": desc}]
+                severity_data = {cat: diff.severity}
+                existing_lessons = update_confidence(
+                    existing_lessons, correction_data, severity_data=severity_data)
+
+                from gradata._db import write_lessons_safe
+                write_lessons_safe(lessons_path, format_lessons(existing_lessons))
+                if "lessons_created" not in event:
+                    event["lessons_updated"] = True
+
+    except Exception as e:
+        _log.warning("Lesson creation failed: %s", e)
+
+    # Index into FTS5
+    try:
+        from gradata._query import fts_index
+        from datetime import date as _fts_date
+        fts_index(source="corrections", file_type="correction",
+                  text=f"{category or 'UNKNOWN'}: {summary or diff.severity} - {final[:500]}",
+                  embed_date=_fts_date.today().isoformat(), ctx=brain.ctx)
+    except Exception as e:
+        _log.debug("FTS index failed: %s", e)
+
+    # Derive task_type once for pipeline + Q-router
+    task_type = context.get("task_type", context.get("task", "")) if context else ""
+
+    # Run through procedural memory pipeline
+    if brain._learning_pipeline:
+        try:
+            pipeline_result = brain._learning_pipeline.process_correction(
+                draft=draft, final=final, severity=diff.severity,
+                category=category or "UNKNOWN", session_id=str(session or ""),
+                task_type=task_type, occurrence_count=1)
+            event["pipeline"] = {
+                "stages_completed": pipeline_result.stages_completed,
+                "is_high_value": pipeline_result.is_high_value,
+                "discriminator_confidence": pipeline_result.discriminator_confidence,
+                "recommendation": pipeline_result.discriminator_recommendation,
+                "cluster_id": pipeline_result.cluster_id,
+                "context_bracket": pipeline_result.context_bracket,
+                "memory_type": pipeline_result.memory_type,
+                "processing_time_ms": pipeline_result.processing_time_ms}
+        except Exception as e:
+            _log.warning("Learning pipeline failed: %s", e)
+
+    # Feed Q-router
+    if agent_type:
+        try:
+            from gradata.enhancements.pattern_integration import feed_q_router
+            feed_q_router(brain, diff.severity, agent_type=agent_type, task_type=task_type)
+        except ImportError:
+            pass
+
+    return event
+
+
+# ── end_session() ──────────────────────────────────────────────────────
+
+def brain_end_session(
+    brain: Brain, *, session_corrections: list[dict] | None = None,
+    session_type: str = "full", machine_mode: bool | None = None,
+    skip_meta_rules: bool = False,
+) -> dict:
+    """Run full graduation sweep at end of session."""
+    try:
+        from gradata.enhancements.self_improvement import (
+            parse_lessons, format_lessons, update_confidence, graduate)
+
+        lessons_path = brain._find_lessons_path()
+        if not lessons_path or not lessons_path.is_file():
+            return {"error": "no lessons.md found"}
+
+        lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+        if not lessons:
+            return {"lessons": 0, "promotions": 0, "demotions": 0}
+
+        before_states = {l.description[:40]: l.state.value for l in lessons}
+
+        lessons = update_confidence(
+            lessons, session_corrections or [],
+            session_type=session_type, machine_mode=machine_mode)
+
+        is_machine = machine_mode if machine_mode is not None else (
+            len(session_corrections or []) > 10)
+        active, graduated = graduate(lessons, machine_mode=is_machine)
+
+        promotions, demotions, kills = 0, 0, 0
+        transitions = []
+        for l in active + graduated:
+            key = l.description[:40]
+            old_state = before_states.get(key, "")
+            new_state = l.state.value
+            if old_state and new_state != old_state:
+                transitions.append((l, old_state, new_state))
+                if new_state in ("PATTERN", "RULE"):
+                    promotions += 1
+                elif new_state == "INSTINCT" and old_state == "PATTERN":
+                    demotions += 1
+                elif new_state in ("KILLED", "UNTESTABLE"):
+                    kills += 1
+
+        for l, old_s, new_s in transitions:
+            if new_s in ("PATTERN", "RULE"):
+                try:
+                    brain.emit("GRADUATION", "end_session", {
+                        "lesson": l.description[:100], "category": l.category,
+                        "from_state": old_s, "to_state": new_s,
+                        "confidence": l.confidence, "fire_count": l.fire_count})
+                except Exception as e:
+                    _log.debug("Graduation emit failed: %s", e)
+
+        # Persist lineage (table created by _migrations.py)
+        if transitions and brain.db_path.is_file():
+            try:
+                import sqlite3
+                from datetime import datetime, UTC
+                conn = sqlite3.connect(str(brain.db_path))
+                now = datetime.now(UTC).isoformat()
+                for l, old_s, new_s in transitions:
+                    conn.execute(
+                        "INSERT INTO lesson_transitions "
+                        "(lesson_desc, category, old_state, new_state, confidence, "
+                        "fire_count, session, transitioned_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (l.description[:100], l.category, old_s, new_s,
+                         l.confidence, l.fire_count, None, now))
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                _log.debug("Lineage logging failed: %s", e)
+
+        all_lessons = active + graduated
+        from gradata._db import write_lessons_safe
+        write_lessons_safe(lessons_path, format_lessons(all_lessons))
+
+        # Archive graduated RULE lessons
+        new_rules = [l for l in graduated if l.state.value == "RULE"
+                     and before_states.get(l.description[:40]) != "RULE"]
+        archive_path = lessons_path.parent / "lessons-archive.md"
+        if new_rules and archive_path.exists():
+            from datetime import date
+            archive_text = archive_path.read_text(encoding="utf-8")
+            archive_lines = [archive_text.rstrip(), f"\n## Graduated {date.today().isoformat()} (auto)"]
+            for r in new_rules:
+                archive_lines.append(
+                    f"[{r.date}] {r.category}: {r.description} → Auto-graduated (confidence {r.confidence:.2f})")
+            archive_path.write_text("\n".join(archive_lines) + "\n", encoding="utf-8")
+
+        # Meta-rule discovery
+        meta_rules_discovered = 0
+        if not skip_meta_rules:
+            try:
+                from gradata.enhancements.meta_rules import refresh_meta_rules
+                from gradata.enhancements.meta_rules_storage import load_meta_rules, save_meta_rules
+                existing_metas = load_meta_rules(brain.db_path)
+                llm_key = getattr(brain, '_llm_key', None)
+                new_metas = refresh_meta_rules(
+                    all_lessons, existing_metas, session_corrections or [],
+                    current_session=0, **({'api_key': llm_key} if llm_key else {}))
+                if new_metas:
+                    if any(l.parent_meta_rule_id for l in all_lessons):
+                        from gradata.enhancements.self_improvement import propagate_confidence
+                        propagate_confidence(all_lessons, new_metas)
+                    save_meta_rules(brain.db_path, new_metas)
+                    meta_rules_discovered = len(new_metas) - len(existing_metas)
+                    if meta_rules_discovered > 0:
+                        _log.info("Meta-rules: %d new (%d total)", meta_rules_discovered, len(new_metas))
+            except ImportError as e:
+                _log.warning("Meta-rules unavailable: %s", e)
+            except Exception as e:
+                _log.warning("Meta-rule discovery failed: %s", e)
+
+        result = {
+            "total_lessons": len(all_lessons), "active": len(active),
+            "graduated": len(graduated), "promotions": promotions,
+            "demotions": demotions, "kills": kills,
+            "new_rules": [l.description[:60] for l in new_rules] if new_rules else [],
+            "meta_rules_discovered": meta_rules_discovered}
+
+        if promotions or demotions or kills:
+            _log.info("Graduation sweep: %d promotions, %d demotions, %d kills",
+                      promotions, demotions, kills)
+        return result
+
+    except Exception as e:
+        _log.warning("Graduation sweep failed: %s", e)
+        return {"error": str(e)}
+
+
+# ── auto_evolve() ──────────────────────────────────────────────────────
+
+def brain_auto_evolve(
+    brain: Brain, output: str, *, task: str = "", agent_type: str = "",
+    evaluator: Callable | None = None, dimensions: list | None = None,
+    threshold: float = 7.0,
+) -> dict:
+    """Evaluate output and auto-generate corrections for failed dimensions."""
+    from gradata.contrib.patterns.evaluator import evaluate, QUALITY_DIMENSIONS, default_evaluator
+
+    dims = dimensions or QUALITY_DIMENSIONS
+    eval_fn = evaluator or default_evaluator
+    result = evaluate(output=output, evaluator=eval_fn, dimensions=dims)
+
+    corrections = []
+    for dim_name, score in result.scores.items():
+        if score < threshold:
+            feedback = result.feedback.get(dim_name, "")
+            cat = _DIMENSION_CATEGORY_MAP.get(dim_name.lower(), "PROCESS")
+            correction_desc = f"[AUTO] {dim_name} scored {score:.1f}/{threshold:.1f}: {feedback}"
+            try:
+                brain.correct(draft=output[:2000], final=correction_desc[:2000],
+                              category=cat, agent_type=agent_type or "auto-evolve",
+                              context={"task": task, "auto_evolve": True})
+                corrections.append({"dimension": dim_name, "score": score,
+                                    "category": cat, "feedback": feedback[:200]})
+            except Exception as e:
+                _log.warning("Auto-evolve correction failed for %s: %s", dim_name, e)
+
+    if corrections:
+        _log.info("auto_evolve: %d corrections from %d dimensions (agent=%s)",
+                  len(corrections), len(dims), agent_type or "auto")
+
+    return {"scores": result.scores, "average": result.average, "verdict": result.verdict,
+            "corrections_generated": len(corrections), "corrections": corrections,
+            "threshold": threshold}
+
+
+# ── detect_implicit_feedback() ─────────────────────────────────────────
+
+def brain_detect_implicit_feedback(
+    brain: Brain, user_message: str, *, session: int = None,
+) -> dict:
+    """Detect implicit behavioral feedback in user prompts."""
+    signals = []
+    text = user_message.lower()
+
+    for marker in ["are you sure", "that's wrong", "that's not right", "not accurate",
+                    "no, not that", "no don't", "stop doing", "why did you", "why didn't you"]:
+        if marker in text:
+            signals.append({"type": "pushback", "marker": marker})
+    for marker in ["make sure", "don't forget", "remember to", "you should always",
+                    "i already told", "i just said", "as i mentioned", "like i said"]:
+        if marker in text:
+            signals.append({"type": "reminder", "marker": marker})
+    for marker in ["what about", "you forgot", "you missed", "you skipped",
+                    "you ignored", "you dropped", "did you check", "did you verify"]:
+        if marker in text:
+            signals.append({"type": "gap", "marker": marker})
+    for marker in ["are we sure", "is that right", "is that correct",
+                    "won't that", "won't people", "i feel like"]:
+        if marker in text:
+            signals.append({"type": "challenge", "marker": marker})
+
+    has_feedback = len(signals) > 0
+    event = None
+    if has_feedback:
+        event = brain.emit("IMPLICIT_FEEDBACK", "brain.detect_implicit_feedback",
+                           {"signals": [s["type"] for s in signals],
+                            "markers": [s["marker"] for s in signals],
+                            "snippet": user_message[:200]},
+                           tags=[f"signal:{s['type']}" for s in signals], session=session)
+
+    return {"signals": signals, "has_feedback": has_feedback, "event": event}
+
+
+# ── Export helpers ─────────────────────────────────────────────────────
+
+def brain_export_rules(brain: Brain, *, min_state: str = "PATTERN", skill_name: str = "") -> str:
+    """Export graduated brain rules as OpenSpace-compatible SKILL.md."""
+    try:
+        from gradata.enhancements.self_improvement import parse_lessons
+    except ImportError:
+        return ""
+
+    lessons_path = brain._find_lessons_path()
+    if not lessons_path or not lessons_path.is_file():
+        return ""
+
+    lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+    qualified = _filter_lessons_by_state(lessons, min_state)
+    qualified.sort(key=lambda l: (-_STATE_RANK.get(l.state.value, 0), -l.confidence))
+    if not qualified:
+        return ""
+
+    domain = "general"
+    if brain.manifest_path.is_file():
+        import json
+        try:
+            manifest = json.loads(brain.manifest_path.read_text(encoding="utf-8"))
+            domain = manifest.get("metadata", {}).get("domain", "general")
+        except Exception:
+            pass
+
+    if not skill_name:
+        skill_name = f"gradata-{domain.lower().replace(' ', '-')}-rules"
+    # agentskills.io spec: lowercase a-z, 0-9, hyphens only, no consecutive hyphens
+    skill_name = re.sub(r"[^a-z0-9\-]", "-", skill_name.lower())
+    skill_name = re.sub(r"-{2,}", "-", skill_name).strip("-")
+
+    by_category: dict[str, list] = {}
+    for l in qualified:
+        by_category.setdefault(l.category, []).append(l)
+
+    categories_str = ", ".join(sorted(by_category.keys())).lower()
+    lines = [
+        "---", f"name: {skill_name}",
+        f"description: Behavioral rules for {domain} tasks covering {categories_str}. "
+        f"Graduated from {len(qualified)} corrections via Gradata.",
+        "license: AGPL-3.0",
+        "compatibility: Requires Python 3.11+ and gradata SDK",
+        "metadata:",
+        "  author: gradata",
+        '  version: "1.0"',
+        f"  domain: {domain}",
+        f"  rules-count: \"{len(qualified)}\"",
+        "---", "", f"# {skill_name.replace('-', ' ').title()}", "",
+        "## Purpose", "",
+        f"Behavioral rules adapted from human corrections in the {domain} domain.",
+        "Apply these rules to avoid repeating past mistakes.", "",
+        "## When to Apply", "",
+        f"- Any {domain} task involving: {categories_str}",
+        f"- {len(qualified)} rules across {len(by_category)} categories", "",
+        "## Rules", ""]
+
+    for cat, cat_lessons in sorted(by_category.items()):
+        lines.append(f"### {cat}")
+        lines.append("")
+        for i, l in enumerate(cat_lessons, 1):
+            lines.append(f"{i}. **[{l.state.value}:{int(l.confidence * 100)}%]** {l.description}")
+            if l.example_draft and l.example_corrected:
+                lines.append(f"   - Before: {l.example_draft}")
+                lines.append(f"   - After: {l.example_corrected}")
+        lines.append("")
+
+    top_rules = qualified[:5]
+    if top_rules:
+        lines.extend(["## Guidelines", ""])
+        for i, l in enumerate(top_rules, 1):
+            lines.append(f"{i}. {l.category}: {l.description}")
+        lines.append("")
+
+    lines.extend(["## Provenance", "",
+                   f"- Source: Gradata correction-based procedural memory",
+                   f"- Domain: {domain}", f"- Rules exported: {len(qualified)}",
+                   f"- Categories: {len(by_category)}", f"- Min graduation tier: {min_state}", ""])
+    return "\n".join(lines)
+
+
+def brain_export_rules_json(brain: Brain, *, min_state: str = "PATTERN") -> list[dict]:
+    """Export graduated rules as a flat, sorted JSON array."""
+    try:
+        from gradata.enhancements.self_improvement import parse_lessons
+    except ImportError:
+        return []
+    lessons_path = brain._find_lessons_path()
+    if not lessons_path or not lessons_path.is_file():
+        return []
+    lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+    qualified = _filter_lessons_by_state(lessons, min_state)
+    qualified.sort(key=lambda l: (l.category, l.description))
+    return [{"category": l.category, "description": l.description,
+             "state": l.state.value, "confidence": round(l.confidence, 2),
+             "fire_count": l.fire_count, "date": l.date} for l in qualified]
+
+
+def brain_export_skill(brain: Brain, *, output_dir: str | None = None,
+                       min_state: str = "PATTERN", skill_name: str = "") -> "Path":
+    """Export graduated rules as a full skill directory."""
+    from pathlib import Path
+    import json
+    import hashlib
+    from datetime import datetime, UTC
+
+    content = brain_export_rules(brain, min_state=min_state, skill_name=skill_name)
+    if not content:
+        raise ValueError("No qualified rules to export. Train the brain first.")
+
+    for line in content.splitlines():
+        if line.startswith("name:"):
+            skill_name = line.split(":", 1)[1].strip()
+            break
+
+    base = Path(output_dir).resolve() if output_dir else brain.dir / "skills"
+    skill_dir = base / skill_name  # skill_name already sanitized by brain_export_rules
+    skill_dir.mkdir(parents=True, exist_ok=True)
+
+    (skill_dir / "SKILL.md").write_text(content, encoding="utf-8")
+
+    brain_hash = hashlib.sha256(brain.dir.name.encode() + skill_name.encode()).hexdigest()[:8]
+    skill_id = f"{skill_name}__imp_{brain_hash}"
+    (skill_dir / ".skill_id").write_text(skill_id, encoding="utf-8")
+
+    provenance = {"source": "gradata", "skill_id": skill_id,
+                  "brain_name": brain.dir.name, "exported_at": datetime.now(UTC).isoformat(),
+                  "min_state": min_state}
+    if brain.manifest_path.is_file():
+        try:
+            manifest = json.loads(brain.manifest_path.read_text(encoding="utf-8"))
+            provenance["domain"] = manifest.get("metadata", {}).get("domain", "")
+            provenance["sessions_trained"] = manifest.get("metadata", {}).get("sessions_trained", 0)
+        except Exception:
+            pass
+    (skill_dir / "provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
+    return skill_dir
+
+
+def brain_export_skills(brain: Brain, *, output_dir: str | None = None,
+                        min_state: str = "PATTERN") -> list[str]:
+    """Export graduated rules as per-category SKILL.md files."""
+    from pathlib import Path
+    from collections import defaultdict
+
+    rules = brain_export_rules_json(brain, min_state=min_state)
+    if not rules:
+        return []
+
+    by_category: dict[str, list[dict]] = defaultdict(list)
+    for rule in rules:
+        by_category[rule["category"]].append(rule)
+
+    domain = "general"
+    try:
+        if hasattr(brain, "manifest_path") and brain.manifest_path.is_file():
+            import json
+            manifest = json.loads(brain.manifest_path.read_text(encoding="utf-8"))
+            domain = manifest.get("metadata", {}).get("domain", "general").lower()
+    except Exception:
+        pass
+
+    base = Path(output_dir).resolve() if output_dir else brain.dir / "skills"
+    created = []
+    for cat, cat_rules in sorted(by_category.items()):
+        slug = re.sub(r"[^\w\-]", "_", cat.lower())
+        skill_dir = base / f"gradata-{slug}"
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        lines = ["---", f'name: "gradata-{domain}-{slug}"',
+                  f'description: "Behavioral rules for {cat} from {len(cat_rules)} corrections"',
+                  f"tags: [{domain}, {slug}, gradata]", "source: gradata",
+                  "compatible_with: [hermes, mindstudio, openspace]",
+                  "---", "", f"# {cat} Rules ({domain.title()})", ""]
+        for i, rule in enumerate(cat_rules, 1):
+            lines.append(f"{i}. [{rule['state']}:{rule['confidence']:.2f}] {rule['description']}")
+        lines.append("")
+        skill_path = skill_dir / "SKILL.md"
+        skill_path.write_text("\n".join(lines), encoding="utf-8")
+        created.append(str(skill_path))
+    return created
