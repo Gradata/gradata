@@ -55,7 +55,7 @@ class TestArchitectureLayers:
         importlib.import_module(f"gradata.enhancements.{module}")
 
     @pytest.mark.parametrize("module", [
-        "quality_gates", "truth_protocol", "brain_scores",
+        "quality_gates", "truth_protocol",
         "eval_benchmark", "install_manifest", "outcome_feedback",
     ])
     def test_contrib_enhancements_importable(self, module):

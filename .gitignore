@@ -126,3 +126,18 @@ scripts/
 docs/cloud/
 docs/study-protocol.md
 super_meta_rules.py
+
+# Codex local configuration
+.codex/
+
+# Claude Flow runtime data
+.claude-flow/data/
+.claude-flow/logs/
+.agents/
+AGENTS.md
+design-system/
+
+# Environment variables
+.env
+.env.local
+.env.*.local

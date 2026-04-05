@@ -99,11 +99,7 @@ class Brain:
             self.tools = ToolRegistry()
         except ImportError:
             self.tools = None  # type: ignore[assignment]
-        try:
-            from gradata.enhancements.agent_graduation import AgentGraduationTracker
-            self.agent_graduation = AgentGraduationTracker(self.dir)
-        except ImportError:
-            self.agent_graduation = None  # type: ignore[assignment]
+        self.agent_graduation = None  # Future: agent-level graduation tracking
 
         # Procedural memory pipeline (observe→cluster→discriminate→route→bracket)
         self._learning_pipeline = None
@@ -138,6 +134,15 @@ class Brain:
 
         # Cloud connection (None = local-only mode)
         self._cloud = None
+
+    @property
+    def session(self) -> int:
+        """Current session number (from event log or loop-state.md)."""
+        try:
+            from gradata._events import get_current_session
+            return get_current_session()
+        except Exception:
+            return 0
 
     @classmethod
     def init(
@@ -486,7 +491,8 @@ class Brain:
                     matched = True
                     break
             if matched:
-                lessons_path.write_text(format_lessons(lessons), encoding="utf-8")
+                from gradata._db import write_lessons_safe
+                write_lessons_safe(lessons_path, format_lessons(lessons))
 
         if not matched:
             conn.close()

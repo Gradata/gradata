@@ -42,9 +42,11 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-_SEVERITY_MINOR = "minor"      # edit_distance < 0.10
+_SEVERITY_AS_IS = "as-is"        # edit_distance < 0.02
+_SEVERITY_MINOR = "minor"        # 0.02 <= edit_distance < 0.10
 _SEVERITY_MODERATE = "moderate"  # 0.10 <= edit_distance < 0.40
-_SEVERITY_MAJOR = "major"      # edit_distance >= 0.40
+_SEVERITY_MAJOR = "major"        # 0.40 <= edit_distance < 0.80
+_SEVERITY_DISCARDED = "discarded"  # edit_distance >= 0.80
 
 _SOURCE = "sidecar:watcher"
 
@@ -147,19 +149,23 @@ def _normalise_edit_distance(old: str, new: str) -> float:
 
 
 def _classify_severity(edit_distance: float) -> str:
-    """Map edit distance to a human-readable severity label.
+    """Map edit distance to severity label (aligned with diff_engine 5-label scale).
 
     Args:
         edit_distance: Normalised edit distance in ``[0.0, 1.0]``.
 
     Returns:
-        One of ``"minor"``, ``"moderate"``, or ``"major"``.
+        One of ``"as-is"``, ``"minor"``, ``"moderate"``, ``"major"``, ``"discarded"``.
     """
+    if edit_distance < 0.02:
+        return _SEVERITY_AS_IS
     if edit_distance < 0.10:
         return _SEVERITY_MINOR
     if edit_distance < 0.40:
         return _SEVERITY_MODERATE
-    return _SEVERITY_MAJOR
+    if edit_distance < 0.80:
+        return _SEVERITY_MAJOR
+    return _SEVERITY_DISCARDED
 
 
 def _build_unified_diff(old: str, new: str, path: str, max_lines: int = 50) -> str:

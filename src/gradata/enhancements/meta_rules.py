@@ -350,8 +350,10 @@ def _synthesise_principle(lessons: list[Lesson], theme: str) -> str:
 # Transfer Scope Classification (delegates to rule_engine)
 # ---------------------------------------------------------------------------
 
-# Re-export for backward compat (super_meta_rules imports this name)
-from gradata.rules.rule_engine import classify_transfer_scope as _classify_meta_transfer_scope  # noqa: E501
+# Lazy import to avoid circular dependency with rule_engine.py
+def _classify_meta_transfer_scope(rule_text: str) -> "RuleTransferScope":
+    from gradata.rules.rule_engine import classify_transfer_scope
+    return classify_transfer_scope(rule_text)
 
 
 def _pick_examples(lessons: list[Lesson], max_examples: int = 2) -> list[str]:
@@ -892,28 +894,15 @@ def parse_lessons_from_markdown(text: str) -> list[Lesson]:
 
 
 def __getattr__(name: str):  # noqa: N807
-    """Lazy-load storage and super-meta symbols to avoid circular imports."""
+    """Lazy-load storage symbols to avoid circular imports."""
     _STORAGE_NAMES = {
         "ensure_table", "save_meta_rules", "load_meta_rules",
         "ensure_super_table", "save_super_meta_rules", "load_super_meta_rules",
         "ensure_meta_table",
     }
-    _SUPER_NAMES = {
-        "detect_super_meta_rules", "detect_universal_rules",
-        "validate_super_meta_rule", "refresh_super_meta_rules",
-        "format_super_meta_rules_for_prompt", "_super_meta_id",
-        "_merge_context_weights", "_group_meta_rules_by_category_overlap",
-        "_group_meta_rules_by_theme", "_synthesise_super_principle",
-        "_build_super_meta",
-    }
     if name in _STORAGE_NAMES:
         import gradata.enhancements.meta_rules_storage as _storage
         obj = getattr(_storage, "ensure_table" if name == "ensure_meta_table" else name)
-        globals()[name] = obj
-        return obj
-    if name in _SUPER_NAMES:
-        import gradata.enhancements.super_meta_rules as _super
-        obj = getattr(_super, name)
         globals()[name] = obj
         return obj
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -169,7 +169,7 @@ _CATEGORY_TYPE_MAP: dict[str, CorrectionType] = {
 def patterns_to_lessons(patterns: list[ExtractedPattern]) -> list[Lesson]:
     """Convert patterns with sufficient evidence into candidate Lesson objects.
 
-    New lessons start as INSTINCT at INITIAL_CONFIDENCE (0.30).
+    New lessons start as INSTINCT at INITIAL_CONFIDENCE (0.40).
     Only patterns with confidence >= 0.25 are promoted.
     """
     from datetime import date
