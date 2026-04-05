@@ -1,0 +1,23 @@
+{
+  "brain_id": "demo-brain",
+  "version": "0.2.1",
+  "created": "2026-01-05T00:00:00Z",
+  "sessions_trained": 25,
+  "total_corrections": 87,
+  "rules_count": 5,
+  "patterns_count": 10,
+  "instincts_count": 15,
+  "killed_count": 3,
+  "categories": ["DRAFTING", "CODE", "TONE", "PROCESS", "ACCURACY"],
+  "convergence": {
+    "trend": "converging",
+    "correction_rate_start": 4.2,
+    "correction_rate_end": 1.1,
+    "reduction_percent": 73.8
+  },
+  "quality": {
+    "adaptation_score": 0.74,
+    "trust_grade": "B+"
+  },
+  "note": "Synthetic demo brain for evaluation. Generated data — not from a real user."
+}

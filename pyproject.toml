@@ -1,0 +1,103 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gradata"
+version = "0.4.0"
+description = "AI that learns your judgment. Corrections become behavioral rules that converge on your style."
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+requires-python = ">=3.11"
+authors = [
+    { name = "Gradata", email = "oliver@gradata.com" },
+]
+keywords = ["ai", "learning", "behavioral", "agents", "personalization", "judgment", "corrections"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = []  # Zero required deps — base patterns are pure Python + stdlib
+
+[project.optional-dependencies]
+# ChromaDB removed S66 — FTS5 is primary search, sqlite-vec planned
+embeddings = ["sentence-transformers>=2.0.0"]  # Local embeddings
+gemini = ["google-genai>=1.0.0"]  # Gemini embeddings (free tier)
+encrypted = ["cryptography>=41.0"]  # Encryption at rest for system.db
+cloud = []  # Cloud client uses stdlib only (urllib). Enhancements included in base package.
+all = ["sentence-transformers>=2.0.0", "google-genai>=1.0.0", "cryptography>=41.0"]
+dev = [
+    "pytest>=8.0",
+    "hypothesis>=6.0",
+    "pyright>=1.1",
+    "bandit>=1.7",
+    "coverage>=7.0",
+]
+
+[project.scripts]
+gradata = "gradata.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Gradata/gradata"
+Documentation = "https://gradata.github.io/gradata/"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gradata"]
+exclude = ["**/__pycache__", "**/*.pyc", "**/*.db", "**/*( 1)*", "**/* (1)*"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["**/__pycache__", "**/*.pyc", "**/*.db", "**/*( 1)*", "**/* (1)*"]
+
+# --- Ruff (linter + formatter) ---
+[tool.ruff]
+src = ["src"]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "N",     # pep8-naming
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "SIM",   # flake8-simplify
+    "TCH",   # flake8-type-checking
+    "RUF",   # ruff-specific
+]
+ignore = [
+    "E501",  # line too long (formatter handles)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["gradata"]
+
+# --- Pyright (type checker) ---
+[tool.pyright]
+pythonVersion = "3.11"
+pythonPlatform = "All"
+typeCheckingMode = "basic"
+include = ["src"]
+exclude = ["**/__pycache__"]
+reportMissingImports = "warning"
+reportMissingTypeStubs = false
+
+# --- Bandit (security linter) ---
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]  # allow assert in non-test code for now
+
+# --- Pytest ---
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "integration: tests that hit external LLM APIs (cost money, skip in CI)",
+]

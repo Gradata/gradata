@@ -1,0 +1,74 @@
+site_name: Gradata
+site_description: AI behavioral adaptation engine. Corrections graduate into rules.
+repo_url: https://github.com/Gradata/gradata
+repo_name: Gradata/gradata
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Light mode
+    - scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Dark mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - content.code.annotate
+    - search.highlight
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/install.md
+    - Quick Start: getting-started/quickstart.md
+    - Core Concepts: getting-started/concepts.md
+  - Guides:
+    - Training a Brain: guides/training.md
+    - Custom Domains: guides/custom-domains.md
+    - MCP Integration: guides/mcp.md
+    - Claude Code Setup: getting-started/claude-code-setup.md
+  - API Reference:
+    - Brain Class: api/brain.md
+    - CLI: api/cli.md
+    - Patterns API: api/patterns.md
+    - Enhancements API: api/enhancements.md
+  - Contributing:
+    - Architecture: architecture/overview.md
+    - Patterns: architecture/patterns.md
+    - Enhancements: architecture/enhancements.md
+    - Brain Data: architecture/brain.md
+    - Agent Adaptation: architecture/agent-graduation.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            show_source: false
+            show_root_heading: true
+            heading_level: 2
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true

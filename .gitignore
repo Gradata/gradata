@@ -1,0 +1,168 @@
+# Dependencies
+node_modules/
+
+# Environment and credentials
+.env
+*.env
+.env.*
+.mcp.json
+*.key
+*.pem
+credentials.json
+client_secret*.json
+token.json
+
+# OneDrive temp files
+~$*
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Obsidian workspace (user-specific)
+.obsidian/
+
+# Auto-generated (regenerated each session)
+.vectorstore/
+brain.manifest.json
+system.db
+*.db-wal
+__pycache__/
+*.pyc
+vendor/
+.claude-flow
+autoresearch-results.tsv
+
+# Build artifacts (regenerate on deploy)
+sdk/website-next/.next/
+sdk/website-next/node_modules/
+
+# User config (personal, not part of SDK)
+CLAUDE.md
+domain/
+.carl/
+.claude/
+skills/
+.opencli/
+.vscode/
+.claude-octopus/
+.agentignore
+.claudeignore
+package.json
+package-lock.json
+
+# Sales data (private, never in public repo)
+Leads/
+/brain/
+/brain/prospects/
+/brain/sessions/
+/brain/emails/
+
+# Intermediates (disposable, never commit)
+.tmp/
+
+# Archived research (not for public repo)
+sdk/research/_archived_v2_reference/
+
+# Cache directories
+.pytest_cache/
+.ruff_cache/
+
+# Junk files from cmd.exe redirect misparse (Windows agent output artifacts)
+# When subagents run Bash commands, cmd.exe interprets > in stdout as redirects
+$null
+GateResult
+None
+Path
+Graph
+bool
+dict[str
+site/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.vectorstore/
+
+# Sensitive files — never commit to public repo
+system.db
+brain.manifest.json
+*.db
+SPEC.md
+AUDIT.md
+GATE0-PROOF.md
+.planning/
+
+# Internal docs — implementation plans, audit reports, session notes (contain algorithm details)
+docs/superpowers/
+docs/audit-history/
+docs/audit-reports/
+docs/Session Notes/
+docs/Exports/
+docs/provisional-patent-draft.md
+docs/META_LEARNING.md
+docs/STRESS_TEST_PROTOCOL.md
+docs/GRADATA-LAUNCH-STRATEGY.md
+docs/GTM-Execution-Plan.md
+docs/gradata-marketing-strategy.md
+docs/ablation-experiment-s93.md
+docs/ARCHITECTURE.md
+docs/north-star-research.md
+
+# Internal dev tooling — not part of SDK
+CLAUDE.md
+FEATURES.md
+Dockerfile
+.dockerignore
+.claude/
+packages/
+docs/GTM-Execution-Plan.md
+docs/gradata-comparison-table.md
+
+# Secrets
+.env
+.env.*
+*.secret
+credentials*
+
+# Virtual environments
+.venv/
+venv/
+
+# IDE / editor
+.idea/
+.vscode/
+
+# Node
+node_modules/
+
+# Development artifacts (not shipped)
+test-brain/
+website/
+website-next/
+onboarding/
+templates/
+# examples/ — included for open source hygiene
+research/
+scripts/
+docs/cloud/
+docs/study-protocol.md
+
+
+# Codex local configuration
+.codex/
+
+# Claude Flow runtime data
+.claude-flow/data/
+.claude-flow/logs/
+.agents/
+AGENTS.md
+design-system/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.gstack/
