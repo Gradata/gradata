@@ -99,11 +99,7 @@ class Brain:
             self.tools = ToolRegistry()
         except ImportError:
             self.tools = None  # type: ignore[assignment]
-        try:
-            from gradata.enhancements.agent_graduation import AgentGraduationTracker
-            self.agent_graduation = AgentGraduationTracker(self.dir)
-        except ImportError:
-            self.agent_graduation = None  # type: ignore[assignment]
+        self.agent_graduation = None  # Future: agent-level graduation tracking
 
         # Procedural memory pipeline (observe→cluster→discriminate→route→bracket)
         self._learning_pipeline = None
