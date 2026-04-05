@@ -51,6 +51,7 @@ from gradata.exceptions import (
     TaxonomyError,
     ValidationError,
 )
+from gradata.context_wrapper import brain_context
 from gradata.onboard import onboard
 
 __all__ = [
@@ -61,6 +62,8 @@ __all__ = [
     "LessonState",
     "RuleTransferScope",
     "__version__",
+    # One-line wrapper
+    "brain_context",
     # Graduation pipeline
     "compute_learning_velocity",
     "format_lessons",
