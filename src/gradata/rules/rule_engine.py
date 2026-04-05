@@ -31,7 +31,8 @@ from dataclasses import dataclass
 
 from gradata._scope import RuleScope, scope_matches
 from gradata._types import ELIGIBLE_STATES, CorrectionType, Lesson, LessonState, RuleTransferScope
-from gradata.enhancements.meta_rules import evaluate_conditions  # noqa: F401
+# evaluate_conditions lives in meta_rules.py — not re-exported here
+# to avoid circular dependency. Callers should import from meta_rules directly.
 
 _log = logging.getLogger(__name__)
 

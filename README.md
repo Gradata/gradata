@@ -56,7 +56,8 @@ brain.apply_brain_rules() → AI stops making that mistake
 - `brain.correct(draft, final)` — capture corrections with automatic diff + severity classification
 - `brain.apply_brain_rules(task)` — inject graduated rules into prompts
 - `brain.manifest()` — mathematical proof the brain is improving (compound score)
-- `brain.prove()` — paired t-test showing correction rate decreased after graduation
+- `brain.end_session()` — graduation sweep with SESSION_END event tracking
+- `brain.session` — current session number (auto-tracked from event log)
 
 **Human-in-the-loop approval:**
 - `brain.review_pending()` — list lessons awaiting approval
@@ -155,7 +156,7 @@ src/gradata/
 
 ## Caveats
 
-- v0.2.0 — API may change
+- v0.2.1 — API may change
 - Local-only for now
 - The graduation engine needs multiple sessions to produce rules. Don't expect results in one sitting.
 

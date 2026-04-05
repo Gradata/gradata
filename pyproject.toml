@@ -4,22 +4,30 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gradata"
-version = "0.2.0"
+version = "0.2.1"
 description = "Procedural memory for AI agents. Corrections become behavioral rules that compound over time."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
 requires-python = ">=3.11"
 authors = [
+    { name = "Oliver Le", email = "oliver@gradata.com" },
+]
+maintainers = [
     { name = "Gradata", email = "hello@gradata.com" },
 ]
-keywords = ["ai", "brain", "sdk", "memory", "agents", "claude"]
+keywords = ["ai", "brain", "sdk", "memory", "agents", "procedural-memory", "corrections", "learning", "claude", "llm"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
     "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
 ]
 
 dependencies = []  # Zero required deps — base patterns are pure Python + stdlib
@@ -43,8 +51,11 @@ dev = [
 gradata = "gradata.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/gradata-systems/gradata"
-Documentation = "https://github.com/gradata-systems/gradata#readme"
+Homepage = "https://github.com/Gradata/gradata"
+Documentation = "https://github.com/Gradata/gradata#readme"
+Repository = "https://github.com/Gradata/gradata"
+"Bug Tracker" = "https://github.com/Gradata/gradata/issues"
+Changelog = "https://github.com/Gradata/gradata/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/gradata"]

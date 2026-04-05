@@ -139,6 +139,15 @@ class Brain:
         # Cloud connection (None = local-only mode)
         self._cloud = None
 
+    @property
+    def session(self) -> int:
+        """Current session number (from event log or loop-state.md)."""
+        try:
+            from gradata._events import get_current_session
+            return get_current_session()
+        except Exception:
+            return 0
+
     @classmethod
     def init(
         cls,
@@ -486,7 +495,8 @@ class Brain:
                     matched = True
                     break
             if matched:
-                lessons_path.write_text(format_lessons(lessons), encoding="utf-8")
+                from gradata._db import write_lessons_safe
+                write_lessons_safe(lessons_path, format_lessons(lessons))
 
         if not matched:
             conn.close()

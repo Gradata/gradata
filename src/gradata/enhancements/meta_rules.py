@@ -350,8 +350,10 @@ def _synthesise_principle(lessons: list[Lesson], theme: str) -> str:
 # Transfer Scope Classification (delegates to rule_engine)
 # ---------------------------------------------------------------------------
 
-# Re-export for backward compat (super_meta_rules imports this name)
-from gradata.rules.rule_engine import classify_transfer_scope as _classify_meta_transfer_scope  # noqa: E501
+# Lazy import to avoid circular dependency with rule_engine.py
+def _classify_meta_transfer_scope(rule_text: str) -> "RuleTransferScope":
+    from gradata.rules.rule_engine import classify_transfer_scope
+    return classify_transfer_scope(rule_text)
 
 
 def _pick_examples(lessons: list[Lesson], max_examples: int = 2) -> list[str]:

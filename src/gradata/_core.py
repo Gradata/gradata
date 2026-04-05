@@ -87,10 +87,11 @@ def brain_correct(
     if not category and classifications:
         category = classifications[0].category.upper()
 
+    scope_obj = build_scope(context) if context else None
     scope_data = {}
-    if context:
+    if scope_obj:
         from gradata._scope import scope_to_dict
-        scope_data = scope_to_dict(build_scope(context))
+        scope_data = scope_to_dict(scope_obj)
 
     data = {
         "draft_text": draft[:2000], "final_text": final[:2000],
@@ -116,7 +117,6 @@ def brain_correct(
     # Auto-extract patterns
     try:
         from gradata.enhancements.pattern_extractor import extract_patterns
-        scope_obj = build_scope(context) if context else None
         patterns = extract_patterns(classifications, scope=scope_obj)
         if patterns:
             event["patterns_extracted"] = len(patterns)
@@ -348,19 +348,17 @@ def brain_end_session(
         # Persist lineage (table created by _migrations.py)
         if transitions and brain.db_path.is_file():
             try:
-                import sqlite3
                 from datetime import datetime, UTC
-                conn = sqlite3.connect(str(brain.db_path))
+                from gradata._db import get_connection
                 now = datetime.now(UTC).isoformat()
-                for l, old_s, new_s in transitions:
-                    conn.execute(
-                        "INSERT INTO lesson_transitions "
-                        "(lesson_desc, category, old_state, new_state, confidence, "
-                        "fire_count, session, transitioned_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                        (l.description[:100], l.category, old_s, new_s,
-                         l.confidence, l.fire_count, None, now))
-                conn.commit()
-                conn.close()
+                with get_connection(brain.db_path) as conn:
+                    for l, old_s, new_s in transitions:
+                        conn.execute(
+                            "INSERT INTO lesson_transitions "
+                            "(lesson_desc, category, old_state, new_state, confidence, "
+                            "fire_count, session, transitioned_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                            (l.description[:100], l.category, old_s, new_s,
+                             l.confidence, l.fire_count, None, now))
             except Exception as e:
                 _log.debug("Lineage logging failed: %s", e)
 
@@ -381,6 +379,9 @@ def brain_end_session(
                     f"[{r.date}] {r.category}: {r.description} → Auto-graduated (confidence {r.confidence:.2f})")
             archive_path.write_text("\n".join(archive_lines) + "\n", encoding="utf-8")
 
+        # Detect session number early so meta-rules and events use the real value
+        current_session = brain.session
+
         # Meta-rule discovery
         meta_rules_discovered = 0
         if not skip_meta_rules:
@@ -391,7 +392,8 @@ def brain_end_session(
                 llm_key = getattr(brain, '_llm_key', None)
                 new_metas = refresh_meta_rules(
                     all_lessons, existing_metas, session_corrections or [],
-                    current_session=0, **({'api_key': llm_key} if llm_key else {}))
+                    current_session=current_session,
+                    **({'api_key': llm_key} if llm_key else {}))
                 if new_metas:
                     if any(l.parent_meta_rule_id for l in all_lessons):
                         from gradata.enhancements.self_improvement import propagate_confidence
@@ -406,11 +408,23 @@ def brain_end_session(
                 _log.warning("Meta-rule discovery failed: %s", e)
 
         result = {
+            "session": current_session,
             "total_lessons": len(all_lessons), "active": len(active),
             "graduated": len(graduated), "promotions": promotions,
             "demotions": demotions, "kills": kills,
             "new_rules": [l.description[:60] for l in new_rules] if new_rules else [],
             "meta_rules_discovered": meta_rules_discovered}
+
+        # Session boundary marker for dashboard queries
+        try:
+            brain.emit("SESSION_END", "brain.end_session", {
+                "session": current_session,
+                "total_lessons": len(all_lessons),
+                "promotions": promotions, "demotions": demotions,
+                "graduated_rules": len(new_rules),
+            }, session=current_session)
+        except Exception as e:
+            _log.warning("SESSION_END emit failed: %s", e)
 
         if promotions or demotions or kills:
             _log.info("Graduation sweep: %d promotions, %d demotions, %d kills",
