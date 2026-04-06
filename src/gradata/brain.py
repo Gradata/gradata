@@ -350,6 +350,15 @@ class Brain:
         self._convergence_session = self.session
         return self._convergence_cache
 
+    def efficiency(self, *, estimate_time: bool = False) -> dict:
+        """Quantify effort saved by brain learning.
+
+        Returns effort_ratio (ratio of current vs initial correction rate).
+        Pass estimate_time=True for approximate time-saved estimates.
+        """
+        from gradata._core import brain_efficiency
+        return brain_efficiency(self, estimate_time=estimate_time)
+
     # ── Output Logging ─────────────────────────────────────────────────
 
     def log_output(self, text: str, output_type: str = "general",

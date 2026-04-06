@@ -980,3 +980,61 @@ def brain_convergence(brain: "Brain") -> dict:
         "total_corrections": sum(counts),
         "total_sessions": len(sessions),
     }
+
+
+# ── Efficiency ────────────────────────────────────────────────────────
+
+_SEVERITY_SECONDS = {
+    "trivial": 5,
+    "minor": 15,
+    "moderate": 45,
+    "major": 120,
+    "rewrite": 300,
+}
+
+
+def brain_efficiency(brain: "Brain", *, estimate_time: bool = False) -> dict:
+    """Quantify effort saved by brain learning.
+
+    Returns effort_ratio (current vs initial correction rate).
+    Optional estimate_time adds severity-weighted time estimates (approximate).
+    """
+    convergence = brain._get_convergence()
+    counts = convergence.get("corrections_per_session", [])
+
+    if len(counts) < 3:
+        result: dict = {
+            "effort_ratio": 1.0,
+            "corrections_initial": 0,
+            "corrections_recent": 0,
+            "total_corrections": convergence.get("total_corrections", 0),
+            "total_sessions": convergence.get("total_sessions", 0),
+        }
+        if estimate_time:
+            result["estimated_seconds_saved"] = 0
+            result["time_breakdown"] = {}
+        return result
+
+    initial = sum(counts[:3]) / 3.0
+    recent = sum(counts[-3:]) / 3.0
+    effort_ratio = round(recent / initial, 2) if initial > 0 else 1.0
+
+    result = {
+        "effort_ratio": effort_ratio,
+        "corrections_initial": round(initial, 1),
+        "corrections_recent": round(recent, 1),
+        "total_corrections": convergence.get("total_corrections", 0),
+        "total_sessions": convergence.get("total_sessions", 0),
+    }
+
+    if estimate_time:
+        corrections_avoided = max(0, (initial - recent) * len(counts))
+        avg_severity_weight = _SEVERITY_SECONDS.get("moderate", 45)
+        estimated_seconds = int(corrections_avoided * avg_severity_weight)
+        result["estimated_seconds_saved"] = estimated_seconds
+        result["time_breakdown"] = {
+            "corrections_avoided": round(corrections_avoided, 1),
+            "avg_seconds_per_correction": avg_severity_weight,
+        }
+
+    return result
