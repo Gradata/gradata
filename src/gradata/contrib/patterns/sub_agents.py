@@ -202,21 +202,6 @@ def orchestrate(
     )
 
 
-def format_orchestration(result: OrchestratedResult) -> str:
-    """Format orchestration result as human-readable summary."""
-    status = "SUCCESS" if result.success else f"PARTIAL ({result.delegations_completed}/{result.delegations_total})"
-    lines = [
-        f"Orchestration: {status} | {result.total_duration_ms:.0f}ms | QA: {'PASS' if result.qa_passed else 'FAIL'}",
-    ]
-    for wave_idx, wave_ids in enumerate(result.execution_order):
-        lines.append(f"  Wave {wave_idx + 1}: {', '.join(wave_ids)}")
-    for r in result.delegation_results:
-        icon = "ok" if r.success else "FAIL"
-        lines.append(f"  [{icon}] {r.delegation_id} ({r.agent}) — {r.duration_ms:.0f}ms")
-        if r.error:
-            lines.append(f"         Error: {r.error}")
-    return "\n".join(lines)
-
 
 # ---------------------------------------------------------------------------
 # Agent definition loading (extracted from brain/scripts/spawn.py)
