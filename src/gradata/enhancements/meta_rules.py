@@ -520,9 +520,12 @@ def merge_into_meta(
     lesson_ids = [_lesson_id(l) for l in rules]
     meta_id = _meta_id(lesson_ids)
 
-    # Stamp source lessons with their parent meta-rule ID
+    # Stamp source lessons with their parent meta-rule ID.
+    # Only stamp if not already assigned, so the first (highest-confidence)
+    # meta-rule assignment wins when a lesson appears in multiple groups.
     for lesson in rules:
-        lesson.parent_meta_rule_id = meta_id
+        if not lesson.parent_meta_rule_id:
+            lesson.parent_meta_rule_id = meta_id
 
     # Detect theme if not overridden
     if theme_override:
