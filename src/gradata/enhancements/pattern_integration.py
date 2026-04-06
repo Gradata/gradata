@@ -11,7 +11,6 @@ Usage:
     from gradata.enhancements.pattern_integration import (
         process_reflection_result,
         process_guardrail_result,
-        process_qualify_result,
         process_reconciliation,
         process_loop_event,
         process_parallel_failures,
@@ -184,47 +183,6 @@ def feed_q_router(
     except Exception as e:
         logger.debug("feed_q_router failed: %s", e)
         return {"processed": False, "error": str(e)}
-
-
-# ---------------------------------------------------------------------------
-# 5. Execute/Qualify → Graduation
-# ---------------------------------------------------------------------------
-
-def process_qualify_result(
-    brain: Brain,
-    result: ExecuteQualifyResult,
-    category: str = "ACCURACY",
-) -> dict:
-    """Feed qualify PASS/GAP/DRIFT into graduation.
-
-    - PASS → survival bonus for related lessons
-    - GAP → minor correction (rule is incomplete)
-    - DRIFT → moderate correction (rule is wrong)
-    """
-    from gradata.enhancements.self_improvement import update_confidence
-
-    final_qualify = getattr(result, "final_qualify", None)
-    if final_qualify is None:
-        return {"processed": False}
-
-    score = getattr(final_qualify, "score", None)
-    score_name = score.name if score else "UNKNOWN"
-
-    def _apply(lessons):
-        if score_name == "PASS":
-            for lesson in lessons:
-                if lesson.category == category.upper():
-                    lesson.fire_count += 1
-        elif score_name == "GAP":
-            update_confidence(lessons, [{"category": category.upper(), "severity_label": "minor",
-                                         "description": "Qualify GAP: rule incomplete"}])
-        elif score_name == "DRIFT":
-            update_confidence(lessons, [{"category": category.upper(), "severity_label": "moderate",
-                                         "description": "Qualify DRIFT: rule is wrong"}])
-
-    if not _mutate_lessons(brain, _apply):
-        return {"processed": False}
-    return {"processed": True, "score": score_name, "attempts": getattr(result, "attempts_used", 0)}
 
 
 # ---------------------------------------------------------------------------
