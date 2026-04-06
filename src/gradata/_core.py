@@ -157,12 +157,12 @@ def brain_correct(
                     try:
                         from gradata.enhancements.edit_classifier import extract_behavioral_instruction
                         from gradata.enhancements.instruction_cache import InstructionCache
-                        if not hasattr(brain, '_instruction_cache'):
+                        if not isinstance(brain._instruction_cache, InstructionCache):
                             brain._instruction_cache = InstructionCache(
                                 lessons_path.parent / "instruction_cache.json"
                             )
                         behavioral_desc = extract_behavioral_instruction(
-                            diff, primary, cache=brain._instruction_cache,
+                            diff, primary, cache=brain._instruction_cache,  # type: ignore[arg-type]
                         )
                         desc = behavioral_desc or primary.description
                     except Exception as e:
