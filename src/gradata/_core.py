@@ -399,7 +399,7 @@ def brain_end_session(
                         from gradata.enhancements.self_improvement import propagate_confidence
                         propagate_confidence(all_lessons, new_metas)
                     save_meta_rules(brain.db_path, new_metas)
-                    meta_rules_discovered = len(new_metas) - len(existing_metas)
+                    meta_rules_discovered = max(0, len(new_metas) - len(existing_metas))
                     if meta_rules_discovered > 0:
                         _log.info("Meta-rules: %d new (%d total)", meta_rules_discovered, len(new_metas))
             except ImportError as e:
