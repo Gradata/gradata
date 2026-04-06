@@ -162,6 +162,10 @@ def brain_correct(
                         best_match = existing_l
 
                 if best_match and best_sim >= 0.35:
+                    if dry_run:
+                        event["dry_run"] = True
+                        event["would_reinforce"] = {"category": cat, "description": best_match.description[:200], "similarity": round(best_sim, 3)}
+                        return event
                     best_match.fire_count += 1
                     if len(desc) > len(best_match.description):
                         best_match.description = desc
