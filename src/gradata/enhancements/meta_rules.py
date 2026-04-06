@@ -24,9 +24,7 @@ from gradata._types import ELIGIBLE_STATES, Lesson, RuleTransferScope
 # ---------------------------------------------------------------------------
 
 # Tier constants (Rosch 1978: subordinate / basic / superordinate)
-TIER_META = 1           # Meta-rule: emerges from 3+ graduated lessons
 TIER_SUPER_META = 2     # Super-meta-rule: emerges from 3+ meta-rules
-TIER_UNIVERSAL = 3      # Universal principle: emerges from 3+ super-meta-rules
 
 
 @dataclass

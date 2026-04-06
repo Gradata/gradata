@@ -38,7 +38,6 @@ VALID_FACT_TYPES = _load_fact_types()
 MIN_FACT_LENGTH = 3
 CONF_EXPLICIT = 0.9
 CONF_INFERRED = 0.6
-CONF_GUESSED = 0.3
 
 
 def _get_db(ctx: "BrainContext | None" = None):

@@ -17,8 +17,6 @@ VALID_TYPES: frozenset[str] = frozenset({
     "procedural",   # How to do things (workflows, patterns)
 })
 
-_ISO_FORMAT = "%Y-%m-%dT%H:%M:%S.%f+00:00"
-
 
 # ---------------------------------------------------------------------------
 # Helpers
