@@ -290,8 +290,8 @@ def brain_correct(
         try:
             from gradata.enhancements.pattern_integration import feed_q_router
             feed_q_router(brain, diff.severity, agent_type=agent_type, task_type=task_type)
-        except ImportError:
-            pass
+        except Exception as e:
+            _log.debug("Q-router feed failed: %s", e)
 
     return event
 
