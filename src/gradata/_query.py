@@ -211,14 +211,6 @@ def reciprocal_rank_fusion(ranked_lists: list[list[dict]], k: int = 60) -> list[
     return output
 
 
-def embed_query(text: str) -> list[float]:
-    """Embed a query string. Uses sentence-transformers locally.
-
-    sqlite-vec planned for vector similarity search.
-    """
-    from gradata._embed import embed_texts_local
-    return embed_texts_local([text])[0]
-
 
 def compute_recency_weight(embed_date: str) -> float:
     try:

@@ -100,17 +100,6 @@ def beta_posterior(successes: int, trials: int, prior_alpha: float = 1.0, prior_
     }
 
 
-def bayesian_confidence_update(current_alpha: float, current_beta: float,
-                                success: bool) -> tuple:
-    if success:
-        new_alpha = current_alpha + 1
-        new_beta = current_beta
-    else:
-        new_alpha = current_alpha
-        new_beta = current_beta + 1
-    mean = new_alpha / (new_alpha + new_beta)
-    return (new_alpha, new_beta, round(mean, 4))
-
 
 # ============================================================================
 # 2. WILSON CONFIDENCE INTERVALS
@@ -312,58 +301,3 @@ def mtbf_mttr(corrections: list, total_sessions: int) -> dict:
 
 # ============================================================================
 # 9-12: Fisher, Power, Logistic, Naive Bayes (unchanged logic)
-# ============================================================================
-
-def fisher_test(success_a: int, total_a: int, success_b: int, total_b: int) -> dict:
-    try:
-        from scipy.stats import fisher_exact
-        table = [[success_a, total_a - success_a], [success_b, total_b - success_b]]
-        odds_ratio, p_value = fisher_exact(table)
-        if p_value < 0.01:
-            sig = "HIGHLY_SIGNIFICANT"
-        elif p_value < 0.05:
-            sig = "SIGNIFICANT"
-        elif p_value < 0.10:
-            sig = "SUGGESTIVE"
-        else:
-            sig = "NOT_SIGNIFICANT"
-        return {"odds_ratio": round(odds_ratio, 3), "p_value": round(p_value, 4), "significance": sig,
-                "rate_a": round(success_a / max(total_a, 1), 4), "rate_b": round(success_b / max(total_b, 1), 4)}
-    except ImportError:
-        return {"error": "scipy required for Fisher's exact test", "significance": "UNKNOWN"}
-
-
-def min_sample_size(baseline_rate: float, target_rate: float, power: float = 0.80, alpha: float = 0.05) -> dict:
-    try:
-        from scipy.stats import norm
-        z_alpha = norm.ppf(1 - alpha / 2)
-        z_beta = norm.ppf(power)
-        p1, p2 = baseline_rate, target_rate
-        p_bar = (p1 + p2) / 2
-        numerator = (z_alpha * math.sqrt(2 * p_bar * (1 - p_bar)) + z_beta * math.sqrt(p1 * (1 - p1) + p2 * (1 - p2))) ** 2
-        denominator = (p1 - p2) ** 2
-        n = math.ceil(numerator / denominator) if denominator > 0 else float('inf')
-        return {"n_per_group": n, "total_needed": n * 2, "baseline": baseline_rate, "target": target_rate, "effect_size": round(abs(target_rate - baseline_rate), 4)}
-    except ImportError:
-        effect = abs(target_rate - baseline_rate)
-        if effect == 0:
-            return {"n_per_group": float('inf'), "total_needed": float('inf')}
-        n = math.ceil(16 * baseline_rate * (1 - baseline_rate) / effect ** 2)
-        return {"n_per_group": n, "total_needed": n * 2, "approximate": True}
-
-
-def naive_bayes_score(prospect: dict, base_rates: dict) -> dict:
-    overall_base = base_rates.get("_overall", 0.015)
-    multiplier = 1.0
-    factors = []
-    for category, value in prospect.items():
-        if category in base_rates and value in base_rates[category]:
-            cat_rate = base_rates[category][value]
-            factor = cat_rate / overall_base if overall_base > 0 else 1.0
-            multiplier *= factor
-            factors.append({"category": category, "value": value, "rate": round(cat_rate, 4), "multiplier": round(factor, 2)})
-    predicted = min(1.0, overall_base * multiplier)
-    data_points = sum(1 for f in factors if f["rate"] > 0)
-    confidence = "HIGH" if data_points >= 3 else "MEDIUM" if data_points >= 1 else "LOW"
-    return {"predicted_probability": round(predicted, 4), "predicted_pct": f"{predicted:.1%}",
-            "base_rate": overall_base, "multiplier": round(multiplier, 2), "confidence": confidence, "factors": factors}

@@ -34,15 +34,6 @@ TOOL_RULE_MATRIX: dict[str, list[str]] = {
 }
 
 
-def update_tool_rule_matrix(extensions: dict[str, list[str]]) -> None:
-    """Extend or override TOOL_RULE_MATRIX entries at runtime.
-
-    Args:
-        extensions: Mapping of tool_type -> list of relevant category strings.
-            Existing keys are replaced; new keys are added.
-    """
-    TOOL_RULE_MATRIX.update(extensions)
-
 
 def should_verify(tool_type: str, rule_category: str) -> bool:
     """Pre-execution gate: is this rule relevant for this tool/task?
@@ -81,35 +72,6 @@ def get_relevant_rules(tool_type: str, all_rules: list[dict]) -> list[dict]:
         if should_verify(tool_type, rule.get("category", "UNKNOWN"))
     ]
 
-
-def build_decision_context(tool_type: str, tool_input: str = "") -> dict[str, Any]:
-    """Build a context dict suitable for evaluate_conditions() calls.
-
-    Translates a tool invocation into the key-value context that meta-rule
-    condition evaluation expects (keys like ``task``, ``tool``, ``domain``).
-
-    Args:
-        tool_type: The tool or task type string.
-        tool_input: Optional raw input/arguments for the tool.
-
-    Returns:
-        Context dict with ``tool``, ``task``, and ``input_length`` keys.
-    """
-    # Map tool types to broad task domains for condition matching
-    _TOOL_TO_TASK: dict[str, str] = {
-        "Write": "code",
-        "Edit": "code",
-        "Bash": "code",
-        "email_draft": "sales",
-        "demo_prep": "sales",
-        "prospecting": "sales",
-        "code": "code",
-    }
-    return {
-        "tool": tool_type,
-        "task": _TOOL_TO_TASK.get(tool_type, tool_type),
-        "input_length": len(tool_input),
-    }
 
 
 # ---------------------------------------------------------------------------

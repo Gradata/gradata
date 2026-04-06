@@ -315,15 +315,6 @@ def register_intent_pattern(
         _REGISTERED_INTENT_PATTERNS.append(entry)
 
 
-def get_registered_intent_patterns() -> list[IntentPattern]:
-    """Return a copy of the current intent-pattern registry.
-
-    Returns:
-        A copy of the registry list to prevent accidental mutation by callers.
-    """
-    return list(_REGISTERED_INTENT_PATTERNS)
-
-
 # ---------------------------------------------------------------------------
 # Classification result
 # ---------------------------------------------------------------------------

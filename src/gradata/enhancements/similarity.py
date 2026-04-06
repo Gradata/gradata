@@ -70,21 +70,6 @@ def _cosine(v1: dict[str, float], v2: dict[str, float]) -> float:
     return dot / (mag1 * mag2)
 
 
-def tfidf_similarity(text1: str, text2: str) -> float:
-    """TF-based cosine similarity between two texts.
-
-    Uses term frequency (no IDF since we compare pairs, not corpora).
-    Good enough for detecting paraphrases in correction descriptions.
-
-    Returns:
-        Similarity score in [0.0, 1.0].
-    """
-    t1 = _tokenize(text1)
-    t2 = _tokenize(text2)
-    if not t1 or not t2:
-        return 0.0
-    return _cosine(_tf(t1), _tf(t2))
-
 
 # ---------------------------------------------------------------------------
 # Synonym expansion (boosts recall for paraphrases)
@@ -166,23 +151,6 @@ def semantic_similarity(text1: str, text2: str) -> float:
 _OLLAMA_BASE: str | None = None
 _EMBED_MODEL: str = "nomic-embed-text"
 
-
-def configure_embeddings(base_url: str = "http://localhost:11434", model: str = "nomic-embed-text"):
-    """Configure embedding backend for higher-accuracy similarity.
-
-    Only localhost URLs are accepted to prevent SSRF attacks.
-    """
-    global _OLLAMA_BASE, _EMBED_MODEL
-    from urllib.parse import urlparse
-    parsed = urlparse(base_url)
-    hostname = parsed.hostname or ""
-    if hostname not in ("localhost", "127.0.0.1", "::1"):
-        raise ValueError(
-            f"Only localhost URLs are allowed for embedding backend (got {hostname!r}). "
-            "This restriction prevents SSRF attacks."
-        )
-    _OLLAMA_BASE = base_url
-    _EMBED_MODEL = model
 
 
 def _get_embedding(text: str) -> list[float] | None:

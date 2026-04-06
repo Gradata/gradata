@@ -247,50 +247,6 @@ def extract_from_file(filepath):
     return facts
 
 
-def extract_all(ctx: BrainContext | None = None):
-    all_facts = []
-    valid_names = _get_prospect_names()
-    prospects_dir = ctx.prospects_dir if ctx else _p.PROSPECTS_DIR
-    for f in sorted(prospects_dir.glob("*.md")):
-        if f.name.startswith("_"):
-            continue
-        file_facts = extract_from_file(f)
-        for fact in file_facts:
-            if fact["prospect"] in valid_names:
-                all_facts.append(fact)
-    return all_facts
-
-
-def store_facts(facts_list, ctx: BrainContext | None = None):
-    conn = _get_db(ctx)
-    _init_tables(conn)
-    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    inserted = 0
-    updated = 0
-    for fact in facts_list:
-        existing = conn.execute(
-            "SELECT id, confidence FROM facts WHERE prospect=? AND fact_type=? AND fact_value=?",
-            (fact["prospect"], fact["fact_type"], fact["fact_value"])
-        ).fetchone()
-        if existing:
-            new_conf = max(existing["confidence"], fact["confidence"])
-            conn.execute(
-                "UPDATE facts SET confidence=?, last_verified=?, source=?, stale=0 WHERE id=?",
-                (new_conf, now, fact["source"], existing["id"])
-            )
-            updated += 1
-        else:
-            conn.execute(
-                """INSERT INTO facts (prospect, company, fact_type, fact_value, confidence,
-                   source, extracted_at, last_verified, stale)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)""",
-                (fact["prospect"], fact.get("company", ""), fact["fact_type"],
-                 fact["fact_value"], fact["confidence"], fact["source"], now, now)
-            )
-            inserted += 1
-    conn.commit()
-    conn.close()
-    return inserted, updated
 
 
 def query_facts(prospect=None, fact_type=None, min_confidence=0.0,
@@ -314,41 +270,6 @@ def query_facts(prospect=None, fact_type=None, min_confidence=0.0,
     return [dict(r) for r in rows]
 
 
-def mark_stale(days=30, ctx: BrainContext | None = None):
-    conn = _get_db(ctx)
-    _init_tables(conn)
-    cutoff = (datetime.now(UTC) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    result = conn.execute("UPDATE facts SET stale=1 WHERE last_verified < ? AND stale=0", (cutoff,))
-    count = result.rowcount
-    conn.commit()
-    conn.close()
-    return count
-
-
-def decay_confidence(days=14, ctx: "BrainContext | None" = None):
-    conn = _get_db(ctx)
-    _init_tables(conn)
-    now = datetime.now(UTC)
-    rows = conn.execute("SELECT id, confidence, last_verified FROM facts WHERE stale=0").fetchall()
-    updated = 0
-    for row in rows:
-        if not row["last_verified"]:
-            continue
-        try:
-            last = datetime.fromisoformat(row["last_verified"].replace("Z", "+00:00"))
-        except (ValueError, TypeError):
-            continue
-        elapsed = (now - last).days
-        periods = elapsed // days
-        if periods > 0:
-            decay = periods * 0.05
-            new_conf = max(0.1, row["confidence"] - decay)
-            if new_conf != row["confidence"]:
-                conn.execute("UPDATE facts SET confidence=? WHERE id=?", (round(new_conf, 2), row["id"]))
-                updated += 1
-    conn.commit()
-    conn.close()
-    return updated
 
 
 def get_stats(ctx: BrainContext | None = None):

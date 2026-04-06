@@ -11,9 +11,6 @@ Usage:
     from gradata.enhancements.pattern_integration import (
         process_reflection_result,
         process_guardrail_result,
-        process_eval_result,
-        process_qualify_result,
-        process_reconciliation,
         process_loop_event,
         process_parallel_failures,
         process_escalation,
@@ -30,9 +27,6 @@ if TYPE_CHECKING:
     from gradata.brain import Brain
     from gradata.contrib.patterns.reflection import ReflectionResult
     from gradata.contrib.patterns.guardrails import GuardedResult
-    from gradata.contrib.patterns.evaluator import EvalLoopResult
-    from gradata.contrib.patterns.execute_qualify import ExecuteQualifyResult
-    from gradata.contrib.patterns.reconciliation import ReconciliationSummary
     from gradata.contrib.patterns.loop_detection import LoopAction
 
 logger = logging.getLogger("gradata")
@@ -185,124 +179,6 @@ def feed_q_router(
     except Exception as e:
         logger.debug("feed_q_router failed: %s", e)
         return {"processed": False, "error": str(e)}
-
-
-# ---------------------------------------------------------------------------
-# 4. Evaluator → Graduation
-# ---------------------------------------------------------------------------
-
-def process_eval_result(
-    brain: Brain,
-    result: EvalLoopResult,
-    category: str = "QUALITY",
-) -> dict:
-    """Feed evaluator verdicts into graduation confidence.
-
-    - APPROVED (avg >= 8.0) → boost
-    - MAJOR_REVISION (avg < 6.0) → penalty
-    - Regression detected → contradiction penalty
-    """
-    from gradata.enhancements.self_improvement import update_confidence, ACCEPTANCE_BONUS
-
-    if not result.iterations:
-        return {"processed": False}
-
-    final_iter = result.iterations[-1]
-    avg = final_iter.average
-
-    def _apply(lessons):
-        if result.converged and avg >= 8.0:
-            for lesson in lessons:
-                if lesson.category == category.upper():
-                    lesson.confidence = round(min(1.0, lesson.confidence + ACCEPTANCE_BONUS * 0.5), 2)
-        elif avg < 6.0:
-            correction_data = [{"category": category.upper(), "severity_label": "moderate"}]
-            update_confidence(lessons, correction_data)
-
-    if not _mutate_lessons(brain, _apply):
-        return {"processed": False}
-    return {"processed": True, "converged": result.converged, "average": avg}
-
-
-# ---------------------------------------------------------------------------
-# 5. Execute/Qualify → Graduation
-# ---------------------------------------------------------------------------
-
-def process_qualify_result(
-    brain: Brain,
-    result: ExecuteQualifyResult,
-    category: str = "ACCURACY",
-) -> dict:
-    """Feed qualify PASS/GAP/DRIFT into graduation.
-
-    - PASS → survival bonus for related lessons
-    - GAP → minor correction (rule is incomplete)
-    - DRIFT → moderate correction (rule is wrong)
-    """
-    from gradata.enhancements.self_improvement import update_confidence
-
-    final_qualify = getattr(result, "final_qualify", None)
-    if final_qualify is None:
-        return {"processed": False}
-
-    score = getattr(final_qualify, "score", None)
-    score_name = score.name if score else "UNKNOWN"
-
-    def _apply(lessons):
-        if score_name == "PASS":
-            for lesson in lessons:
-                if lesson.category == category.upper():
-                    lesson.fire_count += 1
-        elif score_name == "GAP":
-            update_confidence(lessons, [{"category": category.upper(), "severity_label": "minor",
-                                         "description": "Qualify GAP: rule incomplete"}])
-        elif score_name == "DRIFT":
-            update_confidence(lessons, [{"category": category.upper(), "severity_label": "moderate",
-                                         "description": "Qualify DRIFT: rule is wrong"}])
-
-    if not _mutate_lessons(brain, _apply):
-        return {"processed": False}
-    return {"processed": True, "score": score_name, "attempts": getattr(result, "attempts_used", 0)}
-
-
-# ---------------------------------------------------------------------------
-# 6. Reconciliation → Graduation
-# ---------------------------------------------------------------------------
-
-def process_reconciliation(
-    brain: Brain,
-    summary: ReconciliationSummary,
-) -> dict:
-    """Feed plan-vs-actual deviations into graduation.
-
-    - PASS items → survival bonus for related lessons
-    - GAP/DRIFT deviations → correction signals per category
-    """
-    from gradata.enhancements.self_improvement import update_confidence
-
-    deviations = getattr(summary, "deviations", [])
-    passes = 0
-    gaps = 0
-
-    for dev in deviations:
-        score_name = getattr(getattr(dev, "score", None), "name", "UNKNOWN")
-        if score_name == "PASS":
-            passes += 1
-        elif score_name in ("GAP", "DRIFT"):
-            gaps += 1
-
-    def _apply(lessons):
-        for dev in deviations:
-            score_name = getattr(getattr(dev, "score", None), "name", "UNKNOWN")
-            cat = getattr(dev, "category", "GENERAL").upper() if hasattr(dev, "category") else "GENERAL"
-            if score_name in ("GAP", "DRIFT"):
-                severity = "minor" if score_name == "GAP" else "moderate"
-                update_confidence(lessons, [{"category": cat, "severity_label": severity,
-                                             "description": f"Reconciliation {score_name}: {getattr(dev, 'detail', '')}"}])
-
-    if not _mutate_lessons(brain, _apply):
-        return {"processed": False}
-    return {"processed": True, "passes": passes, "gaps": gaps}
 
 
 # ---------------------------------------------------------------------------
@@ -631,30 +507,6 @@ def topic_boosts_from_rules() -> dict[str, float]:
     # Categories with more rules get higher boost (1.0 + density * 0.5)
     return {cat: round(1.0 + (count / total) * 0.5, 2) for cat, count in categories.items()}
 
-
-# ---------------------------------------------------------------------------
-# 19. Rule Engine — assumption validation feeds back misfires
-# ---------------------------------------------------------------------------
-
-def process_rule_assumption_failure(
-    brain: Brain,
-    rule_description: str,
-    reason: str,
-) -> dict:
-    """Feed rule assumption failures back as misfire signals."""
-    from gradata.enhancements.self_improvement import update_confidence
-
-    def _apply(lessons):
-        for lesson in lessons:
-            if lesson.description[:40] == rule_description[:40]:
-                lesson.misfire_count += 1
-                break
-        update_confidence(lessons, [{"category": "GENERAL", "severity_label": "minor",
-                                     "description": f"Rule assumption failed: {reason}"}])
-
-    if not _mutate_lessons(brain, _apply):
-        return {"processed": False}
-    return {"processed": True, "reason": reason}
 
 
 # ---------------------------------------------------------------------------

@@ -119,15 +119,3 @@ def compute_metrics(
         return {}
 
 
-def format_metrics(metrics: dict) -> str:
-    """Format metrics dict as human-readable string."""
-    if not metrics:
-        return "No metrics available."
-
-    lines = ["Brain Metrics:"]
-    for key, value in metrics.items():
-        if isinstance(value, float):
-            lines.append(f"  {key}: {value:.4f}")
-        else:
-            lines.append(f"  {key}: {value}")
-    return "\n".join(lines)

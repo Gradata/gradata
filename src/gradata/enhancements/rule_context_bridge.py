@@ -158,27 +158,3 @@ def on_graduation_event(event: dict) -> None:
     logger.debug("RuleContext: published %s [%s:%.2f]", category, new_state, confidence)
 
 
-def on_meta_rule_event(event: dict) -> None:
-    """Event trigger: when a meta-rule is discovered, publish."""
-    from gradata.rules.rule_context import GraduatedRule, get_rule_context
-
-    data = event.get("data_json", event.get("data", {}))
-    if isinstance(data, str):
-        try:
-            data = json.loads(data)
-        except (json.JSONDecodeError, TypeError):
-            return
-
-    principle = data.get("principle", "")
-    if not principle:
-        return
-
-    rule_id = f"meta:{hash(principle) & 0xFFFFFFFF}"
-    ctx = get_rule_context()
-    ctx.publish(GraduatedRule(
-        rule_id=rule_id,
-        category="META",
-        principle=principle,
-        confidence=0.95,
-        source_type="meta_rule",
-    ))
