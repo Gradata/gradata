@@ -422,11 +422,20 @@ def _compound_score(
             if early_share > 0.60:
                 slope_pts *= 0.3
 
-    # Low-absolute-error bonus: don't penalize already-good brains
+    # Low-absolute-error bonus: don't penalize already-good brains.
+    # Only award if the brain actually started higher and improved (or was
+    # always near zero from the start).  Prevents gaming by a brain that
+    # never had corrections and therefore never learned anything.
     if correction_density_trend and len(correction_density_trend) >= 5:
         recent_mean = statistics.mean(correction_density_trend[-5:])
+        early_mean = statistics.mean(correction_density_trend[:5])
         if recent_mean < 0.10:
-            slope_pts = max(slope_pts, 10.0)
+            if early_mean >= 0.10:
+                # Genuine improvement: started high, now low
+                slope_pts = max(slope_pts, 10.0)
+            else:
+                # Always low — modest bonus (may indicate few corrections overall)
+                slope_pts = max(slope_pts, 5.0)
 
     score += slope_pts
 
