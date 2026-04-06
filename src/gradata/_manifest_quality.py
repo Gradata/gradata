@@ -394,7 +394,11 @@ def _compound_score(
     # Component 3: Graduation rate (0-15 pts)
     total_lessons = lessons_graduated + lessons_active
     if total_lessons > 0:
-        score += min(1.0, lessons_graduated / max(20, total_lessons)) * 15
+        grad_rate = lessons_graduated / total_lessons
+        # Scale down bonus for very small sample sizes to avoid inflation
+        # from e.g. 1 graduated out of 1 total = 100% rate.
+        sample_factor = min(1.0, total_lessons / 10)
+        score += grad_rate * sample_factor * 15
 
     # Component 4: Active lessons (0-8 pts)
     score += min(1.0, lessons_active / 10) * 8
