@@ -11,7 +11,6 @@ Usage:
     from gradata.enhancements.pattern_integration import (
         process_reflection_result,
         process_guardrail_result,
-        process_eval_result,
         process_qualify_result,
         process_reconciliation,
         process_loop_event,
@@ -185,43 +184,6 @@ def feed_q_router(
     except Exception as e:
         logger.debug("feed_q_router failed: %s", e)
         return {"processed": False, "error": str(e)}
-
-
-# ---------------------------------------------------------------------------
-# 4. Evaluator → Graduation
-# ---------------------------------------------------------------------------
-
-def process_eval_result(
-    brain: Brain,
-    result: EvalLoopResult,
-    category: str = "QUALITY",
-) -> dict:
-    """Feed evaluator verdicts into graduation confidence.
-
-    - APPROVED (avg >= 8.0) → boost
-    - MAJOR_REVISION (avg < 6.0) → penalty
-    - Regression detected → contradiction penalty
-    """
-    from gradata.enhancements.self_improvement import update_confidence, ACCEPTANCE_BONUS
-
-    if not result.iterations:
-        return {"processed": False}
-
-    final_iter = result.iterations[-1]
-    avg = final_iter.average
-
-    def _apply(lessons):
-        if result.converged and avg >= 8.0:
-            for lesson in lessons:
-                if lesson.category == category.upper():
-                    lesson.confidence = round(min(1.0, lesson.confidence + ACCEPTANCE_BONUS * 0.5), 2)
-        elif avg < 6.0:
-            correction_data = [{"category": category.upper(), "severity_label": "moderate"}]
-            update_confidence(lessons, correction_data)
-
-    if not _mutate_lessons(brain, _apply):
-        return {"processed": False}
-    return {"processed": True, "converged": result.converged, "average": avg}
 
 
 # ---------------------------------------------------------------------------
