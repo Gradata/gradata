@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gradata"
-version = "0.2.0"
+version = "0.3.0"
 description = "Procedural memory for AI agents. Corrections become behavioral rules that compound over time."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
 requires-python = ">=3.11"
 authors = [
-    { name = "Gradata", email = "hello@gradata.com" },
+    { name = "Gradata", email = "oliver@gradata.com" },
 ]
 keywords = ["ai", "brain", "sdk", "memory", "agents", "claude"]
 classifiers = [
