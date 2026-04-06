@@ -1,5 +1,10 @@
 # Gradata — AI that learns your judgment
 
+[![Tests](https://github.com/Gradata/gradata/actions/workflows/test.yml/badge.svg)](https://github.com/Gradata/gradata/actions/workflows/test.yml)
+[![PyPI](https://img.shields.io/pypi/v/gradata)](https://pypi.org/project/gradata/)
+[![Python](https://img.shields.io/pypi/pyversions/gradata)](https://pypi.org/project/gradata/)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+
 Every correction you make teaches your AI something. Gradata captures those corrections, extracts the behavioral instruction behind them, and graduates it into a rule. Over time, your AI stops needing corrections. It converges on your judgment.
 
 Not generally more intelligent. Calibrated to you.
@@ -95,8 +100,6 @@ Memory systems remember what you said. Gradata learns how you think.
 | Mem0 | Yes | No | No | No |
 | Letta (MemGPT) | Yes | No | No | No |
 | LangChain Memory | Yes | No | No | No |
-| Fine-tuning | Permanent | Expensive, slow | No | No |
-| System prompts | Static | Manual only | No | No |
 | **Gradata** | Yes | **Yes** | **Yes** | **Yes** |
 
 **vs Mem0:** Mem0 stores context. Gradata evolves behavior. You could use both.
@@ -104,14 +107,6 @@ Memory systems remember what you said. Gradata learns how you think.
 **vs fine-tuning:** Fine-tuning is expensive, slow, and loses the original model. Gradata adapts at inference time — every correction takes effect immediately.
 
 **vs system prompts:** System prompts are static. Gradata's rules are dynamic — they graduate, decay, and evolve based on your corrections.
-
-## Rent Trained Brains (Coming Soon)
-
-A sales leader trains a brain over 200 sessions. Their outreach patterns, objection handling, follow-up cadence — all encoded as graduated rules.
-
-A new SDR rents that brain. Day one, they write emails in the leader's voice and follow the leader's prospecting workflow. The brain isn't smarter. It's calibrated to a specific human's judgment.
-
-That trained brain is the rentable asset.
 
 ## Features
 
@@ -135,18 +130,11 @@ That trained brain is the rentable asset.
 - MCP server for Claude Code, Cursor, Windsurf
 - `gradata init --mcp` generates config automatically
 
-## Pricing
+## Status
 
-| | Free | Pro | Team |
-|---|---|---|---|
-| **Price** | $0 | $9-29/mo | Contact |
-| Local brain | Yes | Yes | Yes |
-| Behavioral extraction | Templates | **LLM-powered** | LLM-powered |
-| Graduation pipeline | Basic | **Cloud-optimized** | Cloud-optimized |
-| Convergence dashboard | Score only | **Full analytics** | Full + admin |
-| Brain rental | -- | -- | **Yes** |
+Gradata is in active development (v0.4.0). The SDK is fully functional and free. Cloud features (dashboard, optimization, brain rental) are on the roadmap.
 
-Free tier is fully functional. Paid makes the brain learn faster and gives you convergence analytics.
+[Star the repo](https://github.com/Gradata/gradata) to follow progress.
 
 ## CLI
 
@@ -179,6 +167,15 @@ src/gradata/
   integrations/           # OpenAI, Anthropic, LangChain, CrewAI
   contrib/patterns/       # Optional agentic patterns
 ```
+
+## Community
+
+- [GitHub Issues](https://github.com/Gradata/gradata/issues) — bugs, features, questions
+- [GitHub Discussions](https://github.com/Gradata/gradata/discussions) — ideas, show & tell
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
