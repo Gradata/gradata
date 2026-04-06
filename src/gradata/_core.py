@@ -153,7 +153,20 @@ def brain_correct(
                 if classifications:
                     primary = next((c for c in classifications if c.category.upper() == cat),
                                    classifications[0])
-                    desc = primary.description
+                    # Try behavioral extraction (LLM + cache + templates)
+                    try:
+                        from gradata.enhancements.edit_classifier import extract_behavioral_instruction
+                        from gradata.enhancements.instruction_cache import InstructionCache
+                        _cache_path = brain._find_lessons_path(create=True)
+                        _inst_cache = InstructionCache(
+                            _cache_path.parent / "instruction_cache.json"
+                        ) if _cache_path else None
+                        behavioral_desc = extract_behavioral_instruction(
+                            diff, primary, cache=_inst_cache,
+                        )
+                        desc = behavioral_desc or primary.description
+                    except Exception:
+                        desc = primary.description
                 elif summary:
                     desc = summary
                 else:
