@@ -100,17 +100,6 @@ def beta_posterior(successes: int, trials: int, prior_alpha: float = 1.0, prior_
     }
 
 
-def bayesian_confidence_update(current_alpha: float, current_beta: float,
-                                success: bool) -> tuple:
-    if success:
-        new_alpha = current_alpha + 1
-        new_beta = current_beta
-    else:
-        new_alpha = current_alpha
-        new_beta = current_beta + 1
-    mean = new_alpha / (new_alpha + new_beta)
-    return (new_alpha, new_beta, round(mean, 4))
-
 
 # ============================================================================
 # 2. WILSON CONFIDENCE INTERVALS
