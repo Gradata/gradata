@@ -17,6 +17,8 @@ Usage:
     gradata install brain-archive.zip          # Install from marketplace
     gradata install --list                     # List installed brains
 """
+from __future__ import annotations
+
 
 import argparse
 import json

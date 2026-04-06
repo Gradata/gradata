@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import sqlite3
 import sys
 from datetime import UTC, datetime
@@ -18,6 +19,8 @@ from datetime import UTC, datetime
 import gradata._paths as _p
 from gradata._paths import BrainContext
 from gradata._stats import brier_score
+
+_log = logging.getLogger("gradata.events")
 
 
 def _ensure_table(conn: sqlite3.Connection):
@@ -104,7 +107,7 @@ def emit(event_type: str, source: str, data: dict | None = None, tags: list | No
             f.write(json.dumps(event, ensure_ascii=False) + "\n")
         jsonl_ok = True
     except Exception as e:
-        print(f"[events] JSONL write failed: {e}", file=sys.stderr)
+        _log.error("JSONL write failed: %s", e)
 
     try:
         with contextlib.closing(sqlite3.connect(str(db_path))) as conn:
@@ -119,7 +122,7 @@ def emit(event_type: str, source: str, data: dict | None = None, tags: list | No
             conn.commit()
             sqlite_ok = True
     except Exception as e:
-        print(f"[events] SQLite write failed: {e}", file=sys.stderr)
+        _log.error("SQLite write failed: %s", e)
 
     if not jsonl_ok and not sqlite_ok:
         from gradata.exceptions import EventPersistenceError
@@ -196,9 +199,11 @@ def query(event_type: str | None = None, session: int | None = None, last_n_sess
 
 
 def supersede(event_id: int, new_data: dict | None = None, new_tags: list | None = None,
-              source: str = "supersede", new_valid_from: str | None = None):
+              source: str = "supersede", new_valid_from: str | None = None,
+              ctx: "BrainContext | None" = None):
     now = datetime.now(UTC).isoformat()
-    with contextlib.closing(sqlite3.connect(str(_p.DB_PATH))) as conn:
+    db = ctx.db_path if ctx else _p.DB_PATH
+    with contextlib.closing(sqlite3.connect(str(db))) as conn:
         conn.row_factory = sqlite3.Row
         _ensure_table(conn)
         original = conn.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
@@ -210,14 +215,16 @@ def supersede(event_id: int, new_data: dict | None = None, new_tags: list | None
     replacement = emit(
         event_type=original["type"], source=source,
         data=new_data or (json.loads(original["data_json"]) if original["data_json"] else {}),
-        tags=new_tags or orig_tags, session=_detect_session(), valid_from=new_valid_from or now,
+        tags=new_tags or orig_tags, session=_detect_session(ctx=ctx), valid_from=new_valid_from or now,
+        ctx=ctx,
     )
     replacement["superseded_id"] = event_id
     return replacement
 
 
-def correction_rate(last_n_sessions: int = 5) -> dict:
-    with contextlib.closing(sqlite3.connect(str(_p.DB_PATH))) as conn:
+def correction_rate(last_n_sessions: int = 5, ctx: "BrainContext | None" = None) -> dict:
+    db = ctx.db_path if ctx else _p.DB_PATH
+    with contextlib.closing(sqlite3.connect(str(db))) as conn:
         _ensure_table(conn)
         rows = conn.execute("""
             SELECT session, COUNT(*) as count FROM events WHERE type = 'CORRECTION'
@@ -227,8 +234,9 @@ def correction_rate(last_n_sessions: int = 5) -> dict:
     return {r[0]: r[1] for r in rows}
 
 
-def compute_leading_indicators(session: int) -> dict:
-    with contextlib.closing(sqlite3.connect(str(_p.DB_PATH))) as conn:
+def compute_leading_indicators(session: int, ctx: "BrainContext | None" = None) -> dict:
+    db = ctx.db_path if ctx else _p.DB_PATH
+    with contextlib.closing(sqlite3.connect(str(db))) as conn:
         _ensure_table(conn)
         result = {
             "first_draft_acceptance": 0.0, "correction_density": 0.0,
@@ -371,9 +379,10 @@ def find_contradictions(event_type: str | None = None, tag_prefix: str | None = 
     return conflicts
 
 
-def audit_trend(last_n_sessions: int = 5) -> list:
+def audit_trend(last_n_sessions: int = 5, ctx: "BrainContext | None" = None) -> list:
     """Get audit scores for trend analysis."""
-    with contextlib.closing(sqlite3.connect(str(_p.DB_PATH))) as conn:
+    db = ctx.db_path if ctx else _p.DB_PATH
+    with contextlib.closing(sqlite3.connect(str(db))) as conn:
         _ensure_table(conn)
         rows = conn.execute("""
             SELECT session, data_json FROM events

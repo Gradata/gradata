@@ -6,6 +6,10 @@ FTS5 is the primary search engine. sqlite-vec planned for vector similarity.
 Portable — uses _paths and _config instead of hardcoded paths.
 """
 
+from __future__ import annotations
+
+import logging
+
 import hashlib
 import json
 import os
@@ -143,10 +147,10 @@ def parse_outcome_links() -> dict[str, dict]:
 def get_gemini_client():
     if EMBEDDING_PROVIDER == "local":
         return None
-    from google import genai
+    from google import genai  # type: ignore[attr-defined]  # optional dep
     api_key = os.environ.get(API_KEY_ENV_VAR)
     if not api_key:
-        print(f"[ERR] {API_KEY_ENV_VAR} not set.")
+        logging.getLogger("gradata.embed").error("%s not set", API_KEY_ENV_VAR)
         return None
     return genai.Client(api_key=api_key)
 

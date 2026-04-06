@@ -11,6 +11,8 @@ Aggregate stats are queried from events for the self-improvement pipeline.
 
 from __future__ import annotations
 
+import logging
+
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -59,8 +61,7 @@ def log_application(
         from gradata._events import emit
         return emit("RULE_APPLICATION", source, data, tags, session)
     except Exception as e:
-        import sys
-        print(f"[rule_tracker] WARNING: Failed to log rule application for {rule_id}: {e}", file=sys.stderr)
+        logging.getLogger("gradata.rule_tracker").warning("Failed to log rule application for %s: %s", rule_id, e)
         return None
 
 
@@ -83,8 +84,7 @@ def get_session_applications(db_path: Path, session: int) -> list[dict]:
             for e in events
         ]
     except Exception as e:
-        import sys
-        print(f"[rule_tracker] WARNING: get_session_applications failed: {e}", file=sys.stderr)
+        logging.getLogger("gradata.rule_tracker").warning("get_session_applications failed: %s", e)
         return []
 
 
@@ -118,6 +118,5 @@ def get_rule_history(db_path: Path, rule_id: str, limit: int = 20) -> list[dict]
             for e in matching[:limit]
         ]
     except Exception as e:
-        import sys
-        print(f"[rule_tracker] WARNING: get_rule_history failed for {rule_id}: {e}", file=sys.stderr)
+        logging.getLogger("gradata.rule_tracker").warning("get_rule_history failed for %s: %s", rule_id, e)
         return []

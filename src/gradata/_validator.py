@@ -10,6 +10,8 @@ Trust Dimensions:
     4. DATA_COMPLETENESS — Are events well-formed with required fields?
     5. BEHAVIORAL_COVERAGE — Do CARL rules cover declared capabilities?
 """
+from __future__ import annotations
+
 
 import json
 import re
