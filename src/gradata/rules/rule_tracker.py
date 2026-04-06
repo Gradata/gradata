@@ -64,40 +64,6 @@ def log_application(
         return None
 
 
-def get_rule_stats(db_path: Path, rule_id: str) -> dict:
-    """Aggregate stats for a rule from RULE_APPLICATION events.
-
-    Returns dict with: total, accepted, misfired, contradicted,
-    acceptance_rate, misfire_rate.
-    """
-    empty: dict = {
-        "total": 0, "accepted": 0, "misfired": 0, "contradicted": 0,
-        "acceptance_rate": 0.0, "misfire_rate": 0.0,
-    }
-    try:
-        from gradata._events import query
-        events = query(event_type="RULE_APPLICATION", limit=1000)
-        matching = [e for e in events if e.get("data", {}).get("rule_id") == rule_id]
-
-        if not matching:
-            return empty
-
-        total = len(matching)
-        accepted = sum(1 for e in matching if e["data"].get("accepted"))
-        misfired = sum(1 for e in matching if e["data"].get("misfired"))
-        contradicted = sum(1 for e in matching if e["data"].get("contradicted"))
-
-        return {
-            "total": total,
-            "accepted": accepted,
-            "misfired": misfired,
-            "contradicted": contradicted,
-            "acceptance_rate": round(accepted / total, 4) if total else 0.0,
-            "misfire_rate": round(misfired / total, 4) if total else 0.0,
-        }
-    except Exception:
-        return empty
-
 
 def get_session_applications(db_path: Path, session: int) -> list[dict]:
     """All RULE_APPLICATION events for a given session."""
