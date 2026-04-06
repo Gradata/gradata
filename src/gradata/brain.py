@@ -202,7 +202,7 @@ class Brain:
             domain=domain,
             company=company,
             embedding=embedding,
-            interactive=interactive if interactive is not None else True,
+            interactive=interactive,
         )
 
     # ── Credit Budgets (daily API spend limits) ──────────────────────────
