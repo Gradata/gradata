@@ -198,27 +198,29 @@ def _transfer_score(ctx: "BrainContext | None" = None, window: int = 10) -> floa
 
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = get_connection(db)
-        _, min_session = _session_window(conn, window)
+        try:
+            _, min_session = _session_window(conn, window)
 
-        # Count corrections vs outputs in RULE categories in recent sessions
-        cats_list = list(rule_cats)
-        ph = ",".join("?" * len(cats_list))
-        corrections = conn.execute(
-            f"SELECT COUNT(*) FROM events WHERE type='CORRECTION' AND session >= ? "
-            f"AND json_extract(data_json, '$.category') IN ({ph})",
-            [min_session, *cats_list],
-        ).fetchone()[0] or 0
-        outputs = conn.execute(
-            f"SELECT COUNT(*) FROM events WHERE type='OUTPUT' AND session >= ? "
-            f"AND json_extract(data_json, '$.category') IN ({ph})",
-            [min_session, *cats_list],
-        ).fetchone()[0] or 0
-        conn.close()
+            # Count corrections vs outputs in RULE categories in recent sessions
+            cats_list = list(rule_cats)
+            ph = ",".join("?" * len(cats_list))
+            corrections = conn.execute(
+                f"SELECT COUNT(*) FROM events WHERE type='CORRECTION' AND session >= ? "
+                f"AND json_extract(data_json, '$.category') IN ({ph})",
+                [min_session, *cats_list],
+            ).fetchone()[0] or 0
+            outputs = conn.execute(
+                f"SELECT COUNT(*) FROM events WHERE type='OUTPUT' AND session >= ? "
+                f"AND json_extract(data_json, '$.category') IN ({ph})",
+                [min_session, *cats_list],
+            ).fetchone()[0] or 0
 
-        if outputs < 3:
-            return None
-        # Invert: low correction rate = high transfer score
-        return max(0.0, 1.0 - (corrections / outputs))
+            if outputs < 3:
+                return None
+            # Invert: low correction rate = high transfer score
+            return max(0.0, 1.0 - (corrections / outputs))
+        finally:
+            conn.close()
     except Exception:
         return None
 
@@ -306,14 +308,16 @@ def _severity_difficulty_weight(ctx: "BrainContext | None" = None) -> float | No
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = get_connection(db)
-        _, min_session = _session_window(conn, 20)
+        try:
+            _, min_session = _session_window(conn, 20)
 
-        rows = conn.execute("""
-            SELECT json_extract(data_json, '$.severity') as sev,
-                   json_extract(data_json, '$.fire_count') as fires
-            FROM events WHERE type = 'CORRECTION' AND session >= ?
-        """, (min_session,)).fetchall()
-        conn.close()
+            rows = conn.execute("""
+                SELECT json_extract(data_json, '$.severity') as sev,
+                       json_extract(data_json, '$.fire_count') as fires
+                FROM events WHERE type = 'CORRECTION' AND session >= ?
+            """, (min_session,)).fetchall()
+        finally:
+            conn.close()
 
         if len(rows) < 5:
             return None
