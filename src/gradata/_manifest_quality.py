@@ -323,8 +323,11 @@ def _severity_difficulty_weight(ctx: "BrainContext | None" = None) -> float | No
             w = difficulty.get(sev, 0.5)
             total_weight += w
             # "Survived" = correction was processed and lesson was reused (fire_count > 0)
-            if fire_count and int(fire_count) > 0:
-                survived_weight += w
+            try:
+                if fire_count and int(fire_count) > 0:
+                    survived_weight += w
+            except (ValueError, TypeError):
+                pass
 
         if total_weight == 0:
             return None
