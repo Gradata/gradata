@@ -89,7 +89,7 @@ def _scope_match(category: str, task_type: str | None) -> float:
 
 def _context_relevance(description: str, keywords: list[str] | None) -> float:
     if not keywords:
-        return 0.0
+        return 0.5  # neutral when no context provided, consistent with _scope_match
     desc_lower = description.lower()
     hits = sum(1 for kw in keywords if kw.lower() in desc_lower)
     return hits / len(keywords)
