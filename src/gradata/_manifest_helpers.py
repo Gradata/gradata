@@ -14,7 +14,6 @@ from gradata._paths import BrainContext
 # ── Severity constants (single source of truth) ───────────────────────
 LOW_SEVERITY = frozenset({"as-is", "minor"})
 HIGH_SEVERITY = frozenset({"moderate", "major", "discarded"})
-ALL_SEVERITY = LOW_SEVERITY | HIGH_SEVERITY
 
 
 def _session_window(conn, window: int = 20) -> tuple[int, int]:

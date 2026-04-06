@@ -297,23 +297,6 @@ def load_swe_bench_verified() -> list[SWEInstance]:
     return _load_dataset("princeton-nlp/SWE-bench_Verified", split="test")
 
 
-def load_from_jsonl(filepath: str | Path) -> list[SWEInstance]:
-    """Load instances from a local JSONL file (for offline/cached use)."""
-    instances = []
-    with open(filepath, "r", encoding="utf-8") as f:
-        for line in f:
-            data = json.loads(line)
-            instances.append(SWEInstance(
-                instance_id=data["instance_id"],
-                repo=data.get("repo", ""),
-                problem_statement=data.get("problem_statement", ""),
-                gold_patch=data.get("patch", data.get("gold_patch", "")),
-                fail_to_pass=data.get("FAIL_TO_PASS", data.get("fail_to_pass", [])),
-                base_commit=data.get("base_commit", ""),
-            ))
-    return instances
-
-
 # ---------------------------------------------------------------------------
 # Agent function type
 # ---------------------------------------------------------------------------

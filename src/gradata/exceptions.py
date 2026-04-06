@@ -26,10 +26,6 @@ class TaxonomyError(BrainError):
     """Invalid or corrupt taxonomy.json configuration."""
 
 
-class MigrationError(BrainError):
-    """Database schema migration failed."""
-
-
 class EmbeddingError(BrainError):
     """Embedding operation failed (missing deps or backend error)."""
 

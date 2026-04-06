@@ -475,29 +475,6 @@ class FileWatcher:
             logger.info("FileWatcher stopped after %d iteration(s).", iteration)
 
     # ------------------------------------------------------------------
-    # Properties
-    # ------------------------------------------------------------------
-
-    @property
-    def tracked_files(self) -> list[str]:
-        """Return a sorted list of currently tracked file paths.
-
-        Returns:
-            List of absolute path strings.
-        """
-        return sorted(self._watched.keys())
-
-    @property
-    def pending_changes(self) -> list[FileChange]:
-        """Return a copy of all changes detected this session.
-
-        Useful for post-session auditing and test assertions.
-
-        Returns:
-            List of :class:`FileChange` objects in detection order.
-        """
-        return list(self._changes)
-
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------

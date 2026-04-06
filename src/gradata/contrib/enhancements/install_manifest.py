@@ -365,13 +365,6 @@ class InstallManifest:
         """Create a manifest with default modules and profiles."""
         return cls(modules=DEFAULT_MODULES, profiles=DEFAULT_PROFILES)
 
-    def get_module(self, module_id: str) -> Module | None:
-        """Look up a module by ID."""
-        return self._modules.get(module_id)
-
-    def get_profile(self, profile_name: str) -> Profile | None:
-        """Look up a profile by name."""
-        return self._profiles.get(profile_name)
 
     @property
     def available_modules(self) -> list[Module]:

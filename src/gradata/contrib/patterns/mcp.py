@@ -110,20 +110,6 @@ class MCPBridge:
         except Exception as e:
             return {"error": str(e)}
 
-    def register_server(self, server: MCPServer) -> None:
-        """Track a connected MCP server (for cross-platform routing)."""
-        self._connected_servers.append(server)
-
-    @property
-    def connected_servers(self) -> list[MCPServer]:
-        return list(self._connected_servers)
-
-    def discover_tools(self) -> list[MCPToolSchema]:
-        """List all tools from connected servers + brain tools."""
-        all_tools = list(self._tools.values())
-        for server in self._connected_servers:
-            all_tools.extend(server.tools)
-        return all_tools
 
     def stats(self) -> dict[str, Any]:
         """Bridge statistics."""

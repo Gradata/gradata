@@ -207,35 +207,6 @@ class ContractRegistry:
         constraints.sort(key=lambda c: priority_order[c.priority])
         return constraints
 
-    def check_violations(
-        self,
-        task: str,
-        action_description: str = "",
-    ) -> list[ConstraintViolation]:
-        """Check for constraint violations in a proposed action.
-
-        This is a simple keyword-based check. In production, this would
-        be enhanced with semantic matching.
-
-        Args:
-            task: The task that triggered constraint lookup.
-            action_description: Description of the proposed action.
-
-        Returns:
-            List of ConstraintViolation objects for matching constraints.
-            An empty list means no applicable constraints were found.
-        """
-        applicable = self.get_prioritized_constraints(task)
-        if not applicable:
-            return []
-
-        violations: list[ConstraintViolation] = []
-        for constraint in applicable:
-            violations.append(ConstraintViolation(
-                constraint=constraint,
-                context=action_description,
-            ))
-        return violations
 
     def has_blocking_violations(self, task: str) -> bool:
         """Check whether any MUST constraints are violated.
@@ -247,9 +218,6 @@ class ContractRegistry:
         )
         return any(c.priority == RulePriority.MUST for c in must_constraints)
 
-    def get_contracts_for_domain(self, domain: str) -> list[BehavioralContract]:
-        """Return all contracts for a specific domain."""
-        return [c for c in self._contracts if c.domain == domain]
 
     def format_constraints_prompt(self, task: str) -> str:
         """Format applicable constraints as a prompt injection block.

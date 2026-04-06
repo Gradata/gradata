@@ -67,19 +67,6 @@ _IMPLICIT_PATTERNS: list[tuple[re.Pattern, float, str]] = [
     (re.compile(r"\b(more|less)\s+(concise|detailed|specific|general|formal|casual)", re.IGNORECASE), 0.68, "degree_adjust"),
 ]
 
-# Combined for convenience
-CORRECTION_SIGNALS = [
-    # Explicit corrections
-    r"no[,.]?\s*(not\s+)?(that|this|like that)",
-    r"(change|fix|update|replace)\s+(this|that|it)\s+to",
-    r"don't\s+(do|use|include|add|write|say)",
-    r"(wrong|incorrect|inaccurate|not right)",
-    r"(stop|quit|never)\s+(doing|using|writing|adding)",
-    # Implicit corrections
-    r"(actually|instead|rather)[,.]?\s",
-    r"(should\s+be|needs\s+to\s+be|make\s+it)",
-    r"I\s+(said|told\s+you|asked\s+for|wanted)",
-]
 
 
 # ---------------------------------------------------------------------------

@@ -40,7 +40,7 @@ from gradata.enhancements.self_improvement import (
     parse_lessons,
     update_confidence,
 )
-from gradata._types import GraduationEngine, Lesson, LessonState, RuleTransferScope
+from gradata._types import Lesson, LessonState, RuleTransferScope
 from gradata.brain import Brain
 from gradata.exceptions import (
     BrainError,

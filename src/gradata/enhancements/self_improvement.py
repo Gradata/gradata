@@ -56,7 +56,6 @@ KILL_LIMITS: dict[str, int] = {
     "MATURE": 10,       # 100-200 sessions
     "STABLE": 8,        # 200+ sessions
 }
-UNTESTABLE_SESSION_LIMIT = 15  # Default (INFANT)
 
 # Severity multipliers for contradiction penalty
 # Typo fix barely dents confidence; rewrite hits hard

@@ -38,8 +38,6 @@ _FACTUAL_RE = re.compile(
     r"(\$[\d,.]+|\d{4}-\d{2}-\d{2}|\d+%|https?://\S+|\b\d{3,}\b)"
 )
 
-_STYLE_CHARS = set("—–-:;,.'\"*_`~()[]{}!?")
-
 _TONE_WORDS = {
     "actually", "just", "really", "basically", "honestly",
     "perhaps", "maybe", "possibly", "might", "could",
