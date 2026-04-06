@@ -61,7 +61,6 @@ def log_application(
         from gradata._events import emit
         return emit("RULE_APPLICATION", source, data, tags, session)
     except Exception as e:
-        import sys
         logging.getLogger("gradata.rule_tracker").warning("Failed to log rule application for %s: %s", rule_id, e)
         return None
 
@@ -85,7 +84,6 @@ def get_session_applications(db_path: Path, session: int) -> list[dict]:
             for e in events
         ]
     except Exception as e:
-        import sys
         logging.getLogger("gradata.rule_tracker").warning("get_session_applications failed: %s", e)
         return []
 
@@ -120,6 +118,5 @@ def get_rule_history(db_path: Path, rule_id: str, limit: int = 20) -> list[dict]
             for e in matching[:limit]
         ]
     except Exception as e:
-        import sys
         logging.getLogger("gradata.rule_tracker").warning("get_rule_history failed for %s: %s", rule_id, e)
         return []

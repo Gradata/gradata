@@ -215,7 +215,8 @@ def supersede(event_id: int, new_data: dict | None = None, new_tags: list | None
     replacement = emit(
         event_type=original["type"], source=source,
         data=new_data or (json.loads(original["data_json"]) if original["data_json"] else {}),
-        tags=new_tags or orig_tags, session=_detect_session(), valid_from=new_valid_from or now,
+        tags=new_tags or orig_tags, session=_detect_session(ctx=ctx), valid_from=new_valid_from or now,
+        ctx=ctx,
     )
     replacement["superseded_id"] = event_id
     return replacement
