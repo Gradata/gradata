@@ -11,7 +11,6 @@ Usage:
     from gradata.enhancements.pattern_integration import (
         process_reflection_result,
         process_guardrail_result,
-        process_reconciliation,
         process_loop_event,
         process_parallel_failures,
         process_escalation,
@@ -183,46 +182,6 @@ def feed_q_router(
     except Exception as e:
         logger.debug("feed_q_router failed: %s", e)
         return {"processed": False, "error": str(e)}
-
-
-# ---------------------------------------------------------------------------
-# 6. Reconciliation → Graduation
-# ---------------------------------------------------------------------------
-
-def process_reconciliation(
-    brain: Brain,
-    summary: ReconciliationSummary,
-) -> dict:
-    """Feed plan-vs-actual deviations into graduation.
-
-    - PASS items → survival bonus for related lessons
-    - GAP/DRIFT deviations → correction signals per category
-    """
-    from gradata.enhancements.self_improvement import update_confidence
-
-    deviations = getattr(summary, "deviations", [])
-    passes = 0
-    gaps = 0
-
-    for dev in deviations:
-        score_name = getattr(getattr(dev, "score", None), "name", "UNKNOWN")
-        if score_name == "PASS":
-            passes += 1
-        elif score_name in ("GAP", "DRIFT"):
-            gaps += 1
-
-    def _apply(lessons):
-        for dev in deviations:
-            score_name = getattr(getattr(dev, "score", None), "name", "UNKNOWN")
-            cat = getattr(dev, "category", "GENERAL").upper() if hasattr(dev, "category") else "GENERAL"
-            if score_name in ("GAP", "DRIFT"):
-                severity = "minor" if score_name == "GAP" else "moderate"
-                update_confidence(lessons, [{"category": cat, "severity_label": severity,
-                                             "description": f"Reconciliation {score_name}: {getattr(dev, 'detail', '')}"}])
-
-    if not _mutate_lessons(brain, _apply):
-        return {"processed": False}
-    return {"processed": True, "passes": passes, "gaps": gaps}
 
 
 # ---------------------------------------------------------------------------
