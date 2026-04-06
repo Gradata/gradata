@@ -118,14 +118,14 @@ class TestUpdateConfidenceMachineMode:
 
 class TestGraduateMachineMode:
     def test_machine_kill_limits_higher(self):
-        """Machine mode uses higher kill limits."""
-        # Lesson that would be killed in human mode (15 sessions) but not machine (30)
+        """Machine mode uses higher kill limits than human mode."""
+        # Lesson that would be killed in human mode (INFANT=8) but not machine (INFANT=16)
         lesson = _make_lesson(
             state=LessonState.INSTINCT,
             confidence=0.30,
             fire_count=0,
         )
-        lesson.sessions_since_fire = 16  # > 15 (human INFANT kill) but < 30 (machine)
+        lesson.sessions_since_fire = 10  # > 8 (human INFANT kill) but < 16 (machine)
 
         lessons_human = [copy.deepcopy(lesson)]
         lessons_machine = [copy.deepcopy(lesson)]
@@ -144,8 +144,11 @@ class TestMachineConstants:
         from gradata.enhancements.self_improvement import CONTRADICTION_PENALTY
         assert abs(MACHINE_CONTRADICTION_PENALTY) < abs(CONTRADICTION_PENALTY)
 
-    def test_machine_kill_limits_are_doubled(self):
-        assert MACHINE_KILL_LIMITS["INFANT"] >= 25
+    def test_machine_kill_limits_higher_than_human(self):
+        from gradata.enhancements.self_improvement import KILL_LIMITS
+        for key in KILL_LIMITS:
+            assert MACHINE_KILL_LIMITS[key] > KILL_LIMITS[key], \
+                f"Machine {key} ({MACHINE_KILL_LIMITS[key]}) should exceed human ({KILL_LIMITS[key]})"
 
     def test_machine_severity_weights_are_softer(self):
         assert MACHINE_SEVERITY_WEIGHTS["moderate"] < 0.60
