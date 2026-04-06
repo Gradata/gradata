@@ -271,7 +271,8 @@ def _load_dataset(dataset_name: str, split: str = "test") -> list[SWEInstance]:
 
     ds = load_dataset(dataset_name, split=split)
     instances = []
-    for item in ds:
+    for raw_item in ds:
+        item: dict = dict(raw_item)  # type: ignore[arg-type]
         instances.append(SWEInstance(
             instance_id=item["instance_id"],
             repo=item["repo"],

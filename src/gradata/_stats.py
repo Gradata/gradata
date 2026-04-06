@@ -75,11 +75,11 @@ def beta_posterior(successes: int, trials: int, prior_alpha: float = 1.0, prior_
     def prob_above(baseline: float) -> float:
         try:
             from scipy.stats import beta as beta_dist
-            return 1 - beta_dist.cdf(baseline, alpha, beta_param)
+            return float(1 - beta_dist.cdf(baseline, alpha, beta_param))
         except ImportError:
             if mean > baseline:
-                return min(0.99, 0.5 + (mean - baseline) / (ci_high - ci_low + 0.001))
-            return max(0.01, 0.5 - (baseline - mean) / (ci_high - ci_low + 0.001))
+                return float(min(0.99, 0.5 + (mean - baseline) / (ci_high - ci_low + 0.001)))
+            return float(max(0.01, 0.5 - (baseline - mean) / (ci_high - ci_low + 0.001)))
 
     p_above = prob_above(0.015)
     if p_above > 0.90:
@@ -93,7 +93,7 @@ def beta_posterior(successes: int, trials: int, prior_alpha: float = 1.0, prior_
 
     return {
         "posterior_mean": round(mean, 4),
-        "ci_95": (round(ci_low, 4), round(ci_high, 4)),
+        "ci_95": (round(float(ci_low), 4), round(float(ci_high), 4)),
         "prob_above_baseline": round(p_above, 3),
         "confidence_label": label,
         "alpha": alpha, "beta": beta_param, "n": trials,
