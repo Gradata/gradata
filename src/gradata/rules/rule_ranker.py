@@ -116,5 +116,8 @@ def _effectiveness_bonus(
     if info is None:
         return 0.0
     if info.get("effective"):
-        return min(0.15, info.get("sessions_survived", 0) * 0.015)
+        # Flat bonus for rules proven effective this session.
+        # SessionHistory tracks effective/corrected booleans, not
+        # session counts, so a fixed +0.10 is appropriate.
+        return 0.10
     return -0.10
