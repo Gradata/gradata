@@ -372,14 +372,6 @@ def register_task_type(
         _REGISTERED_TASK_TYPES.append(entry)
 
 
-def get_registered_task_types() -> list[TaskType]:
-    """Return the current (mutable) list of registered task types.
-
-    Returns:
-        A copy of the registry to prevent accidental mutation by callers.
-    """
-    return list(_REGISTERED_TASK_TYPES)
-
 
 # ---------------------------------------------------------------------------
 # Classification helpers
