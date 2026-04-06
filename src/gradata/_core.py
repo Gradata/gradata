@@ -310,7 +310,7 @@ def brain_end_session(
 
         lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
         if not lessons:
-            return {"lessons": 0, "promotions": 0, "demotions": 0}
+            return {"session": brain.session, "lessons": 0, "promotions": 0, "demotions": 0}
 
         before_states = {l.description[:40]: l.state.value for l in lessons}
 
