@@ -269,15 +269,6 @@ _RE_DESTRUCTIVE = re.compile(
 _RE_OUT_OF_SCOPE: re.Pattern | None = None
 
 
-def configure_scope_guard(pattern: str) -> None:
-    """Set a custom out-of-scope regex pattern for the current brain domain.
-
-    Example (sales brain):
-        configure_scope_guard(r"(?i)\\b(?:salesforce|hubspot|marketo)\\b")
-    """
-    global _RE_OUT_OF_SCOPE
-    _RE_OUT_OF_SCOPE = re.compile(pattern) if pattern else None
-
 
 # ---------------------------------------------------------------------------
 # Guard check functions (private)
