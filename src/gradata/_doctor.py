@@ -9,6 +9,8 @@ Usage:
     # Or via CLI:
     gradata doctor
 """
+from __future__ import annotations
+
 
 import json
 import os

@@ -18,6 +18,8 @@ Flow:
     5. Run bootstrap steps from manifest
     6. Print activation instructions
 """
+from __future__ import annotations
+
 
 import json
 import subprocess

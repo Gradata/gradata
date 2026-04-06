@@ -25,6 +25,8 @@ Tools exposed:
 
 from __future__ import annotations
 
+import logging
+
 import argparse
 import io
 import json
@@ -502,13 +504,13 @@ def run_server(brain_dir: str | Path | None, *, stdin=None, stdout=None) -> None
                 raise ImportError("gradata.brain.Brain could not be imported")
             brain_path = Path(brain_dir)
             if not brain_path.exists():
-                print(f"[mcp_server] Auto-initializing brain at {brain_dir}", file=sys.stderr)
+                logging.getLogger("gradata.mcp_server").info("Auto-initializing brain at %s", brain_dir)
                 brain = Brain.init(brain_dir, domain="General")
             else:
                 brain = Brain(brain_dir)
         except Exception as exc:
             # Log to stderr so it does not pollute the JSON-RPC channel
-            print(f"[mcp_server] Brain init failed: {exc}", file=sys.stderr)
+            logging.getLogger("gradata.mcp_server").error("Brain init failed: %s", exc)
 
     while True:
         msg = _read_message(in_stream)

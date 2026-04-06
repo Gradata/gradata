@@ -7,6 +7,8 @@ No hardcoded user paths. No machine-specific references.
 For the original runtime: brain/scripts/paths.py (unchanged).
 This file is the SDK-portable equivalent.
 """
+from __future__ import annotations
+
 
 import os
 from dataclasses import dataclass
