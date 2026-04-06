@@ -9,7 +9,6 @@ configurable.
 import json
 import re
 import sqlite3
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import gradata._paths as _p
