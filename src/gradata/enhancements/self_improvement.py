@@ -102,7 +102,6 @@ MACHINE_SEVERITY_WEIGHTS: dict[str, float] = {
 
 # Graduation gate thresholds
 _GRADUATION_DEDUP_THRESHOLD = 0.85   # Near-duplicate rule detection
-_COUNTERFACTUAL_SIM_THRESHOLD = 0.35  # Historical correction matching
 
 # Auto-detection threshold: if a session has more than this many corrections,
 # it's likely machine-driven. Set high enough that intensive human sessions
@@ -839,73 +838,6 @@ def propagate_confidence(
             meta.confidence = round(sum(confs) / len(confs), 2)
 
     return meta_rules
-
-
-# ---------------------------------------------------------------------------
-# Counterfactual Testing — historical pattern validation before deployment
-# ---------------------------------------------------------------------------
-
-
-def counterfactual_test(
-    rule: Lesson,
-    historical_corrections: list[dict],
-) -> dict:
-    """Test whether a rule would have prevented historical corrections.
-
-    Before deploying a newly graduated rule, check if it matches patterns
-    in past corrections. A rule that would have caught 0 historical
-    corrections is either too specific or not useful.
-
-    Args:
-        rule: The lesson (typically RULE state) to test.
-        historical_corrections: Past corrections with 'category' and
-            'description' keys.
-
-    Returns:
-        Dict with 'matches' (count), 'total' (count), 'hit_rate' (float),
-        and 'would_have_helped' (bool: hit_rate >= 0.1).
-    """
-    if not historical_corrections:
-        return {"matches": 0, "total": 0, "hit_rate": 0.0, "would_have_helped": False}
-
-    same_category = [
-        c for c in historical_corrections
-        if c.get("category", "").upper() == rule.category.upper()
-    ]
-
-    if not same_category:
-        return {"matches": 0, "total": len(historical_corrections),
-                "hit_rate": 0.0, "would_have_helped": False}
-
-    matches = 0
-    try:
-        from gradata.enhancements.similarity import semantic_similarity, _STOP_WORDS
-        rule_words = set(rule.description.lower().split()) - _STOP_WORDS
-        for corr in same_category:
-            desc = corr.get("description", "")
-            sim = semantic_similarity(rule.description, desc)
-            if sim >= _COUNTERFACTUAL_SIM_THRESHOLD:
-                matches += 1
-            else:
-                # Keyword fallback for short descriptions where TF-IDF fails
-                corr_words = set(desc.lower().split()) - _STOP_WORDS
-                if len(rule_words & corr_words) >= 2:
-                    matches += 1
-    except ImportError:
-        _fallback_stops = frozenset({"a", "the", "is", "in", "to", "of", "and", "or"})
-        rule_words = set(rule.description.lower().split()) - _fallback_stops
-        for corr in same_category:
-            corr_words = set(corr.get("description", "").lower().split()) - _fallback_stops
-            if len(rule_words & corr_words) >= 2:
-                matches += 1
-
-    hit_rate = matches / len(same_category) if same_category else 0.0
-    return {
-        "matches": matches,
-        "total": len(same_category),
-        "hit_rate": round(hit_rate, 3),
-        "would_have_helped": hit_rate >= 0.1,
-    }
 
 
 # ---------------------------------------------------------------------------
