@@ -17,7 +17,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from gradata._types import ELIGIBLE_STATES, Lesson, LessonState, RuleTransferScope
+from gradata._types import ELIGIBLE_STATES, Lesson, RuleTransferScope
 
 # ---------------------------------------------------------------------------
 # Data Model
