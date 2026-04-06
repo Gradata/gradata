@@ -342,8 +342,10 @@ def brain_end_session(
             lessons, session_corrections or [],
             session_type=session_type, machine_mode=machine_mode)
 
+        # Auto-detect machine mode: human sessions rarely exceed 30 corrections.
+        # Previous threshold of 10 misclassified productive human sessions.
         is_machine = machine_mode if machine_mode is not None else (
-            len(session_corrections or []) > 10)
+            len(session_corrections or []) > 30)
         active, graduated = graduate(lessons, machine_mode=is_machine)
 
         promotions, demotions, kills = 0, 0, 0
