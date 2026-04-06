@@ -15,7 +15,6 @@ import gradata._paths as _p
 from gradata._paths import BrainContext
 
 
-def _EXPORTS_DIR(): return _p.BRAIN_DIR / "exports"
 def _VAULT_DIR(): return _p.BRAIN_DIR / "vault"
 def _LESSONS_ACTIVE(): return _p.LESSONS_FILE
 def _LESSONS_ARCHIVE(): return _p.BRAIN_DIR / "lessons-archive.md"
