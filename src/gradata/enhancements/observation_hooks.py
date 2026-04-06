@@ -40,8 +40,6 @@ from typing import Any
 __all__ = [
     "Observation",
     "observe_tool_use",
-    "ProjectDetector",
-    "get_project_id",
     "ObservationStore",
 ]
 
@@ -148,75 +146,6 @@ def observe_tool_use(
         success=success,
     )
 
-
-class ProjectDetector:
-    """Detects project identity via git remote hash.
-
-    Creates a portable, machine-independent project identifier by
-    hashing the git remote URL. Falls back to directory name hash
-    if no git remote is available.
-
-    Adapted from ecc's portable project detection (git remote hash).
-    """
-
-    @staticmethod
-    def get_project_id(project_dir: str | Path | None = None) -> str:
-        """Get a portable project identifier.
-
-        Priority:
-        1. GRADATA_PROJECT_ID env var (explicit override)
-        2. Hash of git remote URL (portable across machines)
-        3. Hash of git root directory name (machine-specific fallback)
-        4. "global" (no project context)
-
-        Args:
-            project_dir: Optional project directory path. Uses cwd if None.
-
-        Returns:
-            A 12-character hex hash as project identifier.
-        """
-        import os
-        import subprocess
-
-        # 1. Explicit env var
-        explicit = os.environ.get("GRADATA_PROJECT_ID")
-        if explicit:
-            return explicit[:12]
-
-        work_dir = str(project_dir) if project_dir else os.getcwd()
-
-        # 2. Git remote URL hash
-        try:
-            result = subprocess.run(
-                ["git", "remote", "get-url", "origin"],
-                capture_output=True, text=True, timeout=5,
-                cwd=work_dir,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                url = result.stdout.strip()
-                return hashlib.sha256(url.encode()).hexdigest()[:12]
-        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-            pass
-
-        # 3. Git root directory name hash
-        try:
-            result = subprocess.run(
-                ["git", "rev-parse", "--show-toplevel"],
-                capture_output=True, text=True, timeout=5,
-                cwd=work_dir,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                root = result.stdout.strip()
-                return hashlib.sha256(root.encode()).hexdigest()[:12]
-        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-            pass
-
-        # 4. Global fallback
-        return "global"
-
-
-# Module-level convenience
-get_project_id = ProjectDetector.get_project_id
 
 
 class ObservationStore:
