@@ -219,7 +219,9 @@ def brain_correct(
                         best_sim = sim
                         best_match = existing_l
 
-                if best_match and best_sim >= 0.35:
+                from gradata._config import get_similarity_threshold
+                sim_threshold = get_similarity_threshold(cat)
+                if best_match and best_sim >= sim_threshold:
                     if dry_run:
                         event["dry_run"] = True
                         event["would_reinforce"] = {"category": cat, "description": best_match.description[:200], "similarity": round(best_sim, 3)}
