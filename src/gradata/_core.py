@@ -40,6 +40,32 @@ def _filter_lessons_by_state(lessons, min_state: str = "PATTERN"):
 
 # ── correct() ──────────────────────────────────────────────────────────
 
+
+def _attribute_domain_fires(
+    brain: "Brain",
+    correction_category: str,
+    correction_desc: str,
+) -> None:
+    """Attribute fires and misfires to rules active in this session.
+
+    For each fired rule, increment fires for the correction's category.
+    If the correction contradicts the rule, also increment misfires.
+    """
+    from gradata.enhancements.self_improvement import _classify_correction_direction
+
+    for rule in brain._fired_rules:
+        if not hasattr(rule, "domain_scores"):
+            continue
+        domain = correction_category.upper()
+        if domain not in rule.domain_scores:
+            rule.domain_scores[domain] = {"fires": 0, "misfires": 0}
+        rule.domain_scores[domain]["fires"] += 1
+
+        direction = _classify_correction_direction(correction_desc, rule.description)
+        if direction == "CONTRADICTING":
+            rule.domain_scores[domain]["misfires"] += 1
+
+
 def brain_correct(
     brain: Brain, draft: str, final: str, *,
     category: str | None = None, context: dict | None = None,
@@ -153,21 +179,30 @@ def brain_correct(
                 if classifications:
                     primary = next((c for c in classifications if c.category.upper() == cat),
                                    classifications[0])
-                    # Try behavioral extraction (LLM + cache + templates)
-                    try:
-                        from gradata.enhancements.edit_classifier import extract_behavioral_instruction
-                        from gradata.enhancements.instruction_cache import InstructionCache
-                        if not isinstance(brain._instruction_cache, InstructionCache):
-                            brain._instruction_cache = InstructionCache(
-                                lessons_path.parent / "instruction_cache.json"
-                            )
-                        behavioral_desc = extract_behavioral_instruction(
-                            diff, primary, cache=brain._instruction_cache,  # type: ignore[arg-type]
-                        )
-                        desc = behavioral_desc or primary.description
-                    except Exception as e:
-                        _log.debug("Behavioral extraction failed: %s", e)
+                    # Check convergence gate — skip extraction if category is settled
+                    convergence_data = brain._get_convergence()
+                    cat_convergence = convergence_data.get("by_category", {}).get(cat, {})
+                    category_converged = cat_convergence.get("trend") == "converged"
+
+                    if category_converged:
+                        _log.debug("Skipping extraction for converged category: %s", cat)
                         desc = primary.description
+                    else:
+                        # Try behavioral extraction (LLM + cache + templates)
+                        try:
+                            from gradata.enhancements.edit_classifier import extract_behavioral_instruction
+                            from gradata.enhancements.instruction_cache import InstructionCache
+                            if not isinstance(brain._instruction_cache, InstructionCache):
+                                brain._instruction_cache = InstructionCache(
+                                    lessons_path.parent / "instruction_cache.json"
+                                )
+                            behavioral_desc = extract_behavioral_instruction(
+                                diff, primary, cache=brain._instruction_cache,  # type: ignore[arg-type]
+                            )
+                            desc = behavioral_desc or primary.description
+                        except Exception as e:
+                            _log.debug("Behavioral extraction failed: %s", e)
+                            desc = primary.description
                 elif summary:
                     desc = summary
                 else:
@@ -275,6 +310,18 @@ def brain_correct(
 
     except Exception as e:
         _log.warning("Lesson creation failed: %s", e)
+
+    # Domain-scoped misfire attribution
+    try:
+        if brain._fired_rules and (category or classifications):
+            correction_desc = ""
+            if 'desc' in locals():
+                correction_desc = desc
+            elif summary:
+                correction_desc = summary
+            _attribute_domain_fires(brain, category or "UNKNOWN", correction_desc)
+    except Exception as e:
+        _log.debug("Domain fire attribution failed: %s", e)
 
     # Index into FTS5
     try:
@@ -782,26 +829,103 @@ def brain_export_skills(brain: Brain, *, output_dir: str | None = None,
 
 # ── convergence() ─────────────────────────────────────────────────────
 
+def _mann_kendall(data: "list[int] | list[float]") -> tuple[str, float]:
+    """Mann-Kendall trend test (pure Python, no scipy needed).
+
+    Returns (trend, p_value) where trend is "decreasing", "increasing", or "no_trend".
+    Uses normal approximation for n >= 3.
+    """
+    import math
+
+    n = len(data)
+    if n < 3:
+        return "no_trend", 1.0
+
+    # Compute S statistic
+    s = 0
+    for i in range(n - 1):
+        for j in range(i + 1, n):
+            diff = data[j] - data[i]
+            if diff > 0:
+                s += 1
+            elif diff < 0:
+                s -= 1
+
+    # Handle ties
+    from collections import Counter
+    tie_counts = [c for c in Counter(data).values() if c > 1]
+    tie_correction = sum(t * (t - 1) * (2 * t + 5) for t in tie_counts)
+
+    # Variance of S
+    var_s = (n * (n - 1) * (2 * n + 5) - tie_correction) / 18.0
+    if var_s == 0:
+        return "no_trend", 1.0
+
+    # Z statistic (continuity correction)
+    if s > 0:
+        z = (s - 1) / math.sqrt(var_s)
+    elif s < 0:
+        z = (s + 1) / math.sqrt(var_s)
+    else:
+        z = 0.0
+
+    # Two-tailed p-value using normal CDF approximation
+    p_value = 2.0 * (1.0 - _normal_cdf(abs(z)))
+
+    if p_value < 0.05:
+        trend = "decreasing" if s < 0 else "increasing"
+    else:
+        trend = "no_trend"
+
+    return trend, round(p_value, 4)
+
+
+def _normal_cdf(x: float) -> float:
+    """Standard normal CDF approximation (Abramowitz & Stegun)."""
+    import math
+    t = 1.0 / (1.0 + 0.2316419 * abs(x))
+    d = 0.3989422804014327  # 1/sqrt(2*pi)
+    p = d * math.exp(-x * x / 2.0) * (
+        t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 +
+        t * (-1.821255978 + t * 1.330274429))))
+    )
+    return 1.0 - p if x >= 0 else p
+
+
 def brain_convergence(brain: "Brain") -> dict:
     """Compute corrections-per-session convergence data.
+
+    Uses Mann-Kendall trend test for statistical rigor.
+    Includes per-category breakdown.
 
     Returns dict with:
         sessions: list of session numbers
         corrections_per_session: list of correction counts per session
         trend: "converging" | "converged" | "diverging" | "insufficient_data"
+        p_value: float (Mann-Kendall p-value, lower = stronger trend)
+        by_category: dict of category -> {corrections_per_session, trend}
         total_corrections: int
         total_sessions: int
     """
     empty = {"sessions": [], "corrections_per_session": [], "trend": "insufficient_data",
-             "total_corrections": 0, "total_sessions": 0}
+             "p_value": 1.0, "by_category": {}, "total_corrections": 0, "total_sessions": 0}
 
     try:
         from gradata._db import get_connection
+        import json as _json
         with get_connection(brain.db_path) as conn:
+            # Aggregate corrections per session
             rows = conn.execute(
                 "SELECT session, COUNT(*) as cnt FROM events "
                 "WHERE type = 'CORRECTION' AND session IS NOT NULL AND session > 0 "
                 "GROUP BY session ORDER BY session"
+            ).fetchall()
+
+            # Per-category breakdown
+            cat_rows = conn.execute(
+                "SELECT session, data_json FROM events "
+                "WHERE type = 'CORRECTION' AND session IS NOT NULL AND session > 0 "
+                "ORDER BY session"
             ).fetchall()
     except Exception:
         return empty
@@ -812,25 +936,105 @@ def brain_convergence(brain: "Brain") -> dict:
     sessions = [r[0] for r in rows]
     counts = [r[1] for r in rows]
 
-    # Determine trend
-    trend = "insufficient_data"
-    if len(counts) >= 3:
-        first_half = counts[:len(counts) // 2]
-        second_half = counts[len(counts) // 2:]
-        avg_first = sum(first_half) / len(first_half)
-        avg_second = sum(second_half) / len(second_half)
+    # Mann-Kendall trend test
+    mk_trend, p_value = _mann_kendall(counts)
+    if mk_trend == "decreasing":
+        trend = "converging"
+    elif mk_trend == "increasing":
+        trend = "diverging"
+    elif len(counts) >= 3:
+        trend = "converged"
+    else:
+        trend = "insufficient_data"
 
-        if avg_second < avg_first * 0.7:
-            trend = "converging"
-        elif abs(avg_second - avg_first) <= max(1, avg_first * 0.15):
-            trend = "converged"
-        else:
-            trend = "diverging"
+    # Per-category convergence
+    cat_by_session: dict[str, dict[int, int]] = {}
+    for session, data_json in cat_rows:
+        try:
+            data = _json.loads(data_json) if isinstance(data_json, str) else {}
+            cat = data.get("category", "UNKNOWN")
+        except (_json.JSONDecodeError, TypeError):
+            cat = "UNKNOWN"
+        if cat not in cat_by_session:
+            cat_by_session[cat] = {}
+        cat_by_session[cat][session] = cat_by_session[cat].get(session, 0) + 1
+
+    by_category: dict[str, dict] = {}
+    for cat, session_counts in cat_by_session.items():
+        cat_counts = [session_counts.get(s, 0) for s in sessions]
+        cat_mk, cat_p = _mann_kendall(cat_counts)
+        cat_trend = "converging" if cat_mk == "decreasing" else (
+            "diverging" if cat_mk == "increasing" else "converged")
+        by_category[cat] = {
+            "corrections_per_session": cat_counts,
+            "trend": cat_trend,
+            "p_value": cat_p,
+        }
 
     return {
         "sessions": sessions,
         "corrections_per_session": counts,
         "trend": trend,
+        "p_value": p_value,
+        "by_category": by_category,
         "total_corrections": sum(counts),
         "total_sessions": len(sessions),
     }
+
+
+# ── Efficiency ────────────────────────────────────────────────────────
+
+_SEVERITY_SECONDS = {
+    "trivial": 5,
+    "minor": 15,
+    "moderate": 45,
+    "major": 120,
+    "rewrite": 300,
+}
+
+
+def brain_efficiency(brain: "Brain", *, estimate_time: bool = False) -> dict:
+    """Quantify effort saved by brain learning.
+
+    Returns effort_ratio (current vs initial correction rate).
+    Optional estimate_time adds severity-weighted time estimates (approximate).
+    """
+    convergence = brain._get_convergence()
+    counts = convergence.get("corrections_per_session", [])
+
+    if len(counts) < 3:
+        result: dict = {
+            "effort_ratio": 1.0,
+            "corrections_initial": 0,
+            "corrections_recent": 0,
+            "total_corrections": convergence.get("total_corrections", 0),
+            "total_sessions": convergence.get("total_sessions", 0),
+        }
+        if estimate_time:
+            result["estimated_seconds_saved"] = 0
+            result["time_breakdown"] = {}
+        return result
+
+    initial = sum(counts[:3]) / 3.0
+    recent = sum(counts[-3:]) / 3.0
+    effort_ratio = round(recent / initial, 2) if initial > 0 else 1.0
+
+    result = {
+        "effort_ratio": effort_ratio,
+        "corrections_initial": round(initial, 1),
+        "corrections_recent": round(recent, 1),
+        "total_corrections": convergence.get("total_corrections", 0),
+        "total_sessions": convergence.get("total_sessions", 0),
+    }
+
+    if estimate_time:
+        corrections_avoided = max(0, (initial - recent) * len(counts))
+        avg_severity_weight = _SEVERITY_SECONDS.get("moderate", 45)
+        estimated_seconds = int(corrections_avoided * avg_severity_weight)
+        result["estimated_seconds_saved"] = estimated_seconds
+        result["time_breakdown"] = {
+            "corrections_avoided": round(corrections_avoided, 1),
+            "avg_seconds_per_correction": avg_severity_weight,
+        }
+
+    return result

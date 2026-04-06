@@ -67,6 +67,9 @@ class Brain:
                 open_encrypted_db(self.dir, self._encryption_key)
 
         self._instruction_cache: object | None = None  # lazy: InstructionCache
+        self._fired_rules: list = []  # Rules injected this session (for misfire attribution)
+        self._convergence_cache: dict | None = None
+        self._convergence_session: int | None = None
 
         logger.debug("Brain init: %s (db=%s)", self.dir, self.db_path)
 
@@ -337,6 +340,24 @@ class Brain:
         """Get corrections-per-session convergence data."""
         from gradata._core import brain_convergence
         return brain_convergence(self)
+
+    def _get_convergence(self) -> dict:
+        """Get cached convergence data (one DB query per session)."""
+        if self._convergence_cache is not None and self._convergence_session == self.session:
+            return self._convergence_cache
+        from gradata._core import brain_convergence
+        self._convergence_cache = brain_convergence(self)
+        self._convergence_session = self.session
+        return self._convergence_cache
+
+    def efficiency(self, *, estimate_time: bool = False) -> dict:
+        """Quantify effort saved by brain learning.
+
+        Returns effort_ratio (ratio of current vs initial correction rate).
+        Pass estimate_time=True for approximate time-saved estimates.
+        """
+        from gradata._core import brain_efficiency
+        return brain_efficiency(self, estimate_time=estimate_time)
 
     # ── Output Logging ─────────────────────────────────────────────────
 
