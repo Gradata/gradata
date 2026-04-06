@@ -433,8 +433,8 @@ def _group_by_theme(lessons: list[Lesson]) -> dict[str, list[Lesson]]:
                     top_cat = sorted(set(cats), key=lambda c: (-cats.count(c), c))[0]
                     cluster_name = f"semantic_{top_cat.lower()}"
                     theme_groups[cluster_name].extend(cluster)
-        except ImportError:
-            pass  # similarity module optional
+        except Exception:
+            pass  # similarity module optional or computation failed
 
     return dict(theme_groups)
 
