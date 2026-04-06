@@ -412,6 +412,20 @@ def filter_by_scope(
     return results
 
 
+def is_rule_disabled_for_domain(lesson: Lesson, domain: str) -> bool:
+    """Check if a rule should be suppressed in a specific domain.
+
+    A rule is disabled when its misfire rate exceeds 30% with at least
+    3 fires in that domain — enough data to be meaningful.
+    """
+    scores = lesson.domain_scores.get(domain, {})
+    fires = scores.get("fires", 0)
+    misfires = scores.get("misfires", 0)
+    if fires < 3:
+        return False
+    return misfires / fires > 0.3
+
+
 def apply_rules(
     lessons: list[Lesson],
     scope: RuleScope,
@@ -466,6 +480,14 @@ def apply_rules(
 
     # Step 1 — eligibility gate
     eligible = [lesson for lesson in lessons if lesson.state in _ELIGIBLE_STATES]
+
+    # Step 1.5 — domain scoping: filter out rules disabled for current domain
+    current_domain = scope.domain.upper() if scope.domain else ""
+    if current_domain:
+        eligible = [
+            lesson for lesson in eligible
+            if not is_rule_disabled_for_domain(lesson, current_domain)
+        ]
 
     # Step 2 & 3 — score with weighted scope matching and threshold
     scored: list[tuple[Lesson, float]] = []
