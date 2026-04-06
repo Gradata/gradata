@@ -33,6 +33,7 @@ class EventBus:
     def __init__(self, handler_timeout: float = 5.0) -> None:
         self.listeners: dict[str, list[tuple[Callable, bool]]] = defaultdict(list)
         self.handler_timeout = handler_timeout
+        self._lock = threading.Lock()
 
     # -- public API -----------------------------------------------------------
 
@@ -42,17 +43,21 @@ class EventBus:
         If *async_handler* is True the handler runs in a daemon thread
         (fire-and-forget) instead of blocking the caller.
         """
-        if not any(h is handler for h, _ in self.listeners[event]):
-            self.listeners[event].append((handler, async_handler))
+        with self._lock:
+            if not any(h is handler for h, _ in self.listeners[event]):
+                self.listeners[event].append((handler, async_handler))
 
     def off(self, event: str, handler: Callable) -> None:
         """Remove *handler* from *event*."""
-        entries = self.listeners.get(event, [])
-        self.listeners[event] = [(h, a) for h, a in entries if h is not handler]
+        with self._lock:
+            entries = self.listeners.get(event, [])
+            self.listeners[event] = [(h, a) for h, a in entries if h is not handler]
 
     def emit(self, event: str, payload: Any = None) -> None:
         """Emit *event* with *payload*.  Errors are logged, never raised."""
-        for handler, is_async in list(self.listeners.get(event, [])):
+        with self._lock:
+            handlers = list(self.listeners.get(event, []))
+        for handler, is_async in handlers:
             if is_async:
                 threading.Thread(target=self._safe_call, args=(handler, payload, self.handler_timeout), daemon=True).start()
             else:
