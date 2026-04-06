@@ -51,7 +51,6 @@ FILE_TYPE_MAP = {
 # ── RAG Graduation ─────────────────────────────────────────────────
 RAG_ACTIVATION_THRESHOLD = 20
 RAG_ACTIVE = True
-DOMAIN_THRESHOLDS = {}
 
 # ── Episodic Memory ───────────────────────────────────────────────
 RECENCY_DECAY = 0.008
