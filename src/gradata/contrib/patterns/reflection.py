@@ -418,45 +418,6 @@ def default_evaluator(output: Any, criterion: Criterion) -> CriterionScore:
     )
 
 
-# ---------------------------------------------------------------------------
-# format_critique helper
-# ---------------------------------------------------------------------------
-
-
-def format_critique(result: CritiqueResult) -> str:
-    """Render a :class:`CritiqueResult` as a human-readable checklist string.
-
-    Output format::
-
-        === Critique — Cycle 1 ===
-        Overall score : 7.5 / 10
-        All required  : PASS
-
-        [PASS] has_subject       (10.0)  Found 'Subject:' header.
-        [FAIL] has_cta            (0.0)  No recognisable call-to-action phrase found.
-        [PASS] appropriate_length(10.0)  Word count 45 is within the 200-word limit.
-        [PASS] no_jargon         (10.0)  No jargon detected.   [optional]
-
-    Args:
-        result: The :class:`CritiqueResult` to format.
-
-    Returns:
-        A multi-line string suitable for printing or logging.
-    """
-    lines: list[str] = [
-        f"=== Critique — Cycle {result.cycle} ===",
-        f"Overall score : {result.overall_score:.1f} / 10",
-        f"All required  : {'PASS' if result.all_required_passed else 'FAIL'}",
-        "",
-    ]
-
-    for name, cs in result.scores.items():
-        status = "PASS" if cs.passed else "FAIL"
-        score_part = f"({cs.score:.1f})" if cs.score is not None else "     "
-        lines.append(f"  [{status}] {name:<22} {score_part}  {cs.reason}")
-
-    return "\n".join(lines)
-
 
 # ---------------------------------------------------------------------------
 # Predefined checklists
