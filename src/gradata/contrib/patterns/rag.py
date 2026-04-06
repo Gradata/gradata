@@ -372,62 +372,6 @@ def format_context(result: RetrievalResult, max_chars: int = 5000) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Progressive disclosure (from claude-mem: compact -> timeline -> full)
-# ---------------------------------------------------------------------------
-
-def progressive_disclose(
-    chunks: list[Chunk],
-    budget: int = 2000,
-    tier: str = "auto",
-) -> tuple[str, str]:
-    """Return context in progressive tiers based on budget.
-
-    From claude-mem pattern: don't dump everything. Start compact,
-    expand only if the task needs it.
-
-    Tiers:
-      compact  — one-line summaries, source only (~200 chars each)
-      timeline — source + first sentence (~500 chars each)
-      full     — complete chunk content
-
-    Args:
-        chunks: Retrieved chunks sorted by relevance.
-        budget: Character budget for the context block.
-        tier: "compact", "timeline", "full", or "auto" (picks based on budget).
-
-    Returns:
-        (formatted_context, tier_used)
-    """
-    if not chunks:
-        return "", "empty"
-
-    if tier == "auto":
-        if budget < 1000:
-            tier = "compact"
-        elif budget < 3000:
-            tier = "timeline"
-        else:
-            tier = "full"
-
-    lines: list[str] = []
-    total = 0
-
-    for chunk in chunks:
-        if tier == "compact":
-            text = f"[{chunk.source}] {chunk.content[:80].split(chr(10))[0]}..."
-        elif tier == "timeline":
-            first_sentence = chunk.content.split(".")[0] + "." if "." in chunk.content else chunk.content[:200]
-            text = f"[{chunk.source}] {first_sentence}"
-        else:
-            text = f"[{chunk.source}] {chunk.content[:500]}"
-
-        if total + len(text) > budget:
-            break
-        lines.append(text)
-        total += len(text)
-
-    return "\n".join(lines), tier
-
 
 # ---------------------------------------------------------------------------
 # Private content filtering (from claude-mem: <private> tag convention)
