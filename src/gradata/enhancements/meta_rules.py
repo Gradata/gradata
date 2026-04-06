@@ -415,10 +415,14 @@ def _group_by_theme(lessons: list[Lesson]) -> dict[str, list[Lesson]]:
                 best_cluster = -1
                 best_sim = 0.0
                 for i, cluster in enumerate(clusters):
-                    # Compare to cluster centroid (first member = seed)
-                    sim = semantic_similarity(lesson.description, cluster[0].description)
-                    if sim > best_sim:
-                        best_sim = sim
+                    # Average-linkage: compare to all cluster members
+                    # for more stable clustering than seed-only comparison.
+                    avg_sim = sum(
+                        semantic_similarity(lesson.description, m.description)
+                        for m in cluster
+                    ) / len(cluster)
+                    if avg_sim > best_sim:
+                        best_sim = avg_sim
                         best_cluster = i
                 if best_sim >= 0.55 and best_cluster >= 0:
                     clusters[best_cluster].append(lesson)
@@ -516,9 +520,12 @@ def merge_into_meta(
     lesson_ids = [_lesson_id(l) for l in rules]
     meta_id = _meta_id(lesson_ids)
 
-    # Stamp source lessons with their parent meta-rule ID
+    # Stamp source lessons with their parent meta-rule ID.
+    # Only stamp if not already assigned, so the first (highest-confidence)
+    # meta-rule assignment wins when a lesson appears in multiple groups.
     for lesson in rules:
-        lesson.parent_meta_rule_id = meta_id
+        if not lesson.parent_meta_rule_id:
+            lesson.parent_meta_rule_id = meta_id
 
     # Detect theme if not overridden
     if theme_override:
@@ -597,6 +604,10 @@ def validate_meta_rule(
     # with the principle AND contains negation/reversal language
     _REVERSAL_WORDS = {"actually", "instead", "wrong", "incorrect", "stop", "dont", "don", "not"}
 
+    # Scale overlap threshold relative to principle size so short principles
+    # (4-6 tokens) can still be invalidated. Minimum 2 overlapping tokens.
+    overlap_threshold = max(2, len(principle_tokens) // 3)
+
     for correction in recent_corrections:
         desc = correction.get("description", "")
         desc_tokens = _tokenise(desc)
@@ -604,8 +615,8 @@ def validate_meta_rule(
         overlap = len(principle_tokens & desc_tokens)
         has_reversal = bool(desc_tokens & _REVERSAL_WORDS)
 
-        # High overlap + reversal language = likely contradiction
-        if overlap >= 4 and has_reversal:
+        # Significant overlap + reversal language = likely contradiction
+        if overlap >= overlap_threshold and has_reversal:
             return False
 
     return True

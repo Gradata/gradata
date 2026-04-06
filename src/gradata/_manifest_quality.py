@@ -29,52 +29,52 @@ def _compute_fda(ctx: "BrainContext | None" = None, window: int = 20) -> float |
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = get_connection(db)
+        try:
+            # Get the most recent N real sessions with outputs (exclude system sessions)
+            # Uses HAVING COUNT >= 2 to skip phantom sessions with stray events
+            sessions_with_outputs = conn.execute("""
+                SELECT e.session FROM events e
+                LEFT JOIN session_metrics sm ON e.session = sm.session
+                WHERE e.type = 'OUTPUT'
+                  AND typeof(e.session) = 'integer'
+                  AND (sm.session_type IS NULL OR sm.session_type != 'systems')
+                GROUP BY e.session HAVING COUNT(*) >= 2
+                ORDER BY e.session DESC LIMIT ?
+            """, (window,)).fetchall()
 
-        # Get the most recent N real sessions with outputs (exclude system sessions)
-        # Uses HAVING COUNT >= 2 to skip phantom sessions with stray events
-        sessions_with_outputs = conn.execute("""
-            SELECT e.session FROM events e
-            LEFT JOIN session_metrics sm ON e.session = sm.session
-            WHERE e.type = 'OUTPUT'
-              AND typeof(e.session) = 'integer'
-              AND (sm.session_type IS NULL OR sm.session_type != 'systems')
-            GROUP BY e.session HAVING COUNT(*) >= 2
-            ORDER BY e.session DESC LIMIT ?
-        """, (window,)).fetchall()
+            if len(sessions_with_outputs) < 3:
+                return None
 
-        if len(sessions_with_outputs) < 3:
+            accepted = 0
+            for (session,) in sessions_with_outputs:
+                # Check for corrections — use severity if available, otherwise any correction counts
+                has_severity = conn.execute("""
+                    SELECT COUNT(*) FROM events
+                    WHERE type = 'CORRECTION' AND session = ?
+                      AND json_extract(data_json, '$.severity') IS NOT NULL
+                """, (session,)).fetchone()[0]
+
+                if has_severity > 0:
+                    # Severity data exists: only major/moderate/discarded count against acceptance
+                    major_corrections = conn.execute("""
+                        SELECT COUNT(*) FROM events
+                        WHERE type = 'CORRECTION' AND session = ?
+                          AND json_extract(data_json, '$.severity') IN ('moderate', 'major', 'discarded')  -- HIGH_SEVERITY
+                    """, (session,)).fetchone()[0]
+                else:
+                    # No severity data: any correction counts against acceptance
+                    major_corrections = conn.execute("""
+                        SELECT COUNT(*) FROM events
+                        WHERE type = 'CORRECTION' AND session = ?
+                    """, (session,)).fetchone()[0]
+
+                if major_corrections == 0:
+                    accepted += 1
+
+            total = len(sessions_with_outputs)
+            return round(accepted / total, 3) if total > 0 else None
+        finally:
             conn.close()
-            return None
-
-        accepted = 0
-        for (session,) in sessions_with_outputs:
-            # Check for corrections — use severity if available, otherwise any correction counts
-            has_severity = conn.execute("""
-                SELECT COUNT(*) FROM events
-                WHERE type = 'CORRECTION' AND session = ?
-                  AND json_extract(data_json, '$.severity') IS NOT NULL
-            """, (session,)).fetchone()[0]
-
-            if has_severity > 0:
-                # Severity data exists: only major/moderate/discarded count against acceptance
-                major_corrections = conn.execute("""
-                    SELECT COUNT(*) FROM events
-                    WHERE type = 'CORRECTION' AND session = ?
-                      AND json_extract(data_json, '$.severity') IN ('moderate', 'major', 'discarded')  -- HIGH_SEVERITY
-                """, (session,)).fetchone()[0]
-            else:
-                # No severity data: any correction counts against acceptance
-                major_corrections = conn.execute("""
-                    SELECT COUNT(*) FROM events
-                    WHERE type = 'CORRECTION' AND session = ?
-                """, (session,)).fetchone()[0]
-
-            if major_corrections == 0:
-                accepted += 1
-
-        conn.close()
-        total = len(sessions_with_outputs)
-        return round(accepted / total, 3) if total > 0 else None
     except Exception:
         return None
 
@@ -89,29 +89,31 @@ def _categories_extinct(ctx: "BrainContext | None" = None, window: int = 20) -> 
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = get_connection(db)
-        _, min_session = _session_window(conn, window)
+        try:
+            _, min_session = _session_window(conn, window)
 
-        all_cats = {r[0] for r in conn.execute("""
-            SELECT DISTINCT json_extract(data_json, '$.category')
-            FROM events WHERE type = 'CORRECTION'
-              AND json_extract(data_json, '$.category') IS NOT NULL
-        """).fetchall()}
+            all_cats = {r[0] for r in conn.execute("""
+                SELECT DISTINCT json_extract(data_json, '$.category')
+                FROM events WHERE type = 'CORRECTION'
+                  AND json_extract(data_json, '$.category') IS NOT NULL
+            """).fetchall()}
 
-        recent_cats = {r[0] for r in conn.execute("""
-            SELECT DISTINCT json_extract(data_json, '$.category')
-            FROM events WHERE type = 'CORRECTION' AND session >= ?
-              AND json_extract(data_json, '$.category') IS NOT NULL
-        """, (min_session,)).fetchall()}
+            recent_cats = {r[0] for r in conn.execute("""
+                SELECT DISTINCT json_extract(data_json, '$.category')
+                FROM events WHERE type = 'CORRECTION' AND session >= ?
+                  AND json_extract(data_json, '$.category') IS NOT NULL
+            """, (min_session,)).fetchall()}
 
-        tested_cats = {r[0] for r in conn.execute("""
-            SELECT DISTINCT json_extract(data_json, '$.category')
-            FROM events WHERE type = 'OUTPUT' AND session >= ?
-              AND json_extract(data_json, '$.category') IS NOT NULL
-        """, (min_session,)).fetchall()}
+            tested_cats = {r[0] for r in conn.execute("""
+                SELECT DISTINCT json_extract(data_json, '$.category')
+                FROM events WHERE type = 'OUTPUT' AND session >= ?
+                  AND json_extract(data_json, '$.category') IS NOT NULL
+            """, (min_session,)).fetchall()}
 
-        conn.close()
-        extinct = sorted((all_cats - recent_cats) & tested_cats)
-        return extinct
+            extinct = sorted((all_cats - recent_cats) & tested_cats)
+            return extinct
+        finally:
+            conn.close()
     except Exception:
         return []
 
@@ -126,21 +128,23 @@ def _per_session_density(ctx: "BrainContext | None" = None, limit: int = 100) ->
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = get_connection(db)
-        # DB-side windowing: fetch last N sessions, then reverse in Python
-        rows = conn.execute("""
-            SELECT e.session,
-                   SUM(CASE WHEN e.type='CORRECTION' THEN 1 ELSE 0 END) as corr,
-                   SUM(CASE WHEN e.type='OUTPUT' THEN 1 ELSE 0 END) as out_cnt
-            FROM events e
-            LEFT JOIN session_metrics sm ON e.session = sm.session
-            WHERE typeof(e.session)='integer'
-              AND (sm.session_type IS NULL OR sm.session_type != 'systems')
-            GROUP BY e.session
-            HAVING SUM(CASE WHEN e.type='OUTPUT' THEN 1 ELSE 0 END) >= 1
-            ORDER BY e.session DESC LIMIT ?
-        """, (limit,)).fetchall()
-        conn.close()
-        return [r[1] / r[2] for r in reversed(rows)]
+        try:
+            # DB-side windowing: fetch last N sessions, then reverse in Python
+            rows = conn.execute("""
+                SELECT e.session,
+                       SUM(CASE WHEN e.type='CORRECTION' THEN 1 ELSE 0 END) as corr,
+                       SUM(CASE WHEN e.type='OUTPUT' THEN 1 ELSE 0 END) as out_cnt
+                FROM events e
+                LEFT JOIN session_metrics sm ON e.session = sm.session
+                WHERE typeof(e.session)='integer'
+                  AND (sm.session_type IS NULL OR sm.session_type != 'systems')
+                GROUP BY e.session
+                HAVING SUM(CASE WHEN e.type='OUTPUT' THEN 1 ELSE 0 END) >= 1
+                ORDER BY e.session DESC LIMIT ?
+            """, (limit,)).fetchall()
+            return [r[1] / r[2] for r in reversed(rows)]
+        finally:
+            conn.close()
     except Exception:
         return []
 
@@ -155,18 +159,20 @@ def _severity_ratio(ctx: "BrainContext | None" = None, window: int = 20) -> floa
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = get_connection(db)
-        _, min_session = _session_window(conn, window)
-        rows = conn.execute("""
-            SELECT json_extract(data_json, '$.severity') as sev, COUNT(*) as cnt
-            FROM events WHERE type = 'CORRECTION' AND session >= ?
-            GROUP BY sev
-        """, (min_session,)).fetchall()
-        conn.close()
-        total = sum(r[1] for r in rows)
-        if total < 5:
-            return None
-        low = sum(r[1] for r in rows if r[0] in LOW_SEVERITY)
-        return low / total
+        try:
+            _, min_session = _session_window(conn, window)
+            rows = conn.execute("""
+                SELECT json_extract(data_json, '$.severity') as sev, COUNT(*) as cnt
+                FROM events WHERE type = 'CORRECTION' AND session >= ?
+                GROUP BY sev
+            """, (min_session,)).fetchall()
+            total = sum(r[1] for r in rows)
+            if total < 5:
+                return None
+            low = sum(r[1] for r in rows if r[0] in LOW_SEVERITY)
+            return low / total
+        finally:
+            conn.close()
     except Exception:
         return None
 
@@ -192,27 +198,29 @@ def _transfer_score(ctx: "BrainContext | None" = None, window: int = 10) -> floa
 
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = get_connection(db)
-        _, min_session = _session_window(conn, window)
+        try:
+            _, min_session = _session_window(conn, window)
 
-        # Count corrections vs outputs in RULE categories in recent sessions
-        cats_list = list(rule_cats)
-        ph = ",".join("?" * len(cats_list))
-        corrections = conn.execute(
-            f"SELECT COUNT(*) FROM events WHERE type='CORRECTION' AND session >= ? "
-            f"AND json_extract(data_json, '$.category') IN ({ph})",
-            [min_session, *cats_list],
-        ).fetchone()[0] or 0
-        outputs = conn.execute(
-            f"SELECT COUNT(*) FROM events WHERE type='OUTPUT' AND session >= ? "
-            f"AND json_extract(data_json, '$.category') IN ({ph})",
-            [min_session, *cats_list],
-        ).fetchone()[0] or 0
-        conn.close()
+            # Count corrections vs outputs in RULE categories in recent sessions
+            cats_list = list(rule_cats)
+            ph = ",".join("?" * len(cats_list))
+            corrections = conn.execute(
+                f"SELECT COUNT(*) FROM events WHERE type='CORRECTION' AND session >= ? "
+                f"AND json_extract(data_json, '$.category') IN ({ph})",
+                [min_session, *cats_list],
+            ).fetchone()[0] or 0
+            outputs = conn.execute(
+                f"SELECT COUNT(*) FROM events WHERE type='OUTPUT' AND session >= ? "
+                f"AND json_extract(data_json, '$.category') IN ({ph})",
+                [min_session, *cats_list],
+            ).fetchone()[0] or 0
 
-        if outputs < 3:
-            return None
-        # Invert: low correction rate = high transfer score
-        return max(0.0, 1.0 - (corrections / outputs))
+            if outputs < 3:
+                return None
+            # Invert: low correction rate = high transfer score
+            return max(0.0, 1.0 - (corrections / outputs))
+        finally:
+            conn.close()
     except Exception:
         return None
 
@@ -255,7 +263,7 @@ def _counterfactual_percentile(
         # Random density trend: uniform noise around 0.5
         trend = [max(0.01, 0.5 + _rng.gauss(0, 0.15)) for _ in range(min(sessions, 50))]
         null_score = _compound_score(
-            correction_rate=max(0.05, _rng.gauss(0.4, 0.15)),
+            correction_rate=max(0.05, min(1.0, _rng.gauss(0.4, 0.15))),
             severity_ratio=max(0.0, min(1.0, _rng.gauss(0.5, 0.2))),
             lessons_graduated=max(0, int(_rng.gauss(sessions * 0.3, sessions * 0.1))),
             lessons_active=max(0, int(_rng.gauss(5, 2))),
@@ -300,14 +308,16 @@ def _severity_difficulty_weight(ctx: "BrainContext | None" = None) -> float | No
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = get_connection(db)
-        _, min_session = _session_window(conn, 20)
+        try:
+            _, min_session = _session_window(conn, 20)
 
-        rows = conn.execute("""
-            SELECT json_extract(data_json, '$.severity') as sev,
-                   json_extract(data_json, '$.fire_count') as fires
-            FROM events WHERE type = 'CORRECTION' AND session >= ?
-        """, (min_session,)).fetchall()
-        conn.close()
+            rows = conn.execute("""
+                SELECT json_extract(data_json, '$.severity') as sev,
+                       json_extract(data_json, '$.fire_count') as fires
+                FROM events WHERE type = 'CORRECTION' AND session >= ?
+            """, (min_session,)).fetchall()
+        finally:
+            conn.close()
 
         if len(rows) < 5:
             return None
@@ -370,7 +380,9 @@ def _compound_score(
     # Component 1: Correction improvement (0-20 pts)
     if correction_rate is not None and total_corrections >= 5:
         score += max(0.0, 1.0 - correction_rate) * 20
-    elif correction_rate is None:
+    elif correction_rate is None or total_corrections < 5:
+        # Insufficient data: exclude from achievable maximum so the
+        # score isn't deflated by a zero-contribution component.
         max_achievable -= 20
 
     # Component 2: Severity improvement (0-25 pts)
@@ -382,7 +394,11 @@ def _compound_score(
     # Component 3: Graduation rate (0-15 pts)
     total_lessons = lessons_graduated + lessons_active
     if total_lessons > 0:
-        score += min(1.0, lessons_graduated / max(20, total_lessons)) * 15
+        grad_rate = lessons_graduated / total_lessons
+        # Scale down bonus for very small sample sizes to avoid inflation
+        # from e.g. 1 graduated out of 1 total = 100% rate.
+        sample_factor = min(1.0, total_lessons / 10)
+        score += grad_rate * sample_factor * 15
 
     # Component 4: Active lessons (0-8 pts)
     score += min(1.0, lessons_active / 10) * 8
@@ -412,19 +428,31 @@ def _compound_score(
             slope_pts = reduction * 15 * volatility_penalty
 
     # Anti-gaming: discount front-loaded corrections (>60% in first 20%)
+    # Only applies when there are enough total corrections to be meaningful.
+    # A brain with very few sparse corrections can legitimately have them
+    # concentrated early without it being gaming behavior.
     if correction_density_trend and len(correction_density_trend) >= 6:
         early_n = max(1, len(correction_density_trend) // 5)
         total_density = sum(correction_density_trend)
-        if total_density > 0:
+        if total_density > 1.0:  # need meaningful volume, not just 1 stray correction
             early_share = sum(correction_density_trend[:early_n]) / total_density
             if early_share > 0.60:
                 slope_pts *= 0.3
 
-    # Low-absolute-error bonus: don't penalize already-good brains
+    # Low-absolute-error bonus: don't penalize already-good brains.
+    # Only award if the brain actually started higher and improved (or was
+    # always near zero from the start).  Prevents gaming by a brain that
+    # never had corrections and therefore never learned anything.
     if correction_density_trend and len(correction_density_trend) >= 5:
         recent_mean = statistics.mean(correction_density_trend[-5:])
+        early_mean = statistics.mean(correction_density_trend[:5])
         if recent_mean < 0.10:
-            slope_pts = max(slope_pts, 10.0)
+            if early_mean >= 0.10:
+                # Genuine improvement: started high, now low
+                slope_pts = max(slope_pts, 10.0)
+            else:
+                # Always low — modest bonus (may indicate few corrections overall)
+                slope_pts = max(slope_pts, 5.0)
 
     score += slope_pts
 

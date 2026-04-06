@@ -13,6 +13,7 @@ Do NOT merge these two systems. They serve different purposes.
 from __future__ import annotations
 
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
 from typing import Any, Callable
@@ -24,30 +25,35 @@ MAX_ASYNC_WORKERS = 4
 
 
 class EventBus:
-    """In-process event bus with bounded listeners and thread pool for async handlers."""
+    """In-process event bus with bounded listeners, thread safety, and thread pool."""
 
     def __init__(self) -> None:
         self.listeners: dict[str, list[tuple[Callable, bool]]] = defaultdict(list)
         self._pool = ThreadPoolExecutor(max_workers=MAX_ASYNC_WORKERS, thread_name_prefix="gradata-bus")
+        self._lock = threading.Lock()
 
     def on(self, event: str, handler: Callable, async_handler: bool = False) -> None:
         """Subscribe *handler* to *event*. Deduplicates and bounds per event."""
-        entries = self.listeners[event]
-        if any(h is handler for h, _ in entries):
-            return
-        if len(entries) >= MAX_LISTENERS_PER_EVENT:
-            logger.warning("EventBus: max listeners (%d) reached for %r, ignoring", MAX_LISTENERS_PER_EVENT, event)
-            return
-        entries.append((handler, async_handler))
+        with self._lock:
+            entries = self.listeners[event]
+            if any(h is handler for h, _ in entries):
+                return
+            if len(entries) >= MAX_LISTENERS_PER_EVENT:
+                logger.warning("EventBus: max listeners (%d) reached for %r", MAX_LISTENERS_PER_EVENT, event)
+                return
+            entries.append((handler, async_handler))
 
     def off(self, event: str, handler: Callable) -> None:
         """Remove *handler* from *event*."""
-        entries = self.listeners.get(event, [])
-        self.listeners[event] = [(h, a) for h, a in entries if h is not handler]
+        with self._lock:
+            entries = self.listeners.get(event, [])
+            self.listeners[event] = [(h, a) for h, a in entries if h is not handler]
 
     def emit(self, event: str, payload: Any = None) -> None:
         """Emit *event* with *payload*. Errors are logged, never raised."""
-        for handler, is_async in list(self.listeners.get(event, [])):
+        with self._lock:
+            handlers = list(self.listeners.get(event, []))
+        for handler, is_async in handlers:
             if is_async:
                 self._pool.submit(self._safe_call, handler, payload)
             else:

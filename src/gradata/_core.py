@@ -333,20 +333,26 @@ def brain_end_session(
         if not lessons:
             return {"session": brain.session, "lessons": 0, "promotions": 0, "demotions": 0}
 
-        before_states = {l.description[:40]: l.state.value for l in lessons}
+        # Use category + description prefix as key to avoid collisions
+        # when two lessons share the same first 40 chars of description.
+        def _lesson_key(l):
+            return f"{l.category}:{l.description[:60]}"
+        before_states = {_lesson_key(l): l.state.value for l in lessons}
 
         lessons = update_confidence(
             lessons, session_corrections or [],
             session_type=session_type, machine_mode=machine_mode)
 
+        # Auto-detect machine mode: human sessions rarely exceed 30 corrections.
+        # Previous threshold of 10 misclassified productive human sessions.
         is_machine = machine_mode if machine_mode is not None else (
-            len(session_corrections or []) > 10)
+            len(session_corrections or []) > 30)
         active, graduated = graduate(lessons, machine_mode=is_machine)
 
         promotions, demotions, kills = 0, 0, 0
         transitions = []
         for l in active + graduated:
-            key = l.description[:40]
+            key = _lesson_key(l)
             old_state = before_states.get(key, "")
             new_state = l.state.value
             if old_state and new_state != old_state:
@@ -392,11 +398,11 @@ def brain_end_session(
 
         # Archive graduated RULE lessons
         new_rules = [l for l in graduated if l.state.value == "RULE"
-                     and before_states.get(l.description[:40]) != "RULE"]
+                     and before_states.get(_lesson_key(l)) != "RULE"]
         archive_path = lessons_path.parent / "lessons-archive.md"
-        if new_rules and archive_path.exists():
+        if new_rules and archive_path.parent.is_dir():
             from datetime import date
-            archive_text = archive_path.read_text(encoding="utf-8")
+            archive_text = archive_path.read_text(encoding="utf-8") if archive_path.exists() else "# Lessons Archive"
             archive_lines = [archive_text.rstrip(), f"\n## Graduated {date.today().isoformat()} (auto)"]
             for r in new_rules:
                 archive_lines.append(
@@ -426,7 +432,11 @@ def brain_end_session(
                         if all_lessons:
                             write_lessons_safe(lessons_path, format_lessons(all_lessons))
                     save_meta_rules(brain.db_path, new_metas)
-                    meta_rules_discovered = max(0, len(new_metas) - len(existing_metas))
+                    # Count genuinely new meta-rules by ID, not list length.
+                    # Length comparison hides new discoveries when invalidations
+                    # reduce the total below the previous count.
+                    existing_ids = {m.id for m in existing_metas}
+                    meta_rules_discovered = sum(1 for m in new_metas if m.id not in existing_ids)
                     if meta_rules_discovered > 0:
                         _log.info("Meta-rules: %d new (%d total)", meta_rules_discovered, len(new_metas))
             except ImportError as e:
@@ -515,21 +525,36 @@ def brain_detect_implicit_feedback(
     signals = []
     text = user_message.lower()
 
+    # Use word-boundary check to reduce false positives from substring
+    # matching (e.g. "not inaccurate" matching "not accurate").
+    def _phrase_match(phrase: str) -> bool:
+        idx = text.find(phrase)
+        if idx < 0:
+            return False
+        # Check left boundary (start of string or non-alpha)
+        if idx > 0 and text[idx - 1].isalpha():
+            return False
+        # Check right boundary (end of string or non-alpha)
+        end = idx + len(phrase)
+        if end < len(text) and text[end].isalpha():
+            return False
+        return True
+
     for marker in ["are you sure", "that's wrong", "that's not right", "not accurate",
                     "no, not that", "no don't", "stop doing", "why did you", "why didn't you"]:
-        if marker in text:
+        if _phrase_match(marker):
             signals.append({"type": "pushback", "marker": marker})
     for marker in ["make sure", "don't forget", "remember to", "you should always",
                     "i already told", "i just said", "as i mentioned", "like i said"]:
-        if marker in text:
+        if _phrase_match(marker):
             signals.append({"type": "reminder", "marker": marker})
     for marker in ["what about", "you forgot", "you missed", "you skipped",
                     "you ignored", "you dropped", "did you check", "did you verify"]:
-        if marker in text:
+        if _phrase_match(marker):
             signals.append({"type": "gap", "marker": marker})
     for marker in ["are we sure", "is that right", "is that correct",
                     "won't that", "won't people", "i feel like"]:
-        if marker in text:
+        if _phrase_match(marker):
             signals.append({"type": "challenge", "marker": marker})
 
     has_feedback = len(signals) > 0

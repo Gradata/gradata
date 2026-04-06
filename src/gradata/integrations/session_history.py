@@ -41,8 +41,13 @@ class SessionHistory:
             self.corrected_this_session.add(rule_id)
 
     def on_session_ended(self, payload: dict) -> None:
-        """Attach effectiveness scores to the session-end payload."""
+        """Attach effectiveness scores to the session-end payload and reset.
+
+        Resets session state after computing effectiveness so the next
+        session starts clean (prevents cross-session state leakage).
+        """
         payload["rule_effectiveness"] = self.compute_effectiveness()
+        self.reset()
 
     # ── Public API ───────────────────────────────────────────────
 

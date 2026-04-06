@@ -89,13 +89,15 @@ def _scope_match(category: str, task_type: str | None) -> float:
 
 def _context_relevance(description: str, keywords: list[str] | None) -> float:
     if not keywords:
-        return 0.0
+        return 0.5  # neutral when no context provided, consistent with _scope_match
     desc_lower = description.lower()
     hits = sum(1 for kw in keywords if kw.lower() in desc_lower)
     return hits / len(keywords)
 
 
 def _recency_score(last_session: int, current_session: int) -> float:
+    if current_session <= 0 or last_session <= 0:
+        return 0.5  # neutral when session info unavailable
     sessions_ago = max(0, current_session - last_session)
     return 1.0 / (1.0 + sessions_ago * 0.1)
 
@@ -116,5 +118,8 @@ def _effectiveness_bonus(
     if info is None:
         return 0.0
     if info.get("effective"):
-        return min(0.15, info.get("sessions_survived", 0) * 0.015)
+        # Flat bonus for rules proven effective this session.
+        # SessionHistory tracks effective/corrected booleans, not
+        # session counts, so a fixed +0.10 is appropriate.
+        return 0.10
     return -0.10
