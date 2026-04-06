@@ -354,49 +354,6 @@ def order_by_relevance_position(chunks: list[Chunk]) -> list[Chunk]:
     return result
 
 
-
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# Private content filtering (from claude-mem: <private> tag convention)
-# ---------------------------------------------------------------------------
-
-import re as _re
-
-_PRIVATE_RE = _re.compile(r"<private>.*?</private>", _re.DOTALL | _re.IGNORECASE)
-
-
-def strip_private(text: str) -> str:
-    """Remove <private>...</private> blocks from text.
-
-    From claude-mem pattern: users can mark content that should never
-    be stored, retrieved, or included in brain operations.
-
-    Example:
-        >>> strip_private("Hello <private>secret API key</private> world")
-        'Hello  world'
-    """
-    return _PRIVATE_RE.sub("", text)
-
-
-def filter_private_chunks(chunks: list[Chunk]) -> list[Chunk]:
-    """Remove chunks that contain only private content."""
-    filtered: list[Chunk] = []
-    for chunk in chunks:
-        cleaned = strip_private(chunk.content).strip()
-        if cleaned:
-            filtered.append(Chunk(
-                content=cleaned,
-                source=chunk.source,
-                chunk_id=chunk.chunk_id,
-                relevance_score=chunk.relevance_score,
-                recency_weight=chunk.recency_weight,
-                memory_type=chunk.memory_type,
-                graduation_level=chunk.graduation_level,
-            ))
-    return filtered
-
-
 # ---------------------------------------------------------------------------
 # Convenience classes (wrap cascade_retrieve for OOP usage)
 # ---------------------------------------------------------------------------
