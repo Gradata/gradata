@@ -332,7 +332,11 @@ def brain_end_session(
         if not lessons:
             return {"session": brain.session, "lessons": 0, "promotions": 0, "demotions": 0}
 
-        before_states = {l.description[:40]: l.state.value for l in lessons}
+        # Use category + description prefix as key to avoid collisions
+        # when two lessons share the same first 40 chars of description.
+        def _lesson_key(l):
+            return f"{l.category}:{l.description[:60]}"
+        before_states = {_lesson_key(l): l.state.value for l in lessons}
 
         lessons = update_confidence(
             lessons, session_corrections or [],
@@ -345,7 +349,7 @@ def brain_end_session(
         promotions, demotions, kills = 0, 0, 0
         transitions = []
         for l in active + graduated:
-            key = l.description[:40]
+            key = _lesson_key(l)
             old_state = before_states.get(key, "")
             new_state = l.state.value
             if old_state and new_state != old_state:
@@ -391,7 +395,7 @@ def brain_end_session(
 
         # Archive graduated RULE lessons
         new_rules = [l for l in graduated if l.state.value == "RULE"
-                     and before_states.get(l.description[:40]) != "RULE"]
+                     and before_states.get(_lesson_key(l)) != "RULE"]
         archive_path = lessons_path.parent / "lessons-archive.md"
         if new_rules and archive_path.exists():
             from datetime import date
