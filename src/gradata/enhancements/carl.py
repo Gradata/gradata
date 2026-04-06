@@ -218,9 +218,6 @@ class ContractRegistry:
         )
         return any(c.priority == RulePriority.MUST for c in must_constraints)
 
-    def get_contracts_for_domain(self, domain: str) -> list[BehavioralContract]:
-        """Return all contracts for a specific domain."""
-        return [c for c in self._contracts if c.domain == domain]
 
     def format_constraints_prompt(self, task: str) -> str:
         """Format applicable constraints as a prompt injection block.
