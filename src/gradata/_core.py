@@ -477,7 +477,7 @@ def brain_auto_evolve(
 # ── detect_implicit_feedback() ─────────────────────────────────────────
 
 def brain_detect_implicit_feedback(
-    brain: Brain, user_message: str, *, session: int = None,
+    brain: Brain, user_message: str, *, session: int | None = None,
 ) -> dict:
     """Detect implicit behavioral feedback in user prompts."""
     signals = []
