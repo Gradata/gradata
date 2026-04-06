@@ -415,10 +415,14 @@ def _group_by_theme(lessons: list[Lesson]) -> dict[str, list[Lesson]]:
                 best_cluster = -1
                 best_sim = 0.0
                 for i, cluster in enumerate(clusters):
-                    # Compare to cluster centroid (first member = seed)
-                    sim = semantic_similarity(lesson.description, cluster[0].description)
-                    if sim > best_sim:
-                        best_sim = sim
+                    # Average-linkage: compare to all cluster members
+                    # for more stable clustering than seed-only comparison.
+                    avg_sim = sum(
+                        semantic_similarity(lesson.description, m.description)
+                        for m in cluster
+                    ) / len(cluster)
+                    if avg_sim > best_sim:
+                        best_sim = avg_sim
                         best_cluster = i
                 if best_sim >= 0.55 and best_cluster >= 0:
                     clusters[best_cluster].append(lesson)
