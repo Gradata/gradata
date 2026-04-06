@@ -96,6 +96,8 @@ def _context_relevance(description: str, keywords: list[str] | None) -> float:
 
 
 def _recency_score(last_session: int, current_session: int) -> float:
+    if current_session <= 0 or last_session <= 0:
+        return 0.5  # neutral when session info unavailable
     sessions_ago = max(0, current_session - last_session)
     return 1.0 / (1.0 + sessions_ago * 0.1)
 
