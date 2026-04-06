@@ -24,10 +24,8 @@ const filePath = toolInput.file_path || toolInput.path || '';
 
 let findings = [];
 try {
-  if (fs.existsSync(STATE_FILE)) {
-    findings = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-    findings = findings.filter(f => Date.now() - f.ts < FINDING_TTL_MS);
-  }
+  findings = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+  findings = findings.filter(f => Date.now() - f.ts < FINDING_TTL_MS);
 } catch (e) { findings = []; }
 
 if (toolName === 'Bash') {

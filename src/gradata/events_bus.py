@@ -32,7 +32,8 @@ class EventBus:
         If *async_handler* is True the handler runs in a daemon thread
         (fire-and-forget) instead of blocking the caller.
         """
-        self.listeners[event].append((handler, async_handler))
+        if not any(h is handler for h, _ in self.listeners[event]):
+            self.listeners[event].append((handler, async_handler))
 
     def off(self, event: str, handler: Callable) -> None:
         """Remove *handler* from *event*."""
@@ -43,19 +44,9 @@ class EventBus:
         """Emit *event* with *payload*.  Errors are logged, never raised."""
         for handler, is_async in list(self.listeners.get(event, [])):
             if is_async:
-                t = threading.Thread(target=self._safe_call, args=(handler, payload), daemon=True)
-                t.start()
+                threading.Thread(target=self._safe_call, args=(handler, payload), daemon=True).start()
             else:
-                t = threading.Thread(target=self._safe_call, args=(handler, payload), daemon=True)
-                t.start()
-                t.join(timeout=self.handler_timeout)
-                if t.is_alive():
-                    logger.warning(
-                        "Handler %s for event %r timed out after %.1fs",
-                        handler,
-                        event,
-                        self.handler_timeout,
-                    )
+                self._safe_call(handler, payload)
 
     # -- internals ------------------------------------------------------------
 

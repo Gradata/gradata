@@ -52,16 +52,18 @@ class TestEventBus:
         assert results == ["ok"]
 
     def test_handler_timeout(self):
-        bus = EventBus(handler_timeout=0.3)
+        # Sync handlers run directly (no timeout). Async handlers are fire-and-forget.
+        # This test verifies a slow async handler doesn't block emit().
+        bus = EventBus()
 
         def slow_handler(p):
             time.sleep(5)
 
-        bus.on("evt", slow_handler)
+        bus.on("evt", slow_handler, async_handler=True)
         start = time.time()
         bus.emit("evt", {})
         elapsed = time.time() - start
-        assert elapsed < 2.0, f"emit blocked for {elapsed:.1f}s, expected < 2s"
+        assert elapsed < 1.0, f"async emit blocked for {elapsed:.1f}s, expected < 1s"
 
     def test_async_handler(self):
         result = threading.Event()

@@ -136,12 +136,18 @@ class Brain:
         from gradata.events_bus import EventBus
         self.bus = EventBus()
 
-        # Register built-in nervous system subscribers
-        from gradata.integrations.embeddings import subscribe_to_bus as _embed_sub
-        from gradata.integrations.session_history import SessionHistory as _SH
-        _embed_sub(self.bus)
-        self._session_history = _SH()
-        self._session_history.subscribe_to_bus(self.bus)
+        # Register built-in nervous system subscribers (lazy, never block init)
+        try:
+            from gradata.integrations.embeddings import subscribe_to_bus as _embed_sub
+            _embed_sub(self.bus)
+        except ImportError:
+            pass
+        try:
+            from gradata.integrations.session_history import SessionHistory as _SH
+            self._session_history = _SH()
+            self._session_history.subscribe_to_bus(self.bus)
+        except ImportError:
+            pass
 
         # Cloud connection (None = local-only mode)
         self._cloud = None

@@ -70,7 +70,7 @@ def _score_rule(
         + 0.10 * fire
     )
 
-    bonus = _effectiveness_bonus(rule.get("description", ""), effectiveness)
+    bonus = _effectiveness_bonus(rule, effectiveness)
     return max(0.0, min(1.0, base + bonus))
 
 
@@ -105,12 +105,14 @@ def _fire_count_score(fire_count: int) -> float:
 
 
 def _effectiveness_bonus(
-    description: str,
+    rule: dict[str, Any],
     effectiveness: dict[str, dict[str, Any]] | None,
 ) -> float:
     if not effectiveness:
         return 0.0
-    info = effectiveness.get(description)
+    # Try rule_id first (matches SessionHistory keys), fall back to description
+    rule_id = rule.get("id") or rule.get("description", "")
+    info = effectiveness.get(rule_id)
     if info is None:
         return 0.0
     if info.get("effective"):

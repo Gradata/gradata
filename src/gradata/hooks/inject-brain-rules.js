@@ -104,46 +104,28 @@ try {
   let rulesBlock;
   let method = 'score';
 
-  // Try QMD for context-aware boosting (HTTP MCP API)
+  // Try QMD for context-aware boosting (synchronous to avoid race condition)
   try {
-    const http = require('http');
-    const qmdPayload = JSON.stringify({
-      jsonrpc: '2.0', method: 'tools/call',
-      params: { name: 'ctx_search', arguments: { query: 'current working context', limit: 5 } },
-      id: 1,
-    });
-    const qmdReq = http.request({
-      hostname: 'localhost', port: 8181, path: '/mcp',
-      method: 'POST', timeout: 2000,
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(qmdPayload) },
-    });
-    let qmdBody = '';
-    qmdReq.on('response', (res) => {
-      res.on('data', c => qmdBody += c);
-      res.on('end', () => {
-        try {
-          const r = JSON.parse(qmdBody);
-          const text = (r.result && r.result.content && r.result.content[0] && r.result.content[0].text) || '';
-          if (text.length > 10) {
-            method = 'qmd+score';
-            const contextKeywords = text.toLowerCase().split(/\W+/).filter(w => w.length > 3);
-            // Boost rules that match QMD context keywords
-            for (const s of scored) {
-              const desc = (s.description || '').toLowerCase();
-              const matches = contextKeywords.filter(kw => desc.includes(kw)).length;
-              if (matches > 0) {
-                s.score += 0.15 * Math.min(1.0, matches / Math.max(1, contextKeywords.length));
-              }
-            }
-            scored.sort((a, b) => b.score - a.score);
-          }
-        } catch (_) {}
-      });
-    });
-    qmdReq.on('error', () => {});
-    qmdReq.on('timeout', () => qmdReq.destroy());
-    qmdReq.write(qmdPayload);
-    qmdReq.end();
+    const { execSync } = require('child_process');
+    const qmdPayload = '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ctx_search","arguments":{"query":"current working context","limit":5}},"id":1}';
+    const curlResult = execSync(
+      `curl -s -m 2 -X POST http://localhost:8181/mcp -H "Content-Type: application/json" -d '${qmdPayload}'`,
+      { encoding: 'utf8', timeout: 3000 }
+    );
+    const r = JSON.parse(curlResult);
+    const qmdText = (r.result && r.result.content && r.result.content[0] && r.result.content[0].text) || '';
+    if (qmdText.length > 10) {
+      method = 'qmd+score';
+      const contextKeywords = qmdText.toLowerCase().split(/\W+/).filter(w => w.length > 3);
+      for (const s of scored) {
+        const desc = (s.description || '').toLowerCase();
+        const matches = contextKeywords.filter(kw => desc.includes(kw)).length;
+        if (matches > 0) {
+          s.score += 0.15 * Math.min(1.0, matches / Math.max(1, contextKeywords.length));
+        }
+      }
+      scored.sort((a, b) => b.score - a.score);
+    }
   } catch (_) {
     // QMD not available — continue with score-only ranking
   }
