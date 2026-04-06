@@ -425,7 +425,11 @@ def brain_end_session(
                         if all_lessons:
                             write_lessons_safe(lessons_path, format_lessons(all_lessons))
                     save_meta_rules(brain.db_path, new_metas)
-                    meta_rules_discovered = max(0, len(new_metas) - len(existing_metas))
+                    # Count genuinely new meta-rules by ID, not list length.
+                    # Length comparison hides new discoveries when invalidations
+                    # reduce the total below the previous count.
+                    existing_ids = {m.id for m in existing_metas}
+                    meta_rules_discovered = sum(1 for m in new_metas if m.id not in existing_ids)
                     if meta_rules_discovered > 0:
                         _log.info("Meta-rules: %d new (%d total)", meta_rules_discovered, len(new_metas))
             except ImportError as e:
