@@ -1,58 +1,44 @@
 # Contributing to Gradata
 
-Thanks for your interest in contributing. Here's how to get started.
+Thanks for your interest in contributing.
 
-## Setup
-
-```bash
-git clone https://github.com/gradata-systems/gradata.git
-cd gradata/sdk
-uv pip install -e ".[dev]" --system  # or: pip install -e ".[dev]"
-```
-
-## Development workflow
-
-1. Create a branch from `main`
-2. Make changes
-3. Add tests for new functionality
-4. Run the test suite: `pytest tests/ -q`
-5. Run type checks: `pyright src/`
-6. Run linting: `ruff check src/`
-7. Submit a PR against `main`
-
-## Code standards
-
-- **Zero dependencies** for core package. If your change adds a required dependency, it will be rejected. Optional dependencies go in `[project.optional-dependencies]`.
-- **Type hints** on all public API functions.
-- **Tests required** for all new functionality. We use pytest. Target: every public method has at least one behavioral test.
-- **No hardcoded paths or secrets.** All configuration via environment variables or brain config.
-
-## Architecture
-
-The SDK has 3 layers:
-
-- **Layer 0 (`patterns/`)** -- base agentic patterns. Never imports from `enhancements/`.
-- **Layer 1 (`enhancements/`)** -- brain-specific learning. May import from `patterns/`.
-- **Shared types (`_types.py`)** -- data classes used by both layers.
-
-Do not add cross-layer imports. If both layers need a type, put it in `_types.py`.
-
-## Tests
+## Development Setup
 
 ```bash
-pytest tests/ -q              # all tests
-pytest tests/test_brain.py -v # specific file
-pytest -k "test_correct"      # by name
+git clone https://github.com/Gradata/gradata.git
+cd gradata
+pip install -e ".[dev]"
+pytest tests/
 ```
 
-## Licensing
+## Running Tests
 
-Gradata is dual-licensed: AGPL-3.0 for open source, commercial license for enterprise. By contributing, you agree your contributions will be licensed under the same terms.
+```bash
+pytest tests/ -x -q          # Full suite
+pytest tests/test_core.py -v  # Specific module
+```
 
-## Reporting issues
+## Code Style
 
-Open an issue on GitHub with:
-- What you expected
-- What happened
+- Python 3.11+, type hints required
+- Run `pyright` for type checking (target: zero errors)
+- Keep files under 500 lines
+- No unnecessary abstractions — YAGNI
+
+## Pull Requests
+
+1. Fork the repo and create a branch from `main`
+2. Write tests for new functionality (TDD preferred)
+3. Ensure all tests pass and pyright is clean
+4. Keep PRs focused — one feature or fix per PR
+
+## Reporting Issues
+
+Open an issue on [GitHub](https://github.com/Gradata/gradata/issues). Include:
+- What you expected vs what happened
 - Steps to reproduce
 - Python version and OS
+
+## License
+
+By contributing, you agree that your contributions will be licensed under AGPL-3.0.

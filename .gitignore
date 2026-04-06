@@ -119,7 +119,7 @@ website/
 website-next/
 onboarding/
 templates/
-examples/
+# examples/ — included for open source hygiene
 research/
 mkdocs.yml
 scripts/
