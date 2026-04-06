@@ -601,6 +601,10 @@ def validate_meta_rule(
     # with the principle AND contains negation/reversal language
     _REVERSAL_WORDS = {"actually", "instead", "wrong", "incorrect", "stop", "dont", "don", "not"}
 
+    # Scale overlap threshold relative to principle size so short principles
+    # (4-6 tokens) can still be invalidated. Minimum 2 overlapping tokens.
+    overlap_threshold = max(2, len(principle_tokens) // 3)
+
     for correction in recent_corrections:
         desc = correction.get("description", "")
         desc_tokens = _tokenise(desc)
@@ -608,8 +612,8 @@ def validate_meta_rule(
         overlap = len(principle_tokens & desc_tokens)
         has_reversal = bool(desc_tokens & _REVERSAL_WORDS)
 
-        # High overlap + reversal language = likely contradiction
-        if overlap >= 4 and has_reversal:
+        # Significant overlap + reversal language = likely contradiction
+        if overlap >= overlap_threshold and has_reversal:
             return False
 
     return True
