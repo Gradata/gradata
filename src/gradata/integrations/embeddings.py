@@ -83,17 +83,25 @@ def cluster_lessons_by_similarity(lessons, threshold=0.7, client=None):
         client = get_client()
     vectors = [client.embed(l["description"]) for l in lessons]
     parent = list(range(len(lessons)))
+    rank = [0] * len(lessons)
 
     def find(x):
         while parent[x] != x:
-            parent[x] = parent[parent[x]]
+            parent[x] = parent[parent[x]]  # path splitting
             x = parent[x]
         return x
 
     def union(x, y):
         px, py = find(x), find(y)
         if px != py:
-            parent[px] = py
+            # Union by rank for O(alpha(n)) amortized find
+            if rank[px] < rank[py]:
+                parent[px] = py
+            elif rank[px] > rank[py]:
+                parent[py] = px
+            else:
+                parent[py] = px
+                rank[px] += 1
 
     for i in range(len(lessons)):
         for j in range(i + 1, len(lessons)):
