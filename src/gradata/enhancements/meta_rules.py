@@ -608,7 +608,7 @@ def merge_into_meta(
     if principle is None:
         principle = _synthesise_principle(rules, theme)
     categories = sorted(set(l.category for l in rules))
-    avg_confidence = round(sum(l.confidence for l in rules) / len(rules), 2) if rules else 0.0
+    avg_confidence = min(1.0, round(sum(l.confidence for l in rules) / len(rules), 2)) if rules else 0.0
 
     # Infer scope from majority of source rules
     scope: dict = {}
