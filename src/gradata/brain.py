@@ -33,8 +33,11 @@ does not support concurrent writes from multiple threads. Use one Brain
 per process, or use process-level locks for multi-worker deployments.
 """
 
+from __future__ import annotations
+
 import logging
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 logger = logging.getLogger("gradata")
@@ -166,11 +169,11 @@ class Brain:
         cls,
         brain_dir: str | Path,
         *,
-        domain: str = None,
-        name: str = None,
-        company: str = None,
-        embedding: str = None,
-        interactive: bool = None,
+        domain: str | None = None,
+        name: str | None = None,
+        company: str | None = None,
+        embedding: str | None = None,
+        interactive: bool | None = None,
     ) -> "Brain":
         """Bootstrap a new brain directory with the onboarding wizard.
 
@@ -199,7 +202,7 @@ class Brain:
             domain=domain,
             company=company,
             embedding=embedding,
-            interactive=interactive,
+            interactive=interactive if interactive is not None else True,
         )
 
     # ── Credit Budgets (daily API spend limits) ──────────────────────────
@@ -323,7 +326,7 @@ class Brain:
                                   evaluator=evaluator, dimensions=dimensions,
                                   threshold=threshold)
 
-    def detect_implicit_feedback(self, user_message: str, session: int = None) -> dict:
+    def detect_implicit_feedback(self, user_message: str, session: int | None = None) -> dict:
         """Detect implicit behavioral feedback in user prompts."""
         from gradata._core import brain_detect_implicit_feedback
         return brain_detect_implicit_feedback(self, user_message, session=session)
@@ -345,7 +348,7 @@ class Brain:
         if scope is not None:
             data["scope"] = scope
         return self.emit("OUTPUT", "brain.log_output", data,
-                         [f"output:{output_type}"], session)
+                         [f"output:{output_type}"], session or 0)
 
     # ── Rules ──────────────────────────────────────────────────────────
 
@@ -449,7 +452,7 @@ class Brain:
                 "lesson_description": target.description[:200],
                 "previous_state": old_state, "previous_confidence": old_conf,
                 "kill_reason": "manual_rollback",
-            }, [f"category:{target.category}", "rollback"], None)
+            }, [f"category:{target.category}", "rollback"], 0)
         except Exception as e:
             logger.debug("Rollback event emit failed: %s", e)
         return {"rolled_back": True, "lesson_index": target_idx,
@@ -632,14 +635,14 @@ class Brain:
 
     # ── Events ─────────────────────────────────────────────────────────
 
-    def emit(self, event_type: str, source: str, data: dict = None,
-             tags: list = None, session: int = None) -> dict:
+    def emit(self, event_type: str, source: str, data: dict | None = None,
+             tags: list | None = None, session: int | None = None) -> dict:
         """Emit an event to the brain's event log."""
         from gradata._events import emit
-        return emit(event_type, source, data or {}, tags or [], session, ctx=self.ctx)
+        return emit(event_type, source, data or {}, tags or [], session or 0, ctx=self.ctx)
 
-    def query_events(self, event_type: str = None, session: int = None,
-                     last_n_sessions: int = None, limit: int = 100) -> list[dict]:
+    def query_events(self, event_type: str | None = None, session: int | None = None,
+                     last_n_sessions: int | None = None, limit: int = 100) -> list[dict]:
         """Query events from the brain's event log."""
         try:
             from gradata._events import query
@@ -648,7 +651,7 @@ class Brain:
         except ImportError:
             return []
 
-    def get_facts(self, prospect: str = None, fact_type: str = None) -> list[dict]:
+    def get_facts(self, prospect: str | None = None, fact_type: str | None = None) -> list[dict]:
         """Query structured facts from the brain."""
         try:
             from gradata._fact_extractor import query_facts
@@ -690,8 +693,8 @@ class Brain:
 
     # ── Search ─────────────────────────────────────────────────────────
 
-    def search(self, query: str, mode: str = None, top_k: int = 5,
-               file_type: str = None) -> list[dict]:
+    def search(self, query: str, mode: str | None = None, top_k: int = 5,
+               file_type: str | None = None) -> list[dict]:
         """Search the brain using FTS5 keyword search."""
         if mode == "events":
             return self._search_events(query, top_k)
@@ -770,7 +773,7 @@ class Brain:
         except ImportError:
             return {"schema_version": "1.0.0", "metadata": {"brain_version": "unknown"}}
 
-    def export(self, output_path: str = None, mode: str = "full") -> Path:
+    def export(self, output_path: str | None = None, mode: str = "full") -> Path:
         """Export brain as a shareable archive."""
         try:
             from gradata._export_brain import export_brain
@@ -909,7 +912,7 @@ class Brain:
         from gradata.contrib.patterns.pipeline import Pipeline
         return Pipeline(*stages)
 
-    def run(self, tasks: list[str] | str, worker: object, *,
+    def run(self, tasks: list[str] | str, worker: "Callable", *,
             max_concurrent: int = 3) -> dict:
         """Execute task(s) through orchestrator. See gradata.contrib.patterns.orchestrator."""
         from gradata.contrib.patterns.orchestrator import execute_orchestrated
@@ -917,9 +920,9 @@ class Brain:
             tasks = [tasks]
         return execute_orchestrated(tasks, worker, brain=self, max_concurrent=max_concurrent)
 
-    def spawn_queue(self, tasks: list[str], worker: object, *,
+    def spawn_queue(self, tasks: list[str], worker: "Callable", *,
                     max_concurrent: int = 3, timeout_seconds: int = 1800,
-                    on_complete: object | None = None) -> dict:
+                    on_complete: "Callable | None" = None) -> dict:
         """Execute tasks through a pull-based queue with N concurrent workers."""
         import concurrent.futures
         results, failed = [], []
