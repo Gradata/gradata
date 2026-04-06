@@ -370,7 +370,9 @@ def _compound_score(
     # Component 1: Correction improvement (0-20 pts)
     if correction_rate is not None and total_corrections >= 5:
         score += max(0.0, 1.0 - correction_rate) * 20
-    elif correction_rate is None:
+    elif correction_rate is None or total_corrections < 5:
+        # Insufficient data: exclude from achievable maximum so the
+        # score isn't deflated by a zero-contribution component.
         max_achievable -= 20
 
     # Component 2: Severity improvement (0-25 pts)
