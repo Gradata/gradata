@@ -374,7 +374,7 @@ def _compound_score(
     # Component 2: Severity improvement (0-25 pts)
     if severity_ratio is not None:
         score += severity_ratio * 25
-    elif total_corrections < 5:
+    else:
         max_achievable -= 25
 
     # Component 3: Graduation rate (0-15 pts)
