@@ -911,7 +911,8 @@ def brain_convergence(brain: "Brain") -> dict:
     """
     empty = {"sessions": [], "corrections_per_session": [], "trend": "insufficient_data",
              "p_value": 1.0, "changepoints": [], "by_category": {},
-             "total_corrections": 0, "total_sessions": 0}
+             "total_corrections": 0, "total_sessions": 0,
+             "edit_distance_per_session": [], "edit_distance_trend": "insufficient_data"}
 
     try:
         from gradata._db import get_connection
@@ -929,6 +930,15 @@ def brain_convergence(brain: "Brain") -> dict:
                 "SELECT session, data_json FROM events "
                 "WHERE type = 'CORRECTION' AND session IS NOT NULL AND session > 0 "
                 "ORDER BY session"
+            ).fetchall()
+
+            # Average edit distance per session
+            ed_rows = conn.execute(
+                "SELECT session, AVG(json_extract(data_json, '$.edit_distance')) as avg_ed "
+                "FROM events "
+                "WHERE type = 'CORRECTION' AND session IS NOT NULL AND session > 0 "
+                "AND json_extract(data_json, '$.edit_distance') IS NOT NULL "
+                "GROUP BY session ORDER BY session"
             ).fetchall()
     except Exception:
         return empty
@@ -974,6 +984,15 @@ def brain_convergence(brain: "Brain") -> dict:
             "p_value": cat_p,
         }
 
+    # Edit distance trend
+    ed_counts = [r[1] for r in ed_rows] if ed_rows else []
+    if len(ed_counts) >= 3:
+        ed_mk_trend, _ed_p = _mann_kendall(ed_counts)
+        ed_trend = "improving" if ed_mk_trend == "decreasing" else (
+            "worsening" if ed_mk_trend == "increasing" else "stable")
+    else:
+        ed_trend = "insufficient_data"
+
     from gradata._stats import cusum_changepoints
     raw_changepoints = cusum_changepoints(counts)
     changepoint_sessions = [sessions[i] for i in raw_changepoints if i < len(sessions)]
@@ -987,6 +1006,8 @@ def brain_convergence(brain: "Brain") -> dict:
         "by_category": by_category,
         "total_corrections": sum(counts),
         "total_sessions": len(sessions),
+        "edit_distance_per_session": [round(r[1], 4) for r in ed_rows] if ed_rows else [],
+        "edit_distance_trend": ed_trend,
     }
 
 
