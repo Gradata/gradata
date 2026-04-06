@@ -405,6 +405,9 @@ def brain_end_session(
                     if any(l.parent_meta_rule_id for l in all_lessons):
                         from gradata.enhancements.self_improvement import propagate_confidence
                         propagate_confidence(all_lessons, new_metas)
+                        # Re-write lessons to persist propagated confidence
+                        if all_lessons:
+                            write_lessons_safe(lessons_path, format_lessons(all_lessons))
                     save_meta_rules(brain.db_path, new_metas)
                     meta_rules_discovered = max(0, len(new_metas) - len(existing_metas))
                     if meta_rules_discovered > 0:
