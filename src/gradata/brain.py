@@ -66,6 +66,8 @@ class Brain:
             if self._encryption_key:
                 open_encrypted_db(self.dir, self._encryption_key)
 
+        self._instruction_cache: object | None = None  # lazy: InstructionCache
+
         logger.debug("Brain init: %s (db=%s)", self.dir, self.db_path)
 
         # Build immutable context for this brain instance (DI path)

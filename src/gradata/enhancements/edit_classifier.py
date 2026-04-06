@@ -17,8 +17,12 @@ from __future__ import annotations
 import re
 from collections import Counter
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from gradata.enhancements.diff_engine import DiffResult
+
+if TYPE_CHECKING:
+    from gradata.enhancements.instruction_cache import InstructionCache
 
 
 @dataclass
@@ -395,7 +399,7 @@ def extract_behavioral_instruction(
     diff: DiffResult,
     classification: EditClassification,
     *,
-    cache: "InstructionCache | None" = None,
+    cache: InstructionCache | None = None,
     llm_enabled: bool = True,
 ) -> str | None:
     """Extract a behavioral instruction from a correction.
