@@ -10,7 +10,6 @@ from __future__ import annotations
 import logging
 import math
 import os
-from typing import Sequence
 from urllib.request import Request, urlopen
 import json
 
@@ -19,13 +18,7 @@ logger = logging.getLogger(__name__)
 EMBEDDING_DIM = 128
 
 
-def cosine_similarity(a: Sequence[float], b: Sequence[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
-    norm_a = math.sqrt(sum(x * x for x in a))
-    norm_b = math.sqrt(sum(x * x for x in b))
-    if norm_a == 0.0 or norm_b == 0.0:
-        return 0.0
-    return dot / (norm_a * norm_b)
+from gradata._math import cosine_similarity  # noqa: E402 — shared utility
 
 
 class EmbeddingClient:

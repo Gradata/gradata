@@ -134,30 +134,10 @@ class ClusterAssignment:
 
 
 # ---------------------------------------------------------------------------
-# Math utilities
+# Math utilities (shared implementation in _math.py)
 # ---------------------------------------------------------------------------
 
-def cosine_similarity(a: list[float], b: list[float]) -> float:
-    """Compute cosine similarity between two vectors.
-
-    Args:
-        a: First vector.
-        b: Second vector (must be same length).
-
-    Returns:
-        Cosine similarity in [-1.0, 1.0]. Returns 0.0 for zero vectors.
-    """
-    if len(a) != len(b):
-        return 0.0
-
-    dot = sum(x * y for x, y in zip(a, b))
-    mag_a = math.sqrt(sum(x * x for x in a))
-    mag_b = math.sqrt(sum(x * x for x in b))
-
-    if mag_a == 0.0 or mag_b == 0.0:
-        return 0.0
-
-    return dot / (mag_a * mag_b)
+from gradata._math import cosine_similarity  # noqa: E402, F811
 
 
 # ---------------------------------------------------------------------------

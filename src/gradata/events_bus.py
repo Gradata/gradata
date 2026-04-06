@@ -1,4 +1,14 @@
-"""EventBus — lightweight pub/sub for Gradata's nervous system."""
+"""EventBus — lightweight in-memory pub/sub for Gradata's nervous system.
+
+This is the IN-MEMORY subscriber notification system. It does NOT persist events.
+For event persistence (JSONL + SQLite), see _events.py / brain.emit().
+
+Both systems fire in brain_correct() and brain_end_session() intentionally:
+  - EventBus.emit() → notifies in-memory subscribers (embeddings, session_history)
+  - brain.emit() / _events.emit() → writes to events.jsonl + system.db
+
+Do NOT merge these two systems. They serve different purposes.
+"""
 
 from __future__ import annotations
 

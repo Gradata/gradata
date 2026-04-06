@@ -6,10 +6,11 @@
  * the current session context, and injects the top-N most relevant
  * as a <brain-rules> block into the session.
  *
- * Scoring formula (procedural memory, not episodic):
- *   40% scope match   — does the task type match the rule category?
- *   30% confidence     — RULE:0.92 > PATTERN:0.65
- *   20% recency        — recently fired rules rank higher
+ * Scoring formula (aligned with Python rule_ranker.py):
+ *   30% scope match   — does the task type match the rule category?
+ *   25% confidence     — RULE:0.92 > PATTERN:0.65
+ *   20% context        — QMD keyword boost (applied separately)
+ *   15% recency        — recently fired rules rank higher
  *   10% fire count     — battle-tested rules rank higher
  *
  * Budget: max 10 rules, ~500 tokens. Prevents context bloat.
@@ -91,7 +92,9 @@ try {
     // Fire count: log scale, capped
     const fireScore = Math.min(1.0, Math.log(l.fireCount + 1) / Math.log(100));
 
-    const total = (0.40 * scopeScore) + (0.30 * confScore) + (0.20 * recencyScore) + (0.10 * fireScore);
+    // Weights aligned with Python rule_ranker.py (30/25/20/15/10)
+    // Context relevance (20%) is added later via QMD boost if available
+    const total = (0.30 * scopeScore) + (0.25 * confScore) + (0.15 * recencyScore) + (0.10 * fireScore);
 
     return { ...l, score: total };
   });
