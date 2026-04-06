@@ -45,31 +45,33 @@ def _compute_fda(ctx: "BrainContext | None" = None, window: int = 20) -> float |
             if len(sessions_with_outputs) < 3:
                 return None
 
+            # Single aggregate query replacing N+1 per-session queries
+            session_ids = [s[0] for s in sessions_with_outputs]
+            placeholders = ",".join("?" * len(session_ids))
+            correction_stats = conn.execute(f"""
+                SELECT session,
+                       SUM(CASE WHEN json_extract(data_json, '$.severity') IS NOT NULL THEN 1 ELSE 0 END) as has_sev,
+                       SUM(CASE WHEN json_extract(data_json, '$.severity') IN ('moderate', 'major', 'discarded') THEN 1 ELSE 0 END) as major,
+                       COUNT(*) as total_corr
+                FROM events
+                WHERE type = 'CORRECTION' AND session IN ({placeholders})
+                GROUP BY session
+            """, session_ids).fetchall()
+
+            # Build lookup: session -> (has_severity, major_count, total_count)
+            corr_by_session = {row[0]: (row[1], row[2], row[3]) for row in correction_stats}
+
             accepted = 0
             for (session,) in sessions_with_outputs:
-                # Check for corrections — use severity if available, otherwise any correction counts
-                has_severity = conn.execute("""
-                    SELECT COUNT(*) FROM events
-                    WHERE type = 'CORRECTION' AND session = ?
-                      AND json_extract(data_json, '$.severity') IS NOT NULL
-                """, (session,)).fetchone()[0]
-
-                if has_severity > 0:
-                    # Severity data exists: only major/moderate/discarded count against acceptance
-                    major_corrections = conn.execute("""
-                        SELECT COUNT(*) FROM events
-                        WHERE type = 'CORRECTION' AND session = ?
-                          AND json_extract(data_json, '$.severity') IN ('moderate', 'major', 'discarded')  -- HIGH_SEVERITY
-                    """, (session,)).fetchone()[0]
+                has_sev, major, total_corr = corr_by_session.get(session, (0, 0, 0))
+                if has_sev > 0:
+                    # Severity data: only major/moderate/discarded count against acceptance
+                    if major == 0:
+                        accepted += 1
                 else:
                     # No severity data: any correction counts against acceptance
-                    major_corrections = conn.execute("""
-                        SELECT COUNT(*) FROM events
-                        WHERE type = 'CORRECTION' AND session = ?
-                    """, (session,)).fetchone()[0]
-
-                if major_corrections == 0:
-                    accepted += 1
+                    if total_corr == 0:
+                        accepted += 1
 
             total = len(sessions_with_outputs)
             return round(accepted / total, 3) if total > 0 else None
