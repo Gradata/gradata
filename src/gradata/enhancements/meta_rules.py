@@ -666,7 +666,7 @@ def validate_meta_rule(
 
     # Contradiction signals: if a correction shares significant overlap
     # with the principle AND contains negation/reversal language
-    _REVERSAL_WORDS = {"actually", "instead", "wrong", "incorrect", "stop", "dont", "not"}
+    _REVERSAL_WORDS = {"actually", "instead", "wrong", "incorrect", "stop", "dont", "don", "not"}
 
     for correction in recent_corrections:
         desc = correction.get("description", "")
