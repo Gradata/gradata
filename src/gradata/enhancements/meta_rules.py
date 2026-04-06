@@ -16,7 +16,6 @@ import hashlib
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from gradata._types import ELIGIBLE_STATES, Lesson, LessonState, RuleTransferScope
 
