@@ -414,10 +414,13 @@ def _compound_score(
             slope_pts = reduction * 15 * volatility_penalty
 
     # Anti-gaming: discount front-loaded corrections (>60% in first 20%)
+    # Only applies when there are enough total corrections to be meaningful.
+    # A brain with very few sparse corrections can legitimately have them
+    # concentrated early without it being gaming behavior.
     if correction_density_trend and len(correction_density_trend) >= 6:
         early_n = max(1, len(correction_density_trend) // 5)
         total_density = sum(correction_density_trend)
-        if total_density > 0:
+        if total_density > 1.0:  # need meaningful volume, not just 1 stray correction
             early_share = sum(correction_density_trend[:early_n]) / total_density
             if early_share > 0.60:
                 slope_pts *= 0.3
