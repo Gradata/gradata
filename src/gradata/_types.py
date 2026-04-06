@@ -122,6 +122,7 @@ class Lesson:
     pending_approval: bool = False  # True = awaiting human review before graduation
     parent_meta_rule_id: str | None = None  # Meta-rule this lesson contributed to
     memory_ids: list[str] = field(default_factory=list)  # Linked memory IDs
+    domain_scores: dict[str, dict[str, int]] = field(default_factory=dict)  # Per-domain fire/misfire tracking
 
     def __post_init__(self) -> None:
         self.confidence = round(max(0.0, min(1.0, self.confidence)), 2)

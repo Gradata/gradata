@@ -283,6 +283,7 @@ def parse_lessons(text: str) -> list[Lesson]:
         pending_approval = False
         parent_meta_rule_id: str | None = None
         memory_ids: list[str] = []
+        domain_scores: dict = {}
         j = i + 1
         while j < len(lines) and lines[j].startswith("  "):
             meta_line = lines[j].strip()
@@ -301,6 +302,12 @@ def parse_lessons(text: str) -> list[Lesson]:
                 parent_meta_rule_id = meta_line[len("Parent meta-rule:"):].strip() or None
             elif meta_line.startswith("Memory links:"):
                 memory_ids = [x.strip() for x in meta_line[len("Memory links:"):].strip().split(",") if x.strip()]
+            elif meta_line.startswith("Domain scores:"):
+                import json as _json
+                try:
+                    domain_scores = _json.loads(meta_line[len("Domain scores:"):].strip())
+                except _json.JSONDecodeError:
+                    domain_scores = {}
             meta_m = _META_RE.search(meta_line)
             if meta_m:
                 fire_count = int(meta_m.group(1))
@@ -324,6 +331,7 @@ def parse_lessons(text: str) -> list[Lesson]:
             pending_approval=pending_approval,
             parent_meta_rule_id=parent_meta_rule_id,
             memory_ids=memory_ids,
+            domain_scores=domain_scores,
         ))
         i = j if j > i + 1 else i + 1
 
@@ -889,6 +897,10 @@ def format_lessons(lessons: list[Lesson]) -> str:
 
         if lesson.memory_ids:
             lines.append(f"  Memory links: {','.join(lesson.memory_ids)}")
+
+        if lesson.domain_scores:
+            import json as _json
+            lines.append(f"  Domain scores: {_json.dumps(lesson.domain_scores)}")
 
         lines.append("")  # blank line between lessons
 
