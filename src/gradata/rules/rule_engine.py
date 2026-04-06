@@ -28,6 +28,10 @@ import json
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gradata.events_bus import EventBus
 
 from gradata._scope import RuleScope, scope_matches
 from gradata._types import ELIGIBLE_STATES, CorrectionType, Lesson, LessonState, RuleTransferScope
@@ -433,6 +437,7 @@ def apply_rules(
     events: list[dict[str, str]] | None = None,
     user_message: str = "",
     _context: str = "",
+    bus: "EventBus | None" = None,
 ) -> list[AppliedRule]:
     """Select and rank lessons relevant to the given scope.
 
@@ -484,10 +489,20 @@ def apply_rules(
     # Step 1.5 — domain scoping: filter out rules disabled for current domain
     current_domain = scope.domain.upper() if scope.domain else ""
     if current_domain:
-        eligible = [
-            lesson for lesson in eligible
-            if not is_rule_disabled_for_domain(lesson, current_domain)
-        ]
+        filtered = []
+        for lesson in eligible:
+            if is_rule_disabled_for_domain(lesson, current_domain):
+                if bus:
+                    scores = lesson.domain_scores.get(current_domain, {})
+                    bus.emit("rule_scoped_out", {
+                        "lesson_category": lesson.category,
+                        "lesson_description": lesson.description[:80],
+                        "domain": current_domain,
+                        "misfire_rate": scores.get("misfires", 0) / max(1, scores.get("fires", 1)),
+                    })
+            else:
+                filtered.append(lesson)
+        eligible = filtered
 
     # Step 2 & 3 — score with weighted scope matching and threshold
     scored: list[tuple[Lesson, float]] = []

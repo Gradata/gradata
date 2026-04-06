@@ -108,3 +108,44 @@ def test_apply_rules_filters_domain_disabled():
     descriptions = [r.lesson.description for r in results]
     assert "Use active voice" in descriptions
     assert "Be concise" not in descriptions
+
+
+def test_rule_scoped_out_event_emitted():
+    """rule_scoped_out event fires when a rule is filtered by domain."""
+    from gradata.events_bus import EventBus
+
+    bus = EventBus()
+    events_received = []
+    bus.on("rule_scoped_out", lambda payload: events_received.append(payload))
+
+    bad_rule = Lesson(
+        date="2026-04-06", state=LessonState.RULE,
+        confidence=0.95, category="TONE",
+        description="Be concise in all output",
+        domain_scores={"CODE": {"fires": 10, "misfires": 5}},
+    )
+    scope = RuleScope(domain="CODE")
+    apply_rules([bad_rule], scope, bus=bus)
+
+    assert len(events_received) == 1
+    assert events_received[0]["domain"] == "CODE"
+    assert events_received[0]["lesson_category"] == "TONE"
+
+
+def test_attribute_domain_fires_increments():
+    """_attribute_domain_fires increments fires for correction category."""
+    from gradata._core import _attribute_domain_fires
+    from unittest.mock import MagicMock
+
+    brain = MagicMock()
+    rule = Lesson(
+        date="2026-04-06", state=LessonState.RULE,
+        confidence=0.95, category="DRAFTING",
+        description="Use active voice",
+        domain_scores={"DRAFTING": {"fires": 5, "misfires": 0}},
+    )
+    brain._fired_rules = [rule]
+
+    _attribute_domain_fires(brain, "DRAFTING", "some correction")
+
+    assert rule.domain_scores["DRAFTING"]["fires"] == 6

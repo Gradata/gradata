@@ -40,6 +40,32 @@ def _filter_lessons_by_state(lessons, min_state: str = "PATTERN"):
 
 # ── correct() ──────────────────────────────────────────────────────────
 
+
+def _attribute_domain_fires(
+    brain: "Brain",
+    correction_category: str,
+    correction_desc: str,
+) -> None:
+    """Attribute fires and misfires to rules active in this session.
+
+    For each fired rule, increment fires for the correction's category.
+    If the correction contradicts the rule, also increment misfires.
+    """
+    from gradata.enhancements.self_improvement import _classify_correction_direction
+
+    for rule in brain._fired_rules:
+        if not hasattr(rule, "domain_scores"):
+            continue
+        domain = correction_category.upper()
+        if domain not in rule.domain_scores:
+            rule.domain_scores[domain] = {"fires": 0, "misfires": 0}
+        rule.domain_scores[domain]["fires"] += 1
+
+        direction = _classify_correction_direction(correction_desc, rule.description)
+        if direction == "CONTRADICTING":
+            rule.domain_scores[domain]["misfires"] += 1
+
+
 def brain_correct(
     brain: Brain, draft: str, final: str, *,
     category: str | None = None, context: dict | None = None,
@@ -275,6 +301,18 @@ def brain_correct(
 
     except Exception as e:
         _log.warning("Lesson creation failed: %s", e)
+
+    # Domain-scoped misfire attribution
+    try:
+        if brain._fired_rules and (category or classifications):
+            correction_desc = ""
+            if 'desc' in locals():
+                correction_desc = desc
+            elif summary:
+                correction_desc = summary
+            _attribute_domain_fires(brain, category or "UNKNOWN", correction_desc)
+    except Exception as e:
+        _log.debug("Domain fire attribution failed: %s", e)
 
     # Index into FTS5
     try:

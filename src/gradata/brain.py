@@ -67,6 +67,7 @@ class Brain:
                 open_encrypted_db(self.dir, self._encryption_key)
 
         self._instruction_cache: object | None = None  # lazy: InstructionCache
+        self._fired_rules: list = []  # Rules injected this session (for misfire attribution)
 
         logger.debug("Brain init: %s (db=%s)", self.dir, self.db_path)
 
