@@ -125,7 +125,7 @@ mkdocs.yml
 scripts/
 docs/cloud/
 docs/study-protocol.md
-super_meta_rules.py
+
 
 # Codex local configuration
 .codex/
