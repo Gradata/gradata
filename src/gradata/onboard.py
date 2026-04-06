@@ -128,6 +128,11 @@ _DOMAIN_SUBDIRS = {
 _SUBDIRS = _CORE_SUBDIRS + _DOMAIN_SUBDIRS.get("sales", [])
 
 
+def _is_interactive() -> bool:
+    """Check if stdin is an interactive TTY."""
+    return hasattr(sys, "stdin") and sys.stdin is not None and sys.stdin.isatty()
+
+
 def _ask(prompt: str, default: str = "") -> str:
     """Prompt user with a default value. Returns stripped answer or default.
 
@@ -136,7 +141,7 @@ def _ask(prompt: str, default: str = "") -> str:
     Falls back to the default on ``EOFError`` even when ``isatty()`` is
     ``True`` (e.g. ``python -c`` on Windows).
     """
-    if not (hasattr(sys, "stdin") and sys.stdin and sys.stdin.isatty()):
+    if not _is_interactive():
         return default
     try:
         suffix = f" [{default}]" if default else ""
@@ -284,7 +289,7 @@ def onboard(
         Brain instance pointing at the new directory.
     """
     if interactive is None:
-        interactive = hasattr(sys, "stdin") and sys.stdin is not None and sys.stdin.isatty()
+        interactive = _is_interactive()
     from gradata.brain import Brain
 
     brain_dir = Path(path).resolve()

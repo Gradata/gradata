@@ -157,15 +157,16 @@ def brain_correct(
                     try:
                         from gradata.enhancements.edit_classifier import extract_behavioral_instruction
                         from gradata.enhancements.instruction_cache import InstructionCache
-                        _cache_path = brain._find_lessons_path(create=True)
-                        _inst_cache = InstructionCache(
-                            _cache_path.parent / "instruction_cache.json"
-                        ) if _cache_path else None
+                        if not hasattr(brain, '_instruction_cache'):
+                            brain._instruction_cache = InstructionCache(
+                                lessons_path.parent / "instruction_cache.json"
+                            )
                         behavioral_desc = extract_behavioral_instruction(
-                            diff, primary, cache=_inst_cache,
+                            diff, primary, cache=brain._instruction_cache,
                         )
                         desc = behavioral_desc or primary.description
-                    except Exception:
+                    except Exception as e:
+                        _log.debug("Behavioral extraction failed: %s", e)
                         desc = primary.description
                 elif summary:
                     desc = summary
@@ -463,8 +464,8 @@ def brain_end_session(
                                         "confidence": getattr(meta, "confidence", 0.0),
                                         "session": current_session,
                                     })
-                                except Exception:
-                                    pass
+                                except Exception as e:
+                                    _log.debug("Meta-rule event emit failed: %s", e)
             except ImportError as e:
                 _log.warning("Meta-rules unavailable: %s", e)
             except Exception as e:

@@ -343,13 +343,21 @@ def _match_template(classification: EditClassification) -> str | None:
     return None
 
 
+_EXTRACTION_MODEL = "claude-haiku-4-5-20251001"
+_EXTRACTION_TIMEOUT = 12.0  # seconds
+
+
 def _call_llm_for_instruction(
     diff: DiffResult, classification: EditClassification,
 ) -> str | None:
+    """Call LLM to extract a behavioral instruction. Returns None on any failure."""
     try:
         import anthropic
     except ImportError:
         return None
+
+    import logging
+    _log = logging.getLogger("gradata")
 
     old_text = ""
     new_text = ""
@@ -368,17 +376,17 @@ def _call_llm_for_instruction(
     )
 
     try:
-        client = anthropic.Anthropic()
+        client = anthropic.Anthropic(timeout=_EXTRACTION_TIMEOUT)
         msg = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model=_EXTRACTION_MODEL,
             max_tokens=100,
             messages=[{"role": "user", "content": prompt}],
         )
         text = msg.content[0].text.strip()  # type: ignore[union-attr]
         if 5 < len(text) < 200:
             return text
-    except Exception:
-        pass
+    except Exception as e:
+        _log.debug("LLM instruction extraction failed: %s", e)
 
     return None
 

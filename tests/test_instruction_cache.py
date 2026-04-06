@@ -26,6 +26,7 @@ def test_cache_persists_to_disk():
         path = Path(d) / "cache.json"
         cache1 = InstructionCache(path)
         cache1.put("key1", "Always validate input at boundaries")
+        cache1.flush()
 
         cache2 = InstructionCache(path)
         assert cache2.get("key1") == "Always validate input at boundaries"
