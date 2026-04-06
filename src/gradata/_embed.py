@@ -147,7 +147,7 @@ def parse_outcome_links() -> dict[str, dict]:
 def get_gemini_client():
     if EMBEDDING_PROVIDER == "local":
         return None
-    from google import genai
+    from google import genai  # type: ignore[attr-defined]  # optional dep
     api_key = os.environ.get(API_KEY_ENV_VAR)
     if not api_key:
         logging.getLogger("gradata.embed").error("%s not set", API_KEY_ENV_VAR)
