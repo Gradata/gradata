@@ -443,4 +443,5 @@ def _compound_score(
     if max_achievable < 100.0 and max_achievable > 20.0:
         score = (score / max_achievable) * 100.0
 
-    return round(min(100.0, score), 1)
+    final = round(min(100.0, score), 1)
+    return 0.0 if math.isnan(final) else final
