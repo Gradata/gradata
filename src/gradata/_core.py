@@ -366,7 +366,8 @@ def brain_end_session(
 
         all_lessons = active + graduated
         from gradata._db import write_lessons_safe
-        write_lessons_safe(lessons_path, format_lessons(all_lessons))
+        if all_lessons:  # guard against wiping lessons file when all lessons are killed
+            write_lessons_safe(lessons_path, format_lessons(all_lessons))
 
         # Archive graduated RULE lessons
         new_rules = [l for l in graduated if l.state.value == "RULE"
