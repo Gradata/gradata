@@ -159,9 +159,6 @@ class BrainContextState:
 
         return "\n\n".join(parts)
 
-    def capture_user(self, message: str) -> None:
-        """Capture a user message for fact extraction."""
-        self._captured_messages.append({"role": "user", "content": message})
 
     def capture_response(self, response: str) -> None:
         """Capture the AI's response for tracking.
