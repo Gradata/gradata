@@ -334,18 +334,6 @@ def _detect_session(ctx: "BrainContext | None" = None) -> int:
 # ── Brain-quality functions (promoted from brain shim) ────────────────
 
 
-def _ensure_periodic_audits(conn: sqlite3.Connection):
-    """Create periodic_audits table if it doesn't exist."""
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS periodic_audits (
-            audit_name TEXT PRIMARY KEY,
-            frequency INTEGER NOT NULL,
-            last_run_session INTEGER DEFAULT 0,
-            next_due_session INTEGER DEFAULT 0
-        )
-    """)
-    conn.commit()
-
 
 def find_contradictions(event_type: str = None, tag_prefix: str = None) -> list:
     """Find events that may contradict each other — same tags, overlapping validity.
