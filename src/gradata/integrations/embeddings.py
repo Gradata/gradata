@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import math
+from collections import OrderedDict
 import os
 from urllib.request import Request, urlopen
 import json
@@ -16,6 +17,9 @@ import json
 logger = logging.getLogger(__name__)
 
 EMBEDDING_DIM = 128
+
+# Maximum cached embeddings to prevent unbounded memory growth.
+_CACHE_MAX_SIZE = 2000
 
 
 from gradata._math import cosine_similarity  # noqa: E402 — shared utility
@@ -105,8 +109,8 @@ def cluster_lessons_by_similarity(lessons, threshold=0.7, client=None):
     return list(clusters.values())
 
 
-# Embedding cache: keyed by description text → vector
-_embedding_cache: dict[str, list[float]] = {}
+# Embedding cache: LRU-style OrderedDict, capped at _CACHE_MAX_SIZE.
+_embedding_cache: OrderedDict[str, list[float]] = OrderedDict()
 
 
 def subscribe_to_bus(bus):
@@ -125,6 +129,9 @@ def subscribe_to_bus(bus):
                 vec = get_client().embed(desc)
                 if vec:
                     _embedding_cache[desc] = vec
+                    # Evict oldest entries when cache exceeds max size
+                    while len(_embedding_cache) > _CACHE_MAX_SIZE:
+                        _embedding_cache.popitem(last=False)
         except Exception:
             logger.warning("Failed to embed payload", exc_info=True)
 
