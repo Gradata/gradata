@@ -140,21 +140,6 @@ class CloudClient:
             logger.warning("Sync failed: %s", e)
             return {"status": "error", "error": str(e)}
 
-    def marketplace_status(self) -> dict:
-        """Check if this brain is marketplace-ready.
-
-        Returns grade, trust level, and listing eligibility.
-        """
-        if not self.connected:
-            return {"eligible": False, "reason": "not_connected"}
-
-        try:
-            return self._post("/brains/marketplace-status", {
-                "brain_id": self._brain_id,
-            })
-        except Exception as e:
-            return {"eligible": False, "reason": str(e)}
-
     # ── Internal helpers ──────────────────────────────────────────────
 
     def _post(self, path: str, data: dict) -> dict[str, Any]:
