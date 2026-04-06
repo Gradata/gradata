@@ -462,3 +462,9 @@ def test_end_session_emits_session_ended(tmp_path):
     brain.end_session()
     assert len(received) == 1
     assert "session_number" in received[0]
+
+def test_brain_bus_has_subscribers(tmp_path):
+    from tests.conftest import init_brain
+    brain = init_brain(tmp_path)
+    assert len(brain.bus.listeners.get("correction.created", [])) >= 1
+    assert len(brain.bus.listeners.get("session.ended", [])) >= 1
