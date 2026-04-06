@@ -138,13 +138,6 @@ _CITATION_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Log-evidence trailer expected on mutation action strings.
-# A mutation is "logged" if it contains "|", "->", "logged", "emitted", or "saved".
-_MUTATION_LOG_RE = re.compile(
-    r"(\|->?|->|\blogged\b|\bemitted\b|\bsaved\b|\brecorded\b|\bwritten\b)",
-    re.IGNORECASE,
-)
-
 
 # ---------------------------------------------------------------------------
 # verify_claims
@@ -314,63 +307,3 @@ def verify_citations(output: str, sources: list[str]) -> TruthVerdict:
     return verdict
 
 
-# ---------------------------------------------------------------------------
-# verify_mutations
-# ---------------------------------------------------------------------------
-
-
-def verify_mutations(actions: list[str]) -> TruthVerdict:
-    """Check that every state-changing action string carries a log marker.
-
-    State-changing actions should be verifiable.  This function enforces the
-    convention that action strings include a log-evidence trailer such as
-    ``"| logged"`` or ``"-> events.jsonl"`` so that callers can confirm the
-    action was actually recorded.
-
-    Checks performed:
-        1. ``actions_have_log_markers`` — every string in ``actions`` matches
-           the log-evidence pattern (contains ``|``, ``->``, or a keyword
-           such as ``logged``, ``emitted``, ``saved``, ``recorded``,
-           ``written``).
-
-    Args:
-        actions: List of action description strings from the caller's
-            execution trace.
-
-    Returns:
-        A ``TruthVerdict`` with one check summarising all unlogged actions.
-    """
-    verdict = TruthVerdict()
-
-    if not actions:
-        verdict.add(TruthCheck(
-            name="actions_have_log_markers",
-            passed=True,
-            detail="No actions provided; check skipped.",
-        ))
-        return verdict
-
-    unlogged: list[str] = [
-        action for action in actions
-        if not _MUTATION_LOG_RE.search(action)
-    ]
-
-    if unlogged:
-        verdict.add(TruthCheck(
-            name="actions_have_log_markers",
-            passed=False,
-            detail=(
-                f"{len(unlogged)} of {len(actions)} action(s) lack a "
-                "log-evidence marker (|, ->, logged, emitted, saved, "
-                "recorded, or written)."
-            ),
-            evidence="; ".join(unlogged[:5]),
-        ))
-    else:
-        verdict.add(TruthCheck(
-            name="actions_have_log_markers",
-            passed=True,
-            detail=f"All {len(actions)} action(s) carry log-evidence markers.",
-        ))
-
-    return verdict
