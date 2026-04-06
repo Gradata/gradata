@@ -167,23 +167,6 @@ _OLLAMA_BASE: str | None = None
 _EMBED_MODEL: str = "nomic-embed-text"
 
 
-def configure_embeddings(base_url: str = "http://localhost:11434", model: str = "nomic-embed-text"):
-    """Configure embedding backend for higher-accuracy similarity.
-
-    Only localhost URLs are accepted to prevent SSRF attacks.
-    """
-    global _OLLAMA_BASE, _EMBED_MODEL
-    from urllib.parse import urlparse
-    parsed = urlparse(base_url)
-    hostname = parsed.hostname or ""
-    if hostname not in ("localhost", "127.0.0.1", "::1"):
-        raise ValueError(
-            f"Only localhost URLs are allowed for embedding backend (got {hostname!r}). "
-            "This restriction prevents SSRF attacks."
-        )
-    _OLLAMA_BASE = base_url
-    _EMBED_MODEL = model
-
 
 def _get_embedding(text: str) -> list[float] | None:
     """Get embedding vector from Ollama (returns None if unavailable)."""
