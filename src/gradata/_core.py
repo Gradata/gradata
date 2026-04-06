@@ -48,6 +48,8 @@ def brain_correct(
 ) -> dict:
     """Record a correction: user edited draft into final version."""
     # Input validation
+    draft = draft or ""
+    final = final or ""
     if not draft and not final:
         raise ValueError("Both draft and final are empty — nothing to correct.")
     if draft == final:
