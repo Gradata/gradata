@@ -35,7 +35,21 @@ class EmbeddingClient:
                 logger.warning("API embedding failed, falling back to local", exc_info=True)
         return self._embed_local(text)
 
+    @staticmethod
+    def _is_trusted_url(url):
+        """SSRF protection: only allow HTTPS to gradata.ai or localhost."""
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        if parsed.hostname in ("localhost", "127.0.0.1"):
+            return True
+        if parsed.scheme == "https" and parsed.hostname and parsed.hostname.endswith("gradata.ai"):
+            return True
+        return False
+
     def _embed_api(self, text):
+        if not self._is_trusted_url(self.api_url):
+            logger.warning("Blocked embedding request to untrusted URL")
+            return self._embed_local(text)
         headers = {"Content-Type": "application/json"}
         if self._token:
             headers["Authorization"] = "Bearer " + self._token

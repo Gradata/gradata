@@ -7,7 +7,11 @@ const fs = require('fs');
 const os = require('os');
 const http = require('http');
 
-const EFFECTIVENESS_FILE = require('path').join(os.tmpdir(), 'gradata-rule-effectiveness.json');
+// Use per-user subdirectory to prevent symlink attacks on shared systems
+const path = require('path');
+const GRADATA_TMP = path.join(os.tmpdir(), `gradata-${process.getuid ? process.getuid() : 'win'}`);
+try { fs.mkdirSync(GRADATA_TMP, { recursive: true, mode: 0o700 }); } catch (_) {}
+const EFFECTIVENESS_FILE = path.join(GRADATA_TMP, 'rule-effectiveness.json');
 
 let effectiveness = {};
 try {

@@ -8,7 +8,10 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const STATE_FILE = path.join(os.tmpdir(), 'gradata-tool-findings.json');
+// Use per-user subdirectory to prevent symlink attacks on shared systems
+const GRADATA_TMP = path.join(os.tmpdir(), `gradata-${process.getuid ? process.getuid() : 'win'}`);
+try { fs.mkdirSync(GRADATA_TMP, { recursive: true, mode: 0o700 }); } catch (_) {}
+const STATE_FILE = path.join(GRADATA_TMP, 'tool-findings.json');
 const FINDING_TTL_MS = 10 * 60 * 1000;
 
 let input = '';

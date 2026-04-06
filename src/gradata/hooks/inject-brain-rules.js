@@ -107,15 +107,24 @@ try {
   let rulesBlock;
   let method = 'score';
 
-  // Try QMD for context-aware boosting (synchronous to avoid race condition)
+  // Try QMD for context-aware boosting (native http, no shell)
   try {
     const { execSync } = require('child_process');
-    const qmdPayload = '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ctx_search","arguments":{"query":"current working context","limit":5}},"id":1}';
-    const curlResult = execSync(
-      `curl -s -m 2 -X POST http://localhost:8181/mcp -H "Content-Type: application/json" -d '${qmdPayload}'`,
-      { encoding: 'utf8', timeout: 3000 }
-    );
-    const r = JSON.parse(curlResult);
+    // Use node -e to make a synchronous HTTP call without shell injection risk
+    const nodeScript = `
+      const http = require("http");
+      const payload = JSON.stringify({jsonrpc:"2.0",method:"tools/call",params:{name:"ctx_search",arguments:{query:"current working context",limit:5}},id:1});
+      const req = http.request({hostname:"localhost",port:8181,path:"/mcp",method:"POST",timeout:2000,headers:{"Content-Type":"application/json","Content-Length":Buffer.byteLength(payload)}}, res => {
+        let b=""; res.on("data",c=>b+=c); res.on("end",()=>process.stdout.write(b));
+      });
+      req.on("error",()=>process.exit(1));
+      req.on("timeout",()=>{req.destroy();process.exit(1)});
+      req.write(payload); req.end();
+    `;
+    const qmdResult = execSync(`node -e "${nodeScript.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`, {
+      encoding: 'utf8', timeout: 3000,
+    });
+    const r = JSON.parse(qmdResult);
     const qmdText = (r.result && r.result.content && r.result.content[0] && r.result.content[0].text) || '';
     if (qmdText.length > 10) {
       method = 'qmd+score';
