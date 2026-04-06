@@ -27,9 +27,6 @@ if TYPE_CHECKING:
     from gradata.brain import Brain
     from gradata.contrib.patterns.reflection import ReflectionResult
     from gradata.contrib.patterns.guardrails import GuardedResult
-    from gradata.contrib.patterns.evaluator import EvalLoopResult
-    from gradata.contrib.patterns.execute_qualify import ExecuteQualifyResult
-    from gradata.contrib.patterns.reconciliation import ReconciliationSummary
     from gradata.contrib.patterns.loop_detection import LoopAction
 
 logger = logging.getLogger("gradata")
