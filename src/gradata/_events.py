@@ -130,49 +130,6 @@ def emit(event_type: str, source: str, data: dict = None, tags: list = None,
     return event
 
 
-# Event types eligible for FTS indexing (deferred to session end via index_recent_events)
-_SEARCHABLE_EVENTS = frozenset({"CORRECTION", "OUTPUT", "LESSON_CHANGE", "FACT_EXTRACTED", "CORRECTION_CHAIN"})
-
-
-def index_recent_events(ctx: dict | None = None, limit: int = 500) -> int:
-    """Batch-index recent events into FTS5 for session search.
-
-    Call at session end (not per-event) to avoid per-emit() overhead.
-    Uses fts_index_batch() for amortized connection + DDL cost.
-
-    Returns:
-        Number of events indexed.
-    """
-    import sqlite3
-    db_path = (ctx or {}).get("db_path")
-    if not db_path:
-        return 0
-    try:
-        from gradata._query import fts_index
-        conn = sqlite3.connect(str(db_path))
-        rows = conn.execute(
-            "SELECT id, ts, type, source, data_json FROM events "
-            "WHERE type IN (?, ?, ?, ?) ORDER BY id DESC LIMIT ?",
-            (*_SEARCHABLE_EVENTS, limit),
-        ).fetchall()
-        conn.close()
-        indexed = 0
-        for row_id, ts, etype, src, data_json in rows:
-            try:
-                fts_index(
-                    source=f"event:{etype}:{row_id}",
-                    file_type="event",
-                    text=f"{etype} {src or ''}: {(data_json or '')[:2000]}",
-                    embed_date=ts[:10],
-                    ctx=ctx,
-                )
-                indexed += 1
-            except Exception:
-                pass
-        return indexed
-    except Exception:
-        return 0
-
 
 def emit_gate_result(gate_name: str, result: str, sources_checked: list = None, detail: str = "") -> dict:
     sources = sources_checked or []
