@@ -908,7 +908,8 @@ def brain_convergence(brain: "Brain") -> dict:
         total_sessions: int
     """
     empty = {"sessions": [], "corrections_per_session": [], "trend": "insufficient_data",
-             "p_value": 1.0, "by_category": {}, "total_corrections": 0, "total_sessions": 0}
+             "p_value": 1.0, "changepoints": [], "by_category": {},
+             "total_corrections": 0, "total_sessions": 0}
 
     try:
         from gradata._db import get_connection
@@ -971,11 +972,16 @@ def brain_convergence(brain: "Brain") -> dict:
             "p_value": cat_p,
         }
 
+    from gradata._stats import cusum_changepoints
+    raw_changepoints = cusum_changepoints(counts)
+    changepoint_sessions = [sessions[i] for i in raw_changepoints if i < len(sessions)]
+
     return {
         "sessions": sessions,
         "corrections_per_session": counts,
         "trend": trend,
         "p_value": p_value,
+        "changepoints": changepoint_sessions,
         "by_category": by_category,
         "total_corrections": sum(counts),
         "total_sessions": len(sessions),
