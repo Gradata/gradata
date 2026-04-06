@@ -29,52 +29,52 @@ def _compute_fda(ctx: "BrainContext | None" = None, window: int = 20) -> float |
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = get_connection(db)
+        try:
+            # Get the most recent N real sessions with outputs (exclude system sessions)
+            # Uses HAVING COUNT >= 2 to skip phantom sessions with stray events
+            sessions_with_outputs = conn.execute("""
+                SELECT e.session FROM events e
+                LEFT JOIN session_metrics sm ON e.session = sm.session
+                WHERE e.type = 'OUTPUT'
+                  AND typeof(e.session) = 'integer'
+                  AND (sm.session_type IS NULL OR sm.session_type != 'systems')
+                GROUP BY e.session HAVING COUNT(*) >= 2
+                ORDER BY e.session DESC LIMIT ?
+            """, (window,)).fetchall()
 
-        # Get the most recent N real sessions with outputs (exclude system sessions)
-        # Uses HAVING COUNT >= 2 to skip phantom sessions with stray events
-        sessions_with_outputs = conn.execute("""
-            SELECT e.session FROM events e
-            LEFT JOIN session_metrics sm ON e.session = sm.session
-            WHERE e.type = 'OUTPUT'
-              AND typeof(e.session) = 'integer'
-              AND (sm.session_type IS NULL OR sm.session_type != 'systems')
-            GROUP BY e.session HAVING COUNT(*) >= 2
-            ORDER BY e.session DESC LIMIT ?
-        """, (window,)).fetchall()
+            if len(sessions_with_outputs) < 3:
+                return None
 
-        if len(sessions_with_outputs) < 3:
+            accepted = 0
+            for (session,) in sessions_with_outputs:
+                # Check for corrections — use severity if available, otherwise any correction counts
+                has_severity = conn.execute("""
+                    SELECT COUNT(*) FROM events
+                    WHERE type = 'CORRECTION' AND session = ?
+                      AND json_extract(data_json, '$.severity') IS NOT NULL
+                """, (session,)).fetchone()[0]
+
+                if has_severity > 0:
+                    # Severity data exists: only major/moderate/discarded count against acceptance
+                    major_corrections = conn.execute("""
+                        SELECT COUNT(*) FROM events
+                        WHERE type = 'CORRECTION' AND session = ?
+                          AND json_extract(data_json, '$.severity') IN ('moderate', 'major', 'discarded')  -- HIGH_SEVERITY
+                    """, (session,)).fetchone()[0]
+                else:
+                    # No severity data: any correction counts against acceptance
+                    major_corrections = conn.execute("""
+                        SELECT COUNT(*) FROM events
+                        WHERE type = 'CORRECTION' AND session = ?
+                    """, (session,)).fetchone()[0]
+
+                if major_corrections == 0:
+                    accepted += 1
+
+            total = len(sessions_with_outputs)
+            return round(accepted / total, 3) if total > 0 else None
+        finally:
             conn.close()
-            return None
-
-        accepted = 0
-        for (session,) in sessions_with_outputs:
-            # Check for corrections — use severity if available, otherwise any correction counts
-            has_severity = conn.execute("""
-                SELECT COUNT(*) FROM events
-                WHERE type = 'CORRECTION' AND session = ?
-                  AND json_extract(data_json, '$.severity') IS NOT NULL
-            """, (session,)).fetchone()[0]
-
-            if has_severity > 0:
-                # Severity data exists: only major/moderate/discarded count against acceptance
-                major_corrections = conn.execute("""
-                    SELECT COUNT(*) FROM events
-                    WHERE type = 'CORRECTION' AND session = ?
-                      AND json_extract(data_json, '$.severity') IN ('moderate', 'major', 'discarded')  -- HIGH_SEVERITY
-                """, (session,)).fetchone()[0]
-            else:
-                # No severity data: any correction counts against acceptance
-                major_corrections = conn.execute("""
-                    SELECT COUNT(*) FROM events
-                    WHERE type = 'CORRECTION' AND session = ?
-                """, (session,)).fetchone()[0]
-
-            if major_corrections == 0:
-                accepted += 1
-
-        conn.close()
-        total = len(sessions_with_outputs)
-        return round(accepted / total, 3) if total > 0 else None
     except Exception:
         return None
 
