@@ -174,10 +174,6 @@ def set_brain_dir(brain_dir: str | Path, working_dir: str | Path | None = None):
     _current_context = BrainContext.from_brain_dir(brain_dir, working_dir)
 
 
-def get_current_context() -> "BrainContext | None":
-    """Return the current BrainContext, or None if set_brain_dir() hasn't been called."""
-    return _current_context
-
 
 # Module-level default context (None until set_brain_dir() is called)
 _current_context: BrainContext | None = None
