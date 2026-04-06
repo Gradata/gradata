@@ -130,7 +130,7 @@ def brain_correct(
         from gradata.enhancements.self_improvement import (
             parse_lessons, format_lessons, update_confidence, INITIAL_CONFIDENCE)
 
-        if _SEV_RANK.get(diff.severity, 0) > _SEV_RANK.get(min_severity, 0):
+        if _SEV_RANK.get(diff.severity, 0) >= _SEV_RANK.get(min_severity, 0):
             lessons_path = brain._find_lessons_path(create=True)
             if lessons_path:
                 existing_text = ""
