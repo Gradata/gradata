@@ -143,13 +143,6 @@ class RuleContext:
             return (scoped + universal)[:10]
         return rules[:10]
 
-    def for_router(self) -> dict[str, list[GraduatedRule]]:
-        """Rules grouped by agent_type for routing bias adjustments."""
-        result: dict[str, list[GraduatedRule]] = defaultdict(list)
-        for rule in self.query(min_confidence=0.60, limit=50):
-            if rule.agent_type:
-                result[rule.agent_type].append(rule)
-        return dict(result)
 
     def for_agent(self, agent_type: str) -> list[GraduatedRule]:
         """Rules scoped to a specific agent type."""
