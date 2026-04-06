@@ -54,15 +54,31 @@ class EventBus:
         """Emit *event* with *payload*.  Errors are logged, never raised."""
         for handler, is_async in list(self.listeners.get(event, [])):
             if is_async:
-                threading.Thread(target=self._safe_call, args=(handler, payload), daemon=True).start()
+                threading.Thread(target=self._safe_call, args=(handler, payload, self.handler_timeout), daemon=True).start()
             else:
-                self._safe_call(handler, payload)
+                self._safe_call(handler, payload, self.handler_timeout)
 
     # -- internals ------------------------------------------------------------
 
     @staticmethod
-    def _safe_call(handler: Callable, payload: Any) -> None:
-        try:
-            handler(payload)
-        except Exception:
-            logger.exception("Handler %s raised an exception", handler)
+    def _safe_call(handler: Callable, payload: Any, timeout: float = 5.0) -> None:
+        """Call *handler* with a timeout guard for synchronous handlers.
+
+        Uses a daemon thread + join(timeout) so a hung handler doesn't
+        block the emit loop forever.
+        """
+        result: list[Exception | None] = [None]
+
+        def _run() -> None:
+            try:
+                handler(payload)
+            except Exception as exc:
+                result[0] = exc
+
+        t = threading.Thread(target=_run, daemon=True)
+        t.start()
+        t.join(timeout)
+        if t.is_alive():
+            logger.warning("Handler %s exceeded timeout (%.1fs), moving on", handler, timeout)
+        elif result[0] is not None:
+            logger.exception("Handler %s raised an exception", handler, exc_info=result[0])
