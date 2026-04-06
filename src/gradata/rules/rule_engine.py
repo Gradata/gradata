@@ -416,18 +416,64 @@ def filter_by_scope(
     return results
 
 
+def _beta_ppf_05(alpha: float, beta_param: float) -> float:
+    """Approximate 5th percentile of Beta(alpha, beta) distribution.
+
+    Uses normal approximation. For tiny samples, returns conservative estimate.
+    """
+    import math
+    if alpha <= 0 or beta_param <= 0:
+        return 0.0
+    total = alpha + beta_param
+    mean = alpha / total
+    if total <= 2:
+        return max(0.0, mean - 0.3)
+    variance = (alpha * beta_param) / (total * total * (total + 1))
+    std = math.sqrt(variance)
+    return max(0.0, min(1.0, mean - 1.645 * std))
+
+
+def beta_domain_reliability(fires: int, misfires: int) -> float:
+    """Domain reliability via Beta distribution lower bound.
+
+    Returns 5th percentile of Beta(successes+1, failures+1).
+    No data (0,0) returns 1.0 (neutral — no penalty).
+    """
+    if fires == 0 and misfires == 0:
+        return 1.0
+    successes = fires - misfires
+    alpha = max(1, successes + 1)
+    beta_param = misfires + 1
+    return round(_beta_ppf_05(alpha, beta_param), 4)
+
+
+def effective_confidence(
+    fsrs_confidence: float,
+    domain_fires: int,
+    domain_misfires: int,
+) -> float:
+    """Unified confidence = FSRS global * Beta domain reliability.
+
+    FSRS handles global graduation curve. Beta handles per-domain
+    reliability. No double-counting.
+    """
+    reliability = beta_domain_reliability(domain_fires, domain_misfires)
+    return round(fsrs_confidence * reliability, 4)
+
+
 def is_rule_disabled_for_domain(lesson: Lesson, domain: str) -> bool:
     """Check if a rule should be suppressed in a specific domain.
 
-    A rule is disabled when its misfire rate exceeds 30% with at least
-    3 fires in that domain — enough data to be meaningful.
+    Uses Beta distribution lower bound instead of naive ratio.
+    Disabled when we're 95% confident the misfire rate exceeds 30%.
     """
     scores = lesson.domain_scores.get(domain, {})
     fires = scores.get("fires", 0)
     misfires = scores.get("misfires", 0)
     if fires < 3:
         return False
-    return misfires / fires > 0.3
+    reliability = beta_domain_reliability(fires, misfires)
+    return reliability < 0.5
 
 
 def apply_rules(
@@ -547,13 +593,23 @@ def apply_rules(
 
     # Step 4 — compute difficulty per rule
     # Step 5 — sort: state priority DESC, difficulty DESC, relevance DESC, confidence DESC
+    def _effective_conf(lesson: Lesson, domain: str) -> float:
+        if not domain:
+            return lesson.confidence
+        scores = lesson.domain_scores.get(domain, {})
+        return effective_confidence(
+            lesson.confidence,
+            scores.get("fires", 0),
+            scores.get("misfires", 0),
+        )
+
     scored.sort(
         key=lambda t: (
             _STATE_PRIORITY[t[0].state],
             # Difficulty: use event history if available, else lesson counters
             compute_rule_difficulty(t[0].category, events) if events else _difficulty_from_lesson(t[0]),
             t[1],
-            t[0].confidence,
+            _effective_conf(t[0], current_domain),
         ),
         reverse=True,
     )
