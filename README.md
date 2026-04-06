@@ -1,12 +1,11 @@
-# Gradata
+# Gradata — AI that learns your judgment
 
-Procedural memory for AI agents. Corrections become behavioral rules that compound over time.
+Every correction you make teaches your AI something. Gradata captures those corrections, extracts the behavioral instruction behind them, and graduates it into a rule. Over time, your AI stops needing corrections. It converges on your judgment.
 
-Your AI keeps making the same mistakes. Gradata fixes that.
+Not generally more intelligent. Calibrated to you.
 
 ```bash
 pip install gradata
-gradata init
 ```
 
 Works with any LLM. Python 3.11+. Zero required dependencies.
@@ -18,193 +17,123 @@ from gradata import Brain
 
 brain = Brain.init("./my-brain")
 
-# Your AI produces output. You fix it.
+# Your AI produces output. You fix it. Brain learns.
 brain.correct(
     draft="We are pleased to inform you of our new product offering.",
     final="Hey, check out what we just shipped."
 )
+# Brain extracts: "Write in a casual, direct tone — avoid formal business language"
 
-# Brain learns. Next time, inject rules into the prompt:
+# Next session — inject learned rules into the prompt:
 rules = brain.apply_brain_rules("write an email")
-# > "[RULE:0.92] TONE: Use casual, direct language..."
+# > "[RULE:0.92] TONE: Write in a casual, direct tone..."
 
-# Prove the brain is getting better:
+# Prove the brain is converging:
 manifest = brain.manifest()
 ```
 
 ## How It Works
 
 ```
-Human corrects AI output
+You correct your AI
        |
 brain.correct(draft, final)
        |
-Diff computed > severity classified > lesson created
+Behavioral instruction extracted:
+  "We are pleased..." → "Hey, check this out"
+  = "Write in a casual, direct tone"
        |
-Confidence grows with each reinforcement:
-  0.40 = INSTINCT (new, unproven)
-  0.60 = PATTERN  (seen enough to trust)
-  0.90 = RULE     (injected into every prompt)
+Confidence grows with reinforcement:
+  INSTINCT (0.40) → PATTERN (0.60) → RULE (0.90)
        |
-3+ related rules > META-RULE (general principle)
+3+ related rules → META-RULE emerges
+  "Use casual tone" + "No sign-offs" + "Short sentences"
+  = "Match Oliver's direct communication style"
        |
-brain.apply_brain_rules() > AI stops making that mistake
+Your AI converges on YOUR judgment
 ```
 
-## Nervous System (v0.3.0)
+## Why This Works
 
-Gradata v0.3.0 introduces the **Event Bus** -- a central nervous system that wires all components together:
+**Corrections are signal.** Every time you edit an AI's output, you're encoding your expertise. Most systems throw that signal away. Gradata captures it, extracts what you meant, and turns it into a rule.
 
-```python
-# Every correction triggers the full pipeline automatically:
-brain.correct(draft, final)
-  # > EventBus emits "correction.created"
-  #   > Embeddings subscriber embeds the lesson (async)
-  #   > Session history records which rules were corrected
-  #   > Tool findings check if this matched a lint/test failure
+**Meta-rules are personalized intelligence.** When individual rules start clustering — your email tone preferences aligning with your code review style aligning with your process preferences — meta-rules emerge. The AI starts predicting your patterns across domains. To you, it just "gets it." That's not general intelligence. That's convergence on your judgment.
 
-brain.end_session()
-  # > EventBus emits "session.ended"
-  #   > Graduation sweep promotes lessons
-  #   > Session history computes rule effectiveness
-  #   > Embeddings cluster related lessons for meta-rules
-```
+**Convergence is measurable.** Track corrections-per-session over time. When the curve flattens, the brain has learned your style. That curve is the product demo.
 
-**Subscribe to any event:**
-```python
-brain.bus.on("correction.created", my_handler)
-brain.bus.on("lesson.graduated", my_dashboard_push)
-brain.bus.on("meta_rule.created", my_slack_notifier)
-```
+## Ablation Experiment Results
 
-### Semantic Clustering
+We ran a controlled experiment: 10 tasks scored with and without brain rules.
 
-Meta-rules now form by **meaning**, not just keywords:
+| Metric | Without Rules | With Rules | Delta |
+|--------|--------------|------------|-------|
+| Overall quality | 6.60 | 7.47 | **+13.2%** |
+| Preference adherence | 5.40 | 6.90 | **+1.50** |
+| Correctness | 7.50 | 7.80 | +0.30 |
 
-```python
-# These lessons cluster automatically via embeddings:
-# "validate email before upload"
-# "verify addresses before campaign push"
-# "check email format before send"
-#   > META-RULE: "Always validate contact data before external operations"
-```
+The rules didn't make the AI generally smarter. They made it smarter **for that specific user** — matching their email style, prospecting workflow, code conventions, and session handoff format.
 
-Two-tier embeddings: lightweight local model (free) or cloud API (paid, higher quality).
+## Behavioral Extraction
 
-### Rule Effectiveness Tracking
+Old approach (diff fingerprints — useless):
+> `"Content change (added: getattr)"`
 
-Rules that work get boosted. Rules that don't get demoted:
+New approach (behavioral instructions — rentable):
+> `"Use getattr() for safe attribute access on objects that may lack the attribute"`
 
-```python
-# Rule "always validate email" injected > never corrected > effectiveness: HIGH > boost
-# Rule "use formal tone" injected > corrected 3/5 sessions > effectiveness: LOW > demote
-```
+Every correction now produces an actionable instruction through:
+1. **Cache hit** — instant lookup of previously extracted instructions
+2. **Template match** — pre-built instructions for common patterns
+3. **LLM extraction** — Haiku call for novel corrections (~$0.001 each)
 
-### Context-Aware Rule Ranking
+## What Makes This Different
 
-Rules ranked by what you're actually working on, not just confidence:
+Memory systems remember what you said. Gradata learns how you think.
 
-```
-30% scope match | 25% confidence | 20% context relevance | 15% recency | 10% fire count
-```
+| System | Remembers | Learns from corrections | Graduates rules | Proves convergence |
+|--------|-----------|------------------------|-----------------|-------------------|
+| Mem0 | Yes | No | No | No |
+| Letta (MemGPT) | Yes | No | No | No |
+| LangChain Memory | Yes | No | No | No |
+| Fine-tuning | Permanent | Expensive, slow | No | No |
+| System prompts | Static | Manual only | No | No |
+| **Gradata** | Yes | **Yes** | **Yes** | **Yes** |
+
+**vs Mem0:** Mem0 stores context. Gradata evolves behavior. You could use both.
+
+**vs fine-tuning:** Fine-tuning is expensive, slow, and loses the original model. Gradata adapts at inference time — every correction takes effect immediately.
+
+**vs system prompts:** System prompts are static. Gradata's rules are dynamic — they graduate, decay, and evolve based on your corrections.
+
+## Rent Trained Brains (Coming Soon)
+
+A sales leader trains a brain over 200 sessions. Their outreach patterns, objection handling, follow-up cadence — all encoded as graduated rules.
+
+A new SDR rents that brain. Day one, they write emails in the leader's voice and follow the leader's prospecting workflow. The brain isn't smarter. It's calibrated to a specific human's judgment.
+
+That trained brain is the rentable asset.
 
 ## Features
 
 **Core learning loop:**
-- `brain.correct(draft, final)` -- capture corrections with automatic diff + severity classification
-- `brain.apply_brain_rules(task)` -- inject graduated rules into prompts
-- `brain.manifest()` -- mathematical proof the brain is improving (compound score)
-- `brain.prove()` -- paired t-test showing correction rate decreased after graduation
+- `brain.correct(draft, final)` — captures corrections, extracts behavioral instructions, creates lessons
+- `brain.apply_brain_rules(task)` — injects graduated rules into prompts
+- `brain.manifest()` — mathematical proof the brain is converging
+- `brain.prove()` — paired t-test showing correction rate decreased after graduation
 
 **Event Bus (v0.3.0):**
-- `brain.bus.on(event, handler)` -- subscribe to any event in the pipeline
-- Built-in events: `correction.created`, `lesson.graduated`, `lesson.demoted`, `meta_rule.created`, `session.started`, `session.ended`, `rules.injected`, `tool.finding`
-- Async handlers for non-blocking integrations
-- Error isolation -- handler failures never break the pipeline
+- `brain.bus.on(event, handler)` — subscribe to any event in the pipeline
+- Events: `correction.created`, `lesson.graduated`, `meta_rule.created`, `session.ended`
 
-**Human-in-the-loop approval:**
-- `brain.review_pending()` -- list lessons awaiting approval
-- `brain.approve_lesson(id)` / `brain.reject_lesson(id)` -- pre-graduation veto gate
-- `gradata review` CLI -- approve/reject from terminal
+**Human-in-the-loop:**
+- `brain.review_pending()` — list lessons awaiting approval
+- `brain.approve_lesson(id)` / `brain.reject_lesson(id)` — pre-graduation veto
+- `gradata review` CLI — approve/reject from terminal
 
-**Encryption at rest:**
-- `pip install gradata[encrypted]` -- AES-128 via Fernet
-- `Brain("./my-brain", encryption_key="...")` or `GRADATA_ENCRYPTION_KEY` env var
-
-**Correction provenance:**
-- Every lesson tracks which correction events created it
-- Meta-rules link back to their source lessons
-- Full audit trail: correction > lesson > rule > meta-rule
-
-**23 optional agentic patterns** (`from gradata.contrib.patterns import ...`):
-Pipeline, Guard, RAG, Reflection, Memory, MCP, Orchestrator, Q-Learning Router, and more.
-
-## Works With Any LLM
-
-```python
-# OpenAI
-from gradata.integrations.openai_adapter import patch_openai
-client = patch_openai(openai_client, brain_dir="./my-brain")
-
-# Anthropic
-from gradata.integrations.anthropic_adapter import patch_anthropic
-client = patch_anthropic(anthropic_client, brain_dir="./my-brain")
-
-# LangChain
-from gradata.integrations.langchain_adapter import BrainMemory
-memory = BrainMemory(brain_dir="./my-brain")
-
-# CrewAI
-from gradata.integrations.crewai_adapter import BrainCrewMemory
-crew = Crew(memory=BrainCrewMemory(brain_dir="./my-brain"))
-
-# Any other LLM -- just call the API directly
-brain.correct(draft=llm_output, final=user_edited_output)
-rules = brain.apply_brain_rules(task_description)
-```
-
-## CLI
-
-```bash
-gradata init                          # Create a brain + scaffold hooks
-gradata correct --draft "..." --final "..."  # Log a correction
-gradata review                        # Approve/reject pending lessons
-gradata stats                         # Brain health
-gradata manifest --json               # Quality metrics
-gradata search "topic"                # Search brain knowledge
-gradata export                        # Package for sharing
-gradata doctor                        # Diagnose issues
-```
-
-## MCP Server
-
-Works with Claude Code, Cursor, Windsurf, and any MCP-compatible host:
-
-```json
-{
-  "mcpServers": {
-    "gradata": {
-      "command": "python",
-      "args": ["-m", "gradata.mcp_server"]
-    }
-  }
-}
-```
-
-Or let `gradata init --mcp` generate the config for you.
-
-## What Makes This Different
-
-| System | Remembers | Learns from corrections | Graduates rules | Proves improvement | Event Bus |
-|--------|-----------|------------------------|-----------------|-------------------|-----------|
-| Mem0 | Yes | No | No | No | No |
-| Letta (MemGPT) | Yes | No | No | No | No |
-| LangChain Memory | Yes | No | No | No | No |
-| **Gradata** | Yes | **Yes** | **Yes** | **Yes** | **Yes** |
-
-Everyone else builds *declarative memory* -- "remember that I like short emails."
-
-Gradata builds *procedural memory* -- "after 12 corrections on email tone, graduated a RULE at 0.92 confidence: use casual, direct language." That's a learned behavior with a proof trail.
+**Integrations:**
+- OpenAI, Anthropic, LangChain, CrewAI adapters
+- MCP server for Claude Code, Cursor, Windsurf
+- `gradata init --mcp` generates config automatically
 
 ## Pricing
 
@@ -212,29 +141,22 @@ Gradata builds *procedural memory* -- "after 12 corrections on email tone, gradu
 |---|---|---|---|
 | **Price** | $0 | $9-29/mo | Contact |
 | Local brain | Yes | Yes | Yes |
-| Graduation pipeline | Basic | **Optimized (cloud)** | Optimized |
-| Meta-rule synthesis | Keyword | **Semantic (embeddings)** | Semantic |
-| Dashboard (gradata.ai) | Compound score only | **Full analytics** | Full + admin |
-| Cross-brain learning | -- | -- | **Yes** |
-| Rule effectiveness tracking | Local | **Cloud-synced** | Cloud-synced |
-| Support | Community | Email | Dedicated |
+| Behavioral extraction | Templates | **LLM-powered** | LLM-powered |
+| Graduation pipeline | Basic | **Cloud-optimized** | Cloud-optimized |
+| Convergence dashboard | Score only | **Full analytics** | Full + admin |
+| Brain rental | -- | -- | **Yes** |
 
-Free tier is fully functional. Paid makes the brain learn faster and gives you analytics.
+Free tier is fully functional. Paid makes the brain learn faster and gives you convergence analytics.
 
-## Platform Support
-
-- **OS:** Windows, macOS, Linux
-- **Python:** 3.11+
-- **LLMs:** OpenAI, Anthropic, LangChain, CrewAI, or any LLM via direct API
-- **IDE Integration:** Claude Code, Cursor, Windsurf (via MCP)
-- **Storage:** Local SQLite (zero infrastructure)
-
-## Optional Extras
+## CLI
 
 ```bash
-pip install gradata[encrypted]    # Encryption at rest (Fernet AES)
-pip install gradata[embeddings]   # Local sentence-transformers
-pip install gradata[all]          # Everything
+gradata init                          # Create a brain
+gradata correct --draft "..." --final "..."  # Log a correction
+gradata review                        # Approve/reject pending lessons
+gradata stats                         # Brain health + convergence
+gradata manifest --json               # Quality proof
+gradata doctor                        # Diagnose issues
 ```
 
 ## Architecture
@@ -242,37 +164,22 @@ pip install gradata[all]          # Everything
 ```
 src/gradata/
   brain.py              # Brain class (public API)
-  events_bus.py         # Central event bus (v0.3.0)
-  _core.py              # Correction pipeline + graduation
+  events_bus.py         # Central event bus
+  _core.py              # Correction pipeline + behavioral extraction
   _events.py            # Append-only event log (JSONL + SQLite)
-  _types.py             # Lesson, LessonState, typed models
   enhancements/
+    edit_classifier.py    # Classification + behavioral instruction extraction
+    instruction_cache.py  # LLM extraction cache
     self_improvement.py   # Graduation pipeline
-    meta_rules.py         # Meta-rule synthesis
     diff_engine.py        # Edit distance, severity
+    meta_rules.py         # Meta-rule synthesis
   rules/
     rule_engine.py        # Inject rules into prompts
-    rule_ranker.py        # Context-aware ranking (v0.3.0)
-    scope.py              # Task classification
-  integrations/
-    embeddings.py         # Two-tier embeddings (v0.3.0)
-    session_history.py    # Rule effectiveness (v0.3.0)
-    openai_adapter.py     # OpenAI integration
-    anthropic_adapter.py  # Anthropic integration
-    langchain_adapter.py  # LangChain integration
-    crewai_adapter.py     # CrewAI integration
-  hooks/
-    auto_correct.py       # Automatic diff capture
-    inject-brain-rules.js # Rule injection + QMD context
-    tool-finding-capture.js # Lint/test findings to lessons
-    session-history-sync.js # Cross-session effectiveness
+    rule_ranker.py        # Context-aware ranking
+  integrations/           # OpenAI, Anthropic, LangChain, CrewAI
   contrib/patterns/       # Optional agentic patterns
 ```
 
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
-
 ## License
 
-AGPL-3.0. Commercial license available for teams that need it.
+AGPL-3.0. Commercial license available.
