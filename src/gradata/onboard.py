@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -127,11 +128,27 @@ _DOMAIN_SUBDIRS = {
 _SUBDIRS = _CORE_SUBDIRS + _DOMAIN_SUBDIRS.get("sales", [])
 
 
+def _is_interactive() -> bool:
+    """Check if stdin is an interactive TTY."""
+    return hasattr(sys, "stdin") and sys.stdin is not None and sys.stdin.isatty()
+
+
 def _ask(prompt: str, default: str = "") -> str:
-    """Prompt user with a default value. Returns stripped answer or default."""
-    suffix = f" [{default}]" if default else ""
-    answer = input(f"{prompt}{suffix}: ").strip()
-    return answer or default
+    """Prompt user with a default value. Returns stripped answer or default.
+
+    When stdin is not a TTY (scripts, CI, tests), returns the default
+    immediately to avoid blocking on ``input()`` / raising ``EOFError``.
+    Falls back to the default on ``EOFError`` even when ``isatty()`` is
+    ``True`` (e.g. ``python -c`` on Windows).
+    """
+    if not _is_interactive():
+        return default
+    try:
+        suffix = f" [{default}]" if default else ""
+        answer = input(f"{prompt}{suffix}: ").strip()
+        return answer or default
+    except EOFError:
+        return default
 
 
 def _build_manifest(name: str, domain: str, embedding: str) -> dict:
@@ -253,7 +270,7 @@ def onboard(
     domain: str | None = None,
     company: str | None = None,
     embedding: str | None = None,
-    interactive: bool = True,
+    interactive: bool | None = None,
 ) -> Brain:
     """
     Bootstrap a new brain with the onboarding wizard.
@@ -264,11 +281,15 @@ def onboard(
         domain: Domain (e.g. "Sales", "Engineering"). Prompted if None and interactive.
         company: Company name. If provided, creates company.md. Prompted if None and interactive.
         embedding: "local" (default) or "gemini". Prompted if None and interactive.
-        interactive: If False, uses defaults for any missing values.
+        interactive: If True, runs the interactive wizard. If False, uses defaults
+            for any missing values. If None (default), auto-detects from
+            whether stdin is a TTY.
 
     Returns:
         Brain instance pointing at the new directory.
     """
+    if interactive is None:
+        interactive = _is_interactive()
     from gradata.brain import Brain
 
     brain_dir = Path(path).resolve()

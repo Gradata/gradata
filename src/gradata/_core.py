@@ -153,7 +153,21 @@ def brain_correct(
                 if classifications:
                     primary = next((c for c in classifications if c.category.upper() == cat),
                                    classifications[0])
-                    desc = primary.description
+                    # Try behavioral extraction (LLM + cache + templates)
+                    try:
+                        from gradata.enhancements.edit_classifier import extract_behavioral_instruction
+                        from gradata.enhancements.instruction_cache import InstructionCache
+                        if not isinstance(brain._instruction_cache, InstructionCache):
+                            brain._instruction_cache = InstructionCache(
+                                lessons_path.parent / "instruction_cache.json"
+                            )
+                        behavioral_desc = extract_behavioral_instruction(
+                            diff, primary, cache=brain._instruction_cache,  # type: ignore[arg-type]
+                        )
+                        desc = behavioral_desc or primary.description
+                    except Exception as e:
+                        _log.debug("Behavioral extraction failed: %s", e)
+                        desc = primary.description
                 elif summary:
                     desc = summary
                 else:
@@ -439,6 +453,19 @@ def brain_end_session(
                     meta_rules_discovered = sum(1 for m in new_metas if m.id not in existing_ids)
                     if meta_rules_discovered > 0:
                         _log.info("Meta-rules: %d new (%d total)", meta_rules_discovered, len(new_metas))
+                        for meta in new_metas:
+                            if meta.id not in existing_ids:
+                                try:
+                                    brain.bus.emit("meta_rule.created", {
+                                        "id": meta.id,
+                                        "principle": meta.principle,
+                                        "description": meta.principle,
+                                        "source_categories": getattr(meta, "source_categories", []),
+                                        "confidence": getattr(meta, "confidence", 0.0),
+                                        "session": current_session,
+                                    })
+                                except Exception as e:
+                                    _log.debug("Meta-rule event emit failed: %s", e)
             except ImportError as e:
                 _log.warning("Meta-rules unavailable: %s", e)
             except Exception as e:
@@ -751,3 +778,59 @@ def brain_export_skills(brain: Brain, *, output_dir: str | None = None,
         skill_path.write_text("\n".join(lines), encoding="utf-8")
         created.append(str(skill_path))
     return created
+
+
+# ── convergence() ─────────────────────────────────────────────────────
+
+def brain_convergence(brain: "Brain") -> dict:
+    """Compute corrections-per-session convergence data.
+
+    Returns dict with:
+        sessions: list of session numbers
+        corrections_per_session: list of correction counts per session
+        trend: "converging" | "converged" | "diverging" | "insufficient_data"
+        total_corrections: int
+        total_sessions: int
+    """
+    empty = {"sessions": [], "corrections_per_session": [], "trend": "insufficient_data",
+             "total_corrections": 0, "total_sessions": 0}
+
+    try:
+        from gradata._db import get_connection
+        with get_connection(brain.db_path) as conn:
+            rows = conn.execute(
+                "SELECT session, COUNT(*) as cnt FROM events "
+                "WHERE type = 'CORRECTION' AND session IS NOT NULL AND session > 0 "
+                "GROUP BY session ORDER BY session"
+            ).fetchall()
+    except Exception:
+        return empty
+
+    if not rows:
+        return empty
+
+    sessions = [r[0] for r in rows]
+    counts = [r[1] for r in rows]
+
+    # Determine trend
+    trend = "insufficient_data"
+    if len(counts) >= 3:
+        first_half = counts[:len(counts) // 2]
+        second_half = counts[len(counts) // 2:]
+        avg_first = sum(first_half) / len(first_half)
+        avg_second = sum(second_half) / len(second_half)
+
+        if avg_second < avg_first * 0.7:
+            trend = "converging"
+        elif abs(avg_second - avg_first) <= max(1, avg_first * 0.15):
+            trend = "converged"
+        else:
+            trend = "diverging"
+
+    return {
+        "sessions": sessions,
+        "corrections_per_session": counts,
+        "trend": trend,
+        "total_corrections": sum(counts),
+        "total_sessions": len(sessions),
+    }

@@ -17,8 +17,12 @@ from __future__ import annotations
 import re
 from collections import Counter
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from gradata.enhancements.diff_engine import DiffResult
+
+if TYPE_CHECKING:
+    from gradata.enhancements.instruction_cache import InstructionCache
 
 
 @dataclass
@@ -283,3 +287,148 @@ def summarize_edits(classifications: list[EditClassification]) -> str:
     ]
     total = sum(counts.values())
     return f"{total} edit{'s' if total != 1 else ''}: {', '.join(fallback_parts)}"
+
+
+# ---------------------------------------------------------------------------
+# Behavioral Instruction Extraction (v0.4.0)
+# ---------------------------------------------------------------------------
+
+_INSTRUCTION_TEMPLATES: dict[str, str] = {
+    # CODE patterns
+    "getattr": "Use getattr() for safe attribute access on objects that may lack the attribute",
+    "valueerror,typeerror": "Add explicit ValueError/TypeError guards for invalid inputs",
+    "except,try,false": "Wrap risky operations in try/except with explicit error handling",
+    "collections,callable,import,abc": "Import from collections.abc for abstract base types",
+    "list,str,int": "Add explicit type hints for function parameters and return values",
+    "optional,defined,ignore,type": "Use Optional[] and type: ignore for conditional imports",
+    "hash": "Use hash() or __hash__ instead of hashlib for non-cryptographic hashing",
+    "noqa": "Suppress specific linter warnings with targeted noqa comments",
+    "logging,getlogger": "Use module-level logger via logging.getLogger(__name__)",
+    "none,else,true": "Handle None/falsy cases explicitly with early returns",
+    # TONE patterns
+    "casualized": "Write in a casual, direct tone — avoid formal business language",
+    "formalized": "Use professional, formal tone for this context",
+    "softened": "Use softer, more empathetic language",
+    "strengthened": "Be more direct and assertive — remove hedging words",
+    # PROCESS patterns
+    "first,plan": "Always plan before implementing — plan then adversary review then build",
+    "check,verify": "Verify data and assumptions before acting on them",
+    "approve,review": "Get review or approval before proceeding with changes",
+    "audit,before": "Audit existing code/state before making modifications",
+    "before,research": "Research the topic thoroughly before producing output",
+    # STRUCTURE patterns
+    "reordered": "Present information in a more logical order",
+    "heading,structure": "Use clear heading hierarchy for document structure",
+}
+
+
+def _match_template(classification: EditClassification) -> str | None:
+    desc_lower = classification.description.lower()
+
+    for keyword in ("casualized", "formalized", "softened", "strengthened"):
+        if keyword in desc_lower:
+            return _INSTRUCTION_TEMPLATES.get(keyword)
+
+    if "reordered" in desc_lower or "reformatted" in desc_lower:
+        return _INSTRUCTION_TEMPLATES.get("reordered")
+
+    added_match = re.search(r"added:\s*([^)]+)", desc_lower)
+    if added_match:
+        added_words = [w.strip() for w in added_match.group(1).split(",")]
+        # Try multi-word keys (sorted for consistency)
+        for n in range(min(len(added_words), 4), 0, -1):
+            key = ",".join(sorted(added_words[:n]))
+            if key in _INSTRUCTION_TEMPLATES:
+                return _INSTRUCTION_TEMPLATES[key]
+        for word in added_words:
+            if word in _INSTRUCTION_TEMPLATES:
+                return _INSTRUCTION_TEMPLATES[word]
+
+    return None
+
+
+_EXTRACTION_MODEL = "claude-haiku-4-5-20251001"
+_EXTRACTION_TIMEOUT = 12.0  # seconds
+
+
+def _call_llm_for_instruction(
+    diff: DiffResult, classification: EditClassification,
+) -> str | None:
+    """Call LLM to extract a behavioral instruction. Returns None on any failure."""
+    try:
+        import anthropic
+    except ImportError:
+        return None
+
+    import logging
+    _log = logging.getLogger("gradata")
+
+    old_text = ""
+    new_text = ""
+    for section in diff.changed_sections[:3]:
+        old_text += section.old_text[:500] + "\n"
+        new_text += section.new_text[:500] + "\n"
+
+    prompt = (
+        "A human corrected an AI's output. Extract ONE behavioral instruction "
+        "that explains what the AI should do differently next time.\n\n"
+        f"Category: {classification.category}\n"
+        f"BEFORE:\n{old_text.strip()}\n\n"
+        f"AFTER:\n{new_text.strip()}\n\n"
+        "Reply with ONE imperative sentence (e.g., 'Use casual tone in emails' "
+        "or 'Always validate input before processing'). No explanation."
+    )
+
+    try:
+        client = anthropic.Anthropic(timeout=_EXTRACTION_TIMEOUT)
+        msg = client.messages.create(
+            model=_EXTRACTION_MODEL,
+            max_tokens=100,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = msg.content[0].text.strip()  # type: ignore[union-attr]
+        if 5 < len(text) < 200:
+            return text
+    except Exception as e:
+        _log.debug("LLM instruction extraction failed: %s", e)
+
+    return None
+
+
+def extract_behavioral_instruction(
+    diff: DiffResult,
+    classification: EditClassification,
+    *,
+    cache: InstructionCache | None = None,
+    llm_enabled: bool = True,
+) -> str | None:
+    """Extract a behavioral instruction from a correction.
+
+    Resolution order: cache hit -> template match -> LLM extraction -> None.
+    """
+    from gradata.enhancements.instruction_cache import InstructionCache
+
+    added_match = re.search(r"added:\s*([^)]+)", classification.description.lower())
+    cut_match = re.search(r"cut:\s*([^);]+)", classification.description.lower())
+    added_words = [w.strip() for w in added_match.group(1).split(",")] if added_match else []
+    removed_words = [w.strip() for w in cut_match.group(1).split(",")] if cut_match else []
+    cache_key = InstructionCache.make_key(classification.category, added_words, removed_words)
+
+    if cache:
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+
+    template = _match_template(classification)
+    if template:
+        if cache:
+            cache.put(cache_key, template)
+        return template
+
+    if llm_enabled:
+        instruction = _call_llm_for_instruction(diff, classification)
+        if instruction and cache:
+            cache.put(cache_key, instruction)
+        return instruction
+
+    return None

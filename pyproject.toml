@@ -4,15 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gradata"
-version = "0.3.0"
-description = "Procedural memory for AI agents. Corrections become behavioral rules that compound over time."
+version = "0.4.0"
+description = "AI that learns your judgment. Corrections become behavioral rules that converge on your style."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
 requires-python = ">=3.11"
 authors = [
     { name = "Gradata", email = "oliver@gradata.com" },
 ]
-keywords = ["ai", "brain", "sdk", "memory", "agents", "claude"]
+keywords = ["ai", "learning", "behavioral", "agents", "personalization", "judgment", "corrections"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

@@ -66,6 +66,8 @@ class Brain:
             if self._encryption_key:
                 open_encrypted_db(self.dir, self._encryption_key)
 
+        self._instruction_cache: object | None = None  # lazy: InstructionCache
+
         logger.debug("Brain init: %s (db=%s)", self.dir, self.db_path)
 
         # Build immutable context for this brain instance (DI path)
@@ -202,7 +204,7 @@ class Brain:
             domain=domain,
             company=company,
             embedding=embedding,
-            interactive=interactive if interactive is not None else True,
+            interactive=interactive,
         )
 
     # ── Credit Budgets (daily API spend limits) ──────────────────────────
@@ -330,6 +332,11 @@ class Brain:
         """Detect implicit behavioral feedback in user prompts."""
         from gradata._core import brain_detect_implicit_feedback
         return brain_detect_implicit_feedback(self, user_message, session=session)
+
+    def convergence(self) -> dict:
+        """Get corrections-per-session convergence data."""
+        from gradata._core import brain_convergence
+        return brain_convergence(self)
 
     # ── Output Logging ─────────────────────────────────────────────────
 
