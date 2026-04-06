@@ -51,10 +51,10 @@ PREFERENCE_DECAY_DAMPER = 0.5
 
 # SPEC Section 1: maturity-aware kill switches (relevant cycles only)
 KILL_LIMITS: dict[str, int] = {
-    "INFANT": 15,       # 0-50 sessions
-    "ADOLESCENT": 12,   # 50-100 sessions
-    "MATURE": 10,       # 100-200 sessions
-    "STABLE": 8,        # 200+ sessions
+    "INFANT": 8,        # 0-50 sessions — unproven, die fast
+    "ADOLESCENT": 12,   # 50-100 sessions — some evidence, moderate grace
+    "MATURE": 15,       # 100-200 sessions — proven useful, longer grace
+    "STABLE": 20,       # 200+ sessions — battle-tested, longest grace
 }
 
 # Severity multipliers for contradiction penalty
@@ -86,10 +86,10 @@ SURVIVAL_SEVERITY_WEIGHTS: dict[str, float] = {
 MACHINE_CONTRADICTION_PENALTY = -0.06
 MACHINE_ACCEPTANCE_BONUS = 0.10
 MACHINE_KILL_LIMITS: dict[str, int] = {
-    "INFANT": 30,
-    "ADOLESCENT": 24,
-    "MATURE": 20,
-    "STABLE": 16,
+    "INFANT": 16,
+    "ADOLESCENT": 20,
+    "MATURE": 24,
+    "STABLE": 30,
 }
 MACHINE_SEVERITY_WEIGHTS: dict[str, float] = {
     "trivial": 0.10,
