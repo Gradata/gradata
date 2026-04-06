@@ -632,30 +632,6 @@ def topic_boosts_from_rules() -> dict[str, float]:
     return {cat: round(1.0 + (count / total) * 0.5, 2) for cat, count in categories.items()}
 
 
-# ---------------------------------------------------------------------------
-# 19. Rule Engine — assumption validation feeds back misfires
-# ---------------------------------------------------------------------------
-
-def process_rule_assumption_failure(
-    brain: Brain,
-    rule_description: str,
-    reason: str,
-) -> dict:
-    """Feed rule assumption failures back as misfire signals."""
-    from gradata.enhancements.self_improvement import update_confidence
-
-    def _apply(lessons):
-        for lesson in lessons:
-            if lesson.description[:40] == rule_description[:40]:
-                lesson.misfire_count += 1
-                break
-        update_confidence(lessons, [{"category": "GENERAL", "severity_label": "minor",
-                                     "description": f"Rule assumption failed: {reason}"}])
-
-    if not _mutate_lessons(brain, _apply):
-        return {"processed": False}
-    return {"processed": True, "reason": reason}
-
 
 # ---------------------------------------------------------------------------
 # 20. Middleware — graduation middleware wraps operations
