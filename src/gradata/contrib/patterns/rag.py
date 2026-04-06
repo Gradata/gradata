@@ -354,22 +354,6 @@ def order_by_relevance_position(chunks: list[Chunk]) -> list[Chunk]:
     return result
 
 
-def format_context(result: RetrievalResult, max_chars: int = 5000) -> str:
-    """Format retrieval result as context block for prompt injection."""
-    if not result.chunks:
-        return ""
-
-    lines = [f"## Brain Context ({result.mode}, {len(result.chunks)} results)"]
-    total = 0
-    for chunk in result.chunks:
-        text = chunk.content[:500]
-        if total + len(text) > max_chars:
-            break
-        grad = f" [{chunk.graduation_level}]" if chunk.graduation_level else ""
-        lines.append(f"- [{chunk.source}{grad}] {text}")
-        total += len(text)
-    return "\n".join(lines)
-
 
 # ---------------------------------------------------------------------------
 
