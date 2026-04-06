@@ -452,6 +452,19 @@ def brain_end_session(
                     meta_rules_discovered = sum(1 for m in new_metas if m.id not in existing_ids)
                     if meta_rules_discovered > 0:
                         _log.info("Meta-rules: %d new (%d total)", meta_rules_discovered, len(new_metas))
+                        for meta in new_metas:
+                            if meta.id not in existing_ids:
+                                try:
+                                    brain.bus.emit("meta_rule.created", {
+                                        "id": meta.id,
+                                        "principle": meta.principle,
+                                        "description": meta.principle,
+                                        "source_categories": getattr(meta, "source_categories", []),
+                                        "confidence": getattr(meta, "confidence", 0.0),
+                                        "session": current_session,
+                                    })
+                                except Exception:
+                                    pass
             except ImportError as e:
                 _log.warning("Meta-rules unavailable: %s", e)
             except Exception as e:
