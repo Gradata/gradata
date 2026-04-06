@@ -191,12 +191,3 @@ class ToolRegistry:
         }
 
 
-def format_tools(tools: list[ToolSpec]) -> str:
-    """Format tool list for display."""
-    if not tools:
-        return "No tools registered."
-    lines = [f"Available tools ({len(tools)}):"]
-    for t in tools:
-        confirm = " [requires confirmation]" if t.requires_confirmation else ""
-        lines.append(f"  {t.name} ({t.category}): {t.description}{confirm}")
-    return "\n".join(lines)
