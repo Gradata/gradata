@@ -179,21 +179,30 @@ def brain_correct(
                 if classifications:
                     primary = next((c for c in classifications if c.category.upper() == cat),
                                    classifications[0])
-                    # Try behavioral extraction (LLM + cache + templates)
-                    try:
-                        from gradata.enhancements.edit_classifier import extract_behavioral_instruction
-                        from gradata.enhancements.instruction_cache import InstructionCache
-                        if not isinstance(brain._instruction_cache, InstructionCache):
-                            brain._instruction_cache = InstructionCache(
-                                lessons_path.parent / "instruction_cache.json"
-                            )
-                        behavioral_desc = extract_behavioral_instruction(
-                            diff, primary, cache=brain._instruction_cache,  # type: ignore[arg-type]
-                        )
-                        desc = behavioral_desc or primary.description
-                    except Exception as e:
-                        _log.debug("Behavioral extraction failed: %s", e)
+                    # Check convergence gate — skip extraction if category is settled
+                    convergence_data = brain._get_convergence()
+                    cat_convergence = convergence_data.get("by_category", {}).get(cat, {})
+                    category_converged = cat_convergence.get("trend") == "converged"
+
+                    if category_converged:
+                        _log.debug("Skipping extraction for converged category: %s", cat)
                         desc = primary.description
+                    else:
+                        # Try behavioral extraction (LLM + cache + templates)
+                        try:
+                            from gradata.enhancements.edit_classifier import extract_behavioral_instruction
+                            from gradata.enhancements.instruction_cache import InstructionCache
+                            if not isinstance(brain._instruction_cache, InstructionCache):
+                                brain._instruction_cache = InstructionCache(
+                                    lessons_path.parent / "instruction_cache.json"
+                                )
+                            behavioral_desc = extract_behavioral_instruction(
+                                diff, primary, cache=brain._instruction_cache,  # type: ignore[arg-type]
+                            )
+                            desc = behavioral_desc or primary.description
+                        except Exception as e:
+                            _log.debug("Behavioral extraction failed: %s", e)
+                            desc = primary.description
                 elif summary:
                     desc = summary
                 else:
