@@ -237,7 +237,7 @@ def validate_tag(tag: str, strict: bool = False) -> tuple[bool, str]:
     return True, "ok"
 
 
-def validate_tags(tags: list[str], event_type: str = None,
+def validate_tags(tags: list[str], event_type: str | None = None,
                   strict: bool = False) -> list[str]:
     issues = []
     for tag in tags:
@@ -253,8 +253,8 @@ def validate_tags(tags: list[str], event_type: str = None,
     return issues
 
 
-def enrich_tags(tags: list[str], event_type: str = None,
-                data: dict = None) -> list[str]:
+def enrich_tags(tags: list[str], event_type: str | None = None,
+                data: dict | None = None) -> list[str]:
     enriched = list(tags)
     prefixes = {t.split(":")[0] for t in enriched if ":" in t}
     data = data or {}

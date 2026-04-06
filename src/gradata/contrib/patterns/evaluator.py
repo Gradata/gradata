@@ -337,7 +337,7 @@ def evaluate(
         previous_result is not None and average < previous_result.average
     )
 
-    if regression:
+    if regression and previous_result is not None:
         logger.warning(
             "Regression detected: score dropped from %.3f to %.3f.",
             previous_result.average,
@@ -416,7 +416,8 @@ def evaluate_optimize_loop(
         if iteration == 1:
             current_output = generator(task)
         else:
-            current_output = generator(task, feedback=previous_eval.feedback)
+            fb = previous_eval.feedback if previous_eval is not None else {}
+            current_output = generator(task, feedback=fb)
 
         result = evaluate(
             output=current_output,

@@ -138,7 +138,7 @@ def fts_rebuild(ctx: "BrainContext | None" = None):
     return len(docs)
 
 
-def fts_search(query_text: str, file_type: str = None, top_k: int = 10,
+def fts_search(query_text: str, file_type: str | None = None, top_k: int = 10,
                ctx: "BrainContext | None" = None) -> list[dict]:
     db = ctx.db_path if ctx else _p.DB_PATH
     conn = sqlite3.connect(str(db))
@@ -152,7 +152,7 @@ def fts_search(query_text: str, file_type: str = None, top_k: int = 10,
     else:
         fts_query = f'"{words[0]}"' if words else '""'
     sql = "SELECT rowid, source, file_type, text, embed_date, rank FROM brain_fts WHERE brain_fts MATCH ?"
-    params = [fts_query]
+    params: list[str | int] = [fts_query]
     if file_type:
         sql += " AND file_type = ?"
         params.append(file_type)

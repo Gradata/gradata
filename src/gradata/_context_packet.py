@@ -338,8 +338,8 @@ def format_as_prompt(packet: dict, task_type: str) -> str:
     return "\n".join(sections)
 
 
-def build_packet(prospect: str = None, task_type: str = None,
-                 topic: str = None, session: int = None,
+def build_packet(prospect: str | None = None, task_type: str | None = None,
+                 topic: str | None = None, session: int | None = None,
                  ctx: "BrainContext | None" = None) -> str:
     packet = {}
     if session is None:
@@ -367,4 +367,4 @@ def build_packet(prospect: str = None, task_type: str = None,
     else:
         packet["user_scope"] = _load_user_scope(ctx=ctx)
 
-    return format_as_prompt(packet, task_type)
+    return format_as_prompt(packet, task_type or "general")

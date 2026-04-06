@@ -54,7 +54,7 @@ class EmbeddingClient:
         if self._token:
             headers["Authorization"] = "Bearer " + self._token
         body = json.dumps({"text": text}).encode()
-        req = Request(self.api_url, data=body, headers=headers, method="POST")
+        req = Request(str(self.api_url), data=body, headers=headers, method="POST")
         with urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
         return data["embedding"]

@@ -5,6 +5,7 @@ Evaluates multiple candidate rule wordings before committing to one.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 
@@ -32,7 +33,7 @@ class ToTResult:
 
 def explore(
     candidates: list[str],
-    scorer: object,
+    scorer: Callable[[str], tuple[float, str]],
     *,
     branch_factor: int = 3,
     max_depth: int = 2,
@@ -98,7 +99,7 @@ def explore(
 def evaluate_rule_candidates(
     lesson_description: str,
     existing_rules: list[str],
-    scorer: callable | None = None,
+    scorer: Callable[[str], tuple[float, str]] | None = None,
 ) -> ToTResult:
     """Evaluate multiple wordings for a graduating rule.
 
@@ -114,8 +115,9 @@ def evaluate_rule_candidates(
     Returns:
         ToTResult with best rule wording.
     """
+    effective_scorer: Callable[[str], tuple[float, str]]
     if scorer is None:
-        def scorer(candidate: str) -> tuple[float, str]:
+        def _default_scorer(candidate: str) -> tuple[float, str]:
             # Heuristic: shorter, more specific rules score higher
             words = candidate.split()
             length_score = max(0.0, 1.0 - len(words) / 50)
@@ -127,6 +129,9 @@ def evaluate_rule_candidates(
                     overlap_penalty += 0.2
             score = round(length_score - overlap_penalty, 4)
             return (max(0.0, min(1.0, score)), f"length={len(words)}, overlap_penalty={overlap_penalty:.2f}")
+        effective_scorer = _default_scorer
+    else:
+        effective_scorer = scorer
 
     candidates = [
         lesson_description,
@@ -134,4 +139,4 @@ def evaluate_rule_candidates(
         f"Never {lesson_description.lower().replace('always ', '').replace('use ', 'use ').strip()}",
     ]
 
-    return explore(candidates, scorer)
+    return explore(candidates, effective_scorer)

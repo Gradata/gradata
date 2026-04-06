@@ -293,7 +293,7 @@ DEFAULT_TASK_TYPES: list[TaskType] = [
             "find entities", "find items", "entity list",
             "build a list", "identify targets",
         ],
-        domain_hint=None,
+        domain_hint="",
     ),
     TaskType(
         name="resistance_handling",
@@ -301,7 +301,7 @@ DEFAULT_TASK_TYPES: list[TaskType] = [
             "objection", "push back", "they said no", "handle objection",
             "overcome", "rebuttal",
         ],
-        domain_hint=None,
+        domain_hint="",
     ),
     TaskType(
         name="follow_up",
@@ -317,7 +317,7 @@ DEFAULT_TASK_TYPES: list[TaskType] = [
             "update crm", "log a note", "crm note", "update system",
             "update records", "deal note",
         ],
-        domain_hint=None,
+        domain_hint="",
     ),
 ]
 

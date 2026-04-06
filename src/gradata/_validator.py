@@ -190,8 +190,8 @@ def _verify_training_depth(manifest: dict, conn: sqlite3.Connection) -> dict:
 
     if span and span[0] and span[1]:
         try:
-            first = datetime.fromisoformat(span[0])
-            last = datetime.fromisoformat(span[1])
+            first = datetime.fromisoformat(str(span[0]))
+            last = datetime.fromisoformat(str(span[1]))
             days = (last - first).days
             results.append({
                 "check": "training_span_days",
@@ -531,7 +531,7 @@ def _compute_trust_score(dimensions: list[dict]) -> dict:
 
 # ── Main Validation ──────────────────────────────────────────────────
 
-def validate_brain(manifest_path: Path = None, ctx: BrainContext | None = None) -> dict:
+def validate_brain(manifest_path: Path | None = None, ctx: BrainContext | None = None) -> dict:
     """Run full brain validation. Returns structured report."""
     brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
     path = manifest_path or (brain_dir / "brain.manifest.json")

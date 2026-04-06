@@ -21,6 +21,10 @@ from __future__ import annotations
 import logging
 import sqlite3
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gradata.contrib.patterns.q_learning_router import QLearningRouter
 
 _log = logging.getLogger(__name__)
 

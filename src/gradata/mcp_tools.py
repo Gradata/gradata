@@ -423,9 +423,9 @@ def export_skill(
         Dict with skill_dir, skill_id, rules_count, and SKILL.md preview.
     """
     from gradata.brain import Brain
-    from gradata._paths import get_brain_dir
+    from gradata._paths import BRAIN_DIR
 
-    bd = Path(brain_dir) if brain_dir else get_brain_dir()
+    bd = Path(brain_dir) if brain_dir else BRAIN_DIR
     if not bd or not bd.exists():
         return {"error": "No brain directory found. Run Brain.init() first."}
 

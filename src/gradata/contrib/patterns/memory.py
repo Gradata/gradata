@@ -473,7 +473,7 @@ class MemoryManager:
 
     def __repr__(self) -> str:
         try:
-            count = len(self._store) if hasattr(self._store, "__len__") else "?"
+            count = len(self._store) if hasattr(self._store, "__len__") else "?"  # type: ignore[arg-type]
         except Exception:
             count = "?"
         return f"MemoryManager(store={self._store.__class__.__name__}, memories={count})"

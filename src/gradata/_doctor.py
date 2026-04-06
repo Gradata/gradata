@@ -191,7 +191,7 @@ def _check_disk_space(brain_path):
         return {"name": "disk_space", "status": "error", "detail": str(e)}
 
 
-def diagnose(brain_dir: str | Path = None) -> dict:
+def diagnose(brain_dir: str | Path | None = None) -> dict:
     """Run all health checks and return structured report.
 
     Args:

@@ -151,7 +151,7 @@ class GraduationEngine:
         Default implementation: gradata.enhancements.self_improvement.update_confidence
         """
         from gradata.enhancements.self_improvement import update_confidence
-        return update_confidence(lessons, corrections, severity_data=severity_data, is_machine=is_machine)
+        return update_confidence(lessons, corrections, severity_data=severity_data, machine_mode=is_machine)
 
     def graduate(
         self,

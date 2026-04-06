@@ -284,7 +284,7 @@ def get_stats(db_path) -> dict:
     return {"collection": "brain_embeddings", "total_chunks": count}
 
 
-def main(brain_dir: Path = None, full: bool = False, dry_run: bool = False,
+def main(brain_dir: Path | None = None, full: bool = False, dry_run: bool = False,
          stats_only: bool = False, ctx: BrainContext | None = None):
     """Run embedding. Called by Brain.embed() or CLI.
 

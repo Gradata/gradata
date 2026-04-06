@@ -498,4 +498,13 @@ class HumanLoopGate:
         approver: Callable | None = None,
     ) -> ApprovalResult:
         """Full gate check: assess risk, request approval if needed."""
-        return gate(action, context=context, approver=approver)
+        request = gate(action)
+        if request is None:
+            return ApprovalResult(
+                approved=True, feedback="auto_approved_low_risk"
+            )
+        if approver is not None:
+            return approver(request)
+        return ApprovalResult(
+            approved=False, feedback="requires_human_review"
+        )

@@ -638,9 +638,10 @@ def guards_from_graduated_rules() -> list[Guard]:
                 # Rules are phrased as "never X" or "always Y"
                 # This is a heuristic; real guardrails need LLM-backed checks
                 return GuardCheck(
-                    guard_name=f"rule_{rule_cat.lower()}",
+                    name=f"rule_{rule_cat.lower()}",
                     result="pass",
-                    detail=f"Rule: {rule_text[:80]}",
+                    details=f"Rule: {rule_text[:80]}",
+                    action_taken="passed",
                 )
             return check_fn
 

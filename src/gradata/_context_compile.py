@@ -44,7 +44,7 @@ def _get_prospect_names(ctx: "BrainContext | None" = None) -> dict[str, str]:
 
 
 def extract_entities(message: str, ctx: "BrainContext | None" = None) -> dict:
-    result = {"prospect": None, "task_type": None, "topic": None}
+    result: dict[str, str | None] = {"prospect": None, "task_type": None, "topic": None}
     msg_lower = message.lower()
     prospect_map = _get_prospect_names(ctx=ctx)
     for key in sorted(prospect_map.keys(), key=len, reverse=True):
@@ -62,7 +62,7 @@ def extract_entities(message: str, ctx: "BrainContext | None" = None) -> dict:
     return result
 
 
-def compile_context(message: str, prospect: str = None, task: str = None,
+def compile_context(message: str, prospect: str | None = None, task: str | None = None,
                     ctx: "BrainContext | None" = None) -> str:
     entities = extract_entities(message, ctx=ctx)
     if prospect:
