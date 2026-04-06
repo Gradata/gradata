@@ -524,21 +524,36 @@ def brain_detect_implicit_feedback(
     signals = []
     text = user_message.lower()
 
+    # Use word-boundary check to reduce false positives from substring
+    # matching (e.g. "not inaccurate" matching "not accurate").
+    def _phrase_match(phrase: str) -> bool:
+        idx = text.find(phrase)
+        if idx < 0:
+            return False
+        # Check left boundary (start of string or non-alpha)
+        if idx > 0 and text[idx - 1].isalpha():
+            return False
+        # Check right boundary (end of string or non-alpha)
+        end = idx + len(phrase)
+        if end < len(text) and text[end].isalpha():
+            return False
+        return True
+
     for marker in ["are you sure", "that's wrong", "that's not right", "not accurate",
                     "no, not that", "no don't", "stop doing", "why did you", "why didn't you"]:
-        if marker in text:
+        if _phrase_match(marker):
             signals.append({"type": "pushback", "marker": marker})
     for marker in ["make sure", "don't forget", "remember to", "you should always",
                     "i already told", "i just said", "as i mentioned", "like i said"]:
-        if marker in text:
+        if _phrase_match(marker):
             signals.append({"type": "reminder", "marker": marker})
     for marker in ["what about", "you forgot", "you missed", "you skipped",
                     "you ignored", "you dropped", "did you check", "did you verify"]:
-        if marker in text:
+        if _phrase_match(marker):
             signals.append({"type": "gap", "marker": marker})
     for marker in ["are we sure", "is that right", "is that correct",
                     "won't that", "won't people", "i feel like"]:
-        if marker in text:
+        if _phrase_match(marker):
             signals.append({"type": "challenge", "marker": marker})
 
     has_feedback = len(signals) > 0
