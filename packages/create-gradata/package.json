@@ -9,7 +9,7 @@
   "license": "AGPL-3.0-or-later",
   "repository": {
     "type": "git",
-    "url": "https://github.com/gradata-systems/gradata"
+    "url": "https://github.com/Gradata/gradata"
   },
   "engines": {
     "node": ">=18"

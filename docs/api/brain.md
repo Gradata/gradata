@@ -4,7 +4,7 @@ The `Brain` class is the primary interface to the SDK. All operations go through
 
 ## Constructor
 
-### `Brain(brain_dir)`
+### `Brain(brain_dir, working_dir=None, encryption_key=None)`
 
 Open an existing brain.
 
@@ -17,6 +17,8 @@ brain = Brain("./my-brain")
 **Args:**
 
 - `brain_dir` (str | Path): Path to the brain directory. Must exist.
+- `working_dir` (str | Path | None): Optional working directory for context.
+- `encryption_key` (str | None): Encryption key for at-rest encryption. Also reads `GRADATA_ENCRYPTION_KEY` env var.
 
 **Raises:** `BrainNotFoundError` if the directory doesn't exist.
 
@@ -27,11 +29,9 @@ Bootstrap a new brain with the onboarding wizard.
 ```python
 brain = Brain.init(
     "./my-brain",
-    domain="Sales",
-    name="My Sales Brain",
-    company="Acme Corp",
-    embedding="local",     # or "gemini"
-    interactive=False,     # skip terminal prompts
+    domain="Engineering",
+    name="CodeReview Brain",
+    interactive=False,
 )
 ```
 
@@ -39,43 +39,28 @@ brain = Brain.init(
 
 ---
 
-## Core Learning Loop
+## Properties
 
-### `brain.log_output(text, output_type, prompt, self_score, scope, session)`
+### `brain.session` → int
 
-Log an AI-generated draft for tracking.
+Current session number, auto-tracked from the event log. Falls back to `loop-state.md` if no events exist yet.
 
 ```python
-brain.log_output(
-    "Hi John, wanted to reach out...",
-    output_type="email",
-    self_score=7.0,
-    session=1,
-)
+print(f"Session {brain.session}")  # → "Session 42"
 ```
 
-**Args:**
+---
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `text` | str | required | The AI-generated draft |
-| `output_type` | str | `"general"` | Type: email, research, code, etc. |
-| `prompt` | str | None | The user prompt that triggered this |
-| `self_score` | float | None | AI's confidence rating (0-10) |
-| `scope` | dict | None | Scope context dict |
-| `session` | int | None | Session number (auto-detected) |
+## Core Learning Loop
 
-**Returns:** Event dict.
-
-### `brain.correct(draft, final, category, context, session)`
+### `brain.correct(draft, final, category, context, session, agent_type, approval_required, dry_run, min_severity)`
 
 Record a user correction. This is the primary learning signal.
 
 ```python
 event = brain.correct(
-    draft="Hi John, wanted to reach out...",
-    final="John, saw your team is scaling ads. We cut creative testing time in half.",
-    session=1,
+    draft="We are pleased to inform you of our new product offering.",
+    final="Hey, check out what we just shipped.",
 )
 ```
 
@@ -93,12 +78,53 @@ Automatically:
 Get graduated rules for a task, formatted for prompt injection.
 
 ```python
-rules = brain.apply_brain_rules(
-    "email_draft",
-    {"audience": "executive", "domain": "sales"},
-)
+rules = brain.apply_brain_rules("write an email")
 # Returns formatted string ready to inject into LLM prompt
 ```
+
+### `brain.end_session(session_corrections=None, session_type="full", machine_mode=None, skip_meta_rules=False)`
+
+Run the full graduation sweep at end of session.
+
+```python
+result = brain.end_session()
+print(result)
+# → {"session": 42, "total_lessons": 15, "promotions": 2, "demotions": 0, ...}
+```
+
+Automatically:
+
+1. Updates confidence for all lessons based on session corrections
+2. Graduates lessons (INSTINCT → PATTERN → RULE)
+3. Archives newly graduated RULE lessons
+4. Discovers meta-rules from 3+ related graduated rules
+5. Emits `SESSION_END` event with session metrics
+
+**Returns:** Dict with session number, lesson counts, promotions, demotions, new rules.
+
+### `brain.auto_evolve(output, task, agent_type, evaluator, dimensions, threshold)`
+
+Evaluate output and auto-generate corrections for dimensions that score below threshold.
+
+### `brain.detect_implicit_feedback(user_message, session)`
+
+Detect implicit behavioral feedback in user prompts (e.g., "don't do that again").
+
+---
+
+## Human-in-the-Loop Approval
+
+### `brain.review_pending()` → list
+
+List lessons awaiting human approval.
+
+### `brain.approve_lesson(approval_id)` → dict
+
+Approve a pending lesson for graduation. `approval_id` is the integer ID from `review_pending()`.
+
+### `brain.reject_lesson(approval_id, reason="")` → dict
+
+Reject a pending lesson (prevents graduation). `approval_id` is the integer ID from `review_pending()`.
 
 ---
 
@@ -109,7 +135,7 @@ rules = brain.apply_brain_rules(
 Search the brain using FTS5 keyword search.
 
 ```python
-results = brain.search("budget objections", top_k=5)
+results = brain.search("code review patterns", top_k=5)
 ```
 
 **Returns:** List of dicts with `source`, `text`, `score`, `confidence`.
@@ -128,8 +154,6 @@ brain.embed(full=True)  # Full re-embed
 ```
 
 Requires `pip install gradata[embeddings]`.
-
-**Returns:** Number of chunks embedded.
 
 ---
 
@@ -151,17 +175,46 @@ Query events from the log.
 corrections = brain.query_events(event_type="CORRECTION", last_n_sessions=5)
 ```
 
+**Event types emitted by the SDK:**
+- `CORRECTION` — from `correct()`
+- `SESSION_END` — from `end_session()`
+- `GRADUATION` — when a lesson is promoted
+- `RULE_APPLICATION` — from `track_rule()`
+
 ---
 
-## Facts
+## Facts & Observation
 
-### `brain.get_facts(prospect, fact_type)`
+### `brain.get_facts(prospect=None, fact_type=None)`
 
-Query structured facts extracted from knowledge files.
+Query structured facts from the brain.
 
-### `brain.extract_facts()`
+### `brain.observe(messages, user_id="default")`
 
-Extract structured facts from all prospect files. Returns count of facts extracted.
+Extract facts from a conversation without requiring corrections.
+
+```python
+facts = brain.observe([
+    {"role": "user", "content": "I prefer short emails"},
+    {"role": "assistant", "content": "Got it, keeping it brief."},
+])
+```
+
+---
+
+## Lesson Management
+
+### `brain.forget(description=None, category=None)` → int
+
+Delete specific lessons. Supports GDPR right-to-erasure.
+
+### `brain.rollback(lesson_id=None, description=None, category=None)` → dict
+
+Disable lessons with audit trail (soft delete). Returns `{rolled_back: True, lesson_index, category, description, previous_state, previous_confidence}` or `{rolled_back: False, error: ...}`.
+
+### `brain.lineage(category=None, limit=50)` → list
+
+Full correction-to-rule provenance chain.
 
 ---
 
@@ -169,32 +222,25 @@ Extract structured facts from all prospect files. Returns count of facts extract
 
 ### `brain.manifest()`
 
-Generate `brain.manifest.json` and return it.
+Generate `brain.manifest.json` — mathematical proof the brain is improving.
 
 ```python
 m = brain.manifest()
+print(m["compound_score"])   # 0-100 quality score
 print(m["metadata"]["sessions_trained"])
 ```
 
 ### `brain.health()`
 
-Generate a health report.
+Generate a health report with diagnostics.
 
 ### `brain.stats()`
 
 Return brain statistics (file counts, DB size, embedding status).
 
-### `brain.success_conditions(window=20)`
-
-Evaluate the six success conditions from the Build Directive.
-
 ---
 
 ## Patterns API
-
-### `brain.classify(message)`
-
-Classify a user message into intent, audience, and pattern.
 
 ### `brain.guard(text, direction="input")`
 
@@ -203,10 +249,6 @@ Run guardrail checks. `direction` is `"input"` or `"output"`.
 ### `brain.reflect(draft, checklist, evaluator, refiner, max_cycles=3)`
 
 Run a generate-critique-refine loop.
-
-### `brain.assess_risk(action, context=None)`
-
-Classify risk level of an action.
 
 ### `brain.pipeline(*stages)`
 
@@ -222,25 +264,17 @@ Register a custom task type in the scope classifier.
 
 ---
 
-## CARL Contracts
-
-### `brain.register_contract(contract)`
-
-Register a behavioral contract.
-
-### `brain.get_constraints(task)`
-
-Get applicable constraints for a task.
-
----
-
 ## Export
 
 ### `brain.export(output_path=None, mode="full")`
 
 Export brain as a shareable archive.
 
-**Modes:** `"full"` (everything), `"no-prospects"` (exclude prospect data), `"domain-only"` (patterns and rules only).
+**Modes:** `"full"` (everything), `"no-prospects"` (exclude personal data), `"domain-only"` (patterns and rules only).
+
+### `brain.backfill_from_git(repo_path=".", lookback_days=90)`
+
+Bootstrap a brain from git commit history.
 
 ---
 
