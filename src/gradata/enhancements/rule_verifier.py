@@ -34,15 +34,6 @@ TOOL_RULE_MATRIX: dict[str, list[str]] = {
 }
 
 
-def update_tool_rule_matrix(extensions: dict[str, list[str]]) -> None:
-    """Extend or override TOOL_RULE_MATRIX entries at runtime.
-
-    Args:
-        extensions: Mapping of tool_type -> list of relevant category strings.
-            Existing keys are replaced; new keys are added.
-    """
-    TOOL_RULE_MATRIX.update(extensions)
-
 
 def should_verify(tool_type: str, rule_category: str) -> bool:
     """Pre-execution gate: is this rule relevant for this tool/task?
