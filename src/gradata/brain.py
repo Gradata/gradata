@@ -132,6 +132,10 @@ class Brain:
         except ImportError:
             pass  # Bridge not available (minimal install)
 
+        # Event bus for reactive nervous system
+        from gradata.events_bus import EventBus
+        self.bus = EventBus()
+
         # Cloud connection (None = local-only mode)
         self._cloud = None
 

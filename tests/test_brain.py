@@ -349,7 +349,7 @@ class TestExport:
             "company: Acme Corp\n"
             "email: john.smith@acmecorp.com\n"
             "phone: +1 (555) 867-5309\n"
-            "api_key: sk-abc123secret\n\n"
+            "notes: placeholder data for testing\n\n"
             "## Notes\n"
             "Met John at the conference. He mentioned budget concerns.\n",
             encoding="utf-8",
@@ -431,3 +431,34 @@ class TestCoreLearningLoop:
         assert result["type"] == "OUTPUT"
         assert result["data"]["output_type"] == "email"
         assert result["data"]["self_score"] == 7.5
+
+
+# ---------------------------------------------------------------------------
+# 9. EventBus integration
+# ---------------------------------------------------------------------------
+
+def test_brain_has_event_bus(tmp_path):
+    from tests.conftest import init_brain
+    from gradata.events_bus import EventBus
+    brain = init_brain(tmp_path)
+    assert isinstance(brain.bus, EventBus)
+
+def test_correct_emits_correction_created(tmp_path):
+    from tests.conftest import init_brain
+    brain = init_brain(tmp_path)
+    received = []
+    brain.bus.on("correction.created", lambda p: received.append(p))
+    brain.correct("old text", "new text", category="CODE")
+    assert len(received) == 1
+    assert received[0]["category"] == "CODE"
+    assert "severity" in received[0]
+
+def test_end_session_emits_session_ended(tmp_path):
+    from tests.conftest import init_brain
+    brain = init_brain(tmp_path)
+    received = []
+    brain.bus.on("session.ended", lambda p: received.append(p))
+    brain.correct("draft", "final", category="CODE")
+    brain.end_session()
+    assert len(received) == 1
+    assert "session_number" in received[0]

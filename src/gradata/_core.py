@@ -77,8 +77,16 @@ def brain_correct(
                 "edit_distance": 0.0, "severity": "unknown", "outcome": "unknown",
                 "major_edit": False, "category": category or "UNKNOWN",
                 "summary": "", "classifications": []}
-        return brain.emit("CORRECTION", "brain.correct", data,
-                          [f"category:{category or 'UNKNOWN'}"], session)
+        result = brain.emit("CORRECTION", "brain.correct", data,
+                            [f"category:{category or 'UNKNOWN'}"], session)
+        brain.bus.emit("correction.created", {
+            "lesson": {},
+            "severity": "unknown",
+            "category": category or "GENERAL",
+            "diff": "",
+            "source": "human",
+        })
+        return result
 
     from gradata._scope import build_scope
 
@@ -293,6 +301,14 @@ def brain_correct(
         except Exception as e:
             _log.debug("Q-router feed failed: %s", e)
 
+    brain.bus.emit("correction.created", {
+        "lesson": event.get("lesson", {}),
+        "severity": event.get("data", {}).get("severity", "unknown"),
+        "category": category or "GENERAL",
+        "diff": str(event.get("diff", "")),
+        "source": "human",
+    })
+
     return event
 
 
@@ -439,6 +455,11 @@ def brain_end_session(
         if promotions or demotions or kills:
             _log.info("Graduation sweep: %d promotions, %d demotions, %d kills",
                       promotions, demotions, kills)
+        brain.bus.emit("session.ended", {
+            "session_number": brain.session,
+            "stats": result,
+        })
+
         return result
 
     except Exception as e:
