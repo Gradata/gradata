@@ -5,6 +5,8 @@ Dual-writes to events.jsonl (portable) and system.db (queryable).
 Portable — uses _paths for all file locations.
 """
 
+from __future__ import annotations
+
 import contextlib
 import json
 import sqlite3
@@ -53,8 +55,8 @@ def _ensure_table(conn: sqlite3.Connection):
     conn.commit()
 
 
-def emit(event_type: str, source: str, data: dict = None, tags: list = None,
-         session: int = None, valid_from: str = None, valid_until: str = None,
+def emit(event_type: str, source: str, data: dict | None = None, tags: list | None = None,
+         session: int | None = None, valid_from: str | None = None, valid_until: str | None = None,
          ctx: "BrainContext | None" = None):
     """Emit an event to the brain's event log.
 
@@ -76,7 +78,7 @@ def emit(event_type: str, source: str, data: dict = None, tags: list = None,
     enriched_tags = tags or []
     try:
         from gradata._tag_taxonomy import enrich_tags, validate_tags
-        enriched_tags = enrich_tags(enriched_tags, event_type, data)
+        enriched_tags = enrich_tags(enriched_tags, event_type, data or {})
         issues = validate_tags(enriched_tags, event_type)
         if issues:
             import logging
@@ -131,7 +133,7 @@ def emit(event_type: str, source: str, data: dict = None, tags: list = None,
 
 
 
-def emit_gate_result(gate_name: str, result: str, sources_checked: list = None, detail: str = "") -> dict:
+def emit_gate_result(gate_name: str, result: str, sources_checked: list | None = None, detail: str = "") -> dict:
     sources = sources_checked or []
     return emit("GATE_RESULT", "gate:execution", {
         "gate": gate_name, "result": result, "sources_checked": sources,
@@ -139,15 +141,15 @@ def emit_gate_result(gate_name: str, result: str, sources_checked: list = None, 
     }, tags=[f"gate:{gate_name}"])
 
 
-def emit_gate_override(gate_name: str, reason: str, steps_skipped: list = None) -> dict:
+def emit_gate_override(gate_name: str, reason: str, steps_skipped: list | None = None) -> dict:
     return emit("GATE_OVERRIDE", "gate:override", {
         "gate": gate_name, "reason": reason,
         "steps_skipped": steps_skipped or [], "override_type": "explicit",
     }, tags=[f"gate:{gate_name}", "override:explicit"])
 
 
-def query(event_type: str = None, session: int = None, last_n_sessions: int = None,
-          limit: int = 100, as_of: str = None, active_only: bool = False,
+def query(event_type: str | None = None, session: int | None = None, last_n_sessions: int | None = None,
+          limit: int = 100, as_of: str | None = None, active_only: bool = False,
           ctx: "BrainContext | None" = None) -> list:
     db_path = ctx.db_path if ctx else _p.DB_PATH
     with contextlib.closing(sqlite3.connect(str(db_path))) as conn:
@@ -193,8 +195,8 @@ def query(event_type: str = None, session: int = None, last_n_sessions: int = No
     ]
 
 
-def supersede(event_id: int, new_data: dict = None, new_tags: list = None,
-              source: str = "supersede", new_valid_from: str = None):
+def supersede(event_id: int, new_data: dict | None = None, new_tags: list | None = None,
+              source: str = "supersede", new_valid_from: str | None = None):
     now = datetime.now(UTC).isoformat()
     with contextlib.closing(sqlite3.connect(str(_p.DB_PATH))) as conn:
         conn.row_factory = sqlite3.Row
@@ -335,7 +337,7 @@ def _detect_session(ctx: "BrainContext | None" = None) -> int:
 
 
 
-def find_contradictions(event_type: str = None, tag_prefix: str = None) -> list:
+def find_contradictions(event_type: str | None = None, tag_prefix: str | None = None) -> list:
     """Find events that may contradict each other — same tags, overlapping validity.
 
     Useful for detecting stale-but-not-expired facts (e.g., two active events
