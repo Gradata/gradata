@@ -89,29 +89,31 @@ def _categories_extinct(ctx: "BrainContext | None" = None, window: int = 20) -> 
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = get_connection(db)
-        _, min_session = _session_window(conn, window)
+        try:
+            _, min_session = _session_window(conn, window)
 
-        all_cats = {r[0] for r in conn.execute("""
-            SELECT DISTINCT json_extract(data_json, '$.category')
-            FROM events WHERE type = 'CORRECTION'
-              AND json_extract(data_json, '$.category') IS NOT NULL
-        """).fetchall()}
+            all_cats = {r[0] for r in conn.execute("""
+                SELECT DISTINCT json_extract(data_json, '$.category')
+                FROM events WHERE type = 'CORRECTION'
+                  AND json_extract(data_json, '$.category') IS NOT NULL
+            """).fetchall()}
 
-        recent_cats = {r[0] for r in conn.execute("""
-            SELECT DISTINCT json_extract(data_json, '$.category')
-            FROM events WHERE type = 'CORRECTION' AND session >= ?
-              AND json_extract(data_json, '$.category') IS NOT NULL
-        """, (min_session,)).fetchall()}
+            recent_cats = {r[0] for r in conn.execute("""
+                SELECT DISTINCT json_extract(data_json, '$.category')
+                FROM events WHERE type = 'CORRECTION' AND session >= ?
+                  AND json_extract(data_json, '$.category') IS NOT NULL
+            """, (min_session,)).fetchall()}
 
-        tested_cats = {r[0] for r in conn.execute("""
-            SELECT DISTINCT json_extract(data_json, '$.category')
-            FROM events WHERE type = 'OUTPUT' AND session >= ?
-              AND json_extract(data_json, '$.category') IS NOT NULL
-        """, (min_session,)).fetchall()}
+            tested_cats = {r[0] for r in conn.execute("""
+                SELECT DISTINCT json_extract(data_json, '$.category')
+                FROM events WHERE type = 'OUTPUT' AND session >= ?
+                  AND json_extract(data_json, '$.category') IS NOT NULL
+            """, (min_session,)).fetchall()}
 
-        conn.close()
-        extinct = sorted((all_cats - recent_cats) & tested_cats)
-        return extinct
+            extinct = sorted((all_cats - recent_cats) & tested_cats)
+            return extinct
+        finally:
+            conn.close()
     except Exception:
         return []
 
@@ -126,21 +128,23 @@ def _per_session_density(ctx: "BrainContext | None" = None, limit: int = 100) ->
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = get_connection(db)
-        # DB-side windowing: fetch last N sessions, then reverse in Python
-        rows = conn.execute("""
-            SELECT e.session,
-                   SUM(CASE WHEN e.type='CORRECTION' THEN 1 ELSE 0 END) as corr,
-                   SUM(CASE WHEN e.type='OUTPUT' THEN 1 ELSE 0 END) as out_cnt
-            FROM events e
-            LEFT JOIN session_metrics sm ON e.session = sm.session
-            WHERE typeof(e.session)='integer'
-              AND (sm.session_type IS NULL OR sm.session_type != 'systems')
-            GROUP BY e.session
-            HAVING SUM(CASE WHEN e.type='OUTPUT' THEN 1 ELSE 0 END) >= 1
-            ORDER BY e.session DESC LIMIT ?
-        """, (limit,)).fetchall()
-        conn.close()
-        return [r[1] / r[2] for r in reversed(rows)]
+        try:
+            # DB-side windowing: fetch last N sessions, then reverse in Python
+            rows = conn.execute("""
+                SELECT e.session,
+                       SUM(CASE WHEN e.type='CORRECTION' THEN 1 ELSE 0 END) as corr,
+                       SUM(CASE WHEN e.type='OUTPUT' THEN 1 ELSE 0 END) as out_cnt
+                FROM events e
+                LEFT JOIN session_metrics sm ON e.session = sm.session
+                WHERE typeof(e.session)='integer'
+                  AND (sm.session_type IS NULL OR sm.session_type != 'systems')
+                GROUP BY e.session
+                HAVING SUM(CASE WHEN e.type='OUTPUT' THEN 1 ELSE 0 END) >= 1
+                ORDER BY e.session DESC LIMIT ?
+            """, (limit,)).fetchall()
+            return [r[1] / r[2] for r in reversed(rows)]
+        finally:
+            conn.close()
     except Exception:
         return []
 
@@ -155,18 +159,20 @@ def _severity_ratio(ctx: "BrainContext | None" = None, window: int = 20) -> floa
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = get_connection(db)
-        _, min_session = _session_window(conn, window)
-        rows = conn.execute("""
-            SELECT json_extract(data_json, '$.severity') as sev, COUNT(*) as cnt
-            FROM events WHERE type = 'CORRECTION' AND session >= ?
-            GROUP BY sev
-        """, (min_session,)).fetchall()
-        conn.close()
-        total = sum(r[1] for r in rows)
-        if total < 5:
-            return None
-        low = sum(r[1] for r in rows if r[0] in LOW_SEVERITY)
-        return low / total
+        try:
+            _, min_session = _session_window(conn, window)
+            rows = conn.execute("""
+                SELECT json_extract(data_json, '$.severity') as sev, COUNT(*) as cnt
+                FROM events WHERE type = 'CORRECTION' AND session >= ?
+                GROUP BY sev
+            """, (min_session,)).fetchall()
+            total = sum(r[1] for r in rows)
+            if total < 5:
+                return None
+            low = sum(r[1] for r in rows if r[0] in LOW_SEVERITY)
+            return low / total
+        finally:
+            conn.close()
     except Exception:
         return None
 
