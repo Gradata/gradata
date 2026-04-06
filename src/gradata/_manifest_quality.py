@@ -255,7 +255,7 @@ def _counterfactual_percentile(
         # Random density trend: uniform noise around 0.5
         trend = [max(0.01, 0.5 + _rng.gauss(0, 0.15)) for _ in range(min(sessions, 50))]
         null_score = _compound_score(
-            correction_rate=max(0.05, _rng.gauss(0.4, 0.15)),
+            correction_rate=max(0.05, min(1.0, _rng.gauss(0.4, 0.15))),
             severity_ratio=max(0.0, min(1.0, _rng.gauss(0.5, 0.2))),
             lessons_graduated=max(0, int(_rng.gauss(sessions * 0.3, sessions * 0.1))),
             lessons_active=max(0, int(_rng.gauss(5, 2))),
