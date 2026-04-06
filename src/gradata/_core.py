@@ -399,9 +399,9 @@ def brain_end_session(
         new_rules = [l for l in graduated if l.state.value == "RULE"
                      and before_states.get(_lesson_key(l)) != "RULE"]
         archive_path = lessons_path.parent / "lessons-archive.md"
-        if new_rules and archive_path.exists():
+        if new_rules and archive_path.parent.is_dir():
             from datetime import date
-            archive_text = archive_path.read_text(encoding="utf-8")
+            archive_text = archive_path.read_text(encoding="utf-8") if archive_path.exists() else "# Lessons Archive"
             archive_lines = [archive_text.rstrip(), f"\n## Graduated {date.today().isoformat()} (auto)"]
             for r in new_rules:
                 archive_lines.append(
