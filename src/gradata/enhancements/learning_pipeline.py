@@ -409,25 +409,3 @@ def compute_density(corrections: int = 0, outputs: int = 0, **kwargs) -> float:
     return round(corrections / outputs, 6)
 
 
-def compute_half_life(corrections_by_session: list[int]) -> float | None:
-    """Compute the half-life of correction frequency."""
-    if len(corrections_by_session) < 10:
-        return None
-    first_half = sum(corrections_by_session[:5])
-    second_half = sum(corrections_by_session[5:10])
-    if first_half <= 0 or second_half >= first_half:
-        return None
-    import math
-    ratio = second_half / first_half
-    if ratio <= 0:
-        return 5.0
-    return round(-5.0 / math.log2(ratio), 1)
-
-
-def compute_mtbf(correction_sessions: list[int]) -> float | None:
-    """Mean Time Between Failures (corrections)."""
-    if len(correction_sessions) < 2:
-        return None
-    sorted_sessions = sorted(correction_sessions)
-    gaps = [sorted_sessions[i + 1] - sorted_sessions[i] for i in range(len(sorted_sessions) - 1)]
-    return round(sum(gaps) / len(gaps), 1) if gaps else None
