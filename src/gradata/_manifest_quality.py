@@ -432,7 +432,7 @@ def _compound_score(
 
     # Component 8: Transfer score (0-5 pts, NEW)
     if transfer is not None:
-        score += transfer * 5
+        score += max(0.0, min(1.0, transfer)) * 5
     else:
         max_achievable -= 5
 
