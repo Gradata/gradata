@@ -331,6 +331,11 @@ class Brain:
         from gradata._core import brain_detect_implicit_feedback
         return brain_detect_implicit_feedback(self, user_message, session=session)
 
+    def convergence(self) -> dict:
+        """Get corrections-per-session convergence data."""
+        from gradata._core import brain_convergence
+        return brain_convergence(self)
+
     # ── Output Logging ─────────────────────────────────────────────────
 
     def log_output(self, text: str, output_type: str = "general",

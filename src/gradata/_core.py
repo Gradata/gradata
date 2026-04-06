@@ -764,3 +764,59 @@ def brain_export_skills(brain: Brain, *, output_dir: str | None = None,
         skill_path.write_text("\n".join(lines), encoding="utf-8")
         created.append(str(skill_path))
     return created
+
+
+# ── convergence() ─────────────────────────────────────────────────────
+
+def brain_convergence(brain: "Brain") -> dict:
+    """Compute corrections-per-session convergence data.
+
+    Returns dict with:
+        sessions: list of session numbers
+        corrections_per_session: list of correction counts per session
+        trend: "converging" | "converged" | "diverging" | "insufficient_data"
+        total_corrections: int
+        total_sessions: int
+    """
+    empty = {"sessions": [], "corrections_per_session": [], "trend": "insufficient_data",
+             "total_corrections": 0, "total_sessions": 0}
+
+    try:
+        from gradata._db import get_connection
+        with get_connection(brain.db_path) as conn:
+            rows = conn.execute(
+                "SELECT session, COUNT(*) as cnt FROM events "
+                "WHERE type = 'CORRECTION' AND session IS NOT NULL AND session > 0 "
+                "GROUP BY session ORDER BY session"
+            ).fetchall()
+    except Exception:
+        return empty
+
+    if not rows:
+        return empty
+
+    sessions = [r[0] for r in rows]
+    counts = [r[1] for r in rows]
+
+    # Determine trend
+    trend = "insufficient_data"
+    if len(counts) >= 3:
+        first_half = counts[:len(counts) // 2]
+        second_half = counts[len(counts) // 2:]
+        avg_first = sum(first_half) / len(first_half)
+        avg_second = sum(second_half) / len(second_half)
+
+        if avg_second < avg_first * 0.7:
+            trend = "converging"
+        elif abs(avg_second - avg_first) <= max(1, avg_first * 0.15):
+            trend = "converged"
+        else:
+            trend = "diverging"
+
+    return {
+        "sessions": sessions,
+        "corrections_per_session": counts,
+        "trend": trend,
+        "total_corrections": sum(counts),
+        "total_sessions": len(sessions),
+    }
