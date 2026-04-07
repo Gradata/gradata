@@ -956,7 +956,11 @@ def brain_convergence(brain: "Brain") -> dict:
     elif mk_trend == "increasing":
         trend = "diverging"
     elif len(counts) >= 3:
-        trend = "converged"
+        # No trend detected — distinguish flat/converged from noisy/no-signal.
+        # Low coefficient of variation = genuinely stable. High = random noise.
+        avg = sum(counts) / len(counts)
+        cv = (sum((x - avg) ** 2 for x in counts) / len(counts)) ** 0.5 / avg if avg > 0 else 0
+        trend = "converged" if cv < 0.5 else "no_signal"
     else:
         trend = "insufficient_data"
 
