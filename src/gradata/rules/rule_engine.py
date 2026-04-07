@@ -446,7 +446,8 @@ def beta_domain_reliability(fires: int, misfires: int) -> float:
     """
     if fires == 0 and misfires == 0:
         return 1.0
-    successes = fires - misfires  # misfires is a subset of fires
+    misfires = min(misfires, fires)  # enforce invariant: misfires <= fires
+    successes = fires - misfires
     alpha = max(1, successes + 1)
     beta_param = misfires + 1
     return round(_beta_ppf_05(alpha, beta_param), 4)

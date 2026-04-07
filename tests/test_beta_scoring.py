@@ -1,4 +1,6 @@
 """Tests for Bayesian Beta domain scoring — unified with FSRS."""
+from __future__ import annotations
+
 from gradata._types import Lesson, LessonState
 from gradata.rules.rule_engine import (
     beta_domain_reliability,

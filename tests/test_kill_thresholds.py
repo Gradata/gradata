@@ -1,4 +1,6 @@
 """Tests for inverted kill thresholds — mature rules live longer."""
+from __future__ import annotations
+
 from gradata.enhancements.self_improvement import KILL_LIMITS, MACHINE_KILL_LIMITS
 
 

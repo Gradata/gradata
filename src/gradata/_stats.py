@@ -10,6 +10,7 @@ Task Success Rate, MTBF/MTTR, Fisher's Exact, Power Analysis,
 Logistic Regression, Naive Bayes Lead Scoring,
 Theil-Sen + Mann-Kendall Trend Analysis.
 """
+from __future__ import annotations
 
 import math
 from collections import Counter, defaultdict
