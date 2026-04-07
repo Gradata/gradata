@@ -713,6 +713,16 @@ class Brain:
                             rule_id=rule_id,
                             lessons_path=self._find_lessons_path() or self.dir / "lessons.md")
 
+    def trace(self, rule_id: str) -> dict:
+        """Trace a rule's full provenance chain. See gradata.audit.trace_rule."""
+        from gradata.audit import trace_rule
+        return trace_rule(
+            db_path=self.db_path,
+            events_path=self.ctx.events_jsonl if hasattr(self.ctx, "events_jsonl") else self.dir / "events.jsonl",
+            lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
+            rule_id=rule_id,
+        )
+
     def export_data(self, *, output_format: str = "json") -> str:
         """Export rules as JSON or YAML. See gradata.inspection.export_rules."""
         from gradata.inspection import export_rules

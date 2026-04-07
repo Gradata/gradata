@@ -509,6 +509,38 @@ def brain_end_session(
             except Exception as e:
                 _log.debug("Lineage logging failed: %s", e)
 
+            # Write rule provenance for promotions to PATTERN or RULE
+            try:
+                from gradata.audit import write_provenance
+                from gradata.inspection import _make_rule_id
+                from datetime import datetime, UTC
+                now_prov = datetime.now(UTC).isoformat()
+                for l, old_s, new_s in transitions:
+                    if new_s in ("PATTERN", "RULE"):
+                        rid = _make_rule_id(l)
+                        if l.correction_event_ids:
+                            for eid in l.correction_event_ids:
+                                write_provenance(
+                                    brain.db_path,
+                                    rule_id=rid,
+                                    correction_event_id=eid,
+                                    session=brain.session,
+                                    timestamp=now_prov,
+                                    user_context=session_type,
+                                )
+                        else:
+                            # Still record provenance even without event IDs
+                            write_provenance(
+                                brain.db_path,
+                                rule_id=rid,
+                                correction_event_id=None,
+                                session=brain.session,
+                                timestamp=now_prov,
+                                user_context=session_type,
+                            )
+            except Exception as e:
+                _log.debug("Provenance logging failed: %s", e)
+
         all_lessons = active + graduated
         from gradata._db import write_lessons_safe
         if all_lessons:  # guard against wiping lessons file when all lessons are killed

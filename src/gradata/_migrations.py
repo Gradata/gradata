@@ -41,6 +41,14 @@ _BASE_TABLES: list[str] = [
         resolved_at TEXT,
         resolution TEXT
     )""",
+    """CREATE TABLE IF NOT EXISTS rule_provenance (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rule_id TEXT NOT NULL,
+        correction_event_id TEXT,
+        session INTEGER,
+        timestamp TEXT NOT NULL,
+        user_context TEXT
+    )""",
 ]
 
 _MIGRATIONS: list[str] = [
@@ -55,6 +63,8 @@ _MIGRATIONS: list[str] = [
     "ALTER TABLE meta_rules ADD COLUMN applies_when TEXT",
     "ALTER TABLE meta_rules ADD COLUMN never_when TEXT",
     "ALTER TABLE meta_rules ADD COLUMN transfer_scope TEXT DEFAULT 'personal'",
+    # Rule provenance index
+    "CREATE INDEX IF NOT EXISTS idx_provenance_rule_id ON rule_provenance(rule_id)",
     # Super-meta-rules table
     "ALTER TABLE super_meta_rules ADD COLUMN applies_when TEXT",
     "ALTER TABLE super_meta_rules ADD COLUMN never_when TEXT",
