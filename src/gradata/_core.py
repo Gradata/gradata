@@ -65,6 +65,12 @@ def _attribute_domain_fires(
         if direction == "CONTRADICTING":
             rule.domain_scores[domain]["misfires"] += 1
 
+            # Record conflict in rule graph
+            if hasattr(brain, '_rule_graph') and brain._rule_graph:
+                rule_id = f"{rule.category}:{hash(rule.description) % 10000:04d}"
+                correction_id = f"{correction_category}:{hash(correction_desc) % 10000:04d}"
+                brain._rule_graph.add_conflict(rule_id, correction_id)
+
 
 def brain_correct(
     brain: Brain, draft: str, final: str, *,
@@ -322,6 +328,13 @@ def brain_correct(
             brain._fired_rules = []
     except Exception as e:
         _log.debug("Domain fire attribution failed: %s", e)
+
+    # Persist rule graph
+    if hasattr(brain, '_rule_graph') and brain._rule_graph:
+        try:
+            brain._rule_graph.save()
+        except Exception:
+            pass
 
     # Index into FTS5
     try:

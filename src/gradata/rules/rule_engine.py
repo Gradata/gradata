@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from gradata.events_bus import EventBus
+    from gradata.rules.rule_graph import RuleGraph
 
 from gradata._scope import RuleScope, scope_matches
 from gradata._types import ELIGIBLE_STATES, CorrectionType, Lesson, LessonState, RuleTransferScope
@@ -488,6 +489,7 @@ def apply_rules(
     user_message: str = "",
     _context: str = "",
     bus: "EventBus | None" = None,
+    graph: "RuleGraph | None" = None,
 ) -> list[AppliedRule]:
     """Select and rank lessons relevant to the given scope.
 
@@ -634,6 +636,11 @@ def apply_rules(
                 instruction=instruction,
             )
         )
+
+    # Track rule co-occurrence
+    if graph and len(applied) > 1:
+        rule_ids = [r.rule_id for r in applied]
+        graph.add_co_occurrence(rule_ids)
 
     return applied
 

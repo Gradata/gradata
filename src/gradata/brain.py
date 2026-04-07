@@ -75,6 +75,9 @@ class Brain:
         self._convergence_cache: dict | None = None
         self._convergence_session: int | None = None
 
+        from gradata.rules.rule_graph import RuleGraph
+        self._rule_graph = RuleGraph(self.dir / "rule_graph.json")
+
         logger.debug("Brain init: %s (db=%s)", self.dir, self.db_path)
 
         # Build immutable context for this brain instance (DI path)
