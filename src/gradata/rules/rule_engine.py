@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 
 from gradata._scope import RuleScope, scope_matches
 from gradata._types import ELIGIBLE_STATES, CorrectionType, Lesson, LessonState, RuleTransferScope
+from gradata.security.score_obfuscation import truncate_score
 # evaluate_conditions lives in meta_rules.py — not re-exported here
 # to avoid circular dependency. Callers should import from meta_rules directly.
 
@@ -643,8 +644,9 @@ def apply_rules(
     applied: list[AppliedRule] = []
     for lesson, relevance in scored[:max_rules]:
         rule_id = _make_rule_id(lesson)
+        tier_label = truncate_score(lesson.confidence)
         instruction = (
-            f"[{lesson.state.value}:{lesson.confidence:.2f}]"
+            f"[{tier_label}]"
             f" {lesson.category}: {lesson.description}"
         )
         applied.append(
@@ -684,7 +686,8 @@ def merge_related_rules(rules: list[AppliedRule], min_group_size: int = 2) -> li
         best = max(group, key=lambda r: r.lesson.confidence)
         descriptions = [r.lesson.description for r in group]
         merged_desc = ". ".join(d.rstrip(".") for d in descriptions) + "."
-        merged_instruction = f"{cat}: {merged_desc} [{best.lesson.confidence:.2f}]"
+        merged_tier = truncate_score(best.lesson.confidence)
+        merged_instruction = f"[{merged_tier}] {cat}: {merged_desc}"
         merged_rule = AppliedRule(
             rule_id=f"merged_{cat.lower()}",
             lesson=best.lesson,

@@ -231,7 +231,7 @@ class TestMergeRelatedRules:
         assert "merged_" in result[0].rule_id
         assert "Rule A" in result[0].instruction
         assert "Rule B" in result[0].instruction
-        assert "0.95" in result[0].instruction  # highest confidence
+        assert "[RULE]" in result[0].instruction  # tier label, no raw float
 
     def test_different_categories_stay_separate(self):
         r1 = _make_applied(_make_lesson(category="DRAFTING", description="A"))
