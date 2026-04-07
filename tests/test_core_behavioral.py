@@ -10,7 +10,7 @@ from gradata.brain import Brain
 
 def test_correct_uses_behavioral_description():
     """When extraction returns a result, it should be used as the lesson description."""
-    with tempfile.TemporaryDirectory() as d:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
         brain = Brain.init(d)
         with patch(
             "gradata.enhancements.edit_classifier.extract_behavioral_instruction",
@@ -28,7 +28,7 @@ def test_correct_uses_behavioral_description():
 
 def test_correct_falls_back_to_old_description():
     """When extraction returns None, old diff-fingerprint description is used."""
-    with tempfile.TemporaryDirectory() as d:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
         brain = Brain.init(d)
         with patch(
             "gradata.enhancements.edit_classifier.extract_behavioral_instruction",
