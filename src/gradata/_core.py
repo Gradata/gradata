@@ -575,12 +575,27 @@ def brain_end_session(
             except Exception as e:
                 _log.warning("Meta-rule discovery failed: %s", e)
 
+        # Build graduated_rules detail list from transitions
+        from gradata.inspection import _make_rule_id
+        graduated_rules = []
+        for l, old_s, new_s in transitions:
+            if new_s in ("PATTERN", "RULE"):
+                graduated_rules.append({
+                    "rule_id": _make_rule_id(l),
+                    "category": l.category,
+                    "description": l.description[:100],
+                    "old_state": old_s,
+                    "new_state": new_s,
+                    "confidence": l.confidence,
+                })
+
         result = {
             "session": current_session,
             "total_lessons": len(all_lessons), "active": len(active),
             "graduated": len(graduated), "promotions": promotions,
             "demotions": demotions, "kills": kills,
             "new_rules": [l.description[:60] for l in new_rules] if new_rules else [],
+            "graduated_rules": graduated_rules,
             "meta_rules_discovered": meta_rules_discovered}
 
         # Session boundary marker for dashboard queries
