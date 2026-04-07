@@ -39,6 +39,10 @@ import logging
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gradata._types import Lesson
 
 logger = logging.getLogger("gradata")
 
@@ -67,9 +71,12 @@ class Brain:
                 open_encrypted_db(self.dir, self._encryption_key)
 
         self._instruction_cache: object | None = None  # lazy: InstructionCache
-        self._fired_rules: list = []  # Rules injected this session (for misfire attribution)
+        self._fired_rules: list["Lesson"] = []  # Rules injected this session (for misfire attribution)
         self._convergence_cache: dict | None = None
         self._convergence_session: int | None = None
+
+        from gradata.rules.rule_graph import RuleGraph
+        self._rule_graph = RuleGraph(self.dir / "rule_graph.json")
 
         logger.debug("Brain init: %s (db=%s)", self.dir, self.db_path)
 
@@ -358,6 +365,33 @@ class Brain:
         """
         from gradata._core import brain_efficiency
         return brain_efficiency(self, estimate_time=estimate_time)
+
+    def prove(self) -> dict:
+        """Generate statistical proof that this brain improves output quality.
+
+        Returns a proof document showing whether and how strongly the brain
+        has learned from corrections. Used for marketplace trust verification.
+        """
+        from gradata._core import brain_prove
+        return brain_prove(self)
+
+    def share(self) -> dict:
+        """Export graduated rules as a shareable package for team distribution.
+
+        Only includes PATTERN and RULE state lessons — proven behavioral
+        rules that have survived the graduation pipeline.
+        """
+        from gradata._core import brain_share
+        return brain_share(self)
+
+    def absorb(self, package: dict) -> dict:
+        """Import shared rules from another brain's share() output.
+
+        Rules enter as INSTINCT — this brain must validate them through
+        its own correction cycle before they graduate.
+        """
+        from gradata._core import brain_absorb
+        return brain_absorb(self, package)
 
     # ── Output Logging ─────────────────────────────────────────────────
 
@@ -796,6 +830,16 @@ class Brain:
         try:
             from gradata._brain_manifest import generate_manifest, write_manifest
             m = generate_manifest(ctx=self.ctx)
+            # Embed prove() data so the manifest is a complete quality certificate
+            try:
+                m["proof"] = self.prove()
+            except Exception:
+                m["proof"] = {
+                    "proven": False,
+                    "confidence_level": "error",
+                    "evidence": {},
+                    "summary": "Proof generation failed",
+                }
             write_manifest(m, ctx=self.ctx)
             return m
         except ImportError:

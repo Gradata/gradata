@@ -1,0 +1,13 @@
+.git
+.tmp
+.claude
+__pycache__
+*.pyc
+.pytest_cache
+brain/
+docs/
+tests/
+*.egg-info
+dist/
+build/
+node_modules/

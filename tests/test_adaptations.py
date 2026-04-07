@@ -624,7 +624,7 @@ class TestObservationHooks:
         assert parsed["tool_name"] == "Read"
 
     def test_store_append_and_read(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             store = ObservationStore(base_dir=tmpdir)
             obs = observe_tool_use("Bash", input_data="ls", project_id="abc123")
             store.append(obs)
@@ -634,14 +634,14 @@ class TestObservationHooks:
             assert recent[0].tool_name == "Bash"
 
     def test_store_count(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             store = ObservationStore(base_dir=tmpdir)
             for i in range(5):
                 store.append(observe_tool_use(f"Tool{i}", project_id="proj"))
             assert store.count("proj") == 5
 
     def test_store_stats(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             store = ObservationStore(base_dir=tmpdir)
             store.append(observe_tool_use("Test", project_id="global"))
             stats = store.stats("global")
@@ -649,7 +649,7 @@ class TestObservationHooks:
             assert stats["size_bytes"] > 0
 
     def test_store_empty_read(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             store = ObservationStore(base_dir=tmpdir)
             assert store.read_recent("nonexistent") == []
 
@@ -702,7 +702,7 @@ class TestQLearningRouter:
         assert router.epsilon < 1.0
 
     def test_save_and_load(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             filepath = Path(tmpdir) / "router.json"
             router = QLearningRouter()
             for _ in range(5):
@@ -839,7 +839,7 @@ class TestInstallManifest:
         assert len(state.installed_modules) > 0
 
     def test_state_save_load(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             filepath = Path(tmpdir) / "state.json"
             state = InstallState(
                 installed_modules=["core-patterns", "carl"],
@@ -1302,7 +1302,7 @@ class TestLearningPipeline:
         assert "classify_memory" in result.stages_completed
 
     def test_pipeline_with_temp_dir(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             pipeline = LearningPipeline(brain_dir=tmpdir)
             result = pipeline.process_correction(
                 draft="The quarterly results show...",
@@ -1326,7 +1326,7 @@ class TestLearningPipeline:
         assert result2.is_high_value is True
 
     def test_pipeline_with_vector_clusters(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             pipeline = LearningPipeline(brain_dir=tmpdir)
             r1 = pipeline.process_correction(
                 severity="moderate",
@@ -1382,7 +1382,7 @@ class TestLearningPipeline:
         assert result.memory_type != ""
 
     def test_pipeline_save_state(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             pipeline = LearningPipeline(brain_dir=tmpdir)
             pipeline.process_correction(
                 severity="moderate",
@@ -1413,7 +1413,7 @@ class TestLearningPipeline:
         assert result.success is False
 
     def test_pipeline_observation_capture(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             pipeline = LearningPipeline(brain_dir=tmpdir)
             result = pipeline.process_correction(
                 draft="test",
@@ -1543,7 +1543,7 @@ class TestRouterWarmstart:
         assert router.update_count == 0  # No data, no training
 
     def test_warmstart_empty_db(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             import sqlite3
             db_path = Path(tmpdir) / "system.db"
             conn = sqlite3.connect(str(db_path))
@@ -1559,7 +1559,7 @@ class TestRouterWarmstart:
             assert router.update_count == 0
 
     def test_warmstart_with_corrections(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             import sqlite3
             db_path = Path(tmpdir) / "system.db"
             conn = sqlite3.connect(str(db_path))
@@ -1587,7 +1587,7 @@ class TestRouterWarmstart:
             assert router.epsilon < 0.5  # Should have decayed
 
     def test_warmstart_saves_router(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             import sqlite3
             db_path = Path(tmpdir) / "system.db"
             router_path = Path(tmpdir) / "q_router.json"
@@ -1658,7 +1658,7 @@ class TestBrainCorrectPipeline:
         """Brain.correct() should include pipeline results in the event."""
         from gradata.brain import Brain
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             brain = Brain.init(tmpdir, domain="Test")
             event = brain.correct(
                 draft="Dear Sir or Madam, I am writing to inform you",
@@ -1678,7 +1678,7 @@ class TestBrainCorrectPipeline:
         """Major corrections should be flagged as high-value."""
         from gradata.brain import Brain
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             brain = Brain.init(tmpdir, domain="Test")
 
             # Major edit — should be high value
@@ -1694,7 +1694,7 @@ class TestBrainCorrectPipeline:
         """Pipeline should report context bracket."""
         from gradata.brain import Brain
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             brain = Brain.init(tmpdir, domain="Test")
             event = brain.correct(
                 draft="version A",
@@ -1709,7 +1709,7 @@ class TestBrainCorrectPipeline:
         """Pipeline should report processing time."""
         from gradata.brain import Brain
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             brain = Brain.init(tmpdir, domain="Test")
             event = brain.correct(
                 draft="old text",
@@ -1723,7 +1723,7 @@ class TestBrainCorrectPipeline:
         """Brain should initialize the learning pipeline."""
         from gradata.brain import Brain
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             brain = Brain.init(tmpdir, domain="Test")
             assert brain._learning_pipeline is not None
 
@@ -1738,7 +1738,7 @@ class TestBugFix_ObservationStoreRotation:
 
     def test_rotation_uses_nanoseconds(self):
         """Rotated filenames should use time_ns to avoid collisions."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             store = ObservationStore(base_dir=tmpdir, max_file_size_mb=0.0001)
             # Write enough to trigger rotation
             for i in range(20):
@@ -1826,7 +1826,7 @@ class TestBugFix_RouterVersionComparison:
     """BUG 8: Version comparison uses string ordering."""
 
     def test_semantic_version_comparison(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             filepath = Path(tmpdir) / "router.json"
             # Write a version 10.0.0 file (string "10.0.0" < "2.0.0")
             import json as _json
@@ -2226,7 +2226,7 @@ class TestGitBackfill:
     def test_brain_backfill_method(self):
         from gradata.brain import Brain
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             brain = Brain.init(tmpdir, domain="Test")
             result = brain.backfill_from_git(
                 repo_path=".",

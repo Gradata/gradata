@@ -10,6 +10,7 @@ Task Success Rate, MTBF/MTTR, Fisher's Exact, Power Analysis,
 Logistic Regression, Naive Bayes Lead Scoring,
 Theil-Sen + Mann-Kendall Trend Analysis.
 """
+from __future__ import annotations
 
 import math
 from collections import Counter, defaultdict
@@ -53,6 +54,54 @@ def trend_analysis(y: list[float]) -> tuple[float, float]:
     z = (s - 1) / math.sqrt(var_s) if s > 0 else (s + 1) / math.sqrt(var_s) if s < 0 else 0
     p_value = 2.0 * (1.0 - 0.5 * (1.0 + math.erf(abs(z) / math.sqrt(2.0))))
     return slope, p_value
+
+
+def cusum_changepoints(data: list[int] | list[float], threshold: float = 1.0) -> list[int]:
+    """CUSUM changepoint detection for abrupt level shifts.
+
+    Accumulates consecutive differences (data[i] - data[i-1]). When
+    the cumulative sum exceeds threshold * std_dev, a changepoint is
+    recorded and the accumulator resets.
+
+    Note: uses successive differences, NOT deviations from the global
+    mean. Sensitive to sharp step changes (e.g. corrections dropping
+    from 10 to 2) but insensitive to slow gradual trends — use
+    trend_analysis / Mann-Kendall for those.
+
+    Args:
+        data: Time series of values.
+        threshold: Sensitivity in standard deviations. Default 1.0.
+
+    Returns:
+        Sorted list of indices where significant level shifts occurred.
+    """
+    n = len(data)
+    if n < 3:
+        return []
+
+    mean = sum(data) / n
+    variance = sum((x - mean) ** 2 for x in data) / n
+    if variance == 0:
+        return []
+    std_dev = variance ** 0.5
+    limit = threshold * std_dev
+
+    changepoints: list[int] = []
+    s_pos = 0.0
+    s_neg = 0.0
+
+    for i in range(1, n):
+        diff = data[i] - data[i - 1]
+        s_pos = max(0.0, s_pos + diff - 0.5 * std_dev)
+        s_neg = max(0.0, s_neg - diff - 0.5 * std_dev)
+
+        if s_pos > limit or s_neg > limit:
+            changepoints.append(i)
+            s_pos = 0.0
+            s_neg = 0.0
+
+    return changepoints
+
 
 # ============================================================================
 # 1. BAYESIAN BETA-BINOMIAL

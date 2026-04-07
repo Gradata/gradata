@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from gradata._types import Lesson
     from gradata.brain import Brain
 
 _log = logging.getLogger("gradata")
@@ -64,6 +65,12 @@ def _attribute_domain_fires(
         direction = _classify_correction_direction(correction_desc, rule.description)
         if direction == "CONTRADICTING":
             rule.domain_scores[domain]["misfires"] += 1
+
+            # Record conflict in rule graph
+            if hasattr(brain, '_rule_graph') and brain._rule_graph:
+                rule_id = f"{rule.category}:{hash(rule.description) % 10000:04d}"
+                correction_id = f"{correction_category}:{hash(correction_desc) % 10000:04d}"
+                brain._rule_graph.add_conflict(rule_id, correction_id)
 
 
 def brain_correct(
@@ -161,6 +168,7 @@ def brain_correct(
         _log.warning("Pattern extraction failed: %s", e)
 
     # Close the loop: correction → lesson
+    desc = ""  # Will be set if severity threshold is met
     try:
         from datetime import date as _date
         from gradata._types import Lesson, LessonState
@@ -219,7 +227,9 @@ def brain_correct(
                         best_sim = sim
                         best_match = existing_l
 
-                if best_match and best_sim >= 0.35:
+                from gradata._config import get_similarity_threshold
+                sim_threshold = get_similarity_threshold(cat)
+                if best_match and best_sim >= sim_threshold:
                     if dry_run:
                         event["dry_run"] = True
                         event["would_reinforce"] = {"category": cat, "description": best_match.description[:200], "similarity": round(best_sim, 3)}
@@ -311,17 +321,21 @@ def brain_correct(
     except Exception as e:
         _log.warning("Lesson creation failed: %s", e)
 
-    # Domain-scoped misfire attribution
+    # Domain-scoped misfire attribution (then clear fired rules to prevent unbounded growth)
     try:
         if brain._fired_rules and (category or classifications):
-            correction_desc = ""
-            if 'desc' in locals():
-                correction_desc = desc
-            elif summary:
-                correction_desc = summary
+            correction_desc = desc if desc else (summary or "")
             _attribute_domain_fires(brain, category or "UNKNOWN", correction_desc)
+            brain._fired_rules = []
     except Exception as e:
         _log.debug("Domain fire attribution failed: %s", e)
+
+    # Persist rule graph
+    if hasattr(brain, '_rule_graph') and brain._rule_graph:
+        try:
+            brain._rule_graph.save()
+        except Exception:
+            pass
 
     # Index into FTS5
     try:
@@ -375,6 +389,18 @@ def brain_correct(
 
 
 # ── end_session() ──────────────────────────────────────────────────────
+
+
+def _graduation_message(old_state: str, lesson: "Lesson") -> str:
+    """Generate a user-facing graduation notification message."""
+    if lesson.state.value == "PATTERN":
+        return (f"You've corrected this {lesson.fire_count} times — "
+                f"Gradata learned it: \"{lesson.description[:80]}\"")
+    elif lesson.state.value == "RULE":
+        return (f"Graduated to RULE: \"{lesson.description[:80]}\" — "
+                f"this correction is now permanent ({lesson.confidence:.0%} confidence)")
+    return f"Lesson updated: {lesson.description[:80]}"
+
 
 def brain_end_session(
     brain: Brain, *, session_corrections: list[dict] | None = None,
@@ -434,6 +460,19 @@ def brain_end_session(
                         "confidence": l.confidence, "fire_count": l.fire_count})
                 except Exception as e:
                     _log.debug("Graduation emit failed: %s", e)
+                # User-facing graduation notification
+                try:
+                    brain.bus.emit("lesson.graduated", {
+                        "category": l.category,
+                        "description": l.description[:100],
+                        "old_state": old_s,
+                        "new_state": new_s,
+                        "fire_count": l.fire_count,
+                        "confidence": l.confidence,
+                        "message": _graduation_message(old_s, l),
+                    })
+                except Exception as e:
+                    _log.debug("lesson.graduated emit failed: %s", e)
 
         # Persist lineage (table created by _migrations.py)
         if transitions and brain.db_path.is_file():
@@ -830,66 +869,22 @@ def brain_export_skills(brain: Brain, *, output_dir: str | None = None,
 # ── convergence() ─────────────────────────────────────────────────────
 
 def _mann_kendall(data: "list[int] | list[float]") -> tuple[str, float]:
-    """Mann-Kendall trend test (pure Python, no scipy needed).
+    """Mann-Kendall trend test — delegates to _stats.trend_analysis().
 
     Returns (trend, p_value) where trend is "decreasing", "increasing", or "no_trend".
-    Uses normal approximation for n >= 3.
     """
-    import math
-
-    n = len(data)
-    if n < 3:
+    if len(data) < 3:
         return "no_trend", 1.0
 
-    # Compute S statistic
-    s = 0
-    for i in range(n - 1):
-        for j in range(i + 1, n):
-            diff = data[j] - data[i]
-            if diff > 0:
-                s += 1
-            elif diff < 0:
-                s -= 1
-
-    # Handle ties
-    from collections import Counter
-    tie_counts = [c for c in Counter(data).values() if c > 1]
-    tie_correction = sum(t * (t - 1) * (2 * t + 5) for t in tie_counts)
-
-    # Variance of S
-    var_s = (n * (n - 1) * (2 * n + 5) - tie_correction) / 18.0
-    if var_s == 0:
-        return "no_trend", 1.0
-
-    # Z statistic (continuity correction)
-    if s > 0:
-        z = (s - 1) / math.sqrt(var_s)
-    elif s < 0:
-        z = (s + 1) / math.sqrt(var_s)
-    else:
-        z = 0.0
-
-    # Two-tailed p-value using normal CDF approximation
-    p_value = 2.0 * (1.0 - _normal_cdf(abs(z)))
+    from gradata._stats import trend_analysis
+    slope, p_value = trend_analysis([float(x) for x in data])
 
     if p_value < 0.05:
-        trend = "decreasing" if s < 0 else "increasing"
+        trend = "decreasing" if slope < 0 else "increasing"
     else:
         trend = "no_trend"
 
     return trend, round(p_value, 4)
-
-
-def _normal_cdf(x: float) -> float:
-    """Standard normal CDF approximation (Abramowitz & Stegun)."""
-    import math
-    t = 1.0 / (1.0 + 0.2316419 * abs(x))
-    d = 0.3989422804014327  # 1/sqrt(2*pi)
-    p = d * math.exp(-x * x / 2.0) * (
-        t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 +
-        t * (-1.821255978 + t * 1.330274429))))
-    )
-    return 1.0 - p if x >= 0 else p
 
 
 def brain_convergence(brain: "Brain") -> dict:
@@ -908,24 +903,33 @@ def brain_convergence(brain: "Brain") -> dict:
         total_sessions: int
     """
     empty = {"sessions": [], "corrections_per_session": [], "trend": "insufficient_data",
-             "p_value": 1.0, "by_category": {}, "total_corrections": 0, "total_sessions": 0}
+             "p_value": 1.0, "changepoints": [], "by_category": {},
+             "total_corrections": 0, "total_sessions": 0,
+             "edit_distance_per_session": [], "edit_distance_trend": "insufficient_data"}
 
     try:
         from gradata._db import get_connection
-        import json as _json
         with get_connection(brain.db_path) as conn:
-            # Aggregate corrections per session
             rows = conn.execute(
                 "SELECT session, COUNT(*) as cnt FROM events "
                 "WHERE type = 'CORRECTION' AND session IS NOT NULL AND session > 0 "
                 "GROUP BY session ORDER BY session"
             ).fetchall()
 
-            # Per-category breakdown
+            # Per-category counts pushed to SQL (avoids fetching all JSON blobs)
             cat_rows = conn.execute(
-                "SELECT session, data_json FROM events "
+                "SELECT session, json_extract(data_json, '$.category') as cat, COUNT(*) as cnt "
+                "FROM events "
                 "WHERE type = 'CORRECTION' AND session IS NOT NULL AND session > 0 "
-                "ORDER BY session"
+                "GROUP BY session, cat ORDER BY session"
+            ).fetchall()
+
+            ed_rows = conn.execute(
+                "SELECT session, AVG(json_extract(data_json, '$.edit_distance')) as avg_ed "
+                "FROM events "
+                "WHERE type = 'CORRECTION' AND session IS NOT NULL AND session > 0 "
+                "AND json_extract(data_json, '$.edit_distance') IS NOT NULL "
+                "GROUP BY session ORDER BY session"
             ).fetchall()
     except Exception:
         return empty
@@ -943,54 +947,74 @@ def brain_convergence(brain: "Brain") -> dict:
     elif mk_trend == "increasing":
         trend = "diverging"
     elif len(counts) >= 3:
-        trend = "converged"
+        # No trend detected — distinguish flat/converged from noisy/no-signal.
+        # Low coefficient of variation = genuinely stable. High = random noise.
+        avg = sum(counts) / len(counts)
+        cv = (sum((x - avg) ** 2 for x in counts) / len(counts)) ** 0.5 / avg if avg > 0 else 0
+        trend = "converged" if cv < 0.5 else "no_signal"
     else:
         trend = "insufficient_data"
 
-    # Per-category convergence
+    # Per-category convergence (pre-grouped by SQL)
     cat_by_session: dict[str, dict[int, int]] = {}
-    for session, data_json in cat_rows:
-        try:
-            data = _json.loads(data_json) if isinstance(data_json, str) else {}
-            cat = data.get("category", "UNKNOWN")
-        except (_json.JSONDecodeError, TypeError):
-            cat = "UNKNOWN"
+    for session, cat, cnt in cat_rows:
+        cat = (cat or "UNKNOWN").upper()
         if cat not in cat_by_session:
             cat_by_session[cat] = {}
-        cat_by_session[cat][session] = cat_by_session[cat].get(session, 0) + 1
+        cat_by_session[cat][session] = cat_by_session[cat].get(session, 0) + cnt
 
     by_category: dict[str, dict] = {}
     for cat, session_counts in cat_by_session.items():
         cat_counts = [session_counts.get(s, 0) for s in sessions]
         cat_mk, cat_p = _mann_kendall(cat_counts)
-        cat_trend = "converging" if cat_mk == "decreasing" else (
-            "diverging" if cat_mk == "increasing" else "converged")
+        if cat_mk == "decreasing":
+            cat_trend = "converging"
+        elif cat_mk == "increasing":
+            cat_trend = "diverging"
+        elif len(cat_counts) >= 3:
+            cat_avg = sum(cat_counts) / len(cat_counts)
+            cat_cv = (sum((x - cat_avg) ** 2 for x in cat_counts) / len(cat_counts)) ** 0.5 / cat_avg if cat_avg > 0 else 0
+            cat_trend = "converged" if cat_cv < 0.5 else "no_signal"
+        else:
+            cat_trend = "insufficient_data"
         by_category[cat] = {
             "corrections_per_session": cat_counts,
             "trend": cat_trend,
             "p_value": cat_p,
         }
 
+    # Edit distance trend
+    ed_counts = [r[1] for r in ed_rows] if ed_rows else []
+    if len(ed_counts) >= 3:
+        ed_mk_trend, _ed_p = _mann_kendall(ed_counts)
+        ed_trend = "improving" if ed_mk_trend == "decreasing" else (
+            "worsening" if ed_mk_trend == "increasing" else "stable")
+    else:
+        ed_trend = "insufficient_data"
+
+    from gradata._stats import cusum_changepoints
+    raw_changepoints = cusum_changepoints(counts)
+    changepoint_sessions = [sessions[i] for i in raw_changepoints if i < len(sessions)]
+
     return {
         "sessions": sessions,
         "corrections_per_session": counts,
         "trend": trend,
         "p_value": p_value,
+        "changepoints": changepoint_sessions,
         "by_category": by_category,
         "total_corrections": sum(counts),
         "total_sessions": len(sessions),
+        "edit_distance_per_session": [round(r[1], 4) for r in ed_rows] if ed_rows else [],
+        "edit_distance_trend": ed_trend,
     }
 
 
 # ── Efficiency ────────────────────────────────────────────────────────
 
-_SEVERITY_SECONDS = {
-    "trivial": 5,
-    "minor": 15,
-    "moderate": 45,
-    "major": 120,
-    "rewrite": 300,
-}
+# Average seconds saved per correction avoided (approximate).
+# TODO: query actual severity distribution when real user data exists.
+_AVG_SECONDS_PER_CORRECTION = 45
 
 
 def brain_efficiency(brain: "Brain", *, estimate_time: bool = False) -> dict:
@@ -1029,7 +1053,7 @@ def brain_efficiency(brain: "Brain", *, estimate_time: bool = False) -> dict:
 
     if estimate_time:
         corrections_avoided = max(0, (initial - recent) * len(counts))
-        avg_severity_weight = _SEVERITY_SECONDS.get("moderate", 45)
+        avg_severity_weight = _AVG_SECONDS_PER_CORRECTION
         estimated_seconds = int(corrections_avoided * avg_severity_weight)
         result["estimated_seconds_saved"] = estimated_seconds
         result["time_breakdown"] = {
@@ -1038,3 +1062,207 @@ def brain_efficiency(brain: "Brain", *, estimate_time: bool = False) -> dict:
         }
 
     return result
+
+
+def brain_prove(brain: "Brain") -> dict:
+    """Generate statistical proof that this brain improves output quality."""
+    convergence = brain._get_convergence()
+    efficiency = brain_efficiency(brain)
+
+    # Count graduated rules
+    rule_count = 0
+    try:
+        lessons_path = brain._find_lessons_path()
+        if lessons_path and lessons_path.is_file():
+            from gradata.enhancements.self_improvement import parse_lessons
+            from gradata._types import LessonState
+            lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+            rule_count = sum(1 for l in lessons if l.state in (LessonState.PATTERN, LessonState.RULE))
+    except Exception:
+        pass
+
+    # Determine which categories have converged
+    by_cat = convergence.get("by_category", {})
+    categories_converged = [cat for cat, data in by_cat.items() if data.get("trend") == "converged"]
+
+    # Find strongest category (lowest p-value with decreasing trend)
+    strongest = None
+    best_p = 1.0
+    for cat, data in by_cat.items():
+        if data.get("trend") == "converging" and data.get("p_value", 1.0) < best_p:
+            best_p = data["p_value"]
+            strongest = cat
+
+    # Determine proof strength
+    total_sessions = convergence.get("total_sessions", 0)
+    total_corrections = convergence.get("total_corrections", 0)
+    trend = convergence.get("trend", "insufficient_data")
+    p_value = convergence.get("p_value", 1.0)
+    effort_ratio = efficiency.get("effort_ratio", 1.0)
+
+    if total_sessions < 3 or total_corrections < 5:
+        confidence_level = "insufficient"
+        proven = False
+    elif trend == "converging" and p_value < 0.05 and effort_ratio < 0.7:
+        confidence_level = "strong"
+        proven = True
+    elif trend in ("converging", "converged") and effort_ratio < 0.85:
+        confidence_level = "moderate"
+        proven = True
+    elif rule_count >= 3:
+        confidence_level = "weak"
+        proven = True
+    else:
+        confidence_level = "insufficient"
+        proven = False
+
+    # Generate summary
+    if proven and confidence_level == "strong":
+        pct = int((1 - effort_ratio) * 100)
+        summary = f"Brain reduces correction effort by {pct}% (p={p_value:.3f}, {rule_count} graduated rules, {total_sessions} sessions)"
+    elif proven:
+        summary = f"Brain shows improvement ({rule_count} rules graduated across {total_sessions} sessions, effort ratio {effort_ratio})"
+    else:
+        summary = f"Insufficient evidence ({total_sessions} sessions, {total_corrections} corrections, {rule_count} rules)"
+
+    return {
+        "proven": proven,
+        "confidence_level": confidence_level,
+        "evidence": {
+            "convergence_trend": trend,
+            "p_value": p_value,
+            "changepoints": convergence.get("changepoints", []),
+            "effort_ratio": effort_ratio,
+            "rule_count": rule_count,
+            "correction_count": total_corrections,
+            "sessions": total_sessions,
+            "categories_converged": categories_converged,
+            "strongest_category": strongest,
+            "edit_distance_trend": convergence.get("edit_distance_trend", "insufficient_data"),
+        },
+        "summary": summary,
+    }
+
+
+# ── Sharing ──────────────────────────────────────────────────────────
+
+
+def brain_share(brain: "Brain") -> dict:
+    """Export graduated rules as a shareable package for team distribution.
+
+    Only exports PATTERN and RULE state lessons — proven behavioral rules
+    that have survived the graduation pipeline.
+    """
+    from datetime import datetime, timezone
+    from gradata._types import LessonState
+
+    lessons_path = brain._find_lessons_path()
+    rules: list[dict] = []
+    if lessons_path and lessons_path.is_file():
+        from gradata.enhancements.self_improvement import parse_lessons
+        all_lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+        for lesson in all_lessons:
+            if lesson.state in (LessonState.PATTERN, LessonState.RULE):
+                rules.append({
+                    "category": lesson.category,
+                    "description": lesson.description,
+                    "confidence": lesson.confidence,
+                    "state": lesson.state.value,
+                    "fire_count": lesson.fire_count,
+                    "correction_type": (
+                        lesson.correction_type.value
+                        if hasattr(lesson.correction_type, "value")
+                        else str(lesson.correction_type)
+                    ),
+                })
+
+    proof: dict = {}
+    try:
+        proof = brain_prove(brain)
+    except Exception:
+        pass
+
+    return {
+        "brain_id": str(brain.dir),
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "rules": rules,
+        "rule_count": len(rules),
+        "proof": proof,
+    }
+
+
+def brain_absorb(brain: "Brain", package: dict) -> dict:
+    """Import shared rules into this brain.
+
+    Imported rules enter as INSTINCT with initial confidence (0.40),
+    not at their original confidence — the recipient brain must
+    validate them through its own correction cycle.
+
+    Skips rules that are >0.6 similar to existing lessons (duplicates).
+    """
+    from datetime import date as _date
+    from gradata._types import CorrectionType, Lesson, LessonState
+    from gradata.enhancements.self_improvement import format_lessons, parse_lessons
+    from gradata.enhancements.similarity import best_similarity
+
+    INITIAL_CONFIDENCE = 0.40
+
+    lessons_path = brain._find_lessons_path(create=True)
+    if not lessons_path:
+        return {"absorbed": 0, "skipped": 0, "error": "No lessons path"}
+
+    existing_text = ""
+    if lessons_path.is_file():
+        existing_text = lessons_path.read_text(encoding="utf-8")
+    existing = parse_lessons(existing_text) if existing_text else []
+
+    absorbed = 0
+    skipped = 0
+
+    for rule in package.get("rules", []):
+        desc = rule.get("description", "")
+        cat = rule.get("category", "UNKNOWN")
+
+        # Check for duplicates against same-category lessons
+        is_duplicate = False
+        for existing_l in existing:
+            if existing_l.category == cat:
+                sim = best_similarity(desc, existing_l.description)
+                if sim >= 0.6:
+                    is_duplicate = True
+                    break
+
+        if is_duplicate:
+            skipped += 1
+            continue
+
+        # Import as INSTINCT — recipient must validate
+        correction_type_str = rule.get("correction_type", "behavioral")
+        try:
+            ct = CorrectionType(correction_type_str)
+        except (ValueError, KeyError):
+            ct = CorrectionType.BEHAVIORAL
+
+        new_lesson = Lesson(
+            date=_date.today().isoformat(),
+            state=LessonState.INSTINCT,
+            confidence=INITIAL_CONFIDENCE,
+            category=cat,
+            description=desc,
+            correction_type=ct,
+            agent_type="shared",
+        )
+        existing.append(new_lesson)
+        absorbed += 1
+
+    # Write back
+    lessons_path.write_text(format_lessons(existing), encoding="utf-8")
+
+    return {
+        "absorbed": absorbed,
+        "skipped": skipped,
+        "source": package.get("brain_id", "unknown"),
+        "total_rules_in_package": package.get(
+            "rule_count", len(package.get("rules", []))
+        ),
+    }

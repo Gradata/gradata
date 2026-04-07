@@ -175,7 +175,7 @@ def test_sqlite_roundtrip():
 
 
 def test_refresh_meta_rules():
-    """Test the refresh pipeline."""
+    """Test the refresh pipeline preserves valid existing meta-rules."""
     lessons = [
         Lesson("2026-03-20", LessonState.PATTERN, 0.80, "PROCESS", "Never skip wrap-up steps"),
         Lesson("2026-03-20", LessonState.PATTERN, 0.75, "PROCESS", "Always run gate checks before done"),
@@ -196,9 +196,12 @@ def test_refresh_meta_rules():
     result = refresh_meta_rules(
         lessons, existing, recent_corrections=[], current_session=42
     )
-    # Should have the old one (still valid) + any new discovered ones
+    # Valid existing meta-rules should survive refresh
     ids = [m.id for m in result]
     assert "META-old" in ids, "Valid existing meta-rule should survive refresh"
+    # Validated session should be updated
+    meta_old = [m for m in result if m.id == "META-old"][0]
+    assert meta_old.last_validated_session == 42
     print(f"[PASS] refresh_meta_rules -> {len(result)} meta-rules")
 
 

@@ -7,6 +7,7 @@ Domain-specific values (FILE_TYPE_MAP, MEMORY_TYPE_MAP, MEMORY_TYPE_WEIGHTS)
 are defaults that can be overridden by brain/taxonomy.json. See reload_config()
 and the _tag_taxonomy.py reload mechanism.
 """
+from __future__ import annotations
 
 import json
 import os
@@ -65,6 +66,23 @@ CONFIDENCE_LOW = 0.35
 # ── Query Defaults ─────────────────────────────────────────────────
 DEFAULT_TOP_K = 5
 SIMILARITY_THRESHOLD = 0.35
+
+CATEGORY_SIMILARITY_THRESHOLDS: dict[str, float] = {
+    "ACCURACY": 0.60,
+    "FACTUAL": 0.60,
+    "CORRECTNESS": 0.55,
+    "PROCESS": 0.50,
+    "DRAFTING": 0.35,
+    "TONE": 0.30,
+    "STYLE": 0.30,
+    "FORMATTING": 0.30,
+}
+
+
+def get_similarity_threshold(category: str) -> float:
+    """Get similarity threshold for a category. Higher = stricter matching."""
+    return CATEGORY_SIMILARITY_THRESHOLDS.get(category.upper(), SIMILARITY_THRESHOLD)
+
 
 # ── Brain File Extensions to Index ─────────────────────────────────
 INDEXABLE_EXTENSIONS = {".md", ".txt"}

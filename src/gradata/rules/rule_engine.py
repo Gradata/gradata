@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from gradata.events_bus import EventBus
+    from gradata.rules.rule_graph import RuleGraph
 
 from gradata._scope import RuleScope, scope_matches
 from gradata._types import ELIGIBLE_STATES, CorrectionType, Lesson, LessonState, RuleTransferScope
@@ -416,18 +417,70 @@ def filter_by_scope(
     return results
 
 
+def _beta_ppf_05(alpha: float, beta_param: float) -> float:
+    """Approximate 5th percentile of Beta(alpha, beta) distribution.
+
+    Uses normal approximation. For tiny samples, returns conservative estimate.
+    """
+    import math
+    if alpha <= 0 or beta_param <= 0:
+        return 0.0
+    total = alpha + beta_param
+    mean = alpha / total
+    if total <= 2:
+        return max(0.0, mean - 0.3)
+    variance = (alpha * beta_param) / (total * total * (total + 1))
+    std = math.sqrt(variance)
+    return max(0.0, min(1.0, mean - 1.645 * std))
+
+
+def beta_domain_reliability(fires: int, misfires: int) -> float:
+    """Domain reliability via Beta distribution lower bound.
+
+    fires = total activations in this domain (includes misfires).
+    misfires = activations that made output worse (subset of fires).
+    successes = fires - misfires = activations that helped or were neutral.
+
+    Returns 5th percentile of Beta(successes+1, misfires+1).
+    No data (0,0) returns 1.0 (neutral — no penalty).
+    """
+    if fires == 0 and misfires == 0:
+        return 1.0
+    misfires = min(misfires, fires)  # enforce invariant: misfires <= fires
+    successes = fires - misfires
+    alpha = max(1, successes + 1)
+    beta_param = misfires + 1
+    return round(_beta_ppf_05(alpha, beta_param), 4)
+
+
+def effective_confidence(
+    fsrs_confidence: float,
+    domain_fires: int,
+    domain_misfires: int,
+) -> float:
+    """Unified confidence = FSRS global * Beta domain reliability.
+
+    FSRS handles global graduation curve. Beta handles per-domain
+    reliability. No double-counting.
+    """
+    reliability = beta_domain_reliability(domain_fires, domain_misfires)
+    return round(fsrs_confidence * reliability, 4)
+
+
 def is_rule_disabled_for_domain(lesson: Lesson, domain: str) -> bool:
     """Check if a rule should be suppressed in a specific domain.
 
-    A rule is disabled when its misfire rate exceeds 30% with at least
-    3 fires in that domain — enough data to be meaningful.
+    Uses Beta distribution 5th-percentile lower bound on the success rate.
+    Disabled when the lower bound falls below 0.5 — i.e., we're 95%
+    confident the success rate is below 50% (misfire rate above 50%).
     """
     scores = lesson.domain_scores.get(domain, {})
     fires = scores.get("fires", 0)
     misfires = scores.get("misfires", 0)
     if fires < 3:
         return False
-    return misfires / fires > 0.3
+    reliability = beta_domain_reliability(fires, misfires)
+    return reliability < 0.5
 
 
 def apply_rules(
@@ -438,6 +491,7 @@ def apply_rules(
     user_message: str = "",
     _context: str = "",
     bus: "EventBus | None" = None,
+    graph: "RuleGraph | None" = None,
 ) -> list[AppliedRule]:
     """Select and rank lessons relevant to the given scope.
 
@@ -547,16 +601,43 @@ def apply_rules(
 
     # Step 4 — compute difficulty per rule
     # Step 5 — sort: state priority DESC, difficulty DESC, relevance DESC, confidence DESC
+    def _effective_conf(lesson: Lesson, domain: str) -> float:
+        if not domain:
+            return lesson.confidence
+        scores = lesson.domain_scores.get(domain, {})
+        return effective_confidence(
+            lesson.confidence,
+            scores.get("fires", 0),
+            scores.get("misfires", 0),
+        )
+
     scored.sort(
         key=lambda t: (
             _STATE_PRIORITY[t[0].state],
             # Difficulty: use event history if available, else lesson counters
             compute_rule_difficulty(t[0].category, events) if events else _difficulty_from_lesson(t[0]),
             t[1],
-            t[0].confidence,
+            _effective_conf(t[0], current_domain),
         ),
         reverse=True,
     )
+
+    # Step 5.5 — conflict filtering: avoid injecting rules with high conflict history
+    if graph:
+        filtered_scored: list[tuple[Lesson, float]] = []
+        selected_ids: set[str] = set()
+        for lesson, relevance in scored:
+            rule_id = _make_rule_id(lesson)
+            # Check if this rule conflicts with any already-selected rule
+            dominated = False
+            for sel_id in selected_ids:
+                if graph.conflict_count(rule_id, sel_id) >= 3:
+                    dominated = True
+                    break
+            if not dominated:
+                filtered_scored.append((lesson, relevance))
+                selected_ids.add(rule_id)
+        scored = filtered_scored
 
     # Step 6 — assemble AppliedRule objects, capped at max_rules
     applied: list[AppliedRule] = []
@@ -574,6 +655,11 @@ def apply_rules(
                 instruction=instruction,
             )
         )
+
+    # Track rule co-occurrence
+    if graph and len(applied) > 1:
+        rule_ids = [r.rule_id for r in applied]
+        graph.add_co_occurrence(rule_ids)
 
     return applied
 
