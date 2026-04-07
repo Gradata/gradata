@@ -1036,3 +1036,83 @@ def brain_efficiency(brain: "Brain", *, estimate_time: bool = False) -> dict:
         }
 
     return result
+
+
+def brain_prove(brain: "Brain") -> dict:
+    """Generate statistical proof that this brain improves output quality."""
+    convergence = brain._get_convergence()
+    efficiency = brain_efficiency(brain)
+
+    # Count graduated rules
+    rule_count = 0
+    try:
+        lessons_path = brain._find_lessons_path()
+        if lessons_path and lessons_path.is_file():
+            from gradata.enhancements.self_improvement import parse_lessons
+            from gradata._types import LessonState
+            lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+            rule_count = sum(1 for l in lessons if l.state in (LessonState.PATTERN, LessonState.RULE))
+    except Exception:
+        pass
+
+    # Determine which categories have converged
+    by_cat = convergence.get("by_category", {})
+    categories_converged = [cat for cat, data in by_cat.items() if data.get("trend") == "converged"]
+
+    # Find strongest category (lowest p-value with decreasing trend)
+    strongest = None
+    best_p = 1.0
+    for cat, data in by_cat.items():
+        if data.get("trend") == "converging" and data.get("p_value", 1.0) < best_p:
+            best_p = data["p_value"]
+            strongest = cat
+
+    # Determine proof strength
+    total_sessions = convergence.get("total_sessions", 0)
+    total_corrections = convergence.get("total_corrections", 0)
+    trend = convergence.get("trend", "insufficient_data")
+    p_value = convergence.get("p_value", 1.0)
+    effort_ratio = efficiency.get("effort_ratio", 1.0)
+
+    if total_sessions < 3 or total_corrections < 5:
+        confidence_level = "insufficient"
+        proven = False
+    elif trend == "converging" and p_value < 0.05 and effort_ratio < 0.7:
+        confidence_level = "strong"
+        proven = True
+    elif trend in ("converging", "converged") and effort_ratio < 0.85:
+        confidence_level = "moderate"
+        proven = True
+    elif rule_count >= 3:
+        confidence_level = "weak"
+        proven = True
+    else:
+        confidence_level = "insufficient"
+        proven = False
+
+    # Generate summary
+    if proven and confidence_level == "strong":
+        pct = int((1 - effort_ratio) * 100)
+        summary = f"Brain reduces correction effort by {pct}% (p={p_value:.3f}, {rule_count} graduated rules, {total_sessions} sessions)"
+    elif proven:
+        summary = f"Brain shows improvement ({rule_count} rules graduated across {total_sessions} sessions, effort ratio {effort_ratio})"
+    else:
+        summary = f"Insufficient evidence ({total_sessions} sessions, {total_corrections} corrections, {rule_count} rules)"
+
+    return {
+        "proven": proven,
+        "confidence_level": confidence_level,
+        "evidence": {
+            "convergence_trend": trend,
+            "p_value": p_value,
+            "changepoints": convergence.get("changepoints", []),
+            "effort_ratio": effort_ratio,
+            "rule_count": rule_count,
+            "correction_count": total_corrections,
+            "sessions": total_sessions,
+            "categories_converged": categories_converged,
+            "strongest_category": strongest,
+            "edit_distance_trend": convergence.get("edit_distance_trend", "insufficient_data"),
+        },
+        "summary": summary,
+    }

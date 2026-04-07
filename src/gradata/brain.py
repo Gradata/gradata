@@ -366,6 +366,15 @@ class Brain:
         from gradata._core import brain_efficiency
         return brain_efficiency(self, estimate_time=estimate_time)
 
+    def prove(self) -> dict:
+        """Generate statistical proof that this brain improves output quality.
+
+        Returns a proof document showing whether and how strongly the brain
+        has learned from corrections. Used for marketplace trust verification.
+        """
+        from gradata._core import brain_prove
+        return brain_prove(self)
+
     # ── Output Logging ─────────────────────────────────────────────────
 
     def log_output(self, text: str, output_type: str = "general",
