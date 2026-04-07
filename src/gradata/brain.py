@@ -695,6 +695,30 @@ class Brain:
         from gradata._core import brain_export_skills
         return brain_export_skills(self, output_dir=output_dir, min_state=min_state)
 
+    # ── Rule Inspection API ────────────────────────────────────────────
+
+    def rules(self, *, include_all: bool = False, category: str | None = None) -> list[dict]:
+        """List graduated brain rules. See gradata.inspection.list_rules."""
+        from gradata.inspection import list_rules
+        return list_rules(db_path=self.db_path,
+                          lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
+                          include_all=include_all, category=category)
+
+    def explain(self, rule_id: str) -> dict:
+        """Trace a rule to its source corrections. See gradata.inspection.explain_rule."""
+        from gradata.inspection import explain_rule
+        return explain_rule(db_path=self.db_path,
+                            events_path=self.ctx.events_path if hasattr(self.ctx, "events_path") else self.dir / "events.jsonl",
+                            rule_id=rule_id,
+                            lessons_path=self._find_lessons_path() or self.dir / "lessons.md")
+
+    def export_data(self, *, format: str = "json") -> str:
+        """Export rules as JSON or YAML. See gradata.inspection.export_rules."""
+        from gradata.inspection import export_rules
+        return export_rules(db_path=self.db_path,
+                            lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
+                            format=format)
+
     # ── Events ─────────────────────────────────────────────────────────
 
     def emit(self, event_type: str, source: str, data: dict | None = None,
