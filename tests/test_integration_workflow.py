@@ -22,33 +22,8 @@ pytestmark = [
 
 @pytest.fixture
 def brain(tmp_path):
-    """Fresh brain in temp directory via Brain.init."""
-    brain_dir = tmp_path / "integration-brain"
-    os.environ["BRAIN_DIR"] = str(brain_dir)
-    b = Brain.init(
-        brain_dir,
-        name="IntegrationTest",
-        domain="Testing",
-        embedding="local",
-        interactive=False,
-    )
-
-    # Rewire module-level path caches (same as conftest.init_brain)
-    import gradata._paths as _p
-    import gradata._events as _ev
-    import gradata._brain_manifest as _bm
-
-    _ev.BRAIN_DIR = _p.BRAIN_DIR
-    _ev.EVENTS_JSONL = _p.EVENTS_JSONL
-    _ev.DB_PATH = _p.DB_PATH
-
-    _bm.BRAIN_DIR = _p.BRAIN_DIR
-    _bm.DB_PATH = _p.DB_PATH
-    _bm.EVENTS_JSONL = _p.EVENTS_JSONL
-    _bm.WORKING_DIR = _p.WORKING_DIR
-    _bm.MANIFEST_PATH = _p.BRAIN_DIR / "brain.manifest.json"
-
-    yield b
+    """Fresh brain in temp directory."""
+    yield Brain(str(tmp_path))
 
 
 class TestMultiSessionWorkflow:
