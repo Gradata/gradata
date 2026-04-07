@@ -313,13 +313,14 @@ class Brain:
     def correct(self, draft: str, final: str, category: str | None = None,
                 context: dict | None = None, session: int | None = None,
                 agent_type: str | None = None, approval_required: bool = False,
-                dry_run: bool = False, min_severity: str = "as-is") -> dict:
+                dry_run: bool = False, min_severity: str = "as-is",
+                scope: str | None = None) -> dict:
         """Record a correction: user edited draft into final version."""
         from gradata._core import brain_correct
         return brain_correct(self, draft, final, category=category, context=context,
                              session=session, agent_type=agent_type,
                              approval_required=approval_required, dry_run=dry_run,
-                             min_severity=min_severity)
+                             min_severity=min_severity, scope=scope)
 
     def end_session(self, session_corrections: list[dict] | None = None,
                     session_type: str = "full", machine_mode: bool | None = None,

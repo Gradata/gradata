@@ -78,7 +78,7 @@ def brain_correct(
     category: str | None = None, context: dict | None = None,
     session: int | None = None, agent_type: str | None = None,
     approval_required: bool = False, dry_run: bool = False,
-    min_severity: str = "as-is",
+    min_severity: str = "as-is", scope: str | None = None,
 ) -> dict:
     """Record a correction: user edited draft into final version."""
     # Input validation
@@ -137,6 +137,10 @@ def brain_correct(
         from gradata._scope import scope_to_dict
         scope_data = scope_to_dict(scope_obj)
 
+    # Tag correction scope (default: domain)
+    correction_scope = scope or "domain"
+    scope_data["correction_scope"] = correction_scope
+
     data = {
         "draft_text": draft[:2000], "final_text": final[:2000],
         "edit_distance": diff.edit_distance, "severity": diff.severity,
@@ -146,6 +150,7 @@ def brain_correct(
                              "description": c.description} for c in classifications],
         "lines_added": diff.summary_stats.get("lines_added", 0),
         "lines_removed": diff.summary_stats.get("lines_removed", 0),
+        "correction_scope": correction_scope,
     }
     if scope_data:
         data["scope"] = scope_data
@@ -157,6 +162,7 @@ def brain_correct(
     event = brain.emit("CORRECTION", "brain.correct", data, tags, session)
     event["diff"] = diff
     event["classifications"] = classifications
+    event["correction_scope"] = correction_scope
 
     # Auto-extract patterns
     try:
@@ -252,15 +258,19 @@ def brain_correct(
                     except Exception as e:
                         _log.debug("Provenance emit failed: %s", e)
                 else:
+                    import json as _json
                     lesson_scope = ""
                     if agent_type or context:
-                        import json as _json
                         scope_ctx = dict(context or {})
                         if agent_type:
                             scope_ctx["agent_type"] = agent_type
                         scope_obj = build_scope(scope_ctx)
-                        lesson_scope = _json.dumps(
-                            {k: v for k, v in scope_obj.__dict__.items() if v and v != "normal"})
+                        scope_dict = {k: v for k, v in scope_obj.__dict__.items() if v and v != "normal"}
+                    else:
+                        scope_dict = {}
+                    # Always tag correction_scope on new lessons
+                    scope_dict["correction_scope"] = correction_scope
+                    lesson_scope = _json.dumps(scope_dict)
 
                     init_conf = 0.0 if approval_required else INITIAL_CONFIDENCE
                     correction_id = str(event.get("id", "")) if event.get("id") else ""

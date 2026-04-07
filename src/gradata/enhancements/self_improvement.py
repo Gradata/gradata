@@ -283,6 +283,7 @@ def parse_lessons(text: str) -> list[Lesson]:
         pending_approval = False
         parent_meta_rule_id: str | None = None
         memory_ids: list[str] = []
+        scope_json: str = ""
         domain_scores: dict = {}
         j = i + 1
         while j < len(lines) and lines[j].startswith("  "):
@@ -302,6 +303,8 @@ def parse_lessons(text: str) -> list[Lesson]:
                 parent_meta_rule_id = meta_line[len("Parent meta-rule:"):].strip() or None
             elif meta_line.startswith("Memory links:"):
                 memory_ids = [x.strip() for x in meta_line[len("Memory links:"):].strip().split(",") if x.strip()]
+            elif meta_line.startswith("Scope:"):
+                scope_json = meta_line[len("Scope:"):].strip()
             elif meta_line.startswith("Domain scores:"):
                 import json as _json
                 try:
@@ -325,6 +328,7 @@ def parse_lessons(text: str) -> list[Lesson]:
             fire_count=fire_count,
             sessions_since_fire=sessions_since_fire,
             misfire_count=misfire_count,
+            scope_json=scope_json,
             agent_type=agent_type,
             kill_reason=kill_reason,
             correction_event_ids=correction_event_ids,
@@ -691,6 +695,18 @@ def graduate(
         if lesson.pending_approval:
             continue  # Awaiting human review — skip graduation entirely
 
+        # ONE_OFF scoped lessons never graduate past INSTINCT
+        if lesson.scope_json:
+            try:
+                import json as _json
+                _scope = _json.loads(lesson.scope_json)
+                if _scope.get("correction_scope") == "one_off":
+                    # Block promotion from INSTINCT; block PATTERN->RULE too
+                    if lesson.state in (LessonState.INSTINCT, LessonState.PATTERN):
+                        continue
+            except (ValueError, TypeError):
+                pass
+
         # UNTESTABLE lessons: check if they should be killed (enough idle sessions)
         if lesson.state == LessonState.UNTESTABLE:
             if lesson.sessions_since_fire >= kill_limit + 5:
@@ -897,6 +913,9 @@ def format_lessons(lessons: list[Lesson]) -> str:
 
         if lesson.memory_ids:
             lines.append(f"  Memory links: {','.join(lesson.memory_ids)}")
+
+        if lesson.scope_json:
+            lines.append(f"  Scope: {lesson.scope_json}")
 
         if lesson.domain_scores:
             import json as _json

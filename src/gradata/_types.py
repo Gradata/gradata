@@ -33,6 +33,14 @@ class RuleTransferScope(Enum):
     UNIVERSAL = "universal"  # Everyone benefits (no AI tells, verify data, don't fabricate)
 
 
+class CorrectionScope(Enum):
+    """Hierarchical scope for corrections — controls graduation ceiling."""
+    UNIVERSAL = "universal"    # Applies everywhere
+    DOMAIN = "domain"          # Default: applies within this domain
+    PROJECT = "project"        # Applies only to this project
+    ONE_OFF = "one_off"        # Never graduates past INSTINCT
+
+
 class LessonState(Enum):
     """Maturity tiers for a learned lesson."""
     INSTINCT = "INSTINCT"       # 0.00 - 0.59
