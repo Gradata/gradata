@@ -667,7 +667,11 @@ def graduate(
       - graduated = RULE + UNTESTABLE + KILLED + ARCHIVED (terminal or proven)
 
     SPEC guardrail: no promotion from silence. fire_count must meet
-    minimum thresholds even if confidence is high enough.
+    minimum thresholds even if confidence is high enough:
+      - INSTINCT -> PATTERN requires fire_count >= 3 (MIN_APPLICATIONS_FOR_PATTERN).
+      - PATTERN -> RULE requires fire_count >= 5 (MIN_APPLICATIONS_FOR_RULE).
+    A single session cannot fast-track promotion; the fire-count gates are
+    non-bypassable regardless of confidence level.
 
     Args:
         lessons: Lessons to evaluate for promotion/demotion/kill.
@@ -691,6 +695,16 @@ def graduate(
     for lesson in lessons:
         if lesson.state in (LessonState.KILLED, LessonState.ARCHIVED):
             continue
+
+        # Safety assertion: warn if a single session caused an unusually
+        # large confidence jump (possible runaway boosting).
+        if hasattr(lesson, '_pre_session_confidence'):
+            jump = lesson.confidence - lesson._pre_session_confidence
+            if jump > PATTERN_THRESHOLD:
+                _log.warning(
+                    "Safety assertion: confidence jump %.2f exceeds PATTERN_THRESHOLD %.2f for %s: %s",
+                    jump, PATTERN_THRESHOLD, lesson.category, lesson.description[:60],
+                )
 
         if lesson.pending_approval:
             continue  # Awaiting human review — skip graduation entirely
