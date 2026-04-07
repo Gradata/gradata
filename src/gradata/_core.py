@@ -131,6 +131,14 @@ def brain_correct(
     if not category and classifications:
         category = classifications[0].category.upper()
 
+    # PII redaction — runs AFTER extraction on full text, BEFORE storage
+    try:
+        from gradata.safety import redact_pii_with_report
+        draft_redacted, _ = redact_pii_with_report(draft)
+        final_redacted, _ = redact_pii_with_report(final)
+    except ImportError:
+        draft_redacted, final_redacted = draft, final
+
     scope_obj = build_scope(context) if context else None
     scope_data = {}
     if scope_obj:
@@ -142,7 +150,7 @@ def brain_correct(
     scope_data["correction_scope"] = correction_scope
 
     data = {
-        "draft_text": draft[:2000], "final_text": final[:2000],
+        "draft_text": draft_redacted[:2000], "final_text": final_redacted[:2000],
         "edit_distance": diff.edit_distance, "severity": diff.severity,
         "outcome": diff.severity, "major_edit": diff.severity in ("major", "discarded"),
         "category": category or "UNKNOWN", "summary": summary,
@@ -301,7 +309,7 @@ def brain_correct(
                                     "(lesson_category, lesson_description, draft_text, final_text, "
                                     "severity, correction_event_id, agent_type, created_at) "
                                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                                    (cat, desc[:500], draft[:2000], final[:2000],
+                                    (cat, desc[:500], draft_redacted[:2000], final_redacted[:2000],
                                      diff.severity, correction_id, agent_type or "",
                                      _date.today().isoformat()))
                         except Exception as e:
@@ -352,7 +360,7 @@ def brain_correct(
         from gradata._query import fts_index
         from datetime import date as _fts_date
         fts_index(source="corrections", file_type="correction",
-                  text=f"{category or 'UNKNOWN'}: {summary or diff.severity} - {final[:500]}",
+                  text=f"{category or 'UNKNOWN'}: {summary or diff.severity} - {final_redacted[:500]}",
                   embed_date=_fts_date.today().isoformat(), ctx=brain.ctx)
     except Exception as e:
         _log.debug("FTS index failed: %s", e)
