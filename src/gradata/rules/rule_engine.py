@@ -620,6 +620,23 @@ def apply_rules(
         reverse=True,
     )
 
+    # Step 5.5 — conflict filtering: avoid injecting rules with high conflict history
+    if graph:
+        filtered_scored: list[tuple[Lesson, float]] = []
+        selected_ids: set[str] = set()
+        for lesson, relevance in scored:
+            rule_id = _make_rule_id(lesson)
+            # Check if this rule conflicts with any already-selected rule
+            dominated = False
+            for sel_id in selected_ids:
+                if graph.conflict_count(rule_id, sel_id) >= 3:
+                    dominated = True
+                    break
+            if not dominated:
+                filtered_scored.append((lesson, relevance))
+                selected_ids.add(rule_id)
+        scored = filtered_scored
+
     # Step 6 — assemble AppliedRule objects, capped at max_rules
     applied: list[AppliedRule] = []
     for lesson, relevance in scored[:max_rules]:
