@@ -1,9 +1,11 @@
 """
 Meta-Rule Emergence — compound learning through principle discovery.
 ====================================================================
-3+ related corrections merge into higher-order principles.
-Discovery runs at session close; the rule engine prefers meta-rules
-over individual rules (1 meta-rule replaces 3-5 corrections).
+Meta-rule discovery and synthesis require Gradata Cloud.  The open-source
+SDK preserves the full data model, formatting, ranking, validation, and
+storage API so that cloud-generated meta-rules work seamlessly.
+
+Discovery, grouping, and synthesis are no-ops in the open-source build.
 
 Public API is fully preserved here via re-exports from:
   - ``meta_rules_storage`` (SQLite persistence)
@@ -13,11 +15,13 @@ Public API is fully preserved here via re-exports from:
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
-from collections import defaultdict
 from dataclasses import dataclass, field
 
 from gradata._types import ELIGIBLE_STATES, Lesson, RuleTransferScope
+
+_log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Data Model
@@ -25,6 +29,7 @@ from gradata._types import ELIGIBLE_STATES, Lesson, RuleTransferScope
 
 # Tier constants (Rosch 1978: subordinate / basic / superordinate)
 TIER_SUPER_META = 2     # Super-meta-rule: emerges from 3+ meta-rules
+TIER_UNIVERSAL = 3      # Universal principle: emerges from 3+ super-meta-rules
 
 
 @dataclass
@@ -144,7 +149,7 @@ def _eval_single_condition(condition: str, context: dict) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Helpers (kept for compatibility)
 # ---------------------------------------------------------------------------
 
 def _lesson_id(lesson: Lesson) -> str:
@@ -164,409 +169,78 @@ def _tokenise(text: str) -> set[str]:
     return set(re.findall(r"[a-z]{3,}", text.lower()))
 
 
-# Semantic theme clusters: words that indicate the same underlying theme.
-# Each key is a theme label; values are words that signal that theme.
-_THEME_CLUSTERS: dict[str, set[str]] = {
-    "formatting": {
-        "format", "formatting", "bold", "dash", "dashes", "colon",
-        "colons", "emphasis", "punctuation", "bullet", "bullets",
-        "paragraph", "prose", "style", "numbered", "list", "lists",
-        "subject", "lines", "decorative", "inline",
-    },
-    "pricing": {
-        "pricing", "price", "cost", "costs", "subscription", "monthly",
-        "annual", "tier", "tiers", "starter", "standard", "budget",
-        "value", "deal", "revenue", "paid", "free",
-    },
-    "accuracy": {
-        "verify", "verified", "check", "confirm", "accurate", "accuracy",
-        "never", "guess", "assume", "assumption", "validate",
-        "validated", "source", "evidence", "facts", "factual",
-    },
-    "research_first": {
-        "research", "investigate", "before",
-        "prior", "lookup", "enrich", "enrichment", "profile",
-    },
-    "entity_handling": {
-        "entity", "item", "task", "message", "demo", "followup",
-        "follow", "email", "emails", "draft", "drafting",
-        "subject", "thread", "reply",
-    },
-    "process_discipline": {
-        "skip", "skipping", "never", "always", "mandatory", "gate",
-        "gates", "checklist", "step", "steps", "wrap", "startup",
-        "audit", "verify", "verification", "done", "ready", "complete",
-    },
-    "tool_usage": {
-        "tool", "tools", "api", "scraper",
-        "playwright", "integration", "endpoint",
-    },
-    "communication_tone": {
-        "tone", "empathy", "condescending", "casual", "direct",
-        "agency", "positioning", "framing", "pitch", "sell",
-        "feature", "outcome", "pain", "acknowledge",
-    },
-    "data_integrity": {
-        "filter", "owner", "owner_only", "shared_filter", "shared", "blended",
-        "metrics", "measurement", "dedup", "duplicate", "integrity",
-    },
-    "ip_protection": {
-        "public", "docs", "documentation", "expose", "mechanism",
-        "competitor", "architecture", "internal", "proprietary",
-        "open", "source",
-    },
-}
-
-
 def _detect_themes(text: str) -> dict[str, int]:
-    """Return {theme: overlap_count} for a piece of text."""
-    tokens = _tokenise(text)
-    hits: dict[str, int] = {}
-    for theme, keywords in _THEME_CLUSTERS.items():
-        overlap = len(tokens & keywords)
-        if overlap >= 2:
-            hits[theme] = overlap
-    return hits
+    """Theme detection requires Gradata Cloud."""
+    return {}
 
 
-def _synthesise_principle(lessons: list[Lesson], theme: str) -> str:
-    """Generate a principle statement from a group of related lessons.
-
-    Extracts recurring patterns from lesson descriptions:
-    - Words consistently cut across lessons → things the user dislikes
-    - Words consistently added → things the user prefers
-    - Tone/structure signals → communication style preferences
-
-    Produces a human-readable principle like:
-        "Prefer direct language (cut hedging: perhaps, might, probably)
-         and add specifics (numbers, timelines, names)"
-    """
-    from collections import Counter
-
-    # Parse structured descriptions to extract cut/added words and signals
-    all_cut: Counter[str] = Counter()
-    all_added: Counter[str] = Counter()
-    signals: list[str] = []
-
-    for lesson in lessons:
-        desc = lesson.description
-
-        # Extract "cut: word, word" patterns
-        cut_match = re.search(r"cut:\s*([^;)]+)", desc, re.IGNORECASE)
-        if cut_match:
-            words = [w.strip() for w in cut_match.group(1).split(",") if w.strip()]
-            all_cut.update(words)
-
-        # Extract "added: word, word" patterns
-        add_match = re.search(r"added:\s*([^;)]+)", desc, re.IGNORECASE)
-        if add_match:
-            words = [w.strip() for w in add_match.group(1).split(",") if w.strip()]
-            all_added.update(words)
-
-        # Collect tone/structure signals
-        if "formalized" in desc.lower():
-            signals.append("formalize")
-        elif "casualized" in desc.lower():
-            signals.append("casualize")
-        if "strengthened" in desc.lower():
-            signals.append("strengthen tone")
-        elif "softened" in desc.lower():
-            signals.append("soften tone")
-        if "structure changed" in desc.lower():
-            signals.append("restructure")
-        if "reordered" in desc.lower():
-            signals.append("reorder")
-
-        # Handle non-structured descriptions (human-written lessons)
-        if not cut_match and not add_match and "→" in desc:
-            behaviour = desc.split("→", 1)[1].strip()
-            first = re.split(r"[.!]", behaviour)[0].strip()
-            if first and len(first) < 120:
-                signals.append(first)
-
-    # Build principle from recurring patterns
-    parts: list[str] = []
-
-    # Tone direction (most common signal)
-    signal_counts = Counter(signals)
-    top_signals = [s for s, _ in signal_counts.most_common(2) if signal_counts[s] >= 2]
-    if top_signals:
-        parts.append(f"Style: {', '.join(top_signals)}")
-
-    # Most-cut words (things user consistently removes) — need 2+ occurrences
-    frequent_cuts = [w for w, c in all_cut.most_common(8) if c >= 2]
-    if frequent_cuts:
-        parts.append(f"Avoid: {', '.join(frequent_cuts[:6])}")
-
-    # Most-added words (things user consistently adds)
-    frequent_adds = [w for w, c in all_added.most_common(8) if c >= 2]
-    if frequent_adds:
-        parts.append(f"Prefer: {', '.join(frequent_adds[:6])}")
-
-    # Theme-specific framing
-    _FRAMES: dict[str, str] = {
-        "formatting": "Clean formatting",
-        "pricing": "Precise pricing language",
-        "accuracy": "Verify before stating",
-        "research_first": "Research before action",
-        "entity_handling": "Entity communication protocol",
-        "process_discipline": "Process discipline",
-        "tool_usage": "Correct tool usage",
-        "communication_tone": "Tone and audience fit",
-        "data_integrity": "Data integrity",
-        "ip_protection": "Protect internals",
-        "content": "Content preferences",
-        "tone": "Communication style",
-        "structure": "Document structure",
-        "factual": "Factual accuracy",
-        "process": "Workflow discipline",
-        "style": "Formatting style",
-    }
-
-    frame = _FRAMES.get(theme.lower(), theme.replace("_", " ").title())
-
-    if parts:
-        return f"{frame}: {'. '.join(parts)}"
-
-    # Fallback: collect raw descriptions
-    descs = []
-    for lesson in lessons:
-        first = re.split(r"[.!;]", lesson.description)[0].strip()
-        if first and len(first) < 100 and first.lower() not in {d.lower() for d in descs}:
-            descs.append(first)
-    if descs:
-        summary = "; ".join(descs[:4])
-        if len(descs) > 4:
-            summary += f" (+{len(descs) - 4} more)"
-        return f"{frame}: {summary}"
-
-    return f"{frame}: {len(lessons)} related corrections"
+def _classify_meta_transfer_scope(rule_text: str) -> RuleTransferScope:
+    """Transfer scope classification requires Gradata Cloud."""
+    return RuleTransferScope.PERSONAL
 
 
 # ---------------------------------------------------------------------------
-# Transfer Scope Classification (delegates to rule_engine)
-# ---------------------------------------------------------------------------
-
-# Lazy import to avoid circular dependency with rule_engine.py
-def _classify_meta_transfer_scope(rule_text: str) -> "RuleTransferScope":
-    from gradata.rules.rule_engine import classify_transfer_scope
-    return classify_transfer_scope(rule_text)
-
-
-def _pick_examples(lessons: list[Lesson], max_examples: int = 2) -> list[str]:
-    """Pick the most concrete example descriptions from a lesson group."""
-    # Prefer lessons with arrows (explicit correction format)
-    with_arrow = [l for l in lessons if "→" in l.description]
-    source = with_arrow if with_arrow else lessons
-
-    examples: list[str] = []
-    for lesson in source[:max_examples]:
-        desc = lesson.description
-        if len(desc) > 150:
-            desc = desc[:147] + "..."
-        examples.append(f"[{lesson.category}] {desc}")
-    return examples
-
-
-# ---------------------------------------------------------------------------
-# Core: Grouping
-# ---------------------------------------------------------------------------
-
-def _group_by_category(lessons: list[Lesson]) -> dict[str, list[Lesson]]:
-    """Group graduated lessons by their category."""
-    groups: dict[str, list[Lesson]] = defaultdict(list)
-    for lesson in lessons:
-        if lesson.state in ELIGIBLE_STATES:
-            groups[lesson.category].append(lesson)
-    return dict(groups)
-
-
-def _group_by_theme(lessons: list[Lesson]) -> dict[str, list[Lesson]]:
-    """Group lessons across categories by semantic theme overlap.
-
-    Two-pass strategy:
-      1. Keyword-based: assign lessons to known theme clusters.
-      2. Semantic fallback: lessons that didn't match any keyword theme
-         are clustered by pairwise similarity (catches paraphrases).
-    """
-    eligible = [l for l in lessons if l.state in ELIGIBLE_STATES]
-    theme_groups: dict[str, list[Lesson]] = defaultdict(list)
-    unmatched: list[Lesson] = []
-
-    # Pass 1: keyword themes
-    for lesson in eligible:
-        themes = _detect_themes(lesson.description)
-        if themes:
-            best_theme = max(themes, key=themes.get)  # type: ignore[arg-type]
-            theme_groups[best_theme].append(lesson)
-        else:
-            unmatched.append(lesson)
-
-    # Pass 2: semantic clustering for unmatched lessons
-    if len(unmatched) >= 3:
-        try:
-            from gradata.enhancements.similarity import semantic_similarity
-            # Greedy single-linkage: assign each unmatched lesson to its
-            # nearest cluster, or start a new cluster if nothing is close.
-            clusters: list[list[Lesson]] = []
-            for lesson in unmatched:
-                best_cluster = -1
-                best_sim = 0.0
-                for i, cluster in enumerate(clusters):
-                    # Average-linkage: compare to all cluster members
-                    # for more stable clustering than seed-only comparison.
-                    avg_sim = sum(
-                        semantic_similarity(lesson.description, m.description)
-                        for m in cluster
-                    ) / len(cluster)
-                    if avg_sim > best_sim:
-                        best_sim = avg_sim
-                        best_cluster = i
-                if best_sim >= 0.55 and best_cluster >= 0:
-                    clusters[best_cluster].append(lesson)
-                else:
-                    clusters.append([lesson])
-
-            for cluster in clusters:
-                if len(cluster) >= 3:
-                    # Deterministic name: most common category, alphabetic tie-break
-                    cats = [ls.category for ls in cluster]
-                    top_cat = sorted(set(cats), key=lambda c: (-cats.count(c), c))[0]
-                    cluster_name = f"semantic_{top_cat.lower()}"
-                    theme_groups[cluster_name].extend(cluster)
-        except Exception:
-            pass  # similarity module optional or computation failed
-
-    return dict(theme_groups)
-
-
-# ---------------------------------------------------------------------------
-# Core: Discovery
+# Discovery (requires Gradata Cloud)
 # ---------------------------------------------------------------------------
 
 def discover_meta_rules(
     lessons: list[Lesson],
     min_group_size: int = 3,
     current_session: int = 0,
-    api_key: str | None = None,
+    **kwargs: object,
 ) -> list[MetaRule]:
     """Scan graduated lessons for emergent meta-rules.
 
-    Two grouping strategies run in parallel:
-        1. Group by category (same-category clusters)
-        2. Group by semantic theme (cross-category clusters)
-
-    Any group with ``min_group_size`` or more lessons becomes a
-    candidate meta-rule.  Duplicate lessons across strategies are
-    deduplicated by meta-rule ID (which is derived from source
-    lesson IDs).
+    Meta-rule discovery requires Gradata Cloud.  This open-source
+    build returns an empty list.
 
     Args:
-        lessons: All lessons (active + archived). Only PATTERN and
-            RULE state lessons are considered.
+        lessons: All lessons (active + archived).
         min_group_size: Minimum group size to form a meta-rule.
         current_session: Current session number for timestamping.
-        api_key: Optional LLM API key for principle synthesis.
+        **kwargs: Accepts additional keyword arguments for compatibility.
 
     Returns:
-        List of discovered :class:`MetaRule` objects, sorted by
-        confidence descending.
+        Empty list (discovery requires Gradata Cloud).
     """
-    seen_ids: set[str] = set()
-    metas: list[MetaRule] = []
+    _log.info("Meta-rule discovery requires Gradata Cloud")
+    return []
 
-    # Strategy 1: category-based grouping
-    for category, group in _group_by_category(lessons).items():
-        if len(group) >= min_group_size:
-            meta = merge_into_meta(group, theme_override=category.lower(), session=current_session, api_key=api_key)
-            if meta.id not in seen_ids:
-                seen_ids.add(meta.id)
-                metas.append(meta)
-
-    # Strategy 2: theme-based grouping (cross-category)
-    for theme, group in _group_by_theme(lessons).items():
-        if len(group) >= min_group_size:
-            meta = merge_into_meta(group, theme_override=theme, session=current_session, api_key=api_key)
-            if meta.id not in seen_ids:
-                seen_ids.add(meta.id)
-                metas.append(meta)
-
-    metas.sort(key=lambda m: m.confidence, reverse=True)
-    return metas
-
-
-# ---------------------------------------------------------------------------
 
 def merge_into_meta(
     rules: list[Lesson],
     theme_override: str = "",
     session: int = 0,
-    api_key: str | None = None,
+    **kwargs: object,
 ) -> MetaRule:
     """Synthesise a group of related rules into one meta-rule.
 
+    Full principle synthesis requires Gradata Cloud.  This open-source
+    build returns a placeholder meta-rule with correct IDs, categories,
+    and confidence but no synthesised principle.
+
     Args:
-        rules: The grouped lessons (all should be PATTERN or RULE).
-        theme_override: If provided, use this as the theme label
-            instead of auto-detecting.
+        rules: The grouped lessons.
+        theme_override: Theme label (unused in open-source build).
         session: Current session number.
-        api_key: Optional LLM API key for principle synthesis.
+        **kwargs: Accepts additional keyword arguments for compatibility.
 
     Returns:
-        A :class:`MetaRule` instance.
+        A :class:`MetaRule` with placeholder principle.
     """
+    _log.info("Meta-rule synthesis requires Gradata Cloud")
     lesson_ids = [_lesson_id(l) for l in rules]
-    meta_id = _meta_id(lesson_ids)
-
-    # Stamp source lessons with their parent meta-rule ID.
-    # Only stamp if not already assigned, so the first (highest-confidence)
-    # meta-rule assignment wins when a lesson appears in multiple groups.
-    for lesson in rules:
-        if not lesson.parent_meta_rule_id:
-            lesson.parent_meta_rule_id = meta_id
-
-    # Detect theme if not overridden
-    if theme_override:
-        theme = theme_override
-    else:
-        # Combine all descriptions and pick the dominant theme
-        combined = " ".join(l.description for l in rules)
-        themes = _detect_themes(combined)
-        theme = max(themes, key=themes.get) if themes else "general"  # type: ignore[arg-type]
-
-    # Try LLM synthesis first (produces behavioral principles, not word lists)
-    principle = None
-    if api_key:
-        from gradata.enhancements.llm_synthesizer import synthesise_principle_llm
-        principle = synthesise_principle_llm(rules, theme, api_key=api_key)
-    if principle is None:
-        principle = _synthesise_principle(rules, theme)
+    mid = _meta_id(lesson_ids)
     categories = sorted(set(l.category for l in rules))
-    avg_confidence = min(1.0, round(sum(l.confidence for l in rules) / len(rules), 2)) if rules else 0.0
-
-    # Infer scope from majority of source rules
-    scope: dict = {}
-    if all("email" in l.description.lower() or "draft" in l.description.lower() for l in rules):
-        scope["task_type"] = "email_draft"
-    if all("demo" in l.description.lower() for l in rules):
-        scope["task_type"] = "demo_prep"
-
-    examples = _pick_examples(rules)
-
-    # Auto-classify transfer scope from principle text
-    transfer_scope = _classify_meta_transfer_scope(principle)
-
+    avg_conf = min(1.0, round(sum(l.confidence for l in rules) / len(rules), 2)) if rules else 0.0
     return MetaRule(
-        id=meta_id,
-        principle=principle,
+        id=mid,
+        principle="(requires Gradata Cloud)",
         source_categories=categories,
         source_lesson_ids=lesson_ids,
-        confidence=avg_confidence,
+        confidence=avg_conf,
         created_session=session,
         last_validated_session=session,
-        scope=scope,
-        examples=examples,
-        transfer_scope=transfer_scope,
     )
 
 
@@ -760,56 +434,37 @@ def refresh_meta_rules(
     recent_corrections: list[dict] | None = None,
     current_session: int = 0,
     min_group_size: int = 3,
-    api_key: str | None = None,
+    **kwargs: object,
 ) -> list[MetaRule]:
     """Re-discover meta-rules, keeping valid existing ones.
 
-    Pipeline:
-        1. Validate each existing meta-rule against recent corrections.
-        2. Drop invalidated meta-rules.
-        3. Re-run discovery on the full lesson set.
-        4. Merge: keep existing valid meta-rules (preserving their
-           ``created_session``), add newly discovered ones.
+    In the open-source build, this validates and returns existing
+    meta-rules but does not discover new ones.  New discovery
+    requires Gradata Cloud.
 
     Args:
         lessons: All lessons (active + archived).
         existing_metas: Previously discovered meta-rules.
         recent_corrections: Corrections from the latest session(s).
         current_session: Current session number.
-        min_group_size: Minimum group size for meta-rule discovery.
-        api_key: Optional LLM API key for principle synthesis.
+        min_group_size: Minimum group size (unused in open-source build).
+        **kwargs: Accepts additional keyword arguments for compatibility.
 
     Returns:
-        Updated list of :class:`MetaRule` objects.
+        Validated subset of *existing_metas*.
     """
+    _log.info("Meta-rule discovery requires Gradata Cloud")
     corrections = recent_corrections or []
 
-    # Step 1-2: validate existing
-    valid_existing: dict[str, MetaRule] = {}
+    # Validate existing meta-rules (invalidation still works locally)
+    valid: list[MetaRule] = []
     for meta in existing_metas:
         if validate_meta_rule(meta, corrections):
             meta.last_validated_session = current_session
-            valid_existing[meta.id] = meta
+            valid.append(meta)
 
-    # Step 3: re-discover
-    discovered = discover_meta_rules(lessons, min_group_size, current_session, api_key=api_key)
-
-    # Step 4: merge (existing take priority to preserve created_session)
-    merged: dict[str, MetaRule] = {}
-    for meta in discovered:
-        if meta.id in valid_existing:
-            merged[meta.id] = valid_existing[meta.id]
-        else:
-            merged[meta.id] = meta
-
-    # Also keep existing valid ones that weren't re-discovered
-    # (source lessons may have been archived but meta-rule is still valid)
-    for mid, meta in valid_existing.items():
-        if mid not in merged:
-            merged[mid] = meta
-
-    result = sorted(merged.values(), key=lambda m: m.confidence, reverse=True)
-    return result
+    valid.sort(key=lambda m: m.confidence, reverse=True)
+    return valid
 
 
 # ---------------------------------------------------------------------------

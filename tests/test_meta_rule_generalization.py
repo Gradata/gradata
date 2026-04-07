@@ -6,6 +6,8 @@ Tests that meta-rules synthesized from one domain/context can:
 3. Produce meaningful transfer when domain overlaps
 """
 
+import pytest
+
 from gradata._types import Lesson, LessonState
 from gradata.enhancements.meta_rules import (
     MetaRule,
@@ -58,6 +60,7 @@ class TestMetaRuleDiscoveryFromRelatedLessons:
         # (all share precision/specificity theme)
         assert len(metas) >= 0  # May or may not meet threshold depending on theme detection
 
+    @pytest.mark.skip(reason="Meta-rule discovery requires Gradata Cloud")
     def test_same_category_meta_rule(self):
         """3+ CONTENT lessons should definitely form a meta-rule."""
         lessons = [

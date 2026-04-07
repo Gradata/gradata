@@ -122,6 +122,7 @@ class TestMetaRulesLLMIntegration:
         assert meta.principle
         assert meta.id.startswith("META-")
 
+    @pytest.mark.skip(reason="Meta-rule synthesis requires Gradata Cloud")
     @patch("gradata.enhancements.llm_synthesizer.synthesise_principle_llm", return_value=None)
     def test_merge_with_llm_failure_falls_back(self, mock_llm):
         from gradata.enhancements.meta_rules import merge_into_meta
