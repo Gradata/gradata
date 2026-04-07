@@ -98,3 +98,6 @@ skips = ["B101"]  # allow assert in non-test code for now
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "integration: tests that hit external LLM APIs (cost money, skip in CI)",
+]
