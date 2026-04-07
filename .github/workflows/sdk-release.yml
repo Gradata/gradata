@@ -31,29 +31,15 @@ jobs:
           version: "latest"
 
       - name: Install dev dependencies
-        working-directory: sdk
         run: uv pip install --system -e ".[dev]"
 
       - name: Run test suite (gate before publish)
-        working-directory: sdk
         run: python -m pytest tests/ -v --tb=short
 
-      - name: Run SPEC compliance (gate before publish)
-        working-directory: sdk
-        run: python -m pytest tests/test_spec_compliance.py -v
-
       - name: Build wheel and sdist
-        working-directory: sdk
         run: uv build
 
       - name: Publish to PyPI
-        # Requires a Trusted Publisher configured at pypi.org:
-        #   Publisher: GitHub Actions
-        #   Owner: spritesai
-        #   Repository: aios-brain
-        #   Workflow: sdk-release.yml
-        #   Environment: (leave blank for tag-triggered releases)
-        # No API token or secret is needed — OIDC handles auth.
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: sdk/dist/
+          packages-dir: dist/
