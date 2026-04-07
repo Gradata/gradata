@@ -83,15 +83,15 @@ def list_rules(
     lessons = _load_lessons_from_path(lessons_path)
 
     if not include_all:
-        lessons = [l for l in lessons if l.state in ELIGIBLE_STATES]
+        lessons = [lesson for lesson in lessons if lesson.state in ELIGIBLE_STATES]
 
     if category:
-        lessons = [l for l in lessons if l.category.upper() == category.upper()]
+        lessons = [lesson for lesson in lessons if lesson.category.upper() == category.upper()]
 
     # Sort by confidence descending
-    lessons.sort(key=lambda l: l.confidence, reverse=True)
+    lessons.sort(key=lambda lesson: lesson.confidence, reverse=True)
 
-    return [_lesson_to_dict(l) for l in lessons]
+    return [_lesson_to_dict(lesson) for lesson in lessons]
 
 
 def explain_rule(
@@ -105,7 +105,7 @@ def explain_rule(
 
     Args:
         db_path: Path to system.db.
-        events_path: Path to events.jsonl.
+        events_path: Reserved for future provenance event lookup.
         rule_id: The stable rule ID (from list_rules).
         lessons_path: Path to lessons.md.
 
@@ -132,18 +132,17 @@ def explain_rule(
     db = Path(db_path)
     if db.is_file():
         try:
-            conn = sqlite3.connect(str(db))
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                """SELECT old_state, new_state, confidence, fire_count,
-                          session, transitioned_at
-                   FROM lesson_transitions
-                   WHERE lesson_desc = ? AND category = ?
-                   ORDER BY transitioned_at""",
-                (target.description, target.category),
-            ).fetchall()
-            transitions = [dict(r) for r in rows]
-            conn.close()
+            with sqlite3.connect(str(db)) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    """SELECT old_state, new_state, confidence, fire_count,
+                              session, transitioned_at
+                       FROM lesson_transitions
+                       WHERE lesson_desc = ? AND category = ?
+                       ORDER BY transitioned_at""",
+                    (target.description, target.category),
+                ).fetchall()
+                transitions = [dict(r) for r in rows]
         except Exception as e:
             _log.debug("Failed to query lesson_transitions: %s", e)
 
@@ -155,20 +154,20 @@ def export_rules(
     *,
     db_path: Path | str,
     lessons_path: Path | str,
-    format: str = "json",
+    output_format: str = "json",
 ) -> str:
     """Export rules in the specified format.
 
     Args:
         db_path: Path to system.db.
         lessons_path: Path to lessons.md.
-        format: "json" or "yaml". Raises ValueError for unsupported formats.
+        output_format: "json" or "yaml". Raises ValueError for unsupported formats.
 
     Returns:
         Serialized string in the requested format.
     """
-    if format not in ("json", "yaml"):
-        raise ValueError(f"Unsupported format: {format!r}. Use 'json' or 'yaml'.")
+    if output_format not in ("json", "yaml"):
+        raise ValueError(f"Unsupported format: {output_format!r}. Use 'json' or 'yaml'.")
 
     rules = list_rules(db_path=db_path, lessons_path=lessons_path)
     payload = {
@@ -176,11 +175,11 @@ def export_rules(
         "metadata": {
             "exported_at": datetime.now(timezone.utc).isoformat(),
             "count": len(rules),
-            "format": format,
+            "format": output_format,
         },
     }
 
-    if format == "json":
+    if output_format == "json":
         return json.dumps(payload, indent=2, default=str)
 
     # YAML — minimal serializer, no PyYAML dependency
@@ -200,6 +199,8 @@ def _yaml_val(v: object) -> str:
     if isinstance(v, (int, float)):
         return str(v)
     s = str(v)
+    # Escape embedded double quotes before wrapping
+    s = s.replace('"', '\\"')
     # Quote strings that could be misinterpreted
     if s == "" or ":" in s or "#" in s or s.startswith(("-", "[", "{")):
         return f'"{s}"'

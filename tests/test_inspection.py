@@ -176,7 +176,7 @@ class TestExportRules:
         """JSON export is valid JSON with expected keys."""
         output = export_rules(db_path=brain_dir / "system.db",
                               lessons_path=brain_dir / "lessons.md",
-                              format="json")
+                              output_format="json")
         parsed = json.loads(output)
         assert "rules" in parsed
         assert "metadata" in parsed
@@ -186,7 +186,7 @@ class TestExportRules:
         """YAML export contains expected markers."""
         output = export_rules(db_path=brain_dir / "system.db",
                               lessons_path=brain_dir / "lessons.md",
-                              format="yaml")
+                              output_format="yaml")
         assert "rules:" in output
         assert "category:" in output
 
@@ -195,7 +195,7 @@ class TestExportRules:
         with pytest.raises(ValueError, match="Unsupported"):
             export_rules(db_path=brain_dir / "system.db",
                          lessons_path=brain_dir / "lessons.md",
-                         format="xml")
+                         output_format="xml")
 
 
 # ---------------------------------------------------------------------------
@@ -263,18 +263,18 @@ class TestBrainWrappers:
 
     def test_brain_explain_returns_dict(self, brain):
         rules = brain.rules()
-        if rules:
-            result = brain.explain(rules[0]["id"])
-            assert isinstance(result, dict)
-            assert "description" in result
+        assert len(rules) > 0, "Fixture must seed PATTERN/RULE lessons"
+        result = brain.explain(rules[0]["id"])
+        assert isinstance(result, dict)
+        assert "description" in result
 
     def test_brain_export_data_json(self, brain):
-        output = brain.export_data(format="json")
+        output = brain.export_data(output_format="json")
         parsed = json.loads(output)
         assert "rules" in parsed
 
     def test_brain_export_data_yaml(self, brain):
-        output = brain.export_data(format="yaml")
+        output = brain.export_data(output_format="yaml")
         assert isinstance(output, str)
 
     def test_brain_rules_empty(self, tmp_path: Path):

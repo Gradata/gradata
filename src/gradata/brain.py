@@ -708,16 +708,16 @@ class Brain:
         """Trace a rule to its source corrections. See gradata.inspection.explain_rule."""
         from gradata.inspection import explain_rule
         return explain_rule(db_path=self.db_path,
-                            events_path=self.ctx.events_path if hasattr(self.ctx, "events_path") else self.dir / "events.jsonl",
+                            events_path=self.ctx.events_jsonl if hasattr(self.ctx, "events_jsonl") else self.dir / "events.jsonl",
                             rule_id=rule_id,
                             lessons_path=self._find_lessons_path() or self.dir / "lessons.md")
 
-    def export_data(self, *, format: str = "json") -> str:
+    def export_data(self, *, output_format: str = "json") -> str:
         """Export rules as JSON or YAML. See gradata.inspection.export_rules."""
         from gradata.inspection import export_rules
         return export_rules(db_path=self.db_path,
                             lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
-                            format=format)
+                            output_format=output_format)
 
     # ── Events ─────────────────────────────────────────────────────────
 
