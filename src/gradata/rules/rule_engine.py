@@ -469,8 +469,9 @@ def effective_confidence(
 def is_rule_disabled_for_domain(lesson: Lesson, domain: str) -> bool:
     """Check if a rule should be suppressed in a specific domain.
 
-    Uses Beta distribution lower bound instead of naive ratio.
-    Disabled when we're 95% confident the misfire rate exceeds 30%.
+    Uses Beta distribution 5th-percentile lower bound on the success rate.
+    Disabled when the lower bound falls below 0.5 — i.e., we're 95%
+    confident the success rate is below 50% (misfire rate above 50%).
     """
     scores = lesson.domain_scores.get(domain, {})
     fires = scores.get("fires", 0)

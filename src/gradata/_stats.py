@@ -56,11 +56,16 @@ def trend_analysis(y: list[float]) -> tuple[float, float]:
 
 
 def cusum_changepoints(data: list[int] | list[float], threshold: float = 1.0) -> list[int]:
-    """CUSUM (Cumulative Sum) changepoint detection.
+    """CUSUM changepoint detection for abrupt level shifts.
 
-    Tracks cumulative deviation from the mean. When the cumulative sum
-    exceeds threshold * std_dev, a changepoint is recorded and the
-    accumulator resets.
+    Accumulates consecutive differences (data[i] - data[i-1]). When
+    the cumulative sum exceeds threshold * std_dev, a changepoint is
+    recorded and the accumulator resets.
+
+    Note: uses successive differences, NOT deviations from the global
+    mean. Sensitive to sharp step changes (e.g. corrections dropping
+    from 10 to 2) but insensitive to slow gradual trends — use
+    trend_analysis / Mann-Kendall for those.
 
     Args:
         data: Time series of values.
