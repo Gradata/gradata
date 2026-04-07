@@ -389,6 +389,18 @@ def brain_correct(
 
 # ── end_session() ──────────────────────────────────────────────────────
 
+
+def _graduation_message(old_state: str, lesson: "Lesson") -> str:
+    """Generate a user-facing graduation notification message."""
+    if lesson.state.value == "PATTERN":
+        return (f"You've corrected this {lesson.fire_count} times — "
+                f"Gradata learned it: \"{lesson.description[:80]}\"")
+    elif lesson.state.value == "RULE":
+        return (f"Graduated to RULE: \"{lesson.description[:80]}\" — "
+                f"this correction is now permanent ({lesson.confidence:.0%} confidence)")
+    return f"Lesson updated: {lesson.description[:80]}"
+
+
 def brain_end_session(
     brain: Brain, *, session_corrections: list[dict] | None = None,
     session_type: str = "full", machine_mode: bool | None = None,
@@ -447,6 +459,19 @@ def brain_end_session(
                         "confidence": l.confidence, "fire_count": l.fire_count})
                 except Exception as e:
                     _log.debug("Graduation emit failed: %s", e)
+                # User-facing graduation notification
+                try:
+                    brain.bus.emit("lesson.graduated", {
+                        "category": l.category,
+                        "description": l.description[:100],
+                        "old_state": old_s,
+                        "new_state": new_s,
+                        "fire_count": l.fire_count,
+                        "confidence": l.confidence,
+                        "message": _graduation_message(old_s, l),
+                    })
+                except Exception as e:
+                    _log.debug("lesson.graduated emit failed: %s", e)
 
         # Persist lineage (table created by _migrations.py)
         if transitions and brain.db_path.is_file():
