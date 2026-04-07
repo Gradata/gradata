@@ -436,12 +436,16 @@ def _beta_ppf_05(alpha: float, beta_param: float) -> float:
 def beta_domain_reliability(fires: int, misfires: int) -> float:
     """Domain reliability via Beta distribution lower bound.
 
-    Returns 5th percentile of Beta(successes+1, failures+1).
+    fires = total activations in this domain (includes misfires).
+    misfires = activations that made output worse (subset of fires).
+    successes = fires - misfires = activations that helped or were neutral.
+
+    Returns 5th percentile of Beta(successes+1, misfires+1).
     No data (0,0) returns 1.0 (neutral — no penalty).
     """
     if fires == 0 and misfires == 0:
         return 1.0
-    successes = fires - misfires
+    successes = fires - misfires  # misfires is a subset of fires
     alpha = max(1, successes + 1)
     beta_param = misfires + 1
     return round(_beta_ppf_05(alpha, beta_param), 4)

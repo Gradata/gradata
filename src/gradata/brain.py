@@ -39,6 +39,10 @@ import logging
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gradata._types import Lesson
 
 logger = logging.getLogger("gradata")
 
@@ -67,7 +71,7 @@ class Brain:
                 open_encrypted_db(self.dir, self._encryption_key)
 
         self._instruction_cache: object | None = None  # lazy: InstructionCache
-        self._fired_rules: list = []  # Rules injected this session (for misfire attribution)
+        self._fired_rules: list["Lesson"] = []  # Rules injected this session (for misfire attribution)
         self._convergence_cache: dict | None = None
         self._convergence_session: int | None = None
 

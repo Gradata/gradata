@@ -161,6 +161,7 @@ def brain_correct(
         _log.warning("Pattern extraction failed: %s", e)
 
     # Close the loop: correction → lesson
+    desc = ""  # Will be set if severity threshold is met
     try:
         from datetime import date as _date
         from gradata._types import Lesson, LessonState
@@ -313,15 +314,12 @@ def brain_correct(
     except Exception as e:
         _log.warning("Lesson creation failed: %s", e)
 
-    # Domain-scoped misfire attribution
+    # Domain-scoped misfire attribution (then clear fired rules to prevent unbounded growth)
     try:
         if brain._fired_rules and (category or classifications):
-            correction_desc = ""
-            if 'desc' in locals():
-                correction_desc = desc
-            elif summary:
-                correction_desc = summary
+            correction_desc = desc if desc else (summary or "")
             _attribute_domain_fires(brain, category or "UNKNOWN", correction_desc)
+            brain._fired_rules = []
     except Exception as e:
         _log.debug("Domain fire attribution failed: %s", e)
 
@@ -832,66 +830,22 @@ def brain_export_skills(brain: Brain, *, output_dir: str | None = None,
 # ── convergence() ─────────────────────────────────────────────────────
 
 def _mann_kendall(data: "list[int] | list[float]") -> tuple[str, float]:
-    """Mann-Kendall trend test (pure Python, no scipy needed).
+    """Mann-Kendall trend test — delegates to _stats.trend_analysis().
 
     Returns (trend, p_value) where trend is "decreasing", "increasing", or "no_trend".
-    Uses normal approximation for n >= 3.
     """
-    import math
-
-    n = len(data)
-    if n < 3:
+    if len(data) < 3:
         return "no_trend", 1.0
 
-    # Compute S statistic
-    s = 0
-    for i in range(n - 1):
-        for j in range(i + 1, n):
-            diff = data[j] - data[i]
-            if diff > 0:
-                s += 1
-            elif diff < 0:
-                s -= 1
-
-    # Handle ties
-    from collections import Counter
-    tie_counts = [c for c in Counter(data).values() if c > 1]
-    tie_correction = sum(t * (t - 1) * (2 * t + 5) for t in tie_counts)
-
-    # Variance of S
-    var_s = (n * (n - 1) * (2 * n + 5) - tie_correction) / 18.0
-    if var_s == 0:
-        return "no_trend", 1.0
-
-    # Z statistic (continuity correction)
-    if s > 0:
-        z = (s - 1) / math.sqrt(var_s)
-    elif s < 0:
-        z = (s + 1) / math.sqrt(var_s)
-    else:
-        z = 0.0
-
-    # Two-tailed p-value using normal CDF approximation
-    p_value = 2.0 * (1.0 - _normal_cdf(abs(z)))
+    from gradata._stats import trend_analysis
+    slope, p_value = trend_analysis([float(x) for x in data])
 
     if p_value < 0.05:
-        trend = "decreasing" if s < 0 else "increasing"
+        trend = "decreasing" if slope < 0 else "increasing"
     else:
         trend = "no_trend"
 
     return trend, round(p_value, 4)
-
-
-def _normal_cdf(x: float) -> float:
-    """Standard normal CDF approximation (Abramowitz & Stegun)."""
-    import math
-    t = 1.0 / (1.0 + 0.2316419 * abs(x))
-    d = 0.3989422804014327  # 1/sqrt(2*pi)
-    p = d * math.exp(-x * x / 2.0) * (
-        t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 +
-        t * (-1.821255978 + t * 1.330274429))))
-    )
-    return 1.0 - p if x >= 0 else p
 
 
 def brain_convergence(brain: "Brain") -> dict:
@@ -916,23 +870,21 @@ def brain_convergence(brain: "Brain") -> dict:
 
     try:
         from gradata._db import get_connection
-        import json as _json
         with get_connection(brain.db_path) as conn:
-            # Aggregate corrections per session
             rows = conn.execute(
                 "SELECT session, COUNT(*) as cnt FROM events "
                 "WHERE type = 'CORRECTION' AND session IS NOT NULL AND session > 0 "
                 "GROUP BY session ORDER BY session"
             ).fetchall()
 
-            # Per-category breakdown
+            # Per-category counts pushed to SQL (avoids fetching all JSON blobs)
             cat_rows = conn.execute(
-                "SELECT session, data_json FROM events "
+                "SELECT session, json_extract(data_json, '$.category') as cat, COUNT(*) as cnt "
+                "FROM events "
                 "WHERE type = 'CORRECTION' AND session IS NOT NULL AND session > 0 "
-                "ORDER BY session"
+                "GROUP BY session, cat ORDER BY session"
             ).fetchall()
 
-            # Average edit distance per session
             ed_rows = conn.execute(
                 "SELECT session, AVG(json_extract(data_json, '$.edit_distance')) as avg_ed "
                 "FROM events "
@@ -964,24 +916,28 @@ def brain_convergence(brain: "Brain") -> dict:
     else:
         trend = "insufficient_data"
 
-    # Per-category convergence
+    # Per-category convergence (pre-grouped by SQL)
     cat_by_session: dict[str, dict[int, int]] = {}
-    for session, data_json in cat_rows:
-        try:
-            data = _json.loads(data_json) if isinstance(data_json, str) else {}
-            cat = data.get("category", "UNKNOWN")
-        except (_json.JSONDecodeError, TypeError):
-            cat = "UNKNOWN"
+    for session, cat, cnt in cat_rows:
+        cat = (cat or "UNKNOWN").upper()
         if cat not in cat_by_session:
             cat_by_session[cat] = {}
-        cat_by_session[cat][session] = cat_by_session[cat].get(session, 0) + 1
+        cat_by_session[cat][session] = cat_by_session[cat].get(session, 0) + cnt
 
     by_category: dict[str, dict] = {}
     for cat, session_counts in cat_by_session.items():
         cat_counts = [session_counts.get(s, 0) for s in sessions]
         cat_mk, cat_p = _mann_kendall(cat_counts)
-        cat_trend = "converging" if cat_mk == "decreasing" else (
-            "diverging" if cat_mk == "increasing" else "converged")
+        if cat_mk == "decreasing":
+            cat_trend = "converging"
+        elif cat_mk == "increasing":
+            cat_trend = "diverging"
+        elif len(cat_counts) >= 3:
+            cat_avg = sum(cat_counts) / len(cat_counts)
+            cat_cv = (sum((x - cat_avg) ** 2 for x in cat_counts) / len(cat_counts)) ** 0.5 / cat_avg if cat_avg > 0 else 0
+            cat_trend = "converged" if cat_cv < 0.5 else "no_signal"
+        else:
+            cat_trend = "insufficient_data"
         by_category[cat] = {
             "corrections_per_session": cat_counts,
             "trend": cat_trend,
@@ -1017,13 +973,9 @@ def brain_convergence(brain: "Brain") -> dict:
 
 # ── Efficiency ────────────────────────────────────────────────────────
 
-_SEVERITY_SECONDS = {
-    "trivial": 5,
-    "minor": 15,
-    "moderate": 45,
-    "major": 120,
-    "rewrite": 300,
-}
+# Average seconds saved per correction avoided (approximate).
+# TODO: query actual severity distribution when real user data exists.
+_AVG_SECONDS_PER_CORRECTION = 45
 
 
 def brain_efficiency(brain: "Brain", *, estimate_time: bool = False) -> dict:
@@ -1062,7 +1014,7 @@ def brain_efficiency(brain: "Brain", *, estimate_time: bool = False) -> dict:
 
     if estimate_time:
         corrections_avoided = max(0, (initial - recent) * len(counts))
-        avg_severity_weight = _SEVERITY_SECONDS.get("moderate", 45)
+        avg_severity_weight = _AVG_SECONDS_PER_CORRECTION
         estimated_seconds = int(corrections_avoided * avg_severity_weight)
         result["estimated_seconds_saved"] = estimated_seconds
         result["time_breakdown"] = {
