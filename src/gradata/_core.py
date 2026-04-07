@@ -1141,3 +1141,127 @@ def brain_prove(brain: "Brain") -> dict:
         },
         "summary": summary,
     }
+
+
+# ── Sharing ──────────────────────────────────────────────────────────
+
+
+def brain_share(brain: "Brain") -> dict:
+    """Export graduated rules as a shareable package for team distribution.
+
+    Only exports PATTERN and RULE state lessons — proven behavioral rules
+    that have survived the graduation pipeline.
+    """
+    from datetime import datetime, timezone
+    from gradata._types import LessonState
+
+    lessons_path = brain._find_lessons_path()
+    rules: list[dict] = []
+    if lessons_path and lessons_path.is_file():
+        from gradata.enhancements.self_improvement import parse_lessons
+        all_lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+        for lesson in all_lessons:
+            if lesson.state in (LessonState.PATTERN, LessonState.RULE):
+                rules.append({
+                    "category": lesson.category,
+                    "description": lesson.description,
+                    "confidence": lesson.confidence,
+                    "state": lesson.state.value,
+                    "fire_count": lesson.fire_count,
+                    "correction_type": (
+                        lesson.correction_type.value
+                        if hasattr(lesson.correction_type, "value")
+                        else str(lesson.correction_type)
+                    ),
+                })
+
+    proof: dict = {}
+    try:
+        proof = brain_prove(brain)
+    except Exception:
+        pass
+
+    return {
+        "brain_id": str(brain.dir),
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "rules": rules,
+        "rule_count": len(rules),
+        "proof": proof,
+    }
+
+
+def brain_absorb(brain: "Brain", package: dict) -> dict:
+    """Import shared rules into this brain.
+
+    Imported rules enter as INSTINCT with initial confidence (0.40),
+    not at their original confidence — the recipient brain must
+    validate them through its own correction cycle.
+
+    Skips rules that are >0.6 similar to existing lessons (duplicates).
+    """
+    from datetime import date as _date
+    from gradata._types import CorrectionType, Lesson, LessonState
+    from gradata.enhancements.self_improvement import format_lessons, parse_lessons
+    from gradata.enhancements.similarity import best_similarity
+
+    INITIAL_CONFIDENCE = 0.40
+
+    lessons_path = brain._find_lessons_path(create=True)
+    if not lessons_path:
+        return {"absorbed": 0, "skipped": 0, "error": "No lessons path"}
+
+    existing_text = ""
+    if lessons_path.is_file():
+        existing_text = lessons_path.read_text(encoding="utf-8")
+    existing = parse_lessons(existing_text) if existing_text else []
+
+    absorbed = 0
+    skipped = 0
+
+    for rule in package.get("rules", []):
+        desc = rule.get("description", "")
+        cat = rule.get("category", "UNKNOWN")
+
+        # Check for duplicates against same-category lessons
+        is_duplicate = False
+        for existing_l in existing:
+            if existing_l.category == cat:
+                sim = best_similarity(desc, existing_l.description)
+                if sim >= 0.6:
+                    is_duplicate = True
+                    break
+
+        if is_duplicate:
+            skipped += 1
+            continue
+
+        # Import as INSTINCT — recipient must validate
+        correction_type_str = rule.get("correction_type", "behavioral")
+        try:
+            ct = CorrectionType(correction_type_str)
+        except (ValueError, KeyError):
+            ct = CorrectionType.BEHAVIORAL
+
+        new_lesson = Lesson(
+            date=_date.today().isoformat(),
+            state=LessonState.INSTINCT,
+            confidence=INITIAL_CONFIDENCE,
+            category=cat,
+            description=desc,
+            correction_type=ct,
+            agent_type="shared",
+        )
+        existing.append(new_lesson)
+        absorbed += 1
+
+    # Write back
+    lessons_path.write_text(format_lessons(existing), encoding="utf-8")
+
+    return {
+        "absorbed": absorbed,
+        "skipped": skipped,
+        "source": package.get("brain_id", "unknown"),
+        "total_rules_in_package": package.get(
+            "rule_count", len(package.get("rules", []))
+        ),
+    }

@@ -375,6 +375,24 @@ class Brain:
         from gradata._core import brain_prove
         return brain_prove(self)
 
+    def share(self) -> dict:
+        """Export graduated rules as a shareable package for team distribution.
+
+        Only includes PATTERN and RULE state lessons — proven behavioral
+        rules that have survived the graduation pipeline.
+        """
+        from gradata._core import brain_share
+        return brain_share(self)
+
+    def absorb(self, package: dict) -> dict:
+        """Import shared rules from another brain's share() output.
+
+        Rules enter as INSTINCT — this brain must validate them through
+        its own correction cycle before they graduate.
+        """
+        from gradata._core import brain_absorb
+        return brain_absorb(self, package)
+
     # ── Output Logging ─────────────────────────────────────────────────
 
     def log_output(self, text: str, output_type: str = "general",
