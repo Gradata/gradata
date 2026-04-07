@@ -191,7 +191,7 @@ def validate_manifest(ctx: "BrainContext | None" = None) -> list[str]:
     except json.JSONDecodeError as e:
         return [f"Invalid JSON: {e}"]
 
-    required_keys = ["schema_version", "metadata", "quality", "database", "rag", "paths"]
+    required_keys = ["schema_version", "metadata", "quality", "database", "rag", "paths", "proof"]
     for k in required_keys:
         if k not in manifest:
             issues.append(f"Missing required key: {k}")

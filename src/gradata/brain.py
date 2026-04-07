@@ -812,6 +812,16 @@ class Brain:
         try:
             from gradata._brain_manifest import generate_manifest, write_manifest
             m = generate_manifest(ctx=self.ctx)
+            # Embed prove() data so the manifest is a complete quality certificate
+            try:
+                m["proof"] = self.prove()
+            except Exception:
+                m["proof"] = {
+                    "proven": False,
+                    "confidence_level": "error",
+                    "evidence": {},
+                    "summary": "Proof generation failed",
+                }
             write_manifest(m, ctx=self.ctx)
             return m
         except ImportError:
