@@ -108,6 +108,31 @@ def transition(current: LessonState, action: str) -> LessonState:
 
 
 @dataclass
+class RuleMetadata:
+    """5W1H metadata + dual utility/safety scores for graduated rules.
+
+    Tracks provenance (who, what, why, when, where, how) and dual scores
+    that let the injection pipeline balance usefulness vs safety.
+    """
+    what: str = ""
+    why: str = ""
+    who: str = ""
+    when_created: str = ""
+    when_validated: str = ""
+    where_scope: str = ""
+    how_enforced: str = "injected"
+    utility_score: float = 0.5
+    safety_score: float = 0.5
+
+    def __post_init__(self) -> None:
+        self.utility_score = round(max(0.0, min(1.0, self.utility_score)), 2)
+        self.safety_score = round(max(0.0, min(1.0, self.safety_score)), 2)
+
+    def to_dict(self) -> dict:
+        return {f: getattr(self, f) for f in self.__dataclass_fields__}
+
+
+@dataclass
 class Lesson:
     """A single learned lesson with confidence tracking."""
     date: str                          # ISO date when the lesson was created
@@ -131,6 +156,7 @@ class Lesson:
     parent_meta_rule_id: str | None = None  # Meta-rule this lesson contributed to
     memory_ids: list[str] = field(default_factory=list)  # Linked memory IDs
     domain_scores: dict[str, dict[str, int]] = field(default_factory=dict)  # Per-domain fire/misfire tracking
+    metadata: RuleMetadata = field(default_factory=RuleMetadata)  # 5W1H + dual scores
 
     def __post_init__(self) -> None:
         self.confidence = round(max(0.0, min(1.0, self.confidence)), 2)
