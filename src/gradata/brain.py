@@ -164,6 +164,10 @@ class Brain:
         except ImportError:
             pass
 
+        # Query budget — sliding-window rate limiter
+        from gradata.security.query_budget import QueryBudget
+        self._query_budget = QueryBudget()
+
         # Cloud connection (None = local-only mode)
         self._cloud = None
 
@@ -422,6 +426,9 @@ class Brain:
     def apply_brain_rules(self, task: str, context: dict | None = None,
                           agent_type: str | None = None) -> str:
         """Get applicable brain rules for a task, formatted for prompt injection."""
+        self._query_budget.record("apply_rules")
+        if self._query_budget.is_rate_exceeded("apply_rules"):
+            logger.warning("Query budget exceeded for apply_rules")
         if self._cloud and self._cloud.connected:
             try:
                 return self._cloud.apply_rules(task, context)

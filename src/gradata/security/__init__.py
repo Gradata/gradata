@@ -9,6 +9,7 @@ from gradata.security.brain_salt import (
     load_or_create_salt,
     salt_threshold,
 )
+from gradata.security.query_budget import QueryBudget
 
 __all__ = [
     "truncate_score",
@@ -16,4 +17,5 @@ __all__ = [
     "generate_brain_salt",
     "load_or_create_salt",
     "salt_threshold",
+    "QueryBudget",
 ]
