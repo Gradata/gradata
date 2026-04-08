@@ -7,7 +7,7 @@ Tracks per-endpoint call timestamps using ``time.monotonic()`` and a
 from __future__ import annotations
 
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 
 
 class QueryBudget:
@@ -24,7 +24,7 @@ class QueryBudget:
     def __init__(self, window_seconds: float = 300, max_calls: int = 500) -> None:
         self.window_seconds = window_seconds
         self.max_calls = max_calls
-        self._calls: dict[str, list[float]] = defaultdict(list)
+        self._calls: dict[str, deque[float]] = defaultdict(deque)
 
     # ── Core API ──────────────────────────────────────────────────────
 
@@ -55,7 +55,7 @@ class QueryBudget:
         Returns a dict with a ``burst`` boolean flag.
         """
         self._prune(endpoint)
-        timestamps = self._calls[endpoint]
+        timestamps = list(self._calls[endpoint])
 
         if len(timestamps) < 10:
             return {"burst": False}
@@ -111,4 +111,4 @@ class QueryBudget:
         calls = self._calls[endpoint]
         # Binary-ish fast path: timestamps are monotonically ordered
         while calls and calls[0] < cutoff:
-            calls.pop(0)
+            calls.popleft()

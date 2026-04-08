@@ -8,7 +8,6 @@ a Brain object. Brain gets thin 1-2 line wrappers.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import sqlite3
@@ -16,18 +15,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from gradata._types import ELIGIBLE_STATES, Lesson, LessonState
+from gradata.rules.rule_engine import _make_rule_id
 
 _log = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _make_rule_id(lesson: Lesson) -> str:
-    """Generate a stable, deterministic ID from category + description."""
-    key = f"{lesson.category}:{lesson.description}"
-    return hashlib.sha256(key.encode("utf-8")).hexdigest()[:12]
 
 
 def _load_lessons_from_path(lessons_path: Path | str) -> list[Lesson]:

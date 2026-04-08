@@ -72,7 +72,7 @@ def constant_time_pad(fn, min_ms: float = 20.0, jitter_ms: float = 5.0):
     start = time.perf_counter()
     result = fn()
     elapsed_ms = (time.perf_counter() - start) * 1000
-    jitter = (secrets.randbelow(int(jitter_ms * 1000)) / 1000) if jitter_ms > 0 else 0.0
+    jitter = (secrets.randbelow(int(jitter_ms * 1000)) / 1000) if jitter_ms >= 0.001 else 0.0
     target_ms = min_ms + jitter
     remaining_ms = target_ms - elapsed_ms
     if remaining_ms > 0:

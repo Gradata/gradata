@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import time
+from datetime import datetime, timezone
 
 
 def create_provenance_record(
@@ -30,7 +30,7 @@ def create_provenance_record(
     Returns:
         Dict with user_id, correction_hash, session, timestamp, and hmac.
     """
-    timestamp = time.time()
+    timestamp = datetime.now(timezone.utc).isoformat()
     message = f"{user_id}|{correction_hash}|{session}|{timestamp}"
     signature = hmac.new(
         salt.encode(), message.encode(), hashlib.sha256,

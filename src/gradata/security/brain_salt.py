@@ -29,12 +29,13 @@ def load_or_create_salt(brain_dir: str | Path) -> str:
     brain_dir = Path(brain_dir)
     salt_path = brain_dir / ".brain_salt"
 
-    if salt_path.exists():
+    try:
+        with open(salt_path, "x", encoding="utf-8") as f:
+            salt = generate_brain_salt()
+            f.write(salt)
+        return salt
+    except FileExistsError:
         return salt_path.read_text(encoding="utf-8").strip()
-
-    salt = generate_brain_salt()
-    salt_path.write_text(salt, encoding="utf-8")
-    return salt
 
 
 def salt_threshold(base: float, salt: str, tier_name: str) -> float:

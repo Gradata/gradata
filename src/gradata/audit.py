@@ -82,20 +82,19 @@ def query_provenance(
         return []
 
     try:
-        conn = sqlite3.connect(str(db))
-        conn.row_factory = sqlite3.Row
-        if rule_id is not None:
-            rows = conn.execute(
-                "SELECT * FROM rule_provenance WHERE rule_id = ? ORDER BY id DESC LIMIT ?",
-                (rule_id, limit),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT * FROM rule_provenance ORDER BY id DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
-        conn.close()
-        return [dict(r) for r in rows]
+        with sqlite3.connect(str(db)) as conn:
+            conn.row_factory = sqlite3.Row
+            if rule_id is not None:
+                rows = conn.execute(
+                    "SELECT * FROM rule_provenance WHERE rule_id = ? ORDER BY id DESC LIMIT ?",
+                    (rule_id, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM rule_provenance ORDER BY id DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+            return [dict(r) for r in rows]
     except Exception as e:
         _log.debug("query_provenance failed: %s", e)
         return []
@@ -205,18 +204,17 @@ def trace_rule(
     db = Path(db_path)
     if db.is_file():
         try:
-            conn = sqlite3.connect(str(db))
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                """SELECT old_state, new_state, confidence, fire_count,
-                          session, transitioned_at
-                   FROM lesson_transitions
-                   WHERE lesson_desc = ? AND category = ?
-                   ORDER BY transitioned_at""",
-                (target.description, target.category),
-            ).fetchall()
-            transitions = [dict(r) for r in rows]
-            conn.close()
+            with sqlite3.connect(str(db)) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    """SELECT old_state, new_state, confidence, fire_count,
+                              session, transitioned_at
+                       FROM lesson_transitions
+                       WHERE lesson_desc = ? AND category = ?
+                       ORDER BY transitioned_at""",
+                    (target.description, target.category),
+                ).fetchall()
+                transitions = [dict(r) for r in rows]
         except Exception as e:
             _log.debug("Failed to query lesson_transitions: %s", e)
 
