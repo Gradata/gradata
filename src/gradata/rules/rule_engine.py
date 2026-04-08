@@ -26,6 +26,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import random
+import secrets
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -702,6 +704,7 @@ def format_rules_for_prompt(
     rules: list[AppliedRule],
     merge: bool = True,
     scope_filter: RuleTransferScope | None = None,
+    shuffle_seed: int | None = None,
 ) -> str:
     """Format applied rules into an XML-tagged LLM-injectable block.
 
@@ -734,17 +737,30 @@ def format_rules_for_prompt(
     if merge:
         rules = merge_related_rules(rules)
 
-    # Sort by priority: RULE state first, then difficulty (harder rules up),
-    # then confidence descending. Primacy positioning: best rules at top
-    # where LLMs attend most strongly.
-    rules.sort(
-        key=lambda r: (
-            1 if r.lesson.state.value == "RULE" else 0,
-            _difficulty_from_lesson(r.lesson),
-            r.lesson.confidence,
-        ),
-        reverse=True,
-    )
+    # Bucketed shuffle: group by tier, shuffle within each tier, concatenate
+    # in tier order (RULE first). Prevents adversaries from inferring
+    # confidence rankings via injection order.
+    tier_order = [LessonState.RULE, LessonState.PATTERN, LessonState.INSTINCT]
+    buckets: dict[LessonState, list[AppliedRule]] = {t: [] for t in tier_order}
+    for r in rules:
+        bucket = buckets.get(r.lesson.state)
+        if bucket is not None:
+            bucket.append(r)
+    # Shuffle within each tier
+    if shuffle_seed is not None:
+        rng = random.Random(shuffle_seed)
+        for tier in tier_order:
+            rng.shuffle(buckets[tier])
+    else:
+        for tier in tier_order:
+            # Production: use secrets for non-deterministic shuffle
+            bucket = buckets[tier]
+            for i in range(len(bucket) - 1, 0, -1):
+                j = secrets.randbelow(i + 1)
+                bucket[i], bucket[j] = bucket[j], bucket[i]
+    rules = []
+    for tier in tier_order:
+        rules.extend(buckets[tier])
 
     lines = [
         "<brain-rules>",
