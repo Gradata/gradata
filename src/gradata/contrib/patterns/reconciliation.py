@@ -32,12 +32,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 __all__ = [
-    "DeviationScore",
-    "PlanItem",
     "ActualResult",
     "DeviationDetail",
-    "ReconciliationSummary",
+    "DeviationScore",
+    "PlanItem",
     "Reconciler",
+    "ReconciliationSummary",
     "format_summary",
 ]
 
@@ -271,7 +271,7 @@ class Reconciler:
 
     def _classify_root_cause(
         self,
-        plan: PlanItem,  # noqa: ARG002
+        plan: PlanItem,
         actual: ActualResult,
     ) -> str:
         """Classify the root cause of a deviation.
@@ -308,7 +308,7 @@ def format_summary(summary: ReconciliationSummary) -> str:
         Multi-line formatted string.
     """
     lines = [
-        f"## Reconciliation Summary (UNIFY)",
+        "## Reconciliation Summary (UNIFY)",
         f"Overall: **{summary.overall_score.value.upper()}** "
         f"({summary.pass_count}P / {summary.gap_count}G / {summary.drift_count}D)",
         f"Completion: {summary.completion_ratio:.0%}",

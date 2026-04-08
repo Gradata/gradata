@@ -19,9 +19,8 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from gradata.enhancements.diff_engine import DiffResult
-
 if TYPE_CHECKING:
+    from gradata.enhancements.diff_engine import DiffResult
     from gradata.enhancements.instruction_cache import InstructionCache
 
 
@@ -125,7 +124,7 @@ def _classify_section(old_text: str, new_text: str, severity: str) -> list[EditC
 
     # STYLE: mostly punctuation/formatting changes
     word_diff = len(old_words.symmetric_difference(new_words))
-    char_diff = sum(1 for a, b in zip(old_text, new_text) if a != b)
+    char_diff = sum(1 for a, b in zip(old_text, new_text, strict=False) if a != b)
     is_punctuation_heavy = (
         word_diff <= 2
         and char_diff > 0

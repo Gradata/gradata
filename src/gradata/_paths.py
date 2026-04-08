@@ -9,7 +9,6 @@ This file is the SDK-portable equivalent.
 """
 from __future__ import annotations
 
-
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,7 +40,7 @@ class BrainContext:
     gates_dir: Path
 
     @classmethod
-    def from_brain_dir(cls, brain_dir: str | Path, working_dir: str | Path | None = None) -> "BrainContext":
+    def from_brain_dir(cls, brain_dir: str | Path, working_dir: str | Path | None = None) -> BrainContext:
         """Build a BrainContext from a brain directory path.
 
         Args:

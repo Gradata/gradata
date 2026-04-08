@@ -34,16 +34,15 @@ Usage::
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from typing import Any
 
 __all__ = [
-    "ClusterConfig",
-    "ClusterState",
     "ClusterAssignment",
-    "cosine_similarity",
+    "ClusterConfig",
     "ClusterManager",
+    "ClusterState",
+    "cosine_similarity",
 ]
 
 
@@ -137,8 +136,7 @@ class ClusterAssignment:
 # Math utilities (shared implementation in _math.py)
 # ---------------------------------------------------------------------------
 
-from gradata._math import cosine_similarity  # noqa: E402, F811
-
+from gradata._math import cosine_similarity  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Cluster Manager

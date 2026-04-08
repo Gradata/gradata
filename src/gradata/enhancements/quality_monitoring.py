@@ -21,26 +21,27 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from gradata.enhancements.metrics import MetricsWindow
+if TYPE_CHECKING:
+    from gradata.enhancements.metrics import MetricsWindow
 
 __all__ = [
-    # Anti-pattern detection
-    "AntiPattern",
-    "Detection",
-    "AntiPatternDetector",
+    "BLANDNESS_THRESHOLD",
     "DEFAULT_ANTI_PATTERNS",
     "DEFAULT_PATTERNS",
     # Failure detection
     "Alert",
+    # Anti-pattern detection
+    "AntiPattern",
+    "AntiPatternDetector",
+    "Detection",
     "detect_being_ignored",
-    "detect_playing_safe",
-    "detect_overfitting",
-    "detect_regression_to_mean",
     "detect_failures",
+    "detect_overfitting",
+    "detect_playing_safe",
+    "detect_regression_to_mean",
     "format_alerts",
-    "BLANDNESS_THRESHOLD",
 ]
 
 

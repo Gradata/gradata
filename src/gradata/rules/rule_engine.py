@@ -39,6 +39,7 @@ if TYPE_CHECKING:
 from gradata._scope import RuleScope, scope_matches
 from gradata._types import ELIGIBLE_STATES, CorrectionType, Lesson, LessonState, RuleTransferScope
 from gradata.security.score_obfuscation import truncate_score
+
 # evaluate_conditions lives in meta_rules.py — not re-exported here
 # to avoid circular dependency. Callers should import from meta_rules directly.
 
@@ -500,8 +501,8 @@ def apply_rules(
     events: list[dict[str, str]] | None = None,
     user_message: str = "",
     _context: str = "",
-    bus: "EventBus | None" = None,
-    graph: "RuleGraph | None" = None,
+    bus: EventBus | None = None,
+    graph: RuleGraph | None = None,
 ) -> list[AppliedRule]:
     """Select and rank lessons relevant to the given scope.
 

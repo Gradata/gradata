@@ -26,10 +26,12 @@ with OpenAI, Anthropic, or any chat completions API.
 from __future__ import annotations
 
 import logging
-from collections.abc import Generator
-from contextlib import contextmanager
-from pathlib import Path
-from typing import Any
+from contextlib import contextmanager, suppress
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from pathlib import Path
 
 logger = logging.getLogger("gradata.context_wrapper")
 
@@ -110,10 +112,8 @@ class BrainContextState:
 
         # Pre-load rules if brain available
         if brain and inject_rules:
-            try:
+            with suppress(Exception):
                 self._rules_text = brain.apply_brain_rules("general")
-            except Exception:
-                pass
 
     @property
     def rules(self) -> str:
@@ -171,10 +171,8 @@ class BrainContextState:
 
         # Log the output
         if self._brain:
-            try:
+            with suppress(Exception):
                 self._brain.log_output(response, output_type="general")
-            except Exception:
-                pass
 
     def correct(self, draft: str | None = None, final: str = "") -> dict | None:
         """Record a correction (user edited the AI's output).

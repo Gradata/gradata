@@ -6,10 +6,13 @@ Split from _brain_manifest.py for file size compliance (<500 lines).
 """
 
 import re
+from typing import TYPE_CHECKING
 
 import gradata._paths as _p
 from gradata._db import get_connection
-from gradata._paths import BrainContext
+
+if TYPE_CHECKING:
+    from gradata._paths import BrainContext
 
 # ── Severity constants (single source of truth) ───────────────────────
 LOW_SEVERITY = frozenset({"as-is", "minor"})

@@ -192,9 +192,7 @@ def _build_unified_diff(old: str, new: str, path: str, max_lines: int = 50) -> s
         )
     )
     if len(diff_lines) > max_lines:
-        diff_lines = diff_lines[:max_lines] + [
-            f"\n... diff truncated at {max_lines} lines ..."
-        ]
+        diff_lines = [*diff_lines[:max_lines], f"\n... diff truncated at {max_lines} lines ..."]
     return "\n".join(diff_lines)
 
 

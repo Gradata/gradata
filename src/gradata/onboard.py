@@ -306,10 +306,7 @@ def onboard(
         print("\n=== Gradata — Onboarding Wizard ===\n")
 
     if name is None:
-        if interactive:
-            name = _ask("Brain name", default=brain_dir.name)
-        else:
-            name = brain_dir.name
+        name = _ask("Brain name", default=brain_dir.name) if interactive else brain_dir.name
 
     if domain is None:
         if interactive:
@@ -398,25 +395,25 @@ def onboard(
     if not domain_md.exists():
         domain_lines = [
             f"# {name}",
-            f"",
+            "",
             f"Domain: {domain}",
         ]
         if company:
             domain_lines.append(f"Company: {company}")
         domain_lines += [
-            f"",
-            f"## Rules",
-            f"<!-- Brain rules will graduate here automatically. -->",
-            f"<!-- You can also add manual rules below: -->",
-            f"",
+            "",
+            "## Rules",
+            "<!-- Brain rules will graduate here automatically. -->",
+            "<!-- You can also add manual rules below: -->",
+            "",
         ]
         for rule in seed_rules:
             domain_lines.append(f"- {rule['description']}")
         domain_lines += [
-            f"",
-            f"## Tools",
-            f"<!-- List external tools this brain should know about -->",
-            f"",
+            "",
+            "## Tools",
+            "<!-- List external tools this brain should know about -->",
+            "",
         ]
         domain_md.write_text("\n".join(domain_lines) + "\n", encoding="utf-8")
 
@@ -453,9 +450,9 @@ def onboard(
     # ── Write seed rules from workflow discovery ────────────────────────
     if seed_rules:
         try:
+            from gradata._db import write_lessons_safe
             from gradata._types import Lesson, LessonState
             from gradata.enhancements.self_improvement import format_lessons
-            from gradata._db import write_lessons_safe
             lessons_path = brain_dir / "lessons.md"
             today = datetime.now(UTC).strftime("%Y-%m-%d")
             lessons = []
@@ -502,7 +499,7 @@ def onboard(
         print()
         print("  That's it. Correct -> graduate -> apply. The brain learns.")
         if embedding == "gemini":
-            print(f"\n  Note: Set GEMINI_API_KEY for Gemini embeddings.")
+            print("\n  Note: Set GEMINI_API_KEY for Gemini embeddings.")
         print()
 
     return brain

@@ -34,11 +34,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 __all__ = [
-    "BenchmarkCase",
-    "CaseResult",
-    "BenchmarkResult",
-    "LearningBenchmark",
     "STANDARD_BENCHMARK",
+    "BenchmarkCase",
+    "BenchmarkResult",
+    "CaseResult",
+    "LearningBenchmark",
     "run_standard_benchmark",
 ]
 
@@ -166,8 +166,8 @@ class LearningBenchmark:
 
         # Import edit classifier for category detection
         try:
-            from gradata.enhancements.edit_classifier import classify_edits
             from gradata.enhancements.diff_engine import compute_diff
+            from gradata.enhancements.edit_classifier import classify_edits
             has_classifier = True
         except ImportError:
             has_classifier = False

@@ -33,9 +33,9 @@ from typing import Any
 _log = logging.getLogger(__name__)
 
 __all__ = [
+    "BackfillStats",
     "backfill_from_git",
     "scan_git_diffs",
-    "BackfillStats",
 ]
 
 

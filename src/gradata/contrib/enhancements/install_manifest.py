@@ -34,15 +34,15 @@ from pathlib import Path
 from typing import Any
 
 __all__ = [
-    "ModuleCost",
-    "ModuleStability",
-    "Module",
-    "Profile",
-    "InstallPlan",
-    "InstallState",
     "DEFAULT_MODULES",
     "DEFAULT_PROFILES",
     "InstallManifest",
+    "InstallPlan",
+    "InstallState",
+    "Module",
+    "ModuleCost",
+    "ModuleStability",
+    "Profile",
 ]
 
 
@@ -145,7 +145,7 @@ class InstallState:
         filepath = Path(filepath)
         if not filepath.exists():
             return cls()
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, encoding="utf-8") as f:
             data = json.load(f)
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
 

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def create_provenance_record(
@@ -38,7 +38,7 @@ def create_provenance_record(
         raise ValueError(f"session must be a non-negative integer, got {session!r}")
     if not salt or not salt.strip():
         raise ValueError("salt must be a non-empty string")
-    timestamp = datetime.now(timezone.utc).isoformat()
+    timestamp = datetime.now(UTC).isoformat()
     message = f"{user_id}|{correction_hash}|{session}|{timestamp}"
     signature = hmac.new(
         salt.encode(), message.encode(), hashlib.sha256,

@@ -453,10 +453,7 @@ def register_route_rules(
     global _ROUTE_RULES, _ROUTE_DEFAULT
 
     new_rules = [RouteRule(keywords=kw, agent=agent) for kw, agent in rules]
-    if replace:
-        _ROUTE_RULES = new_rules
-    else:
-        _ROUTE_RULES = new_rules + _ROUTE_RULES
+    _ROUTE_RULES = new_rules if replace else new_rules + _ROUTE_RULES
 
     if default_agent is not None:
         _ROUTE_DEFAULT = default_agent
@@ -527,7 +524,7 @@ def execute_orchestrated(
 
     # If brain has spawn_queue, use it for parallel execution
     if brain and hasattr(brain, "spawn_queue"):
-        _sq = getattr(brain, "spawn_queue")
+        _sq = brain.spawn_queue
         result = _sq(tasks=tasks, worker=worker, max_concurrent=max_concurrent)
         result["strategy"] = "queue"
         result["patterns_detected"] = sorted(patterns)

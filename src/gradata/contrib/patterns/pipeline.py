@@ -33,9 +33,11 @@ Usage::
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -57,11 +59,10 @@ class GateResult:
     score: float | None = None
 
     def __post_init__(self) -> None:
-        if self.score is not None:
-            if not (0.0 <= self.score <= 1.0):
-                raise ValueError(
-                    f"GateResult.score must be in [0.0, 1.0], got {self.score!r}"
-                )
+        if self.score is not None and not (0.0 <= self.score <= 1.0):
+            raise ValueError(
+                f"GateResult.score must be in [0.0, 1.0], got {self.score!r}"
+            )
 
 
 @dataclass

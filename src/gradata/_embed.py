@@ -7,14 +7,14 @@ FTS5 is the primary search engine. sqlite-vec planned for vector similarity.
 
 from __future__ import annotations
 
-import logging
-
 import hashlib
 import json
+import logging
 import os
 import re
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import gradata._paths as _p
 from gradata._config import (
@@ -29,7 +29,9 @@ from gradata._config import (
     SKIP_DIRS,
     SKIP_FILES,
 )
-from gradata._paths import BrainContext
+
+if TYPE_CHECKING:
+    from gradata._paths import BrainContext
 
 
 def get_file_hash(path: Path) -> str:

@@ -91,7 +91,7 @@ def lessons_lock(lessons_path: str | Path, timeout: float = 10.0):
                 try:
                     msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
                     break
-                except (OSError, IOError):
+                except OSError:
                     if time.monotonic() > deadline:
                         raise TimeoutError(
                             f"Could not acquire lessons lock after {timeout}s"
@@ -103,7 +103,7 @@ def lessons_lock(lessons_path: str | Path, timeout: float = 10.0):
                 try:
                     fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     break
-                except (OSError, IOError):
+                except OSError:
                     if time.monotonic() > deadline:
                         raise TimeoutError(
                             f"Could not acquire lessons lock after {timeout}s"
@@ -119,13 +119,13 @@ def lessons_lock(lessons_path: str | Path, timeout: float = 10.0):
                 try:
                     import msvcrt
                     msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-                except (OSError, IOError):
+                except OSError:
                     pass
             else:
                 try:
                     import fcntl
                     fcntl.flock(fd, fcntl.LOCK_UN)
-                except (OSError, IOError):
+                except OSError:
                     pass
             os.close(fd)
 

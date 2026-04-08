@@ -26,16 +26,15 @@ Usage::
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 __all__ = [
-    "BrainBriefing",
-    "generate_briefing",
-    "export_briefing",
     "EXPORT_TARGETS",
+    "BrainBriefing",
+    "export_briefing",
+    "generate_briefing",
 ]
 
 # Where to write briefing files for each agent platform
@@ -299,8 +298,8 @@ def _count_active_lessons(brain_dir: Path) -> int:
     if _lessons_cache["path"] == str(lessons_path) and _lessons_cache["mtime"] == mtime:
         return _lessons_cache["count"]
     try:
-        from gradata.enhancements.self_improvement import parse_lessons
         from gradata._core import _filter_lessons_by_state
+        from gradata.enhancements.self_improvement import parse_lessons
         lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
         count = len(_filter_lessons_by_state(lessons, min_state="INSTINCT"))
         _lessons_cache.update({"path": str(lessons_path), "mtime": mtime, "count": count})

@@ -8,8 +8,10 @@ self._find_lessons_path) so they work transparently via multiple inheritance.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -88,9 +90,9 @@ class BrainInspectionMixin:
         Returns:
             {"approved": True} on success, {"error": "..."} if not found.
         """
-        from gradata.inspection import _make_rule_id, _load_lessons_from_path
-        from gradata.enhancements.self_improvement import format_lessons
         from gradata._db import write_lessons_safe
+        from gradata.enhancements.self_improvement import format_lessons
+        from gradata.inspection import _load_lessons_from_path, _make_rule_id
 
         lessons_path = self._find_lessons_path() or self.dir / "lessons.md"
         lessons = _load_lessons_from_path(lessons_path)
@@ -130,10 +132,10 @@ class BrainInspectionMixin:
             {"rejected": True, "demoted_from": old_state} on success,
             {"error": "..."} if not found.
         """
-        from gradata.inspection import _make_rule_id, _load_lessons_from_path
-        from gradata.enhancements.self_improvement import format_lessons
         from gradata._db import write_lessons_safe
         from gradata._types import LessonState
+        from gradata.enhancements.self_improvement import format_lessons
+        from gradata.inspection import _load_lessons_from_path, _make_rule_id
 
         lessons_path = self._find_lessons_path() or self.dir / "lessons.md"
         lessons = _load_lessons_from_path(lessons_path)

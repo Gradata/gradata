@@ -10,6 +10,12 @@ Endpoints:
     POST /correct      — record a correction
     POST /detect       — detect implicit feedback / mode
     POST /end-session  — close the current session
+    POST /brain-recall — search brain for context relevant to a file
+    POST /enforce-rules — check content against graduated rules
+    POST /log-event    — log structured events for pattern analysis
+    POST /tag-delta    — semantic tagging of file changes
+    POST /checkpoint   — save learning state before context compaction
+    POST /maintain     — brain maintenance tasks
 
 Usage:
     python -m gradata.daemon --brain-dir ./my-brain
@@ -18,6 +24,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
+import hashlib
 import json
 import logging
 import os
@@ -25,13 +33,20 @@ import signal
 import sqlite3
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from socketserver import ThreadingMixIn
 
 import gradata
+from gradata._scope import RuleScope
+from gradata._types import LessonState
+from gradata.detection.addition_pattern import AdditionTracker, classify_addition, is_addition
+from gradata.detection.correction_conflict import ConflictTracker, extract_diff_tokens
+from gradata.detection.mode_classifier import classify_mode
+from gradata.enhancements.self_improvement import parse_lessons
+from gradata.rules.rule_engine import apply_rules, format_rules_for_prompt
 
 logger = logging.getLogger("gradata.daemon")
 
@@ -73,23 +88,29 @@ class _Handler(BaseHTTPRequestHandler):
     """Routes requests to the parent GradataDaemon instance."""
 
     # Suppress default stderr logging — we use our own logger
-    def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+    def log_message(self, format: str, *args: object) -> None:
         logger.debug(format, *args)
 
     # ── Routing ─────────────────────────────────────────────────────────
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         if self.path == "/health":
             self._handle_health()
         else:
             self._not_found()
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         routes: dict[str, object] = {
             "/apply-rules": self._handle_apply_rules,
             "/correct": self._handle_correct,
             "/detect": self._handle_detect,
             "/end-session": self._handle_end_session,
+            "/brain-recall": self._handle_brain_recall,
+            "/enforce-rules": self._handle_enforce_rules,
+            "/log-event": self._handle_log_event,
+            "/tag-delta": self._handle_tag_delta,
+            "/checkpoint": self._handle_checkpoint,
+            "/maintain": self._handle_maintain,
         }
         handler = routes.get(self.path)
         if handler:
@@ -100,7 +121,7 @@ class _Handler(BaseHTTPRequestHandler):
     # ── Helpers ─────────────────────────────────────────────────────────
 
     @property
-    def daemon(self) -> "GradataDaemon":
+    def daemon(self) -> GradataDaemon:
         return self.server._daemon  # type: ignore[attr-defined]
 
     def _read_json(self) -> dict:
@@ -154,18 +175,12 @@ class _Handler(BaseHTTPRequestHandler):
 
         d = self.daemon
         with d._brain_lock:
-            # Load and parse lessons
             lessons_path = d._brain_dir / "lessons.md"
             if lessons_path.exists():
-                from gradata.enhancements.self_improvement import parse_lessons
                 lessons_text = lessons_path.read_text(encoding="utf-8")
                 lessons = parse_lessons(lessons_text)
             else:
                 lessons = []
-
-            # Build scope and apply rules
-            from gradata._scope import RuleScope
-            from gradata.rules.rule_engine import apply_rules, format_rules_for_prompt
 
             scope = RuleScope(
                 task_type=context.get("task_type", ""),
@@ -193,10 +208,13 @@ class _Handler(BaseHTTPRequestHandler):
         if session_id:
             d._fired_rules[session_id] = fired_ids
 
+        mode, mode_conf = classify_mode(prompt)
+
         self._send_json({
             "rules": rules_out,
             "injection_text": injection_text,
-            "mode_detected": "chat",
+            "mode_detected": mode,
+            "mode_confidence": mode_conf,
             "fired_rule_ids": fired_ids,
         })
 
@@ -249,6 +267,31 @@ class _Handler(BaseHTTPRequestHandler):
         if session_id:
             d._fired_rules[session_id] = untested
 
+        # Addition pattern detection (Signal 4)
+
+        addition_detected = False
+        addition_lesson = None
+        if is_addition(old_string, new_string):
+            ext = Path(file_path).suffix if file_path else ""
+            fingerprint = classify_addition(old_string, new_string, ext)
+            addition_lesson = d._addition_tracker.record(fingerprint, session_id)
+            addition_detected = True
+
+        # Correction-of-correction detection (Signal 6)
+
+        correction_conflict = None
+        _, new_removed = extract_diff_tokens(old_string, new_string)
+        if new_removed and misfired:
+            for rule_id in misfired:
+                action = d._conflict_tracker.record_conflict(rule_id)
+                if action:
+                    correction_conflict = {
+                        "rule_id": rule_id,
+                        "action": action,
+                        "conflict_count": d._conflict_tracker.get_count(rule_id),
+                    }
+                    break
+
         # Build response
         self._send_json({
             "captured": True,
@@ -258,8 +301,9 @@ class _Handler(BaseHTTPRequestHandler):
             "lesson_state": result.get("lesson_state", "INSTINCT"),
             "misfired_rules": misfired,
             "accepted_rules": [],
-            "addition_detected": False,
-            "correction_conflict": None,
+            "addition_detected": addition_detected,
+            "addition_lesson": addition_lesson,
+            "correction_conflict": correction_conflict,
         })
 
     def _handle_detect(self) -> None:
@@ -288,6 +332,8 @@ class _Handler(BaseHTTPRequestHandler):
         recent_fired = body.get("recent_fired_rules", [])
         related_rules = recent_fired if detected else []
 
+        mode, mode_conf = classify_mode(user_message)
+
         self._send_json({
             "implicit_feedback": {
                 "detected": detected,
@@ -295,8 +341,8 @@ class _Handler(BaseHTTPRequestHandler):
                 "related_rules": related_rules,
                 "action_taken": "logged" if detected else None,
             },
-            "mode": "chat",
-            "mode_confidence": 0.0,
+            "mode": mode,
+            "mode_confidence": mode_conf,
         })
 
     def _handle_end_session(self) -> None:
@@ -337,6 +383,194 @@ class _Handler(BaseHTTPRequestHandler):
             "cross_project_candidates": [],
         })
 
+    # ── Extended endpoint handlers ─────────────────────────────────────
+
+    def _handle_brain_recall(self) -> None:
+        self.daemon._reset_idle_timer()
+        body = self._read_json()
+        file_path = body.get("file_path", "")
+        content_preview = body.get("content_preview", "")
+
+        d = self.daemon
+        context_parts: list[str] = []
+        relevant_rules: list[dict] = []
+
+        query = (
+            f"{Path(file_path).stem} {content_preview[:200]}"
+            if file_path
+            else content_preview[:200]
+        )
+        if query.strip():
+            try:
+                with d._brain_lock:
+                    results = (
+                        d._brain.search(query)
+                        if hasattr(d._brain, "search")
+                        else []
+                    )
+                    if isinstance(results, list):
+                        context_parts = [str(r) for r in results[:5]]
+            except Exception as e:
+                logger.exception("brain-recall search failed: %s", e)
+
+        self._send_json({
+            "context": "\n".join(context_parts),
+            "relevant_rules": relevant_rules,
+            "relevant_corrections": [],
+        })
+
+    def _handle_enforce_rules(self) -> None:
+        self.daemon._reset_idle_timer()
+        body = self._read_json()
+        content = body.get("content", "")
+
+        d = self.daemon
+        violations: list[dict] = []
+
+        if content:
+            with d._brain_lock:
+                lessons = d._brain._load_lessons()
+
+                rules = [le for le in lessons if le.state == LessonState.RULE]
+
+                content_lower = content.lower()
+                for rule in rules:
+                    desc_lower = rule.description.lower()
+                    if "never" in desc_lower:
+                        never_what = desc_lower.split("never", 1)[1].strip()[:50]
+                        keywords = [w for w in never_what.split() if len(w) > 3]
+                        if any(kw in content_lower for kw in keywords):
+                            desc_hash = hashlib.sha256(rule.description.encode()).hexdigest()[:8]
+                            violations.append({
+                                "rule_id": f"{rule.category}:{desc_hash}",
+                                "description": rule.description,
+                                "severity": "warn",
+                            })
+
+        self._send_json({
+            "violations": violations,
+            "pass": len(violations) == 0,
+        })
+
+    def _handle_log_event(self) -> None:
+        self.daemon._reset_idle_timer()
+        body = self._read_json()
+        event_type = body.get("event_type", "unknown")
+        data = body.get("data", {})
+
+        d = self.daemon
+        try:
+            with d._brain_lock:
+                d._brain.emit(event_type.upper(), "plugin.hook", data)
+        except Exception as exc:
+            logger.debug("log-event failed: %s", exc)
+
+        self._send_json({"logged": True})
+
+    def _handle_tag_delta(self) -> None:
+        self.daemon._reset_idle_timer()
+        body = self._read_json()
+        file_path = body.get("file_path", "")
+        old_content = body.get("old_content", "")
+        new_content = body.get("new_content", "")
+
+        ext = Path(file_path).suffix.lower() if file_path else ""
+        category = _EXT_CATEGORY.get(ext, "GENERAL")
+
+        tags: list[str] = []
+        if not old_content and new_content:
+            tags.append("new_file")
+        elif old_content and not new_content:
+            tags.append("deleted")
+        else:
+            old_lines = set(old_content.splitlines())
+            new_lines = set(new_content.splitlines())
+            added = new_lines - old_lines
+            removed = old_lines - new_lines
+
+            if len(added) > len(removed) * 3:
+                tags.append("feature_addition")
+            elif len(removed) > len(added) * 3:
+                tags.append("cleanup")
+            elif added and removed:
+                tags.append("refactor")
+
+            added_text = "\n".join(added)
+            if "import " in added_text or "require(" in added_text:
+                tags.append("dependency_change")
+            if "test" in added_text.lower() or "assert" in added_text.lower():
+                tags.append("test_change")
+            if "fix" in added_text.lower() or "bug" in added_text.lower():
+                tags.append("bug_fix")
+
+        if not tags:
+            tags.append("edit")
+
+        self._send_json({"tags": tags, "category": category})
+
+    def _handle_checkpoint(self) -> None:
+        self.daemon._reset_idle_timer()
+        body = self._read_json()
+        session_id = body.get("session_id", "")
+        reason = body.get("reason", "manual")
+
+        d = self.daemon
+        pending = 0
+        checkpointed = True
+        try:
+            with d._brain_lock:
+                lessons = d._brain._load_lessons()
+                pending = sum(1 for le in lessons
+                              if le.state in (LessonState.INSTINCT, LessonState.PATTERN))
+                d._brain.emit("CHECKPOINT", "plugin.pre_compact", {
+                    "session_id": session_id, "reason": reason, "pending_lessons": pending,
+                })
+        except Exception as e:
+            logger.exception("checkpoint failed for session_id=%s, reason=%s: %s", session_id, reason, e)
+            checkpointed = False
+
+        self._send_json({
+            "checkpointed": checkpointed,
+            "pending_lessons": pending,
+            "unsaved_corrections": 0,
+        })
+
+    def _handle_maintain(self) -> None:
+        self.daemon._reset_idle_timer()
+        body = self._read_json()
+        tasks_requested = body.get("tasks", ["manifest"])
+
+        d = self.daemon
+        completed: list[str] = []
+        failed: list[str] = []
+        start = time.monotonic()
+
+        for task_name in tasks_requested:
+            try:
+                with d._brain_lock:
+                    if task_name == "manifest":
+                        d._brain.manifest()
+                        completed.append("manifest")
+                    elif task_name == "fts_rebuild":
+                        if hasattr(d._brain, "search"):
+                            d._brain.search("")
+                        completed.append("fts_rebuild")
+                    elif task_name == "patterns":
+                        d._brain.export_rules(min_state="PATTERN")
+                        completed.append("patterns")
+                    else:
+                        failed.append(task_name)
+            except Exception as exc:
+                logger.debug("maintain task %s failed: %s", task_name, exc)
+                failed.append(task_name)
+
+        duration_ms = round((time.monotonic() - start) * 1000)
+        self._send_json({
+            "completed": completed,
+            "failed": failed,
+            "duration_ms": duration_ms,
+        })
+
 
 # ── Main daemon class ──────────────────────────────────────────────────
 
@@ -363,12 +597,14 @@ class GradataDaemon:
 
         self._sessions: dict[str, int] = {}
         self._fired_rules: dict[str, list[str]] = {}
+        self._addition_tracker = AdditionTracker()
+        self._conflict_tracker = ConflictTracker()
 
         self._port = port
         self._pid_file = Path(pid_file) if pid_file else None
         self._server: _ThreadingHTTPServer | None = None
         self._started_mono = time.monotonic()
-        self._started_at = datetime.now(timezone.utc).isoformat()
+        self._started_at = datetime.now(UTC).isoformat()
 
         # Session counter: pick up from DB
         self._session_counter = self._init_session_counter()
@@ -446,6 +682,9 @@ class GradataDaemon:
         # Start idle timer
         self._reset_idle_timer()
 
+        # Opt-in anonymous telemetry
+        self._maybe_send_telemetry()
+
         assert self._server is not None
         try:
             self._server.serve_forever()
@@ -478,10 +717,76 @@ class GradataDaemon:
         if self._idle_timer:
             self._idle_timer.cancel()
         if self._pid_file and self._pid_file.exists():
-            try:
+            with contextlib.suppress(OSError):
                 self._pid_file.unlink()
-            except OSError:
+
+    def _maybe_send_telemetry(self) -> None:
+        """Send anonymous daily heartbeat if telemetry is opted in."""
+        import re as _re
+        config_path = Path.home() / ".gradata" / "config.toml"
+        try:
+            config_text = config_path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return
+
+        if not _re.search(r"^\s*telemetry\s*=\s*true\s*$", config_text, _re.IGNORECASE | _re.MULTILINE):
+            return
+
+        match = _re.search(r'telemetry_last_sent\s*=\s*"([^"]+)"', config_text)
+        if match:
+            try:
+                last_sent = datetime.fromisoformat(match.group(1))
+                if (datetime.now(UTC) - last_sent).total_seconds() < 86400:
+                    return
+            except ValueError:
                 pass
+
+        def _send() -> None:
+            import platform
+            import urllib.request
+            rules_count = 0
+            lessons_count = 0
+            try:
+                with self._brain_lock:
+                    lessons = self._brain._load_lessons()
+                    lessons_count = len(lessons)
+                    rules_count = sum(1 for lesson in lessons if lesson.state.name == "RULE")
+            except Exception as e:
+                logger.exception("telemetry: failed to load lessons: %s", e)
+            payload = json.dumps({
+                "sdk_version": gradata.__version__,
+                "rules_count": rules_count,
+                "lessons_count": lessons_count,
+                "os": platform.system().lower(),
+                "python_version": platform.python_version(),
+            }).encode()
+            try:
+                req = urllib.request.Request(
+                    "https://api.gradata.com/telemetry",
+                    data=payload,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                urllib.request.urlopen(req, timeout=5)
+            except Exception:
+                pass
+            try:
+                import re as _re2
+                now = datetime.now(UTC).isoformat()
+                if "telemetry_last_sent" in config_text:
+                    new_config = _re2.sub(
+                        r'telemetry_last_sent\s*=\s*"[^"]*"',
+                        f'telemetry_last_sent = "{now}"',
+                        config_text,
+                    )
+                else:
+                    new_config = config_text.rstrip() + f'\ntelemetry_last_sent = "{now}"\n'
+                config_path.write_text(new_config, encoding="utf-8")
+            except Exception:
+                pass
+
+        thread = threading.Thread(target=_send, daemon=True)
+        thread.start()
 
     @property
     def port(self) -> int:

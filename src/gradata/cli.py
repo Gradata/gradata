@@ -19,7 +19,6 @@ Usage:
 """
 from __future__ import annotations
 
-
 import argparse
 import json
 import sys
@@ -318,7 +317,7 @@ def cmd_diagnose(args):
     else:
         print("No lessons yet — need more corrections to start building procedural memory.")
 
-    print(f"\nRun 'gradata health' for a full brain health report.")
+    print("\nRun 'gradata health' for a full brain health report.")
 
 
 def cmd_correct(args):
@@ -400,7 +399,7 @@ def cmd_convergence(args):
     print(f"\n  Corrections per Session (trend: {trend})")
     print(f"  {'─' * (chart_width + 15)}")
 
-    for i, (s, c) in enumerate(zip(sessions, counts)):
+    for _i, (s, c) in enumerate(zip(sessions, counts, strict=False)):
         bar_len = int((c / max_count) * chart_width) if max_count > 0 else 0
         bar = "█" * bar_len
         print(f"  S{s:<4} │{bar} {c}")
@@ -412,7 +411,7 @@ def cmd_convergence(args):
     # Category breakdown
     by_cat = data.get("by_category", {})
     if by_cat:
-        print(f"\n  By category:")
+        print("\n  By category:")
         for cat, info in sorted(by_cat.items()):
             cat_trend = info.get("trend", "?")
             cat_total = sum(info.get("corrections_per_session", []))
@@ -537,7 +536,7 @@ def main():
                          help="Poll interval in seconds (default: 5)")
 
     # diagnose — free correction pattern diagnostic (no graduation needed)
-    p_diagnose = sub.add_parser("diagnose", help="Analyze correction patterns (free diagnostic)")
+    sub.add_parser("diagnose", help="Analyze correction patterns (free diagnostic)")
 
     # review — human-in-the-loop approval
     p_review = sub.add_parser("review", help="Review pending lessons for approval")

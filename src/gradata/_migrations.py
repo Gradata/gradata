@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import contextlib
 import sqlite3
 from pathlib import Path
-from gradata._db import get_connection
 
+from gradata._db import get_connection
 
 _BASE_TABLES: list[str] = [
     """CREATE TABLE IF NOT EXISTS events (
@@ -79,10 +80,8 @@ def run_migrations(db_path: str | Path) -> int:
     conn = get_connection(db_path)
     applied = 0
     for sql in _BASE_TABLES:
-        try:
+        with contextlib.suppress(sqlite3.OperationalError):
             conn.execute(sql)
-        except sqlite3.OperationalError:
-            pass
     for sql in _MIGRATIONS:
         try:
             conn.execute(sql)

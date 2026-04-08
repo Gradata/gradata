@@ -27,15 +27,15 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 __all__ = [
-    "ContextBracket",
-    "BracketConfig",
     "BRACKET_CONFIGS",
+    "BracketConfig",
+    "ContextBracket",
+    "ContextTracker",
+    "estimate_remaining_capacity",
+    "format_bracket_prompt",
     "get_bracket",
     "get_bracket_guidance",
-    "estimate_remaining_capacity",
     "is_action_allowed",
-    "format_bracket_prompt",
-    "ContextTracker",
 ]
 
 
@@ -232,9 +232,7 @@ def is_action_allowed(bracket: ContextBracket, action: str) -> bool:
         True if the action is permitted.
     """
     config = BRACKET_CONFIGS[bracket]
-    if action in config.prohibited_actions:
-        return False
-    return True
+    return action not in config.prohibited_actions
 
 
 def format_bracket_prompt(bracket: ContextBracket) -> str:

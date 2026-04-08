@@ -28,13 +28,13 @@ continue to classify identically.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 # ---------------------------------------------------------------------------
 # Audience Tiers
 # ---------------------------------------------------------------------------
 
-class AudienceTier(str, Enum):
+class AudienceTier(StrEnum):
     """Who the output is primarily written for.
 
     Tiers below are intentionally role-agnostic so they apply equally to

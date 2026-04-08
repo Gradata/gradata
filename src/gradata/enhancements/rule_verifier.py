@@ -13,7 +13,10 @@ import re
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Pre-execution decision tree
@@ -195,7 +198,8 @@ CREATE TABLE IF NOT EXISTS rule_verifications (
 
 
 def ensure_table(db_path: Path) -> None:
-    from gradata._db import get_connection, ensure_table as _ensure
+    from gradata._db import ensure_table as _ensure
+    from gradata._db import get_connection
     conn = get_connection(db_path)
     _ensure(conn, _CREATE_TABLE)
     conn.close()

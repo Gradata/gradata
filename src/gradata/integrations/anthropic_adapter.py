@@ -21,8 +21,10 @@ Usage:
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = logging.getLogger("gradata.integrations.anthropic")
 
@@ -83,7 +85,7 @@ def patch_anthropic(client: Any, brain_dir: str | Path = "./brain") -> Any:
 
             if ai_content:
                 brain.log_output(ai_content, output_type="chat")
-                all_msgs = messages + [{"role": "assistant", "content": ai_content}]
+                all_msgs = [*messages, {"role": "assistant", "content": ai_content}]
                 if hasattr(brain, 'observe'):
                     brain.observe(all_msgs)
         except Exception as e:

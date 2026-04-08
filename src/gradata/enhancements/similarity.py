@@ -184,7 +184,7 @@ def embedding_similarity(text1: str, text2: str) -> float | None:
     e2 = _get_embedding(text2)
     if e1 is None or e2 is None:
         return None
-    dot = sum(a * b for a, b in zip(e1, e2))
+    dot = sum(a * b for a, b in zip(e1, e2, strict=False))
     mag1 = math.sqrt(sum(a * a for a in e1))
     mag2 = math.sqrt(sum(b * b for b in e2))
     if mag1 == 0 or mag2 == 0:

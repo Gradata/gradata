@@ -12,16 +12,18 @@ Trust Dimensions:
 """
 from __future__ import annotations
 
-
 import json
 import re
 import sqlite3
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import gradata._paths as _p
-from gradata._paths import BrainContext
+
+if TYPE_CHECKING:
+    from gradata._paths import BrainContext
 
 __all__ = [
     "main",
@@ -589,7 +591,7 @@ def validate_brain(manifest_path: Path | None = None, ctx: BrainContext | None =
     return report
 
 
-def save_validation(report: dict, ctx: "BrainContext | None" = None):
+def save_validation(report: dict, ctx: BrainContext | None = None):
     """Save validation report to brain/validations/."""
     brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
     validations_dir = brain_dir / "validations"

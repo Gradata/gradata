@@ -113,9 +113,7 @@ _get_prospect_names = _get_entity_names
 def _quality_gate(fact_type, fact_value):
     if not fact_value or len(fact_value.strip()) < MIN_FACT_LENGTH:
         return False
-    if fact_type not in VALID_FACT_TYPES:
-        return False
-    return True
+    return fact_type in VALID_FACT_TYPES
 
 
 def _clean_value(val):

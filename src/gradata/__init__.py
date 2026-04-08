@@ -32,17 +32,18 @@ if _log_level in ("DEBUG", "INFO", "WARNING", "ERROR"):
     )
     _logging.getLogger("gradata").setLevel(getattr(_logging, _log_level))
 
-from gradata._paths import BrainContext
-from gradata.enhancements.self_improvement import (
+from gradata._paths import BrainContext  # noqa: E402
+from gradata._types import Lesson, LessonState, RuleTransferScope  # noqa: E402
+from gradata.brain import Brain  # noqa: E402
+from gradata.context_wrapper import brain_context  # noqa: E402
+from gradata.enhancements.self_improvement import (  # noqa: E402
     compute_learning_velocity,
     format_lessons,
     graduate,
     parse_lessons,
     update_confidence,
 )
-from gradata._types import Lesson, LessonState, RuleTransferScope
-from gradata.brain import Brain
-from gradata.exceptions import (
+from gradata.exceptions import (  # noqa: E402
     BrainError,
     BrainNotFoundError,
     EmbeddingError,
@@ -51,20 +52,24 @@ from gradata.exceptions import (
     TaxonomyError,
     ValidationError,
 )
-from gradata.context_wrapper import brain_context
-from gradata.onboard import onboard
+from gradata.onboard import onboard  # noqa: E402
 
 __all__ = [
     # Core API
     "Brain",
     "BrainContext",
+    "BrainError",
+    "BrainNotFoundError",
+    "EmbeddingError",
+    "EventPersistenceError",
+    "ExportError",
     "Lesson",
     "LessonState",
     "RuleTransferScope",
+    "TaxonomyError",
+    "ValidationError",
     "__version__",
-    # One-line wrapper
     "brain_context",
-    # Graduation pipeline
     "compute_learning_velocity",
     "format_lessons",
     "graduate",

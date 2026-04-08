@@ -225,9 +225,8 @@ def validate_tag(tag: str, strict: bool = False) -> tuple[bool, str]:
             return False, f"Unknown tag prefix: {prefix}"
         return True, f"Unknown prefix (allowed in non-strict): {prefix}"
     spec = TAXONOMY[prefix]
-    if spec["mode"] == "closed":
-        if value not in spec["values"]:
-            return False, f"Invalid {prefix} value: {value}. Valid: {sorted(spec['values'])}"
+    if spec["mode"] == "closed" and value not in spec["values"]:
+        return False, f"Invalid {prefix} value: {value}. Valid: {sorted(spec['values'])}"
     if spec["mode"] == "dynamic" and prefix in ("prospect", "entity", "candidate", "customer"):
         known = _get_entity_names()
         if known and value not in known:

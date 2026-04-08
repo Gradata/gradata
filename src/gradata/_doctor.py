@@ -11,7 +11,6 @@ Usage:
 """
 from __future__ import annotations
 
-
 import json
 import os
 import shutil
@@ -207,10 +206,7 @@ def diagnose(brain_dir: str | Path | None = None) -> dict:
         }
     """
     # Resolve brain path
-    if brain_dir:
-        brain_path = Path(brain_dir).resolve()
-    else:
-        brain_path = _resolve_brain_path()
+    brain_path = Path(brain_dir).resolve() if brain_dir else _resolve_brain_path()
 
     checks = [
         _check_python_version(),
