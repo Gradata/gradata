@@ -206,13 +206,14 @@ def trace_rule(
         try:
             with sqlite3.connect(str(db)) as conn:
                 conn.row_factory = sqlite3.Row
+                # Query by description[:100] to match how transitions are stored
                 rows = conn.execute(
                     """SELECT old_state, new_state, confidence, fire_count,
                               session, transitioned_at
                        FROM lesson_transitions
                        WHERE lesson_desc = ? AND category = ?
                        ORDER BY transitioned_at""",
-                    (target.description, target.category),
+                    (target.description[:100], target.category),
                 ).fetchall()
                 transitions = [dict(r) for r in rows]
         except Exception as e:

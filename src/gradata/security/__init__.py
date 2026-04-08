@@ -1,8 +1,11 @@
 """Security utilities for Gradata SDK."""
 
+from __future__ import annotations
+
 from gradata.security.score_obfuscation import (
     obfuscate_instruction,
     truncate_score,
+    constant_time_pad,
 )
 from gradata.security.brain_salt import (
     generate_brain_salt,
@@ -19,6 +22,7 @@ from gradata.security.correction_provenance import (
 __all__ = [
     "truncate_score",
     "obfuscate_instruction",
+    "constant_time_pad",
     "generate_brain_salt",
     "load_or_create_salt",
     "salt_threshold",

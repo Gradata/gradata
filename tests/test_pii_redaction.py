@@ -155,14 +155,19 @@ class TestBrainCorrectPiiIntegration:
         assert "[REDACTED_EMAIL]" in stored_draft
 
     def test_behavioral_extraction_uses_full_text(self, brain):
-        """Extraction should work on the full unredacted text, so
-        classifications/summary still reference meaningful content."""
+        """Extraction should produce meaningful classification from unredacted text,
+        and redacted input should produce weaker results."""
         draft = "Contact alice@notify.com for the credentials"
         final = "Contact the client for access credentials"
         result = brain.correct(draft, final)
         # Should still produce valid classifications from the full diff
         assert "classifications" in result
-        assert result.get("data", {}).get("severity") != "unknown"
+        severity = result.get("data", {}).get("severity", "unknown")
+        assert severity != "unknown"
+        # Control: pre-redacted draft should still classify but may differ
+        redacted_draft = "Contact [REDACTED_EMAIL] for the credentials"
+        result_redacted = brain.correct(redacted_draft, final)
+        assert "classifications" in result_redacted
 
     def test_key_redacted_in_event(self, brain):
         """Credential patterns in draft text must not leak to storage."""

@@ -116,16 +116,24 @@ class TestDocstring:
     def test_docstring_mentions_min_applications(self) -> None:
         doc = graduate.__doc__
         assert doc is not None, "graduate() has no docstring"
-        # Must mention the 3-fire requirement
-        assert "3" in doc or "MIN_APPLICATIONS" in doc, (
-            "Docstring does not document the 3-fire requirement"
+        # Must mention the exact fire-count thresholds
+        assert "fire_count >= 3" in doc or "MIN_APPLICATIONS_FOR_PATTERN" in doc, (
+            "Docstring does not document the 3-fire requirement for PATTERN"
+        )
+        assert "fire_count >= 5" in doc or "MIN_APPLICATIONS_FOR_RULE" in doc, (
+            "Docstring does not document the 5-fire requirement for RULE"
         )
 
     def test_docstring_mentions_pattern_and_rule_thresholds(self) -> None:
         doc = graduate.__doc__
         assert doc is not None
-        assert "PATTERN" in doc
-        assert "RULE" in doc
+        # Must mention the specific transitions
+        assert "INSTINCT -> PATTERN" in doc or "INSTINCT → PATTERN" in doc, (
+            "Docstring must document INSTINCT -> PATTERN transition"
+        )
+        assert "PATTERN -> RULE" in doc or "PATTERN → RULE" in doc, (
+            "Docstring must document PATTERN -> RULE transition"
+        )
 
 
 class TestConfidenceJumpWarning:

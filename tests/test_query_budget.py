@@ -1,6 +1,6 @@
 """Tests for sliding-window query budgeting."""
 
-import time
+from unittest.mock import patch
 
 import pytest
 
@@ -38,28 +38,46 @@ class TestBurstDetection:
     """detect_anomalies flags bursts when recent rate > 3x average."""
 
     def test_burst_detected(self):
-        qb = QueryBudget(window_seconds=300, max_calls=1000)
+        """Simulate slow calls then a fast burst using mocked time."""
+        _clock = [0.0]
 
-        # 10 slow calls spread across ~2s (5 calls/sec average)
-        for _ in range(10):
-            qb.record("ep")
-            time.sleep(0.2)
+        def _monotonic():
+            return _clock[0]
 
-        # 50 fast calls in a tight burst (>>15 calls/sec)
-        for _ in range(50):
-            qb.record("ep")
+        with patch("gradata.security.query_budget.time") as mock_time:
+            mock_time.monotonic = _monotonic
+            qb = QueryBudget(window_seconds=300, max_calls=1000)
 
-        result = qb.detect_anomalies("ep")
-        assert result["burst"] is True
+            # 10 slow calls spread across 2s
+            for _ in range(10):
+                qb.record("ep")
+                _clock[0] += 0.2
+
+            # 50 fast calls in a tight burst
+            for _ in range(50):
+                qb.record("ep")
+                _clock[0] += 0.001
+
+            result = qb.detect_anomalies("ep")
+            assert result["burst"] is True
 
     def test_no_false_positive_on_normal_usage(self):
-        qb = QueryBudget(window_seconds=300, max_calls=1000)
-        # 20 calls at a steady pace
-        for _ in range(20):
-            qb.record("ep")
-            time.sleep(0.02)
-        result = qb.detect_anomalies("ep")
-        assert result["burst"] is False
+        """Steady-pace calls should not trigger burst detection."""
+        _clock = [0.0]
+
+        def _monotonic():
+            return _clock[0]
+
+        with patch("gradata.security.query_budget.time") as mock_time:
+            mock_time.monotonic = _monotonic
+            qb = QueryBudget(window_seconds=300, max_calls=1000)
+
+            for _ in range(20):
+                qb.record("ep")
+                _clock[0] += 0.02
+
+            result = qb.detect_anomalies("ep")
+            assert result["burst"] is False
 
     def test_below_minimum_calls_no_burst(self):
         qb = QueryBudget(window_seconds=300, max_calls=1000)
@@ -73,8 +91,37 @@ class TestWindowExpiry:
     """Expired timestamps are pruned and count drops to 0."""
 
     def test_window_expiry(self):
-        qb = QueryBudget(window_seconds=1, max_calls=100)
-        qb.record("ep")
-        assert qb.count("ep") == 1
-        time.sleep(1.1)
-        assert qb.count("ep") == 0
+        """Use mocked time to simulate window expiry without sleeping."""
+        _clock = [0.0]
+
+        def _monotonic():
+            return _clock[0]
+
+        with patch("gradata.security.query_budget.time") as mock_time:
+            mock_time.monotonic = _monotonic
+            qb = QueryBudget(window_seconds=1, max_calls=100)
+            qb.record("ep")
+            assert qb.count("ep") == 1
+
+            _clock[0] += 1.1  # Advance past the 1s window
+            assert qb.count("ep") == 0
+
+
+class TestInitValidation:
+    """Constructor rejects invalid parameters."""
+
+    def test_rejects_zero_window(self):
+        with pytest.raises(ValueError, match="positive"):
+            QueryBudget(window_seconds=0)
+
+    def test_rejects_negative_window(self):
+        with pytest.raises(ValueError, match="positive"):
+            QueryBudget(window_seconds=-1)
+
+    def test_rejects_negative_max_calls(self):
+        with pytest.raises(ValueError, match="non-negative"):
+            QueryBudget(max_calls=-1)
+
+    def test_accepts_zero_max_calls(self):
+        qb = QueryBudget(max_calls=0)
+        assert qb.max_calls == 0

@@ -22,6 +22,10 @@ class QueryBudget:
     """
 
     def __init__(self, window_seconds: float = 300, max_calls: int = 500) -> None:
+        if window_seconds <= 0:
+            raise ValueError(f"window_seconds must be positive, got {window_seconds}")
+        if max_calls < 0:
+            raise ValueError(f"max_calls must be non-negative, got {max_calls}")
         self.window_seconds = window_seconds
         self.max_calls = max_calls
         self._calls: dict[str, deque[float]] = defaultdict(deque)
@@ -113,3 +117,5 @@ class QueryBudget:
         # Binary-ish fast path: timestamps are monotonically ordered
         while calls and calls[0] < cutoff:
             calls.popleft()
+        if not calls:
+            self._calls.pop(endpoint, None)

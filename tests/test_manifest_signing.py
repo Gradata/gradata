@@ -55,3 +55,9 @@ class TestVerifyManifest:
 
     def test_missing_signature_returns_false(self):
         assert verify_manifest(SAMPLE_MANIFEST, SALT) is False
+
+    def test_malformed_signature_type_returns_false(self):
+        """Non-string signature types should fail closed."""
+        for bad_sig in [42, {"key": "val"}, ["sig"], None, True]:
+            manifest = dict(SAMPLE_MANIFEST, signature=bad_sig)
+            assert verify_manifest(manifest, SALT) is False

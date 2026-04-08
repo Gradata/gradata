@@ -32,6 +32,8 @@ def truncate_score(confidence: float) -> str:
     Returns:
         Tier label string.
     """
+    if not (0.0 <= confidence <= 1.0):
+        raise ValueError(f"confidence must be in [0.0, 1.0], got {confidence}")
     if confidence >= 0.90:
         return "RULE"
     if confidence >= 0.60:
@@ -69,6 +71,8 @@ def constant_time_pad(fn, min_ms: float = 20.0, jitter_ms: float = 5.0):
     Returns:
         Whatever *fn* returns.
     """
+    if min_ms < 0 or jitter_ms < 0:
+        raise ValueError("min_ms and jitter_ms must be non-negative")
     start = time.perf_counter()
     result = fn()
     elapsed_ms = (time.perf_counter() - start) * 1000

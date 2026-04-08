@@ -17,6 +17,10 @@ def sign_manifest(manifest: dict, salt: str) -> dict:
 
     The original *manifest* is never mutated.
     """
+    if not isinstance(manifest, dict):
+        raise TypeError("manifest must be a dict")
+    if not isinstance(salt, str) or not salt.strip():
+        raise ValueError("salt must be a non-empty string")
     payload = _canonical_payload(manifest)
     sig = hmac.new(salt.encode(), payload, hashlib.sha256).hexdigest()
     signed = dict(manifest)
@@ -32,7 +36,7 @@ def verify_manifest(manifest: dict, salt: str) -> bool:
     Uses ``hmac.compare_digest`` for timing-safe comparison.
     """
     stored_sig = manifest.get("signature")
-    if not stored_sig:
+    if not isinstance(stored_sig, str) or not stored_sig:
         return False
 
     payload = _canonical_payload(manifest)

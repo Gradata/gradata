@@ -32,7 +32,7 @@ def _load_lessons_from_path(lessons_path: Path | str) -> list[Lesson]:
 
 def _lesson_to_dict(lesson: Lesson) -> dict:
     """Convert a Lesson dataclass to a serializable dict with a stable ID."""
-    return {
+    d = {
         "id": _make_rule_id(lesson),
         "date": lesson.date,
         "state": lesson.state.value,
@@ -45,6 +45,9 @@ def _lesson_to_dict(lesson: Lesson) -> dict:
         "misfire_count": lesson.misfire_count,
         "correction_event_ids": lesson.correction_event_ids,
     }
+    if hasattr(lesson, "metadata") and lesson.metadata is not None:
+        d["metadata"] = lesson.metadata.to_dict() if hasattr(lesson.metadata, "to_dict") else lesson.metadata
+    return d
 
 
 # ---------------------------------------------------------------------------

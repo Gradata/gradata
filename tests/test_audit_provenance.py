@@ -28,12 +28,12 @@ SAMPLE_LESSONS = textwrap.dedent("""\
     [2026-01-15] [RULE:0.95] DRAFTING: Never use em dashes in email prose
       Root cause: User corrected em dashes 8 times across sessions
       Fire count: 12 | Sessions since fire: 1 | Misfires: 0
-      Correction event IDs: evt_abc123, evt_def456
+      Corrections: evt_abc123, evt_def456
 
     [2026-02-10] [PATTERN:0.72] ACCURACY: Always verify data before sending
       Root cause: Sent unverified stats in demo prep
       Fire count: 5 | Sessions since fire: 3 | Misfires: 1
-      Correction event IDs: evt_ghi789
+      Corrections: evt_ghi789
 
     [2026-03-01] [INSTINCT:0.42] PROCESS: Check calendar before scheduling
       Root cause: Double-booked a meeting
@@ -117,11 +117,16 @@ class TestRuleProvenanceTable:
     def test_table_exists_after_migration(self, brain_dir: Path) -> None:
         """rule_provenance table should exist after migrations run."""
         from gradata._migrations import run_migrations
-        # Run migrations on our test DB (table already created in fixture,
-        # but verify migrations don't break it)
-        run_migrations(brain_dir / "system.db")
+        # Drop the table first so we verify migrations actually create it
+        db_path = brain_dir / "system.db"
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("DROP TABLE IF EXISTS rule_provenance")
+        conn.commit()
+        conn.close()
 
-        conn = sqlite3.connect(str(brain_dir / "system.db"))
+        run_migrations(db_path)
+
+        conn = sqlite3.connect(str(db_path))
         cursor = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='rule_provenance'"
         )

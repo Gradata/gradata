@@ -44,6 +44,12 @@ from gradata.security.score_obfuscation import truncate_score
 
 _log = logging.getLogger(__name__)
 
+
+def _tier_label(lesson: Lesson) -> str:
+    """Return the display tier for a lesson — state name if available, else confidence bucket."""
+    return lesson.state.value if lesson.state else truncate_score(lesson.confidence)
+
+
 # ---------------------------------------------------------------------------
 # Data Model
 # ---------------------------------------------------------------------------
@@ -288,9 +294,8 @@ def compute_scope_weight(
 def _make_rule_id(lesson: Lesson) -> str:
     """Derive a stable, opaque rule identifier from a lesson.
 
-    Format: ``"CATEGORY:NNNN"`` where NNNN is a 4-digit decimal derived
-    from the description hash modulo 10 000.  Collisions are possible but
-    rare enough for the current scale.
+    Format: ``"CATEGORY:HHHHHHHH"`` where HHHHHHHH is an 8-char hex
+    digest of category+description for global uniqueness.
 
     Args:
         lesson: Source lesson.
@@ -298,8 +303,10 @@ def _make_rule_id(lesson: Lesson) -> str:
     Returns:
         Rule identifier string.
     """
-    desc_hash = int(hashlib.sha256(lesson.description.encode()).hexdigest(), 16)
-    return f"{lesson.category}:{desc_hash % 10000:04d}"
+    digest = hashlib.sha256(
+        f"{lesson.category}:{lesson.description}".encode()
+    ).hexdigest()[:8]
+    return f"{lesson.category}:{digest}"
 
 
 # ---------------------------------------------------------------------------
@@ -646,7 +653,7 @@ def apply_rules(
     applied: list[AppliedRule] = []
     for lesson, relevance in scored[:max_rules]:
         rule_id = _make_rule_id(lesson)
-        tier_label = truncate_score(lesson.confidence)
+        tier_label = _tier_label(lesson)
         instruction = (
             f"[{tier_label}]"
             f" {lesson.category}: {lesson.description}"
@@ -688,7 +695,7 @@ def merge_related_rules(rules: list[AppliedRule], min_group_size: int = 2) -> li
         best = max(group, key=lambda r: r.lesson.confidence)
         descriptions = [r.lesson.description for r in group]
         merged_desc = ". ".join(d.rstrip(".") for d in descriptions) + "."
-        merged_tier = truncate_score(best.lesson.confidence)
+        merged_tier = _tier_label(best.lesson)
         merged_instruction = f"[{merged_tier}] {cat}: {merged_desc}"
         merged_rule = AppliedRule(
             rule_id=f"merged_{cat.lower()}",

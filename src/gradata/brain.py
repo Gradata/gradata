@@ -47,7 +47,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger("gradata")
 
 
-class Brain:
+from gradata.brain_inspection import BrainInspectionMixin
+
+
+class Brain(BrainInspectionMixin):
     """A personal AI brain backed by a directory of knowledge files."""
 
     def __init__(self, brain_dir: str | Path, working_dir: str | Path | None = None,
@@ -429,6 +432,7 @@ class Brain:
         self._query_budget.record("apply_rules")
         if self._query_budget.is_rate_exceeded("apply_rules"):
             logger.warning("Query budget exceeded for apply_rules")
+            return ""  # enforce: block injection when budget exhausted
         if self._cloud and self._cloud.connected:
             try:
                 return self._cloud.apply_rules(task, context)
@@ -465,27 +469,77 @@ class Brain:
 
     # ── Lesson Management ──────────────────────────────────────────────
 
-    def forget(self, description: str | None = None, category: str | None = None) -> int:
-        """Remove lessons matching description or category."""
-        if not description and not category:
-            raise ValueError("Provide at least one of description or category")
-        lessons_path = self._find_lessons_path()
-        if not lessons_path or not lessons_path.is_file():
-            return 0
+    def forget(self, what: str = "last") -> dict | list[dict]:
+        """Human-friendly way to undo lessons.
+
+        Examples:
+            brain.forget("last")           # most recent lesson
+            brain.forget("last 3")         # last 3 lessons
+            brain.forget("casual tone")    # fuzzy match description
+            brain.forget("all tone")       # everything in TONE category
+        """
         try:
             from gradata.enhancements.self_improvement import parse_lessons, format_lessons
         except ImportError:
-            return 0
+            return {"rolled_back": False, "error": "enhancements not installed"}
+        from gradata._types import LessonState
+        from gradata._db import write_lessons_safe
+
+        lessons_path = self._find_lessons_path()
+        if not lessons_path or not lessons_path.is_file():
+            return {"rolled_back": False, "error": "no lessons file"}
         lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
-        before = len(lessons)
-        filtered = [l for l in lessons if not (
-            (description and description.lower() in l.description.lower()) or
-            (category and l.category.upper() == category.upper()))]
-        removed = before - len(filtered)
-        if removed > 0:
-            from gradata._db import write_lessons_safe
-            write_lessons_safe(lessons_path, format_lessons(filtered))
-        return removed
+
+        what = what.strip()
+        wl = what.lower()
+
+        # Resolve target indices
+        active = [(i, l) for i, l in enumerate(lessons)
+                  if l.state in (LessonState.INSTINCT, LessonState.PATTERN, LessonState.RULE)]
+        targets: list[int] = []
+
+        if wl == "last" or wl.startswith("last "):
+            parts = wl.split()
+            n = int(parts[1]) if len(parts) == 2 and parts[1].isdigit() else 1
+            if not active:
+                return {"rolled_back": False, "error": "no active lessons"}
+            targets = [i for i, _ in active[-n:]]
+
+        elif wl.startswith("all "):
+            cat = what[4:].strip()
+            targets = [i for i, l in active if l.category.upper() == cat.upper()]
+            if not targets:
+                return {"rolled_back": False, "error": f"no active lessons in '{cat}'"}
+
+        else:
+            # Fuzzy match on description — single target
+            return self.rollback(description=what)
+
+        # Batch kill: mutate in memory, write once
+        results = []
+        for idx in targets:
+            lesson = lessons[idx]
+            old_state, old_conf = lesson.state.value, lesson.confidence
+            lesson.state, lesson.confidence = LessonState.KILLED, 0.0
+            results.append({"rolled_back": True, "lesson_index": idx,
+                            "category": lesson.category, "description": lesson.description,
+                            "previous_state": old_state, "previous_confidence": old_conf})
+        write_lessons_safe(lessons_path, format_lessons(lessons))
+
+        for r in results:
+            try:
+                self.emit("LESSON_CHANGE", "brain.forget", {
+                    "action": "rolled_back", "lesson_index": r["lesson_index"],
+                    "lesson_category": r["category"],
+                    "lesson_description": r["description"][:200],
+                    "previous_state": r["previous_state"],
+                    "previous_confidence": r["previous_confidence"],
+                    "kill_reason": "manual_forget",
+                }, [f"category:{r['category']}", "rollback"], 0)
+            except Exception:
+                pass
+
+        return results[0] if len(results) == 1 else results
 
     def rollback(self, lesson_id: int | None = None, description: str | None = None,
                  category: str | None = None) -> dict:
@@ -707,137 +761,10 @@ class Brain:
         from gradata._core import brain_export_skills
         return brain_export_skills(self, output_dir=output_dir, min_state=min_state)
 
-    # ── Rule Inspection API ────────────────────────────────────────────
-
-    def rules(self, *, include_all: bool = False, category: str | None = None) -> list[dict]:
-        """List graduated brain rules. See gradata.inspection.list_rules."""
-        from gradata.inspection import list_rules
-        return list_rules(db_path=self.db_path,
-                          lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
-                          include_all=include_all, category=category)
-
-    def explain(self, rule_id: str) -> dict:
-        """Trace a rule to its source corrections. See gradata.inspection.explain_rule."""
-        from gradata.inspection import explain_rule
-        return explain_rule(db_path=self.db_path,
-                            events_path=self.ctx.events_jsonl if hasattr(self.ctx, "events_jsonl") else self.dir / "events.jsonl",
-                            rule_id=rule_id,
-                            lessons_path=self._find_lessons_path() or self.dir / "lessons.md")
-
-    def trace(self, rule_id: str) -> dict:
-        """Trace a rule's full provenance chain. See gradata.audit.trace_rule."""
-        from gradata.audit import trace_rule
-        return trace_rule(
-            db_path=self.db_path,
-            events_path=self.ctx.events_jsonl if hasattr(self.ctx, "events_jsonl") else self.dir / "events.jsonl",
-            lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
-            rule_id=rule_id,
-        )
-
-    def export_data(self, *, output_format: str = "json") -> str:
-        """Export rules as JSON or YAML. See gradata.inspection.export_rules."""
-        from gradata.inspection import export_rules
-        return export_rules(db_path=self.db_path,
-                            lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
-                            output_format=output_format)
-
-    # ── Batch Approval at Session End ─────────────────────────────────
-
-    def pending_promotions(self) -> list[dict]:
-        """List rules that have graduated (PATTERN or RULE state).
-
-        Silent during work — call at session end to review what graduated.
-        Returns list of rule dicts with id, category, state, confidence, etc.
-        """
-        from gradata.inspection import list_rules
-        return list_rules(
-            db_path=self.db_path,
-            lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
-        )
-
-    def approve_promotion(self, rule_id: str) -> dict:
-        """Explicitly endorse a graduated rule.
-
-        No-op on data — the rule already passed threshold and is persisted.
-        Emits a 'promotion.approved' event for audit trail.
-
-        Args:
-            rule_id: Stable rule ID from pending_promotions().
-
-        Returns:
-            {"approved": True} on success, {"error": "..."} if not found.
-        """
-        from gradata.inspection import _make_rule_id, _load_lessons_from_path
-
-        lessons_path = self._find_lessons_path() or self.dir / "lessons.md"
-        lessons = _load_lessons_from_path(lessons_path)
-        target = None
-        for lesson in lessons:
-            if _make_rule_id(lesson) == rule_id:
-                target = lesson
-                break
-        if target is None:
-            return {"error": f"Rule not found: {rule_id}"}
-
-        try:
-            self.bus.emit("promotion.approved", {
-                "rule_id": rule_id,
-                "category": target.category,
-                "description": target.description[:200],
-                "state": target.state.value,
-                "confidence": target.confidence,
-            })
-        except Exception as e:
-            logger.debug("promotion.approved emit failed: %s", e)
-
-        return {"approved": True}
-
-    def reject_promotion(self, rule_id: str) -> dict:
-        """Reject a graduated rule — demotes back to INSTINCT with confidence 0.40.
-
-        Rewrites lessons file with the demoted lesson. Emits 'promotion.rejected'.
-
-        Args:
-            rule_id: Stable rule ID from pending_promotions().
-
-        Returns:
-            {"rejected": True, "demoted_from": old_state} on success,
-            {"error": "..."} if not found.
-        """
-        from gradata.inspection import _make_rule_id, _load_lessons_from_path
-        from gradata.enhancements.self_improvement import format_lessons
-        from gradata._db import write_lessons_safe
-        from gradata._types import LessonState
-
-        lessons_path = self._find_lessons_path() or self.dir / "lessons.md"
-        lessons = _load_lessons_from_path(lessons_path)
-        target = None
-        for lesson in lessons:
-            if _make_rule_id(lesson) == rule_id:
-                target = lesson
-                break
-        if target is None:
-            return {"error": f"Rule not found: {rule_id}"}
-
-        old_state = target.state.value
-        target.state = LessonState.INSTINCT
-        target.confidence = 0.40
-
-        write_lessons_safe(lessons_path, format_lessons(lessons))
-
-        try:
-            self.bus.emit("promotion.rejected", {
-                "rule_id": rule_id,
-                "category": target.category,
-                "description": target.description[:200],
-                "demoted_from": old_state,
-                "new_state": "INSTINCT",
-                "confidence": 0.40,
-            })
-        except Exception as e:
-            logger.debug("promotion.rejected emit failed: %s", e)
-
-        return {"rejected": True, "demoted_from": old_state}
+    # ── Rule Inspection API + Batch Approval ─────────────────────────
+    # Provided by BrainInspectionMixin (brain_inspection.py):
+    #   rules(), explain(), trace(), export_data(),
+    #   pending_promotions(), approve_promotion(), reject_promotion()
 
     # ── Events ─────────────────────────────────────────────────────────
 

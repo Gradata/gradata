@@ -16,18 +16,18 @@ _PII_PATTERNS: list[tuple[str, str, re.Pattern[str]]] = [
     ("openai_api_key", "[REDACTED_OPENAI_KEY]",
      re.compile(r"sk-(?:proj-)?[A-Za-z0-9_-]{20,}")),
     ("github_token", "[REDACTED_GITHUB_TOKEN]",
-     re.compile(r"ghp_[A-Za-z0-9]{20,}")),
+     re.compile(r"(?:ghp_|github_pat_)[A-Za-z0-9_]{20,}")),
     ("slack_token", "[REDACTED_SLACK_TOKEN]",
-     re.compile(r"xoxb-[A-Za-z0-9\-]{20,}")),
+     re.compile(r"(?:xoxb|xoxp|xapp|xwfp)-[A-Za-z0-9\-]{20,}")),
     ("aws_access_key", "[REDACTED_AWS_KEY]",
      re.compile(r"AKIA[A-Z0-9]{16}")),
     ("google_api_key", "[REDACTED_GOOGLE_KEY]",
      re.compile(r"AIza[A-Za-z0-9_-]{35}")),
     ("gitlab_token", "[REDACTED_GITLAB_TOKEN]",
      re.compile(r"glpat-[A-Za-z0-9_-]{20,}")),
-    # Credit card numbers (13-19 digits, optional separators)
+    # Credit card numbers (4-4-4-4 grouped format only to avoid false positives)
     ("credit_card", "[REDACTED_CC]",
-     re.compile(r"\b(?:\d[ -]*?){13,19}\b")),
+     re.compile(r"\b(?:\d{4}[- ]){3}\d{4}\b")),
     # SSN (xxx-xx-xxxx)
     ("ssn", "[REDACTED_SSN]",
      re.compile(r"\b\d{3}-\d{2}-\d{4}\b")),

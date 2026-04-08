@@ -30,6 +30,14 @@ def create_provenance_record(
     Returns:
         Dict with user_id, correction_hash, session, timestamp, and hmac.
     """
+    if not user_id or not user_id.strip():
+        raise ValueError("user_id must be a non-empty string")
+    if not correction_hash or not correction_hash.strip():
+        raise ValueError("correction_hash must be a non-empty string")
+    if not isinstance(session, int) or session < 0:
+        raise ValueError(f"session must be a non-negative integer, got {session!r}")
+    if not salt or not salt.strip():
+        raise ValueError("salt must be a non-empty string")
     timestamp = datetime.now(timezone.utc).isoformat()
     message = f"{user_id}|{correction_hash}|{session}|{timestamp}"
     signature = hmac.new(

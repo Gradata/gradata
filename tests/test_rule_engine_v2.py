@@ -387,7 +387,7 @@ class TestMakeRuleId:
         lesson = _make_lesson(category="DRAFTING", description="Test rule")
         rule_id = _make_rule_id(lesson)
         assert rule_id.startswith("DRAFTING:")
-        assert len(rule_id.split(":")[1]) == 4
+        assert len(rule_id.split(":")[1]) == 8
 
     def test_deterministic(self):
         lesson = _make_lesson(description="Same desc")

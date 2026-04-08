@@ -241,8 +241,15 @@ class TestRulesPersistWithoutReview:
 
     def test_unreviewed_rules_survive_end_session(self, brain):
         """After end_session, graduated rules still exist even without review."""
-        before_count = len(brain.pending_promotions())
+        before = brain.pending_promotions()
+        before_ids = {r["id"] for r in before}
+        assert len(before_ids) > 0
+
         brain.end_session()
-        # Rules may change state during graduation sweep, but they persist
+
+        # Same rule IDs should still be present in the full rule set
         all_rules = brain.rules(include_all=True)
-        assert len(all_rules) > 0
+        after_ids = {r["id"] for r in all_rules}
+        assert before_ids.issubset(after_ids), (
+            f"Missing rules after end_session: {before_ids - after_ids}"
+        )

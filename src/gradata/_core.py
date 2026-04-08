@@ -94,6 +94,13 @@ def brain_correct(
     if session is not None and (not isinstance(session, int) or session < 1):
         raise ValueError(f"session must be a positive integer, got {session!r}")
 
+    # Normalize and validate scope
+    _VALID_SCOPES = {"domain", "one_off", "universal", "project"}
+    if scope is not None:
+        scope = str(scope).strip().lower() or None
+        if scope is not None and scope not in _VALID_SCOPES:
+            raise ValueError(f"Unsupported correction scope: {scope!r}. Must be one of {_VALID_SCOPES}")
+
     # Route to cloud if connected
     if brain._cloud and brain._cloud.connected:
         try:
@@ -329,7 +336,8 @@ def brain_correct(
                 correction_data = [{"category": cat, "severity_label": diff.severity, "description": desc}]
                 severity_data = {cat: diff.severity}
                 existing_lessons = update_confidence(
-                    existing_lessons, correction_data, severity_data=severity_data)
+                    existing_lessons, correction_data, severity_data=severity_data,
+                    salt=getattr(brain, "_brain_salt", ""))
 
                 from gradata._db import write_lessons_safe
                 write_lessons_safe(lessons_path, format_lessons(existing_lessons))
@@ -406,13 +414,20 @@ def brain_correct(
     # Correction provenance — HMAC-signed proof of who corrected what
     try:
         import hashlib as _hashlib
+        import json
         from gradata.security.correction_provenance import create_provenance_record
-        correction_hash = _hashlib.sha256(f"{draft}|{final}".encode()).hexdigest()
+        correction_hash = _hashlib.sha256(
+            json.dumps([draft, final], separators=(",", ":")).encode()
+        ).hexdigest()
         user_id = context.get("user_id", "unknown") if context else "unknown"
+        _prov_salt = getattr(brain, "_brain_salt", "")
+        if not _prov_salt:
+            _log.warning("brain._brain_salt is empty; skipping provenance HMAC")
+            raise ValueError("empty salt")
         provenance = create_provenance_record(
             user_id=user_id, correction_hash=correction_hash,
             session=session or 0,
-            salt=getattr(brain, "_brain_salt", ""),
+            salt=_prov_salt,
         )
         event["provenance"] = provenance
     except Exception:
@@ -461,7 +476,8 @@ def brain_end_session(
 
         lessons = update_confidence(
             lessons, session_corrections or [],
-            session_type=session_type, machine_mode=machine_mode)
+            session_type=session_type, machine_mode=machine_mode,
+            salt=getattr(brain, "_brain_salt", ""))
 
         # Auto-detect machine mode: human sessions rarely exceed 30 corrections.
         # Previous threshold of 10 misclassified productive human sessions.

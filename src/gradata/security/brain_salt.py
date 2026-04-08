@@ -26,16 +26,31 @@ def load_or_create_salt(brain_dir: str | Path) -> str:
     Returns the 64-char hex salt string.  The file is created atomically
     on first call and reused on subsequent calls (idempotent).
     """
+    import os as _os
+
     brain_dir = Path(brain_dir)
+    brain_dir.mkdir(parents=True, exist_ok=True)
     salt_path = brain_dir / ".brain_salt"
 
+    # Fast path: file already exists and is valid
+    if salt_path.is_file():
+        content = salt_path.read_text(encoding="utf-8").strip()
+        if len(content) == 64:
+            return content
+
+    # Create atomically via temp file + rename
+    salt = generate_brain_salt()
+    tmp_path = salt_path.with_suffix(".tmp")
     try:
-        with open(salt_path, "x", encoding="utf-8") as f:
-            salt = generate_brain_salt()
+        with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(salt)
-        return salt
-    except FileExistsError:
-        return salt_path.read_text(encoding="utf-8").strip()
+            f.flush()
+            _os.fsync(f.fileno())
+        _os.replace(str(tmp_path), str(salt_path))
+    except OSError:
+        # Fallback: direct write
+        salt_path.write_text(salt, encoding="utf-8")
+    return salt
 
 
 def salt_threshold(base: float, salt: str, tier_name: str) -> float:

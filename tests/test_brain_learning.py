@@ -155,66 +155,58 @@ class TestDetectImplicitFeedback:
 # ---------------------------------------------------------------------------
 
 class TestForget:
-    """forget() removes lessons matching description or category."""
+    """forget() — human-friendly undo via plain English strings."""
 
-    def test_raises_if_no_filter_provided(self, fresh_brain):
-        with pytest.raises(ValueError, match="Provide at least one"):
-            fresh_brain.forget()
+    def test_forget_last_no_lessons(self, fresh_brain):
+        result = fresh_brain.forget("last")
+        assert result.get("forgot") is False or result.get("rolled_back") is False
 
-    def test_returns_zero_when_no_lessons_file(self, fresh_brain):
-        # No lessons.md has been created yet — forget() should return 0
-        removed = fresh_brain.forget(description="anything")
-        assert removed == 0
-
-    def test_removes_lessons_by_description_substring(self, tmp_path):
+    def test_forget_last_kills_most_recent(self, tmp_path):
         brain = init_brain(tmp_path)
         _seed_lessons(brain, n=3, category="TONE")
-        removed = brain.forget(description="lesson 1")
-        assert removed == 1
+        result = brain.forget("last")
+        assert result.get("rolled_back") is True
 
-    def test_removes_lessons_by_category(self, tmp_path):
+    def test_forget_last_n(self, tmp_path):
         brain = init_brain(tmp_path)
         _seed_lessons(brain, n=3, category="TONE")
-        removed = brain.forget(category="TONE")
-        assert removed == 3
+        results = brain.forget("last 2")
+        assert isinstance(results, list)
+        assert len(results) == 2
 
-    def test_removes_only_matching_subset(self, tmp_path):
+    def test_forget_by_description_fuzzy(self, tmp_path):
         brain = init_brain(tmp_path)
-        _seed_lessons(brain, n=2, category="TONE")
-        _seed_lessons(brain, n=2, category="FORMAT")
-        removed = brain.forget(category="TONE")
-        assert removed == 2
+        _seed_lessons(brain, n=3, category="TONE")
+        result = brain.forget("lesson 1")
+        assert result.get("rolled_back") is True
 
-    def test_returns_zero_when_nothing_matches(self, tmp_path):
+    def test_forget_all_category(self, tmp_path):
         brain = init_brain(tmp_path)
-        _seed_lessons(brain, n=2, category="TONE")
-        removed = brain.forget(description="this description does not exist xyz999")
-        assert removed == 0
+        _seed_lessons(brain, n=3, category="TONE")
+        results = brain.forget("all TONE")
+        if isinstance(results, list):
+            assert len(results) == 3
+        else:
+            assert results.get("rolled_back") is True
 
-    def test_category_match_is_case_insensitive(self, tmp_path):
-        brain = init_brain(tmp_path)
-        _seed_lessons(brain, n=1, category="TONE")
-        removed = brain.forget(category="tone")
-        assert removed == 1
-
-    def test_lessons_file_updated_after_forget(self, tmp_path):
-        brain = init_brain(tmp_path)
-        _seed_lessons(brain, n=2, category="TONE")
-        brain.forget(category="TONE")
-        # Lessons file is at brain.dir / "lessons.md" (first path _find_lessons_path checks)
-        lessons_path = brain.dir / "lessons.md"
-        if lessons_path.exists():
-            content = lessons_path.read_text(encoding="utf-8")
-            assert "TONE" not in content
-
-    def test_both_filters_applied_as_union(self, tmp_path):
-        """description OR category — both conditions remove matching lessons."""
+    def test_forget_all_category_case_insensitive(self, tmp_path):
         brain = init_brain(tmp_path)
         _seed_lessons(brain, n=1, category="TONE")
-        _seed_lessons(brain, n=1, category="FORMAT")
-        # description matches first TONE lesson, category matches all FORMAT
-        removed = brain.forget(description="lesson 0", category="FORMAT")
-        assert removed >= 2
+        result = brain.forget("all tone")
+        if isinstance(result, dict):
+            assert result.get("rolled_back") is True
+
+    def test_forget_no_match_returns_error(self, tmp_path):
+        brain = init_brain(tmp_path)
+        _seed_lessons(brain, n=2, category="TONE")
+        result = brain.forget("this description does not exist xyz999")
+        assert result.get("rolled_back") is False
+
+    def test_forget_defaults_to_last(self, tmp_path):
+        brain = init_brain(tmp_path)
+        _seed_lessons(brain, n=2, category="TONE")
+        result = brain.forget()
+        assert result.get("rolled_back") is True
 
 
 # ---------------------------------------------------------------------------

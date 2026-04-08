@@ -45,6 +45,24 @@ class TestLoadOrCreateSalt:
         assert load_or_create_salt(tmp_path) == "aa" * 32
 
 
+    def test_creates_missing_parent_dir(self, tmp_path):
+        """load_or_create_salt should create missing parent directories."""
+        from gradata.security.brain_salt import load_or_create_salt
+        nested = tmp_path / "missing_dir" / "deep"
+        salt = load_or_create_salt(nested)
+        assert len(salt) == 64
+        assert (nested / ".brain_salt").exists()
+
+    def test_handles_partial_salt_file(self, tmp_path):
+        """Truncated .brain_salt should be detected and regenerated."""
+        from gradata.security.brain_salt import load_or_create_salt
+        salt_file = tmp_path / ".brain_salt"
+        salt_file.write_text("abcd1234")  # Only 8 chars, not 64
+        salt = load_or_create_salt(tmp_path)
+        assert len(salt) == 64
+        assert salt != "abcd1234"
+
+
 class TestSaltThreshold:
     """salt_threshold() perturbs base within +/-5%."""
 

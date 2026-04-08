@@ -282,6 +282,7 @@ def parse_lessons(text: str) -> list[Lesson]:
         correction_event_ids: list[str] = []
         pending_approval = False
         parent_meta_rule_id: str | None = None
+        metadata_obj = None
         memory_ids: list[str] = []
         scope_json: str = ""
         domain_scores: dict = {}
@@ -311,6 +312,14 @@ def parse_lessons(text: str) -> list[Lesson]:
                     domain_scores = _json.loads(meta_line[len("Domain scores:"):].strip())
                 except _json.JSONDecodeError:
                     domain_scores = {}
+            elif meta_line.startswith("Metadata:"):
+                import json as _json_md
+                try:
+                    _md_dict = _json_md.loads(meta_line[len("Metadata:"):].strip())
+                    from gradata._types import RuleMetadata as _RM
+                    metadata_obj = _RM(**{k: v for k, v in _md_dict.items() if k in _RM.__dataclass_fields__})
+                except (ValueError, TypeError, _json_md.JSONDecodeError):
+                    metadata_obj = None
             meta_m = _META_RE.search(meta_line)
             if meta_m:
                 fire_count = int(meta_m.group(1))
@@ -318,7 +327,7 @@ def parse_lessons(text: str) -> list[Lesson]:
                 misfire_count = int(meta_m.group(3))
             j += 1
 
-        lessons.append(Lesson(
+        _lesson = Lesson(
             date=date_str,
             state=state,
             confidence=confidence,
@@ -336,7 +345,10 @@ def parse_lessons(text: str) -> list[Lesson]:
             parent_meta_rule_id=parent_meta_rule_id,
             memory_ids=memory_ids,
             domain_scores=domain_scores,
-        ))
+        )
+        if metadata_obj is not None:
+            _lesson.metadata = metadata_obj
+        lessons.append(_lesson)
         i = j if j > i + 1 else i + 1
 
     return lessons
@@ -448,6 +460,7 @@ def update_confidence(
     maturity: str = "INFANT",
     renter: bool = False,
     machine_mode: bool | None = None,
+    salt: str = "",
 ) -> list[Lesson]:
     """Update confidence for each lesson based on session corrections.
 
@@ -624,24 +637,33 @@ def update_confidence(
     # Inline promotion/demotion after confidence updates
     # (UNTESTABLE detection already handled above — don't re-run
     # full graduate() which would kill newly-flagged UNTESTABLE lessons)
+    # Use salted thresholds consistent with graduate()
+    if salt:
+        from gradata.security.brain_salt import salt_threshold
+        _uc_pattern_thr = salt_threshold(PATTERN_THRESHOLD, salt, "PATTERN")
+        _uc_rule_thr = salt_threshold(RULE_THRESHOLD, salt, "RULE")
+    else:
+        _uc_pattern_thr = PATTERN_THRESHOLD
+        _uc_rule_thr = RULE_THRESHOLD
+
     for lesson in lessons:
         if lesson.state in (LessonState.KILLED, LessonState.ARCHIVED, LessonState.UNTESTABLE):
             continue
         # Promote PATTERN -> RULE
         if (
             lesson.state == LessonState.PATTERN
-            and lesson.confidence >= RULE_THRESHOLD
+            and lesson.confidence >= _uc_rule_thr
             and lesson.fire_count >= MIN_APPLICATIONS_FOR_RULE
         ) or (
             lesson.state == LessonState.INSTINCT
-            and lesson.confidence >= PATTERN_THRESHOLD
+            and lesson.confidence >= _uc_pattern_thr
             and lesson.fire_count >= MIN_APPLICATIONS_FOR_PATTERN
         ):
             lesson.state = transition(lesson.state, "promote")
         # Demote PATTERN -> INSTINCT
         elif (
             lesson.state == LessonState.PATTERN
-            and lesson.confidence < PATTERN_THRESHOLD
+            and lesson.confidence < _uc_pattern_thr
         ):
             lesson.state = transition(lesson.state, "demote")
 
@@ -708,8 +730,9 @@ def graduate(
 
         # Safety assertion: warn if a single session caused an unusually
         # large confidence jump (possible runaway boosting).
-        if hasattr(lesson, '_pre_session_confidence'):
-            jump = lesson.confidence - lesson._pre_session_confidence
+        pre_conf = getattr(lesson, '_pre_session_confidence', None)
+        if isinstance(pre_conf, (int, float)):
+            jump = lesson.confidence - pre_conf
             if jump > eff_pattern_threshold:
                 _log.warning(
                     "Safety assertion: confidence jump %.2f exceeds PATTERN_THRESHOLD %.2f for %s: %s",
@@ -720,14 +743,14 @@ def graduate(
             continue  # Awaiting human review — skip graduation entirely
 
         # ONE_OFF scoped lessons never graduate past INSTINCT
+        block_promotion = False
         if lesson.scope_json:
             try:
                 import json as _json
                 _scope = _json.loads(lesson.scope_json)
                 if _scope.get("correction_scope") == "one_off":
-                    # Block promotion from INSTINCT; block PATTERN->RULE too
                     if lesson.state in (LessonState.INSTINCT, LessonState.PATTERN):
-                        continue
+                        block_promotion = True
             except (ValueError, TypeError):
                 pass
 
@@ -766,7 +789,8 @@ def graduate(
 
         # Promote PATTERN -> RULE (with adversarial gates + wording refinement)
         if (
-            lesson.state == LessonState.PATTERN
+            not block_promotion
+            and lesson.state == LessonState.PATTERN
             and lesson.confidence >= eff_rule_threshold
             and lesson.fire_count >= MIN_APPLICATIONS_FOR_RULE
         ):
@@ -834,7 +858,8 @@ def graduate(
 
         # Promote INSTINCT -> PATTERN
         if (
-            lesson.state == LessonState.INSTINCT
+            not block_promotion
+            and lesson.state == LessonState.INSTINCT
             and lesson.confidence >= eff_pattern_threshold
             and lesson.fire_count >= MIN_APPLICATIONS_FOR_PATTERN
         ):
@@ -944,6 +969,12 @@ def format_lessons(lessons: list[Lesson]) -> str:
         if lesson.domain_scores:
             import json as _json
             lines.append(f"  Domain scores: {_json.dumps(lesson.domain_scores)}")
+
+        if hasattr(lesson, "metadata") and lesson.metadata is not None:
+            import json as _json_meta
+            md = lesson.metadata.to_dict() if hasattr(lesson.metadata, "to_dict") else {}
+            if any(v for v in md.values() if v and v != 0.5):  # only write non-default
+                lines.append(f"  Metadata: {_json_meta.dumps(md)}")
 
         lines.append("")  # blank line between lessons
 
