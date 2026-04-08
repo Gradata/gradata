@@ -10,6 +10,7 @@ from gradata.security.brain_salt import (
     salt_threshold,
 )
 from gradata.security.query_budget import QueryBudget
+from gradata.security.manifest_signing import sign_manifest, verify_manifest
 
 __all__ = [
     "truncate_score",
@@ -18,4 +19,6 @@ __all__ = [
     "load_or_create_salt",
     "salt_threshold",
     "QueryBudget",
+    "sign_manifest",
+    "verify_manifest",
 ]
