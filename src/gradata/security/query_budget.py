@@ -78,10 +78,11 @@ class QueryBudget:
         # If all data falls within the sub-window, compare the last 20%
         # of timestamps against the first 80% by inter-arrival density
         if not older:
-            n = len(timestamps)
+            ts_list = list(timestamps)
+            n = len(ts_list)
             split = max(1, int(n * 0.8))
-            first_chunk = timestamps[:split]
-            last_chunk = timestamps[split:]
+            first_chunk = ts_list[:split]
+            last_chunk = ts_list[split:]
             if len(first_chunk) < 2 or not last_chunk:
                 return {"burst": False}
             first_span = first_chunk[-1] - first_chunk[0]
