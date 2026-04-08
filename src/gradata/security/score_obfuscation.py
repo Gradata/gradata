@@ -11,6 +11,8 @@ brain.rules(), brain.efficiency()).
 from __future__ import annotations
 
 import re
+import secrets
+import time
 
 # Regex matching bracketed tier labels with trailing float, e.g. [RULE:0.95]
 _SCORE_PATTERN = re.compile(r"\[(RULE|PATTERN|INSTINCT):([\d.]+)\]")
@@ -50,3 +52,29 @@ def obfuscate_instruction(instruction: str) -> str:
         Instruction with all ``[TIER:float]`` replaced by ``[TIER]``.
     """
     return _SCORE_PATTERN.sub(r"[\1]", instruction)
+
+
+def constant_time_pad(fn, min_ms: float = 20.0, jitter_ms: float = 5.0):
+    """Execute *fn* and pad to minimum duration with random jitter.
+
+    Prevents timing side-channels by ensuring that every call takes at
+    least ``min_ms + random(0, jitter_ms)`` milliseconds, regardless of
+    how fast *fn* completes.
+
+    Args:
+        fn: Zero-argument callable to execute.
+        min_ms: Minimum execution time in milliseconds.
+        jitter_ms: Maximum random jitter added on top of *min_ms*.
+
+    Returns:
+        Whatever *fn* returns.
+    """
+    start = time.perf_counter()
+    result = fn()
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    jitter = (secrets.randbelow(int(jitter_ms * 1000)) / 1000) if jitter_ms > 0 else 0.0
+    target_ms = min_ms + jitter
+    remaining_ms = target_ms - elapsed_ms
+    if remaining_ms > 0:
+        time.sleep(remaining_ms / 1000)
+    return result

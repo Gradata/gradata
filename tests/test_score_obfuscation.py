@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import pytest
 
+import time
+
 from gradata.security.score_obfuscation import (
     _SCORE_PATTERN,
+    constant_time_pad,
     obfuscate_instruction,
     truncate_score,
 )
@@ -140,3 +143,44 @@ class TestFormatRulesNoRawFloats:
         )
         # Should contain the tier label without float
         assert "[RULE]" in prompt
+
+
+# ---------------------------------------------------------------------------
+# constant_time_pad
+# ---------------------------------------------------------------------------
+
+
+class TestConstantTimePad:
+    """Verify timing-attack defense via constant_time_pad."""
+
+    def test_padded_takes_at_least_min_ms(self) -> None:
+        """Padded function should take at least min_ms milliseconds."""
+        min_ms = 30.0
+        start = time.perf_counter()
+        constant_time_pad(lambda: 42, min_ms=min_ms, jitter_ms=0.0)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        assert elapsed_ms >= min_ms * 0.95, (
+            f"Expected >= {min_ms * 0.95:.1f}ms, got {elapsed_ms:.1f}ms"
+        )
+
+    def test_returns_function_result(self) -> None:
+        """Should return whatever fn() returns."""
+        result = constant_time_pad(lambda: "hello", min_ms=5.0, jitter_ms=0.0)
+        assert result == "hello"
+
+    def test_returns_none_from_void_fn(self) -> None:
+        result = constant_time_pad(lambda: None, min_ms=5.0, jitter_ms=0.0)
+        assert result is None
+
+    def test_jitter_adds_variance(self) -> None:
+        """With jitter, not all durations should be identical."""
+        durations: list[float] = []
+        for _ in range(10):
+            start = time.perf_counter()
+            constant_time_pad(lambda: 1, min_ms=5.0, jitter_ms=10.0)
+            durations.append((time.perf_counter() - start) * 1000)
+        # With 10ms jitter range over 10 runs, we expect some variance
+        assert max(durations) - min(durations) > 0.5, (
+            f"Expected timing variance from jitter, got spread "
+            f"{max(durations) - min(durations):.2f}ms"
+        )
