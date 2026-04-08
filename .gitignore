@@ -141,3 +141,4 @@ design-system/
 .env
 .env.local
 .env.*.local
+.gstack/

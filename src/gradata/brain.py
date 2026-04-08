@@ -167,6 +167,10 @@ class Brain:
         # Cloud connection (None = local-only mode)
         self._cloud = None
 
+        # Per-brain salt for non-deterministic graduation thresholds
+        from gradata.security.brain_salt import load_or_create_salt
+        self._brain_salt = load_or_create_salt(self.dir)
+
     @property
     def session(self) -> int:
         """Current session number (from event log or loop-state.md)."""

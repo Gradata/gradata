@@ -659,6 +659,7 @@ def graduate(
     maturity: str = "INFANT",
     renter: bool = False,
     machine_mode: bool = False,
+    salt: str = "",
 ) -> tuple[list[Lesson], list[Lesson]]:
     """Apply state transitions and split into active vs graduated.
 
@@ -678,7 +679,16 @@ def graduate(
         maturity: Brain maturity phase for kill-switch thresholds.
         renter: If True, skip all mutations (renter mode: lessons frozen).
         machine_mode: If True, use extended kill limits for machine contexts.
+        salt: Per-brain salt for non-deterministic threshold jitter (+/-5%).
     """
+    # Compute effective thresholds (salted or default)
+    if salt:
+        from gradata.security.brain_salt import salt_threshold
+        eff_pattern_threshold = salt_threshold(PATTERN_THRESHOLD, salt, "PATTERN")
+        eff_rule_threshold = salt_threshold(RULE_THRESHOLD, salt, "RULE")
+    else:
+        eff_pattern_threshold = PATTERN_THRESHOLD
+        eff_rule_threshold = RULE_THRESHOLD
     if renter:
         active = [l for l in lessons if l.state in (LessonState.INSTINCT, LessonState.PATTERN)]
         graduated = [l for l in lessons if l.state not in (LessonState.INSTINCT, LessonState.PATTERN)]
@@ -700,10 +710,10 @@ def graduate(
         # large confidence jump (possible runaway boosting).
         if hasattr(lesson, '_pre_session_confidence'):
             jump = lesson.confidence - lesson._pre_session_confidence
-            if jump > PATTERN_THRESHOLD:
+            if jump > eff_pattern_threshold:
                 _log.warning(
                     "Safety assertion: confidence jump %.2f exceeds PATTERN_THRESHOLD %.2f for %s: %s",
-                    jump, PATTERN_THRESHOLD, lesson.category, lesson.description[:60],
+                    jump, eff_pattern_threshold, lesson.category, lesson.description[:60],
                 )
 
         if lesson.pending_approval:
@@ -757,7 +767,7 @@ def graduate(
         # Promote PATTERN -> RULE (with adversarial gates + wording refinement)
         if (
             lesson.state == LessonState.PATTERN
-            and lesson.confidence >= RULE_THRESHOLD
+            and lesson.confidence >= eff_rule_threshold
             and lesson.fire_count >= MIN_APPLICATIONS_FOR_RULE
         ):
             blocked = False
@@ -825,7 +835,7 @@ def graduate(
         # Promote INSTINCT -> PATTERN
         if (
             lesson.state == LessonState.INSTINCT
-            and lesson.confidence >= PATTERN_THRESHOLD
+            and lesson.confidence >= eff_pattern_threshold
             and lesson.fire_count >= MIN_APPLICATIONS_FOR_PATTERN
         ):
             lesson.state = transition(lesson.state, "promote")
@@ -834,7 +844,7 @@ def graduate(
         # Demote PATTERN -> INSTINCT
         if (
             lesson.state == LessonState.PATTERN
-            and lesson.confidence < PATTERN_THRESHOLD
+            and lesson.confidence < eff_pattern_threshold
         ):
             lesson.state = transition(lesson.state, "demote")
             continue

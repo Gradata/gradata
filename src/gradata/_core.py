@@ -452,7 +452,8 @@ def brain_end_session(
         # Previous threshold of 10 misclassified productive human sessions.
         is_machine = machine_mode if machine_mode is not None else (
             len(session_corrections or []) > 30)
-        active, graduated = graduate(lessons, machine_mode=is_machine)
+        _salt = getattr(brain, "_brain_salt", "")
+        active, graduated = graduate(lessons, machine_mode=is_machine, salt=_salt)
 
         promotions, demotions, kills = 0, 0, 0
         transitions = []
