@@ -26,7 +26,6 @@ Usage::
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Any
 
@@ -183,8 +182,8 @@ def recall(
 
     # Filter to eligible states only
     eligible = [
-        l for l in lessons
-        if l.state in ELIGIBLE_STATES
+        lesson for lesson in lessons
+        if lesson.state in ELIGIBLE_STATES
     ]
 
     # Score each lesson by relevance to query
@@ -341,11 +340,11 @@ def manifest(
     lessons = _load_lessons(lessons_path)
     meta_rules = _load_meta_rules()
 
-    rules = [l for l in lessons if l.state == LessonState.RULE]
-    patterns = [l for l in lessons if l.state == LessonState.PATTERN]
+    rules = [lesson for lesson in lessons if lesson.state == LessonState.RULE]
+    patterns = [lesson for lesson in lessons if lesson.state == LessonState.PATTERN]
     result["rules_count"] = len(rules) + len(patterns)
     result["meta_rules_count"] = len(meta_rules)
-    result["lessons_active"] = len([l for l in lessons if l.state in (LessonState.INSTINCT, LessonState.PATTERN)])
+    result["lessons_active"] = len([lesson for lesson in lessons if lesson.state in (LessonState.INSTINCT, LessonState.PATTERN)])
     result["lessons_graduated"] = len(rules)
 
     # Try to get full manifest from brain (supplement, don't override file-based counts)
@@ -422,8 +421,8 @@ def export_skill(
     Returns:
         Dict with skill_dir, skill_id, rules_count, and SKILL.md preview.
     """
-    from gradata.brain import Brain
     from gradata._paths import BRAIN_DIR
+    from gradata.brain import Brain
 
     bd = Path(brain_dir) if brain_dir else BRAIN_DIR
     if not bd or not bd.exists():

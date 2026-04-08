@@ -31,12 +31,12 @@ from enum import Enum
 from typing import Any
 
 __all__ = [
-    "TaskStatus",
     "TaskOutcome",
-    "report_outcome",
-    "is_actionable",
-    "requires_human",
+    "TaskStatus",
     "format_outcome",
+    "is_actionable",
+    "report_outcome",
+    "requires_human",
 ]
 
 

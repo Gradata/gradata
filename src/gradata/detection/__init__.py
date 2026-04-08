@@ -1,24 +1,26 @@
 """Detection layer — behavioral signal extraction."""
 
-from gradata.detection.mode_classifier import classify_mode, MODE_CATEGORY_MAP
+from __future__ import annotations
+
 from gradata.detection.addition_pattern import (
-    is_addition,
-    classify_addition,
     AdditionTracker,
+    classify_addition,
+    is_addition,
 )
 from gradata.detection.correction_conflict import (
+    ConflictTracker,
     detect_conflict,
     extract_diff_tokens,
-    ConflictTracker,
 )
+from gradata.detection.mode_classifier import MODE_CATEGORY_MAP, classify_mode
 
 __all__ = [
-    "classify_mode",
     "MODE_CATEGORY_MAP",
-    "is_addition",
-    "classify_addition",
     "AdditionTracker",
+    "ConflictTracker",
+    "classify_addition",
+    "classify_mode",
     "detect_conflict",
     "extract_diff_tokens",
-    "ConflictTracker",
+    "is_addition",
 ]

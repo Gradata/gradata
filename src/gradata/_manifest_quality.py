@@ -8,13 +8,15 @@ Split from _brain_manifest.py for file size compliance (<500 lines).
 import math
 import re
 import statistics
+from typing import TYPE_CHECKING
 
 import gradata._paths as _p
 from gradata._db import get_connection
-from gradata._paths import BrainContext
+from gradata._manifest_helpers import LOW_SEVERITY, _session_window
 from gradata._stats import trend_analysis as _trend_analysis
 
-from gradata._manifest_helpers import LOW_SEVERITY, _session_window
+if TYPE_CHECKING:
+    from gradata._paths import BrainContext
 
 
 def _compute_fda(ctx: "BrainContext | None" = None, window: int = 20) -> float | None:

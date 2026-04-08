@@ -25,14 +25,13 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from gradata.brain import Brain
-    from gradata.contrib.patterns.reflection import ReflectionResult
     from gradata.contrib.patterns.guardrails import GuardedResult
-    from gradata.contrib.patterns.loop_detection import LoopAction
+    from gradata.contrib.patterns.reflection import ReflectionResult
 
 logger = logging.getLogger("gradata")
 
 
-def _mutate_lessons(brain: "Brain", mutator_fn) -> bool:
+def _mutate_lessons(brain: Brain, mutator_fn) -> bool:
     """Read lessons under lock, apply mutator, write back. Prevents TOCTOU race.
 
     The entire read→parse→mutate→format→write cycle runs inside lessons_lock(),
@@ -40,7 +39,7 @@ def _mutate_lessons(brain: "Brain", mutator_fn) -> bool:
     Returns True if mutation succeeded, False if lessons file not found.
     """
     from gradata._db import lessons_lock
-    from gradata.enhancements.self_improvement import parse_lessons, format_lessons
+    from gradata.enhancements.self_improvement import format_lessons, parse_lessons
 
     lessons_path = brain._find_lessons_path()
     if not lessons_path or not lessons_path.is_file():
@@ -67,7 +66,7 @@ def process_reflection_result(
     - Converged with score >= 8.0 → boost lessons in matching category
     - Not converged → treat as implicit correction signal
     """
-    from gradata.enhancements.self_improvement import update_confidence, ACCEPTANCE_BONUS
+    from gradata.enhancements.self_improvement import ACCEPTANCE_BONUS, update_confidence
 
     if not result.critiques:
         return {"processed": False}

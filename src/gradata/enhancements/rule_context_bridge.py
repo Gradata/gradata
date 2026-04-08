@@ -12,9 +12,13 @@ Lives in enhancements/ (Layer 1) because it imports from both:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = logging.getLogger("gradata")
 
@@ -48,10 +52,8 @@ def bootstrap_rule_context(
 
                 scope = {}
                 if lesson.scope_json:
-                    try:
+                    with contextlib.suppress(json.JSONDecodeError, TypeError):
                         scope = json.loads(lesson.scope_json)
-                    except (json.JSONDecodeError, TypeError):
-                        pass
 
                 rule_id = f"lesson:{lesson.category}:{lesson.description[:40]}"
                 ctx.publish(GraduatedRule(
@@ -94,11 +96,11 @@ def bootstrap_rule_context(
                 rule_id = f"meta:{row['id']}"
                 # sqlite3.Row supports [] access but not .get()
                 try:
-                    category = row["category"] if "category" in row.keys() else "META"
+                    category = row.get("category", "META")
                 except (KeyError, IndexError):
                     category = "META"
                 try:
-                    principle = row["principle"] if "principle" in row.keys() else str(row)
+                    principle = row["principle"] if "principle" in row else str(row)
                 except (KeyError, IndexError):
                     principle = str(row)
                 ctx.publish(GraduatedRule(
@@ -156,5 +158,4 @@ def on_graduation_event(event: dict) -> None:
     ))
 
     logger.debug("RuleContext: published %s [%s:%.2f]", category, new_state, confidence)
-
 

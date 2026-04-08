@@ -10,44 +10,33 @@ from gradata.detection.addition_pattern import (
     is_addition,
 )
 
-
 # ── is_addition ───────────────────────────────────────────────────────────
 
 
 class TestIsAddition:
-    def test_pure_addition_suffix(self):
-        old = "def foo():"
-        new = "def foo():\n    return 42  # added"
-        assert is_addition(old, new) is True
-
-    def test_pure_addition_prefix(self):
-        old = "print('hello')"
-        new = "import os\nimport sys\nprint('hello')"
-        assert is_addition(old, new) is True
-
-    def test_replacement_not_addition(self):
-        old = "def foo(): pass"
-        new = "def bar(): return 1"
-        assert is_addition(old, new) is False
-
-    def test_too_short_addition(self):
-        old = "hello"
-        new = "hello!!!"
-        assert is_addition(old, new, min_added_chars=10) is False
-
-    def test_major_rewrite_not_addition(self):
-        old = "The quick brown fox jumps over the lazy dog."
-        new = "A fast red cat leaps across the sleeping puppy."
-        assert is_addition(old, new) is False
-
-    def test_empty_old_nonempty_new(self):
-        assert is_addition("", "import os\nimport sys") is True
-
-    def test_empty_old_short_new(self):
-        assert is_addition("", "hi") is False
-
-    def test_both_empty(self):
-        assert is_addition("", "") is False
+    @pytest.mark.parametrize(
+        "old,new,expected,min_added_chars",
+        [
+            # Pure addition suffix
+            ("def foo():", "def foo():\n    return 42  # added", True, 10),
+            # Pure addition prefix
+            ("print('hello')", "import os\nimport sys\nprint('hello')", True, 10),
+            # Replacement not addition
+            ("def foo(): pass", "def bar(): return 1", False, 10),
+            # Too short addition
+            ("hello", "hello!!!", False, 10),
+            # Major rewrite not addition
+            ("The quick brown fox jumps over the lazy dog.", "A fast red cat leaps across the sleeping puppy.", False, 10),
+            # Empty old, nonempty new
+            ("", "import os\nimport sys", True, 10),
+            # Empty old, short new
+            ("", "hi", False, 10),
+            # Both empty
+            ("", "", False, 10),
+        ],
+    )
+    def test_is_addition(self, old, new, expected, min_added_chars):
+        assert is_addition(old, new, min_added_chars=min_added_chars) == expected
 
 
 # ── classify_addition ─────────────────────────────────────────────────────

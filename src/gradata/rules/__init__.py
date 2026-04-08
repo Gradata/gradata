@@ -15,13 +15,13 @@ from gradata.rules.rule_tracker import RuleApplication, log_application
 from gradata.rules.scope import AudienceTier, TaskType, classify_scope
 
 __all__ = [
-    "GraduatedRule",
-    "get_rule_context",
-    "apply_rules",
-    "format_rules_for_prompt",
-    "RuleApplication",
-    "log_application",
     "AudienceTier",
+    "GraduatedRule",
+    "RuleApplication",
     "TaskType",
+    "apply_rules",
     "classify_scope",
+    "format_rules_for_prompt",
+    "get_rule_context",
+    "log_application",
 ]

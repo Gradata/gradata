@@ -12,7 +12,6 @@ Aggregate stats are queried from events for the self-improvement pipeline.
 from __future__ import annotations
 
 import logging
-
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 

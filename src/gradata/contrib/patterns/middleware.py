@@ -42,8 +42,8 @@ from typing import Any
 
 __all__ = [
     "Middleware",
-    "MiddlewareContext",
     "MiddlewareChain",
+    "MiddlewareContext",
     "MiddlewareError",
 ]
 

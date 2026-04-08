@@ -71,7 +71,7 @@ def _extract_correction(tool_input: dict, tool_output: dict | None = None) -> tu
     elif tool_name == "Write":
         # For Write, we need the previous file content
         # The hook receives the tool output which may include the old content
-        file_path = tool_input.get("input", {}).get("file_path", "")
+        tool_input.get("input", {}).get("file_path", "")
         new_content = tool_input.get("input", {}).get("content", "")
 
         if tool_output and tool_output.get("old_content"):

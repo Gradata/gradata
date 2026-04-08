@@ -43,9 +43,9 @@ from typing import Any
 
 __all__ = [
     "LoopAction",
-    "LoopEvent",
-    "LoopDetectorConfig",
     "LoopDetector",
+    "LoopDetectorConfig",
+    "LoopEvent",
 ]
 
 

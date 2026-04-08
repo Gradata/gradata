@@ -19,7 +19,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 
-from gradata._types import ELIGIBLE_STATES, Lesson, RuleTransferScope
+from gradata._types import Lesson, RuleTransferScope
 
 _log = logging.getLogger(__name__)
 
@@ -107,11 +107,7 @@ def evaluate_conditions(
             return False
 
     # Check all never_when (any match blocks the rule)
-    for cond in rule.never_when:
-        if _eval_single_condition(cond, context):
-            return False
-
-    return True
+    return all(not _eval_single_condition(cond, context) for cond in rule.never_when)
 
 
 def _eval_single_condition(condition: str, context: dict) -> bool:
@@ -486,7 +482,7 @@ def parse_lessons_from_markdown(text: str) -> list[Lesson]:
 # ---------------------------------------------------------------------------
 
 
-def __getattr__(name: str):  # noqa: N807
+def __getattr__(name: str):
     """Lazy-load storage symbols to avoid circular imports."""
     _STORAGE_NAMES = {
         "ensure_table", "save_meta_rules", "load_meta_rules",

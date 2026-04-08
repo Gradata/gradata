@@ -11,10 +11,10 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from gradata._types import ELIGIBLE_STATES, Lesson, LessonState
+from gradata._types import ELIGIBLE_STATES, Lesson
 from gradata.rules.rule_engine import _make_rule_id
 
 _log = logging.getLogger(__name__)
@@ -166,7 +166,7 @@ def export_rules(
     payload = {
         "rules": rules,
         "metadata": {
-            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "exported_at": datetime.now(UTC).isoformat(),
             "count": len(rules),
             "format": output_format,
         },

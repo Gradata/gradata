@@ -39,10 +39,10 @@ from pathlib import Path
 from typing import Any
 
 __all__ = [
-    "RouterConfig",
-    "RouteDecision",
     "Experience",
     "QLearningRouter",
+    "RouteDecision",
+    "RouterConfig",
 ]
 
 
@@ -253,7 +253,7 @@ class QLearningRouter:
                 return RouteDecision(
                     agent=cached_agent,
                     state_hash=state_hash,
-                    q_values=dict(zip(self.config.agents, q_vals)),
+                    q_values=dict(zip(self.config.agents, q_vals, strict=False)),
                     confidence=self._compute_confidence(q_vals),
                     exploiting=True,
                 )
@@ -283,7 +283,7 @@ class QLearningRouter:
         return RouteDecision(
             agent=agent,
             state_hash=state_hash,
-            q_values=dict(zip(self.config.agents, q_values)),
+            q_values=dict(zip(self.config.agents, q_values, strict=False)),
             confidence=self._compute_confidence(q_values),
             exploiting=exploiting,
         )
@@ -371,6 +371,7 @@ class QLearningRouter:
     def _compute_hmac(data_bytes: bytes) -> str:
         """Compute HMAC-SHA256 for integrity verification."""
         import hmac as _hmac
+
         # Key derived from machine identity (not secret, just tamper detection)
         import platform
         key = f"gradata-router-{platform.node()}".encode()
@@ -416,7 +417,7 @@ class QLearningRouter:
         if not filepath.exists():
             return False
 
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, encoding="utf-8") as f:
             state = json.load(f)
 
         # Verify HMAC if present (backward compat: files without HMAC still load)

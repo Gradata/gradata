@@ -5,9 +5,11 @@ Primary search: SQLite FTS5 (keyword matching).
 sqlite-vec planned for vector similarity.
 """
 
+import contextlib
 import sqlite3
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import gradata._paths as _p
 from gradata._config import (
@@ -27,7 +29,9 @@ from gradata._config import (
     SKIP_DIRS,
     SKIP_FILES,
 )
-from gradata._paths import BrainContext
+
+if TYPE_CHECKING:
+    from gradata._paths import BrainContext
 
 # ── FTS5 Full-Text Search ────────────────────────────────────────────────
 
@@ -87,14 +91,10 @@ def fts_index_batch(docs: list[dict], ctx: "BrainContext | None" = None):
 def fts_rebuild(ctx: "BrainContext | None" = None):
     db = ctx.db_path if ctx else _p.DB_PATH
     conn = sqlite3.connect(str(db))
-    try:
+    with contextlib.suppress(Exception):
         conn.execute("DROP TABLE IF EXISTS brain_fts")
-    except Exception:
-        pass
-    try:
+    with contextlib.suppress(Exception):
         conn.execute("DROP TABLE IF EXISTS brain_fts_content")
-    except Exception:
-        pass
     conn.commit()
     _ensure_fts_table(conn)
 

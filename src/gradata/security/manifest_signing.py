@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def sign_manifest(manifest: dict, salt: str) -> dict:
@@ -25,7 +25,7 @@ def sign_manifest(manifest: dict, salt: str) -> dict:
     sig = hmac.new(salt.encode(), payload, hashlib.sha256).hexdigest()
     signed = dict(manifest)
     signed["signature"] = sig
-    signed["signed_at"] = datetime.now(timezone.utc).isoformat()
+    signed["signed_at"] = datetime.now(UTC).isoformat()
     return signed
 
 

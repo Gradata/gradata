@@ -14,10 +14,10 @@ from __future__ import annotations
 import logging
 
 from gradata.enhancements.meta_rules import (
-    MetaRule,
-    SuperMetaRule,
     TIER_SUPER_META,
     TIER_UNIVERSAL,
+    MetaRule,
+    SuperMetaRule,
     evaluate_conditions,
 )
 

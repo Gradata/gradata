@@ -37,15 +37,18 @@ from __future__ import annotations
 
 import logging
 import sys
-from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from gradata._types import Lesson
 
 logger = logging.getLogger("gradata")
 
+
+import contextlib
 
 from gradata.brain_inspection import BrainInspectionMixin
 
@@ -68,13 +71,13 @@ class Brain(BrainInspectionMixin):
         import os as _os
         self._encryption_key = None
         if encryption_key or _os.environ.get("GRADATA_ENCRYPTION_KEY"):
-            from gradata._encryption import resolve_encryption_key, open_encrypted_db
+            from gradata._encryption import open_encrypted_db, resolve_encryption_key
             self._encryption_key = resolve_encryption_key(encryption_key)
             if self._encryption_key:
                 open_encrypted_db(self.dir, self._encryption_key)
 
         self._instruction_cache: object | None = None  # lazy: InstructionCache
-        self._fired_rules: list["Lesson"] = []  # Rules injected this session (for misfire attribution)
+        self._fired_rules: list[Lesson] = []  # Rules injected this session (for misfire attribution)
         self._convergence_cache: dict | None = None
         self._convergence_session: int | None = None
 
@@ -197,7 +200,7 @@ class Brain(BrainInspectionMixin):
         company: str | None = None,
         embedding: str | None = None,
         interactive: bool | None = None,
-    ) -> "Brain":
+    ) -> Brain:
         """Bootstrap a new brain directory with the onboarding wizard.
 
         Args:
@@ -479,11 +482,11 @@ class Brain(BrainInspectionMixin):
             brain.forget("all tone")       # everything in TONE category
         """
         try:
-            from gradata.enhancements.self_improvement import parse_lessons, format_lessons
+            from gradata.enhancements.self_improvement import format_lessons, parse_lessons
         except ImportError:
             return {"rolled_back": False, "error": "enhancements not installed"}
-        from gradata._types import LessonState
         from gradata._db import write_lessons_safe
+        from gradata._types import LessonState
 
         lessons_path = self._find_lessons_path()
         if not lessons_path or not lessons_path.is_file():
@@ -527,7 +530,7 @@ class Brain(BrainInspectionMixin):
         write_lessons_safe(lessons_path, format_lessons(lessons))
 
         for r in results:
-            try:
+            with contextlib.suppress(Exception):
                 self.emit("LESSON_CHANGE", "brain.forget", {
                     "action": "rolled_back", "lesson_index": r["lesson_index"],
                     "lesson_category": r["category"],
@@ -536,8 +539,6 @@ class Brain(BrainInspectionMixin):
                     "previous_confidence": r["previous_confidence"],
                     "kill_reason": "manual_forget",
                 }, [f"category:{r['category']}", "rollback"], 0)
-            except Exception:
-                pass
 
         return results[0] if len(results) == 1 else results
 
@@ -545,7 +546,7 @@ class Brain(BrainInspectionMixin):
                  category: str | None = None) -> dict:
         """Disable a specific lesson by setting its state to KILLED."""
         try:
-            from gradata.enhancements.self_improvement import parse_lessons, format_lessons
+            from gradata.enhancements.self_improvement import format_lessons, parse_lessons
         except ImportError:
             return {"rolled_back": False, "error": "enhancements not installed"}
         from gradata._types import LessonState
@@ -612,7 +613,7 @@ class Brain(BrainInspectionMixin):
     def _resolve_pending(self, approval_id: int, resolution: str, mutator) -> dict:
         """Shared logic for approve/reject: look up pending, mutate lesson, resolve."""
         from gradata._db import get_connection, lessons_lock
-        from gradata.enhancements.self_improvement import parse_lessons, format_lessons
+        from gradata.enhancements.self_improvement import format_lessons, parse_lessons
 
         conn = get_connection(self.db_path)
         import sqlite3; conn.row_factory = sqlite3.Row
@@ -984,8 +985,9 @@ class Brain(BrainInspectionMixin):
     def health(self) -> dict:
         """Generate brain health report."""
         try:
-            from gradata.enhancements.reporting import generate_health_report
             import dataclasses
+
+            from gradata.enhancements.reporting import generate_health_report
             return dataclasses.asdict(generate_health_report(self.db_path))
         except ImportError:
             return {"healthy": True, "issues": []}
@@ -1026,8 +1028,13 @@ class Brain(BrainInspectionMixin):
     def guard(self, text: str, direction: str = "input") -> dict:
         """Run guardrail checks on text. See gradata.contrib.patterns.guardrails."""
         from gradata.contrib.patterns.guardrails import (
-            InputGuard, OutputGuard, banned_phrases,
-            destructive_action, injection_detector, pii_detector)
+            InputGuard,
+            OutputGuard,
+            banned_phrases,
+            destructive_action,
+            injection_detector,
+            pii_detector,
+        )
         if direction == "input":
             checks = InputGuard(pii_detector, injection_detector).check(text)
         else:
@@ -1041,7 +1048,8 @@ class Brain(BrainInspectionMixin):
     def reflect(self, draft: str, checklist=None, evaluator=None,
                 refiner=None, max_cycles: int = 3) -> dict:
         """Run reflection loop. See gradata.contrib.patterns.reflection."""
-        from gradata.contrib.patterns.reflection import EMAIL_CHECKLIST, default_evaluator, reflect as _reflect
+        from gradata.contrib.patterns.reflection import EMAIL_CHECKLIST, default_evaluator
+        from gradata.contrib.patterns.reflection import reflect as _reflect
         result = _reflect(output=draft, checklist=checklist or EMAIL_CHECKLIST,
                           evaluator=evaluator or default_evaluator,
                           refiner=refiner or (lambda o, f: o), max_cycles=max_cycles)
@@ -1055,7 +1063,7 @@ class Brain(BrainInspectionMixin):
         from gradata.contrib.patterns.pipeline import Pipeline
         return Pipeline(*stages)
 
-    def run(self, tasks: list[str] | str, worker: "Callable", *,
+    def run(self, tasks: list[str] | str, worker: Callable, *,
             max_concurrent: int = 3) -> dict:
         """Execute task(s) through orchestrator. See gradata.contrib.patterns.orchestrator."""
         from gradata.contrib.patterns.orchestrator import execute_orchestrated
@@ -1063,9 +1071,9 @@ class Brain(BrainInspectionMixin):
             tasks = [tasks]
         return execute_orchestrated(tasks, worker, brain=self, max_concurrent=max_concurrent)
 
-    def spawn_queue(self, tasks: list[str], worker: "Callable", *,
+    def spawn_queue(self, tasks: list[str], worker: Callable, *,
                     max_concurrent: int = 3, timeout_seconds: int = 1800,
-                    on_complete: "Callable | None" = None) -> dict:
+                    on_complete: Callable | None = None) -> dict:
         """Execute tasks through a pull-based queue with N concurrent workers."""
         import concurrent.futures
         results, failed = [], []
@@ -1095,7 +1103,5 @@ class Brain(BrainInspectionMixin):
 
 
 # Re-export Pipeline type
-try:
-    from gradata.contrib.patterns.pipeline import Pipeline
-except ImportError:
+with contextlib.suppress(ImportError):
     pass

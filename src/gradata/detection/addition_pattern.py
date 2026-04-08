@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Gradata
+
 """Signal 4 — Addition pattern detection.
 
 Detects when users repeatedly ADD the same type of content (type annotations,
@@ -9,6 +12,7 @@ from __future__ import annotations
 
 import ast
 import re
+import threading
 from collections import defaultdict
 from dataclasses import dataclass, field
 
@@ -21,6 +25,9 @@ def is_addition(old: str, new: str, min_added_chars: int = 10) -> bool:
     - Empty old + non-empty new (>= min_added_chars) counts as addition.
     - Returns False if old changed significantly or added content is too short.
     """
+    if not isinstance(min_added_chars, int) or min_added_chars < 0:
+        raise ValueError(f"min_added_chars must be a non-negative integer, got {min_added_chars}")
+
     # Empty old, non-empty new = new file content
     if not old and new and len(new) >= min_added_chars:
         return True
@@ -28,8 +35,20 @@ def is_addition(old: str, new: str, min_added_chars: int = 10) -> bool:
     if not old or not new:
         return False
 
-    # old must appear verbatim inside new
-    if old not in new:
+    # Check if old is a subsequence of new (all chars of old appear in order in new)
+    if len(new) < len(old):
+        return False
+
+    # Two-pointer subsequence scan
+    old_idx = 0
+    new_idx = 0
+    while old_idx < len(old) and new_idx < len(new):
+        if old[old_idx] == new[new_idx]:
+            old_idx += 1
+        new_idx += 1
+
+    # If we didn't match all of old, it's not a subsequence
+    if old_idx < len(old):
         return False
 
     added = len(new) - len(old)
@@ -99,9 +118,9 @@ def _classify_python_addition(added_text: str) -> str:
                     and isinstance(node.body[0].value, ast.Constant)
                     and isinstance(node.body[0].value.value, str)):
                 return "docstring"
-        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
-            if isinstance(node.value.value, str):
-                return "docstring"
+        if (isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, str)):
+            return "docstring"
         if isinstance(node, ast.Assert):
             return "assertion"
 
@@ -167,36 +186,38 @@ class AdditionTracker:
     """
 
     def __init__(self, threshold: int = 3, cross_session_threshold: int = 2) -> None:
+        if not isinstance(threshold, int) or threshold < 1:
+            raise ValueError(f"threshold must be a positive integer, got {threshold}")
+        if not isinstance(cross_session_threshold, int) or cross_session_threshold < 1:
+            raise ValueError(f"cross_session_threshold must be a positive integer, got {cross_session_threshold}")
         self._threshold = threshold
         self._cross_session_threshold = cross_session_threshold
         self._counters: dict[tuple[str, str], _FingerprintCounter] = defaultdict(
             _FingerprintCounter
         )
+        self._lock = threading.Lock()
 
     def record(
         self, fingerprint: tuple[str, str], session_id: str
     ) -> dict | None:
         """Record one occurrence. Returns a lesson dict when threshold met."""
-        counter = self._counters[fingerprint]
-        counter.count += 1
-        counter.sessions.add(session_id)
-
         category, stype = fingerprint
+        lesson = None
 
-        # Check cross-session first (2 occurrences across 2+ sessions)
-        if (
-            len(counter.sessions) >= 2
-            and counter.count >= self._cross_session_threshold
-        ):
-            self._counters[fingerprint] = _FingerprintCounter()
-            return self._make_lesson(category, stype)
+        with self._lock:
+            counter = self._counters[fingerprint]
+            counter.count += 1
+            counter.sessions.add(session_id)
 
-        # Single-session threshold
-        if counter.count >= self._threshold:
-            self._counters[fingerprint] = _FingerprintCounter()
-            return self._make_lesson(category, stype)
+            # Check cross-session first (2 occurrences across 2+ sessions)
+            if (
+                len(counter.sessions) >= 2
+                and counter.count >= self._cross_session_threshold
+            ) or counter.count >= self._threshold:
+                self._counters[fingerprint] = _FingerprintCounter()
+                lesson = self._make_lesson(category, stype)
 
-        return None
+        return lesson
 
     @staticmethod
     def _make_lesson(category: str, stype: str) -> dict:

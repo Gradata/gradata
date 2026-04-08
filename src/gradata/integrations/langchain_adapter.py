@@ -19,8 +19,12 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 import logging
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = logging.getLogger("gradata.integrations.langchain")
 
@@ -87,10 +91,8 @@ class BrainMemory:
         ai_msg = outputs.get(self.output_key, "")
 
         if ai_msg:
-            try:
+            with contextlib.suppress(Exception):
                 self.brain.log_output(str(ai_msg), output_type="chat")
-            except Exception:
-                pass
 
         # Observe conversation for fact extraction
         messages = []

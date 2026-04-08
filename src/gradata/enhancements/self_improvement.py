@@ -411,8 +411,11 @@ def _classify_correction_direction(
 
     try:
         from gradata.enhancements.contradiction_detector import (
-            _normalize, _extract_topic_words,
-            _check_polarity, _check_negation, _check_opposite_sentiment,
+            _check_negation,
+            _check_opposite_sentiment,
+            _check_polarity,
+            _extract_topic_words,
+            _normalize,
         )
     except ImportError:
         return "UNKNOWN"

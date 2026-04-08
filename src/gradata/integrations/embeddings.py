@@ -7,12 +7,12 @@ and single-linkage clustering for lesson deduplication.
 
 from __future__ import annotations
 
+import json
 import logging
 import math
-from collections import OrderedDict
 import os
+from collections import OrderedDict
 from urllib.request import Request, urlopen
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -46,9 +46,7 @@ class EmbeddingClient:
         parsed = urlparse(url)
         if parsed.hostname in ("localhost", "127.0.0.1"):
             return True
-        if parsed.scheme == "https" and parsed.hostname and parsed.hostname.endswith("gradata.ai"):
-            return True
-        return False
+        return bool(parsed.scheme == "https" and parsed.hostname and parsed.hostname.endswith("gradata.ai"))
 
     def _embed_api(self, text):
         if not self._is_trusted_url(self.api_url):

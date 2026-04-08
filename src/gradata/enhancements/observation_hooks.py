@@ -38,8 +38,8 @@ from typing import Any
 
 __all__ = [
     "Observation",
-    "observe_tool_use",
     "ObservationStore",
+    "observe_tool_use",
 ]
 
 
@@ -226,7 +226,7 @@ class ObservationStore:
             return []
 
         lines: list[str] = []
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, encoding="utf-8") as f:
             lines = f.readlines()
 
         # Take last N lines
@@ -251,7 +251,7 @@ class ObservationStore:
         filepath = self._get_file(project_id)
         if not filepath.exists():
             return 0
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, encoding="utf-8") as f:
             return sum(1 for line in f if line.strip())
 
     def stats(self, project_id: str = "global") -> dict[str, Any]:

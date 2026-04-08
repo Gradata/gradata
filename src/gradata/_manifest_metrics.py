@@ -8,12 +8,10 @@ Split from _brain_manifest.py for file size compliance (<500 lines).
 import re
 import statistics
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 import gradata._paths as _p
 from gradata._db import get_connection
-from gradata._paths import BrainContext
-from gradata._stats import trend_analysis as _trend_analysis
-
 from gradata._manifest_helpers import _session_window
 from gradata._manifest_quality import (
     _categories_extinct,
@@ -26,6 +24,10 @@ from gradata._manifest_quality import (
     _severity_ratio,
     _transfer_score,
 )
+from gradata._stats import trend_analysis as _trend_analysis
+
+if TYPE_CHECKING:
+    from gradata._paths import BrainContext
 
 
 def _lesson_distribution(ctx: "BrainContext | None" = None) -> dict[str, int]:
@@ -216,7 +218,7 @@ def _outcome_correlation(ctx: "BrainContext | None" = None, window: int = 20) ->
         if len(rows) < 5:
             return None
 
-        sessions = [r[0] for r in rows]
+        [r[0] for r in rows]
         values = [float(r[1]) for r in rows]
 
         # Compute trend direction for outcomes
@@ -232,7 +234,7 @@ def _outcome_correlation(ctx: "BrainContext | None" = None, window: int = 20) ->
         if sx == 0 or sy == 0:
             r = 0.0
         else:
-            r = sum((xi - mx) * (vi - my) for xi, vi in zip(x, values)) / ((n - 1) * sx * sy)
+            r = sum((xi - mx) * (vi - my) for xi, vi in zip(x, values, strict=False)) / ((n - 1) * sx * sy)
 
         return {
             "outcome_trend_slope": round(slope, 4),
@@ -450,4 +452,3 @@ def _rag_status(ctx: "BrainContext | None" = None) -> dict:
     except Exception:
         pass
     return result
-

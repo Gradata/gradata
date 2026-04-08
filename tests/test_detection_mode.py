@@ -50,18 +50,18 @@ class TestClassifyMode:
         assert conf > 0.0
 
     def test_chat_default(self) -> None:
-        mode, conf = classify_mode("hello, how are you?")
+        mode, _conf = classify_mode("hello, how are you?")
         assert mode == "chat"
 
     def test_empty_string(self) -> None:
         mode, conf = classify_mode("")
         assert mode == "chat"
-        assert conf == 0.0
+        assert conf == pytest.approx(0.0)
 
     def test_whitespace_only(self) -> None:
         mode, conf = classify_mode("   ")
         assert mode == "chat"
-        assert conf == 0.0
+        assert conf == pytest.approx(0.0)
 
 
 class TestConfidenceScaling:
@@ -81,7 +81,7 @@ class TestConfidenceScaling:
             "src/main.py TypeError API endpoint REST"
         )
         _, conf = classify_mode(prompt)
-        assert conf <= 1.0
+        assert conf == pytest.approx(1.0)
 
 
 class TestModeCategoryMap:

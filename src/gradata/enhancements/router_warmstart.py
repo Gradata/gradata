@@ -29,8 +29,8 @@ if TYPE_CHECKING:
 _log = logging.getLogger(__name__)
 
 __all__ = [
-    "warm_start_router",
     "warm_start_from_brain",
+    "warm_start_router",
 ]
 
 
@@ -38,7 +38,7 @@ def warm_start_router(
     db_path: Path | str,
     router_path: Path | str | None = None,
     max_events: int = 1000,
-) -> "QLearningRouter":
+) -> QLearningRouter:
     """Bootstrap a Q-Learning router from historical correction events.
 
     Reads CORRECTION events from the brain database, extracts severity
@@ -120,7 +120,7 @@ def warm_start_router(
     return router
 
 
-def warm_start_from_brain(brain_dir: Path | str) -> "QLearningRouter":
+def warm_start_from_brain(brain_dir: Path | str) -> QLearningRouter:
     """Convenience: warm-start from a brain directory.
 
     Args:

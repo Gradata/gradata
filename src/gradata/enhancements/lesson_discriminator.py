@@ -36,9 +36,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 __all__ = [
-    "ImportanceSignal",
     "DiscriminatorConfig",
     "DiscriminatorVerdict",
+    "ImportanceSignal",
     "LessonDiscriminator",
 ]
 
@@ -205,9 +205,7 @@ class LessonDiscriminator:
         # Determine recommendation
         if is_high_value and confidence >= 0.8:
             recommendation = "graduate"
-        elif is_high_value:
-            recommendation = "monitor"
-        elif confidence >= 0.4:
+        elif is_high_value or confidence >= 0.4:
             recommendation = "monitor"
         else:
             recommendation = "discard"

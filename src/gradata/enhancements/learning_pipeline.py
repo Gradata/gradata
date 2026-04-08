@@ -44,8 +44,8 @@ from typing import Any
 _log = logging.getLogger(__name__)
 
 __all__ = [
-    "PipelineResult",
     "LearningPipeline",
+    "PipelineResult",
 ]
 
 
@@ -147,7 +147,11 @@ class LearningPipeline:
         self._cluster_mgr = None
         self._cluster_state = None
         try:
-            from gradata.enhancements.cluster_manager import ClusterManager, ClusterConfig, ClusterState
+            from gradata.enhancements.cluster_manager import (
+                ClusterConfig,
+                ClusterManager,
+                ClusterState,
+            )
             self._cluster_mgr = ClusterManager(cluster_config or ClusterConfig())
             self._cluster_state = ClusterState()
             # Try loading persisted state
@@ -407,5 +411,4 @@ def compute_density(corrections: int = 0, outputs: int = 0, **kwargs) -> float:
     if outputs <= 0:
         return 0.0
     return round(corrections / outputs, 6)
-
 

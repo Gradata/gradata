@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+import time
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
 
 from gradata.daemon import GradataDaemon
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ── Telemetry opt-out / missing config ───────────────────────────────
 
@@ -89,9 +93,15 @@ def test_telemetry_sent_when_opted_in(tmp_path: Path) -> None:
         patch("urllib.request.urlopen") as mock_urlopen,
     ):
         d._maybe_send_telemetry()
-        # Give the background thread time to run
-        import time
-        time.sleep(0.5)
+        # Poll for up to 2 seconds for the background thread to complete
+        timeout = 2.0
+        start = time.monotonic()
+        while time.monotonic() - start < timeout:
+            if mock_urlopen.called:
+                break
+            time.sleep(0.05)
+        else:
+            pytest.fail("Telemetry thread did not complete within timeout")
 
     # The background thread should have attempted a POST
     assert mock_urlopen.called
@@ -103,14 +113,12 @@ def test_telemetry_sent_when_opted_in(tmp_path: Path) -> None:
 
 def test_telemetry_skipped_when_sent_recently(tmp_path: Path) -> None:
     """Telemetry should skip if last_sent is within 24h."""
-    from datetime import datetime, timezone
-
     fake_home = tmp_path / "fakehome"
     config_dir = fake_home / ".gradata"
     config_dir.mkdir(parents=True)
     config_path = config_dir / "config.toml"
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     config_path.write_text(
         f'telemetry = true\ntelemetry_last_sent = "{now}"\n',
         encoding="utf-8",
@@ -126,10 +134,6 @@ def test_telemetry_skipped_when_sent_recently(tmp_path: Path) -> None:
         patch("urllib.request.urlopen") as mock_urlopen,
     ):
         d._maybe_send_telemetry()
-        import time
-        time.sleep(0.3)
 
     # Should NOT have sent — last_sent is too recent
-    assert not mock_urlopen.called
-
-
+    mock_urlopen.assert_not_called()

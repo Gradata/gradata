@@ -38,7 +38,7 @@ def install_hook() -> None:
     hooks[_HOOK_NAME] = _HOOK_CONFIG
     _save_settings(settings)
     print(f"Gradata hook installed in {_SETTINGS_PATH}")
-    print(f"Hook will capture corrections on Edit/Write tool use.")
+    print("Hook will capture corrections on Edit/Write tool use.")
 
 
 def uninstall_hook() -> None:
@@ -58,12 +58,12 @@ def hook_status() -> None:
     settings = _load_settings()
     hooks = settings.get("hooks", {})
     if _HOOK_NAME in hooks:
-        print(f"Gradata hook: INSTALLED")
+        print("Gradata hook: INSTALLED")
         print(f"  Settings: {_SETTINGS_PATH}")
         print(f"  Command: {hooks[_HOOK_NAME].get('command', '?')}")
     else:
         print("Gradata hook: NOT INSTALLED")
-        print(f"  Run: gradata hooks install")
+        print("  Run: gradata hooks install")
 
 
 def capture_correction() -> None:
@@ -85,7 +85,7 @@ def capture_correction() -> None:
 
     # Extract draft (old content) and final (new content) from tool input/output
     tool_input = payload.get("tool_input", {})
-    tool_output = payload.get("tool_output", "")
+    payload.get("tool_output", "")
 
     old_string = tool_input.get("old_string", "")
     new_string = tool_input.get("new_string", "")

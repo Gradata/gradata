@@ -24,8 +24,10 @@ Usage:
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = logging.getLogger("gradata.integrations.openai")
 
@@ -87,7 +89,7 @@ def patch_openai(client: Any, brain_dir: str | Path = "./brain") -> Any:
                 brain.log_output(ai_content, output_type="chat")
                 # Observe the full conversation for fact extraction
                 if hasattr(brain, 'observe'):
-                    brain.observe(messages + [{"role": "assistant", "content": ai_content}])
+                    brain.observe([*messages, {"role": "assistant", "content": ai_content}])
         except Exception as e:
             logger.debug("Response capture skipped: %s", e)
 

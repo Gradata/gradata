@@ -225,7 +225,7 @@ def _extract_implied_changes(text: str) -> list[str]:
         text,
         re.IGNORECASE,
     )
-    for action, target in dont_match:
+    for _action, target in dont_match:
         changes.append(f"remove: {target.strip()}")
 
     # "change X to Y" -> "replace X with Y"

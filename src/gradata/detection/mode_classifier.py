@@ -73,7 +73,7 @@ def classify_mode(prompt: str) -> tuple[str, float]:
 
     Returns:
         (mode, confidence) where mode is one of "code", "email", "config",
-        "documentation", "chat" and confidence is 0.0–1.0.
+        "documentation", "chat" and confidence is 0.0-1.0.
     """
     if not prompt or not prompt.strip():
         return ("chat", 0.0)

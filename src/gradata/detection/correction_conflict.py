@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Gradata
+
 """Signal 6 — Correction-of-correction detection.
 
 Detects when a new correction opposes a recent lesson by checking
@@ -8,6 +11,7 @@ rule to recommend demote / kill actions.
 from __future__ import annotations
 
 import re
+import threading
 from collections import defaultdict
 
 
@@ -36,6 +40,8 @@ def detect_conflict(
     threshold: float = 0.3,
 ) -> bool:
     """True if new correction removes enough of what original added."""
+    if not isinstance(threshold, (int, float)) or not (0.0 <= threshold <= 1.0):
+        raise ValueError(f"threshold must be between 0.0 and 1.0, got {threshold}")
     if not original_added or not new_removed:
         return False
     overlap = original_added & new_removed
@@ -56,17 +62,20 @@ class ConflictTracker:
         self._demote_threshold = demote_threshold
         self._kill_threshold = kill_threshold
         self._counts: dict[str, int] = defaultdict(int)
+        self._lock = threading.Lock()
 
     def record_conflict(self, rule_id: str) -> str | None:
         """Increment conflict count. Return action or None."""
-        self._counts[rule_id] += 1
-        count = self._counts[rule_id]
-        if count >= self._kill_threshold:
-            return "kill"
-        if count >= self._demote_threshold:
-            return "demote"
-        return None
+        with self._lock:
+            self._counts[rule_id] += 1
+            count = self._counts[rule_id]
+            if count >= self._kill_threshold:
+                return "kill"
+            if count >= self._demote_threshold:
+                return "demote"
+            return None
 
     def get_count(self, rule_id: str) -> int:
         """Return current conflict count for a rule."""
-        return self._counts[rule_id]
+        with self._lock:
+            return self._counts[rule_id]

@@ -2,33 +2,32 @@
 
 from __future__ import annotations
 
-import pytest
-
 from gradata.detection.correction_conflict import (
     ConflictTracker,
     detect_conflict,
     extract_diff_tokens,
-    tokenize,
+)
+from gradata.detection.correction_conflict import (
+    tokenize as cc_tokenize,
 )
 
-
-# ── tokenize ──────────────────────────────────────────────────────────────
+# ── cc_tokenize ──────────────────────────────────────────────────────────────
 
 
 class TestTokenize:
     def test_basic(self):
-        result = tokenize("Hello World")
+        result = cc_tokenize("Hello World")
         assert result == {"hello", "world"}
 
     def test_empty_string(self):
-        assert tokenize("") == set()
+        assert cc_tokenize("") == set()
 
     def test_strips_punctuation(self):
-        result = tokenize("hello, world! foo.")
+        result = cc_tokenize("hello, world! foo.")
         assert result == {"hello", "world", "foo"}
 
     def test_deduplicates(self):
-        result = tokenize("the the the")
+        result = cc_tokenize("the the the")
         assert result == {"the"}
 
 

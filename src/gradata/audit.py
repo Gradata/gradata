@@ -167,7 +167,7 @@ def trace_rule(
         Dict with keys: rule_id, rule, provenance, corrections, transitions.
         Returns {"error": "..."} if rule_id not found in lessons.
     """
-    from gradata.inspection import _load_lessons_from_path, _make_rule_id, _lesson_to_dict
+    from gradata.inspection import _lesson_to_dict, _load_lessons_from_path, _make_rule_id
 
     lessons = _load_lessons_from_path(lessons_path)
 

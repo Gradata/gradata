@@ -147,7 +147,7 @@ def build_learning_graph(
         category_groups[lesson.category].append(node_id)
 
     # Build graduation edges (INSTINCT -> PATTERN -> RULE within same category)
-    for category, node_ids in category_groups.items():
+    for _category, node_ids in category_groups.items():
         # Group by state
         by_state: dict[str, list[str]] = {}
         for nid in node_ids:

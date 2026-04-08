@@ -4,13 +4,17 @@ Context Packet Builder.
 Generates structured context briefs before agent spawn.
 """
 
+import contextlib
 import json
 import sqlite3
 from datetime import date, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import gradata._paths as _p
-from gradata._paths import BrainContext
+
+if TYPE_CHECKING:
+    from gradata._paths import BrainContext
 
 
 # Lazy imports
@@ -223,10 +227,8 @@ def _load_audit_context(session: int, ctx: "BrainContext | None" = None) -> dict
         ]
     except Exception:
         pass
-    try:
+    with contextlib.suppress(Exception):
         result["correction_rate"] = _correction_rate(last_n_sessions=5)
-    except Exception:
-        pass
     return result
 
 

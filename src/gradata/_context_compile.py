@@ -6,9 +6,12 @@ returns formatted context injection.
 """
 
 import re
+from typing import TYPE_CHECKING
 
 import gradata._paths as _p
-from gradata._paths import BrainContext
+
+if TYPE_CHECKING:
+    from gradata._paths import BrainContext
 
 # Task detection keywords
 TASK_KEYWORDS = {

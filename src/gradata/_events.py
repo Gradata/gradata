@@ -10,14 +10,15 @@ import contextlib
 import json
 import logging
 import sqlite3
-import sys
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 # IMPORTANT: Use module reference (not value import) so set_brain_dir() updates propagate.
 # `from X import Y` copies the value at import time — subsequent set_brain_dir() won't update it.
 import gradata._paths as _p
-from gradata._paths import BrainContext
-from gradata._stats import brier_score
+
+if TYPE_CHECKING:
+    from gradata._paths import BrainContext
 
 _log = logging.getLogger("gradata.events")
 
@@ -42,24 +43,18 @@ def _ensure_table(conn: sqlite3.Connection):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_session ON events(session)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_type ON events(type)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_session_type ON events(session, type)")
-    try:
+    with contextlib.suppress(sqlite3.OperationalError):
         conn.execute("ALTER TABLE events ADD COLUMN valid_from TEXT")
-    except sqlite3.OperationalError:
-        pass
-    try:
+    with contextlib.suppress(sqlite3.OperationalError):
         conn.execute("ALTER TABLE events ADD COLUMN valid_until TEXT")
-    except sqlite3.OperationalError:
-        pass
-    try:
+    with contextlib.suppress(sqlite3.OperationalError):
         conn.execute("ALTER TABLE events ADD COLUMN scope TEXT DEFAULT 'local'")
-    except sqlite3.OperationalError:
-        pass
     conn.commit()
 
 
 def emit(event_type: str, source: str, data: dict | None = None, tags: list | None = None,
          session: int | None = None, valid_from: str | None = None, valid_until: str | None = None,
-         ctx: "BrainContext | None" = None):
+         ctx: BrainContext | None = None):
     """Emit an event to the brain's event log.
 
     Args:
@@ -152,7 +147,7 @@ def emit_gate_override(gate_name: str, reason: str, steps_skipped: list | None =
 
 def query(event_type: str | None = None, session: int | None = None, last_n_sessions: int | None = None,
           limit: int = 100, as_of: str | None = None, active_only: bool = False,
-          ctx: "BrainContext | None" = None) -> list:
+          ctx: BrainContext | None = None) -> list:
     db_path = ctx.db_path if ctx else _p.DB_PATH
     with contextlib.closing(sqlite3.connect(str(db_path))) as conn:
         conn.row_factory = sqlite3.Row
@@ -199,7 +194,7 @@ def query(event_type: str | None = None, session: int | None = None, last_n_sess
 
 def supersede(event_id: int, new_data: dict | None = None, new_tags: list | None = None,
               source: str = "supersede", new_valid_from: str | None = None,
-              ctx: "BrainContext | None" = None):
+              ctx: BrainContext | None = None):
     now = datetime.now(UTC).isoformat()
     db = ctx.db_path if ctx else _p.DB_PATH
     with contextlib.closing(sqlite3.connect(str(db))) as conn:
@@ -221,7 +216,7 @@ def supersede(event_id: int, new_data: dict | None = None, new_tags: list | None
     return replacement
 
 
-def correction_rate(last_n_sessions: int = 5, ctx: "BrainContext | None" = None) -> dict:
+def correction_rate(last_n_sessions: int = 5, ctx: BrainContext | None = None) -> dict:
     db = ctx.db_path if ctx else _p.DB_PATH
     with contextlib.closing(sqlite3.connect(str(db))) as conn:
         _ensure_table(conn)
@@ -233,7 +228,7 @@ def correction_rate(last_n_sessions: int = 5, ctx: "BrainContext | None" = None)
     return {r[0]: r[1] for r in rows}
 
 
-def compute_leading_indicators(session: int, ctx: "BrainContext | None" = None) -> dict:
+def compute_leading_indicators(session: int, ctx: BrainContext | None = None) -> dict:
     db = ctx.db_path if ctx else _p.DB_PATH
     with contextlib.closing(sqlite3.connect(str(db))) as conn:
         _ensure_table(conn)
@@ -300,7 +295,7 @@ def get_current_session() -> int:
     return _detect_session()
 
 
-def _detect_session(ctx: "BrainContext | None" = None) -> int:
+def _detect_session(ctx: BrainContext | None = None) -> int:
     """Detect current session number from event data.
 
     Args:
@@ -378,7 +373,7 @@ def find_contradictions(event_type: str | None = None, tag_prefix: str | None = 
     return conflicts
 
 
-def audit_trend(last_n_sessions: int = 5, ctx: "BrainContext | None" = None) -> list:
+def audit_trend(last_n_sessions: int = 5, ctx: BrainContext | None = None) -> list:
     """Get audit scores for trend analysis."""
     db = ctx.db_path if ctx else _p.DB_PATH
     with contextlib.closing(sqlite3.connect(str(db))) as conn:
@@ -390,4 +385,3 @@ def audit_trend(last_n_sessions: int = 5, ctx: "BrainContext | None" = None) -> 
             ORDER BY session
         """, (last_n_sessions - 1,)).fetchall()
     return [{"session": r[0], "data": json.loads(r[1])} for r in rows]
-

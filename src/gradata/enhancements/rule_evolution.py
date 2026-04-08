@@ -28,15 +28,15 @@ from gradata._types import ELIGIBLE_STATES, Lesson
 from gradata.enhancements.diff_engine import compute_diff
 
 __all__ = [
-    # A/B Testing
-    "wilson_score_interval",
-    "RuleExperiment",
-    "ExperimentResult",
     "ExperimentManager",
+    "ExperimentResult",
+    "RuleExperiment",
     # Conflict Detection
     "RuleRelation",
-    "detect_rule_conflict",
     "classify_all_relations",
+    "detect_rule_conflict",
+    # A/B Testing
+    "wilson_score_interval",
 ]
 
 

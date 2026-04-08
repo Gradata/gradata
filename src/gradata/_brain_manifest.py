@@ -21,10 +21,10 @@ Split into 4 files for maintainability (<500 lines each):
 
 import json
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 import gradata._paths as _p
 from gradata._db import get_connection
-from gradata._paths import BrainContext
 
 # Re-export helpers so existing imports from _brain_manifest still work
 from gradata._manifest_helpers import (
@@ -34,13 +34,15 @@ from gradata._manifest_helpers import (
     _sdk_capabilities,
     _tag_taxonomy,
 )
-from gradata._manifest_quality import _compound_score
 from gradata._manifest_metrics import (
     _behavioral_contract,
     _memory_composition,
     _quality_metrics,
     _rag_status,
 )
+
+if TYPE_CHECKING:
+    from gradata._paths import BrainContext
 
 
 def generate_manifest(*, domain: str = "General", ctx: "BrainContext | None" = None) -> dict:

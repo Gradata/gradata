@@ -4,18 +4,19 @@ from __future__ import annotations
 
 import json
 import threading
-import time
 import urllib.request
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from gradata.daemon import GradataDaemon
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ── Fixture: spin up a daemon on a random port ─────────────────────────
 
-@pytest.fixture()
+@pytest.fixture
 def daemon_url(tmp_path: Path):
     """Start a GradataDaemon in a background thread, yield its base URL."""
     brain_dir = tmp_path / "brain"
@@ -77,8 +78,9 @@ def test_enforce_rules_no_violations(daemon_url: str) -> None:
     assert resp["violations"] == []
 
 
-def test_enforce_rules_with_rule(tmp_path: Path) -> None:
-    """Seed a RULE-state lesson, then check enforcement catches it."""
+@pytest.fixture
+def daemon_with_lessons(tmp_path: Path):
+    """Start a daemon with pre-seeded lessons.md."""
     brain_dir = tmp_path / "brain"
     brain_dir.mkdir()
 
@@ -106,17 +108,21 @@ def test_enforce_rules_with_rule(tmp_path: Path) -> None:
     t.start()
 
     base = f"http://127.0.0.1:{actual_port}"
-    try:
-        resp = _post(base, "/enforce-rules", {
-            "content": "This is great \u2014 really great stuff with em dashes",
-            "file_path": "email.md",
-        })
-        # If the brain loaded the rule, we should get a violation.
-        # If it didn't parse (empty brain), pass=True is also acceptable.
-        assert "violations" in resp
-        assert "pass" in resp
-    finally:
-        d._server.shutdown()
+    yield base
+
+    d._server.shutdown()
+
+
+def test_enforce_rules_with_rule(daemon_with_lessons: str) -> None:
+    """Seed a RULE-state lesson, then check enforcement catches it."""
+    resp = _post(daemon_with_lessons, "/enforce-rules", {
+        "content": "This is great — really great stuff with em dashes",
+        "file_path": "email.md",
+    })
+    # If the brain loaded the rule, we should get a violation.
+    # If it didn't parse (empty brain), pass=True is also acceptable.
+    assert "violations" in resp
+    assert "pass" in resp
 
 
 # ── /log-event ─────────────────────────────────────────────────────────

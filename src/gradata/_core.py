@@ -7,13 +7,16 @@ Brain.py delegates to these to stay under 500 lines.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import re  # used by export functions for slug sanitization
-from collections.abc import Callable
+from datetime import UTC
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
+
     from gradata._types import Lesson
     from gradata.brain import Brain
 
@@ -43,7 +46,7 @@ def _filter_lessons_by_state(lessons, min_state: str = "PATTERN"):
 
 
 def _attribute_domain_fires(
-    brain: "Brain",
+    brain: Brain,
     correction_category: str,
     correction_desc: str,
 ) -> None:
@@ -192,9 +195,14 @@ def brain_correct(
     desc = ""  # Will be set if severity threshold is met
     try:
         from datetime import date as _date
+
         from gradata._types import Lesson, LessonState
         from gradata.enhancements.self_improvement import (
-            parse_lessons, format_lessons, update_confidence, INITIAL_CONFIDENCE)
+            INITIAL_CONFIDENCE,
+            format_lessons,
+            parse_lessons,
+            update_confidence,
+        )
 
         if _SEV_RANK.get(diff.severity, 0) >= _SEV_RANK.get(min_severity, 0):
             lessons_path = brain._find_lessons_path(create=True)
@@ -219,7 +227,9 @@ def brain_correct(
                     else:
                         # Try behavioral extraction (LLM + cache + templates)
                         try:
-                            from gradata.enhancements.edit_classifier import extract_behavioral_instruction
+                            from gradata.enhancements.edit_classifier import (
+                                extract_behavioral_instruction,
+                            )
                             from gradata.enhancements.instruction_cache import InstructionCache
                             if not isinstance(brain._instruction_cache, InstructionCache):
                                 brain._instruction_cache = InstructionCache(
@@ -358,15 +368,14 @@ def brain_correct(
 
     # Persist rule graph
     if hasattr(brain, '_rule_graph') and brain._rule_graph:
-        try:
+        with contextlib.suppress(Exception):
             brain._rule_graph.save()
-        except Exception:
-            pass
 
     # Index into FTS5
     try:
-        from gradata._query import fts_index
         from datetime import date as _fts_date
+
+        from gradata._query import fts_index
         fts_index(source="corrections", file_type="correction",
                   text=f"{category or 'UNKNOWN'}: {summary or diff.severity} - {final_redacted[:500]}",
                   embed_date=_fts_date.today().isoformat(), ctx=brain.ctx)
@@ -415,6 +424,7 @@ def brain_correct(
     try:
         import hashlib as _hashlib
         import json
+
         from gradata.security.correction_provenance import create_provenance_record
         correction_hash = _hashlib.sha256(
             json.dumps([draft, final], separators=(",", ":")).encode()
@@ -439,7 +449,7 @@ def brain_correct(
 # ── end_session() ──────────────────────────────────────────────────────
 
 
-def _graduation_message(old_state: str, lesson: "Lesson") -> str:
+def _graduation_message(old_state: str, lesson: Lesson) -> str:
     """Generate a user-facing graduation notification message."""
     if lesson.state.value == "PATTERN":
         return (f"You've corrected this {lesson.fire_count} times — "
@@ -458,7 +468,11 @@ def brain_end_session(
     """Run full graduation sweep at end of session."""
     try:
         from gradata.enhancements.self_improvement import (
-            parse_lessons, format_lessons, update_confidence, graduate)
+            format_lessons,
+            graduate,
+            parse_lessons,
+            update_confidence,
+        )
 
         lessons_path = brain._find_lessons_path()
         if not lessons_path or not lessons_path.is_file():
@@ -527,7 +541,8 @@ def brain_end_session(
         # Persist lineage (table created by _migrations.py)
         if transitions and brain.db_path.is_file():
             try:
-                from datetime import datetime, UTC
+                from datetime import UTC, datetime
+
                 from gradata._db import get_connection
                 now = datetime.now(UTC).isoformat()
                 with get_connection(brain.db_path) as conn:
@@ -543,9 +558,10 @@ def brain_end_session(
 
             # Write rule provenance for promotions to PATTERN or RULE
             try:
+                from datetime import UTC, datetime
+
                 from gradata.audit import write_provenance
                 from gradata.inspection import _make_rule_id
-                from datetime import datetime, UTC
                 now_prov = datetime.now(UTC).isoformat()
                 for l, old_s, new_s in transitions:
                     if new_s in ("PATTERN", "RULE"):
@@ -696,7 +712,7 @@ def brain_auto_evolve(
     threshold: float = 7.0,
 ) -> dict:
     """Evaluate output and auto-generate corrections for failed dimensions."""
-    from gradata.contrib.patterns.evaluator import evaluate, QUALITY_DIMENSIONS, default_evaluator
+    from gradata.contrib.patterns.evaluator import QUALITY_DIMENSIONS, default_evaluator, evaluate
 
     dims = dimensions or QUALITY_DIMENSIONS
     eval_fn = evaluator or default_evaluator
@@ -746,9 +762,7 @@ def brain_detect_implicit_feedback(
             return False
         # Check right boundary (end of string or non-alpha)
         end = idx + len(phrase)
-        if end < len(text) and text[end].isalpha():
-            return False
-        return True
+        return not (end < len(text) and text[end].isalpha())
 
     for marker in ["are you sure", "that's wrong", "that's not right", "not accurate",
                     "no, not that", "no don't", "stop doing", "why did you", "why didn't you"]:
@@ -856,7 +870,7 @@ def brain_export_rules(brain: Brain, *, min_state: str = "PATTERN", skill_name: 
         lines.append("")
 
     lines.extend(["## Provenance", "",
-                   f"- Source: Gradata correction-based procedural memory",
+                   "- Source: Gradata correction-based procedural memory",
                    f"- Domain: {domain}", f"- Rules exported: {len(qualified)}",
                    f"- Categories: {len(by_category)}", f"- Min graduation tier: {min_state}", ""])
     return "\n".join(lines)
@@ -880,12 +894,12 @@ def brain_export_rules_json(brain: Brain, *, min_state: str = "PATTERN") -> list
 
 
 def brain_export_skill(brain: Brain, *, output_dir: str | None = None,
-                       min_state: str = "PATTERN", skill_name: str = "") -> "Path":
+                       min_state: str = "PATTERN", skill_name: str = "") -> Path:
     """Export graduated rules as a full skill directory."""
-    from pathlib import Path
-    import json
     import hashlib
-    from datetime import datetime, UTC
+    import json
+    from datetime import UTC, datetime
+    from pathlib import Path
 
     content = brain_export_rules(brain, min_state=min_state, skill_name=skill_name)
     if not content:
@@ -923,8 +937,8 @@ def brain_export_skill(brain: Brain, *, output_dir: str | None = None,
 def brain_export_skills(brain: Brain, *, output_dir: str | None = None,
                         min_state: str = "PATTERN") -> list[str]:
     """Export graduated rules as per-category SKILL.md files."""
-    from pathlib import Path
     from collections import defaultdict
+    from pathlib import Path
 
     rules = brain_export_rules_json(brain, min_state=min_state)
     if not rules:
@@ -965,7 +979,7 @@ def brain_export_skills(brain: Brain, *, output_dir: str | None = None,
 
 # ── convergence() ─────────────────────────────────────────────────────
 
-def _mann_kendall(data: "list[int] | list[float]") -> tuple[str, float]:
+def _mann_kendall(data: list[int] | list[float]) -> tuple[str, float]:
     """Mann-Kendall trend test — delegates to _stats.trend_analysis().
 
     Returns (trend, p_value) where trend is "decreasing", "increasing", or "no_trend".
@@ -976,15 +990,12 @@ def _mann_kendall(data: "list[int] | list[float]") -> tuple[str, float]:
     from gradata._stats import trend_analysis
     slope, p_value = trend_analysis([float(x) for x in data])
 
-    if p_value < 0.05:
-        trend = "decreasing" if slope < 0 else "increasing"
-    else:
-        trend = "no_trend"
+    trend = ("decreasing" if slope < 0 else "increasing") if p_value < 0.05 else "no_trend"
 
     return trend, round(p_value, 4)
 
 
-def brain_convergence(brain: "Brain") -> dict:
+def brain_convergence(brain: Brain) -> dict:
     """Compute corrections-per-session convergence data.
 
     Uses Mann-Kendall trend test for statistical rigor.
@@ -1114,7 +1125,7 @@ def brain_convergence(brain: "Brain") -> dict:
 _AVG_SECONDS_PER_CORRECTION = 45
 
 
-def brain_efficiency(brain: "Brain", *, estimate_time: bool = False) -> dict:
+def brain_efficiency(brain: Brain, *, estimate_time: bool = False) -> dict:
     """Quantify effort saved by brain learning.
 
     Returns effort_ratio (current vs initial correction rate).
@@ -1161,7 +1172,7 @@ def brain_efficiency(brain: "Brain", *, estimate_time: bool = False) -> dict:
     return result
 
 
-def brain_prove(brain: "Brain") -> dict:
+def brain_prove(brain: Brain) -> dict:
     """Generate statistical proof that this brain improves output quality."""
     convergence = brain._get_convergence()
     efficiency = brain_efficiency(brain)
@@ -1171,8 +1182,8 @@ def brain_prove(brain: "Brain") -> dict:
     try:
         lessons_path = brain._find_lessons_path()
         if lessons_path and lessons_path.is_file():
-            from gradata.enhancements.self_improvement import parse_lessons
             from gradata._types import LessonState
+            from gradata.enhancements.self_improvement import parse_lessons
             lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
             rule_count = sum(1 for l in lessons if l.state in (LessonState.PATTERN, LessonState.RULE))
     except Exception:
@@ -1244,13 +1255,14 @@ def brain_prove(brain: "Brain") -> dict:
 # ── Sharing ──────────────────────────────────────────────────────────
 
 
-def brain_share(brain: "Brain") -> dict:
+def brain_share(brain: Brain) -> dict:
     """Export graduated rules as a shareable package for team distribution.
 
     Only exports PATTERN and RULE state lessons — proven behavioral rules
     that have survived the graduation pipeline.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
+
     from gradata._types import LessonState
 
     lessons_path = brain._find_lessons_path()
@@ -1274,21 +1286,19 @@ def brain_share(brain: "Brain") -> dict:
                 })
 
     proof: dict = {}
-    try:
+    with contextlib.suppress(Exception):
         proof = brain_prove(brain)
-    except Exception:
-        pass
 
     return {
         "brain_id": str(brain.dir),
-        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "exported_at": datetime.now(UTC).isoformat(),
         "rules": rules,
         "rule_count": len(rules),
         "proof": proof,
     }
 
 
-def brain_absorb(brain: "Brain", package: dict) -> dict:
+def brain_absorb(brain: Brain, package: dict) -> dict:
     """Import shared rules into this brain.
 
     Imported rules enter as INSTINCT with initial confidence (0.40),
@@ -1298,6 +1308,7 @@ def brain_absorb(brain: "Brain", package: dict) -> dict:
     Skips rules that are >0.6 similar to existing lessons (duplicates).
     """
     from datetime import date as _date
+
     from gradata._types import CorrectionType, Lesson, LessonState
     from gradata.enhancements.self_improvement import format_lessons, parse_lessons
     from gradata.enhancements.similarity import best_similarity

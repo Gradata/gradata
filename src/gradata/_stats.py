@@ -9,7 +9,6 @@ from __future__ import annotations
 import math
 from collections import Counter, defaultdict
 
-
 # ============================================================================
 # 0. TREND ANALYSIS (Theil-Sen + Mann-Kendall)
 # ============================================================================

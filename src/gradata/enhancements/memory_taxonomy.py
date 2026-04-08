@@ -45,15 +45,15 @@ from enum import Enum
 from typing import Any
 
 __all__ = [
-    "MemoryType",
-    "BaseMemoryUnit",
-    "CorrectionNarrative",
     "AtomicFact",
+    "BaseMemoryUnit",
+    "BrainProfile",
+    "CorrectionNarrative",
+    "CrossBrainProfile",
+    "MemoryType",
     "PredictedImpact",
     "ProfileField",
-    "BrainProfile",
     "SharedPattern",
-    "CrossBrainProfile",
     "classify_memory_type",
 ]
 

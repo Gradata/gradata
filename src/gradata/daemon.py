@@ -24,6 +24,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
+import hashlib
 import json
 import logging
 import os
@@ -31,13 +33,11 @@ import signal
 import sqlite3
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from socketserver import ThreadingMixIn
-
-import hashlib
 
 import gradata
 from gradata._scope import RuleScope
@@ -88,18 +88,18 @@ class _Handler(BaseHTTPRequestHandler):
     """Routes requests to the parent GradataDaemon instance."""
 
     # Suppress default stderr logging — we use our own logger
-    def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+    def log_message(self, format: str, *args: object) -> None:
         logger.debug(format, *args)
 
     # ── Routing ─────────────────────────────────────────────────────────
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         if self.path == "/health":
             self._handle_health()
         else:
             self._not_found()
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         routes: dict[str, object] = {
             "/apply-rules": self._handle_apply_rules,
             "/correct": self._handle_correct,
@@ -121,7 +121,7 @@ class _Handler(BaseHTTPRequestHandler):
     # ── Helpers ─────────────────────────────────────────────────────────
 
     @property
-    def daemon(self) -> "GradataDaemon":
+    def daemon(self) -> GradataDaemon:
         return self.server._daemon  # type: ignore[attr-defined]
 
     def _read_json(self) -> dict:
@@ -410,8 +410,8 @@ class _Handler(BaseHTTPRequestHandler):
                     )
                     if isinstance(results, list):
                         context_parts = [str(r) for r in results[:5]]
-            except Exception:
-                pass
+            except Exception as e:
+                logger.exception("brain-recall search failed: %s", e)
 
         self._send_json({
             "context": "\n".join(context_parts),
@@ -516,6 +516,7 @@ class _Handler(BaseHTTPRequestHandler):
 
         d = self.daemon
         pending = 0
+        checkpointed = True
         try:
             with d._brain_lock:
                 lessons = d._brain._load_lessons()
@@ -524,11 +525,12 @@ class _Handler(BaseHTTPRequestHandler):
                 d._brain.emit("CHECKPOINT", "plugin.pre_compact", {
                     "session_id": session_id, "reason": reason, "pending_lessons": pending,
                 })
-        except Exception:
-            pass
+        except Exception as e:
+            logger.exception("checkpoint failed for session_id=%s, reason=%s: %s", session_id, reason, e)
+            checkpointed = False
 
         self._send_json({
-            "checkpointed": True,
+            "checkpointed": checkpointed,
             "pending_lessons": pending,
             "unsaved_corrections": 0,
         })
@@ -602,7 +604,7 @@ class GradataDaemon:
         self._pid_file = Path(pid_file) if pid_file else None
         self._server: _ThreadingHTTPServer | None = None
         self._started_mono = time.monotonic()
-        self._started_at = datetime.now(timezone.utc).isoformat()
+        self._started_at = datetime.now(UTC).isoformat()
 
         # Session counter: pick up from DB
         self._session_counter = self._init_session_counter()
@@ -715,10 +717,8 @@ class GradataDaemon:
         if self._idle_timer:
             self._idle_timer.cancel()
         if self._pid_file and self._pid_file.exists():
-            try:
+            with contextlib.suppress(OSError):
                 self._pid_file.unlink()
-            except OSError:
-                pass
 
     def _maybe_send_telemetry(self) -> None:
         """Send anonymous daily heartbeat if telemetry is opted in."""
@@ -729,19 +729,19 @@ class GradataDaemon:
         except FileNotFoundError:
             return
 
-        if "telemetry = true" not in config_text.lower():
+        if not _re.search(r"^\s*telemetry\s*=\s*true\s*$", config_text, _re.IGNORECASE | _re.MULTILINE):
             return
 
         match = _re.search(r'telemetry_last_sent\s*=\s*"([^"]+)"', config_text)
         if match:
             try:
                 last_sent = datetime.fromisoformat(match.group(1))
-                if (datetime.now(timezone.utc) - last_sent).total_seconds() < 86400:
+                if (datetime.now(UTC) - last_sent).total_seconds() < 86400:
                     return
             except ValueError:
                 pass
 
-        def _send():
+        def _send() -> None:
             import platform
             import urllib.request
             rules_count = 0
@@ -750,9 +750,9 @@ class GradataDaemon:
                 with self._brain_lock:
                     lessons = self._brain._load_lessons()
                     lessons_count = len(lessons)
-                    rules_count = sum(1 for l in lessons if l.state.name == "RULE")
-            except Exception:
-                pass
+                    rules_count = sum(1 for lesson in lessons if lesson.state.name == "RULE")
+            except Exception as e:
+                logger.exception("telemetry: failed to load lessons: %s", e)
             payload = json.dumps({
                 "sdk_version": gradata.__version__,
                 "rules_count": rules_count,
@@ -772,7 +772,7 @@ class GradataDaemon:
                 pass
             try:
                 import re as _re2
-                now = datetime.now(timezone.utc).isoformat()
+                now = datetime.now(UTC).isoformat()
                 if "telemetry_last_sent" in config_text:
                     new_config = _re2.sub(
                         r'telemetry_last_sent\s*=\s*"[^"]*"',

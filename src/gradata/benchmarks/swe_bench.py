@@ -34,21 +34,22 @@ from __future__ import annotations
 import json
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 _log = logging.getLogger(__name__)
 
 __all__ = [
-    "SWEInstance",
     "PatchResult",
     "RunConfig",
     "RunResults",
     "SWEBenchHarness",
+    "SWEInstance",
+    "compare_patches",
     "load_swe_bench_lite",
     "load_swe_bench_verified",
-    "compare_patches",
 ]
 
 
@@ -490,7 +491,7 @@ class SWEBenchHarness:
 
         # Per-batch learning curve comparison
         curve = []
-        for i, (b, e) in enumerate(zip(baseline.batch_stats, enhanced.batch_stats)):
+        for i, (b, e) in enumerate(zip(baseline.batch_stats, enhanced.batch_stats, strict=False)):
             curve.append({
                 "batch": i + 1,
                 "baseline_rate": b.resolve_rate,

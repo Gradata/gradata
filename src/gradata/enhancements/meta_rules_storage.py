@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from gradata._types import RuleTransferScope
-from gradata.enhancements.meta_rules import MetaRule, SuperMetaRule, TIER_SUPER_META
+from gradata.enhancements.meta_rules import TIER_SUPER_META, MetaRule, SuperMetaRule
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Meta-Rule DDL

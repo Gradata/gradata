@@ -30,11 +30,13 @@ import logging
 _log = logging.getLogger("gradata.mcp_server")
 
 import argparse
-import io
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import io
 
 # Import Brain at module level so tests can patch gradata.mcp_server.Brain.
 # The import is guarded so the module stays usable even if the brain package
@@ -382,8 +384,9 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
 
         elif tool_name == "brain_benchmark":
             try:
-                from gradata.contrib.enhancements.eval_benchmark import run_standard_benchmark
                 import dataclasses
+
+                from gradata.contrib.enhancements.eval_benchmark import run_standard_benchmark
                 result = run_standard_benchmark()
                 result_dict = dataclasses.asdict(result)
                 # Remove individual case details for MCP response size

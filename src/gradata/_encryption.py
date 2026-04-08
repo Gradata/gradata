@@ -43,6 +43,7 @@ def _get_fernet(key_bytes: bytes):
     """Create a Fernet instance from raw 32-byte key. Requires cryptography."""
     try:
         import base64
+
         from cryptography.fernet import Fernet
     except ImportError:
         raise ImportError(

@@ -24,9 +24,11 @@ Usage::
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -579,28 +581,28 @@ def validate_agent_spawn(
 # ---------------------------------------------------------------------------
 
 __all__ = [
+    # Classes
+    "Guard",
     # Data types
     "GuardCheck",
     "GuardedResult",
-    "ManifestCheckResult",
-    # Classes
-    "Guard",
     "InputGuard",
+    "ManifestCheckResult",
     "OutputGuard",
-    # Wrapper
-    "guarded",
-    # Built-in guards
-    "pii_detector",
-    "injection_detector",
-    "scope_validator",
     "banned_phrases",
-    "destructive_action",
+    "check_exec_command",
     # Manifest-based agent security
     "check_write_path",
-    "check_exec_command",
-    "scan_for_secrets",
-    "validate_agent_spawn",
+    "destructive_action",
+    # Wrapper
+    "guarded",
     "guards_from_graduated_rules",
+    "injection_detector",
+    # Built-in guards
+    "pii_detector",
+    "scan_for_secrets",
+    "scope_validator",
+    "validate_agent_spawn",
 ]
 
 
@@ -628,12 +630,12 @@ def guards_from_graduated_rules() -> list[Guard]:
 
     guards = []
     for rule in rules:
-        principle = rule.principle.lower()
+        rule.principle.lower()
 
         def _make_check(rule_text: str, rule_cat: str) -> Callable[[Any], GuardCheck]:
             """Create a check function that scans output for rule violations."""
             def check_fn(data: Any) -> GuardCheck:
-                text = str(data).lower() if data else ""
+                str(data).lower() if data else ""
                 # Simple keyword check — does the output violate the rule?
                 # Rules are phrased as "never X" or "always Y"
                 # This is a heuristic; real guardrails need LLM-backed checks
