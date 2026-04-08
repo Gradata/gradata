@@ -11,6 +11,10 @@ from gradata.security.brain_salt import (
 )
 from gradata.security.query_budget import QueryBudget
 from gradata.security.manifest_signing import sign_manifest, verify_manifest
+from gradata.security.correction_provenance import (
+    create_provenance_record,
+    verify_provenance,
+)
 
 __all__ = [
     "truncate_score",
@@ -21,4 +25,6 @@ __all__ = [
     "QueryBudget",
     "sign_manifest",
     "verify_manifest",
+    "create_provenance_record",
+    "verify_provenance",
 ]

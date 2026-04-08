@@ -403,6 +403,21 @@ def brain_correct(
         "source": "human",
     })
 
+    # Correction provenance — HMAC-signed proof of who corrected what
+    try:
+        import hashlib as _hashlib
+        from gradata.security.correction_provenance import create_provenance_record
+        correction_hash = _hashlib.sha256(f"{draft}|{final}".encode()).hexdigest()
+        user_id = context.get("user_id", "unknown") if context else "unknown"
+        provenance = create_provenance_record(
+            user_id=user_id, correction_hash=correction_hash,
+            session=session or 0,
+            salt=getattr(brain, "_brain_salt", ""),
+        )
+        event["provenance"] = provenance
+    except Exception:
+        pass  # Never block corrections
+
     return event
 
 
