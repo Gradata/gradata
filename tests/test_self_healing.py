@@ -273,3 +273,50 @@ class TestRetroactiveTest:
         )
         assert result["passes"] is True
         assert result.get("delta_text")  # Should expose what changed
+
+
+class TestReviewRuleFailures:
+    """review_rule_failures: analyze RULE_FAILURE events and produce patch candidates."""
+
+    def test_generates_patch_for_rule_failure(self):
+        from gradata.enhancements.self_healing import review_rule_failures
+
+        failures = [{
+            "data": {
+                "failed_rule_category": "TONE",
+                "failed_rule_description": "Never use exclamation marks",
+                "failed_rule_confidence": 0.92,
+                "correction_description": "Removed exclamation marks from casual Slack message",
+            }
+        }]
+        patches = review_rule_failures(failures)
+        assert len(patches) == 1
+        assert patches[0]["category"] == "TONE"
+        assert patches[0]["original_description"] == "Never use exclamation marks"
+        assert patches[0]["proposed_description"] != "Never use exclamation marks"
+        assert "retroactive_test" in patches[0]
+
+    def test_empty_failures_returns_empty(self):
+        from gradata.enhancements.self_healing import review_rule_failures
+
+        patches = review_rule_failures([])
+        assert patches == []
+
+    def test_filters_out_patches_failing_retroactive_test(self):
+        from gradata.enhancements.self_healing import review_rule_failures
+
+        # A failure where the correction has no new context words beyond
+        # stop words -- the heuristic can't narrow the rule so
+        # proposed == original and retroactive test rejects it
+        failures = [{
+            "data": {
+                "failed_rule_category": "TONE",
+                "failed_rule_description": "Use bullet points in reports",
+                "failed_rule_confidence": 0.90,
+                "correction_description": "Use bullet points in reports",
+            }
+        }]
+        patches = review_rule_failures(failures)
+        # The patch can't narrow (correction == rule), so it returns unchanged
+        passing = [p for p in patches if p.get("retroactive_test", {}).get("passes")]
+        assert len(passing) == 0

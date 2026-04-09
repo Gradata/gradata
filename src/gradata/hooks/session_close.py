@@ -37,6 +37,32 @@ def _run_graduation(brain_dir: str) -> None:
         pass
 
 
+def _review_rule_failures(brain_dir: str) -> None:
+    """Background review fork: check for RULE_FAILURE events and apply patches."""
+    try:
+        from gradata.brain import Brain
+
+        brain = Brain(brain_dir)
+        failures = brain.query_events(event_type="RULE_FAILURE", last_n_sessions=1, limit=50)
+        if not failures:
+            return
+
+        from gradata.enhancements.self_healing import review_rule_failures
+        patches = review_rule_failures(failures)
+
+        for patch in patches:
+            if not patch.get("retroactive_test", {}).get("passes"):
+                continue
+            brain.patch_rule(
+                category=patch["category"],
+                old_description=patch["original_description"],
+                new_description=patch["proposed_description"],
+                reason=f"Self-healing: {patch['retroactive_test'].get('reason', 'passed retroactive test')}",
+            )
+    except Exception:
+        pass
+
+
 def main(data: dict) -> dict | None:
     brain_dir = resolve_brain_dir()
     if not brain_dir:
@@ -44,6 +70,7 @@ def main(data: dict) -> dict | None:
 
     _emit_session_end(brain_dir)
     _run_graduation(brain_dir)
+    _review_rule_failures(brain_dir)
     return None
 
 

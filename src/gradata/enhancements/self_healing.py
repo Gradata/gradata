@@ -160,3 +160,71 @@ def retroactive_test(
         "delta_text": delta_text,
         "reason": "Patch delta covers failure" if passes else f"Delta irrelevant ({score:.3f} < {threshold})",
     }
+
+
+def _generate_deterministic_patch(
+    rule_description: str,
+    correction_description: str,
+    category: str,
+) -> str:
+    """Generate a narrowed rule description without LLM.
+
+    Heuristic: append the correction context as a qualifying clause.
+    This is the deterministic fallback. LLM refinement is Phase 2.
+    """
+    correction_lower = correction_description.lower()
+    rule_lower = rule_description.lower()
+
+    # Find words in correction that aren't in the rule -- these are the context
+    rule_words = set(rule_lower.split())
+    correction_words = set(correction_lower.split())
+    new_context_words = correction_words - rule_words - {
+        "the", "a", "an", "in", "on", "at", "to", "for", "of", "is", "was",
+        "from", "with", "and", "or", "but", "not", "this", "that",
+    }
+
+    if not new_context_words:
+        return rule_description  # Can't narrow -- return unchanged
+
+    # Take top 3 most informative context words
+    context_phrase = " ".join(sorted(new_context_words)[:3])
+    return f"{rule_description} (especially in context: {context_phrase})"
+
+
+def review_rule_failures(
+    failure_events: list[dict],
+) -> list[dict]:
+    """Analyze RULE_FAILURE events and generate patch candidates.
+
+    Each candidate includes:
+      - category, original_description, proposed_description
+      - retroactive_test result (must pass to enter pipeline)
+
+    This is the background review fork (Hermes pattern).
+    """
+    if not failure_events:
+        return []
+
+    patches = []
+    for event in failure_events:
+        data = event.get("data", {})
+        category = data.get("failed_rule_category", "")
+        original = data.get("failed_rule_description", "")
+        correction = data.get("correction_description", "")
+
+        if not category or not original:
+            continue
+
+        proposed = _generate_deterministic_patch(original, correction, category)
+
+        test_result = retroactive_test(original, proposed, correction)
+
+        patches.append({
+            "category": category,
+            "original_description": original,
+            "proposed_description": proposed,
+            "correction_description": correction,
+            "retroactive_test": test_result,
+        })
+
+    return patches
