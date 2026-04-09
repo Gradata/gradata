@@ -63,10 +63,19 @@ def _simulate_session(brain, correction: dict) -> dict:
         draft=correction["draft"], final=correction["final"],
         category=correction["category"], session=correction["session"],
     )
+    # Propagate real severity from the correction result
+    # Try result["severity"] first (if brain.correct returns it directly),
+    # fall back to result["outcome"] or nested result["data"]["severity"]
+    severity = (
+        result.get("severity") or
+        result.get("outcome") or
+        (result.get("data") or {}).get("severity") or
+        "major"  # final fallback
+    )
     end_result = brain.end_session(
         session_corrections=[{
             "category": correction["category"],
-            "severity": result.get("outcome", "major"),
+            "severity": severity,
             "direction": "REINFORCING",
         }],
         session_type="sales",

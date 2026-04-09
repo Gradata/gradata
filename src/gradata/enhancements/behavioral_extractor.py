@@ -19,14 +19,16 @@ Google Smart Compose (sentence-level diffs > word-level for behavioral extractio
 """
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from gradata.enhancements.diff_engine import DiffResult
     from gradata.enhancements.edit_classifier import EditClassification
+
+_log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -418,11 +420,27 @@ def _try_llm_extract(llm_provider, draft: str, final: str, classification) -> st
     if llm_provider is None:
         return None
     try:
-        refined = llm_provider.extract(draft, final, classification)
+        # Build a prompt from the correction context
+        category = classification.category if classification else "UNKNOWN"
+        prompt = (
+            f"Extract an actionable behavioral instruction from this correction:\n\n"
+            f"Draft: {draft}\n\n"
+            f"Final: {final}\n\n"
+            f"Category: {category}\n\n"
+            f"Return a single imperative instruction (e.g., 'Always X', 'Don't Y', 'Use Z instead of W')."
+        )
+
+        # Call complete() with appropriate parameters
+        refined = llm_provider.complete(prompt, max_tokens=100, timeout=10)
+
         if refined and _is_actionable(refined):
             return refined
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.warning(
+            "LLM extraction failed for category=%s: %s",
+            classification.category if classification else "UNKNOWN",
+            exc
+        )
     return None
 
 
