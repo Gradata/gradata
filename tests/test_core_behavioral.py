@@ -13,7 +13,7 @@ def test_correct_uses_behavioral_description():
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
         brain = Brain.init(d)
         with patch(
-            "gradata.enhancements.edit_classifier.extract_behavioral_instruction",
+            "gradata.enhancements.behavioral_extractor.extract_instruction",
             return_value="Use casual, direct tone in all communications",
         ):
             brain.correct(
@@ -31,7 +31,7 @@ def test_correct_falls_back_to_old_description():
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
         brain = Brain.init(d)
         with patch(
-            "gradata.enhancements.edit_classifier.extract_behavioral_instruction",
+            "gradata.enhancements.behavioral_extractor.extract_instruction",
             return_value=None,
         ):
             brain.correct(

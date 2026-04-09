@@ -225,19 +225,28 @@ def brain_correct(
                         _log.debug("Skipping extraction for converged category: %s", cat)
                         desc = primary.description
                     else:
-                        # Try behavioral extraction (LLM + cache + templates)
+                        # Try behavioral extraction:
+                        # 1. Archetype-based (sentence-level, deterministic)
+                        # 2. Keyword templates (fallback)
+                        # 3. LLM refinement (when connected)
                         try:
-                            from gradata.enhancements.edit_classifier import (
-                                extract_behavioral_instruction,
+                            from gradata.enhancements.behavioral_extractor import extract_instruction
+                            behavioral_desc = extract_instruction(
+                                draft, final, primary, category=cat,
                             )
-                            from gradata.enhancements.instruction_cache import InstructionCache
-                            if not isinstance(brain._instruction_cache, InstructionCache):
-                                brain._instruction_cache = InstructionCache(
-                                    lessons_path.parent / "instruction_cache.json"
+                            if not behavioral_desc:
+                                # Fallback to keyword templates
+                                from gradata.enhancements.edit_classifier import (
+                                    extract_behavioral_instruction,
                                 )
-                            behavioral_desc = extract_behavioral_instruction(
-                                diff, primary, cache=brain._instruction_cache,  # type: ignore[arg-type]
-                            )
+                                from gradata.enhancements.instruction_cache import InstructionCache
+                                if not isinstance(brain._instruction_cache, InstructionCache):
+                                    brain._instruction_cache = InstructionCache(
+                                        lessons_path.parent / "instruction_cache.json"
+                                    )
+                                behavioral_desc = extract_behavioral_instruction(
+                                    diff, primary, cache=brain._instruction_cache,  # type: ignore[arg-type]
+                                )
                             desc = behavioral_desc or primary.description
                         except Exception as e:
                             _log.debug("Behavioral extraction failed: %s", e)
