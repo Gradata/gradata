@@ -99,3 +99,64 @@ def apply_patch(
             lesson.description = new_description
             return lesson
     return None
+
+
+def retroactive_test(
+    original_rule_desc: str,
+    proposed_patch_desc: str,
+    correction_description: str,
+) -> dict:
+    """Gate: does the proposed patch's DELTA cover the failure?
+
+    Compares the *new content added by the patch* (the delta between
+    original and proposed) against the correction description. This tests
+    whether the qualifying language the patch introduces is relevant to
+    the failure context -- not just whether the whole rule overlaps.
+
+    No LLM calls. The failure record IS the test.
+
+    Returns:
+        {"passes": bool, "delta_score": float, "delta_text": str, "reason": str}
+    """
+    if proposed_patch_desc.strip() == original_rule_desc.strip():
+        return {
+            "passes": False,
+            "delta_score": 0.0,
+            "delta_text": "",
+            "reason": "Patch identical to original rule -- no improvement",
+        }
+
+    # Extract the delta: words in the patch that aren't in the original
+    original_words = set(original_rule_desc.lower().split())
+    patch_words = proposed_patch_desc.lower().split()
+    delta_words = [w for w in patch_words if w not in original_words]
+    delta_text = " ".join(delta_words)
+
+    if not delta_text.strip():
+        return {
+            "passes": False,
+            "delta_score": 0.0,
+            "delta_text": "",
+            "reason": "No new content in patch",
+        }
+
+    # Check if the delta is relevant to the correction
+    # Use both TF-IDF similarity and simple word-stem overlap for short texts
+    from gradata.enhancements.similarity import best_similarity
+    sim = best_similarity(delta_text, correction_description)
+
+    # Fallback: word-stem overlap (handles "emails" vs "email", short deltas)
+    delta_stems = {w[:5] for w in delta_text.lower().split() if len(w) >= 3}
+    correction_stems = {w[:5] for w in correction_description.lower().split() if len(w) >= 3}
+    stem_overlap = len(delta_stems & correction_stems) / max(len(delta_stems), 1)
+    score = max(sim, stem_overlap)
+
+    threshold = 0.20  # Lower threshold since delta is shorter text
+    passes = score >= threshold
+
+    return {
+        "passes": passes,
+        "delta_score": round(score, 3),
+        "delta_text": delta_text,
+        "reason": "Patch delta covers failure" if passes else f"Delta irrelevant ({score:.3f} < {threshold})",
+    }

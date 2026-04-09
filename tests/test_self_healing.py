@@ -225,3 +225,51 @@ class TestPatchRule:
         )
         assert result["patched"] is False
         assert "not_found" in result.get("error", "")
+
+
+class TestRetroactiveTest:
+    """retroactive_test: validate a proposed patch against the failure that triggered it."""
+
+    def test_patch_that_covers_failure_passes(self):
+        from gradata.enhancements.self_healing import retroactive_test
+
+        result = retroactive_test(
+            original_rule_desc="Never use exclamation marks",
+            proposed_patch_desc="Never use exclamation marks in professional emails",
+            correction_description="Removed exclamation marks from sales email draft",
+        )
+        assert result["passes"] is True
+
+    def test_patch_unrelated_to_failure_fails(self):
+        from gradata.enhancements.self_healing import retroactive_test
+
+        result = retroactive_test(
+            original_rule_desc="Use bullet points",
+            proposed_patch_desc="Use numbered lists instead of bullet points",
+            correction_description="Removed exclamation marks from email",
+        )
+        assert result["passes"] is False
+
+    def test_patch_identical_to_original_fails(self):
+        """If the patch is the same as the original, it can't help."""
+        from gradata.enhancements.self_healing import retroactive_test
+
+        result = retroactive_test(
+            original_rule_desc="Never use exclamation marks",
+            proposed_patch_desc="Never use exclamation marks",
+            correction_description="Removed exclamation marks",
+        )
+        assert result["passes"] is False
+
+    def test_delta_based_matching(self):
+        """The test should check the DELTA (new words in patch), not the whole patch."""
+        from gradata.enhancements.self_healing import retroactive_test
+
+        # The delta here is "professional emails" -- relevant to "sales email draft"
+        result = retroactive_test(
+            original_rule_desc="Never use exclamation marks",
+            proposed_patch_desc="Never use exclamation marks in professional emails",
+            correction_description="Removed exclamation marks from sales email draft",
+        )
+        assert result["passes"] is True
+        assert result.get("delta_text")  # Should expose what changed
