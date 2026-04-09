@@ -104,7 +104,7 @@ def process_hook_input(raw_input: str) -> dict:
     except json.JSONDecodeError:
         return {"captured": False, "reason": "invalid_json"}
 
-    correction = _extract_correction(data, data.get("tool_output", ""))
+    correction = _extract_correction(data, data.get("tool_output"))
     if correction is None:
         return {"captured": False, "reason": "no_correction"}
 
@@ -243,7 +243,7 @@ def main(data: dict) -> dict | None:
     if not data:
         return None
 
-    correction = _extract_correction(data, data.get("tool_output", ""))
+    correction = _extract_correction(data, data.get("tool_output"))
     if correction is None:
         return None
 

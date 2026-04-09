@@ -62,7 +62,13 @@ def main(data: dict) -> dict | None:
                 line for line in text.splitlines() if line.strip() and not line.startswith("#")
             ])
 
-        uid = os.getuid() if hasattr(os, "getuid") else "win"
+        if hasattr(os, "getuid"):
+            uid = os.getuid()
+        else:
+            try:
+                uid = os.getlogin()
+            except OSError:
+                uid = f"pid{os.getpid()}"
         user_tmp = Path(tempfile.gettempdir()) / f"gradata-{uid}"
         user_tmp.mkdir(parents=True, exist_ok=True)
         dir_hash = hashlib.md5(str(brain_dir).encode()).hexdigest()[:8]
