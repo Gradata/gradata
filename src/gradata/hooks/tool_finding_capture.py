@@ -17,9 +17,20 @@ HOOK_META = {
 }
 
 def _findings_path() -> Path:
-    uid = os.getuid() if hasattr(os, "getuid") else "win"
+    if hasattr(os, "getuid"):
+        uid = os.getuid()
+    else:
+        # Windows: use login name + pid for user isolation
+        try:
+            uid = os.getlogin()
+        except OSError:
+            uid = f"pid{os.getpid()}"
     user_tmp = Path(tempfile.gettempdir()) / f"gradata-{uid}"
-    user_tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        user_tmp.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # Permission denied or other OS error — fall back to plain tempdir
+        user_tmp = Path(tempfile.gettempdir())
     return user_tmp / "findings.json"
 
 
