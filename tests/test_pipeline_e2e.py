@@ -93,7 +93,7 @@ class TestPipelineE2E:
         )
         assert result is not None
         severity = result.get("outcome") or result.get("data", {}).get("severity")
-        assert severity in ("trivial", "minor", "moderate", "major", "rewrite")
+        assert severity in ("as-is", "minor", "moderate", "major", "discarded")
 
     def test_graduation_across_sessions(self, fresh_brain):
         for corr in SALES_CORRECTIONS[:3]:

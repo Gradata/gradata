@@ -209,7 +209,8 @@ def detect_archetype(
 
     # 3. CONSTRAINT_ADDITION (check BEFORE length — constraints lengthen text)
     new_constraints = [w for w in _CONSTRAINT_WORDS
-                       if w in final.lower() and w not in draft.lower()]
+                       if re.search(r'\b' + re.escape(w) + r'\b', final, flags=re.IGNORECASE)
+                       and not re.search(r'\b' + re.escape(w) + r'\b', draft, flags=re.IGNORECASE)]
     if new_constraints:
         constraint_sent = _find_sentence_containing(final, new_constraints[0])
         return ArchetypeMatch(
