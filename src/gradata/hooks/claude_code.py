@@ -31,39 +31,22 @@ _HOOK_CONFIG = {
 }
 
 
-def install_hook() -> None:
-    """Add Gradata correction capture hook to Claude Code settings."""
-    settings = _load_settings()
-    hooks = settings.setdefault("hooks", {})
-    hooks[_HOOK_NAME] = _HOOK_CONFIG
-    _save_settings(settings)
-    print(f"Gradata hook installed in {_SETTINGS_PATH}")
-    print("Hook will capture corrections on Edit/Write tool use.")
+def install_hook(profile: str = "standard") -> None:
+    """Add Gradata hooks to Claude Code settings."""
+    from gradata.hooks._installer import install
+    install(profile)
 
 
 def uninstall_hook() -> None:
-    """Remove Gradata hook from Claude Code settings."""
-    settings = _load_settings()
-    hooks = settings.get("hooks", {})
-    if _HOOK_NAME in hooks:
-        del hooks[_HOOK_NAME]
-        _save_settings(settings)
-        print("Gradata hook removed.")
-    else:
-        print("Gradata hook not found in settings.")
+    """Remove Gradata hooks from Claude Code settings."""
+    from gradata.hooks._installer import uninstall
+    uninstall()
 
 
 def hook_status() -> None:
-    """Check if the Gradata hook is installed."""
-    settings = _load_settings()
-    hooks = settings.get("hooks", {})
-    if _HOOK_NAME in hooks:
-        print("Gradata hook: INSTALLED")
-        print(f"  Settings: {_SETTINGS_PATH}")
-        print(f"  Command: {hooks[_HOOK_NAME].get('command', '?')}")
-    else:
-        print("Gradata hook: NOT INSTALLED")
-        print("  Run: gradata hooks install")
+    """Check if Gradata hooks are installed."""
+    from gradata.hooks._installer import status
+    status()
 
 
 def capture_correction() -> None:
