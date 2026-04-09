@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import time
+import threading
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from unittest.mock import patch
@@ -93,22 +93,17 @@ def test_telemetry_sent_when_opted_in(tmp_path: Path) -> None:
         patch("urllib.request.urlopen") as mock_urlopen,
     ):
         d._maybe_send_telemetry()
-        # Poll for up to 2 seconds for the background thread to complete
-        timeout = 2.0
-        start = time.monotonic()
-        while time.monotonic() - start < timeout:
-            if mock_urlopen.called:
-                break
-            time.sleep(0.05)
-        else:
-            pytest.fail("Telemetry thread did not complete within timeout")
+        # Wait for the background telemetry thread to finish
+        for t in threading.enumerate():
+            if t.name != "MainThread" and t.is_alive():
+                t.join(timeout=5)
 
-    # The background thread should have attempted a POST
-    assert mock_urlopen.called
+        # The background thread should have attempted a POST
+        assert mock_urlopen.called
 
-    # And written telemetry_last_sent to config
-    config_after = config_path.read_text(encoding="utf-8")
-    assert "telemetry_last_sent" in config_after
+        # And written telemetry_last_sent to config
+        config_after = config_path.read_text(encoding="utf-8")
+        assert "telemetry_last_sent" in config_after
 
 
 def test_telemetry_skipped_when_sent_recently(tmp_path: Path) -> None:
