@@ -320,3 +320,60 @@ class TestReviewRuleFailures:
         # The patch can't narrow (correction == rule), so it returns unchanged
         passing = [p for p in patches if p.get("retroactive_test", {}).get("passes")]
         assert len(passing) == 0
+
+
+class TestNudgeThreshold:
+    """check_nudge_threshold: 3+ corrections in a category with no rule -> nudge."""
+
+    def test_nudge_triggered_at_threshold(self):
+        from gradata.enhancements.self_healing import check_nudge_threshold
+
+        correction_events = [
+            {"data": {"category": "TONE", "summary": "Removed exclamation marks"}, "session": 1},
+            {"data": {"category": "TONE", "summary": "Toned down exclamation marks"}, "session": 2},
+            {"data": {"category": "TONE", "summary": "Removed exclamation marks from email"}, "session": 3},
+        ]
+        lessons = []  # No rules
+        result = check_nudge_threshold(correction_events, lessons, category="TONE")
+        assert result["should_nudge"] is True
+        assert result["correction_count"] == 3
+        assert result["centroid_description"]  # Should pick most representative
+
+    def test_no_nudge_below_threshold(self):
+        from gradata.enhancements.self_healing import check_nudge_threshold
+
+        correction_events = [
+            {"data": {"category": "TONE", "summary": "Fixed tone"}, "session": 1},
+            {"data": {"category": "TONE", "summary": "Fixed tone again"}, "session": 2},
+        ]
+        result = check_nudge_threshold(correction_events, [], category="TONE")
+        assert result["should_nudge"] is False
+
+    def test_no_nudge_when_rule_exists(self):
+        from gradata.enhancements.self_healing import check_nudge_threshold
+
+        correction_events = [
+            {"data": {"category": "TONE", "summary": "Fixed tone"}, "session": i} for i in range(5)
+        ]
+        rule = Lesson(
+            date="2026-04-01", state=LessonState.RULE, confidence=0.90,
+            category="TONE", description="Watch your tone", fire_count=5,
+        )
+        result = check_nudge_threshold(correction_events, [rule], category="TONE")
+        assert result["should_nudge"] is False
+        assert "existing_rule" in result
+
+    def test_auto_creates_instinct_with_pending_approval(self):
+        """Nudge should auto-create an INSTINCT lesson from centroid, pending approval."""
+        from gradata.enhancements.self_healing import check_nudge_threshold
+
+        correction_events = [
+            {"data": {"category": "TONE", "summary": "Removed exclamation marks from email"}, "session": 1},
+            {"data": {"category": "TONE", "summary": "Toned down exclamation marks in draft"}, "session": 2},
+            {"data": {"category": "TONE", "summary": "Removed exclamation marks from sales email"}, "session": 3},
+        ]
+        result = check_nudge_threshold(correction_events, [], category="TONE")
+        assert result["should_nudge"] is True
+        assert result["proposed_lesson"] is not None
+        assert result["proposed_lesson"]["state"] == "INSTINCT"
+        assert result["proposed_lesson"]["pending_approval"] is True

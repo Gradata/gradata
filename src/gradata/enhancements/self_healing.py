@@ -228,3 +228,110 @@ def review_rule_failures(
         })
 
     return patches
+
+
+# ── Nudging ────────────────────────────────────────────────────────────
+
+NUDGE_THRESHOLD = 3  # Corrections before nudging
+
+
+def _find_centroid(descriptions: list[str]) -> str:
+    """Find the most representative description (highest avg similarity to others)."""
+    if len(descriptions) <= 1:
+        return descriptions[0] if descriptions else ""
+
+    from gradata.enhancements.similarity import best_similarity
+
+    best_desc, best_avg = descriptions[0], 0.0
+    for desc in descriptions:
+        avg_sim = sum(best_similarity(desc, other) for other in descriptions if other != desc)
+        avg_sim /= max(len(descriptions) - 1, 1)
+        if avg_sim > best_avg:
+            best_avg = avg_sim
+            best_desc = desc
+    return best_desc
+
+
+def check_nudge_threshold(
+    correction_events: list[dict],
+    lessons: list[Lesson],
+    category: str,
+    threshold: int = NUDGE_THRESHOLD,
+) -> dict:
+    """Check if a category has enough corrections without a covering rule to trigger a nudge.
+
+    When triggered (A+B strategy):
+      - Proposes an INSTINCT lesson from the centroid correction (most representative)
+      - Marks it pending_approval=True so it won't graduate without validation
+
+    Returns:
+        {"should_nudge": bool, "correction_count": int, "centroid_description": str,
+         "proposed_lesson": dict | None, ...}
+    """
+    from gradata._types import LessonState
+
+    cat = category.upper()
+
+    # Collect corrections in this category
+    cat_corrections = [
+        e for e in correction_events
+        if (e.get("data", {}).get("category", "") or "").upper() == cat
+    ]
+    count = len(cat_corrections)
+
+    # Check if a RULE already covers this category
+    existing_rule = next(
+        (l for l in lessons
+         if l.category.upper() == cat
+         and l.state == LessonState.RULE
+         and l.confidence >= DEFAULT_MIN_CONFIDENCE),
+        None,
+    )
+
+    if existing_rule:
+        return {
+            "should_nudge": False,
+            "correction_count": count,
+            "centroid_description": "",
+            "proposed_lesson": None,
+            "existing_rule": existing_rule.description[:200],
+            "reason": "Rule already exists for this category",
+        }
+
+    should_nudge = count >= threshold
+    if not should_nudge:
+        return {
+            "should_nudge": False,
+            "correction_count": count,
+            "centroid_description": "",
+            "proposed_lesson": None,
+            "category": cat,
+            "reason": f"Below threshold ({count}/{threshold})",
+        }
+
+    # Find centroid: most representative correction description
+    descriptions = [
+        e.get("data", {}).get("summary", "") or e.get("data", {}).get("description", "")
+        for e in cat_corrections
+    ]
+    descriptions = [d for d in descriptions if d]
+    centroid = _find_centroid(descriptions) if descriptions else f"Repeated {cat.lower()} corrections"
+
+    # Propose an INSTINCT lesson with pending_approval
+    from gradata.enhancements.self_improvement import INITIAL_CONFIDENCE
+    proposed = {
+        "state": "INSTINCT",
+        "confidence": INITIAL_CONFIDENCE,
+        "category": cat,
+        "description": centroid,
+        "pending_approval": True,
+    }
+
+    return {
+        "should_nudge": True,
+        "correction_count": count,
+        "centroid_description": centroid,
+        "proposed_lesson": proposed,
+        "category": cat,
+        "reason": f"{count} corrections, threshold={threshold}",
+    }
