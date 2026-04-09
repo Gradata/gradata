@@ -377,6 +377,34 @@ def brain_correct(
     except Exception as e:
         _log.debug("Domain fire attribution failed: %s", e)
 
+    # Self-healing: detect rule failures
+    try:
+        from gradata.enhancements.self_healing import detect_rule_failure
+        from gradata.enhancements.self_improvement import parse_lessons as _sh_parse
+
+        _sh_lessons_path = brain._find_lessons_path()
+        _sh_all_lessons = _sh_parse(
+            _sh_lessons_path.read_text(encoding="utf-8")
+        ) if _sh_lessons_path and _sh_lessons_path.is_file() else []
+
+        failure = detect_rule_failure(
+            lessons=_sh_all_lessons,
+            correction_category=category or "UNKNOWN",
+            correction_description=desc or summary or "",
+        )
+        if failure:
+            failure["correction_event_id"] = event.get("id")
+            failure["correction_severity"] = diff.severity
+            brain.emit(
+                "RULE_FAILURE", "brain.correct:self_healing",
+                failure,
+                [f"category:{failure['failed_rule_category']}", "self_healing"],
+                session,
+            )
+            event["rule_failure_detected"] = True
+    except Exception as e:
+        _log.debug("Self-healing detection failed: %s", e)
+
     # Persist rule graph
     if hasattr(brain, '_rule_graph') and brain._rule_graph:
         with contextlib.suppress(Exception):

@@ -111,3 +111,46 @@ class TestDetectRuleFailure:
         )
         assert result is not None
         assert result["failed_rule_confidence"] == 0.95
+
+
+class TestBrainCorrectRuleFailure:
+    """brain.correct() emits RULE_FAILURE when a RULE should have caught the correction."""
+
+    @pytest.fixture
+    def brain_with_rule(self, tmp_path):
+        """Create a brain with a graduated RULE in TONE category."""
+        from gradata.brain import Brain
+        from gradata._types import Lesson, LessonState
+        from gradata.enhancements.self_improvement import format_lessons
+        from gradata._db import write_lessons_safe
+
+        brain = Brain.init(str(tmp_path / "test-brain"))
+        rule = Lesson(
+            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
+            category="TONE", description="Never use exclamation marks in professional emails",
+            fire_count=8,
+        )
+        lessons_path = brain._find_lessons_path(create=True)
+        write_lessons_safe(lessons_path, format_lessons([rule]))
+        return brain
+
+    def test_correction_in_ruled_category_emits_rule_failure(self, brain_with_rule):
+        result = brain_with_rule.correct(
+            draft="Great to hear from you! Let's connect!",
+            final="Great to hear from you. Let's connect.",
+            category="TONE",
+        )
+        # Check that a RULE_FAILURE event was emitted
+        events = brain_with_rule.query_events(event_type="RULE_FAILURE", limit=10)
+        assert len(events) >= 1
+        failure = events[0]
+        assert failure["data"]["failed_rule_category"] == "TONE"
+        assert failure["data"]["failed_rule_confidence"] >= 0.80
+
+    def test_correction_in_unruled_category_no_rule_failure(self, brain_with_rule):
+        result = brain_with_rule.correct(
+            draft="wrong format", final="correct format",
+            category="FORMAT",
+        )
+        events = brain_with_rule.query_events(event_type="RULE_FAILURE", limit=10)
+        assert len(events) == 0
