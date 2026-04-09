@@ -79,3 +79,23 @@ def detect_rule_failure(
         result["memory_context"] = memory_context
 
     return result
+
+
+def apply_patch(
+    lessons: list[Lesson],
+    category: str,
+    old_description: str,
+    new_description: str,
+) -> Lesson | None:
+    """Find and patch a rule's description. Returns the patched lesson or None.
+
+    Preserves: confidence, fire_count, state, date, all metadata.
+    Changes: description only.
+    """
+    cat = category.upper()
+    for lesson in lessons:
+        if (lesson.category.upper() == cat
+                and lesson.description == old_description):
+            lesson.description = new_description
+            return lesson
+    return None

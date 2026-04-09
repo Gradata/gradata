@@ -154,3 +154,74 @@ class TestBrainCorrectRuleFailure:
         )
         events = brain_with_rule.query_events(event_type="RULE_FAILURE", limit=10)
         assert len(events) == 0
+
+
+class TestPatchRule:
+    """brain.patch_rule() rewrites a rule's description while preserving metadata."""
+
+    @pytest.fixture
+    def brain_with_rule(self, tmp_path):
+        from gradata.brain import Brain
+        from gradata._types import Lesson, LessonState
+        from gradata.enhancements.self_improvement import format_lessons
+        from gradata._db import write_lessons_safe
+
+        brain = Brain.init(str(tmp_path / "test-brain"))
+        rule = Lesson(
+            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
+            category="TONE", description="Never use exclamation marks",
+            fire_count=8,
+        )
+        lessons_path = brain._find_lessons_path(create=True)
+        write_lessons_safe(lessons_path, format_lessons([rule]))
+        return brain
+
+    def test_patch_rewrites_description(self, brain_with_rule):
+        result = brain_with_rule.patch_rule(
+            category="TONE",
+            old_description="Never use exclamation marks",
+            new_description="Never use exclamation marks in professional emails (casual is OK)",
+            reason="Rule was too broad - failed on casual context",
+        )
+        assert result["patched"] is True
+        assert result["old_description"] == "Never use exclamation marks"
+        assert result["new_description"].startswith("Never use exclamation marks in professional")
+
+        # Verify the lesson was actually updated on disk
+        lessons = brain_with_rule._load_lessons()
+        tone_rules = [l for l in lessons if l.category == "TONE" and l.state.value == "RULE"]
+        assert len(tone_rules) == 1
+        assert "professional emails" in tone_rules[0].description
+
+    def test_patch_preserves_confidence_and_metadata(self, brain_with_rule):
+        result = brain_with_rule.patch_rule(
+            category="TONE",
+            old_description="Never use exclamation marks",
+            new_description="Avoid exclamation marks in formal contexts",
+            reason="Narrowing scope",
+        )
+        lessons = brain_with_rule._load_lessons()
+        tone_rules = [l for l in lessons if l.category == "TONE"]
+        assert tone_rules[0].confidence == 0.92
+        assert tone_rules[0].fire_count == 8
+
+    def test_patch_emits_rule_patched_event(self, brain_with_rule):
+        brain_with_rule.patch_rule(
+            category="TONE",
+            old_description="Never use exclamation marks",
+            new_description="Avoid exclamation marks in formal contexts",
+            reason="Too broad",
+        )
+        events = brain_with_rule.query_events(event_type="RULE_PATCHED", limit=10)
+        assert len(events) >= 1
+        assert events[0]["data"]["reason"] == "Too broad"
+
+    def test_patch_nonexistent_rule_returns_not_found(self, brain_with_rule):
+        result = brain_with_rule.patch_rule(
+            category="TONE",
+            old_description="This rule does not exist",
+            new_description="New version",
+            reason="test",
+        )
+        assert result["patched"] is False
+        assert "not_found" in result.get("error", "")
