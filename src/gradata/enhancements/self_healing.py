@@ -13,18 +13,13 @@ touches production rules without surviving graduation.
 """
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from gradata._types import Lesson
 
-_log = logging.getLogger("gradata.self_healing")
-
 # Only RULE state with confidence >= this threshold triggers self-healing
 DEFAULT_MIN_CONFIDENCE = 0.80
-# States that are alive and should be checked for failures
-_ACTIVE_STATES = {"RULE"}
 
 
 def detect_rule_failure(
@@ -165,7 +160,6 @@ def retroactive_test(
 def _generate_deterministic_patch(
     rule_description: str,
     correction_description: str,
-    category: str,
 ) -> str:
     """Generate a narrowed rule description without LLM.
 
@@ -215,7 +209,7 @@ def review_rule_failures(
         if not category or not original:
             continue
 
-        proposed = _generate_deterministic_patch(original, correction, category)
+        proposed = _generate_deterministic_patch(original, correction)
 
         test_result = retroactive_test(original, proposed, correction)
 

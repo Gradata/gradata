@@ -69,6 +69,73 @@ def _detect_signals(text: str) -> list[dict]:
     return signals
 
 
+def _check_nudges(brain_dir: str) -> None:
+    """Check recent corrections and create INSTINCT lessons for uncovered categories."""
+    from gradata.brain import Brain
+
+    brain = Brain(brain_dir)
+    recent_corrections = brain.query_events(
+        event_type="CORRECTION", last_n_sessions=5, limit=200,
+    )
+    if not recent_corrections:
+        return
+
+    from gradata.enhancements.self_healing import check_nudge_threshold
+
+    lessons = brain._load_lessons()
+    categories_seen = {
+        cat
+        for evt in recent_corrections
+        if (cat := (evt.get("data", {}).get("category") or "").upper())
+        and cat != "UNKNOWN"
+    }
+
+    for cat in categories_seen:
+        nudge = check_nudge_threshold(recent_corrections, lessons, cat)
+        if not nudge["should_nudge"]:
+            continue
+
+        brain.emit(
+            "NUDGE_CREATE_RULE",
+            "hook:implicit_feedback",
+            {
+                "category": cat,
+                "correction_count": nudge["correction_count"],
+                "centroid_description": nudge.get("centroid_description", ""),
+            },
+            [f"category:{cat}", "self_healing"],
+        )
+
+        proposed = nudge.get("proposed_lesson")
+        if not proposed:
+            continue
+
+        from datetime import date as _date
+        from gradata._types import Lesson, LessonState
+        from gradata.enhancements.self_improvement import (
+            format_lessons, parse_lessons, INITIAL_CONFIDENCE,
+        )
+        from gradata._db import write_lessons_safe
+
+        lessons_path = brain._find_lessons_path(create=True)
+        if not lessons_path:
+            continue
+
+        existing = parse_lessons(
+            lessons_path.read_text(encoding="utf-8")
+        ) if lessons_path.is_file() else []
+        new_lesson = Lesson(
+            date=_date.today().isoformat(),
+            state=LessonState.INSTINCT,
+            confidence=INITIAL_CONFIDENCE,
+            category=proposed["category"],
+            description=proposed["description"],
+            pending_approval=True,
+        )
+        existing.append(new_lesson)
+        write_lessons_safe(lessons_path, format_lessons(existing))
+
+
 def main(data: dict) -> dict | None:
     try:
         message = extract_message(data)
@@ -103,55 +170,7 @@ def main(data: dict) -> dict | None:
         # Correction-driven nudging: check if any category needs a rule
         if brain_dir:
             try:
-                from gradata.brain import Brain
-                brain = Brain(brain_dir)
-                recent_corrections = brain.query_events(
-                    event_type="CORRECTION", last_n_sessions=5, limit=200,
-                )
-                if recent_corrections:
-                    from gradata.enhancements.self_healing import check_nudge_threshold
-                    lessons = brain._load_lessons()
-                    categories_seen = set()
-                    for evt in recent_corrections:
-                        cat = (evt.get("data", {}).get("category") or "").upper()
-                        if cat and cat != "UNKNOWN":
-                            categories_seen.add(cat)
-                    for cat in categories_seen:
-                        nudge = check_nudge_threshold(recent_corrections, lessons, cat)
-                        if nudge["should_nudge"]:
-                            brain.emit(
-                                "NUDGE_CREATE_RULE",
-                                "hook:implicit_feedback",
-                                {
-                                    "category": cat,
-                                    "correction_count": nudge["correction_count"],
-                                    "centroid_description": nudge.get("centroid_description", ""),
-                                },
-                                [f"category:{cat}", "self_healing"],
-                            )
-                            proposed = nudge.get("proposed_lesson")
-                            if proposed:
-                                from datetime import date as _date
-                                from gradata._types import Lesson, LessonState
-                                from gradata.enhancements.self_improvement import (
-                                    format_lessons, parse_lessons, INITIAL_CONFIDENCE,
-                                )
-                                from gradata._db import write_lessons_safe
-                                lessons_path = brain._find_lessons_path(create=True)
-                                if lessons_path:
-                                    existing = parse_lessons(
-                                        lessons_path.read_text(encoding="utf-8")
-                                    ) if lessons_path.is_file() else []
-                                    new_lesson = Lesson(
-                                        date=_date.today().isoformat(),
-                                        state=LessonState.INSTINCT,
-                                        confidence=INITIAL_CONFIDENCE,
-                                        category=proposed["category"],
-                                        description=proposed["description"],
-                                        pending_approval=True,
-                                    )
-                                    existing.append(new_lesson)
-                                    write_lessons_safe(lessons_path, format_lessons(existing))
+                _check_nudges(brain_dir)
             except Exception as exc:
                 _log.debug("nudge check failed: %s", exc)
 

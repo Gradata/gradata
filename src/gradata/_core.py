@@ -380,15 +380,10 @@ def brain_correct(
     # Self-healing: detect rule failures
     try:
         from gradata.enhancements.self_healing import detect_rule_failure
-        from gradata.enhancements.self_improvement import parse_lessons as _sh_parse
 
-        _sh_lessons_path = brain._find_lessons_path()
-        _sh_all_lessons = _sh_parse(
-            _sh_lessons_path.read_text(encoding="utf-8")
-        ) if _sh_lessons_path and _sh_lessons_path.is_file() else []
-
+        all_lessons = brain._load_lessons()
         failure = detect_rule_failure(
-            lessons=_sh_all_lessons,
+            lessons=all_lessons,
             correction_category=category or "UNKNOWN",
             correction_description=desc or summary or "",
         )
