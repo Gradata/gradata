@@ -34,6 +34,16 @@ import os
 import sys
 from pathlib import Path
 
+from gradata.hooks._base import run_hook
+from gradata.hooks._profiles import Profile
+
+HOOK_META = {
+    "event": "PostToolUse",
+    "matcher": "Edit|Write",
+    "profile": Profile.MINIMAL,
+    "timeout": 5000,
+}
+
 
 def _get_brain():
     """Get or auto-initialize a brain instance."""
@@ -243,4 +253,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_hook(main, HOOK_META)
