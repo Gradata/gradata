@@ -30,10 +30,6 @@ SECRET_PATTERNS = [
 
 
 def main(data: dict) -> dict | None:
-    tool_name = data.get("tool_name", "")
-    if tool_name not in ("Write", "Edit", "MultiEdit"):
-        return None
-
     tool_input = data.get("tool_input", {})
     content = tool_input.get("content", "") or tool_input.get("new_string", "")
     if not content:

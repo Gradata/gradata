@@ -33,7 +33,7 @@ def read_input(raw: str) -> dict | None:
         return None
     try:
         return json.loads(raw)
-    except (json.JSONDecodeError, Exception):
+    except Exception:
         return None
 
 

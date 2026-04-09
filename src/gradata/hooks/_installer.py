@@ -65,7 +65,6 @@ def generate_settings(profile: str = "standard") -> dict:
         if event not in hooks_by_event:
             hooks_by_event[event] = []
 
-        # Group hooks by event
         hooks_by_event[event].append({
             "hooks": [hook_entry],
             "description": description,
