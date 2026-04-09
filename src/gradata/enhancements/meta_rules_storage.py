@@ -339,10 +339,7 @@ def load_super_meta_rules(db_path: str | Path) -> list[SuperMetaRule]:
 
 # Severity weights for pattern graduation scoring (different scale from
 # self_improvement.SEVERITY_WEIGHTS which is for confidence-delta math)
-PATTERN_SEVERITY_WEIGHTS = {
-    k: max(0.0, min(1.0, v))
-    for k, v in {"major": 1.0, "rewrite": 1.0, "moderate": 0.75, "minor": 0.5, "trivial": 0.25}.items()
-}
+PATTERN_SEVERITY_WEIGHTS = {"major": 2.0, "rewrite": 2.5, "moderate": 1.5, "minor": 1.0, "trivial": 0.5}
 
 
 def ensure_pattern_table(db_path: str | Path) -> None:
@@ -451,20 +448,40 @@ def query_graduation_candidates(
     try:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            """SELECT
-                 pattern_hash,
-                 MIN(category) AS category,
-                 MIN(representative_text) AS representative_text,
-                 COUNT(DISTINCT session_id) AS distinct_sessions,
-                 SUM(severity_weight) AS weighted_score,
-                 MIN(created_at) AS first_seen,
-                 MAX(created_at) AS last_seen,
-                 GROUP_CONCAT(DISTINCT session_id) AS session_ids
-               FROM correction_patterns
-               GROUP BY pattern_hash
-               HAVING COUNT(DISTINCT session_id) >= ?
-                  AND SUM(severity_weight) >= ?
-               ORDER BY weighted_score DESC
+            """WITH representative AS (
+                 SELECT
+                   pattern_hash,
+                   category,
+                   representative_text,
+                   ROW_NUMBER() OVER (PARTITION BY pattern_hash ORDER BY created_at DESC) AS rn
+                 FROM correction_patterns
+               ),
+               aggregates AS (
+                 SELECT
+                   pattern_hash,
+                   COUNT(DISTINCT session_id) AS distinct_sessions,
+                   SUM(severity_weight) AS weighted_score,
+                   MIN(created_at) AS first_seen,
+                   MAX(created_at) AS last_seen,
+                   GROUP_CONCAT(DISTINCT session_id) AS session_ids
+                 FROM correction_patterns
+                 GROUP BY pattern_hash
+                 HAVING COUNT(DISTINCT session_id) >= ?
+                    AND SUM(severity_weight) >= ?
+               )
+               SELECT
+                 r.pattern_hash,
+                 r.category,
+                 r.representative_text,
+                 a.distinct_sessions,
+                 a.weighted_score,
+                 a.first_seen,
+                 a.last_seen,
+                 a.session_ids
+               FROM representative r
+               INNER JOIN aggregates a ON r.pattern_hash = a.pattern_hash
+               WHERE r.rn = 1
+               ORDER BY a.weighted_score DESC
             """,
             (min_sessions, min_score),
         ).fetchall()

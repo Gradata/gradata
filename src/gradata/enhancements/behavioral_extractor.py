@@ -25,11 +25,11 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
-_log = logging.getLogger(__name__)
-
 if TYPE_CHECKING:
     from gradata.enhancements.diff_engine import DiffResult
     from gradata.enhancements.edit_classifier import EditClassification
+
+_log = logging.getLogger(__name__)
 
 # Import at module level to avoid private-symbol import inside function body
 try:
@@ -323,7 +323,7 @@ def detect_archetype(
 # Template Generation
 # ---------------------------------------------------------------------------
 
-def generate_instruction(match: ArchetypeMatch) -> str:
+def generate_instruction(match: ArchetypeMatch, category: str = "") -> str:
     """Generate an imperative behavioral instruction from an archetype match."""
     ctx = match.context
     a = match.archetype
@@ -438,11 +438,27 @@ def _try_llm_extract(llm_provider, draft: str, final: str, classification) -> st
     if llm_provider is None:
         return None
     try:
-        refined = llm_provider.extract(draft, final, classification)
+        # Build a prompt from the correction context
+        cat = classification.category if classification else "UNKNOWN"
+        prompt = (
+            f"Extract an actionable behavioral instruction from this correction:\n\n"
+            f"Draft: {draft}\n\n"
+            f"Final: {final}\n\n"
+            f"Category: {cat}\n\n"
+            f"Return a single imperative instruction (e.g., 'Always X', 'Don't Y', 'Use Z instead of W')."
+        )
+
+        # Call complete() with appropriate parameters
+        refined = llm_provider.complete(prompt, max_tokens=100, timeout=10)
+
         if refined and _is_actionable(refined):
             return refined
     except Exception as exc:
-        _log.debug("LLM extraction failed: %s", exc)
+        _log.warning(
+            "LLM extraction failed for category=%s: %s",
+            classification.category if classification else "UNKNOWN",
+            exc
+        )
     return None
 
 
@@ -478,7 +494,7 @@ def extract_instruction(
         Actionable behavioral instruction, or None if extraction fails.
     """
     match = detect_archetype(draft, final, classification)
-    instruction = generate_instruction(match)
+    instruction = generate_instruction(match, category)
 
     if instruction and _is_actionable(instruction):
         # LLM HOOK: refine low-confidence extractions when provider connected

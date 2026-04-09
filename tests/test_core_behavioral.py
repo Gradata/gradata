@@ -21,9 +21,9 @@ def test_correct_uses_behavioral_description():
                 final="Hey, here's what we decided.",
             )
         lessons_path = Path(d) / "lessons.md"
-        if lessons_path.exists():
-            content = lessons_path.read_text(encoding="utf-8")
-            assert "Use casual, direct tone" in content
+        assert lessons_path.exists(), "lessons.md should be created after correction"
+        content = lessons_path.read_text(encoding="utf-8")
+        assert "Use casual, direct tone" in content
 
 
 def test_correct_falls_back_to_old_description():
@@ -39,6 +39,25 @@ def test_correct_falls_back_to_old_description():
                 final="Hey, here's the deal.",
             )
         lessons_path = Path(d) / "lessons.md"
-        if lessons_path.exists():
-            content = lessons_path.read_text(encoding="utf-8")
-            assert "INSTINCT" in content or "PATTERN" in content
+        assert lessons_path.exists(), "lessons.md should be created after correction"
+        content = lessons_path.read_text(encoding="utf-8")
+        assert "INSTINCT" in content or "PATTERN" in content
+
+
+def test_correct_persists_legacy_on_extractor_failure():
+    """When extract_instruction raises an exception, legacy description should be persisted."""
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
+        brain = Brain.init(d)
+        with patch(
+            "gradata.enhancements.behavioral_extractor.extract_instruction",
+            side_effect=Exception("Simulated extraction failure"),
+        ):
+            brain.correct(
+                draft="Dear Sir, We are pleased to inform you.",
+                final="Hey, here's what we decided.",
+            )
+        lessons_path = Path(d) / "lessons.md"
+        assert lessons_path.exists(), "lessons.md should be created even after extraction failure"
+        content = lessons_path.read_text(encoding="utf-8")
+        # Legacy extractor should have persisted the fallback description
+        assert "INSTINCT" in content or "PATTERN" in content or len(content) > 0
