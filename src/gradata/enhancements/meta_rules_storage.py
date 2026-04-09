@@ -339,7 +339,10 @@ def load_super_meta_rules(db_path: str | Path) -> list[SuperMetaRule]:
 
 # Severity weights for pattern graduation scoring (different scale from
 # self_improvement.SEVERITY_WEIGHTS which is for confidence-delta math)
-PATTERN_SEVERITY_WEIGHTS = {"major": 2.0, "rewrite": 2.5, "moderate": 1.5, "minor": 1.0, "trivial": 0.5}
+PATTERN_SEVERITY_WEIGHTS = {
+    k: max(0.0, min(1.0, v))
+    for k, v in {"major": 1.0, "rewrite": 1.0, "moderate": 0.75, "minor": 0.5, "trivial": 0.25}.items()
+}
 
 
 def ensure_pattern_table(db_path: str | Path) -> None:
@@ -376,6 +379,7 @@ def upsert_correction_pattern(
     severity: str = "minor",
 ) -> None:
     """Record a correction pattern occurrence for a session."""
+    ensure_pattern_table(db_path)
     weight = PATTERN_SEVERITY_WEIGHTS.get(severity, 1.0)
     conn = sqlite3.connect(str(db_path))
     try:
@@ -407,6 +411,7 @@ def upsert_correction_patterns_batch(
     """
     if not patterns:
         return 0
+    ensure_pattern_table(db_path)
     conn = sqlite3.connect(str(db_path))
     try:
         rows = []
@@ -448,8 +453,8 @@ def query_graduation_candidates(
         rows = conn.execute(
             """SELECT
                  pattern_hash,
-                 category,
-                 representative_text,
+                 MIN(category) AS category,
+                 MIN(representative_text) AS representative_text,
                  COUNT(DISTINCT session_id) AS distinct_sessions,
                  SUM(severity_weight) AS weighted_score,
                  MIN(created_at) AS first_seen,

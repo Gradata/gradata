@@ -1,10 +1,13 @@
 """UserPromptSubmit hook: detect implicit feedback signals in user messages."""
 from __future__ import annotations
 
+import logging
 import re
 
 from gradata.hooks._base import run_hook, resolve_brain_dir, extract_message
 from gradata.hooks._profiles import Profile
+
+_log = logging.getLogger(__name__)
 
 HOOK_META = {
     "event": "UserPromptSubmit",
@@ -94,12 +97,13 @@ def main(data: dict) -> dict | None:
                     },
                     ctx=ctx,
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                _log.debug("implicit_feedback emit failed: %s", exc)
 
         signal_names = ", ".join(s["type"] for s in signals)
         return {"result": f"IMPLICIT FEEDBACK: [{signal_names}]"}
-    except Exception:
+    except Exception as exc:
+        _log.debug("implicit_feedback hook error: %s", exc)
         return None
 
 

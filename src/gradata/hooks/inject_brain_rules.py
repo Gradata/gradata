@@ -23,9 +23,8 @@ def _score(lesson) -> float:
     """Score a lesson dict or Lesson object for injection priority."""
     conf = lesson["confidence"] if isinstance(lesson, dict) else lesson.confidence
     state = lesson["state"] if isinstance(lesson, dict) else lesson.state.name
-    state_str = state if isinstance(state, str) else state
-    conf_norm = (conf - 0.6) / 0.4
-    state_bonus = 1.0 if state_str == "RULE" else 0.7
+    conf_norm = (conf - MIN_CONFIDENCE) / (1.0 - MIN_CONFIDENCE)
+    state_bonus = 1.0 if state == "RULE" else 0.7
     return 0.4 * state_bonus + 0.3 * conf_norm + 0.3 * conf
 
 
