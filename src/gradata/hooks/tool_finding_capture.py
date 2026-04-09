@@ -18,17 +18,6 @@ HOOK_META = {
 
 FINDINGS_FILE = Path(tempfile.gettempdir()) / "gradata-findings.json"
 
-# Test failure patterns
-FAILURE_PATTERNS = [
-    "FAILED",
-    "AssertionError",
-    "AssertionError",  # common typo variant
-    "AssertionError" if False else "AssertionError",
-    "pytest",
-    "ERRORS",
-    "failures=",
-]
-
 # Refined patterns that indicate actual test failures
 TEST_FAILURE_INDICATORS = [
     "FAILED tests/",

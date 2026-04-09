@@ -45,21 +45,34 @@ def output_block(reason: str) -> None:
     print(json.dumps({"decision": "block", "reason": reason}))
 
 
+def resolve_brain_dir() -> str | None:
+    """Resolve brain directory from env vars or default location."""
+    brain_dir = os.environ.get("GRADATA_BRAIN_DIR") or os.environ.get("BRAIN_DIR")
+    if brain_dir:
+        return brain_dir if Path(brain_dir).exists() else None
+    default = Path.home() / ".gradata" / "brain"
+    return str(default) if default.exists() else None
+
+
+def extract_message(data: dict) -> str | None:
+    """Extract user message from hook stdin data."""
+    msg = data.get("message") or data.get("prompt") or data.get("content") or ""
+    if not isinstance(msg, str):
+        return None
+    msg = msg.strip()
+    return msg if msg else None
+
+
 def get_brain():
     try:
         from gradata.brain import Brain
     except ImportError:
         return None
-    brain_dir = os.environ.get("GRADATA_BRAIN_DIR") or os.environ.get("BRAIN_DIR")
+    brain_dir = resolve_brain_dir()
     if not brain_dir:
-        default = Path.home() / ".gradata" / "brain"
-        if default.exists():
-            brain_dir = str(default)
-        else:
-            return None
+        return None
     try:
-        p = Path(brain_dir)
-        return Brain(brain_dir) if p.exists() else None
+        return Brain(brain_dir) if Path(brain_dir).exists() else None
     except Exception:
         return None
 

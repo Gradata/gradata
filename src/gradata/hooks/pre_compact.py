@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 import json
-import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from gradata.hooks._base import run_hook
+from gradata.hooks._base import run_hook, resolve_brain_dir
 from gradata.hooks._profiles import Profile
 
 HOOK_META = {
@@ -16,15 +15,6 @@ HOOK_META = {
     "profile": Profile.STANDARD,
     "timeout": 5000,
 }
-
-
-def _resolve_brain_dir() -> Path | None:
-    brain_dir = os.environ.get("GRADATA_BRAIN_DIR") or os.environ.get("BRAIN_DIR")
-    if brain_dir:
-        p = Path(brain_dir)
-        return p if p.exists() else None
-    default = Path.home() / ".gradata" / "brain"
-    return default if default.exists() else None
 
 
 def _get_session_number(brain_dir: Path) -> int | None:
@@ -47,9 +37,10 @@ def _get_session_number(brain_dir: Path) -> int | None:
 
 def main(data: dict) -> dict | None:
     try:
-        brain_dir = _resolve_brain_dir()
-        if not brain_dir:
+        brain_dir_str = resolve_brain_dir()
+        if not brain_dir_str:
             return None
+        brain_dir = Path(brain_dir_str)
 
         session = _get_session_number(brain_dir)
         compact_type = data.get("type", "unknown") if data else "unknown"

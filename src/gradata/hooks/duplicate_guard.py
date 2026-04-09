@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import re
+from difflib import SequenceMatcher
 from pathlib import Path
 
 from gradata.hooks._base import run_hook
@@ -28,35 +29,21 @@ def _normalize(name: str) -> str:
     return name
 
 
-def _levenshtein(s1: str, s2: str) -> int:
-    if len(s1) < len(s2):
-        return _levenshtein(s2, s1)
-    if len(s2) == 0:
-        return len(s1)
-
-    prev_row = list(range(len(s2) + 1))
-    for i, c1 in enumerate(s1):
-        curr_row = [i + 1]
-        for j, c2 in enumerate(s2):
-            insertions = prev_row[j + 1] + 1
-            deletions = curr_row[j] + 1
-            substitutions = prev_row[j] + (c1 != c2)
-            curr_row.append(min(insertions, deletions, substitutions))
-        prev_row = curr_row
-    return prev_row[-1]
-
-
 def _similarity(a: str, b: str) -> float:
-    if not a or not b:
+    na, nb = _normalize(a), _normalize(b)
+    if na == nb:
+        return 1.0
+    # Length short-circuit: reject if length difference alone exceeds threshold
+    max_len = max(len(na), len(nb))
+    if max_len == 0:
+        return 1.0
+    if abs(len(na) - len(nb)) / max_len > 0.45:
         return 0.0
-    distance = _levenshtein(a, b)
-    max_len = max(len(a), len(b))
-    return 1.0 - (distance / max_len)
+    return SequenceMatcher(None, na, nb).ratio()
 
 
 def _find_similar(target_path: str, project_root: str) -> list[tuple[str, float]]:
-    target_norm = _normalize(target_path)
-    if not target_norm:
+    if not _normalize(target_path):
         return []
 
     similar = []
@@ -70,8 +57,7 @@ def _find_similar(target_path: str, project_root: str) -> list[tuple[str, float]
             for f in watched_dir.rglob("*.py"):
                 if f.name.startswith("__"):
                     continue
-                existing_norm = _normalize(f.name)
-                sim = _similarity(target_norm, existing_norm)
+                sim = _similarity(target_path, f.name)
                 if sim > SIMILARITY_THRESHOLD:
                     rel = str(f.relative_to(root))
                     similar.append((rel, sim))

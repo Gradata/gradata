@@ -1,10 +1,13 @@
 """PreToolUse hook: inject RULE-tier lessons as reminders before code edits."""
 from __future__ import annotations
-import os
-import re
 from pathlib import Path
-from gradata.hooks._base import run_hook
+from gradata.hooks._base import run_hook, resolve_brain_dir
 from gradata.hooks._profiles import Profile
+
+try:
+    from gradata.enhancements.self_improvement import parse_lessons
+except ImportError:
+    parse_lessons = None
 
 HOOK_META = {
     "event": "PreToolUse",
@@ -13,37 +16,35 @@ HOOK_META = {
     "timeout": 5000,
 }
 
-RULE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}\s+\[RULE:([0-9.]+)\]\s+(\w+):\s+(.+)$")
 MAX_REMINDERS = 5
 
 
 def main(data: dict) -> dict | None:
-    brain_dir = os.environ.get("GRADATA_BRAIN_DIR") or os.environ.get("BRAIN_DIR")
+    if parse_lessons is None:
+        return None
+
+    brain_dir = resolve_brain_dir()
     if not brain_dir:
-        default = Path.home() / ".gradata" / "brain"
-        if default.exists():
-            brain_dir = str(default)
-        else:
-            return None
+        return None
 
     lessons_path = Path(brain_dir) / "lessons.md"
     if not lessons_path.is_file():
         return None
 
     text = lessons_path.read_text(encoding="utf-8")
-    rules = []
-    for line in text.splitlines():
-        m = RULE_RE.match(line.strip())
-        if m:
-            conf, category, desc = m.groups()
-            truncated = desc[:120] + "..." if len(desc) > 120 else desc
-            rules.append(f"[RULE:{conf}] {category}: {truncated}")
+    all_lessons = parse_lessons(text)
+    rule_lessons = [l for l in all_lessons if l.state.name == "RULE"]
 
-    if not rules:
+    if not rule_lessons:
         return None
 
-    top = rules[:MAX_REMINDERS]
-    block = "ACTIVE RULES (learned from corrections):\n" + "\n".join(f"  • {r}" for r in top)
+    rules = []
+    for l in rule_lessons[:MAX_REMINDERS]:
+        desc = l.description
+        truncated = desc[:120] + "..." if len(desc) > 120 else desc
+        rules.append(f"[RULE:{l.confidence:.2f}] {l.category}: {truncated}")
+
+    block = "ACTIVE RULES (learned from corrections):\n" + "\n".join(f"  • {r}" for r in rules)
     return {"result": block}
 
 

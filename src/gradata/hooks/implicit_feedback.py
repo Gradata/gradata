@@ -1,11 +1,9 @@
 """UserPromptSubmit hook: detect implicit feedback signals in user messages."""
 from __future__ import annotations
 
-import os
 import re
-from pathlib import Path
 
-from gradata.hooks._base import run_hook
+from gradata.hooks._base import run_hook, resolve_brain_dir, extract_message
 from gradata.hooks._profiles import Profile
 
 HOOK_META = {
@@ -50,13 +48,6 @@ SIGNAL_MAP = {
 }
 
 
-def _extract_message(data: dict) -> str | None:
-    msg = data.get("message") or data.get("prompt") or data.get("content")
-    if not msg or not isinstance(msg, str):
-        return None
-    return msg.strip()
-
-
 def _detect_signals(text: str) -> list[dict]:
     signals = []
     for signal_type, patterns in SIGNAL_MAP.items():
@@ -77,7 +68,7 @@ def _detect_signals(text: str) -> list[dict]:
 
 def main(data: dict) -> dict | None:
     try:
-        message = _extract_message(data)
+        message = extract_message(data)
         if not message or len(message) < 5:
             return None
 
@@ -86,10 +77,7 @@ def main(data: dict) -> dict | None:
             return None
 
         # Emit event if brain dir available
-        brain_dir = os.environ.get("GRADATA_BRAIN_DIR") or os.environ.get("BRAIN_DIR")
-        if not brain_dir:
-            default = Path.home() / ".gradata" / "brain"
-            brain_dir = str(default) if default.exists() else None
+        brain_dir = resolve_brain_dir()
 
         if brain_dir:
             try:

@@ -1,10 +1,7 @@
 """PostToolUse hook: emit AGENT_OUTCOME event after Agent tool completes."""
 from __future__ import annotations
 
-import os
-from pathlib import Path
-
-from gradata.hooks._base import run_hook
+from gradata.hooks._base import run_hook, resolve_brain_dir
 from gradata.hooks._profiles import Profile
 
 HOOK_META = {
@@ -13,14 +10,6 @@ HOOK_META = {
     "profile": Profile.STANDARD,
     "timeout": 10000,
 }
-
-
-def _resolve_brain_dir() -> str | None:
-    brain_dir = os.environ.get("GRADATA_BRAIN_DIR") or os.environ.get("BRAIN_DIR")
-    if brain_dir and Path(brain_dir).exists():
-        return brain_dir
-    default = Path.home() / ".gradata" / "brain"
-    return str(default) if default.exists() else None
 
 
 def _infer_agent_type(data: dict) -> str:
@@ -34,7 +23,7 @@ def _infer_agent_type(data: dict) -> str:
 
 def main(data: dict) -> dict | None:
     try:
-        brain_dir = _resolve_brain_dir()
+        brain_dir = resolve_brain_dir()
         if not brain_dir:
             return None
 

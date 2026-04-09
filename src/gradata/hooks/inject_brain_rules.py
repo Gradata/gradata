@@ -1,10 +1,13 @@
 """SessionStart hook: inject graduated rules into session context."""
 from __future__ import annotations
-import os
-import re
 from pathlib import Path
-from gradata.hooks._base import run_hook
+from gradata.hooks._base import run_hook, resolve_brain_dir
 from gradata.hooks._profiles import Profile
+
+try:
+    from gradata.enhancements.self_improvement import parse_lessons
+except ImportError:
+    parse_lessons = None
 
 HOOK_META = {
     "event": "SessionStart",
@@ -14,60 +17,41 @@ HOOK_META = {
 
 MAX_RULES = 10
 MIN_CONFIDENCE = 0.60
-RULE_RE = re.compile(
-    r"^(\d{4}-\d{2}-\d{2})\s+\[(RULE|PATTERN):([0-9.]+)\]\s+(\w+):\s+(.+)$"
-)
 
 
-def _parse_lessons(text: str) -> list[dict]:
-    lessons = []
-    for line in text.splitlines():
-        m = RULE_RE.match(line.strip())
-        if not m:
-            continue
-        date, state, conf_str, category, description = m.groups()
-        conf = float(conf_str)
-        if conf < MIN_CONFIDENCE:
-            continue
-        lessons.append({
-            "date": date,
-            "state": state,
-            "confidence": conf,
-            "category": category,
-            "description": description.strip(),
-        })
-    return lessons
-
-
-def _score(lesson: dict) -> float:
-    conf_norm = (lesson["confidence"] - 0.6) / 0.4
-    state_bonus = 1.0 if lesson["state"] == "RULE" else 0.7
-    return 0.4 * state_bonus + 0.3 * conf_norm + 0.3 * lesson["confidence"]
+def _score(lesson) -> float:
+    """Score a lesson dict or Lesson object for injection priority."""
+    conf = lesson["confidence"] if isinstance(lesson, dict) else lesson.confidence
+    state = lesson["state"] if isinstance(lesson, dict) else lesson.state.name
+    state_str = state if isinstance(state, str) else state
+    conf_norm = (conf - 0.6) / 0.4
+    state_bonus = 1.0 if state_str == "RULE" else 0.7
+    return 0.4 * state_bonus + 0.3 * conf_norm + 0.3 * conf
 
 
 def main(data: dict) -> dict | None:
-    brain_dir = os.environ.get("GRADATA_BRAIN_DIR") or os.environ.get("BRAIN_DIR")
+    if parse_lessons is None:
+        return None
+
+    brain_dir = resolve_brain_dir()
     if not brain_dir:
-        default = Path.home() / ".gradata" / "brain"
-        if default.exists():
-            brain_dir = str(default)
-        else:
-            return None
+        return None
 
     lessons_path = Path(brain_dir) / "lessons.md"
     if not lessons_path.is_file():
         return None
 
     text = lessons_path.read_text(encoding="utf-8")
-    lessons = _parse_lessons(text)
-    if not lessons:
+    all_lessons = parse_lessons(text)
+    filtered = [l for l in all_lessons if l.state.name in ("RULE", "PATTERN") and l.confidence >= MIN_CONFIDENCE]
+    if not filtered:
         return None
 
-    scored = sorted(lessons, key=_score, reverse=True)[:MAX_RULES]
+    scored = sorted(filtered, key=_score, reverse=True)[:MAX_RULES]
 
     lines = []
     for r in scored:
-        lines.append(f"[{r['state']}:{r['confidence']:.2f}] {r['category']}: {r['description']}")
+        lines.append(f"[{r.state.name}:{r.confidence:.2f}] {r.category}: {r.description}")
 
     block = "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
     return {"result": block}

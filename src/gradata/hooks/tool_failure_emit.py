@@ -1,11 +1,9 @@
 """PostToolUse hook: detect tool failures and emit TOOL_FAILURE event."""
 from __future__ import annotations
 
-import os
 import re
-from pathlib import Path
 
-from gradata.hooks._base import run_hook
+from gradata.hooks._base import run_hook, resolve_brain_dir
 from gradata.hooks._profiles import Profile
 
 HOOK_META = {
@@ -70,10 +68,7 @@ def main(data: dict) -> dict | None:
         if not signals:
             return None
 
-        brain_dir = os.environ.get("GRADATA_BRAIN_DIR") or os.environ.get("BRAIN_DIR")
-        if not brain_dir:
-            default = Path.home() / ".gradata" / "brain"
-            brain_dir = str(default) if default.exists() else None
+        brain_dir = resolve_brain_dir()
 
         if brain_dir:
             from gradata._events import emit

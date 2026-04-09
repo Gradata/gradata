@@ -4,26 +4,29 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-from gradata.hooks.inject_brain_rules import main as inject_main, _parse_lessons, _score
+from gradata.enhancements.self_improvement import parse_lessons
+from gradata.hooks.inject_brain_rules import main as inject_main, _score
 from gradata.hooks.session_close import main as close_main
 
 
 def test_parse_lessons_extracts_rules():
     text = (
-        "2026-04-01 [RULE:0.92] PROCESS: Always plan before implementing\n"
-        "2026-04-01 [PATTERN:0.65] TONE: Use casual tone in emails\n"
-        "2026-04-01 [INSTINCT:0.35] CODE: Add docstrings\n"
+        "[2026-04-01] [RULE:0.92] PROCESS: Always plan before implementing\n"
+        "[2026-04-01] [PATTERN:0.65] TONE: Use casual tone in emails\n"
+        "[2026-04-01] [INSTINCT:0.35] CODE: Add docstrings\n"
     )
-    lessons = _parse_lessons(text)
-    assert len(lessons) == 2  # INSTINCT below threshold
-    assert lessons[0]["state"] == "RULE"
-    assert lessons[0]["confidence"] == 0.92
-    assert lessons[1]["state"] == "PATTERN"
+    lessons = parse_lessons(text)
+    # parse_lessons returns all lessons; filtering is done in the hook
+    rules_and_patterns = [l for l in lessons if l.state.name in ("RULE", "PATTERN")]
+    assert len(rules_and_patterns) == 2
+    assert rules_and_patterns[0].state.name == "RULE"
+    assert rules_and_patterns[0].confidence == 0.92
+    assert rules_and_patterns[1].state.name == "PATTERN"
 
 
 def test_parse_lessons_empty():
-    assert _parse_lessons("") == []
-    assert _parse_lessons("random text\nno lessons here\n") == []
+    assert parse_lessons("") == []
+    assert parse_lessons("random text\nno lessons here\n") == []
 
 
 def test_score_rule_higher_than_pattern():
@@ -41,9 +44,9 @@ def test_score_higher_confidence_wins():
 def test_inject_rules_from_lessons(tmp_path):
     lessons = tmp_path / "lessons.md"
     lessons.write_text(
-        "2026-04-01 [RULE:0.92] PROCESS: Always plan before implementing\n"
-        "2026-04-01 [PATTERN:0.65] TONE: Use casual tone in emails\n"
-        "2026-04-01 [INSTINCT:0.35] CODE: Add docstrings\n",
+        "[2026-04-01] [RULE:0.92] PROCESS: Always plan before implementing\n"
+        "[2026-04-01] [PATTERN:0.65] TONE: Use casual tone in emails\n"
+        "[2026-04-01] [INSTINCT:0.35] CODE: Add docstrings\n",
         encoding="utf-8",
     )
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
@@ -59,7 +62,7 @@ def test_inject_rules_no_brain_dir(tmp_path):
     fake_home = tmp_path / "fakehome"
     fake_home.mkdir()
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": "", "BRAIN_DIR": ""}):
-        with patch("gradata.hooks.inject_brain_rules.Path.home", return_value=fake_home):
+        with patch("gradata.hooks._base.Path.home", return_value=fake_home):
             result = inject_main({})
     assert result is None
 
@@ -83,6 +86,6 @@ def test_session_close_no_brain(tmp_path):
     fake_home = tmp_path / "fakehome"
     fake_home.mkdir()
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": "", "BRAIN_DIR": ""}):
-        with patch("gradata.hooks.session_close.Path.home", return_value=fake_home):
+        with patch("gradata.hooks._base.Path.home", return_value=fake_home):
             result = close_main({})
     assert result is None

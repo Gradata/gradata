@@ -99,9 +99,9 @@ def test_config_protection_no_file_path():
 def test_rule_enforcement_injects_rules(tmp_path):
     lessons = tmp_path / "lessons.md"
     lessons.write_text(
-        "2026-04-01 [RULE:0.92] PROCESS: Always plan before implementing\n"
-        "2026-04-01 [PATTERN:0.65] TONE: Use casual tone\n"
-        "2026-04-01 [RULE:0.95] CODE: Never hardcode secrets\n",
+        "[2026-04-01] [RULE:0.92] PROCESS: Always plan before implementing\n"
+        "[2026-04-01] [PATTERN:0.65] TONE: Use casual tone\n"
+        "[2026-04-01] [RULE:0.95] CODE: Never hardcode secrets\n",
         encoding="utf-8",
     )
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
@@ -116,7 +116,7 @@ def test_rule_enforcement_injects_rules(tmp_path):
 
 def test_rule_enforcement_no_rules(tmp_path):
     lessons = tmp_path / "lessons.md"
-    lessons.write_text("2026-04-01 [INSTINCT:0.35] CODE: Add docstrings\n", encoding="utf-8")
+    lessons.write_text("[2026-04-01] [INSTINCT:0.35] CODE: Add docstrings\n", encoding="utf-8")
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
         result = enforce_main({})
     assert result is None
@@ -125,7 +125,7 @@ def test_rule_enforcement_no_rules(tmp_path):
 def test_rule_enforcement_truncates_long_descriptions(tmp_path):
     lessons = tmp_path / "lessons.md"
     long_desc = "A" * 200
-    lessons.write_text(f"2026-04-01 [RULE:0.90] CODE: {long_desc}\n", encoding="utf-8")
+    lessons.write_text(f"[2026-04-01] [RULE:0.90] CODE: {long_desc}\n", encoding="utf-8")
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
         result = enforce_main({})
     assert result is not None
@@ -137,7 +137,7 @@ def test_rule_enforcement_no_brain():
         os.environ.pop("GRADATA_BRAIN_DIR", None)
         os.environ.pop("BRAIN_DIR", None)
         # Mock Path.home to avoid finding a real brain
-        with patch("gradata.hooks.rule_enforcement.Path") as MockPath:
+        with patch("gradata.hooks._base.Path") as MockPath:
             MockPath.home.return_value = Path("/nonexistent")
             result = enforce_main({})
     assert result is None

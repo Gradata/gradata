@@ -15,8 +15,8 @@ from gradata.hooks.agent_precontext import main as precontext_main
 def test_agent_precontext_injects_rules(tmp_path):
     lessons = tmp_path / "lessons.md"
     lessons.write_text(
-        "2026-04-01 [RULE:0.92] PROCESS: Always plan first\n"
-        "2026-04-01 [PATTERN:0.65] CODE: Use type hints\n"
+        "[2026-04-01] [RULE:0.92] PROCESS: Always plan first\n"
+        "[2026-04-01] [PATTERN:0.65] CODE: Use type hints\n"
     )
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
         result = precontext_main({
@@ -40,8 +40,8 @@ def test_agent_precontext_no_brain():
 def test_agent_precontext_scope_matching(tmp_path):
     lessons = tmp_path / "lessons.md"
     lessons.write_text(
-        "2026-04-01 [RULE:0.92] SALES: Always check pipeline first\n"
-        "2026-04-01 [RULE:0.91] CODE: Write tests before code\n"
+        "[2026-04-01] [RULE:0.92] SALES: Always check pipeline first\n"
+        "[2026-04-01] [RULE:0.91] CODE: Write tests before code\n"
     )
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
         result = precontext_main({
@@ -238,7 +238,7 @@ from gradata.hooks.pre_compact import main as compact_main
 
 def test_pre_compact_saves_snapshot(tmp_path):
     lessons = tmp_path / "lessons.md"
-    lessons.write_text("2026-04-01 [RULE:0.92] PROCESS: Plan first\n# header\n")
+    lessons.write_text("[2026-04-01] [RULE:0.92] PROCESS: Plan first\n# header\n")
     loop_state = tmp_path / "loop-state.md"
     loop_state.write_text("## Session 42\n")
 
@@ -329,7 +329,7 @@ from gradata.hooks.brain_maintain import main as maintain_main
 
 def test_brain_maintain_runs_silently(tmp_path):
     lessons = tmp_path / "lessons.md"
-    lessons.write_text("2026-04-01 [RULE:0.92] PROCESS: Plan first\n")
+    lessons.write_text("[2026-04-01] [RULE:0.92] PROCESS: Plan first\n")
 
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
         with patch("gradata._query.fts_index") as mock_fts:
