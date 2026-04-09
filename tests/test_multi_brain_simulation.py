@@ -910,7 +910,7 @@ def test_compound_score_across_personas(all_brains: list[BrainState]) -> None:
       3. Score is bounded [0, 100].
       4. 10-session brain scores < 50-session brain (monotonic improvement).
     """
-    from gradata._brain_manifest import _compound_score
+    from gradata._manifest_quality import _compound_score
 
     persona_scores: list[float] = []
     for brain in all_brains:
