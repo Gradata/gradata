@@ -46,7 +46,7 @@ def test_extraction_runs_when_diverging(tmp_path):
     }
 
     with patch.object(brain, "_get_convergence", return_value=diverging_result):
-        with patch("gradata.enhancements.edit_classifier.extract_behavioral_instruction", return_value=None) as mock_extract:
+        with patch("gradata.enhancements.behavioral_extractor.extract_instruction", return_value="Use 'well' instead of 'good'") as mock_extract:
             brain.correct(
                 "The system is working good",
                 "The system is working well",

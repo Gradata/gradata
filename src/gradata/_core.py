@@ -38,8 +38,8 @@ _DIMENSION_CATEGORY_MAP = {
 def _filter_lessons_by_state(lessons, min_state: str = "PATTERN"):
     """Filter lessons by minimum state rank."""
     min_rank = _STATE_RANK.get(min_state.upper(), 1)
-    return [l for l in lessons
-            if _STATE_RANK.get(l.state.value, -1) >= min_rank and l.confidence > 0.0]
+    return [lesson for lesson in lessons
+            if _STATE_RANK.get(lesson.state.value, -1) >= min_rank and lesson.confidence > 0.0]
 
 
 # ── correct() ──────────────────────────────────────────────────────────
@@ -98,11 +98,11 @@ def brain_correct(
         raise ValueError(f"session must be a positive integer, got {session!r}")
 
     # Normalize and validate scope
-    _VALID_SCOPES = {"domain", "one_off", "universal", "project"}
+    _valid_scopes = {"domain", "one_off", "universal", "project"}
     if scope is not None:
         scope = str(scope).strip().lower() or None
-        if scope is not None and scope not in _VALID_SCOPES:
-            raise ValueError(f"Unsupported correction scope: {scope!r}. Must be one of {_VALID_SCOPES}")
+        if scope is not None and scope not in _valid_scopes:
+            raise ValueError(f"Unsupported correction scope: {scope!r}. Must be one of {_valid_scopes}")
 
     # Route to cloud if connected
     if brain._cloud and brain._cloud.connected:
@@ -225,19 +225,30 @@ def brain_correct(
                         _log.debug("Skipping extraction for converged category: %s", cat)
                         desc = primary.description
                     else:
-                        # Try behavioral extraction (LLM + cache + templates)
+                        # Try behavioral extraction:
+                        # 1. Archetype-based (sentence-level, deterministic)
+                        # 2. Keyword templates (fallback)
+                        # 3. LLM refinement (when connected)
                         try:
-                            from gradata.enhancements.edit_classifier import (
-                                extract_behavioral_instruction,
+                            from gradata.enhancements.behavioral_extractor import (
+                                extract_instruction,
                             )
-                            from gradata.enhancements.instruction_cache import InstructionCache
-                            if not isinstance(brain._instruction_cache, InstructionCache):
-                                brain._instruction_cache = InstructionCache(
-                                    lessons_path.parent / "instruction_cache.json"
+                            behavioral_desc = extract_instruction(
+                                draft, final, primary, category=cat,
+                            )
+                            if not behavioral_desc:
+                                # Fallback to keyword templates
+                                from gradata.enhancements.edit_classifier import (
+                                    extract_behavioral_instruction,
                                 )
-                            behavioral_desc = extract_behavioral_instruction(
-                                diff, primary, cache=brain._instruction_cache,  # type: ignore[arg-type]
-                            )
+                                from gradata.enhancements.instruction_cache import InstructionCache
+                                if not isinstance(brain._instruction_cache, InstructionCache):
+                                    brain._instruction_cache = InstructionCache(
+                                        lessons_path.parent / "instruction_cache.json"
+                                    )
+                                behavioral_desc = extract_behavioral_instruction(
+                                    diff, primary, cache=brain._instruction_cache,  # type: ignore[arg-type]
+                                )
                             desc = behavioral_desc or primary.description
                         except Exception as e:
                             _log.debug("Behavioral extraction failed: %s", e)
@@ -484,9 +495,9 @@ def brain_end_session(
 
         # Use category + description prefix as key to avoid collisions
         # when two lessons share the same first 40 chars of description.
-        def _lesson_key(l):
-            return f"{l.category}:{l.description[:60]}"
-        before_states = {_lesson_key(l): l.state.value for l in lessons}
+        def _lesson_key(lesson):
+            return f"{lesson.category}:{lesson.description[:60]}"
+        before_states = {_lesson_key(lesson): lesson.state.value for lesson in lessons}
 
         lessons = update_confidence(
             lessons, session_corrections or [],
@@ -502,12 +513,12 @@ def brain_end_session(
 
         promotions, demotions, kills = 0, 0, 0
         transitions = []
-        for l in active + graduated:
-            key = _lesson_key(l)
+        for lesson in active + graduated:
+            key = _lesson_key(lesson)
             old_state = before_states.get(key, "")
-            new_state = l.state.value
+            new_state = lesson.state.value
             if old_state and new_state != old_state:
-                transitions.append((l, old_state, new_state))
+                transitions.append((lesson, old_state, new_state))
                 if new_state in ("PATTERN", "RULE"):
                     promotions += 1
                 elif new_state == "INSTINCT" and old_state == "PATTERN":
@@ -515,25 +526,25 @@ def brain_end_session(
                 elif new_state in ("KILLED", "UNTESTABLE"):
                     kills += 1
 
-        for l, old_s, new_s in transitions:
-            if new_s in ("PATTERN", "RULE"):
+        for lesson, old_state, new_state in transitions:
+            if new_state in ("PATTERN", "RULE"):
                 try:
                     brain.emit("GRADUATION", "end_session", {
-                        "lesson": l.description[:100], "category": l.category,
-                        "from_state": old_s, "to_state": new_s,
-                        "confidence": l.confidence, "fire_count": l.fire_count})
+                        "lesson": lesson.description[:100], "category": lesson.category,
+                        "from_state": old_state, "to_state": new_state,
+                        "confidence": lesson.confidence, "fire_count": lesson.fire_count})
                 except Exception as e:
                     _log.debug("Graduation emit failed: %s", e)
                 # User-facing graduation notification
                 try:
                     brain.bus.emit("lesson.graduated", {
-                        "category": l.category,
-                        "description": l.description[:100],
-                        "old_state": old_s,
-                        "new_state": new_s,
-                        "fire_count": l.fire_count,
-                        "confidence": l.confidence,
-                        "message": _graduation_message(old_s, l),
+                        "category": lesson.category,
+                        "description": lesson.description[:100],
+                        "old_state": old_state,
+                        "new_state": new_state,
+                        "fire_count": lesson.fire_count,
+                        "confidence": lesson.confidence,
+                        "message": _graduation_message(old_state, lesson),
                     })
                 except Exception as e:
                     _log.debug("lesson.graduated emit failed: %s", e)
@@ -546,13 +557,13 @@ def brain_end_session(
                 from gradata._db import get_connection
                 now = datetime.now(UTC).isoformat()
                 with get_connection(brain.db_path) as conn:
-                    for l, old_s, new_s in transitions:
+                    for lesson, old_state, new_state in transitions:
                         conn.execute(
                             "INSERT INTO lesson_transitions "
                             "(lesson_desc, category, old_state, new_state, confidence, "
                             "fire_count, session, transitioned_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                            (l.description[:100], l.category, old_s, new_s,
-                             l.confidence, l.fire_count, None, now))
+                            (lesson.description[:100], lesson.category, old_state, new_state,
+                             lesson.confidence, lesson.fire_count, None, now))
             except Exception as e:
                 _log.debug("Lineage logging failed: %s", e)
 
@@ -563,11 +574,11 @@ def brain_end_session(
                 from gradata.audit import write_provenance
                 from gradata.inspection import _make_rule_id
                 now_prov = datetime.now(UTC).isoformat()
-                for l, old_s, new_s in transitions:
-                    if new_s in ("PATTERN", "RULE"):
-                        rid = _make_rule_id(l)
-                        if l.correction_event_ids:
-                            for eid in l.correction_event_ids:
+                for lesson, _old_state, new_state in transitions:
+                    if new_state in ("PATTERN", "RULE"):
+                        rid = _make_rule_id(lesson)
+                        if lesson.correction_event_ids:
+                            for eid in lesson.correction_event_ids:
                                 write_provenance(
                                     brain.db_path,
                                     rule_id=rid,

@@ -331,3 +331,156 @@ def load_super_meta_rules(db_path: str | Path) -> list[SuperMetaRule]:
         return supers
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Correction Pattern Tracking (cross-session)
+# ---------------------------------------------------------------------------
+
+# Severity weights for pattern graduation scoring (different scale from
+# self_improvement.SEVERITY_WEIGHTS which is for confidence-delta math)
+PATTERN_SEVERITY_WEIGHTS = {"major": 2.0, "rewrite": 2.5, "moderate": 1.5, "minor": 1.0, "trivial": 0.5}
+
+
+def ensure_pattern_table(db_path: str | Path) -> None:
+    """Create correction_patterns table if it doesn't exist."""
+    conn = sqlite3.connect(str(db_path))
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS correction_patterns (
+                pattern_hash TEXT NOT NULL,
+                category TEXT NOT NULL,
+                representative_text TEXT NOT NULL,
+                session_id INTEGER NOT NULL,
+                severity TEXT DEFAULT 'minor',
+                severity_weight REAL DEFAULT 1.0,
+                created_at TEXT DEFAULT (datetime('now')),
+                UNIQUE(pattern_hash, session_id)
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_patterns_hash
+            ON correction_patterns(pattern_hash)
+        """)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def upsert_correction_pattern(
+    db_path: str | Path,
+    pattern_hash: str,
+    category: str,
+    representative_text: str,
+    session_id: int,
+    severity: str = "minor",
+) -> None:
+    """Record a correction pattern occurrence for a session."""
+    weight = PATTERN_SEVERITY_WEIGHTS.get(severity, 1.0)
+    conn = sqlite3.connect(str(db_path))
+    try:
+        conn.execute(
+            """INSERT INTO correction_patterns
+               (pattern_hash, category, representative_text, session_id, severity, severity_weight)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(pattern_hash, session_id) DO UPDATE SET
+                 severity = CASE WHEN excluded.severity_weight > severity_weight
+                                THEN excluded.severity ELSE severity END,
+                 severity_weight = MAX(severity_weight, excluded.severity_weight),
+                 representative_text = excluded.representative_text
+            """,
+            (pattern_hash, category, representative_text, session_id, severity, weight),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def upsert_correction_patterns_batch(
+    db_path: str | Path,
+    patterns: list[tuple[str, str, str, int, str]],
+) -> int:
+    """Batch upsert multiple correction patterns in one connection.
+
+    Each tuple: (pattern_hash, category, representative_text, session_id, severity).
+    Returns number of rows upserted.
+    """
+    if not patterns:
+        return 0
+    conn = sqlite3.connect(str(db_path))
+    try:
+        rows = []
+        for pattern_hash, category, representative_text, session_id, severity in patterns:
+            weight = PATTERN_SEVERITY_WEIGHTS.get(severity, 1.0)
+            rows.append((pattern_hash, category, representative_text, session_id, severity, weight))
+        conn.executemany(
+            """INSERT INTO correction_patterns
+               (pattern_hash, category, representative_text, session_id, severity, severity_weight)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(pattern_hash, session_id) DO UPDATE SET
+                 severity = CASE WHEN excluded.severity_weight > severity_weight
+                                THEN excluded.severity ELSE severity END,
+                 severity_weight = MAX(severity_weight, excluded.severity_weight),
+                 representative_text = excluded.representative_text
+            """,
+            rows,
+        )
+        conn.commit()
+        return len(rows)
+    finally:
+        conn.close()
+
+
+def query_graduation_candidates(
+    db_path: str | Path,
+    min_sessions: int = 2,
+    min_score: float = 3.0,
+) -> list[dict]:
+    """Find correction patterns ready for meta-rule graduation.
+
+    Returns patterns where:
+    - Distinct sessions >= min_sessions
+    - Sum of severity weights >= min_score
+    """
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        """WITH representative AS (
+             SELECT
+               pattern_hash,
+               category,
+               representative_text,
+               ROW_NUMBER() OVER (PARTITION BY pattern_hash ORDER BY created_at DESC) AS rn
+             FROM correction_patterns
+           ),
+           aggregates AS (
+             SELECT
+               pattern_hash,
+               COUNT(DISTINCT session_id) AS distinct_sessions,
+               SUM(severity_weight) AS weighted_score,
+               MIN(created_at) AS first_seen,
+               MAX(created_at) AS last_seen,
+               GROUP_CONCAT(DISTINCT session_id) AS session_ids
+             FROM correction_patterns
+             GROUP BY pattern_hash
+             HAVING COUNT(DISTINCT session_id) >= ?
+                AND SUM(severity_weight) >= ?
+           )
+           SELECT
+             r.pattern_hash,
+             r.category,
+             r.representative_text,
+             a.distinct_sessions,
+             a.weighted_score,
+             a.first_seen,
+             a.last_seen,
+             a.session_ids
+           FROM representative r
+           INNER JOIN aggregates a ON r.pattern_hash = a.pattern_hash
+           WHERE r.rn = 1
+           ORDER BY a.weighted_score DESC
+        """,
+        (min_sessions, min_score),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
