@@ -95,19 +95,17 @@ def promote_to_canary(rule_category: str, session: int, db_path: Path | None = N
         db_path = _get_db_path()
 
     try:
-        conn = sqlite3.connect(str(db_path))
-        _ensure_table(conn)
-
         from datetime import datetime
         now = datetime.now(UTC).isoformat()
 
-        conn.execute(
-            "INSERT OR REPLACE INTO rule_canary (category, status, start_session, correction_count, updated_at) "
-            "VALUES (?, ?, ?, 0, ?)",
-            (rule_category, CanaryStatus.CANARY.value, session, now),
-        )
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(str(db_path)) as conn:
+            _ensure_table(conn)
+            conn.execute(
+                "INSERT OR REPLACE INTO rule_canary (category, status, start_session, correction_count, updated_at) "
+                "VALUES (?, ?, ?, 0, ?)",
+                (rule_category, CanaryStatus.CANARY.value, session, now),
+            )
+            conn.commit()
     except Exception as e:
         _log.warning("promote_to_canary failed: %s", e)
 
@@ -124,49 +122,47 @@ def check_canary_health(rule_category: str, session: int, db_path: Path | None =
         db_path = _get_db_path()
 
     try:
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
-        _ensure_table(conn)
+        with sqlite3.connect(str(db_path)) as conn:
+            conn.row_factory = sqlite3.Row
+            _ensure_table(conn)
 
-        row = conn.execute(
-            "SELECT * FROM rule_canary WHERE category = ?",
-            (rule_category,),
-        ).fetchone()
-
-        if not row:
-            conn.close()
-            return {
-                "status": "not_found",
-                "sessions_active": 0,
-                "corrections_caused": 0,
-                "recommendation": "not_in_canary",
-            }
-
-        status = row["status"]
-        start_session = row["start_session"]
-        sessions_active = session - start_session + 1
-
-        # Count corrections in this category since canary started
-        correction_count = 0
-        try:
-            corr_row = conn.execute(
-                "SELECT COUNT(*) as cnt FROM events WHERE type = 'CORRECTION' "
-                "AND data_json LIKE ? AND CAST(session AS INTEGER) >= ?",
-                (f'%"{rule_category}"%', start_session),
+            row = conn.execute(
+                "SELECT * FROM rule_canary WHERE category = ?",
+                (rule_category,),
             ).fetchone()
-            if corr_row:
-                correction_count = corr_row["cnt"]
-        except Exception:
-            # events table may not exist in test contexts
-            correction_count = row["correction_count"]
 
-        # Update correction count
-        conn.execute(
-            "UPDATE rule_canary SET correction_count = ? WHERE category = ?",
-            (correction_count, rule_category),
-        )
-        conn.commit()
-        conn.close()
+            if not row:
+                return {
+                    "status": "not_found",
+                    "sessions_active": 0,
+                    "corrections_caused": 0,
+                    "recommendation": "not_in_canary",
+                }
+
+            status = row["status"]
+            start_session = row["start_session"]
+            sessions_active = session - start_session + 1
+
+            # Count corrections in this category since canary started
+            correction_count = 0
+            try:
+                corr_row = conn.execute(
+                    "SELECT COUNT(*) as cnt FROM events WHERE type = 'CORRECTION' "
+                    "AND data_json LIKE ? AND CAST(session AS INTEGER) >= ?",
+                    (f'%"{rule_category}"%', start_session),
+                ).fetchone()
+                if corr_row:
+                    correction_count = corr_row["cnt"]
+            except Exception:
+                # events table may not exist in test contexts
+                correction_count = row["correction_count"]
+
+            # Update correction count
+            conn.execute(
+                "UPDATE rule_canary SET correction_count = ? WHERE category = ?",
+                (correction_count, rule_category),
+            )
+            conn.commit()
 
         # Determine recommendation
         if status in (CanaryStatus.ACTIVE.value, CanaryStatus.ROLLED_BACK.value):
@@ -203,18 +199,16 @@ def rollback_rule(rule_category: str, reason: str, db_path: Path | None = None) 
         db_path = _get_db_path()
 
     try:
-        conn = sqlite3.connect(str(db_path))
-        _ensure_table(conn)
-
         from datetime import datetime
         now = datetime.now(UTC).isoformat()
 
-        conn.execute(
-            "UPDATE rule_canary SET status = ?, updated_at = ? WHERE category = ?",
-            (CanaryStatus.ROLLED_BACK.value, now, rule_category),
-        )
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(str(db_path)) as conn:
+            _ensure_table(conn)
+            conn.execute(
+                "UPDATE rule_canary SET status = ?, updated_at = ? WHERE category = ?",
+                (CanaryStatus.ROLLED_BACK.value, now, rule_category),
+            )
+            conn.commit()
 
         # Emit RULE_ROLLBACK event
         try:
@@ -242,18 +236,16 @@ def promote_to_active(rule_category: str, db_path: Path | None = None) -> None:
         db_path = _get_db_path()
 
     try:
-        conn = sqlite3.connect(str(db_path))
-        _ensure_table(conn)
-
         from datetime import datetime
         now = datetime.now(UTC).isoformat()
 
-        conn.execute(
-            "UPDATE rule_canary SET status = ?, updated_at = ? WHERE category = ?",
-            (CanaryStatus.ACTIVE.value, now, rule_category),
-        )
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(str(db_path)) as conn:
+            _ensure_table(conn)
+            conn.execute(
+                "UPDATE rule_canary SET status = ?, updated_at = ? WHERE category = ?",
+                (CanaryStatus.ACTIVE.value, now, rule_category),
+            )
+            conn.commit()
 
         # Emit CANARY_PROMOTED event
         try:
@@ -277,15 +269,14 @@ def get_canary_rules(db_path: Path | None = None) -> list[dict]:
         db_path = _get_db_path()
 
     try:
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
-        _ensure_table(conn)
+        with sqlite3.connect(str(db_path)) as conn:
+            conn.row_factory = sqlite3.Row
+            _ensure_table(conn)
 
-        rows = conn.execute(
-            "SELECT * FROM rule_canary WHERE status = ?",
-            (CanaryStatus.CANARY.value,),
-        ).fetchall()
-        conn.close()
+            rows = conn.execute(
+                "SELECT * FROM rule_canary WHERE status = ?",
+                (CanaryStatus.CANARY.value,),
+            ).fetchall()
 
         return [dict(r) for r in rows]
 

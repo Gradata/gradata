@@ -48,8 +48,13 @@ def _load_findings() -> list[dict]:
 
 
 def _save_findings(findings: list[dict]) -> None:
+    """Atomically write findings via temp file + rename to avoid corruption
+    from concurrent hook processes writing simultaneously."""
     try:
-        FINDINGS_FILE.write_text(json.dumps(findings[-20:], indent=2), encoding="utf-8")
+        content = json.dumps(findings[-20:], indent=2)
+        tmp = FINDINGS_FILE.with_suffix(".tmp")
+        tmp.write_text(content, encoding="utf-8")
+        tmp.replace(FINDINGS_FILE)  # atomic on POSIX, near-atomic on Windows
     except Exception:
         pass
 

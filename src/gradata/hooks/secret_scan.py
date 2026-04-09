@@ -35,8 +35,7 @@ def _scan_content(content: str) -> list[dict]:
     for name, pattern in SECRET_PATTERNS:
         matches = pattern.findall(content)
         if matches:
-            for m in matches:
-                findings.append({"name": name, "preview": "***REDACTED***"})
+            findings.extend({"name": name, "preview": "***REDACTED***"} for _ in matches)
     return findings
 
 
