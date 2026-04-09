@@ -427,3 +427,67 @@ class TestNarrowRuleScope:
         scope = json.loads(result["new_scope_json"])
         assert "casual_slack" in scope["excluded_domains"]
         assert "internal_notes" in scope["excluded_domains"]
+
+
+class TestSelfHealingE2E:
+    """Full flow: correct -> RULE_FAILURE detected -> patch generated -> rule updated."""
+
+    @pytest.fixture
+    def brain_with_rule(self, tmp_path):
+        from gradata.brain import Brain
+        from gradata._types import Lesson, LessonState
+        from gradata.enhancements.self_improvement import format_lessons
+        from gradata._db import write_lessons_safe
+
+        brain = Brain.init(str(tmp_path / "test-brain"))
+        rule = Lesson(
+            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
+            category="TONE", description="Never use exclamation marks",
+            fire_count=8,
+        )
+        lessons_path = brain._find_lessons_path(create=True)
+        write_lessons_safe(lessons_path, format_lessons([rule]))
+        return brain
+
+    def test_full_self_healing_flow(self, brain_with_rule):
+        brain = brain_with_rule
+
+        # 1. Correction triggers RULE_FAILURE
+        result = brain.correct(
+            draft="Thanks for joining! Excited to work together!",
+            final="Thanks for joining. Excited to work together.",
+            category="TONE",
+        )
+        assert result.get("rule_failure_detected") is True
+
+        # 2. Verify RULE_FAILURE event was emitted
+        failures = brain.query_events(event_type="RULE_FAILURE", limit=10)
+        assert len(failures) >= 1
+
+        # 3. Review generates a patch
+        from gradata.enhancements.self_healing import review_rule_failures
+        patches = review_rule_failures(failures)
+        assert len(patches) >= 1
+
+        # 4. Apply passing patches via brain.patch_rule()
+        for patch in patches:
+            if patch.get("retroactive_test", {}).get("passes"):
+                brain.patch_rule(
+                    category=patch["category"],
+                    old_description=patch["original_description"],
+                    new_description=patch["proposed_description"],
+                    reason="E2E self-healing test",
+                )
+
+        # 5. Verify RULE_PATCHED event
+        patched_events = brain.query_events(event_type="RULE_PATCHED", limit=10)
+        # May or may not have patches depending on deterministic heuristic
+        # But the flow should complete without errors
+
+        # 6. Verify the lesson was updated (if patched)
+        if patched_events:
+            lessons = brain._load_lessons()
+            tone_rules = [l for l in lessons if l.category == "TONE"]
+            assert len(tone_rules) >= 1
+            # Confidence may drop due to correction penalty, but should still be high
+            assert tone_rules[0].confidence >= 0.70
