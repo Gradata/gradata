@@ -335,3 +335,61 @@ def check_nudge_threshold(
         "category": cat,
         "reason": f"{count} corrections, threshold={threshold}",
     }
+
+
+# ── Scope Narrowing (Phase 2 prep -- capture only) ────────────────────
+
+def narrow_rule_scope(
+    rule: Lesson,
+    failure_context: dict,
+) -> dict:
+    """Add a domain exclusion to a rule based on the context where it failed.
+
+    If a rule fires correctly in "sales email" but incorrectly in "casual slack",
+    the slack domain gets excluded. This is Phase 2 prep -- captures the signal
+    now, full scoped-brains implementation later.
+
+    Args:
+        rule: The rule that failed.
+        failure_context: Dict with domain/agent_type/memory info from the failure.
+
+    Returns:
+        {"narrowed": bool, "new_scope_json": str, ...}
+    """
+    import json
+
+    domain = failure_context.get("domain", "")
+    if not domain:
+        return {"narrowed": False, "reason": "No domain in failure context"}
+
+    # Parse existing scope
+    existing_scope: dict = {}
+    if rule.scope_json:
+        try:
+            existing_scope = json.loads(rule.scope_json)
+        except (json.JSONDecodeError, TypeError):
+            existing_scope = {}
+
+    excluded = existing_scope.get("excluded_domains", [])
+    if domain in excluded:
+        return {"narrowed": False, "reason": f"Domain {domain!r} already excluded"}
+
+    excluded.append(domain)
+    existing_scope["excluded_domains"] = excluded
+
+    # Capture memory context if present (memories as scoping signal)
+    if failure_context.get("active_memories"):
+        memory_exclusions = existing_scope.get("excluded_memory_contexts", [])
+        memory_exclusions.append({
+            "memories": failure_context["active_memories"],
+            "domain": domain,
+        })
+        existing_scope["excluded_memory_contexts"] = memory_exclusions
+
+    new_scope_json = json.dumps(existing_scope)
+
+    return {
+        "narrowed": True,
+        "new_scope_json": new_scope_json,
+        "excluded_domain": domain,
+    }

@@ -377,3 +377,53 @@ class TestNudgeThreshold:
         assert result["proposed_lesson"] is not None
         assert result["proposed_lesson"]["state"] == "INSTINCT"
         assert result["proposed_lesson"]["pending_approval"] is True
+
+
+class TestNarrowRuleScope:
+    """narrow_rule_scope: when a rule fails in a specific context, add exclusion scope."""
+
+    def test_adds_domain_exclusion(self):
+        import json
+        from gradata.enhancements.self_healing import narrow_rule_scope
+
+        rule = Lesson(
+            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
+            category="TONE", description="Never use exclamation marks",
+            fire_count=8, scope_json="",
+        )
+        result = narrow_rule_scope(
+            rule,
+            failure_context={"domain": "casual_slack", "agent_type": "chat"},
+        )
+        assert result["narrowed"] is True
+        scope = json.loads(result["new_scope_json"])
+        assert "casual_slack" in scope.get("excluded_domains", [])
+
+    def test_no_narrowing_without_context(self):
+        from gradata.enhancements.self_healing import narrow_rule_scope
+
+        rule = Lesson(
+            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
+            category="TONE", description="Never use exclamation marks",
+            fire_count=8,
+        )
+        result = narrow_rule_scope(rule, failure_context={})
+        assert result["narrowed"] is False
+
+    def test_accumulates_exclusions(self):
+        import json
+        from gradata.enhancements.self_healing import narrow_rule_scope
+
+        rule = Lesson(
+            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
+            category="TONE", description="Never use exclamation marks",
+            fire_count=8,
+            scope_json=json.dumps({"excluded_domains": ["casual_slack"]}),
+        )
+        result = narrow_rule_scope(
+            rule,
+            failure_context={"domain": "internal_notes"},
+        )
+        scope = json.loads(result["new_scope_json"])
+        assert "casual_slack" in scope["excluded_domains"]
+        assert "internal_notes" in scope["excluded_domains"]
