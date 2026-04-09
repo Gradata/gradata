@@ -43,7 +43,7 @@ def _get_modified_files() -> list[str]:
     try:
         result = subprocess.run(
             ["git", "diff", "--name-only", "HEAD"],
-            capture_output=True, text=True, timeout=5, cwd=cwd,
+            capture_output=True, text=True, timeout=5, cwd=cwd, check=False,
         )
         if result.returncode == 0:
             files.extend(f.strip() for f in result.stdout.splitlines() if f.strip())
@@ -54,7 +54,7 @@ def _get_modified_files() -> list[str]:
     try:
         result = subprocess.run(
             ["git", "ls-files", "--others", "--exclude-standard"],
-            capture_output=True, text=True, timeout=5, cwd=cwd,
+            capture_output=True, text=True, timeout=5, cwd=cwd, check=False,
         )
         if result.returncode == 0:
             files.extend(f.strip() for f in result.stdout.splitlines() if f.strip())
@@ -62,13 +62,7 @@ def _get_modified_files() -> list[str]:
         pass
 
     # Deduplicate while preserving order
-    seen = set()
-    unique = []
-    for f in files:
-        if f not in seen:
-            seen.add(f)
-            unique.append(f)
-    return unique
+    return list(dict.fromkeys(files))
 
 
 def main(data: dict) -> dict | None:

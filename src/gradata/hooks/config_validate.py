@@ -56,7 +56,7 @@ def _validate_json(path: Path) -> list[str]:
                 if not isinstance(hook, dict):
                     continue
                 command = hook.get("command", "")
-                if "python -m gradata.hooks." in command:
+                if " -m gradata.hooks." in command:
                     module_name = command.split("gradata.hooks.")[-1].split()[0].strip('"\'')
                     try:
                         import gradata.hooks as hooks_pkg

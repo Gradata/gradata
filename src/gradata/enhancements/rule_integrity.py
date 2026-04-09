@@ -22,12 +22,18 @@ import hmac
 import json
 import logging
 import os
+import re
 import secrets
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
 logger = logging.getLogger("gradata.rule_integrity")
+
+# Shared regex for parsing lesson lines: [STATE:CONF] CATEGORY: description
+_LESSON_PATTERN = re.compile(
+    r"\[(?:INSTINCT|PATTERN|RULE):(\d+\.\d+)\]\s+(\w+):\s+(.+)"
+)
 
 # ---------------------------------------------------------------------------
 # Key Management
@@ -37,7 +43,13 @@ _SECRET_KEY: bytes | None = None
 
 
 def _get_secret_key() -> bytes | None:
-    """Load the signing key from environment or return None (unsigned mode)."""
+    """Load the signing key from environment or return None (unsigned mode).
+
+    The key is cached in the module-level ``_SECRET_KEY`` after the first
+    successful load.  This is intentional: the secret does not change within
+    a process lifetime, and re-reading the env var on every call would add
+    unnecessary overhead during batch signing/verification operations.
+    """
     global _SECRET_KEY
     if _SECRET_KEY is not None:
         return _SECRET_KEY
@@ -81,7 +93,7 @@ def sign_rule(rule_text: str, category: str, confidence: float) -> str:
     Args:
         rule_text: The rule description text.
         category: Lesson category (e.g. "DRAFTING").
-        confidence: Confidence float (0.0-1.0).
+        confidence: Confidence float (0.0-1.0), clamped to valid range.
 
     Returns:
         Hex-encoded HMAC-SHA256 signature, or empty string if no key configured.
@@ -89,6 +101,7 @@ def sign_rule(rule_text: str, category: str, confidence: float) -> str:
     key = _get_secret_key()
     if key is None:
         return ""
+    confidence = max(0.0, min(1.0, confidence))
     payload = _canonical_payload(rule_text, category, confidence)
     return hmac.new(key, payload, hashlib.sha256).hexdigest()
 
@@ -109,6 +122,7 @@ def verify_rule(rule_text: str, category: str, confidence: float, signature: str
         return True  # No key = unsigned mode, pass through
     if not signature:
         return False  # Key configured but rule unsigned
+    confidence = max(0.0, min(1.0, confidence))
     payload = _canonical_payload(rule_text, category, confidence)
     expected = hmac.new(key, payload, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
@@ -131,8 +145,6 @@ def sign_lesson_file(lessons_path: Path) -> dict[str, str]:
     Returns:
         Dict mapping category -> HMAC signature. Empty if no key.
     """
-    import re
-
     key = _get_secret_key()
     if key is None:
         return {}
@@ -143,12 +155,9 @@ def sign_lesson_file(lessons_path: Path) -> dict[str, str]:
 
     text = lessons_path.read_text(encoding="utf-8")
     signatures: dict[str, str] = {}
-    pattern = re.compile(
-        r"\[(?:INSTINCT|PATTERN|RULE):(\d+\.\d+)\]\s+(\w+):\s+(.+)"
-    )
 
     for line in text.splitlines():
-        m = pattern.search(line)
+        m = _LESSON_PATTERN.search(line)
         if m:
             confidence = float(m.group(1))
             category = m.group(2).upper()
@@ -170,8 +179,6 @@ def verify_lesson_file(lessons_path: Path, signatures: dict[str, str]) -> list[s
     Returns:
         List of tampered category names. Empty = all clean.
     """
-    import re
-
     if not _get_secret_key():
         return []  # Unsigned mode
 
@@ -180,12 +187,9 @@ def verify_lesson_file(lessons_path: Path, signatures: dict[str, str]) -> list[s
 
     text = lessons_path.read_text(encoding="utf-8")
     tampered: list[str] = []
-    pattern = re.compile(
-        r"\[(?:INSTINCT|PATTERN|RULE):(\d+\.\d+)\]\s+(\w+):\s+(.+)"
-    )
 
     for line in text.splitlines():
-        m = pattern.search(line)
+        m = _LESSON_PATTERN.search(line)
         if m:
             confidence = float(m.group(1))
             category = m.group(2).upper()
@@ -272,6 +276,26 @@ def sign_and_store(
     return sig
 
 
+def _load_signature(db_path: Path, category: str) -> str:
+    """Load a single signature for one category from system.db.
+
+    More efficient than load_signatures() when only one category is needed.
+
+    Returns:
+        Hex signature string, or empty string if not found.
+    """
+    _ensure_table(db_path)
+    conn = sqlite3.connect(str(db_path))
+    try:
+        row = conn.execute(
+            "SELECT signature FROM rule_signatures WHERE category = ?",
+            (category.upper(),),
+        ).fetchone()
+        return row[0] if row else ""
+    finally:
+        conn.close()
+
+
 def verify_from_db(
     db_path: Path, rule_text: str, category: str, confidence: float
 ) -> bool:
@@ -287,6 +311,5 @@ def verify_from_db(
     """
     if not _get_secret_key():
         return True
-    sigs = load_signatures(db_path)
-    stored_sig = sigs.get(category.upper(), "")
+    stored_sig = _load_signature(db_path, category)
     return verify_rule(rule_text, category, confidence, stored_sig)

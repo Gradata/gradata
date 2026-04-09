@@ -51,7 +51,7 @@ def test_agent_precontext_scope_matching(tmp_path):
     assert result is not None
     # Sales rule should rank higher for sales-related agent
     lines = result["result"].split("\n")
-    assert any("SALES" in l for l in lines)
+    assert any("SALES" in line for line in lines)
 
 
 # ── agent_graduation ──
@@ -60,8 +60,8 @@ from gradata.hooks.agent_graduation import main as graduation_main
 
 
 def test_agent_graduation_emits_event(tmp_path):
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
-        with patch("gradata._events.emit") as mock_emit:
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}), \
+         patch("gradata._events.emit") as mock_emit:
             result = graduation_main({
                 "tool_name": "Agent",
                 "tool_input": {"subagent_type": "code"},
@@ -89,8 +89,8 @@ from gradata.hooks.tool_failure_emit import main as failure_main
 
 
 def test_tool_failure_detects_error(tmp_path):
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
-        with patch("gradata._events.emit") as mock_emit:
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}), \
+         patch("gradata._events.emit") as mock_emit:
             result = failure_main({
                 "tool_name": "Bash",
                 "tool_input": {"command": "npm install"},
@@ -124,11 +124,15 @@ def test_tool_failure_filters_false_positive():
 from gradata.hooks.tool_finding_capture import main as finding_main, FINDINGS_FILE
 
 
-def test_finding_capture_stores_test_failure():
-    # Clean up any prior findings
-    if FINDINGS_FILE.exists():
-        FINDINGS_FILE.unlink()
+@pytest.fixture(autouse=False)
+def clean_findings():
+    """Ensure FINDINGS_FILE is clean before and after each finding capture test."""
+    FINDINGS_FILE.unlink(missing_ok=True)
+    yield
+    FINDINGS_FILE.unlink(missing_ok=True)
 
+
+def test_finding_capture_stores_test_failure(clean_findings):
     result = finding_main({
         "tool_name": "Bash",
         "tool_input": {"command": "pytest tests/"},
@@ -140,11 +144,8 @@ def test_finding_capture_stores_test_failure():
     assert len(findings) >= 1
     assert "test_foo.py" in findings[0]["files"][0]
 
-    # Clean up
-    FINDINGS_FILE.unlink(missing_ok=True)
 
-
-def test_finding_capture_detects_acted_on():
+def test_finding_capture_detects_acted_on(clean_findings):
     # Pre-populate a finding
     FINDINGS_FILE.write_text(json.dumps([{
         "files": ["tests/test_foo.py"],
@@ -158,9 +159,6 @@ def test_finding_capture_detects_acted_on():
     })
     assert result is not None
     assert "Correction captured" in result["result"]
-
-    # Clean up
-    FINDINGS_FILE.unlink(missing_ok=True)
 
 
 def test_finding_capture_noop_no_failure():
@@ -181,8 +179,8 @@ def test_context_inject_returns_context(tmp_path):
     mock_brain = MagicMock()
     mock_brain.search.return_value = [{"text": "Relevant brain knowledge here"}]
 
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
-        with patch("gradata.brain.Brain", return_value=mock_brain):
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}), \
+         patch("gradata.brain.Brain", return_value=mock_brain):
             result = context_main({"message": "How do I set up the pipeline for new prospects?"})
 
     assert result is not None
@@ -237,6 +235,8 @@ from gradata.hooks.pre_compact import main as compact_main
 
 
 def test_pre_compact_saves_snapshot(tmp_path):
+    import hashlib
+
     lessons = tmp_path / "lessons.md"
     lessons.write_text("[2026-04-01] [RULE:0.92] PROCESS: Plan first\n# header\n")
     loop_state = tmp_path / "loop-state.md"
@@ -244,7 +244,8 @@ def test_pre_compact_saves_snapshot(tmp_path):
 
     uid = os.getuid() if hasattr(os, "getuid") else "win"
     user_tmp = Path(tempfile.gettempdir()) / f"gradata-{uid}"
-    snapshot_path = user_tmp / "compact-snapshot.json"
+    dir_hash = hashlib.md5(str(tmp_path).encode()).hexdigest()[:8]
+    snapshot_path = user_tmp / f"compact-snapshot-{dir_hash}.json"
     snapshot_path.unlink(missing_ok=True)
 
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
@@ -333,11 +334,11 @@ def test_brain_maintain_runs_silently(tmp_path):
     lessons = tmp_path / "lessons.md"
     lessons.write_text("[2026-04-01] [RULE:0.92] PROCESS: Plan first\n")
 
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
-        with patch("gradata._query.fts_index") as mock_fts:
-            with patch("gradata._brain_manifest.generate_manifest", return_value={}):
-                with patch("gradata._brain_manifest.write_manifest"):
-                    result = maintain_main({})
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}), \
+         patch("gradata._query.fts_index") as mock_fts, \
+         patch("gradata._brain_manifest.generate_manifest", return_value={}), \
+         patch("gradata._brain_manifest.write_manifest"):
+            result = maintain_main({})
     assert result is None  # Silent maintenance
     mock_fts.assert_called()
 
@@ -359,8 +360,8 @@ def test_session_persist_writes_handoff(tmp_path):
     loop_state = brain_dir / "loop-state.md"
     loop_state.write_text("## Session 99\n")
 
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(brain_dir)}):
-        with patch("gradata.hooks.session_persist._get_modified_files", return_value=["src/foo.py"]):
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(brain_dir)}), \
+         patch("gradata.hooks.session_persist._get_modified_files", return_value=["src/foo.py"]):
             result = persist_main({})
 
     assert result is None  # Silent
@@ -409,8 +410,8 @@ def test_implicit_feedback_ignores_neutral():
 
 
 def test_implicit_feedback_emits_event(tmp_path):
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
-        with patch("gradata._events.emit") as mock_emit:
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}), \
+         patch("gradata._events.emit") as mock_emit:
             result = feedback_main({"message": "I told you not to do that, are you sure?"})
     assert result is not None
     mock_emit.assert_called_once()

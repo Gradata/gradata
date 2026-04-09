@@ -38,7 +38,7 @@ def _rebuild_fts(brain_dir: str, ctx=None) -> None:
         pass
 
 
-def _generate_manifest(brain_dir: str, ctx=None) -> None:
+def _generate_manifest(ctx=None) -> None:
     """Generate brain manifest for quality tracking."""
     try:
         from gradata._brain_manifest import generate_manifest, write_manifest
@@ -58,7 +58,7 @@ def main(data: dict) -> dict | None:
         ctx = BrainContext.from_brain_dir(brain_dir)
 
         _rebuild_fts(brain_dir, ctx=ctx)
-        _generate_manifest(brain_dir, ctx=ctx)
+        _generate_manifest(ctx=ctx)
     except Exception:
         pass
     return None

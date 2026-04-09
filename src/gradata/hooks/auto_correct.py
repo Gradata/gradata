@@ -80,7 +80,6 @@ def _extract_correction(tool_input: dict, tool_output: dict | None = None) -> tu
     elif tool_name == "Write":
         # For Write, we need the previous file content
         # The hook receives the tool output which may include the old content
-        tool_input.get("input", {}).get("file_path", "")
         new_content = tool_input.get("input", {}).get("content", "")
 
         if tool_output and tool_output.get("old_content"):
@@ -244,11 +243,29 @@ def main(data: dict) -> dict | None:
     if not data:
         return None
 
-    result = process_hook_input(json.dumps(data))
+    correction = _extract_correction(data, data.get("output"))
+    if correction is None:
+        return None
 
-    if result and result.get("captured"):
+    draft, final = correction
+    brain = _get_brain()
+    if brain is None:
+        return None
+
+    try:
+        event = brain.correct(draft, final)
+        severity = event.get("data", {}).get("severity", "unknown")
+        progress = _build_progress(brain, event)
+        result = {
+            "captured": True,
+            "severity": severity,
+            "edit_distance": event.get("data", {}).get("edit_distance", 0),
+        }
+        if progress:
+            result["result"] = progress
         return result
-    return None
+    except Exception:
+        return None
 
 
 if __name__ == "__main__":

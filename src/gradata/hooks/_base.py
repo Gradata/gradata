@@ -66,7 +66,7 @@ def extract_message(data: dict) -> str | None:
     return msg if msg else None
 
 
-def get_brain() -> object | None:
+def get_brain() -> "Brain | None":
     """Get a Brain instance from resolved brain dir, or None on failure."""
     try:
         from gradata.brain import Brain
@@ -76,7 +76,7 @@ def get_brain() -> object | None:
     if not brain_dir:
         return None
     try:
-        return Brain(brain_dir) if Path(brain_dir).exists() else None
+        return Brain(brain_dir)
     except Exception:
         return None
 
@@ -95,4 +95,3 @@ def run_hook(main_fn, meta: dict, *, raw_input: str | None = None) -> None:
             print(json.dumps(result))
     except Exception as exc:
         _log.debug("Hook %s suppressed exception: %s", meta.get("event", "?"), exc)
-        pass  # Silent — never break Claude Code

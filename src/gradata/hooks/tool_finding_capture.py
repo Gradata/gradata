@@ -110,7 +110,7 @@ def main(data: dict) -> dict | None:
             file_basename = Path(file_path).name
             for finding in findings:
                 for f in finding.get("files", []):
-                    if file_basename in f or f in file_path:
+                    if Path(f).name == file_basename:
                         # User is editing a file related to a test finding
                         _save_findings([])  # Clear acted-on findings
                         return {"result": "Correction captured from test finding"}

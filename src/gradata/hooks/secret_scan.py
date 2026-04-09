@@ -36,8 +36,7 @@ def _scan_content(content: str) -> list[dict]:
         matches = pattern.findall(content)
         if matches:
             for m in matches:
-                preview = m[:8] + "..." if len(m) > 12 else m
-                findings.append({"name": name, "preview": preview})
+                findings.append({"name": name, "preview": "***REDACTED***"})
     return findings
 
 

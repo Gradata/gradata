@@ -1,8 +1,10 @@
 """PreCompact hook: save brain state snapshot before context compaction."""
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,7 +29,6 @@ def _get_session_number(brain_dir: Path) -> int | None:
         for line in text.splitlines():
             if "session" in line.lower():
                 # Extract number from lines like "Session: 97" or "## Session 97"
-                import re
                 nums = re.findall(r"\d+", line)
                 if nums:
                     return int(nums[-1])
@@ -64,7 +65,8 @@ def main(data: dict) -> dict | None:
         uid = os.getuid() if hasattr(os, "getuid") else "win"
         user_tmp = Path(tempfile.gettempdir()) / f"gradata-{uid}"
         user_tmp.mkdir(parents=True, exist_ok=True)
-        snapshot_path = user_tmp / "compact-snapshot.json"
+        dir_hash = hashlib.md5(str(brain_dir).encode()).hexdigest()[:8]
+        snapshot_path = user_tmp / f"compact-snapshot-{dir_hash}.json"
         snapshot_path.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
 
         return {"result": "State saved before compaction"}

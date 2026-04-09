@@ -19,10 +19,13 @@ Google Smart Compose (sentence-level diffs > word-level for behavioral extractio
 """
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
+
+_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from gradata.enhancements.diff_engine import DiffResult
@@ -199,7 +202,7 @@ def detect_archetype(
     # Precompute word sets for sentence overlap (avoids re-splitting per pair)
     draft_sent_sets = [set(s.lower().split()) for s in draft_sents]
     final_sent_sets = [set(s.lower().split()) for s in final_sents]
-    added_sents = [s for s, ws in zip(final_sents, final_sent_sets)
+    added_sents = [s for s, ws in zip(final_sents, final_sent_sets, strict=True)
                    if not any(_sentence_overlap(ws, ds) > 0.5 for ds in draft_sent_sets)]
 
     # 2. REMOVAL_HEDGING (check BEFORE length — hedging removal shortens text)
@@ -246,7 +249,7 @@ def detect_archetype(
     # 6. TRUNCATION / EXPANSION (generic length change — after specific checks)
     len_ratio = len(final) / max(len(draft), 1)
     if len_ratio < 0.65:
-        removed_sents = [s for s, ws in zip(draft_sents, draft_sent_sets)
+        removed_sents = [s for s, ws in zip(draft_sents, draft_sent_sets, strict=True)
                          if not any(_sentence_overlap(ws, fs) > 0.5 for fs in final_sent_sets)]
         topic = _extract_topic(removed_sents) if removed_sents else "content"
         return ArchetypeMatch(
@@ -284,7 +287,7 @@ def detect_archetype(
         )
 
     # 10. REMOVAL_CONTENT
-    removed_sents = [s for s, ws in zip(draft_sents, draft_sent_sets)
+    removed_sents = [s for s, ws in zip(draft_sents, draft_sent_sets, strict=True)
                      if not any(_sentence_overlap(ws, fs) > 0.5 for fs in final_sent_sets)]
     if removed_sents and not added_sents:
         topic = _extract_topic(removed_sents)
@@ -320,7 +323,7 @@ def detect_archetype(
 # Template Generation
 # ---------------------------------------------------------------------------
 
-def generate_instruction(match: ArchetypeMatch, category: str = "") -> str:
+def generate_instruction(match: ArchetypeMatch) -> str:
     """Generate an imperative behavioral instruction from an archetype match."""
     ctx = match.context
     a = match.archetype
@@ -400,6 +403,8 @@ _IMPERATIVE_STARTERS = frozenset({
     "remove", "present", "be", "avoid", "ensure", "start",
     "lead", "break", "replace", "run", "test", "audit",
     "research", "validate", "pull", "load", "revise",
+    "prioritize", "emphasize", "highlight", "reduce",
+    "increase", "prefer", "limit", "focus", "simplify",
 })
 
 _GENERIC_FALLBACKS = {
@@ -436,8 +441,8 @@ def _try_llm_extract(llm_provider, draft: str, final: str, classification) -> st
         refined = llm_provider.extract(draft, final, classification)
         if refined and _is_actionable(refined):
             return refined
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.debug("LLM extraction failed: %s", exc)
     return None
 
 
@@ -473,7 +478,7 @@ def extract_instruction(
         Actionable behavioral instruction, or None if extraction fails.
     """
     match = detect_archetype(draft, final, classification)
-    instruction = generate_instruction(match, category)
+    instruction = generate_instruction(match)
 
     if instruction and _is_actionable(instruction):
         # LLM HOOK: refine low-confidence extractions when provider connected

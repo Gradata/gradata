@@ -1,6 +1,7 @@
 """PreToolUse hook: block file creation when a similar file already exists."""
 from __future__ import annotations
 
+import logging
 import os
 import re
 from difflib import SequenceMatcher
@@ -8,6 +9,8 @@ from pathlib import Path
 
 from gradata.hooks._base import run_hook
 from gradata.hooks._profiles import Profile
+
+_log = logging.getLogger(__name__)
 
 HOOK_META = {
     "event": "PreToolUse",
@@ -61,7 +64,8 @@ def _find_similar(target_path: str, project_root: str) -> list[tuple[str, float]
                 if sim > SIMILARITY_THRESHOLD:
                     rel = str(f.relative_to(root))
                     similar.append((rel, sim))
-        except Exception:
+        except Exception as exc:
+            _log.debug("Error scanning %s: %s", watched, exc)
             continue
 
     similar.sort(key=lambda x: x[1], reverse=True)

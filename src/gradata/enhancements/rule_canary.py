@@ -13,11 +13,15 @@ Usage:
     )
 """
 
+from __future__ import annotations
+
+import logging
 import sqlite3
-import sys
 from datetime import UTC
 from enum import Enum
 from pathlib import Path
+
+_log = logging.getLogger(__name__)
 
 # Default canary period: 3 sessions
 CANARY_SESSIONS = 3
@@ -47,14 +51,16 @@ def _ensure_table(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def _get_db_path(ctx=None) -> Path | None:
+def _get_db_path(ctx=None) -> Path:
     """Resolve DB path from context, env var, or relative traversal.
 
     Resolution order:
       1. BrainContext.db_path (if ctx provided)
       2. BRAIN_DIR environment variable + /system.db
       3. Relative traversal from this file's location
-      4. None (caller must handle)
+
+    Raises:
+        ValueError: If no database path can be resolved.
     """
     import os
 
@@ -80,7 +86,7 @@ def _get_db_path(ctx=None) -> Path | None:
     except Exception:
         pass
 
-    return None
+    raise ValueError("Cannot resolve rule_canary DB path: no context, BRAIN_DIR, or relative path found")
 
 
 def promote_to_canary(rule_category: str, session: int, db_path: Path | None = None) -> None:
@@ -103,7 +109,7 @@ def promote_to_canary(rule_category: str, session: int, db_path: Path | None = N
         conn.commit()
         conn.close()
     except Exception as e:
-        print(f"WARNING [promote_to_canary]: {e}", file=sys.stderr)
+        _log.warning("promote_to_canary failed: %s", e)
 
 
 def check_canary_health(rule_category: str, session: int, db_path: Path | None = None) -> dict:
@@ -138,7 +144,7 @@ def check_canary_health(rule_category: str, session: int, db_path: Path | None =
 
         status = row["status"]
         start_session = row["start_session"]
-        sessions_active = session - start_session
+        sessions_active = session - start_session + 1
 
         # Count corrections in this category since canary started
         correction_count = 0
@@ -180,7 +186,7 @@ def check_canary_health(rule_category: str, session: int, db_path: Path | None =
         }
 
     except Exception as e:
-        print(f"WARNING [check_canary_health]: {e}", file=sys.stderr)
+        _log.warning("check_canary_health failed: %s", e)
         return {
             "status": "error",
             "sessions_active": 0,
@@ -212,14 +218,7 @@ def rollback_rule(rule_category: str, reason: str, db_path: Path | None = None) 
 
         # Emit RULE_ROLLBACK event
         try:
-            # Try brain/scripts events.py via env or relative path
-            import os
-            scripts_dir = os.environ.get("BRAIN_DIR")
-            if scripts_dir:
-                scripts_dir = Path(scripts_dir) / "scripts"
-                if scripts_dir.exists():
-                    sys.path.insert(0, str(scripts_dir))
-            from events import emit
+            from gradata._events import emit
             emit(
                 "RULE_ROLLBACK",
                 "rule_canary:rollback_rule",
@@ -231,10 +230,10 @@ def rollback_rule(rule_category: str, reason: str, db_path: Path | None = None) 
                 tags=[f"category:{rule_category}", "canary:rollback"],
             )
         except Exception as e:
-            print(f"WARNING [rollback_rule/emit]: {e}", file=sys.stderr)
+            _log.warning("rollback_rule emit failed: %s", e)
 
     except Exception as e:
-        print(f"WARNING [rollback_rule]: {e}", file=sys.stderr)
+        _log.warning("rollback_rule failed: %s", e)
 
 
 def promote_to_active(rule_category: str, db_path: Path | None = None) -> None:
@@ -258,13 +257,7 @@ def promote_to_active(rule_category: str, db_path: Path | None = None) -> None:
 
         # Emit CANARY_PROMOTED event
         try:
-            import os
-            scripts_dir = os.environ.get("BRAIN_DIR")
-            if scripts_dir:
-                scripts_dir = Path(scripts_dir) / "scripts"
-                if scripts_dir.exists():
-                    sys.path.insert(0, str(scripts_dir))
-            from events import emit
+            from gradata._events import emit
             emit(
                 "CANARY_PROMOTED",
                 "rule_canary:promote_to_active",
@@ -272,10 +265,10 @@ def promote_to_active(rule_category: str, db_path: Path | None = None) -> None:
                 tags=[f"category:{rule_category}", "canary:promoted"],
             )
         except Exception as e:
-            print(f"WARNING [promote_to_active/emit]: {e}", file=sys.stderr)
+            _log.warning("promote_to_active emit failed: %s", e)
 
     except Exception as e:
-        print(f"WARNING [promote_to_active]: {e}", file=sys.stderr)
+        _log.warning("promote_to_active failed: %s", e)
 
 
 def get_canary_rules(db_path: Path | None = None) -> list[dict]:
@@ -297,5 +290,5 @@ def get_canary_rules(db_path: Path | None = None) -> list[dict]:
         return [dict(r) for r in rows]
 
     except Exception as e:
-        print(f"WARNING [get_canary_rules]: {e}", file=sys.stderr)
+        _log.warning("get_canary_rules failed: %s", e)
         return []
