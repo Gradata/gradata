@@ -242,7 +242,9 @@ def test_pre_compact_saves_snapshot(tmp_path):
     loop_state = tmp_path / "loop-state.md"
     loop_state.write_text("## Session 42\n")
 
-    snapshot_path = Path(tempfile.gettempdir()) / "gradata-compact-snapshot.json"
+    uid = os.getuid() if hasattr(os, "getuid") else "win"
+    user_tmp = Path(tempfile.gettempdir()) / f"gradata-{uid}"
+    snapshot_path = user_tmp / "compact-snapshot.json"
     snapshot_path.unlink(missing_ok=True)
 
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):

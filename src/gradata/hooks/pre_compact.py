@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -57,10 +58,13 @@ def main(data: dict) -> dict | None:
         if lessons_path.is_file():
             text = lessons_path.read_text(encoding="utf-8")
             snapshot["lesson_count"] = len([
-                l for l in text.splitlines() if l.strip() and not l.startswith("#")
+                line for line in text.splitlines() if line.strip() and not line.startswith("#")
             ])
 
-        snapshot_path = Path(tempfile.gettempdir()) / "gradata-compact-snapshot.json"
+        uid = os.getuid() if hasattr(os, "getuid") else "win"
+        user_tmp = Path(tempfile.gettempdir()) / f"gradata-{uid}"
+        user_tmp.mkdir(parents=True, exist_ok=True)
+        snapshot_path = user_tmp / "compact-snapshot.json"
         snapshot_path.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
 
         return {"result": "State saved before compaction"}

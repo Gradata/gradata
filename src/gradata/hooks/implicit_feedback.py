@@ -82,6 +82,8 @@ def main(data: dict) -> dict | None:
         if brain_dir:
             try:
                 from gradata._events import emit
+                from gradata._paths import BrainContext
+                ctx = BrainContext.from_brain_dir(brain_dir)
                 emit(
                     "IMPLICIT_FEEDBACK",
                     source="hook:implicit_feedback",
@@ -90,7 +92,7 @@ def main(data: dict) -> dict | None:
                         "snippets": [s["snippet"] for s in signals[:3]],
                         "message_preview": message[:200],
                     },
-                    brain_dir=brain_dir,
+                    ctx=ctx,
                 )
             except Exception:
                 pass

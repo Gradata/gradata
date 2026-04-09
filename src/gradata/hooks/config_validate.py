@@ -44,23 +44,31 @@ def _validate_json(path: Path) -> list[str]:
         if not isinstance(hook_list, list):
             warnings.append(f"hooks.{event_name} should be a list")
             continue
-        for i, hook in enumerate(hook_list):
-            if not isinstance(hook, dict):
+        for i, group in enumerate(hook_list):
+            if not isinstance(group, dict):
                 continue
-            command = hook.get("command", "")
-            if "python -m gradata.hooks." in command:
-                module_name = command.split("gradata.hooks.")[-1].split()[0].strip('"\'')
-                try:
-                    import gradata.hooks as hooks_pkg
-                    hooks_dir = Path(hooks_pkg.__file__).parent
-                    module_path = hooks_dir / f"{module_name}.py"
-                    if not module_path.is_file():
-                        warnings.append(
-                            f"hooks.{event_name}[{i}] references "
-                            f"gradata.hooks.{module_name} but module not found"
-                        )
-                except Exception:
-                    pass
+            # Validate nested hook entries within each group
+            inner_hooks = group.get("hooks", [])
+            if not isinstance(inner_hooks, list):
+                # Fallback: check if this is a flat hook entry (legacy format)
+                inner_hooks = [group]
+            for j, hook in enumerate(inner_hooks):
+                if not isinstance(hook, dict):
+                    continue
+                command = hook.get("command", "")
+                if "python -m gradata.hooks." in command:
+                    module_name = command.split("gradata.hooks.")[-1].split()[0].strip('"\'')
+                    try:
+                        import gradata.hooks as hooks_pkg
+                        hooks_dir = Path(hooks_pkg.__file__).parent
+                        module_path = hooks_dir / f"{module_name}.py"
+                        if not module_path.is_file():
+                            warnings.append(
+                                f"hooks.{event_name}[{i}].hooks[{j}] references "
+                                f"gradata.hooks.{module_name} but module not found"
+                            )
+                    except Exception:
+                        pass
 
     return warnings
 

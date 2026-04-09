@@ -33,16 +33,16 @@ def main(data: dict) -> dict | None:
 
     text = lessons_path.read_text(encoding="utf-8")
     all_lessons = parse_lessons(text)
-    rule_lessons = [l for l in all_lessons if l.state.name == "RULE"]
+    rule_lessons = [lesson for lesson in all_lessons if lesson.state.name == "RULE"]
 
     if not rule_lessons:
         return None
 
     rules = []
-    for l in rule_lessons[:MAX_REMINDERS]:
-        desc = l.description
+    for lesson in rule_lessons[:MAX_REMINDERS]:
+        desc = lesson.description
         truncated = desc[:120] + "..." if len(desc) > 120 else desc
-        rules.append(f"[RULE:{l.confidence:.2f}] {l.category}: {truncated}")
+        rules.append(f"[RULE:{lesson.confidence:.2f}] {lesson.category}: {truncated}")
 
     block = "ACTIVE RULES (learned from corrections):\n" + "\n".join(f"  • {r}" for r in rules)
     return {"result": block}

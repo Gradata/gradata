@@ -11,11 +11,14 @@ Every hook module follows this pattern:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
 from pathlib import Path
 
 from gradata.hooks._profiles import Profile
+
+_log = logging.getLogger(__name__)
 
 
 def get_profile() -> Profile:
@@ -63,7 +66,8 @@ def extract_message(data: dict) -> str | None:
     return msg if msg else None
 
 
-def get_brain():
+def get_brain() -> object | None:
+    """Get a Brain instance from resolved brain dir, or None on failure."""
     try:
         from gradata.brain import Brain
     except ImportError:
@@ -89,5 +93,6 @@ def run_hook(main_fn, meta: dict, *, raw_input: str | None = None) -> None:
         result = main_fn(data or {})
         if result:
             print(json.dumps(result))
-    except Exception:
+    except Exception as exc:
+        _log.debug("Hook %s suppressed exception: %s", meta.get("event", "?"), exc)
         pass  # Silent — never break Claude Code

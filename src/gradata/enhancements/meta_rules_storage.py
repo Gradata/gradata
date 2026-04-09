@@ -443,24 +443,26 @@ def query_graduation_candidates(
     - Sum of severity weights >= min_score
     """
     conn = sqlite3.connect(str(db_path))
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute(
-        """SELECT
-             pattern_hash,
-             category,
-             representative_text,
-             COUNT(DISTINCT session_id) AS distinct_sessions,
-             SUM(severity_weight) AS weighted_score,
-             MIN(created_at) AS first_seen,
-             MAX(created_at) AS last_seen,
-             GROUP_CONCAT(DISTINCT session_id) AS session_ids
-           FROM correction_patterns
-           GROUP BY pattern_hash
-           HAVING COUNT(DISTINCT session_id) >= ?
-              AND SUM(severity_weight) >= ?
-           ORDER BY weighted_score DESC
-        """,
-        (min_sessions, min_score),
-    ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    try:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """SELECT
+                 pattern_hash,
+                 category,
+                 representative_text,
+                 COUNT(DISTINCT session_id) AS distinct_sessions,
+                 SUM(severity_weight) AS weighted_score,
+                 MIN(created_at) AS first_seen,
+                 MAX(created_at) AS last_seen,
+                 GROUP_CONCAT(DISTINCT session_id) AS session_ids
+               FROM correction_patterns
+               GROUP BY pattern_hash
+               HAVING COUNT(DISTINCT session_id) >= ?
+                  AND SUM(severity_weight) >= ?
+               ORDER BY weighted_score DESC
+            """,
+            (min_sessions, min_score),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()

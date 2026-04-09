@@ -16,7 +16,14 @@ HOOK_META = {
     "timeout": 5000,
 }
 
-FINDINGS_FILE = Path(tempfile.gettempdir()) / "gradata-findings.json"
+def _findings_path() -> Path:
+    uid = os.getuid() if hasattr(os, "getuid") else "win"
+    user_tmp = Path(tempfile.gettempdir()) / f"gradata-{uid}"
+    user_tmp.mkdir(parents=True, exist_ok=True)
+    return user_tmp / "findings.json"
+
+
+FINDINGS_FILE = _findings_path()
 
 # Refined patterns that indicate actual test failures
 TEST_FAILURE_INDICATORS = [

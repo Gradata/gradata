@@ -35,18 +35,40 @@ def _get_session_number(brain_dir: Path) -> int | None:
 
 
 def _get_modified_files() -> list[str]:
-    """Get files modified in current session via git diff."""
+    """Get files modified + untracked in current session via git."""
+    cwd = os.environ.get("CLAUDE_PROJECT_DIR", ".")
+    files = []
+
+    # Staged and unstaged changes
     try:
         result = subprocess.run(
             ["git", "diff", "--name-only", "HEAD"],
-            capture_output=True, text=True, timeout=5,
-            cwd=os.environ.get("CLAUDE_PROJECT_DIR", "."),
+            capture_output=True, text=True, timeout=5, cwd=cwd,
         )
         if result.returncode == 0:
-            return [f.strip() for f in result.stdout.splitlines() if f.strip()]
+            files.extend(f.strip() for f in result.stdout.splitlines() if f.strip())
     except Exception:
         pass
-    return []
+
+    # Untracked files (not ignored)
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            capture_output=True, text=True, timeout=5, cwd=cwd,
+        )
+        if result.returncode == 0:
+            files.extend(f.strip() for f in result.stdout.splitlines() if f.strip())
+    except Exception:
+        pass
+
+    # Deduplicate while preserving order
+    seen = set()
+    unique = []
+    for f in files:
+        if f not in seen:
+            seen.add(f)
+            unique.append(f)
+    return unique
 
 
 def main(data: dict) -> dict | None:

@@ -34,6 +34,8 @@ def main(data: dict) -> dict | None:
         preview = output[:200] if output else ""
 
         from gradata._events import emit
+        from gradata._paths import BrainContext
+        ctx = BrainContext.from_brain_dir(brain_dir)
         emit(
             "AGENT_OUTCOME",
             source="hook:agent_graduation",
@@ -42,7 +44,7 @@ def main(data: dict) -> dict | None:
                 "output_preview": preview,
                 "output_length": len(output),
             },
-            brain_dir=brain_dir,
+            ctx=ctx,
         )
     except Exception:
         pass

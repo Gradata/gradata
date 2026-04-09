@@ -80,6 +80,9 @@ def main(data: dict) -> dict | None:
         if not file_path:
             return None
 
+        # Resolve to absolute path to prevent relative path bypass
+        file_path = str(Path(file_path).resolve())
+
         # Only guard new files in watched directories
         if not _in_watched_dir(file_path):
             return None
@@ -89,7 +92,9 @@ def main(data: dict) -> dict | None:
 
         # Find project root
         project_root = os.environ.get("CLAUDE_PROJECT_DIR", "")
-        if not project_root:
+        if project_root:
+            project_root = str(Path(project_root).resolve())
+        else:
             # Walk up from file path to find .git
             p = Path(file_path).parent
             while p != p.parent:

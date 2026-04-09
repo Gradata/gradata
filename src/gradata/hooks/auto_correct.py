@@ -159,7 +159,7 @@ def _build_progress(brain, event: dict) -> str:
 
     # Find the most relevant lesson (most recently modified or matching category)
     category = event.get("data", {}).get("category", "")
-    matching = [l for l in lessons if l.category == category] if category else []
+    matching = [lesson for lesson in lessons if lesson.category == category] if category else []
     lesson = matching[-1] if matching else lessons[-1]
 
     confidence = lesson.confidence
@@ -240,16 +240,16 @@ def generate_full_config(brain_dir: str | None = None) -> dict:
     return {**mcp_config, **hook_config}
 
 
-def main():
-    """Hook entry point: read stdin, process, write result to stdout."""
-    raw = sys.stdin.read()
-    if not raw.strip():
-        return
+def main(data: dict) -> dict | None:
+    """Hook entry point: receive parsed data from run_hook, process, return result."""
+    if not data:
+        return None
 
-    result = process_hook_input(raw)
+    result = process_hook_input(json.dumps(data))
 
-    # Write result to stdout (Claude Code reads this)
-    print(json.dumps(result))
+    if result and result.get("captured"):
+        return result
+    return None
 
 
 if __name__ == "__main__":

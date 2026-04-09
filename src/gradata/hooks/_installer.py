@@ -7,8 +7,11 @@ controlling which Gradata hooks activate at each profile tier.
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from pathlib import Path
+
+_log = logging.getLogger(__name__)
 
 from gradata.hooks._profiles import Profile
 
@@ -59,16 +62,18 @@ def generate_settings(profile: str = "standard") -> dict:
             "command": f"{sys.executable} -m gradata.hooks.{module}",
             "timeout": timeout,
         }
-        if matcher:
-            hook_entry["matcher"] = matcher
 
         if event not in hooks_by_event:
             hooks_by_event[event] = []
 
-        hooks_by_event[event].append({
+        group = {
             "hooks": [hook_entry],
             "description": description,
-        })
+        }
+        if matcher:
+            group["matcher"] = matcher
+
+        hooks_by_event[event].append(group)
 
     return {"hooks": hooks_by_event}
 
@@ -79,7 +84,11 @@ def generate_settings(profile: str = "standard") -> dict:
 
 def _load_settings() -> dict:
     if SETTINGS_PATH.is_file():
-        return json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+        try:
+            return json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, ValueError):
+            _log.warning("Corrupted settings.json at %s — starting fresh", SETTINGS_PATH)
+            return {}
     return {}
 
 
@@ -125,8 +134,8 @@ def install(profile: str = "standard") -> None:
     _save_settings(settings)
 
     count = sum(len(groups) for groups in new["hooks"].values())
-    print(f"Gradata hooks installed ({count} hooks, profile={profile})")
-    print(f"  Settings: {SETTINGS_PATH}")
+    _log.info("Gradata hooks installed (%d hooks, profile=%s)", count, profile)
+    _log.info("  Settings: %s", SETTINGS_PATH)
 
 
 def uninstall() -> None:
@@ -135,9 +144,9 @@ def uninstall() -> None:
     removed = uninstall_from(settings)
     _save_settings(settings)
     if removed:
-        print(f"Removed {removed} Gradata hook(s).")
+        _log.info("Removed %d Gradata hook(s).", removed)
     else:
-        print("No Gradata hooks found.")
+        _log.info("No Gradata hooks found.")
 
 
 def uninstall_from(settings: dict) -> int:
@@ -174,10 +183,10 @@ def status() -> None:
                     })
 
     if gradata_hooks:
-        print(f"Gradata hooks: {len(gradata_hooks)} INSTALLED")
-        print(f"  Settings: {SETTINGS_PATH}")
+        _log.info("Gradata hooks: %d INSTALLED", len(gradata_hooks))
+        _log.info("  Settings: %s", SETTINGS_PATH)
         for h in gradata_hooks:
-            print(f"  [{h['event']}] {h['description']}")
+            _log.info("  [%s] %s", h["event"], h["description"])
     else:
-        print("Gradata hooks: NOT INSTALLED")
-        print("  Run: gradata hooks install")
+        _log.info("Gradata hooks: NOT INSTALLED")
+        _log.info("  Run: gradata hooks install")

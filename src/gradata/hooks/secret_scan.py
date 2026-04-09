@@ -29,12 +29,8 @@ SECRET_PATTERNS = [
 ]
 
 
-def main(data: dict) -> dict | None:
-    tool_input = data.get("tool_input", {})
-    content = tool_input.get("content", "") or tool_input.get("new_string", "")
-    if not content:
-        return None
-
+def _scan_content(content: str) -> list[dict]:
+    """Scan a string for secret patterns. Returns list of findings."""
     findings = []
     for name, pattern in SECRET_PATTERNS:
         matches = pattern.findall(content)
@@ -42,6 +38,30 @@ def main(data: dict) -> dict | None:
             for m in matches:
                 preview = m[:8] + "..." if len(m) > 12 else m
                 findings.append({"name": name, "preview": preview})
+    return findings
+
+
+def main(data: dict) -> dict | None:
+    tool_input = data.get("tool_input", {})
+
+    # Collect all content to scan
+    contents_to_scan = []
+    content = tool_input.get("content", "") or tool_input.get("new_string", "")
+    if content:
+        contents_to_scan.append(content)
+
+    # MultiEdit support: scan each edit's new_string
+    for edit in tool_input.get("edits", []):
+        edit_content = edit.get("new_string", "")
+        if edit_content:
+            contents_to_scan.append(edit_content)
+
+    if not contents_to_scan:
+        return None
+
+    findings = []
+    for text in contents_to_scan:
+        findings.extend(_scan_content(text))
 
     if findings:
         file_path = tool_input.get("file_path", "unknown")

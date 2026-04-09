@@ -12,16 +12,27 @@ HOOK_META = {
 
 def _emit_session_end(brain_dir: str) -> None:
     try:
-        from gradata._events import emit, EventType
-        emit(EventType.SESSION_END, source="hook:session_close", data={}, brain_dir=brain_dir)
+        from gradata._events import emit
+        from gradata._paths import BrainContext
+        ctx = BrainContext.from_brain_dir(brain_dir)
+        emit("SESSION_END", source="hook:session_close", data={}, ctx=ctx)
     except Exception:
         pass
 
 
 def _run_graduation(brain_dir: str) -> None:
     try:
-        from gradata.enhancements.self_improvement import graduation_sweep
-        graduation_sweep(brain_dir=brain_dir)
+        from pathlib import Path
+        from gradata.enhancements.self_improvement import parse_lessons, graduate, format_lessons
+        lessons_path = Path(brain_dir) / "lessons.md"
+        if not lessons_path.is_file():
+            return
+        text = lessons_path.read_text(encoding="utf-8")
+        lessons = parse_lessons(text)
+        if not lessons:
+            return
+        active, _graduated = graduate(lessons)
+        lessons_path.write_text(format_lessons(active), encoding="utf-8")
     except Exception:
         pass
 

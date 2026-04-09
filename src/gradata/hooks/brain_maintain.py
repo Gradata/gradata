@@ -13,7 +13,7 @@ HOOK_META = {
 }
 
 
-def _rebuild_fts(brain_dir: str) -> None:
+def _rebuild_fts(brain_dir: str, ctx=None) -> None:
     """Rebuild FTS index from brain content files."""
     try:
         from gradata._query import fts_index
@@ -23,7 +23,7 @@ def _rebuild_fts(brain_dir: str) -> None:
         lessons = brain_path / "lessons.md"
         if lessons.is_file():
             text = lessons.read_text(encoding="utf-8")
-            fts_index("lessons.md", "markdown", text)
+            fts_index("lessons.md", "markdown", text, ctx=ctx)
 
         # Index any .md files in brain root
         for md_file in brain_path.glob("*.md"):
@@ -31,19 +31,19 @@ def _rebuild_fts(brain_dir: str) -> None:
                 continue
             try:
                 text = md_file.read_text(encoding="utf-8")
-                fts_index(md_file.name, "markdown", text)
+                fts_index(md_file.name, "markdown", text, ctx=ctx)
             except Exception:
                 continue
     except Exception:
         pass
 
 
-def _generate_manifest(brain_dir: str) -> None:
+def _generate_manifest(brain_dir: str, ctx=None) -> None:
     """Generate brain manifest for quality tracking."""
     try:
         from gradata._brain_manifest import generate_manifest, write_manifest
-        manifest = generate_manifest()
-        write_manifest(manifest)
+        manifest = generate_manifest(ctx=ctx)
+        write_manifest(manifest, ctx=ctx)
     except Exception:
         pass
 
@@ -54,8 +54,11 @@ def main(data: dict) -> dict | None:
         if not brain_dir:
             return None
 
-        _rebuild_fts(brain_dir)
-        _generate_manifest(brain_dir)
+        from gradata._paths import BrainContext
+        ctx = BrainContext.from_brain_dir(brain_dir)
+
+        _rebuild_fts(brain_dir, ctx=ctx)
+        _generate_manifest(brain_dir, ctx=ctx)
     except Exception:
         pass
     return None

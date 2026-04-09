@@ -72,6 +72,8 @@ def main(data: dict) -> dict | None:
 
         if brain_dir:
             from gradata._events import emit
+            from gradata._paths import BrainContext
+            ctx = BrainContext.from_brain_dir(brain_dir)
             command = data.get("tool_input", {}).get("command", "")[:200]
             emit(
                 "TOOL_FAILURE",
@@ -82,7 +84,7 @@ def main(data: dict) -> dict | None:
                     "command_preview": command,
                     "output_preview": output[:300],
                 },
-                brain_dir=brain_dir,
+                ctx=ctx,
             )
     except Exception:
         pass

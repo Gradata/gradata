@@ -73,7 +73,7 @@ def main(data: dict) -> dict | None:
 
         text = lessons_path.read_text(encoding="utf-8")
         all_lessons = parse_lessons(text)
-        filtered = [l for l in all_lessons if l.state.name in ("RULE", "PATTERN") and l.confidence >= MIN_CONFIDENCE]
+        filtered = [lesson for lesson in all_lessons if lesson.state.name in ("RULE", "PATTERN") and lesson.confidence >= MIN_CONFIDENCE]
         if not filtered:
             return None
 

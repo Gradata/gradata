@@ -38,20 +38,22 @@ def main(data: dict) -> dict | None:
         if not results:
             return None
 
+        separator = "\n---\n"
         context_parts = []
         total_len = 0
         for r in results:
             text = r.get("text", "") or r.get("content", "") or str(r)
             snippet = text[:500]
-            if total_len + len(snippet) > MAX_CONTEXT_LEN:
+            sep_cost = len(separator) if context_parts else 0
+            if total_len + len(snippet) + sep_cost > MAX_CONTEXT_LEN:
                 break
             context_parts.append(snippet)
-            total_len += len(snippet)
+            total_len += len(snippet) + sep_cost
 
         if not context_parts:
             return None
 
-        joined = "\n---\n".join(context_parts)
+        joined = separator.join(context_parts)
         return {"result": f"brain context: {joined}"}
     except Exception:
         return None
