@@ -26,7 +26,6 @@ from enum import Enum, auto
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from gradata.enhancements.diff_engine import DiffResult
     from gradata.enhancements.edit_classifier import EditClassification
 
 _log = logging.getLogger(__name__)
@@ -407,19 +406,6 @@ _IMPERATIVE_STARTERS = frozenset({
     "increase", "prefer", "limit", "focus", "simplify",
 })
 
-_GENERIC_FALLBACKS = {
-    "TONE": "Adjust tone to match the context",
-    "CONTENT": "Revise content to be more accurate and relevant",
-    "STRUCTURE": "Improve the organization and structure",
-    "FACTUAL": "Verify all facts, numbers, and dates",
-    "STYLE": "Follow the established style conventions",
-    "PROCESS": "Follow the correct workflow sequence",
-    "DRAFTING": "Improve the writing quality",
-    "LEADS": "Follow lead handling procedures",
-    "CODE": "Follow coding best practices",
-}
-
-
 def _is_actionable(instruction: str) -> bool:
     if not instruction or len(instruction) < 5:
         return False
@@ -471,7 +457,7 @@ def extract_instruction(
     final: str,
     classification: EditClassification | None = None,
     *,
-    category: str = "",
+    category: str = "",  # noqa: ARG001 — passed by callers, reserved for future use
     llm_provider=None,
 ) -> str | None:
     """Main entry point. Returns an actionable behavioral instruction.
@@ -509,6 +495,6 @@ def extract_instruction(
     if refined:
         return refined
 
-    # Generic fallback
-    cat = category or (classification.category if classification else "")
-    return _GENERIC_FALLBACKS.get(cat.upper())
+    # Generic fallback — return None so callers can try their own fallback
+    # paths (e.g. keyword templates) before resorting to generic strings.
+    return None

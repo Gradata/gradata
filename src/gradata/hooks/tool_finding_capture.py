@@ -17,6 +17,8 @@ HOOK_META = {
 }
 
 def _findings_path() -> Path:
+    import hashlib
+
     if hasattr(os, "getuid"):
         uid = os.getuid()
     else:
@@ -31,6 +33,11 @@ def _findings_path() -> Path:
     except OSError:
         # Permission denied or other OS error — fall back to plain tempdir
         user_tmp = Path(tempfile.gettempdir())
+    # Namespace by project directory to prevent cross-project leakage
+    project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
+    if project_dir:
+        dir_hash = hashlib.md5(project_dir.encode()).hexdigest()[:8]
+        return user_tmp / f"findings-{dir_hash}.json"
     return user_tmp / "findings.json"
 
 
