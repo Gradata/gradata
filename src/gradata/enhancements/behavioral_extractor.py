@@ -314,7 +314,7 @@ def detect_archetype(
 # Template Generation
 # ---------------------------------------------------------------------------
 
-def generate_instruction(match: ArchetypeMatch, category: str = "") -> str:
+def generate_instruction(match: ArchetypeMatch) -> str:
     """Generate an imperative behavioral instruction from an archetype match."""
     ctx = match.context
     a = match.archetype
@@ -437,10 +437,10 @@ def _try_llm_extract(llm_provider, draft: str, final: str, classification) -> st
         if refined and _is_actionable(refined):
             return refined
     except Exception as exc:
-        _log.warning(
+        _log.debug(
             "LLM extraction failed for category=%s: %s",
             classification.category if classification else "UNKNOWN",
-            exc
+            exc,
         )
     return None
 
@@ -471,13 +471,13 @@ def extract_instruction(
         classification: EditClassification from edit_classifier (optional)
         category: Correction category (DRAFTING, PROCESS, etc.)
         llm_provider: Optional LLM provider for refinement of low-confidence matches.
-                      Interface: llm_provider.extract(draft, final, classification) -> str
+                      Interface: llm_provider.complete(prompt, max_tokens, timeout) -> str
 
     Returns:
         Actionable behavioral instruction, or None if extraction fails.
     """
     match = detect_archetype(draft, final, classification)
-    instruction = generate_instruction(match, category)
+    instruction = generate_instruction(match)
 
     if instruction and _is_actionable(instruction):
         # LLM HOOK: refine low-confidence extractions when provider connected

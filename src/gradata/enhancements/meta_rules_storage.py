@@ -442,45 +442,48 @@ def query_graduation_candidates(
     - Distinct sessions >= min_sessions
     - Sum of severity weights >= min_score
     """
+    ensure_pattern_table(db_path)
     conn = sqlite3.connect(str(db_path))
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute(
-        """WITH representative AS (
-             SELECT
-               pattern_hash,
-               category,
-               representative_text,
-               ROW_NUMBER() OVER (PARTITION BY pattern_hash ORDER BY created_at DESC) AS rn
-             FROM correction_patterns
-           ),
-           aggregates AS (
-             SELECT
-               pattern_hash,
-               COUNT(DISTINCT session_id) AS distinct_sessions,
-               SUM(severity_weight) AS weighted_score,
-               MIN(created_at) AS first_seen,
-               MAX(created_at) AS last_seen,
-               GROUP_CONCAT(DISTINCT session_id) AS session_ids
-             FROM correction_patterns
-             GROUP BY pattern_hash
-             HAVING COUNT(DISTINCT session_id) >= ?
-                AND SUM(severity_weight) >= ?
-           )
-           SELECT
-             r.pattern_hash,
-             r.category,
-             r.representative_text,
-             a.distinct_sessions,
-             a.weighted_score,
-             a.first_seen,
-             a.last_seen,
-             a.session_ids
-           FROM representative r
-           INNER JOIN aggregates a ON r.pattern_hash = a.pattern_hash
-           WHERE r.rn = 1
-           ORDER BY a.weighted_score DESC
-        """,
-        (min_sessions, min_score),
-    ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    try:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """WITH representative AS (
+                 SELECT
+                   pattern_hash,
+                   category,
+                   representative_text,
+                   ROW_NUMBER() OVER (PARTITION BY pattern_hash ORDER BY created_at DESC) AS rn
+                 FROM correction_patterns
+               ),
+               aggregates AS (
+                 SELECT
+                   pattern_hash,
+                   COUNT(DISTINCT session_id) AS distinct_sessions,
+                   SUM(severity_weight) AS weighted_score,
+                   MIN(created_at) AS first_seen,
+                   MAX(created_at) AS last_seen,
+                   GROUP_CONCAT(DISTINCT session_id) AS session_ids
+                 FROM correction_patterns
+                 GROUP BY pattern_hash
+                 HAVING COUNT(DISTINCT session_id) >= ?
+                    AND SUM(severity_weight) >= ?
+               )
+               SELECT
+                 r.pattern_hash,
+                 r.category,
+                 r.representative_text,
+                 a.distinct_sessions,
+                 a.weighted_score,
+                 a.first_seen,
+                 a.last_seen,
+                 a.session_ids
+               FROM representative r
+               INNER JOIN aggregates a ON r.pattern_hash = a.pattern_hash
+               WHERE r.rn = 1
+               ORDER BY a.weighted_score DESC
+            """,
+            (min_sessions, min_score),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()

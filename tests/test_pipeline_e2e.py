@@ -20,8 +20,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 # Try cloud-only override first (real discovery), fall back to SDK stubs
 _CLOUD_DISCOVERY = False
 try:
-    _cloud_path = os.environ.get("GRADATA_CLOUD_PATH", "C:/Users/olive/SpritesWork/brain/cloud-only")
-    sys.path.insert(0, _cloud_path)
+    _cloud_path = os.environ.get("GRADATA_CLOUD_PATH", "")
+    if _cloud_path:
+        sys.path.insert(0, _cloud_path)
     from meta_rules import discover_meta_rules, merge_into_meta  # type: ignore[import]
     _CLOUD_DISCOVERY = True
 except ImportError:
@@ -208,7 +209,7 @@ class TestPipelineE2E:
         m = loaded[0]
         assert m.applies_when == ["task_type=sales", "session_type=sales"]
         assert m.never_when == ["task_type=system"]
-        assert m.context_weights["sales"] == 1.5
+        assert m.context_weights["sales"] == pytest.approx(1.5)
 
     @_requires_cloud
     def test_full_pipeline_correction_to_injection(self, fresh_brain):

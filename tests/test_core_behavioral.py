@@ -60,4 +60,5 @@ def test_correct_persists_legacy_on_extractor_failure():
         assert lessons_path.exists(), "lessons.md should be created even after extraction failure"
         content = lessons_path.read_text(encoding="utf-8")
         # Legacy extractor should have persisted the fallback description
-        assert "INSTINCT" in content or "PATTERN" in content or len(content) > 0
+        assert "INSTINCT" in content or "PATTERN" in content, \
+            "Legacy description should contain INSTINCT or PATTERN state"
