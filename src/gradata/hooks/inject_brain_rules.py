@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from gradata.hooks._base import run_hook, resolve_brain_dir
+from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
 
 try:
@@ -111,8 +111,8 @@ def main(data: dict) -> dict | None:
     wiki_cats = _wiki_categories(context)
 
     if wiki_cats:
-        boosted = [l for l in filtered if l.category.upper() in wiki_cats]
-        rest = [l for l in filtered if l.category.upper() not in wiki_cats]
+        boosted = [lesson for lesson in filtered if lesson.category.upper() in wiki_cats]
+        rest = [lesson for lesson in filtered if lesson.category.upper() not in wiki_cats]
         boosted_sorted = sorted(boosted, key=_score, reverse=True)[:MAX_RULES]
         rest_sorted = sorted(rest, key=_score, reverse=True)
         remaining = MAX_RULES - len(boosted_sorted)

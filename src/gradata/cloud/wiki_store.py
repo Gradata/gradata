@@ -31,7 +31,7 @@ _log = logging.getLogger(__name__)
 EMBEDDING_DIM = 384  # all-MiniLM-L6-v2 output dimension (fixed by model choice)
 
 # SQL for schema creation (run via Supabase SQL editor or RPC)
-SCHEMA_SQL = """
+SCHEMA_SQL = f"""
 -- Enable pgvector extension
 create extension if not exists vector;
 
@@ -44,7 +44,7 @@ create table if not exists wiki_pages (
     page_type       text not null default 'concept',
     content         text not null,
     content_hash    text not null,
-    embedding       vector({dim}),
+    embedding       vector({EMBEDDING_DIM}),
     tags            jsonb default '[]'::jsonb,
     source_file     text,
     created_at      timestamptz not null default now(),
@@ -73,7 +73,7 @@ create index if not exists idx_wiki_sources_brain on wiki_sources(brain_id);
 -- Only create if embedding column is populated
 -- create index if not exists idx_wiki_pages_embedding
 --     on wiki_pages using ivfflat (embedding vector_cosine_ops) with (lists = 100);
-""".format(dim=EMBEDDING_DIM)
+"""
 
 # RLS policies (users can only access their own brain's data)
 RLS_SQL = """
@@ -414,9 +414,9 @@ class WikiStore:
 
 # ── Supabase RPC function for vector search ──────────────────────────
 
-SEARCH_RPC_SQL = """
+SEARCH_RPC_SQL = f"""
 create or replace function wiki_search(
-    query_embedding vector({dim}),
+    query_embedding vector({EMBEDDING_DIM}),
     match_brain_id text,
     match_count int default 5
 )
@@ -448,4 +448,4 @@ begin
     limit match_count;
 end;
 $$;
-""".format(dim=EMBEDDING_DIM)
+"""
