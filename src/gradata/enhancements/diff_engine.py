@@ -75,6 +75,7 @@ class DiffResult:
     changed_sections: list[ChangedSection]
     severity: str
     summary_stats: dict[str, int]
+    semantic_similarity: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +86,7 @@ _SEVERITY_THRESHOLDS: list[tuple[float, str]] = [
     (0.02, "as-is"),
     (0.10, "minor"),
     (0.30, "moderate"),
-    (0.80, "major"),       # Was 0.60 — too many real corrections were "discarded"
+    (0.80, "major"),  # Was 0.60 — too many real corrections were "discarded"
 ]
 
 
@@ -103,6 +104,40 @@ def _classify_severity(edit_distance: float) -> str:
         if edit_distance < threshold:
             return label
     return "discarded"
+
+
+# ---------------------------------------------------------------------------
+# Semantic severity adjustment
+# ---------------------------------------------------------------------------
+
+_SEVERITY_DOWNGRADE: dict[str, str] = {
+    "discarded": "major",
+    "major": "moderate",
+    "moderate": "minor",
+    "minor": "as-is",
+}
+
+_SEMANTIC_DOWNGRADE_THRESHOLD = 0.85
+
+
+def adjust_severity_by_semantics(
+    result: DiffResult,
+    semantic_similarity: float,
+    threshold: float = _SEMANTIC_DOWNGRADE_THRESHOLD,
+) -> DiffResult:
+    """Downgrade severity by one level when semantic similarity is high."""
+    new_severity = result.severity
+    if semantic_similarity >= threshold and result.severity in _SEVERITY_DOWNGRADE:
+        new_severity = _SEVERITY_DOWNGRADE[result.severity]
+
+    return DiffResult(
+        edit_distance=result.edit_distance,
+        compression_distance=result.compression_distance,
+        changed_sections=result.changed_sections,
+        severity=new_severity,
+        summary_stats=result.summary_stats,
+        semantic_similarity=semantic_similarity,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -268,9 +303,7 @@ def compute_diff(draft: str, final: str) -> DiffResult:
 
     # Normalised similarity ratio: 1.0 = identical, 0.0 = nothing in common.
     # We invert to get edit_distance where 0.0 = identical.
-    similarity = difflib.SequenceMatcher(
-        None, draft, final, autojunk=False
-    ).ratio()
+    similarity = difflib.SequenceMatcher(None, draft, final, autojunk=False).ratio()
     edit_distance = round(1.0 - similarity, 6)
 
     # Compression distance: better correlated with human editing effort.
