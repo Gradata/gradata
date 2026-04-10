@@ -58,17 +58,58 @@ def log_application(
 
     try:
         from gradata._events import emit
+
         return emit("RULE_APPLICATION", source, data, tags, session)
     except Exception as e:
-        logging.getLogger("gradata.rule_tracker").warning("Failed to log rule application for %s: %s", rule_id, e)
+        logging.getLogger("gradata.rule_tracker").warning(
+            "Failed to log rule application for %s: %s", rule_id, e
+        )
         return None
 
+
+VALID_SUPPRESSION_REASONS = {
+    "relevance_threshold",
+    "domain_disabled",
+    "conflict",
+    "assumption_invalid",
+}
+
+
+def log_suppression(
+    rule_id: str,
+    reason: str,
+    relevance: float,
+    competing_rule_ids: list[str] | None = None,
+    ctx=None,
+    session: int | None = None,
+) -> None:
+    """Emit a RULE_SUPPRESSION event when a rule is filtered out.
+
+    Args:
+        rule_id: The rule that was suppressed.
+        reason: One of VALID_SUPPRESSION_REASONS.
+        relevance: The relevance score at time of suppression.
+        competing_rule_ids: Other rules that caused suppression (for conflicts).
+        ctx: Optional BrainContext.
+        session: Optional session number.
+    """
+    from gradata._events import emit
+
+    data = {
+        "rule_id": rule_id,
+        "reason": reason,
+        "relevance": round(relevance, 4),
+        "competing_rules": competing_rule_ids or [],
+    }
+    tags = [f"rule:{rule_id}", f"suppression:{reason}"]
+    emit("RULE_SUPPRESSION", source="rule_engine", data=data, tags=tags, session=session, ctx=ctx)
 
 
 def get_session_applications(db_path: Path, session: int) -> list[dict]:
     """All RULE_APPLICATION events for a given session."""
     try:
         from gradata._events import query
+
         events = query(event_type="RULE_APPLICATION", session=session, limit=500)
         return [
             {
@@ -90,6 +131,7 @@ def get_session_applications(db_path: Path, session: int) -> list[dict]:
 @dataclass
 class RuleApplication:
     """Typed record of a single rule application event."""
+
     rule_id: str
     session: int | None = None
     accepted: bool = False
@@ -103,6 +145,7 @@ def get_rule_history(db_path: Path, rule_id: str, limit: int = 20) -> list[dict]
     """Recent RULE_APPLICATION events for a specific rule."""
     try:
         from gradata._events import query
+
         events = query(event_type="RULE_APPLICATION", limit=500)
         matching = [e for e in events if e.get("data", {}).get("rule_id") == rule_id]
         return [
@@ -117,5 +160,7 @@ def get_rule_history(db_path: Path, rule_id: str, limit: int = 20) -> list[dict]
             for e in matching[:limit]
         ]
     except Exception as e:
-        logging.getLogger("gradata.rule_tracker").warning("get_rule_history failed for %s: %s", rule_id, e)
+        logging.getLogger("gradata.rule_tracker").warning(
+            "get_rule_history failed for %s: %s", rule_id, e
+        )
         return []
