@@ -767,24 +767,6 @@ class Brain(BrainInspectionMixin):
     #   rules(), explain(), trace(), export_data(),
     #   pending_promotions(), approve_promotion(), reject_promotion()
 
-    # ── Notifications ──────────────────────────────────────────────────
-
-    def on_notification(self, callback: Callable | None = None) -> None:
-        """Register a callback for human-readable learning notifications.
-
-        If *callback* is None, uses the built-in CLI handler (colored stderr).
-        Notifications are formatted from EventBus events — corrections,
-        graduations, meta-rules, session summaries.
-
-        Usage::
-
-            brain.on_notification()                    # CLI colored output
-            brain.on_notification(my_slack_handler)     # custom handler
-            brain.on_notification(lambda n: print(n.message))
-        """
-        from gradata.notifications import cli_handler, subscribe
-        subscribe(self.bus, callback or cli_handler)
-
     # ── Events ─────────────────────────────────────────────────────────
 
     def emit(self, event_type: str, source: str, data: dict | None = None,
