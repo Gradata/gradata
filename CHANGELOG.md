@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.5.0] - 2026-04-10
+
+### Added
+- Self-healing engine: rule failure detection + auto-patching (PR #21)
+- Cloud backend: Supabase schema, FastAPI sync endpoint, Railway deploy config (PR #22)
+- Wiki-aware rule injection: semantic boost from qmd wiki pages
+- Notification system: `brain.on_notification()` API with 5 event formatters
+- Supabase wiki store: pgvector semantic search for cloud rule injection
+- 19 Python hooks + installer + profile system (PR #20)
+
+### Fixed
+- 210 ruff errors across 106 files
+- Bandit false positives suppressed with explanations
+- Flaky graduation test stabilized for Python 3.12
+- CodeRabbit review findings across PRs #20, #21, #22
+
+### Changed
+- CI: added ruff>=0.4 to dev dependencies
+- CI: fixed sdk-ci.yml paths (removed stale working-directory)
+
 ## [0.4.0] - 2026-04-06
 
 ### Added

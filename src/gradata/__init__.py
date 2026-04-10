@@ -18,7 +18,7 @@ Quick start:
     brain.export()
 """
 
-__version__ = "0.2.0"
+__version__ = "0.5.0"
 
 # ── Debug logging via env var (like OPENAI_LOG=debug) ──────────────────
 import logging as _logging
