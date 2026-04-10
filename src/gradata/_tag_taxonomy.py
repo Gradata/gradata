@@ -97,8 +97,8 @@ _SUB_TO_PARENT: dict[str, str] = {}
 for _parent, _subs in ROSCH_HIERARCHY.items():
     for _sub in _subs:
         _SUB_TO_PARENT.setdefault(_sub, _parent)
-for _p in ROSCH_PARENTS:
-    _SUB_TO_PARENT[_p] = _p
+for _rp in ROSCH_PARENTS:
+    _SUB_TO_PARENT[_rp] = _rp
 
 
 def parent_category(category: str) -> str | None:
