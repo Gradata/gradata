@@ -29,11 +29,25 @@ _CORE_TAXONOMY = {
         "mode": "closed",
         "values": {
             # Core categories (from edit classifier: content/factual/tone/structure/style)
-            "CONTENT", "FACTUAL", "TONE", "STRUCTURE", "STYLE",
+            "CONTENT",
+            "FACTUAL",
+            "TONE",
+            "STRUCTURE",
+            "STYLE",
             # Learning system categories
-            "DRAFTING", "ACCURACY", "PROCESS", "ARCHITECTURE",
-            "COMMUNICATION", "CONTEXT", "CONSTRAINT",
-            "DATA_INTEGRITY", "THOROUGHNESS", "COST",
+            "DRAFTING",
+            "ACCURACY",
+            "PROCESS",
+            "ARCHITECTURE",
+            "COMMUNICATION",
+            "CONTEXT",
+            "CONSTRAINT",
+            "DATA_INTEGRITY",
+            "THOROUGHNESS",
+            "COST",
+            # Rosch superordinate categories
+            "VOICE",
+            "QUALITY",
         },
         "required_on": ["CORRECTION"],
     },
@@ -56,6 +70,41 @@ _CORE_TAXONOMY = {
     },
 }
 
+# ── Rosch 6-Category Hierarchy ───────────────────────────────────────
+# Superordinate categories that group fine-grained correction categories
+# into broader cognitive buckets (inspired by Rosch's prototype theory).
+# A subordinate may appear under multiple parents (e.g. ACCURACY is both
+# PROCESS and QUALITY).
+
+ROSCH_HIERARCHY: dict[str, set[str]] = {
+    "CONTENT": {"FACTUAL", "DATA_INTEGRITY", "ENTITIES"},
+    "VOICE": {"TONE", "STYLE", "COMMUNICATION", "PRESENTATION"},
+    "STRUCTURE": {"ARCHITECTURE", "CONTEXT"},
+    "PROCESS": {"DRAFTING", "ACCURACY", "THOROUGHNESS"},
+    "CONSTRAINT": {"CRM", "STRATEGY", "POSITIONING", "COST", "STARTUP"},
+    "QUALITY": {"DATA_INTEGRITY", "ACCURACY", "THOROUGHNESS"},
+}
+
+ROSCH_PARENTS: set[str] = set(ROSCH_HIERARCHY.keys())
+
+_SUB_TO_PARENT: dict[str, str] = {}
+for _parent, _subs in ROSCH_HIERARCHY.items():
+    for _sub in _subs:
+        _SUB_TO_PARENT.setdefault(_sub, _parent)
+for _p in ROSCH_PARENTS:
+    _SUB_TO_PARENT[_p] = _p
+
+
+def parent_category(category: str) -> str | None:
+    """Return the Rosch superordinate parent for a category, or None."""
+    return _SUB_TO_PARENT.get(category.upper())
+
+
+def subordinates_of(parent: str) -> set[str]:
+    """Return the set of subordinate categories under a Rosch parent."""
+    return set(ROSCH_HIERARCHY.get(parent.upper(), set()))
+
+
 # ── Domain-Specific Defaults (Sales) ──────────────────────────────────
 # These ship as defaults because sales is the first domain.
 # Other domains override via brain_dir/taxonomy.json.
@@ -75,54 +124,88 @@ _SALES_DOMAIN_TAXONOMY = {
     "output": {
         "desc": "Output type produced",
         "mode": "closed",
-        "values": {"email", "cheat_sheet", "research", "cold_call_script",
-                   "linkedin_message", "crm_note", "proposal", "sequence",
-                   "report", "system_artifact"},
+        "values": {
+            "email",
+            "cheat_sheet",
+            "research",
+            "cold_call_script",
+            "linkedin_message",
+            "crm_note",
+            "proposal",
+            "sequence",
+            "report",
+            "system_artifact",
+        },
         "required_on": ["OUTPUT"],
     },
     "angle": {
         "desc": "Communication angle used in messaging",
         "mode": "closed",
-        "values": {"direct", "pain-point", "time-savings", "roi",
-                   "competitor-displacement", "social-proof", "curiosity",
-                   "event-triggered", "referral", "break-up", "custom"},
+        "values": {
+            "direct",
+            "pain-point",
+            "time-savings",
+            "roi",
+            "competitor-displacement",
+            "social-proof",
+            "curiosity",
+            "event-triggered",
+            "referral",
+            "break-up",
+            "custom",
+        },
         "required_on": [],
     },
     "persona": {
         "desc": "Buyer persona type",
         "mode": "closed",
-        "values": {"agency-owner", "founder", "ecom-director", "cmo",
-                   "growth-lead", "fractional-cmo", "marketing-manager",
-                   "vp-marketing", "other"},
+        "values": {
+            "agency-owner",
+            "founder",
+            "ecom-director",
+            "cmo",
+            "growth-lead",
+            "fractional-cmo",
+            "marketing-manager",
+            "vp-marketing",
+            "other",
+        },
         "required_on": [],
     },
     "framework": {
         "desc": "Sales/email framework applied",
         "mode": "closed",
-        "values": {"ccq", "spin", "gap", "jolt", "challenger",
-                   "great-demo", "sandler", "custom"},
+        "values": {"ccq", "spin", "gap", "jolt", "challenger", "great-demo", "sandler", "custom"},
         "required_on": [],
     },
     "channel": {
         "desc": "Communication channel",
         "mode": "closed",
-        "values": {"email", "phone", "linkedin", "meeting", "demo",
-                   "slack", "text"},
+        "values": {"email", "phone", "linkedin", "meeting", "demo", "slack", "text"},
         "required_on": ["DELTA_TAG"],
     },
     "outcome": {
         "desc": "Interaction outcome",
         "mode": "closed",
-        "values": {"reply", "no-reply", "positive-reply", "negative-reply",
-                   "meeting-booked", "demo-completed", "deal-advanced",
-                   "deal-lost", "ghosted", "objection-raised", "pending"},
+        "values": {
+            "reply",
+            "no-reply",
+            "positive-reply",
+            "negative-reply",
+            "meeting-booked",
+            "demo-completed",
+            "deal-advanced",
+            "deal-lost",
+            "ghosted",
+            "objection-raised",
+            "pending",
+        },
         "required_on": [],
     },
 }
 
 # Sales-specific correction categories (extend core set)
-_DOMAIN_CATEGORIES = {"CRM", "STRATEGY", "ENTITIES", "POSITIONING",
-                      "PRESENTATION", "STARTUP"}
+_DOMAIN_CATEGORIES = {"CRM", "STRATEGY", "ENTITIES", "POSITIONING", "PRESENTATION", "STARTUP"}
 
 
 def _load_taxonomy() -> dict:
@@ -136,7 +219,9 @@ def _load_taxonomy() -> dict:
     taxonomy = dict(_CORE_TAXONOMY)
 
     # Try loading domain config from brain directory
-    taxonomy_path = _p.BRAIN_DIR / "taxonomy.json" if hasattr(_p, 'BRAIN_DIR') and _p.BRAIN_DIR else None
+    taxonomy_path = (
+        _p.BRAIN_DIR / "taxonomy.json" if hasattr(_p, "BRAIN_DIR") and _p.BRAIN_DIR else None
+    )
     if taxonomy_path and taxonomy_path.exists():
         try:
             with open(taxonomy_path, encoding="utf-8") as f:
@@ -158,8 +243,8 @@ def _load_taxonomy() -> dict:
                 taxonomy[key] = spec
             # Extend core category values if domain provides extra categories
             if "extra_categories" in domain_taxonomy:
-                taxonomy["category"]["values"] = (
-                    taxonomy["category"]["values"] | set(domain_taxonomy["extra_categories"])
+                taxonomy["category"]["values"] = taxonomy["category"]["values"] | set(
+                    domain_taxonomy["extra_categories"]
                 )
             return taxonomy
         except Exception:
@@ -184,6 +269,7 @@ def reload_taxonomy() -> None:
 
 # ── Validation ─────────────────────────────────────────────────────────
 
+
 def _get_entity_names() -> set[str]:
     """Get valid entity names from brain's entity directory.
 
@@ -193,7 +279,7 @@ def _get_entity_names() -> set[str]:
     names = set()
     # Try common entity directory names
     for dirname in ("prospects", "candidates", "customers", "entities"):
-        entity_dir = _p.BRAIN_DIR / dirname if hasattr(_p, 'BRAIN_DIR') and _p.BRAIN_DIR else None
+        entity_dir = _p.BRAIN_DIR / dirname if hasattr(_p, "BRAIN_DIR") and _p.BRAIN_DIR else None
         if entity_dir and entity_dir.exists():
             for f in entity_dir.glob("*.md"):
                 if f.name.startswith("_"):
@@ -201,7 +287,7 @@ def _get_entity_names() -> set[str]:
                 parts = re.split(r"\s*[—–-]\s*", f.stem, maxsplit=1)
                 names.add(parts[0].strip())
     # Legacy fallback
-    if not names and hasattr(_p, 'PROSPECTS_DIR'):
+    if not names and hasattr(_p, "PROSPECTS_DIR"):
         prospects_dir = _p.PROSPECTS_DIR
         if prospects_dir.exists():
             for f in prospects_dir.glob("*.md"):
@@ -236,8 +322,9 @@ def validate_tag(tag: str, strict: bool = False) -> tuple[bool, str]:
     return True, "ok"
 
 
-def validate_tags(tags: list[str], event_type: str | None = None,
-                  strict: bool = False) -> list[str]:
+def validate_tags(
+    tags: list[str], event_type: str | None = None, strict: bool = False
+) -> list[str]:
     issues = []
     for tag in tags:
         valid, msg = validate_tag(tag, strict=strict)
@@ -247,12 +334,13 @@ def validate_tags(tags: list[str], event_type: str | None = None,
         present_prefixes = {t.split(":")[0] for t in tags if ":" in t}
         for prefix, spec in TAXONOMY.items():
             if event_type in spec.get("required_on", []) and prefix not in present_prefixes:
-                    issues.append(f"Missing required tag '{prefix}:' for {event_type} events")
+                issues.append(f"Missing required tag '{prefix}:' for {event_type} events")
     return issues
 
 
-def enrich_tags(tags: list[str], event_type: str | None = None,
-                data: dict | None = None) -> list[str]:
+def enrich_tags(
+    tags: list[str], event_type: str | None = None, data: dict | None = None
+) -> list[str]:
     enriched = list(tags)
     prefixes = {t.split(":")[0] for t in enriched if ":" in t}
     data = data or {}
@@ -266,10 +354,15 @@ def enrich_tags(tags: list[str], event_type: str | None = None,
         if ot:
             # Normalize common variants to taxonomy values
             output_map = {
-                "email_draft": "email", "email_reply": "email", "follow_up": "email",
-                "call_script": "cold_call_script", "call_prep": "cold_call_script",
-                "demo_prep": "cheat_sheet", "meeting_prep": "cheat_sheet",
-                "linkedin_dm": "linkedin_message", "linkedin_connect": "linkedin_message",
+                "email_draft": "email",
+                "email_reply": "email",
+                "follow_up": "email",
+                "call_script": "cold_call_script",
+                "call_prep": "cold_call_script",
+                "demo_prep": "cheat_sheet",
+                "meeting_prep": "cheat_sheet",
+                "linkedin_dm": "linkedin_message",
+                "linkedin_connect": "linkedin_message",
             }
             normalized = output_map.get(ot, ot)
             enriched.append(f"output:{normalized}")
@@ -280,9 +373,12 @@ def enrich_tags(tags: list[str], event_type: str | None = None,
     if event_type == "DELTA_TAG" and "channel" not in prefixes:
         activity = data.get("activity_type", "")
         channel_map = {
-            "email_sent": "email", "email_received": "email",
-            "call": "phone", "meeting": "meeting",
-            "demo": "demo", "linkedin": "linkedin",
+            "email_sent": "email",
+            "email_received": "email",
+            "call": "phone",
+            "meeting": "meeting",
+            "demo": "demo",
+            "linkedin": "linkedin",
         }
         if activity in channel_map:
             enriched.append(f"channel:{channel_map[activity]}")

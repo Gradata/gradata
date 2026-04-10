@@ -43,10 +43,13 @@ class EmbeddingClient:
     def _is_trusted_url(url):
         """SSRF protection: only allow HTTPS to gradata.ai or localhost."""
         from urllib.parse import urlparse
+
         parsed = urlparse(url)
         if parsed.hostname in ("localhost", "127.0.0.1"):
             return True
-        return bool(parsed.scheme == "https" and parsed.hostname and parsed.hostname.endswith("gradata.ai"))
+        return bool(
+            parsed.scheme == "https" and parsed.hostname and parsed.hostname.endswith("gradata.ai")
+        )
 
     def _embed_api(self, text):
         if not self._is_trusted_url(self.api_url):
@@ -73,6 +76,16 @@ class EmbeddingClient:
         if norm > 0:
             vec = [v / norm for v in vec]
         return vec
+
+    def semantic_similarity(self, text_a: str, text_b: str) -> float:
+        """Cosine similarity between embeddings of two texts.
+        Returns 0.0 if either text is empty, otherwise [0.0, 1.0].
+        """
+        if not text_a or not text_b:
+            return 0.0
+        vec_a = self.embed(text_a)
+        vec_b = self.embed(text_b)
+        return cosine_similarity(vec_a, vec_b)
 
 
 _default_client = None
@@ -155,6 +168,14 @@ def subscribe_to_bus(bus):
         except Exception:
             logger.warning("Failed to embed payload", exc_info=True)
 
-    bus.on("correction.created", lambda p: _embed_and_cache(p, "description", "text"), async_handler=True)
+    bus.on(
+        "correction.created",
+        lambda p: _embed_and_cache(p, "description", "text"),
+        async_handler=True,
+    )
     bus.on("lesson.graduated", lambda p: _embed_and_cache(p, "description"), async_handler=True)
-    bus.on("meta_rule.created", lambda p: _embed_and_cache(p, "description", "rule"), async_handler=True)
+    bus.on(
+        "meta_rule.created",
+        lambda p: _embed_and_cache(p, "description", "rule"),
+        async_handler=True,
+    )
