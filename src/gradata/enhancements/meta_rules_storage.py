@@ -7,6 +7,7 @@ All database I/O for meta-rules lives here.  Core logic and discovery live in
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sqlite3
 from typing import TYPE_CHECKING
@@ -67,10 +68,8 @@ def ensure_table(db_path: str | Path) -> None:
         conn.execute(_CREATE_TABLE_SQL)
         # Migrate: add columns if table existed before this version
         for stmt in (_ADD_CONTEXT_WEIGHTS_SQL, _ADD_APPLIES_WHEN_SQL, _ADD_NEVER_WHEN_SQL, _ADD_TRANSFER_SCOPE_SQL):
-            try:
+            with contextlib.suppress(sqlite3.OperationalError):
                 conn.execute(stmt)
-            except sqlite3.OperationalError:
-                pass  # Column already exists
         conn.commit()
     finally:
         conn.close()
@@ -223,10 +222,8 @@ def ensure_super_table(db_path: str | Path) -> None:
     try:
         conn.execute(_CREATE_SUPER_TABLE_SQL)
         for stmt in (_ADD_SUPER_APPLIES_WHEN_SQL, _ADD_SUPER_NEVER_WHEN_SQL, _ADD_SUPER_TRANSFER_SCOPE_SQL):
-            try:
+            with contextlib.suppress(sqlite3.OperationalError):
                 conn.execute(stmt)
-            except sqlite3.OperationalError:
-                pass  # Column already exists
         conn.commit()
     finally:
         conn.close()

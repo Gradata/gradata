@@ -136,7 +136,7 @@ class ClusterAssignment:
 # Math utilities (shared implementation in _math.py)
 # ---------------------------------------------------------------------------
 
-from gradata._math import cosine_similarity  # noqa: E402
+from gradata._math import cosine_similarity
 
 # ---------------------------------------------------------------------------
 # Cluster Manager

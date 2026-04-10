@@ -246,8 +246,7 @@ def validate_tags(tags: list[str], event_type: str | None = None,
     if event_type:
         present_prefixes = {t.split(":")[0] for t in tags if ":" in t}
         for prefix, spec in TAXONOMY.items():
-            if event_type in spec.get("required_on", []):
-                if prefix not in present_prefixes:
+            if event_type in spec.get("required_on", []) and prefix not in present_prefixes:
                     issues.append(f"Missing required tag '{prefix}:' for {event_type} events")
     return issues
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gradata.hooks._base import run_hook, resolve_brain_dir
+from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
 
 try:

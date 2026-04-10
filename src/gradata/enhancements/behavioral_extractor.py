@@ -414,9 +414,7 @@ def _is_actionable(instruction: str) -> bool:
         return True
     # Accept instructions from PREFIX_INSTRUCTION archetype (explicit user rules)
     # and any instruction that looks imperative (capitalized verb form)
-    if instruction[0].isupper() and len(instruction.split()) >= 3:
-        return True
-    return False
+    return instruction[0].isupper() and len(instruction.split()) >= 3
 
 
 def _try_llm_extract(llm_provider, draft: str, final: str, classification) -> str | None:
@@ -457,7 +455,7 @@ def extract_instruction(
     final: str,
     classification: EditClassification | None = None,
     *,
-    category: str = "",  # noqa: ARG001 — passed by callers, reserved for future use
+    category: str = "",
     llm_provider=None,
 ) -> str | None:
     """Main entry point. Returns an actionable behavioral instruction.

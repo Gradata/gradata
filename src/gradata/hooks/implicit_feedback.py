@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import re
 
-from gradata.hooks._base import run_hook, resolve_brain_dir, extract_message
+from gradata.hooks._base import extract_message, resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
 
 _log = logging.getLogger(__name__)

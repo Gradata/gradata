@@ -1,6 +1,7 @@
 """Stop hook: emit SESSION_END event and run graduation sweep."""
 from __future__ import annotations
-from gradata.hooks._base import run_hook, resolve_brain_dir
+
+from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
 
 HOOK_META = {
@@ -23,7 +24,8 @@ def _emit_session_end(brain_dir: str) -> None:
 def _run_graduation(brain_dir: str) -> None:
     try:
         from pathlib import Path
-        from gradata.enhancements.self_improvement import parse_lessons, graduate, format_lessons
+
+        from gradata.enhancements.self_improvement import format_lessons, graduate, parse_lessons
         lessons_path = Path(brain_dir) / "lessons.md"
         if not lessons_path.is_file():
             return

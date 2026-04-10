@@ -612,11 +612,13 @@ class Brain(BrainInspectionMixin):
 
     def _resolve_pending(self, approval_id: int, resolution: str, mutator) -> dict:
         """Shared logic for approve/reject: look up pending, mutate lesson, resolve."""
+        import sqlite3
+
         from gradata._db import get_connection, lessons_lock
         from gradata.enhancements.self_improvement import format_lessons, parse_lessons
 
         conn = get_connection(self.db_path)
-        import sqlite3; conn.row_factory = sqlite3.Row
+        conn.row_factory = sqlite3.Row
         row = conn.execute(
             "SELECT * FROM pending_approvals WHERE id = ? AND resolution IS NULL",
             (approval_id,)).fetchone()
@@ -660,9 +662,11 @@ class Brain(BrainInspectionMixin):
         if not self.db_path.is_file():
             return []
         try:
+            import sqlite3
+
             from gradata._db import get_connection
             conn = get_connection(self.db_path)
-            import sqlite3; conn.row_factory = sqlite3.Row
+            conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 "SELECT * FROM pending_approvals WHERE resolution IS NULL "
                 "ORDER BY created_at DESC").fetchall()
@@ -942,7 +946,7 @@ class Brain(BrainInspectionMixin):
             return export_brain(include_prospects=(mode != "no-prospects"),
                                 domain_only=(mode == "domain-only"), ctx=self.ctx)
         except ImportError as e:
-            raise RuntimeError(f"Export requires brain modules: {e}")
+            raise RuntimeError(f"Export requires brain modules: {e}") from e
 
     def context_for(self, message: str) -> str:
         """Compile relevant context for a user message."""

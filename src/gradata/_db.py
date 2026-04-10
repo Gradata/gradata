@@ -95,7 +95,7 @@ def lessons_lock(lessons_path: str | Path, timeout: float = 10.0):
                     if time.monotonic() > deadline:
                         raise TimeoutError(
                             f"Could not acquire lessons lock after {timeout}s"
-                        )
+                        ) from None
                     time.sleep(0.1)
         else:
             import fcntl
@@ -107,7 +107,7 @@ def lessons_lock(lessons_path: str | Path, timeout: float = 10.0):
                     if time.monotonic() > deadline:
                         raise TimeoutError(
                             f"Could not acquire lessons lock after {timeout}s"
-                        )
+                        ) from None
                     time.sleep(0.1)
 
         yield lock_path

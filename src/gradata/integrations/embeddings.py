@@ -22,7 +22,7 @@ EMBEDDING_DIM = 128
 _CACHE_MAX_SIZE = 2000
 
 
-from gradata._math import cosine_similarity  # noqa: E402 — shared utility
+from gradata._math import cosine_similarity
 
 
 class EmbeddingClient:
