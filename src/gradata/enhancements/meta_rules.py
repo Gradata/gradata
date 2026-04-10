@@ -464,6 +464,74 @@ def refresh_meta_rules(
 
 
 # ---------------------------------------------------------------------------
+# Cross-Domain Detection
+# ---------------------------------------------------------------------------
+
+
+def detect_cross_domain_candidates(
+    lessons: list,
+    min_domains: int = 3,
+) -> list[dict]:
+    """Find rules that appear in 3+ distinct domains — universal candidates.
+
+    Groups graduated rules by their normalised description. Any description
+    that appears (across distinct domains) in at least *min_domains* different
+    domains is returned as a cross-domain candidate.
+
+    Args:
+        lessons: Iterable of :class:`~gradata._types.Lesson` objects. Only
+            lessons with a non-empty ``domain`` field in their ``scope_json``
+            are considered.
+        min_domains: Minimum distinct domain count to qualify (default 3).
+
+    Returns:
+        List of dicts, each with keys:
+        - ``"description"`` (str): The normalised rule description.
+        - ``"domains"`` (list[str]): Distinct domains where the rule appears.
+        - ``"avg_confidence"`` (float): Mean confidence across all matching
+          lessons.
+        - ``"count"`` (int): Total number of matching lessons.
+    """
+    import json
+    from collections import defaultdict
+
+    # Map normalised_description -> list of (domain, confidence) pairs
+    groups: dict[str, list[tuple[str, float]]] = defaultdict(list)
+
+    for lesson in lessons:
+        # Extract domain from scope_json
+        domain = ""
+        if lesson.scope_json:
+            try:
+                scope_data = json.loads(lesson.scope_json)
+                domain = scope_data.get("domain", "") or ""
+            except (json.JSONDecodeError, TypeError):
+                domain = ""
+
+        if not domain:
+            continue  # Skip lessons without a domain
+
+        normalised = lesson.description.strip()
+        groups[normalised].append((domain, lesson.confidence))
+
+    candidates = []
+    for description, entries in groups.items():
+        distinct_domains = list({d for d, _ in entries})
+        if len(distinct_domains) < min_domains:
+            continue
+
+        avg_conf = round(sum(c for _, c in entries) / len(entries), 4)
+        candidates.append({
+            "description": description,
+            "domains": distinct_domains,
+            "avg_confidence": avg_conf,
+            "count": len(entries),
+        })
+
+    return candidates
+
+
+# ---------------------------------------------------------------------------
 # Lesson Parsing (for testing with real data)
 # ---------------------------------------------------------------------------
 

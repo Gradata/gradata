@@ -331,6 +331,62 @@ def check_nudge_threshold(
     }
 
 
+# ── Suggest Scope Narrowing ───────────────────────────────────────────
+
+
+def suggest_scope_narrowing(
+    rule_scope: "RuleScope",
+    misfire_context: dict,
+) -> "RuleScope | None":
+    """Suggest a narrowed RuleScope based on a misfire context.
+
+    Inspects each field of *rule_scope*.  If a field is a wildcard (holds its
+    default value) **and** the *misfire_context* contains a specific value for
+    that field, the returned scope sets that field to the context value —
+    narrowing the scope to the observed failure context.
+
+    If every field already matches the context (no narrowing possible), or the
+    context provides no scope-relevant keys, returns ``None``.
+
+    Args:
+        rule_scope: The current :class:`~gradata._scope.RuleScope` attached to
+            the rule.
+        misfire_context: Dict describing where the rule fired incorrectly.
+            Supported keys: ``domain``, ``task_type``, ``audience``,
+            ``channel``, ``stakes``, ``agent_type``, ``namespace``.
+
+    Returns:
+        A new narrowed :class:`~gradata._scope.RuleScope`, or ``None`` if the
+        scope already matches the context or no narrowing is applicable.
+    """
+    from dataclasses import asdict
+    from gradata._scope import RuleScope
+
+    # Default values are wildcards — narrowing replaces wildcards with context values
+    defaults = asdict(RuleScope())
+    current = asdict(rule_scope)
+
+    narrowed = dict(current)
+    did_narrow = False
+
+    for field_name, default_val in defaults.items():
+        context_val = misfire_context.get(field_name, "")
+        if not context_val:
+            continue  # Context provides no signal for this field
+
+        rule_val = current[field_name]
+        if rule_val == default_val:
+            # Field is wildcard in rule but context has a specific value → narrow
+            narrowed[field_name] = context_val
+            did_narrow = True
+        # If rule already has a specific value equal to the context, no change needed
+
+    if not did_narrow:
+        return None  # Scope already fully constrained or context gives no new info
+
+    return RuleScope(**narrowed)
+
+
 # ── Scope Narrowing (Phase 2 prep -- capture only) ────────────────────
 
 def narrow_rule_scope(
