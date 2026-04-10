@@ -343,9 +343,10 @@ class Brain(BrainInspectionMixin):
         from gradata.enhancements.self_healing import apply_patch
         from gradata.enhancements.self_improvement import format_lessons, parse_lessons
 
-        lessons_path = self._find_lessons_path()
-        if not lessons_path or not lessons_path.is_file():
-            return {"patched": False, "error": "not_found: no lessons file"}
+        # Only patch the brain-local lessons file — never external fallbacks
+        lessons_path = self.dir / "lessons.md"
+        if not lessons_path.is_file():
+            return {"patched": False, "error": "not_found: no brain-local lessons file"}
 
         lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
         patched = apply_patch(lessons, category, old_description, new_description)
@@ -354,6 +355,13 @@ class Brain(BrainInspectionMixin):
             return {"patched": False, "error": f"not_found: no rule matching category={category!r}"}
 
         write_lessons_safe(lessons_path, format_lessons(lessons))
+
+        # Re-sign the patched rule so HMAC verification stays valid
+        try:
+            from gradata.enhancements.rule_integrity import sign_and_store
+            sign_and_store(self.db_path, new_description, category, patched.confidence)
+        except ImportError:
+            pass  # unsigned mode — no-op
 
         self.emit("RULE_PATCHED", "brain.patch_rule", {
             "category": category,

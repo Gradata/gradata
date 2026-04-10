@@ -90,7 +90,7 @@ def apply_patch(
     cat = category.upper()
     for lesson in lessons:
         if (lesson.category.upper() == cat
-                and lesson.description == old_description):
+                and lesson.description.strip() == old_description.strip()):
             lesson.description = new_description
             return lesson
     return None
@@ -181,7 +181,7 @@ def _generate_deterministic_patch(
         return rule_description  # Can't narrow -- return unchanged
 
     # Take top 3 most informative context words
-    context_phrase = " ".join(sorted(new_context_words)[:3])
+    context_phrase = " ".join(list(new_context_words)[:3])
     return f"{rule_description} (especially in context: {context_phrase})"
 
 

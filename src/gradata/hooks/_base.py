@@ -20,6 +20,9 @@ from gradata.hooks._profiles import Profile
 
 _log = logging.getLogger(__name__)
 
+# Events that can run without input data (lifecycle events, not tool hooks)
+_NO_INPUT_EVENTS = frozenset({"SessionStart", "Stop", "PreCompact"})
+
 
 def get_profile() -> Profile:
     raw = os.environ.get("GRADATA_HOOK_PROFILE", "standard").lower().strip()
@@ -88,7 +91,7 @@ def run_hook(main_fn, meta: dict, *, raw_input: str | None = None) -> None:
             return
         raw = raw_input if raw_input is not None else sys.stdin.read()
         data = read_input(raw)
-        if data is None and meta.get("event") not in ("SessionStart", "Stop", "PreCompact"):
+        if data is None and meta.get("event") not in _NO_INPUT_EVENTS:
             return
         result = main_fn(data or {})
         if result:

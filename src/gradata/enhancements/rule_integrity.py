@@ -139,6 +139,10 @@ def sign_lesson_file(lessons_path: Path) -> dict[str, str]:
     Parses lesson lines matching [STATE:CONF] CATEGORY: description
     and returns a {category: signature} map.
 
+    Note: Only the *last* rule per category is retained. This is intentional —
+    graduation produces one canonical rule per category, so duplicates indicate
+    stale entries. The returned dict is keyed by category for O(1) lookup.
+
     Args:
         lessons_path: Path to lessons.md file.
 
@@ -208,8 +212,7 @@ def verify_lesson_file(lessons_path: Path, signatures: dict[str, str]) -> list[s
 
 def _ensure_table(db_path: Path) -> None:
     """Create rule_signatures table if it doesn't exist."""
-    conn = sqlite3.connect(str(db_path))
-    try:
+    with sqlite3.connect(str(db_path)) as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS rule_signatures (
                 category TEXT PRIMARY KEY,
@@ -218,8 +221,6 @@ def _ensure_table(db_path: Path) -> None:
             )
         """)
         conn.commit()
-    finally:
-        conn.close()
 
 
 def store_signature(db_path: Path, category: str, signature: str) -> None:
