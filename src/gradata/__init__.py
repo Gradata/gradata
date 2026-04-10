@@ -32,18 +32,18 @@ if _log_level in ("DEBUG", "INFO", "WARNING", "ERROR"):
     )
     _logging.getLogger("gradata").setLevel(getattr(_logging, _log_level))
 
-from gradata._paths import BrainContext  # noqa: E402
-from gradata._types import Lesson, LessonState, RuleTransferScope  # noqa: E402
-from gradata.brain import Brain  # noqa: E402
-from gradata.context_wrapper import brain_context  # noqa: E402
-from gradata.enhancements.self_improvement import (  # noqa: E402
+from gradata._paths import BrainContext
+from gradata._types import Lesson, LessonState, RuleTransferScope
+from gradata.brain import Brain
+from gradata.context_wrapper import brain_context
+from gradata.enhancements.self_improvement import (
     compute_learning_velocity,
     format_lessons,
     graduate,
     parse_lessons,
     update_confidence,
 )
-from gradata.exceptions import (  # noqa: E402
+from gradata.exceptions import (
     BrainError,
     BrainNotFoundError,
     EmbeddingError,
@@ -52,7 +52,7 @@ from gradata.exceptions import (  # noqa: E402
     TaxonomyError,
     ValidationError,
 )
-from gradata.onboard import onboard  # noqa: E402
+from gradata.onboard import onboard
 
 __all__ = [
     # Core API

@@ -30,6 +30,12 @@ if TYPE_CHECKING:
 
 _log = logging.getLogger(__name__)
 
+# Import at module level to avoid private-symbol import inside function body
+try:
+    from gradata.enhancements.edit_classifier import _FACTUAL_RE
+except ImportError:
+    _FACTUAL_RE = re.compile(r"\b\d[\d,.]*\b|\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|https?://\S+")
+
 
 # ---------------------------------------------------------------------------
 # Archetype Taxonomy (12 correction types)
@@ -195,12 +201,15 @@ def detect_archetype(
     # Precompute word sets for sentence overlap (avoids re-splitting per pair)
     draft_sent_sets = [set(s.lower().split()) for s in draft_sents]
     final_sent_sets = [set(s.lower().split()) for s in final_sents]
-    added_sents = [s for s, ws in zip(final_sents, final_sent_sets)
+    added_sents = [s for s, ws in zip(final_sents, final_sent_sets, strict=True)
                    if not any(_sentence_overlap(ws, ds) > 0.5 for ds in draft_sent_sets)]
 
     # 2. REMOVAL_HEDGING (check BEFORE length — hedging removal shortens text)
+    draft_lower = draft.lower()
+    final_lower = final.lower()
     removed_hedges = [h for h in _HEDGE_PHRASES
-                      if h in draft.lower() and h not in final.lower()]
+                      if re.search(r'\b' + re.escape(h) + r'\b', draft_lower)
+                      and not re.search(r'\b' + re.escape(h) + r'\b', final_lower)]
     if removed_hedges:
         return ArchetypeMatch(
             Archetype.REMOVAL_HEDGING, 0.90,
@@ -209,8 +218,8 @@ def detect_archetype(
 
     # 3. CONSTRAINT_ADDITION (check BEFORE length — constraints lengthen text)
     new_constraints = [w for w in _CONSTRAINT_WORDS
-                       if re.search(r'\b' + re.escape(w) + r'\b', final, flags=re.IGNORECASE)
-                       and not re.search(r'\b' + re.escape(w) + r'\b', draft, flags=re.IGNORECASE)]
+                       if re.search(r'\b' + re.escape(w) + r'\b', final_lower)
+                       and not re.search(r'\b' + re.escape(w) + r'\b', draft_lower)]
     if new_constraints:
         constraint_sent = _find_sentence_containing(final, new_constraints[0])
         return ArchetypeMatch(
@@ -239,7 +248,7 @@ def detect_archetype(
     # 6. TRUNCATION / EXPANSION (generic length change — after specific checks)
     len_ratio = len(final) / max(len(draft), 1)
     if len_ratio < 0.65:
-        removed_sents = [s for s, ws in zip(draft_sents, draft_sent_sets)
+        removed_sents = [s for s, ws in zip(draft_sents, draft_sent_sets, strict=True)
                          if not any(_sentence_overlap(ws, fs) > 0.5 for fs in final_sent_sets)]
         topic = _extract_topic(removed_sents) if removed_sents else "content"
         return ArchetypeMatch(
@@ -258,7 +267,6 @@ def detect_archetype(
         return ArchetypeMatch(Archetype.REORDER, 0.85, {})
 
     # 8. REPLACEMENT_FACTUAL (reuse regex from edit_classifier)
-    from gradata.enhancements.edit_classifier import _FACTUAL_RE
     old_facts = set(_FACTUAL_RE.findall(draft))
     new_facts = set(_FACTUAL_RE.findall(final))
     if old_facts != new_facts and (old_facts or new_facts):
@@ -278,7 +286,7 @@ def detect_archetype(
         )
 
     # 10. REMOVAL_CONTENT
-    removed_sents = [s for s, ws in zip(draft_sents, draft_sent_sets)
+    removed_sents = [s for s, ws in zip(draft_sents, draft_sent_sets, strict=True)
                      if not any(_sentence_overlap(ws, fs) > 0.5 for fs in final_sent_sets)]
     if removed_sents and not added_sents:
         topic = _extract_topic(removed_sents)
@@ -394,6 +402,8 @@ _IMPERATIVE_STARTERS = frozenset({
     "remove", "present", "be", "avoid", "ensure", "start",
     "lead", "break", "replace", "run", "test", "audit",
     "research", "validate", "pull", "load", "revise",
+    "prioritize", "emphasize", "highlight", "reduce",
+    "increase", "prefer", "limit", "focus", "simplify",
 })
 
 _GENERIC_FALLBACKS = {
@@ -413,7 +423,11 @@ def _is_actionable(instruction: str) -> bool:
     if not instruction or len(instruction) < 5:
         return False
     first_word = instruction.split()[0].lower().removesuffix("'t")
-    return first_word in _IMPERATIVE_STARTERS
+    if first_word in _IMPERATIVE_STARTERS:
+        return True
+    # Accept instructions from PREFIX_INSTRUCTION archetype (explicit user rules)
+    # and any instruction that looks imperative (capitalized verb form)
+    return instruction[0].isupper() and len(instruction.split()) >= 3
 
 
 def _try_llm_extract(llm_provider, draft: str, final: str, classification) -> str | None:
@@ -422,12 +436,12 @@ def _try_llm_extract(llm_provider, draft: str, final: str, classification) -> st
         return None
     try:
         # Build a prompt from the correction context
-        category = classification.category if classification else "UNKNOWN"
+        cat = classification.category if classification else "UNKNOWN"
         prompt = (
             f"Extract an actionable behavioral instruction from this correction:\n\n"
             f"Draft: {draft}\n\n"
             f"Final: {final}\n\n"
-            f"Category: {category}\n\n"
+            f"Category: {cat}\n\n"
             f"Return a single imperative instruction (e.g., 'Always X', 'Don't Y', 'Use Z instead of W')."
         )
 

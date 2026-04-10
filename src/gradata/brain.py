@@ -336,6 +336,40 @@ class Brain(BrainInspectionMixin):
                              approval_required=approval_required, dry_run=dry_run,
                              min_severity=min_severity, scope=scope)
 
+    def patch_rule(self, category: str, old_description: str, new_description: str,
+                   reason: str = "") -> dict:
+        """Rewrite a rule's description. Preserves confidence/metadata. Emits RULE_PATCHED event."""
+        from gradata._db import write_lessons_safe
+        from gradata.enhancements.self_healing import apply_patch
+        from gradata.enhancements.self_improvement import format_lessons, parse_lessons
+
+        lessons_path = self._find_lessons_path()
+        if not lessons_path or not lessons_path.is_file():
+            return {"patched": False, "error": "not_found: no lessons file"}
+
+        lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+        patched = apply_patch(lessons, category, old_description, new_description)
+
+        if not patched:
+            return {"patched": False, "error": f"not_found: no rule matching category={category!r}"}
+
+        write_lessons_safe(lessons_path, format_lessons(lessons))
+
+        self.emit("RULE_PATCHED", "brain.patch_rule", {
+            "category": category,
+            "old_description": old_description[:200],
+            "new_description": new_description[:200],
+            "reason": reason,
+            "confidence_preserved": patched.confidence,
+        }, [f"category:{category}", "self_healing"])
+
+        return {
+            "patched": True,
+            "old_description": old_description,
+            "new_description": new_description,
+            "confidence_preserved": patched.confidence,
+        }
+
     def end_session(self, session_corrections: list[dict] | None = None,
                     session_type: str = "full", machine_mode: bool | None = None,
                     skip_meta_rules: bool = False) -> dict:
@@ -612,11 +646,13 @@ class Brain(BrainInspectionMixin):
 
     def _resolve_pending(self, approval_id: int, resolution: str, mutator) -> dict:
         """Shared logic for approve/reject: look up pending, mutate lesson, resolve."""
+        import sqlite3
+
         from gradata._db import get_connection, lessons_lock
         from gradata.enhancements.self_improvement import format_lessons, parse_lessons
 
         conn = get_connection(self.db_path)
-        import sqlite3; conn.row_factory = sqlite3.Row
+        conn.row_factory = sqlite3.Row
         row = conn.execute(
             "SELECT * FROM pending_approvals WHERE id = ? AND resolution IS NULL",
             (approval_id,)).fetchone()
@@ -660,9 +696,12 @@ class Brain(BrainInspectionMixin):
         if not self.db_path.is_file():
             return []
         try:
+            import sqlite3
+
             from gradata._db import get_connection
+
             conn = get_connection(self.db_path)
-            import sqlite3; conn.row_factory = sqlite3.Row
+            conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 "SELECT * FROM pending_approvals WHERE resolution IS NULL "
                 "ORDER BY created_at DESC").fetchall()
@@ -924,7 +963,7 @@ class Brain(BrainInspectionMixin):
             return export_brain(include_prospects=(mode != "no-prospects"),
                                 domain_only=(mode == "domain-only"), ctx=self.ctx)
         except ImportError as e:
-            raise RuntimeError(f"Export requires brain modules: {e}")
+            raise RuntimeError(f"Export requires brain modules: {e}") from e
 
     def context_for(self, message: str) -> str:
         """Compile relevant context for a user message."""

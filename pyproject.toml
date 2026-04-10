@@ -37,6 +37,7 @@ dev = [
     "pyright>=1.1",
     "bandit>=1.7",
     "coverage>=7.0",
+    "ruff>=0.4",
 ]
 
 [project.scripts]
@@ -74,6 +75,15 @@ select = [
 ]
 ignore = [
     "E501",  # line too long (formatter handles)
+    "E741",  # ambiguous variable name — used intentionally in list comprehensions
+    "E402",  # module-level import not at top — SDK uses conditional/lazy imports
+    "N806",  # non-lowercase variable in function — intentional for constants
+    "N802",  # invalid function name — intentional aliasing
+    "N814",  # camelcase imported as constant — intentional aliasing
+    "RUF001", # ambiguous unicode in string — intentional en-dash in regex
+    "RUF002", # ambiguous unicode in docstring — intentional
+    "RUF003", # ambiguous unicode in comment — intentional
+    "TC003",  # move stdlib import to TYPE_CHECKING — false positive with runtime Path usage
 ]
 
 [tool.ruff.lint.isort]
