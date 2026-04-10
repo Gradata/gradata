@@ -1,6 +1,8 @@
 """PreToolUse hook: block modifications to linter/formatter config files."""
 from __future__ import annotations
+
 import os
+
 from gradata.hooks._base import run_hook
 from gradata.hooks._profiles import Profile
 

@@ -6,10 +6,10 @@ import json
 import os
 import re
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from gradata.hooks._base import run_hook, resolve_brain_dir
+from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
 
 HOOK_META = {
@@ -48,7 +48,7 @@ def main(data: dict) -> dict | None:
         compact_type = data.get("type", "unknown") if data else "unknown"
 
         snapshot = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "session": session,
             "compact_type": compact_type,
             "brain_dir": str(brain_dir),

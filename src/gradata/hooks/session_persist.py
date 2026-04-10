@@ -5,10 +5,10 @@ import json
 import os
 import re
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from gradata.hooks._base import run_hook, resolve_brain_dir
+from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
 
 HOOK_META = {
@@ -79,7 +79,7 @@ def main(data: dict) -> dict | None:
         modified = _get_modified_files()
 
         handoff = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "session": session,
             "modified_files": modified[:50],
             "file_count": len(modified),

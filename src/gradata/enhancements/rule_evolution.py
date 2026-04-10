@@ -278,12 +278,10 @@ def detect_rule_conflict(
             rule_keywords = _extract_keywords(rule.description)
             if new_keywords & rule_keywords:
                 category_cluster.append(rule)
-    if best_rule is not None and best_similarity > update_threshold:
-        if _detect_opposite_direction(new_desc, best_rule.description):
-            return (RuleRelation.UPDATES, best_rule)
-    if best_rule is not None and best_similarity > extend_threshold:
-        if not _detect_opposite_direction(new_desc, best_rule.description):
-            return (RuleRelation.EXTENDS, best_rule)
+    if best_rule is not None and best_similarity > update_threshold and _detect_opposite_direction(new_desc, best_rule.description):
+        return (RuleRelation.UPDATES, best_rule)
+    if best_rule is not None and best_similarity > extend_threshold and not _detect_opposite_direction(new_desc, best_rule.description):
+        return (RuleRelation.EXTENDS, best_rule)
     if len(category_cluster) >= derive_min_cluster:
         return (RuleRelation.DERIVES, None)
     return (RuleRelation.INDEPENDENT, None)

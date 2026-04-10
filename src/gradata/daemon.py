@@ -43,7 +43,12 @@ import gradata
 from gradata._scope import RuleScope
 from gradata._types import LessonState
 from gradata.detection.addition_pattern import AdditionTracker, classify_addition, is_addition
-from gradata.detection.correction_conflict import ConflictTracker, detect_conflict, extract_diff_tokens, tokenize
+from gradata.detection.correction_conflict import (
+    ConflictTracker,
+    detect_conflict,
+    extract_diff_tokens,
+    tokenize,
+)
 from gradata.detection.mode_classifier import classify_mode
 from gradata.enhancements.self_improvement import parse_lessons
 from gradata.rules.rule_engine import apply_rules, format_rules_for_prompt

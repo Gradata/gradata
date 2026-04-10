@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import re
 
-from gradata.hooks._base import run_hook, resolve_brain_dir, extract_message
+from gradata.hooks._base import extract_message, resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
 
 _log = logging.getLogger(__name__)
@@ -111,11 +111,14 @@ def _check_nudges(brain_dir: str) -> None:
             continue
 
         from datetime import date as _date
+
+        from gradata._db import write_lessons_safe
         from gradata._types import Lesson, LessonState
         from gradata.enhancements.self_improvement import (
-            format_lessons, parse_lessons, INITIAL_CONFIDENCE,
+            INITIAL_CONFIDENCE,
+            format_lessons,
+            parse_lessons,
         )
-        from gradata._db import write_lessons_safe
 
         lessons_path = brain._find_lessons_path(create=True)
         if not lessons_path:

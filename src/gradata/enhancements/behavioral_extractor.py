@@ -26,7 +26,6 @@ from enum import Enum, auto
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from gradata.enhancements.diff_engine import DiffResult
     from gradata.enhancements.edit_classifier import EditClassification
 
 _log = logging.getLogger(__name__)
@@ -428,9 +427,7 @@ def _is_actionable(instruction: str) -> bool:
         return True
     # Accept instructions from PREFIX_INSTRUCTION archetype (explicit user rules)
     # and any instruction that looks imperative (capitalized verb form)
-    if instruction[0].isupper() and len(instruction.split()) >= 3:
-        return True
-    return False
+    return instruction[0].isupper() and len(instruction.split()) >= 3
 
 
 def _try_llm_extract(llm_provider, draft: str, final: str, classification) -> str | None:

@@ -1,6 +1,8 @@
 """PreToolUse hook: block writes containing secrets (API keys, tokens, private keys)."""
 from __future__ import annotations
+
 import re
+
 from gradata.hooks._base import run_hook
 from gradata.hooks._profiles import Profile
 

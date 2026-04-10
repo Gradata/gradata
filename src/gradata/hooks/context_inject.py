@@ -1,7 +1,7 @@
 """UserPromptSubmit hook: inject relevant brain context for user messages."""
 from __future__ import annotations
 
-from gradata.hooks._base import run_hook, resolve_brain_dir, extract_message
+from gradata.hooks._base import extract_message, resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
 
 HOOK_META = {

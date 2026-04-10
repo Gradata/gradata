@@ -138,7 +138,7 @@ def evaluate_rule_candidates(
 
     candidates = [
         lesson_description,
-        f"Always {lesson_description.lower().lstrip('always ')}",
+        f"Always {lesson_description.lower().removeprefix('always ')}",
         f"Never {lesson_description.lower().replace('always ', '').replace('use ', 'use ').strip()}",
     ]
 

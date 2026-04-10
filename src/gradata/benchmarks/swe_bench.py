@@ -264,11 +264,11 @@ def _load_dataset(dataset_name: str, split: str = "test") -> list[SWEInstance]:
     """
     try:
         from datasets import load_dataset
-    except ImportError:
+    except ImportError as e:
         raise ImportError(
             "SWE-bench data loading requires the 'datasets' package.\n"
             "Install with: pip install datasets"
-        )
+        ) from e
 
     ds = load_dataset(dataset_name, split=split)
     instances = []
@@ -399,8 +399,7 @@ class SWEBenchHarness:
             # Capture correction if wrong
             correction_captured = False
             lesson_created = False
-            if not resolved and self.brain and config.use_brain:
-                if agent_patch and instance.gold_patch:
+            if not resolved and self.brain and config.use_brain and agent_patch and instance.gold_patch:
                     try:
                         event = self.brain.correct(
                             draft=agent_patch[:5000],

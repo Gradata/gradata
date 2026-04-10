@@ -1,7 +1,7 @@
 """PostToolUse hook: emit AGENT_OUTCOME event after Agent tool completes."""
 from __future__ import annotations
 
-from gradata.hooks._base import run_hook, resolve_brain_dir
+from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
 
 HOOK_META = {

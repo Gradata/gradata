@@ -751,9 +751,8 @@ def graduate(
             try:
                 import json as _json
                 _scope = _json.loads(lesson.scope_json)
-                if _scope.get("correction_scope") == "one_off":
-                    if lesson.state in (LessonState.INSTINCT, LessonState.PATTERN):
-                        block_promotion = True
+                if _scope.get("correction_scope") == "one_off" and lesson.state in (LessonState.INSTINCT, LessonState.PATTERN):
+                    block_promotion = True
             except (ValueError, TypeError):
                 pass
 
