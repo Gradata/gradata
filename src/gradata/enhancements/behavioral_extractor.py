@@ -34,7 +34,7 @@ _log = logging.getLogger(__name__)
 try:
     from gradata.enhancements.edit_classifier import _FACTUAL_RE
 except ImportError:
-    _FACTUAL_RE = re.compile(r"\b\d[\d,.]*\b|\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|https?://\S+")
+    _FACTUAL_RE = re.compile(r"(\$[\d,.]+|\d{4}-\d{2}-\d{2}|\d+%|https?://\S+|\b\d{3,}\b)")
 
 
 # ---------------------------------------------------------------------------
@@ -425,9 +425,9 @@ def _is_actionable(instruction: str) -> bool:
     first_word = instruction.split()[0].lower().removesuffix("'t")
     if first_word in _IMPERATIVE_STARTERS:
         return True
-    # Accept instructions from PREFIX_INSTRUCTION archetype (explicit user rules)
-    # and any instruction that looks imperative (capitalized verb form)
-    return instruction[0].isupper() and len(instruction.split()) >= 3
+    # Accept only known PREFIX_INSTRUCTION patterns (explicit user rules like
+    # "User corrected: ...") — don't treat arbitrary capitalized sentences as actionable
+    return False
 
 
 def _try_llm_extract(llm_provider, draft: str, final: str, classification) -> str | None:

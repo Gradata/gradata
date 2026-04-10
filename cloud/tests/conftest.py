@@ -28,7 +28,13 @@ class MockSupabaseClient:
         self._responses[table][operation] = data
 
     async def select(self, table: str, columns: str = "*", filters: dict | None = None) -> list[dict]:
-        return self._responses[table].get("select", [])
+        rows = self._responses[table].get("select", [])
+        if filters:
+            rows = [
+                r for r in rows
+                if all(r.get(k) == v for k, v in filters.items())
+            ]
+        return rows
 
     async def insert(self, table: str, data: dict | list[dict]) -> list[dict]:
         rows = data if isinstance(data, list) else [data]

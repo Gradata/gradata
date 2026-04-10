@@ -339,7 +339,7 @@ class Brain(BrainInspectionMixin):
     def patch_rule(self, category: str, old_description: str, new_description: str,
                    reason: str = "") -> dict:
         """Rewrite a rule's description. Preserves confidence/metadata. Emits RULE_PATCHED event."""
-        from gradata._db import write_lessons_safe
+        from gradata._db import lessons_lock, write_lessons_safe
         from gradata.enhancements.self_healing import apply_patch
         from gradata.enhancements.self_improvement import format_lessons, parse_lessons
 
@@ -347,21 +347,25 @@ class Brain(BrainInspectionMixin):
         if not lessons_path or not lessons_path.is_file():
             return {"patched": False, "error": "not_found: no lessons file"}
 
-        lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
-        patched = apply_patch(lessons, category, old_description, new_description)
+        with lessons_lock(lessons_path):
+            lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+            patched = apply_patch(lessons, category, old_description, new_description)
 
-        if not patched:
-            return {"patched": False, "error": f"not_found: no rule matching category={category!r}"}
+            if not patched:
+                return {"patched": False, "error": f"not_found: no rule matching category={category!r}"}
 
-        write_lessons_safe(lessons_path, format_lessons(lessons))
+            write_lessons_safe(lessons_path, format_lessons(lessons))
 
-        self.emit("RULE_PATCHED", "brain.patch_rule", {
-            "category": category,
-            "old_description": old_description[:200],
-            "new_description": new_description[:200],
-            "reason": reason,
-            "confidence_preserved": patched.confidence,
-        }, [f"category:{category}", "self_healing"])
+        try:
+            self.emit("RULE_PATCHED", "brain.patch_rule", {
+                "category": category,
+                "old_description": old_description[:200],
+                "new_description": new_description[:200],
+                "reason": reason,
+                "confidence_preserved": patched.confidence,
+            }, [f"category:{category}", "self_healing"])
+        except Exception:
+            logger.debug("Failed to emit RULE_PATCHED event (patch already persisted)")
 
         return {
             "patched": True,

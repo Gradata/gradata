@@ -44,6 +44,7 @@ async def sync_brain(
                 "description": c.description,
                 "draft_preview": c.draft_preview[:500],
                 "final_preview": c.final_preview[:500],
+                **({"created_at": c.created_at} if c.created_at else {}),
             }
             for c in body.corrections
         ]
@@ -77,6 +78,7 @@ async def sync_brain(
                 "data": e.data,
                 "tags": e.tags,
                 "session": e.session,
+                **({"created_at": e.created_at} if e.created_at else {}),
             }
             for e in body.events
         ]

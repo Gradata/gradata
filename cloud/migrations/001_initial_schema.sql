@@ -32,7 +32,8 @@ CREATE TABLE brains (
     name TEXT NOT NULL DEFAULT 'default',
     api_key TEXT NOT NULL UNIQUE DEFAULT 'gd_' || encode(gen_random_bytes(24), 'hex'),
     last_sync_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (workspace_id, user_id)
 );
 
 -- Corrections (the raw correction events from SDK)
@@ -107,7 +108,6 @@ CREATE INDEX idx_events_brain_id ON events(brain_id);
 CREATE INDEX idx_events_type ON events(type);
 CREATE INDEX idx_events_created_at ON events(created_at);
 CREATE INDEX idx_brains_user_id ON brains(user_id);
-CREATE INDEX idx_brains_api_key ON brains(api_key);
 CREATE INDEX idx_workspace_members_user_id ON workspace_members(user_id);
 
 -- ============================================================
@@ -210,7 +210,11 @@ CREATE POLICY rule_patches_via_lesson ON rule_patches
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS trigger AS $$
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
     INSERT INTO workspaces (name, owner_id)
     VALUES (COALESCE(NEW.raw_user_meta_data->>'full_name', 'My Workspace'), NEW.id);
@@ -222,9 +226,16 @@ BEGIN
         'owner'
     );
 
+    INSERT INTO brains (workspace_id, user_id, name)
+    VALUES (
+        (SELECT id FROM workspaces WHERE owner_id = NEW.id ORDER BY created_at DESC LIMIT 1),
+        NEW.id,
+        'default'
+    );
+
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
