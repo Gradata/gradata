@@ -13,6 +13,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gradata.brain import Brain
 import sys
 from pathlib import Path
 
