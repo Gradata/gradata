@@ -524,7 +524,7 @@ def execute_orchestrated(
 
     # If brain has spawn_queue, use it for parallel execution
     if brain and hasattr(brain, "spawn_queue"):
-        _sq = brain.spawn_queue
+        _sq = brain.spawn_queue  # type: ignore[union-attr]
         result = _sq(tasks=tasks, worker=worker, max_concurrent=max_concurrent)
         result["strategy"] = "queue"
         result["patterns_detected"] = sorted(patterns)
