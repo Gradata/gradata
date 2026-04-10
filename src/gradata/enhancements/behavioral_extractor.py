@@ -17,6 +17,7 @@ Resolution order:
 Informed by MiroFish sim 26 research + prior art from Grammarly, Duolingo,
 Google Smart Compose (sentence-level diffs > word-level for behavioral extraction).
 """
+
 from __future__ import annotations
 
 import logging
@@ -26,6 +27,7 @@ from enum import Enum, auto
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from gradata._types import Lesson
     from gradata.enhancements.edit_classifier import EditClassification
 
 _log = logging.getLogger(__name__)
@@ -41,18 +43,19 @@ except ImportError:
 # Archetype Taxonomy (12 correction types)
 # ---------------------------------------------------------------------------
 
+
 class Archetype(Enum):
-    PREFIX_INSTRUCTION = auto()   # Already an instruction ("User corrected: ...")
-    ADDITION_STEP = auto()        # New workflow step inserted
-    REMOVAL_HEDGING = auto()      # Hedging/weak language removed
-    REMOVAL_CONTENT = auto()      # Whole content block removed
-    REPLACEMENT_WORD = auto()     # Specific word/phrase swap
-    REPLACEMENT_TONE = auto()     # Formality/tone shift
+    PREFIX_INSTRUCTION = auto()  # Already an instruction ("User corrected: ...")
+    ADDITION_STEP = auto()  # New workflow step inserted
+    REMOVAL_HEDGING = auto()  # Hedging/weak language removed
+    REMOVAL_CONTENT = auto()  # Whole content block removed
+    REPLACEMENT_WORD = auto()  # Specific word/phrase swap
+    REPLACEMENT_TONE = auto()  # Formality/tone shift
     REPLACEMENT_FACTUAL = auto()  # Numbers/dates/URLs corrected
-    REORDER = auto()              # Same content, different order
-    FORMAT_CHANGE = auto()        # Structure changed (prose→list, etc.)
-    TRUNCATION = auto()           # Significantly shortened (>35% reduction)
-    EXPANSION = auto()            # Significantly expanded (>50% growth)
+    REORDER = auto()  # Same content, different order
+    FORMAT_CHANGE = auto()  # Structure changed (prose→list, etc.)
+    TRUNCATION = auto()  # Significantly shortened (>35% reduction)
+    EXPANSION = auto()  # Significantly expanded (>50% growth)
     CONSTRAINT_ADDITION = auto()  # New always/never/must rule
 
 
@@ -60,7 +63,7 @@ class Archetype(Enum):
 class ArchetypeMatch:
     archetype: Archetype
     confidence: float  # 0.0–1.0
-    context: dict      # archetype-specific extracted data
+    context: dict  # archetype-specific extracted data
 
 
 # ---------------------------------------------------------------------------
@@ -70,28 +73,85 @@ class ArchetypeMatch:
 # Multi-word hedge phrases for substring matching in raw text.
 # Single-word hedges overlap with edit_classifier._TONE_WORDS (used for
 # word-set classification). Both lists must be updated together.
-_HEDGE_PHRASES = frozenset({
-    "no rush", "no pressure", "if you want", "if you'd like",
-    "when you get a chance", "at your convenience", "just",
-    "maybe", "perhaps", "possibly", "i think", "i believe",
-    "might", "could potentially", "sort of", "kind of",
-    "not sure but", "feel free to", "no worries if not",
-    "totally understand if", "let me know if",
-})
+_HEDGE_PHRASES = frozenset(
+    {
+        "no rush",
+        "no pressure",
+        "if you want",
+        "if you'd like",
+        "when you get a chance",
+        "at your convenience",
+        "just",
+        "maybe",
+        "perhaps",
+        "possibly",
+        "i think",
+        "i believe",
+        "might",
+        "could potentially",
+        "sort of",
+        "kind of",
+        "not sure but",
+        "feel free to",
+        "no worries if not",
+        "totally understand if",
+        "let me know if",
+    }
+)
 
-_CONSTRAINT_WORDS = frozenset({
-    "always", "never", "must", "don't", "do not",
-    "required", "mandatory", "prohibited",
-})
+_CONSTRAINT_WORDS = frozenset(
+    {
+        "always",
+        "never",
+        "must",
+        "don't",
+        "do not",
+        "required",
+        "mandatory",
+        "prohibited",
+    }
+)
 
-_ACTION_VERBS = frozenset({
-    "check", "verify", "validate", "review", "audit", "test",
-    "pull", "push", "run", "execute", "load", "import", "export",
-    "create", "build", "deploy", "send", "submit", "approve",
-    "research", "analyze", "compare", "confirm", "refresh",
-    "open", "close", "start", "stop", "enable", "disable",
-    "use", "avoid", "include", "exclude", "add", "remove",
-})
+_ACTION_VERBS = frozenset(
+    {
+        "check",
+        "verify",
+        "validate",
+        "review",
+        "audit",
+        "test",
+        "pull",
+        "push",
+        "run",
+        "execute",
+        "load",
+        "import",
+        "export",
+        "create",
+        "build",
+        "deploy",
+        "send",
+        "submit",
+        "approve",
+        "research",
+        "analyze",
+        "compare",
+        "confirm",
+        "refresh",
+        "open",
+        "close",
+        "start",
+        "stop",
+        "enable",
+        "disable",
+        "use",
+        "avoid",
+        "include",
+        "exclude",
+        "add",
+        "remove",
+    }
+)
 
 _PREFIX_PATTERNS = [
     re.compile(r"^User corrected:\s*(.+)", re.IGNORECASE),
@@ -106,9 +166,10 @@ _PREFIX_PATTERNS = [
 # Sentence-level helpers
 # ---------------------------------------------------------------------------
 
+
 def _split_sentences(text: str) -> list[str]:
     """Split text into sentences at period/question/exclamation boundaries."""
-    parts = re.split(r'(?<=[.!?])\s+', text.strip())
+    parts = re.split(r"(?<=[.!?])\s+", text.strip())
     return [p.strip() for p in parts if p.strip()]
 
 
@@ -134,8 +195,9 @@ def _extract_topic(sentences: list[str]) -> str:
     if not sentences:
         return "content"
     text = sentences[0].strip()
-    text = re.sub(r'^(the|a|an|this|that|we|i|you|it|please|also|then)\s+',
-                  '', text, flags=re.IGNORECASE)
+    text = re.sub(
+        r"^(the|a|an|this|that|we|i|you|it|please|also|then)\s+", "", text, flags=re.IGNORECASE
+    )
     words = text.split()[:6]
     return " ".join(words).rstrip(".,;:") if words else "content"
 
@@ -173,6 +235,7 @@ def _to_imperative(sentence: str) -> str:
 # Archetype Detection
 # ---------------------------------------------------------------------------
 
+
 def detect_archetype(
     draft: str,
     final: str,
@@ -187,8 +250,7 @@ def detect_archetype(
         m = pattern.match(final.strip())
         if m:
             return ArchetypeMatch(
-                Archetype.PREFIX_INSTRUCTION, 1.0,
-                {"instruction": m.group(1).strip()}
+                Archetype.PREFIX_INSTRUCTION, 1.0, {"instruction": m.group(1).strip()}
             )
 
     draft_sents = _split_sentences(draft)
@@ -201,65 +263,70 @@ def detect_archetype(
     # Precompute word sets for sentence overlap (avoids re-splitting per pair)
     draft_sent_sets = [set(s.lower().split()) for s in draft_sents]
     final_sent_sets = [set(s.lower().split()) for s in final_sents]
-    added_sents = [s for s, ws in zip(final_sents, final_sent_sets, strict=True)
-                   if not any(_sentence_overlap(ws, ds) > 0.5 for ds in draft_sent_sets)]
+    added_sents = [
+        s
+        for s, ws in zip(final_sents, final_sent_sets, strict=True)
+        if not any(_sentence_overlap(ws, ds) > 0.5 for ds in draft_sent_sets)
+    ]
 
     # 2. REMOVAL_HEDGING (check BEFORE length — hedging removal shortens text)
     draft_lower = draft.lower()
     final_lower = final.lower()
-    removed_hedges = [h for h in _HEDGE_PHRASES
-                      if re.search(r'\b' + re.escape(h) + r'\b', draft_lower)
-                      and not re.search(r'\b' + re.escape(h) + r'\b', final_lower)]
+    removed_hedges = [
+        h
+        for h in _HEDGE_PHRASES
+        if re.search(r"\b" + re.escape(h) + r"\b", draft_lower)
+        and not re.search(r"\b" + re.escape(h) + r"\b", final_lower)
+    ]
     if removed_hedges:
-        return ArchetypeMatch(
-            Archetype.REMOVAL_HEDGING, 0.90,
-            {"removed_phrases": removed_hedges}
-        )
+        return ArchetypeMatch(Archetype.REMOVAL_HEDGING, 0.90, {"removed_phrases": removed_hedges})
 
     # 3. CONSTRAINT_ADDITION (check BEFORE length — constraints lengthen text)
-    new_constraints = [w for w in _CONSTRAINT_WORDS
-                       if re.search(r'\b' + re.escape(w) + r'\b', final_lower)
-                       and not re.search(r'\b' + re.escape(w) + r'\b', draft_lower)]
+    new_constraints = [
+        w
+        for w in _CONSTRAINT_WORDS
+        if re.search(r"\b" + re.escape(w) + r"\b", final_lower)
+        and not re.search(r"\b" + re.escape(w) + r"\b", draft_lower)
+    ]
     if new_constraints:
         constraint_sent = _find_sentence_containing(final, new_constraints[0])
         return ArchetypeMatch(
-            Archetype.CONSTRAINT_ADDITION, 0.85,
-            {"constraint_word": new_constraints[0],
-             "constraint_sentence": constraint_sent}
+            Archetype.CONSTRAINT_ADDITION,
+            0.85,
+            {"constraint_word": new_constraints[0], "constraint_sentence": constraint_sent},
         )
 
     # 4. ADDITION_STEP: new sentences with action verbs (before length check)
     if added_sents and _contains_action_verb(added_sents[0]):
-        return ArchetypeMatch(
-            Archetype.ADDITION_STEP, 0.80,
-            {"added_step": added_sents[0]}
-        )
+        return ArchetypeMatch(Archetype.ADDITION_STEP, 0.80, {"added_step": added_sents[0]})
 
     # 5. REPLACEMENT_TONE (uses classifier output, before length check)
     if classification:
         desc_lower = classification.description.lower()
         if "casualized" in desc_lower or "formalized" in desc_lower:
             direction = "casual" if "casualized" in desc_lower else "formal"
-            return ArchetypeMatch(
-                Archetype.REPLACEMENT_TONE, 0.85,
-                {"direction": direction}
-            )
+            return ArchetypeMatch(Archetype.REPLACEMENT_TONE, 0.85, {"direction": direction})
 
     # 6. TRUNCATION / EXPANSION (generic length change — after specific checks)
     len_ratio = len(final) / max(len(draft), 1)
     if len_ratio < 0.65:
-        removed_sents = [s for s, ws in zip(draft_sents, draft_sent_sets, strict=True)
-                         if not any(_sentence_overlap(ws, fs) > 0.5 for fs in final_sent_sets)]
+        removed_sents = [
+            s
+            for s, ws in zip(draft_sents, draft_sent_sets, strict=True)
+            if not any(_sentence_overlap(ws, fs) > 0.5 for fs in final_sent_sets)
+        ]
         topic = _extract_topic(removed_sents) if removed_sents else "content"
         return ArchetypeMatch(
-            Archetype.TRUNCATION, 0.85,
-            {"reduction_pct": round((1 - len_ratio) * 100), "removed_topic": topic}
+            Archetype.TRUNCATION,
+            0.85,
+            {"reduction_pct": round((1 - len_ratio) * 100), "removed_topic": topic},
         )
     if len_ratio > 1.5:
         topic = _extract_topic(added_sents) if added_sents else "detail"
         return ArchetypeMatch(
-            Archetype.EXPANSION, 0.80,
-            {"growth_pct": round((len_ratio - 1) * 100), "added_topic": topic}
+            Archetype.EXPANSION,
+            0.80,
+            {"growth_pct": round((len_ratio - 1) * 100), "added_topic": topic},
         )
 
     # 7. REORDER: same words, different arrangement
@@ -271,56 +338,58 @@ def detect_archetype(
     new_facts = set(_FACTUAL_RE.findall(final))
     if old_facts != new_facts and (old_facts or new_facts):
         return ArchetypeMatch(
-            Archetype.REPLACEMENT_FACTUAL, 0.85,
-            {"old_facts": list(old_facts), "new_facts": list(new_facts)}
+            Archetype.REPLACEMENT_FACTUAL,
+            0.85,
+            {"old_facts": list(old_facts), "new_facts": list(new_facts)},
         )
 
     # 9. FORMAT_CHANGE
-    old_has_list = bool(re.search(r'^\s*[-*+]\s', draft, re.MULTILINE))
-    new_has_list = bool(re.search(r'^\s*[-*+]\s', final, re.MULTILINE))
+    old_has_list = bool(re.search(r"^\s*[-*+]\s", draft, re.MULTILINE))
+    new_has_list = bool(re.search(r"^\s*[-*+]\s", final, re.MULTILINE))
     if old_has_list != new_has_list:
         return ArchetypeMatch(
-            Archetype.FORMAT_CHANGE, 0.80,
-            {"old_format": "list" if old_has_list else "prose",
-             "new_format": "list" if new_has_list else "prose"}
+            Archetype.FORMAT_CHANGE,
+            0.80,
+            {
+                "old_format": "list" if old_has_list else "prose",
+                "new_format": "list" if new_has_list else "prose",
+            },
         )
 
     # 10. REMOVAL_CONTENT
-    removed_sents = [s for s, ws in zip(draft_sents, draft_sent_sets, strict=True)
-                     if not any(_sentence_overlap(ws, fs) > 0.5 for fs in final_sent_sets)]
+    removed_sents = [
+        s
+        for s, ws in zip(draft_sents, draft_sent_sets, strict=True)
+        if not any(_sentence_overlap(ws, fs) > 0.5 for fs in final_sent_sets)
+    ]
     if removed_sents and not added_sents:
         topic = _extract_topic(removed_sents)
-        return ArchetypeMatch(
-            Archetype.REMOVAL_CONTENT, 0.75,
-            {"removed_topic": topic}
-        )
+        return ArchetypeMatch(Archetype.REMOVAL_CONTENT, 0.75, {"removed_topic": topic})
 
     # 11. REPLACEMENT_WORD
     if len(added_words) <= 3 and len(removed_words) <= 3 and added_words and removed_words:
         return ArchetypeMatch(
-            Archetype.REPLACEMENT_WORD, 0.80,
-            {"old_words": sorted(removed_words)[:3],
-             "new_words": sorted(added_words)[:3]}
+            Archetype.REPLACEMENT_WORD,
+            0.80,
+            {"old_words": sorted(removed_words)[:3], "new_words": sorted(added_words)[:3]},
         )
 
     # 12. Fallback: any new sentences
     if added_sents:
-        return ArchetypeMatch(
-            Archetype.ADDITION_STEP, 0.60,
-            {"added_step": added_sents[0]}
-        )
+        return ArchetypeMatch(Archetype.ADDITION_STEP, 0.60, {"added_step": added_sents[0]})
 
     # Ultimate fallback
     return ArchetypeMatch(
-        Archetype.REPLACEMENT_WORD, 0.40,
-        {"old_words": sorted(removed_words)[:3],
-         "new_words": sorted(added_words)[:3]}
+        Archetype.REPLACEMENT_WORD,
+        0.40,
+        {"old_words": sorted(removed_words)[:3], "new_words": sorted(added_words)[:3]},
     )
 
 
 # ---------------------------------------------------------------------------
 # Template Generation
 # ---------------------------------------------------------------------------
+
 
 def generate_instruction(match: ArchetypeMatch) -> str:
     """Generate an imperative behavioral instruction from an archetype match."""
@@ -396,15 +465,49 @@ def generate_instruction(match: ArchetypeMatch) -> str:
 # Quality Gate
 # ---------------------------------------------------------------------------
 
-_IMPERATIVE_STARTERS = frozenset({
-    "use", "don", "always", "never", "include", "exclude",
-    "check", "verify", "write", "keep", "cut", "add",
-    "remove", "present", "be", "avoid", "ensure", "start",
-    "lead", "break", "replace", "run", "test", "audit",
-    "research", "validate", "pull", "load", "revise",
-    "prioritize", "emphasize", "highlight", "reduce",
-    "increase", "prefer", "limit", "focus", "simplify",
-})
+_IMPERATIVE_STARTERS = frozenset(
+    {
+        "use",
+        "don",
+        "always",
+        "never",
+        "include",
+        "exclude",
+        "check",
+        "verify",
+        "write",
+        "keep",
+        "cut",
+        "add",
+        "remove",
+        "present",
+        "be",
+        "avoid",
+        "ensure",
+        "start",
+        "lead",
+        "break",
+        "replace",
+        "run",
+        "test",
+        "audit",
+        "research",
+        "validate",
+        "pull",
+        "load",
+        "revise",
+        "prioritize",
+        "emphasize",
+        "highlight",
+        "reduce",
+        "increase",
+        "prefer",
+        "limit",
+        "focus",
+        "simplify",
+    }
+)
+
 
 def _is_actionable(instruction: str) -> bool:
     if not instruction or len(instruction) < 5:
@@ -449,6 +552,7 @@ def _try_llm_extract(llm_provider, draft: str, final: str, classification) -> st
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def extract_instruction(
     draft: str,
@@ -496,3 +600,96 @@ def extract_instruction(
     # Generic fallback — return None so callers can try their own fallback
     # paths (e.g. keyword templates) before resorting to generic strings.
     return None
+
+
+# ---------------------------------------------------------------------------
+# Cross-Correction Recurring Patterns
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class RecurringPattern:
+    """A pattern detected across multiple related corrections."""
+
+    category: str
+    correction_count: int
+    descriptions: list[str]
+    summary: str
+    confidence: float
+
+
+def _extract_common_verbs(descriptions: list[str]) -> list[str]:
+    verb_prefixes = [
+        "use",
+        "remove",
+        "add",
+        "avoid",
+        "be",
+        "check",
+        "verify",
+        "include",
+        "exclude",
+        "always",
+        "never",
+        "ensure",
+        "keep",
+        "start",
+        "stop",
+        "replace",
+        "shorten",
+        "expand",
+    ]
+    counts: dict[str, int] = {}
+    for desc in descriptions:
+        words = desc.lower().split()
+        for word in words:
+            for prefix in verb_prefixes:
+                if word.startswith(prefix):
+                    counts[prefix] = counts.get(prefix, 0) + 1
+                    break
+    return sorted(counts, key=counts.get, reverse=True)[:3]
+
+
+def _synthesize_summary(category: str, descriptions: list[str]) -> str:
+    common_verbs = _extract_common_verbs(descriptions)
+    verb_str = ", ".join(common_verbs[:2]) if common_verbs else "adjust"
+    return (
+        f"Recurring {category} pattern across {len(descriptions)} corrections: "
+        f"consistently {verb_str} in this category"
+    )
+
+
+def detect_recurring_patterns(
+    lessons: list["Lesson"],
+    min_corrections: int = 3,
+) -> list[RecurringPattern]:
+    """Detect patterns spanning multiple corrections in the same category."""
+    if not lessons:
+        return []
+
+    by_cat: dict[str, list["Lesson"]] = {}
+    for lesson in lessons:
+        cat = lesson.category.upper()
+        by_cat.setdefault(cat, []).append(lesson)
+
+    patterns: list[RecurringPattern] = []
+    for cat, cat_lessons in by_cat.items():
+        if len(cat_lessons) < min_corrections:
+            continue
+
+        descriptions = [l.description for l in cat_lessons]
+        total_fires = sum(l.fire_count for l in cat_lessons)
+        confidence = min(0.95, 0.5 + 0.05 * len(cat_lessons) + 0.01 * total_fires)
+
+        patterns.append(
+            RecurringPattern(
+                category=cat,
+                correction_count=len(cat_lessons),
+                descriptions=descriptions,
+                summary=_synthesize_summary(cat, descriptions),
+                confidence=round(confidence, 2),
+            )
+        )
+
+    patterns.sort(key=lambda p: p.correction_count, reverse=True)
+    return patterns
