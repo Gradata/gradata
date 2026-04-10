@@ -11,11 +11,13 @@ this module:
 Architecture: LLM-whim as diagnostician, pipeline as validator. Nothing
 touches production rules without surviving graduation.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from gradata._scope import RuleScope
     from gradata._types import Lesson
 
 # Only RULE state with confidence >= this threshold triggers self-healing
@@ -51,7 +53,8 @@ def detect_rule_failure(
 
     cat = correction_category.upper()
     candidates = [
-        l for l in lessons
+        l
+        for l in lessons
         if l.state == LessonState.RULE
         and l.confidence >= min_confidence
         and l.category.upper() == cat
@@ -89,8 +92,7 @@ def apply_patch(
     """
     cat = category.upper()
     for lesson in lessons:
-        if (lesson.category.upper() == cat
-                and lesson.description.strip() == old_description.strip()):
+        if lesson.category.upper() == cat and lesson.description.strip() == old_description.strip():
             lesson.description = new_description
             return lesson
     return None
@@ -138,6 +140,7 @@ def retroactive_test(
     # Check if the delta is relevant to the correction
     # Use both TF-IDF similarity and simple word-stem overlap for short texts
     from gradata.enhancements.similarity import best_similarity
+
     sim = best_similarity(delta_text, correction_description)
 
     # Fallback: word-stem overlap (handles "emails" vs "email", short deltas)
@@ -153,7 +156,9 @@ def retroactive_test(
         "passes": passes,
         "delta_score": round(score, 3),
         "delta_text": delta_text,
-        "reason": "Patch delta covers failure" if passes else f"Delta irrelevant ({score:.3f} < {threshold})",
+        "reason": "Patch delta covers failure"
+        if passes
+        else f"Delta irrelevant ({score:.3f} < {threshold})",
     }
 
 
@@ -172,10 +177,31 @@ def _generate_deterministic_patch(
     # Find words in correction that aren't in the rule -- these are the context
     rule_words = set(rule_lower.split())
     correction_words = set(correction_lower.split())
-    new_context_words = correction_words - rule_words - {
-        "the", "a", "an", "in", "on", "at", "to", "for", "of", "is", "was",
-        "from", "with", "and", "or", "but", "not", "this", "that",
-    }
+    new_context_words = (
+        correction_words
+        - rule_words
+        - {
+            "the",
+            "a",
+            "an",
+            "in",
+            "on",
+            "at",
+            "to",
+            "for",
+            "of",
+            "is",
+            "was",
+            "from",
+            "with",
+            "and",
+            "or",
+            "but",
+            "not",
+            "this",
+            "that",
+        }
+    )
 
     if not new_context_words:
         return rule_description  # Can't narrow -- return unchanged
@@ -213,13 +239,15 @@ def review_rule_failures(
 
         test_result = retroactive_test(original, proposed, correction)
 
-        patches.append({
-            "category": category,
-            "original_description": original,
-            "proposed_description": proposed,
-            "correction_description": correction,
-            "retroactive_test": test_result,
-        })
+        patches.append(
+            {
+                "category": category,
+                "original_description": original,
+                "proposed_description": proposed,
+                "correction_description": correction,
+                "retroactive_test": test_result,
+            }
+        )
 
     return patches
 
@@ -268,17 +296,19 @@ def check_nudge_threshold(
 
     # Collect corrections in this category
     cat_corrections = [
-        e for e in correction_events
-        if (e.get("data", {}).get("category", "") or "").upper() == cat
+        e for e in correction_events if (e.get("data", {}).get("category", "") or "").upper() == cat
     ]
     count = len(cat_corrections)
 
     # Check if a RULE already covers this category
     existing_rule = next(
-        (l for l in lessons
-         if l.category.upper() == cat
-         and l.state == LessonState.RULE
-         and l.confidence >= DEFAULT_MIN_CONFIDENCE),
+        (
+            l
+            for l in lessons
+            if l.category.upper() == cat
+            and l.state == LessonState.RULE
+            and l.confidence >= DEFAULT_MIN_CONFIDENCE
+        ),
         None,
     )
 
@@ -309,10 +339,13 @@ def check_nudge_threshold(
         for e in cat_corrections
     ]
     descriptions = [d for d in descriptions if d]
-    centroid = _find_centroid(descriptions) if descriptions else f"Repeated {cat.lower()} corrections"
+    centroid = (
+        _find_centroid(descriptions) if descriptions else f"Repeated {cat.lower()} corrections"
+    )
 
     # Propose an INSTINCT lesson with pending_approval
     from gradata.enhancements.self_improvement import INITIAL_CONFIDENCE
+
     proposed = {
         "state": "INSTINCT",
         "confidence": INITIAL_CONFIDENCE,
@@ -335,9 +368,9 @@ def check_nudge_threshold(
 
 
 def suggest_scope_narrowing(
-    rule_scope: "RuleScope",
+    rule_scope: RuleScope,
     misfire_context: dict,
-) -> "RuleScope | None":
+) -> RuleScope | None:
     """Suggest a narrowed RuleScope based on a misfire context.
 
     Inspects each field of *rule_scope*.  If a field is a wildcard (holds its
@@ -360,6 +393,7 @@ def suggest_scope_narrowing(
         scope already matches the context or no narrowing is applicable.
     """
     from dataclasses import asdict
+
     from gradata._scope import RuleScope
 
     # Default values are wildcards — narrowing replaces wildcards with context values
@@ -388,6 +422,7 @@ def suggest_scope_narrowing(
 
 
 # ── Scope Narrowing (Phase 2 prep -- capture only) ────────────────────
+
 
 def narrow_rule_scope(
     rule: Lesson,
@@ -430,10 +465,12 @@ def narrow_rule_scope(
     # Capture memory context if present (memories as scoping signal)
     if failure_context.get("active_memories"):
         memory_exclusions = existing_scope.get("excluded_memory_contexts", [])
-        memory_exclusions.append({
-            "memories": failure_context["active_memories"],
-            "domain": domain,
-        })
+        memory_exclusions.append(
+            {
+                "memories": failure_context["active_memories"],
+                "domain": domain,
+            }
+        )
         existing_scope["excluded_memory_contexts"] = memory_exclusions
 
     new_scope_json = json.dumps(existing_scope)
