@@ -30,4 +30,11 @@ Usage:
 
 from gradata.cloud.client import CloudClient
 
-__all__ = ["CloudClient"]
+__all__ = ["CloudClient", "WikiStore"]
+
+
+def __getattr__(name: str):
+    if name == "WikiStore":
+        from gradata.cloud.wiki_store import WikiStore
+        return WikiStore
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

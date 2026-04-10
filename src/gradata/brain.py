@@ -339,33 +339,37 @@ class Brain(BrainInspectionMixin):
     def patch_rule(self, category: str, old_description: str, new_description: str,
                    reason: str = "") -> dict:
         """Rewrite a rule's description. Preserves confidence/metadata. Emits RULE_PATCHED event."""
-        from gradata._db import lessons_lock, write_lessons_safe
+        from gradata._db import write_lessons_safe
         from gradata.enhancements.self_healing import apply_patch
         from gradata.enhancements.self_improvement import format_lessons, parse_lessons
 
-        lessons_path = self._find_lessons_path()
-        if not lessons_path or not lessons_path.is_file():
-            return {"patched": False, "error": "not_found: no lessons file"}
+        # Only patch the brain-local lessons file — never external fallbacks
+        lessons_path = self.dir / "lessons.md"
+        if not lessons_path.is_file():
+            return {"patched": False, "error": "not_found: no brain-local lessons file"}
 
-        with lessons_lock(lessons_path):
-            lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
-            patched = apply_patch(lessons, category, old_description, new_description)
+        lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+        patched = apply_patch(lessons, category, old_description, new_description)
 
-            if not patched:
-                return {"patched": False, "error": f"not_found: no rule matching category={category!r}"}
+        if not patched:
+            return {"patched": False, "error": f"not_found: no rule matching category={category!r}"}
 
-            write_lessons_safe(lessons_path, format_lessons(lessons))
+        write_lessons_safe(lessons_path, format_lessons(lessons))
 
+        # Re-sign the patched rule so HMAC verification stays valid
         try:
-            self.emit("RULE_PATCHED", "brain.patch_rule", {
-                "category": category,
-                "old_description": old_description[:200],
-                "new_description": new_description[:200],
-                "reason": reason,
-                "confidence_preserved": patched.confidence,
-            }, [f"category:{category}", "self_healing"])
-        except Exception:
-            logger.debug("Failed to emit RULE_PATCHED event (patch already persisted)")
+            from gradata.enhancements.rule_integrity import sign_and_store
+            sign_and_store(self.db_path, new_description, category, patched.confidence)
+        except ImportError:
+            pass  # unsigned mode — no-op
+
+        self.emit("RULE_PATCHED", "brain.patch_rule", {
+            "category": category,
+            "old_description": old_description[:200],
+            "new_description": new_description[:200],
+            "reason": reason,
+            "confidence_preserved": patched.confidence,
+        }, [f"category:{category}", "self_healing"])
 
         return {
             "patched": True,
@@ -809,6 +813,24 @@ class Brain(BrainInspectionMixin):
     # Provided by BrainInspectionMixin (brain_inspection.py):
     #   rules(), explain(), trace(), export_data(),
     #   pending_promotions(), approve_promotion(), reject_promotion()
+
+    # ── Notifications ──────────────────────────────────────────────────
+
+    def on_notification(self, callback: Callable | None = None) -> None:
+        """Register a callback for human-readable learning notifications.
+
+        If *callback* is None, uses the built-in CLI handler (colored stderr).
+        Notifications are formatted from EventBus events — corrections,
+        graduations, meta-rules, session summaries.
+
+        Usage::
+
+            brain.on_notification()                    # CLI colored output
+            brain.on_notification(my_slack_handler)     # custom handler
+            brain.on_notification(lambda n: print(n.message))
+        """
+        from gradata.notifications import cli_handler, subscribe
+        subscribe(self.bus, callback or cli_handler)
 
     # ── Events ─────────────────────────────────────────────────────────
 

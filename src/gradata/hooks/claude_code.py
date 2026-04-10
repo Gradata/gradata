@@ -12,58 +12,25 @@ Usage:
 from __future__ import annotations
 
 import json
-import os
 import sys
-from pathlib import Path
-
-_HOOK_NAME = "gradata-capture"
-_SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
-
-# The hook command that Claude Code will execute
-_HOOK_COMMAND = (
-    f"{sys.executable} -m gradata.hooks.claude_code --capture"
-)
-
-_HOOK_CONFIG = {
-    "type": "PostToolUse",
-    "matcher": "Edit|Write",
-    "command": _HOOK_COMMAND,
-}
 
 
-def install_hook() -> None:
-    """Add Gradata correction capture hook to Claude Code settings."""
-    settings = _load_settings()
-    hooks = settings.setdefault("hooks", {})
-    hooks[_HOOK_NAME] = _HOOK_CONFIG
-    _save_settings(settings)
-    print(f"Gradata hook installed in {_SETTINGS_PATH}")
-    print("Hook will capture corrections on Edit/Write tool use.")
+def install_hook(profile: str = "standard") -> None:
+    """Add Gradata hooks to Claude Code settings."""
+    from gradata.hooks._installer import install
+    install(profile)
 
 
 def uninstall_hook() -> None:
-    """Remove Gradata hook from Claude Code settings."""
-    settings = _load_settings()
-    hooks = settings.get("hooks", {})
-    if _HOOK_NAME in hooks:
-        del hooks[_HOOK_NAME]
-        _save_settings(settings)
-        print("Gradata hook removed.")
-    else:
-        print("Gradata hook not found in settings.")
+    """Remove Gradata hooks from Claude Code settings."""
+    from gradata.hooks._installer import uninstall
+    uninstall()
 
 
 def hook_status() -> None:
-    """Check if the Gradata hook is installed."""
-    settings = _load_settings()
-    hooks = settings.get("hooks", {})
-    if _HOOK_NAME in hooks:
-        print("Gradata hook: INSTALLED")
-        print(f"  Settings: {_SETTINGS_PATH}")
-        print(f"  Command: {hooks[_HOOK_NAME].get('command', '?')}")
-    else:
-        print("Gradata hook: NOT INSTALLED")
-        print("  Run: gradata hooks install")
+    """Check if Gradata hooks are installed."""
+    from gradata.hooks._installer import status
+    status()
 
 
 def capture_correction() -> None:
@@ -76,7 +43,7 @@ def capture_correction() -> None:
         if not raw.strip():
             return
         payload = json.loads(raw)
-    except (json.JSONDecodeError, Exception):
+    except Exception:
         return  # Silent — never block Claude Code
 
     tool_name = payload.get("tool_name", "")
@@ -93,17 +60,10 @@ def capture_correction() -> None:
     if not old_string or not new_string or old_string == new_string:
         return
 
-    # Find brain directory
-    brain_dir = os.environ.get("GRADATA_BRAIN_DIR", "")
+    from gradata.hooks._base import resolve_brain_dir
+    brain_dir = resolve_brain_dir()
     if not brain_dir:
-        # Try common locations
-        for candidate in [Path.cwd() / ".brain", Path.home() / ".gradata"]:
-            if candidate.is_dir():
-                brain_dir = str(candidate)
-                break
-
-    if not brain_dir:
-        return  # No brain configured
+        return
 
     try:
         from gradata import Brain
@@ -113,22 +73,6 @@ def capture_correction() -> None:
     except Exception as e:
         _log.debug("Hook capture failed: %s", e)
 
-
-# ---------------------------------------------------------------------------
-# Settings I/O
-# ---------------------------------------------------------------------------
-
-def _load_settings() -> dict:
-    if _SETTINGS_PATH.is_file():
-        return json.loads(_SETTINGS_PATH.read_text(encoding="utf-8"))
-    return {}
-
-
-def _save_settings(settings: dict) -> None:
-    _SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _SETTINGS_PATH.write_text(
-        json.dumps(settings, indent=2) + "\n", encoding="utf-8"
-    )
 
 
 # ---------------------------------------------------------------------------

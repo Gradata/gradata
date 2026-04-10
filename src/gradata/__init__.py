@@ -52,6 +52,7 @@ from gradata.exceptions import (
     TaxonomyError,
     ValidationError,
 )
+from gradata.notifications import Notification
 from gradata.onboard import onboard
 
 __all__ = [
@@ -65,6 +66,7 @@ __all__ = [
     "ExportError",
     "Lesson",
     "LessonState",
+    "Notification",
     "RuleTransferScope",
     "TaxonomyError",
     "ValidationError",

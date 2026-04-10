@@ -13,6 +13,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gradata.brain import Brain
 import sys
 from pathlib import Path
 
@@ -66,7 +70,7 @@ def extract_message(data: dict) -> str | None:
     return msg if msg else None
 
 
-def get_brain():  # -> Brain | None
+def get_brain() -> Brain | None:
     """Get a Brain instance from resolved brain dir, or None on failure."""
     try:
         from gradata.brain import Brain
