@@ -68,6 +68,12 @@ _CORE_TAXONOMY = {
         "values": {"direct", "casual", "consultative", "formal", "urgent"},
         "required_on": [],
     },
+    "cognitive_load": {
+        "desc": "Cognitive load type (Sweller's CLT)",
+        "mode": "closed",
+        "values": {"intrinsic", "extraneous", "germane"},
+        "required_on": [],
+    },
 }
 
 # ── Rosch 6-Category Hierarchy ───────────────────────────────────────
@@ -382,6 +388,31 @@ def enrich_tags(
         }
         if activity in channel_map:
             enriched.append(f"channel:{channel_map[activity]}")
+    if event_type == "CORRECTION" and "cognitive_load" not in prefixes:
+        cat = data.get("category", "").upper()
+        _COGNITIVE_LOAD_MAP = {
+            "FACTUAL": "intrinsic",
+            "CONTENT": "intrinsic",
+            "DATA_INTEGRITY": "intrinsic",
+            "ENTITIES": "intrinsic",
+            "CONTEXT": "intrinsic",
+            "STYLE": "extraneous",
+            "TONE": "extraneous",
+            "COMMUNICATION": "extraneous",
+            "PRESENTATION": "extraneous",
+            "COST": "extraneous",
+            "PROCESS": "germane",
+            "DRAFTING": "germane",
+            "ACCURACY": "germane",
+            "THOROUGHNESS": "germane",
+            "ARCHITECTURE": "germane",
+            "CONSTRAINT": "germane",
+            "STRATEGY": "germane",
+            "POSITIONING": "germane",
+        }
+        cl = _COGNITIVE_LOAD_MAP.get(cat)
+        if cl:
+            enriched.append(f"cognitive_load:{cl}")
     return enriched
 
 
