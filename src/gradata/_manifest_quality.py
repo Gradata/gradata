@@ -407,9 +407,9 @@ def _compound_score(
     correction_density_trend: list[float] | None = None,
     categories_extinct: int = 0,
     transfer: float | None = None,
-    cross_domain_rules: int = 0,
-    total_rules: int = 0,
-    severity_trend_improving: bool = False,
+    cross_domain_rules: int | None = None,
+    total_rules: int | None = None,
+    severity_trend_improving: bool | None = None,
 ) -> float:
     """Compute weighted brain health score (0-100).
 
@@ -444,7 +444,7 @@ def _compound_score(
 
     # Component 2: Severity improvement (0-20 pts, was 25 — rebalanced for new components)
     if severity_ratio is not None:
-        score += severity_ratio * 20
+        score += max(0.0, min(1.0, severity_ratio)) * 20
     else:
         max_achievable -= 20
 
@@ -525,13 +525,17 @@ def _compound_score(
 
     # Component 9: Cross-domain universality (0-5 pts, NEW)
     # Rewards brains that discover rules applicable across 3+ domains.
-    if total_rules > 0 and cross_domain_rules > 0:
+    if total_rules is None or cross_domain_rules is None:
+        max_achievable -= 5
+    elif total_rules > 0 and cross_domain_rules > 0:
         universality = min(1.0, cross_domain_rules / max(3, total_rules * 0.2))
         score += universality * 5
 
     # Component 10: Severity trend (0-3 pts, NEW)
     # Corrections getting less severe over time = deeper learning.
-    if severity_trend_improving:
+    if severity_trend_improving is None:
+        max_achievable -= 3
+    elif severity_trend_improving:
         score += 3.0
 
     # Normalize to achievable range when optional components are inactive.

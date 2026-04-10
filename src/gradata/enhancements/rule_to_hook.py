@@ -1,4 +1,5 @@
 """Rule-to-Hook graduation — deterministic rules auto-generate enforcement."""
+
 from __future__ import annotations
 
 import re
@@ -63,6 +64,8 @@ def classify_rule(description: str, confidence: float) -> HookCandidate:
     Returns a HookCandidate indicating if/how the rule can be enforced
     deterministically, or NOT_DETERMINISTIC if it requires LLM judgment.
     """
+    if not 0.0 <= confidence <= 1.0:
+        raise ValueError("confidence must be in [0.0, 1.0]")
     desc_lower = description.lower()
 
     for pattern, check_type, template in DETERMINISTIC_PATTERNS:
@@ -94,12 +97,16 @@ def find_hook_candidates(
 
     Only considers RULE and META-RULE state lessons above min_confidence.
     """
+    if not 0.0 <= min_confidence <= 1.0:
+        raise ValueError("min_confidence must be in [0.0, 1.0]")
     candidates: list[HookCandidate] = []
     for lesson in lessons:
         status = lesson.get("status", "").upper()
         if status not in ("RULE", "META-RULE", "META_RULE"):
             continue
         conf = lesson.get("confidence", 0.0)
+        if not isinstance(conf, (int, float)) or not 0.0 <= float(conf) <= 1.0:
+            continue
         if conf < min_confidence:
             continue
         candidate = classify_rule(lesson.get("description", ""), conf)

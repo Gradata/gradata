@@ -1,4 +1,5 @@
 """Tests for graceful degradation under failure conditions."""
+
 from tests.conftest import init_brain
 
 
@@ -28,4 +29,4 @@ class TestGracefulDegradation:
     def test_search_with_no_index(self, tmp_path):
         brain = init_brain(tmp_path)
         results = brain.search("anything")
-        assert isinstance(results, (list, dict))
+        assert isinstance(results, list)

@@ -15,8 +15,10 @@ Public API is fully preserved here via re-exports from:
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import re
+from collections import defaultdict
 from dataclasses import dataclass, field
 
 from gradata._types import Lesson, RuleTransferScope
@@ -28,8 +30,8 @@ _log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # Tier constants (Rosch 1978: subordinate / basic / superordinate)
-TIER_SUPER_META = 2     # Super-meta-rule: emerges from 3+ meta-rules
-TIER_UNIVERSAL = 3      # Universal principle: emerges from 3+ super-meta-rules
+TIER_SUPER_META = 2  # Super-meta-rule: emerges from 3+ meta-rules
+TIER_UNIVERSAL = 3  # Universal principle: emerges from 3+ super-meta-rules
 
 
 @dataclass
@@ -148,6 +150,7 @@ def _eval_single_condition(condition: str, context: dict) -> bool:
 # Helpers (kept for compatibility)
 # ---------------------------------------------------------------------------
 
+
 def _lesson_id(lesson: Lesson) -> str:
     """Derive a stable ID from a lesson's category + description."""
     raw = f"{lesson.category}:{lesson.description}"
@@ -178,6 +181,7 @@ def _classify_meta_transfer_scope(rule_text: str) -> RuleTransferScope:
 # ---------------------------------------------------------------------------
 # Discovery (requires Gradata Cloud)
 # ---------------------------------------------------------------------------
+
 
 def discover_meta_rules(
     lessons: list[Lesson],
@@ -244,6 +248,7 @@ def merge_into_meta(
 # Validation
 # ---------------------------------------------------------------------------
 
+
 def validate_meta_rule(
     meta: MetaRule,
     recent_corrections: list[dict],
@@ -293,6 +298,7 @@ def validate_meta_rule(
 # ---------------------------------------------------------------------------
 # Formatting
 # ---------------------------------------------------------------------------
+
 
 def format_meta_rules_for_prompt(
     metas: list[MetaRule],
@@ -351,10 +357,7 @@ def format_meta_rules_for_prompt(
     for i, meta in enumerate(metas, start=1):
         n = len(meta.source_lesson_ids)
         categories = ", ".join(meta.source_categories)
-        lines.append(
-            f"{i}. [META:{meta.confidence:.2f}|{n} rules|{categories}] "
-            f"{meta.principle}"
-        )
+        lines.append(f"{i}. [META:{meta.confidence:.2f}|{n} rules|{categories}] {meta.principle}")
         if meta.examples:
             for ex in meta.examples:
                 lines.append(f"   - {ex}")
@@ -424,6 +427,7 @@ def rank_meta_rules_by_context(
 # Refresh
 # ---------------------------------------------------------------------------
 
+
 def refresh_meta_rules(
     lessons: list[Lesson],
     existing_metas: list[MetaRule],
@@ -492,9 +496,6 @@ def detect_cross_domain_candidates(
           lessons.
         - ``"count"`` (int): Total number of matching lessons.
     """
-    import json
-    from collections import defaultdict
-
     # Map normalised_description -> list of (domain, confidence) pairs
     groups: dict[str, list[tuple[str, float]]] = defaultdict(list)
 
@@ -521,12 +522,14 @@ def detect_cross_domain_candidates(
             continue
 
         avg_conf = round(sum(c for _, c in entries) / len(entries), 4)
-        candidates.append({
-            "description": description,
-            "domains": distinct_domains,
-            "avg_confidence": avg_conf,
-            "count": len(entries),
-        })
+        candidates.append(
+            {
+                "description": description,
+                "domains": distinct_domains,
+                "avg_confidence": avg_conf,
+                "count": len(entries),
+            }
+        )
 
     return candidates
 
@@ -535,6 +538,7 @@ def detect_cross_domain_candidates(
 # Lesson Parsing (for testing with real data)
 # ---------------------------------------------------------------------------
 
+
 def parse_lessons_from_markdown(text: str) -> list[Lesson]:
     """Parse lessons from lessons.md. Delegates to the authoritative parser.
 
@@ -542,6 +546,7 @@ def parse_lessons_from_markdown(text: str) -> list[Lesson]:
         Use ``gradata.enhancements.self_improvement.parse_lessons`` directly.
     """
     from gradata.enhancements.self_improvement import parse_lessons
+
     return parse_lessons(text)
 
 
@@ -553,12 +558,17 @@ def parse_lessons_from_markdown(text: str) -> list[Lesson]:
 def __getattr__(name: str):
     """Lazy-load storage symbols to avoid circular imports."""
     _STORAGE_NAMES = {
-        "ensure_table", "save_meta_rules", "load_meta_rules",
-        "ensure_super_table", "save_super_meta_rules", "load_super_meta_rules",
+        "ensure_table",
+        "save_meta_rules",
+        "load_meta_rules",
+        "ensure_super_table",
+        "save_super_meta_rules",
+        "load_super_meta_rules",
         "ensure_meta_table",
     }
     if name in _STORAGE_NAMES:
         import gradata.enhancements.meta_rules_storage as _storage
+
         obj = getattr(_storage, "ensure_table" if name == "ensure_meta_table" else name)
         globals()[name] = obj
         return obj

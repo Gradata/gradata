@@ -409,7 +409,7 @@ def suggest_scope_narrowing(
             continue  # Context provides no signal for this field
 
         rule_val = current[field_name]
-        if rule_val == default_val:
+        if rule_val == default_val and context_val != default_val:
             # Field is wildcard in rule but context has a specific value → narrow
             narrowed[field_name] = context_val
             did_narrow = True
