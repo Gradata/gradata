@@ -1,0 +1,68 @@
+name: SDK CI
+
+on:
+  push:
+    paths:
+      - "src/gradata/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - ".github/workflows/sdk-ci.yml"
+  pull_request:
+    paths:
+      - "src/gradata/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - ".github/workflows/sdk-ci.yml"
+
+jobs:
+  ci:
+    name: "Python ${{ matrix.python-version }}"
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Install dev dependencies
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: ruff check src/gradata/
+
+      - name: Type check (pyright)
+        run: pyright src/gradata/
+
+      - name: Security scan (bandit)
+        run: bandit -r src/gradata/ -c pyproject.toml
+
+      - name: Test suite
+        run: python -m pytest tests/ -v --tb=short --ignore=tests/test_spec_compliance.py
+
+      - name: SPEC compliance
+        run: python -m pytest tests/test_spec_compliance.py -v
+
+      - name: Build wheel
+        run: uv build
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "gradata-wheel-py${{ matrix.python-version }}"
+          path: dist/*.whl
+          if-no-files-found: error
+          retention-days: 30
