@@ -51,20 +51,20 @@ PREFERENCE_DECAY_DAMPER = 0.5
 
 # SPEC Section 1: maturity-aware kill switches (relevant cycles only)
 KILL_LIMITS: dict[str, int] = {
-    "INFANT": 8,        # 0-50 sessions — unproven, die fast
-    "ADOLESCENT": 12,   # 50-100 sessions — some evidence, moderate grace
-    "MATURE": 15,       # 100-200 sessions — proven useful, longer grace
-    "STABLE": 20,       # 200+ sessions — battle-tested, longest grace
+    "INFANT": 8,  # 0-50 sessions — unproven, die fast
+    "ADOLESCENT": 12,  # 50-100 sessions — some evidence, moderate grace
+    "MATURE": 15,  # 100-200 sessions — proven useful, longer grace
+    "STABLE": 20,  # 200+ sessions — battle-tested, longest grace
 }
 
 # Severity multipliers for contradiction penalty
 # Typo fix barely dents confidence; rewrite hits hard
 SEVERITY_WEIGHTS: dict[str, float] = {
-    "trivial": 0.20,     # typo fix: -0.10 * 0.20 = -0.02
-    "minor": 0.50,       # word swap: -0.10 * 0.50 = -0.05
-    "moderate": 0.80,    # sentence rewrite: -0.10 * 0.80 = -0.08
-    "major": 1.00,       # significant change: -0.10 * 1.00 = -0.10
-    "rewrite": 1.30,     # complete rewrite: -0.10 * 1.30 = -0.13
+    "trivial": 0.20,  # typo fix: -0.10 * 0.20 = -0.02
+    "minor": 0.50,  # word swap: -0.10 * 0.50 = -0.05
+    "moderate": 0.80,  # sentence rewrite: -0.10 * 0.80 = -0.08
+    "major": 1.00,  # significant change: -0.10 * 1.00 = -0.10
+    "rewrite": 1.30,  # complete rewrite: -0.10 * 1.30 = -0.13
 }
 
 # Legacy survival severity weights (v2.3: survival is flat 0.08, these kept
@@ -100,7 +100,7 @@ MACHINE_SEVERITY_WEIGHTS: dict[str, float] = {
 }
 
 # Graduation gate thresholds
-_GRADUATION_DEDUP_THRESHOLD = 0.85   # Near-duplicate rule detection
+_GRADUATION_DEDUP_THRESHOLD = 0.85  # Near-duplicate rule detection
 
 # Auto-detection threshold: if a session has more than this many corrections,
 # it's likely machine-driven. Set high enough that intensive human sessions
@@ -124,6 +124,7 @@ def detect_correction_poisoning(corrections: list[dict]) -> list[str]:
     These categories should be treated with reduced confidence updates.
     """
     from collections import defaultdict
+
     by_category: dict[str, list[str]] = defaultdict(list)
     for c in corrections:
         cat = c.get("category", "").upper()
@@ -146,8 +147,13 @@ def detect_correction_poisoning(corrections: list[dict]) -> list[str]:
                     contradictions += 1
         if comparisons > 0 and contradictions / comparisons >= _POISONING_CONTRADICTION_RATE:
             poisoned.append(cat)
-            _log.warning("Poisoning detected in %s: %.0f%% contradictions (%d/%d)",
-                        cat, contradictions / comparisons * 100, contradictions, comparisons)
+            _log.warning(
+                "Poisoning detected in %s: %.0f%% contradictions (%d/%d)",
+                cat,
+                contradictions / comparisons * 100,
+                contradictions,
+                comparisons,
+            )
     return poisoned
 
 
@@ -165,9 +171,11 @@ def _detect_machine_context(
     is_machine = len(corrections) > _MACHINE_CORRECTION_THRESHOLD
     if is_machine:
         import logging
+
         logging.getLogger(__name__).info(
             "Auto-detected machine context: %d corrections (threshold: %d)",
-            len(corrections), _MACHINE_CORRECTION_THRESHOLD,
+            len(corrections),
+            _MACHINE_CORRECTION_THRESHOLD,
         )
     return is_machine
 
@@ -181,14 +189,29 @@ _SEVERITY_MAP: dict[str, str] = {
 # Session-type → categories that are testable in that session type
 # DRAFTING is immune during system sessions; ARCHITECTURE is immune during sales
 CATEGORY_SESSION_MAP: dict[str, frozenset[str]] = {
-    "full": frozenset(),     # empty = all categories testable
-    "systems": frozenset({
-        "ARCHITECTURE", "PROCESS", "TOOL", "THOROUGHNESS", "CONTEXT",
-    }),
-    "sales": frozenset({
-        "DRAFTING", "LEADS", "PRICING", "DEMO_PREP", "POSITIONING",
-        "COMMUNICATION", "TONE", "ACCURACY", "DATA_INTEGRITY",
-    }),
+    "full": frozenset(),  # empty = all categories testable
+    "systems": frozenset(
+        {
+            "ARCHITECTURE",
+            "PROCESS",
+            "TOOL",
+            "THOROUGHNESS",
+            "CONTEXT",
+        }
+    ),
+    "sales": frozenset(
+        {
+            "DRAFTING",
+            "LEADS",
+            "PRICING",
+            "DEMO_PREP",
+            "POSITIONING",
+            "COMMUNICATION",
+            "TONE",
+            "ACCURACY",
+            "DATA_INTEGRITY",
+        }
+    ),
 }
 
 
@@ -286,38 +309,58 @@ def parse_lessons(text: str) -> list[Lesson]:
         memory_ids: list[str] = []
         scope_json: str = ""
         domain_scores: dict = {}
+        alpha = 1.0
+        beta_param_val = 1.0
         j = i + 1
         while j < len(lines) and lines[j].startswith("  "):
             meta_line = lines[j].strip()
             if meta_line.startswith("Root cause:") and not root_cause:
-                root_cause = meta_line[len("Root cause:"):].strip()
+                root_cause = meta_line[len("Root cause:") :].strip()
             elif meta_line.startswith("Agent:"):
-                agent_type = meta_line[len("Agent:"):].strip()
+                agent_type = meta_line[len("Agent:") :].strip()
             elif meta_line.startswith("Kill reason:"):
-                kill_reason = meta_line[len("Kill reason:"):].strip()
+                kill_reason = meta_line[len("Kill reason:") :].strip()
             elif meta_line.startswith("Corrections:"):
-                ids_str = meta_line[len("Corrections:"):].strip()
+                ids_str = meta_line[len("Corrections:") :].strip()
                 correction_event_ids = [x.strip() for x in ids_str.split(",") if x.strip()]
             elif meta_line.startswith("Pending approval:"):
-                pending_approval = meta_line[len("Pending approval:"):].strip().lower() == "yes"
+                pending_approval = meta_line[len("Pending approval:") :].strip().lower() == "yes"
             elif meta_line.startswith("Parent meta-rule:"):
-                parent_meta_rule_id = meta_line[len("Parent meta-rule:"):].strip() or None
+                parent_meta_rule_id = meta_line[len("Parent meta-rule:") :].strip() or None
             elif meta_line.startswith("Memory links:"):
-                memory_ids = [x.strip() for x in meta_line[len("Memory links:"):].strip().split(",") if x.strip()]
+                memory_ids = [
+                    x.strip()
+                    for x in meta_line[len("Memory links:") :].strip().split(",")
+                    if x.strip()
+                ]
             elif meta_line.startswith("Scope:"):
-                scope_json = meta_line[len("Scope:"):].strip()
+                scope_json = meta_line[len("Scope:") :].strip()
+            elif meta_line.startswith("Beta params:"):
+                import json as _json_bp
+
+                try:
+                    bp = _json_bp.loads(meta_line[len("Beta params:") :].strip())
+                    alpha = bp.get("alpha", 1.0)
+                    beta_param_val = bp.get("beta", 1.0)
+                except _json_bp.JSONDecodeError:
+                    pass
             elif meta_line.startswith("Domain scores:"):
                 import json as _json
+
                 try:
-                    domain_scores = _json.loads(meta_line[len("Domain scores:"):].strip())
+                    domain_scores = _json.loads(meta_line[len("Domain scores:") :].strip())
                 except _json.JSONDecodeError:
                     domain_scores = {}
             elif meta_line.startswith("Metadata:"):
                 import json as _json_md
+
                 try:
-                    _md_dict = _json_md.loads(meta_line[len("Metadata:"):].strip())
+                    _md_dict = _json_md.loads(meta_line[len("Metadata:") :].strip())
                     from gradata._types import RuleMetadata as _RM
-                    metadata_obj = _RM(**{k: v for k, v in _md_dict.items() if k in _RM.__dataclass_fields__})
+
+                    metadata_obj = _RM(
+                        **{k: v for k, v in _md_dict.items() if k in _RM.__dataclass_fields__}
+                    )
                 except (ValueError, TypeError, _json_md.JSONDecodeError):
                     metadata_obj = None
             meta_m = _META_RE.search(meta_line)
@@ -345,6 +388,8 @@ def parse_lessons(text: str) -> list[Lesson]:
             parent_meta_rule_id=parent_meta_rule_id,
             memory_ids=memory_ids,
             domain_scores=domain_scores,
+            alpha=alpha,
+            beta_param=beta_param_val,
         )
         if metadata_obj is not None:
             _lesson.metadata = metadata_obj
@@ -388,6 +433,45 @@ def fsrs_penalty(confidence: float, *, machine: bool = False) -> float:
     """
     base = abs(MACHINE_CONTRADICTION_PENALTY) if machine else abs(CONTRADICTION_PENALTY)
     return round(base * (0.5 + confidence * 0.5), 4)
+
+
+# ---------------------------------------------------------------------------
+# Bayesian Confidence Blending
+# ---------------------------------------------------------------------------
+
+_BAYESIAN_BLEND_MIN_OBS = 5
+_BAYESIAN_BLEND_MAX_OBS = 20
+
+
+def _bayesian_blend_weight(total_observations: int) -> float:
+    """Return weight for Bayesian component [0.0, 0.7]."""
+    if total_observations < _BAYESIAN_BLEND_MIN_OBS:
+        return 0.0
+    if total_observations >= _BAYESIAN_BLEND_MAX_OBS:
+        return 0.7
+    return (
+        0.7
+        * (total_observations - _BAYESIAN_BLEND_MIN_OBS)
+        / (_BAYESIAN_BLEND_MAX_OBS - _BAYESIAN_BLEND_MIN_OBS)
+    )
+
+
+def _bayesian_confidence(lesson: "Lesson") -> float:
+    """Compute blended confidence from beta posterior + FSRS."""
+    from gradata._stats import beta_posterior
+
+    total_obs = int(lesson.alpha + lesson.beta_param - 2)
+    blend_w = _bayesian_blend_weight(total_obs)
+
+    if blend_w == 0.0:
+        return lesson.confidence
+
+    post = beta_posterior(
+        successes=max(0, int(lesson.alpha - 1)),
+        trials=max(0, total_obs),
+    )
+    bayesian_conf = post["posterior_mean"]
+    return round(blend_w * bayesian_conf + (1.0 - blend_w) * lesson.confidence, 2)
 
 
 # ---------------------------------------------------------------------------
@@ -571,6 +655,7 @@ def update_confidence(
 
                 if direction == "REINFORCING":
                     # Reinforcing: correction aligns with lesson direction → BONUS
+                    lesson.alpha += 1.0
                     base_bonus = fsrs_bonus(lesson.confidence, machine=is_machine)
                     if cat in severity_data:
                         raw_severity = severity_data[cat]
@@ -579,12 +664,12 @@ def update_confidence(
                         bonus = base_bonus * weight
                     else:
                         bonus = base_bonus
-                    lesson.confidence = round(
-                        max(0.0, min(1.0, lesson.confidence + bonus)), 2
-                    )
+                    lesson.confidence = round(max(0.0, min(1.0, lesson.confidence + bonus)), 2)
+                    lesson.confidence = max(0.0, min(1.0, _bayesian_confidence(lesson)))
                     lesson.fire_count += 1
                 else:
                     # CONTRADICTING or UNKNOWN: FSRS penalty
+                    lesson.beta_param += 1.0
                     base_penalty = fsrs_penalty(lesson.confidence, machine=is_machine)
                     if cat in severity_data:
                         raw_severity = severity_data[cat]
@@ -596,9 +681,8 @@ def update_confidence(
                     # Preferences decay slower — stable user taste signals
                     if lesson.correction_type == CorrectionType.PREFERENCE:
                         penalty *= PREFERENCE_DECAY_DAMPER
-                    lesson.confidence = round(
-                        max(0.0, min(1.0, lesson.confidence - penalty)), 2
-                    )
+                    lesson.confidence = round(max(0.0, min(1.0, lesson.confidence - penalty)), 2)
+                    lesson.confidence = max(0.0, min(1.0, _bayesian_confidence(lesson)))
             else:
                 # Survived: category was testable, corrections exist elsewhere
                 base_bonus = fsrs_bonus(lesson.confidence, machine=is_machine)
@@ -620,9 +704,7 @@ def update_confidence(
                         bonus = base_bonus
                 else:
                     bonus = base_bonus
-                lesson.confidence = round(
-                    max(0.0, min(1.0, lesson.confidence + bonus)), 2
-                )
+                lesson.confidence = round(max(0.0, min(1.0, lesson.confidence + bonus)), 2)
 
         # Track sessions since fire
         lesson.sessions_since_fire += 1
@@ -631,9 +713,8 @@ def update_confidence(
         if (
             lesson.fire_count == 0
             and lesson.sessions_since_fire >= kill_limit
-            and lesson.state not in (
-                LessonState.UNTESTABLE, LessonState.KILLED, LessonState.ARCHIVED
-            )
+            and lesson.state
+            not in (LessonState.UNTESTABLE, LessonState.KILLED, LessonState.ARCHIVED)
         ):
             lesson.state = LessonState.UNTESTABLE
 
@@ -643,6 +724,7 @@ def update_confidence(
     # Use salted thresholds consistent with graduate()
     if salt:
         from gradata.security.brain_salt import salt_threshold
+
         _uc_pattern_thr = salt_threshold(PATTERN_THRESHOLD, salt, "PATTERN")
         _uc_rule_thr = salt_threshold(RULE_THRESHOLD, salt, "RULE")
     else:
@@ -664,10 +746,7 @@ def update_confidence(
         ):
             lesson.state = transition(lesson.state, "promote")
         # Demote PATTERN -> INSTINCT
-        elif (
-            lesson.state == LessonState.PATTERN
-            and lesson.confidence < _uc_pattern_thr
-        ):
+        elif lesson.state == LessonState.PATTERN and lesson.confidence < _uc_pattern_thr:
             lesson.state = transition(lesson.state, "demote")
 
     return lessons
@@ -709,6 +788,7 @@ def graduate(
     # Compute effective thresholds (salted or default)
     if salt:
         from gradata.security.brain_salt import salt_threshold
+
         eff_pattern_threshold = salt_threshold(PATTERN_THRESHOLD, salt, "PATTERN")
         eff_rule_threshold = salt_threshold(RULE_THRESHOLD, salt, "RULE")
     else:
@@ -716,7 +796,9 @@ def graduate(
         eff_rule_threshold = RULE_THRESHOLD
     if renter:
         active = [l for l in lessons if l.state in (LessonState.INSTINCT, LessonState.PATTERN)]
-        graduated = [l for l in lessons if l.state not in (LessonState.INSTINCT, LessonState.PATTERN)]
+        graduated = [
+            l for l in lessons if l.state not in (LessonState.INSTINCT, LessonState.PATTERN)
+        ]
         return active, graduated
 
     eff_kill_limits = MACHINE_KILL_LIMITS if machine_mode else KILL_LIMITS
@@ -733,13 +815,16 @@ def graduate(
 
         # Safety assertion: warn if a single session caused an unusually
         # large confidence jump (possible runaway boosting).
-        pre_conf = getattr(lesson, '_pre_session_confidence', None)
+        pre_conf = getattr(lesson, "_pre_session_confidence", None)
         if isinstance(pre_conf, (int, float)):
             jump = lesson.confidence - pre_conf
             if jump > eff_pattern_threshold:
                 _log.warning(
                     "Safety assertion: confidence jump %.2f exceeds PATTERN_THRESHOLD %.2f for %s: %s",
-                    jump, eff_pattern_threshold, lesson.category, lesson.description[:60],
+                    jump,
+                    eff_pattern_threshold,
+                    lesson.category,
+                    lesson.description[:60],
                 )
 
         if lesson.pending_approval:
@@ -750,8 +835,12 @@ def graduate(
         if lesson.scope_json:
             try:
                 import json as _json
+
                 _scope = _json.loads(lesson.scope_json)
-                if _scope.get("correction_scope") == "one_off" and lesson.state in (LessonState.INSTINCT, LessonState.PATTERN):
+                if _scope.get("correction_scope") == "one_off" and lesson.state in (
+                    LessonState.INSTINCT,
+                    LessonState.PATTERN,
+                ):
                     block_promotion = True
             except (ValueError, TypeError):
                 pass
@@ -803,12 +892,16 @@ def graduate(
             # outside the lesson loop to avoid redundant tokenization (O(n*m) → O(n+m)).
             try:
                 from gradata.enhancements.similarity import semantic_similarity
+
                 for existing in existing_rules:
                     sim = semantic_similarity(lesson.description, existing.description)
                     if sim > _GRADUATION_DEDUP_THRESHOLD:
                         blocked = True
-                        _log.debug("Graduation blocked (duplicate): %.2f sim with '%s'",
-                                   sim, existing.description[:60])
+                        _log.debug(
+                            "Graduation blocked (duplicate): %.2f sim with '%s'",
+                            sim,
+                            existing.description[:60],
+                        )
                         break
             except ImportError:
                 pass
@@ -817,12 +910,14 @@ def graduate(
             if not blocked:
                 try:
                     direction = _classify_correction_direction(
-                        lesson.description, existing_rule_summary,
+                        lesson.description,
+                        existing_rule_summary,
                     )
                     if direction == "CONTRADICTING":
                         blocked = True
-                        _log.debug("Graduation blocked (contradiction): '%s'",
-                                   lesson.description[:60])
+                        _log.debug(
+                            "Graduation blocked (contradiction): '%s'", lesson.description[:60]
+                        )
                 except Exception:
                     pass
 
@@ -832,6 +927,7 @@ def graduate(
             if not blocked:
                 try:
                     from gradata.enhancements.similarity import semantic_similarity
+
                     words = lesson.description.split()
                     if len(words) >= 4:
                         mid = len(words) // 2
@@ -839,8 +935,11 @@ def graduate(
                         sim = semantic_similarity(lesson.description, paraphrase)
                         if sim < 0.25:
                             blocked = True
-                            _log.debug("Graduation blocked (fragile wording): sim=%.2f '%s'",
-                                       sim, lesson.description[:60])
+                            _log.debug(
+                                "Graduation blocked (fragile wording): sim=%.2f '%s'",
+                                sim,
+                                lesson.description[:60],
+                            )
                 except ImportError:
                     pass
 
@@ -850,6 +949,7 @@ def graduate(
             # Refine rule wording before graduation
             try:
                 from gradata.contrib.patterns.tree_of_thoughts import evaluate_rule_candidates
+
                 result = evaluate_rule_candidates(lesson.description, existing_rule_descs)
                 if result.best.content and result.best.score > 0.3:
                     lesson.description = result.best.content
@@ -869,10 +969,7 @@ def graduate(
             continue
 
         # Demote PATTERN -> INSTINCT
-        if (
-            lesson.state == LessonState.PATTERN
-            and lesson.confidence < eff_pattern_threshold
-        ):
+        if lesson.state == LessonState.PATTERN and lesson.confidence < eff_pattern_threshold:
             lesson.state = transition(lesson.state, "demote")
             continue
 
@@ -970,10 +1067,19 @@ def format_lessons(lessons: list[Lesson]) -> str:
 
         if lesson.domain_scores:
             import json as _json
+
             lines.append(f"  Domain scores: {_json.dumps(lesson.domain_scores)}")
+
+        if lesson.alpha != 1.0 or lesson.beta_param != 1.0:
+            import json as _json_bp
+
+            lines.append(
+                f"  Beta params: {_json_bp.dumps({'alpha': lesson.alpha, 'beta': lesson.beta_param})}"
+            )
 
         if hasattr(lesson, "metadata") and lesson.metadata is not None:
             import json as _json_meta
+
             md = lesson.metadata.to_dict() if hasattr(lesson.metadata, "to_dict") else {}
             if any(v for v in md.values() if v and v != 0.5):  # only write non-default
                 lines.append(f"  Metadata: {_json_meta.dumps(md)}")
@@ -1021,7 +1127,8 @@ def compute_learning_velocity(
     rule_lessons = [l for l in lessons if l.state == LessonState.RULE]
     avg_time = (
         sum(l.fire_count + l.sessions_since_fire for l in rule_lessons) / len(rule_lessons)
-        if rule_lessons else 0.0
+        if rule_lessons
+        else 0.0
     )
 
     return {
