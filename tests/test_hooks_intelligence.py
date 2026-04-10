@@ -242,7 +242,13 @@ def test_pre_compact_saves_snapshot(tmp_path):
     loop_state = tmp_path / "loop-state.md"
     loop_state.write_text("## Session 42\n")
 
-    uid = os.getuid() if hasattr(os, "getuid") else "win"
+    if hasattr(os, "getuid"):
+        uid = os.getuid()
+    else:
+        try:
+            uid = os.getlogin()
+        except OSError:
+            uid = f"pid{os.getpid()}"
     user_tmp = Path(tempfile.gettempdir()) / f"gradata-{uid}"
     dir_hash = hashlib.md5(str(tmp_path).encode()).hexdigest()[:8]
     snapshot_path = user_tmp / f"compact-snapshot-{dir_hash}.json"

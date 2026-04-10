@@ -31,7 +31,7 @@ def _get_session_number(brain_dir: Path) -> int | None:
                 # Extract number from lines like "Session: 97" or "## Session 97"
                 nums = re.findall(r"\d+", line)
                 if nums:
-                    return int(nums[-1])
+                    return int(nums[0])
     except Exception:
         pass
     return None
@@ -62,7 +62,13 @@ def main(data: dict) -> dict | None:
                 line for line in text.splitlines() if line.strip() and not line.startswith("#")
             ])
 
-        uid = os.getuid() if hasattr(os, "getuid") else "win"
+        if hasattr(os, "getuid"):
+            uid = os.getuid()
+        else:
+            try:
+                uid = os.getlogin()
+            except OSError:
+                uid = f"pid{os.getpid()}"
         user_tmp = Path(tempfile.gettempdir()) / f"gradata-{uid}"
         user_tmp.mkdir(parents=True, exist_ok=True)
         dir_hash = hashlib.md5(str(brain_dir).encode()).hexdigest()[:8]

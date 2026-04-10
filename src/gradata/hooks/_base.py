@@ -13,15 +13,16 @@ from __future__ import annotations
 import json
 import logging
 import os
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gradata.brain import Brain
 import sys
 from pathlib import Path
 
 from gradata.hooks._profiles import Profile
 
 _log = logging.getLogger(__name__)
-
-# Events that can run without input data (lifecycle events, not tool hooks)
-_NO_INPUT_EVENTS = frozenset({"SessionStart", "Stop", "PreCompact"})
 
 
 def get_profile() -> Profile:
@@ -69,7 +70,7 @@ def extract_message(data: dict) -> str | None:
     return msg if msg else None
 
 
-def get_brain():  # -> Brain | None
+def get_brain() -> Brain | None:
     """Get a Brain instance from resolved brain dir, or None on failure."""
     try:
         from gradata.brain import Brain
@@ -91,7 +92,7 @@ def run_hook(main_fn, meta: dict, *, raw_input: str | None = None) -> None:
             return
         raw = raw_input if raw_input is not None else sys.stdin.read()
         data = read_input(raw)
-        if data is None and meta.get("event") not in _NO_INPUT_EVENTS:
+        if data is None and meta.get("event") not in ("SessionStart", "Stop", "PreCompact"):
             return
         result = main_fn(data or {})
         if result:

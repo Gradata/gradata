@@ -28,7 +28,7 @@ def _get_session_number(brain_dir: Path) -> int | None:
             if "session" in line.lower():
                 nums = re.findall(r"\d+", line)
                 if nums:
-                    return int(nums[-1])
+                    return int(nums[0])
     except Exception:
         pass
     return None

@@ -43,6 +43,8 @@ def _scan_content(content: str) -> list[dict]:
 
 def main(data: dict) -> dict | None:
     tool_input = data.get("tool_input", {})
+    if not isinstance(tool_input, dict):
+        return None
 
     # Collect all content to scan
     contents_to_scan = []

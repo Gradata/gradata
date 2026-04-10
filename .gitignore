@@ -166,3 +166,5 @@ design-system/
 .env.local
 .env.*.local
 .gstack/
+.gitnexus
+.superpowers/
