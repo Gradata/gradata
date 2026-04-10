@@ -1,4 +1,5 @@
 """UserPromptSubmit hook: detect implicit feedback signals in user messages."""
+
 from __future__ import annotations
 
 import logging
@@ -44,10 +45,21 @@ CHALLENGE_PATTERNS = [
     re.compile(r"\bwhy (did|would|are) you\b", re.I),
 ]
 
+APPROVAL_PATTERNS = [
+    re.compile(r"\blooks? good\b", re.I),
+    re.compile(r"\bperfect\b", re.I),
+    re.compile(r"\bexactly( what)?\b", re.I),
+    re.compile(r"\bthat'?s (right|correct|great|perfect)\b", re.I),
+    re.compile(r"\byes[,.]?\s+(exactly|perfect|great|right|that)\b", re.I),
+    re.compile(r"\bship it\b", re.I),
+    re.compile(r"\bnailed it\b", re.I),
+]
+
 SIGNAL_MAP = {
     "negation": NEGATION_PATTERNS,
     "reminder": REMINDER_PATTERNS,
     "challenge": CHALLENGE_PATTERNS,
+    "approval": APPROVAL_PATTERNS,
 }
 
 
@@ -60,11 +72,13 @@ def _detect_signals(text: str) -> list[dict]:
                 start = max(0, match.start() - 20)
                 end = min(len(text), match.end() + 40)
                 snippet = text[start:end].strip()
-                signals.append({
-                    "type": signal_type,
-                    "match": match.group(),
-                    "snippet": snippet,
-                })
+                signals.append(
+                    {
+                        "type": signal_type,
+                        "match": match.group(),
+                        "snippet": snippet,
+                    }
+                )
                 break  # One match per category is enough
     return signals
 
@@ -86,6 +100,7 @@ def main(data: dict) -> dict | None:
             try:
                 from gradata._events import emit
                 from gradata._paths import BrainContext
+
                 ctx = BrainContext.from_brain_dir(brain_dir)
                 emit(
                     "IMPLICIT_FEEDBACK",
@@ -97,6 +112,17 @@ def main(data: dict) -> dict | None:
                     },
                     ctx=ctx,
                 )
+                # Emit OUTPUT_ACCEPTED for approval signals
+                if any(s["type"] == "approval" for s in signals):
+                    emit(
+                        "OUTPUT_ACCEPTED",
+                        source="hook:implicit_feedback",
+                        data={
+                            "snippets": [s["snippet"] for s in signals if s["type"] == "approval"],
+                            "message_preview": message[:200],
+                        },
+                        ctx=ctx,
+                    )
             except Exception as exc:
                 _log.debug("implicit_feedback emit failed: %s", exc)
 
