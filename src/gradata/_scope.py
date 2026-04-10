@@ -46,7 +46,35 @@ class RuleScope:
     channel: str = ""
     stakes: str = "normal"
     agent_type: str = ""  # Agent type for scoped rule injection (e.g. "researcher", "reviewer")
-    namespace: str = ""   # Scope tag for per-context rules (e.g. "api-endpoint", "onboarding")
+    namespace: str = ""  # Scope tag for per-context rules (e.g. "api-endpoint", "onboarding")
+    temporal_relevance: str = ""  # "evergreen", "seasonal", "recent", or "" (wildcard)
+    max_idle_sessions: int = 0  # Auto-suppress after N idle sessions (0 = never)
+    created_session: int = 0  # Session number when this scope was first assigned
+
+
+def temporal_decay(
+    sessions_since_fire: int,
+    max_idle: int,
+    floor: float = 0.05,
+    steepness: float = 3.0,
+) -> float:
+    """Compute temporal decay multiplier for rule confidence.
+
+    Uses exponential decay: exp(-steepness * ratio^2) where
+    ratio = sessions_since_fire / max_idle.
+
+    Returns decay multiplier in [floor, 1.0]. If max_idle=0, returns 1.0 (evergreen).
+    """
+    if max_idle <= 0:
+        return 1.0
+    if sessions_since_fire <= 0:
+        return 1.0
+
+    import math
+
+    ratio = sessions_since_fire / max_idle
+    decay = math.exp(-steepness * ratio * ratio)
+    return max(floor, round(decay, 4))
 
 
 # ---------------------------------------------------------------------------
@@ -56,7 +84,7 @@ class RuleScope:
 # task_type → keywords (any keyword triggers the type; first match wins)
 _TASK_TYPE_KEYWORDS: list[tuple[str, list[str]]] = [
     ("email_draft", ["email", "draft", "write", "compose", "reply", "follow-up", "followup"]),
-    ("demo_prep",   ["demo", "call", "meeting", "prep", "presentation"]),
+    ("demo_prep", ["demo", "call", "meeting", "prep", "presentation"]),
     ("prospecting", ["prospect", "lead", "find", "enrich", "list", "sweep"]),
     ("code_review", ["review", "code", "pr", "pull request"]),
     ("documentation", ["doc", "readme", "guide", "spec"]),
@@ -65,24 +93,24 @@ _TASK_TYPE_KEYWORDS: list[tuple[str, list[str]]] = [
 # audience → title keywords (checked case-insensitively; first match wins)
 _AUDIENCE_KEYWORDS: list[tuple[str, list[str]]] = [
     ("c_suite", ["ceo", "cto", "coo", "cfo", "cro", "cmo", "chief"]),
-    ("vp",      ["vp", "vice president", "head of"]),
+    ("vp", ["vp", "vice president", "head of"]),
     ("director", ["director"]),
-    ("manager",  ["manager"]),
+    ("manager", ["manager"]),
     # "ic" is the fallback for anything unmatched
 ]
 
 # channel inference: task keywords → channel
 _CHANNEL_KEYWORDS: list[tuple[str, list[str]]] = [
-    ("email",    ["email", "draft", "compose", "reply", "follow-up", "followup"]),
-    ("slack",    ["slack", "message", "dm"]),
+    ("email", ["email", "draft", "compose", "reply", "follow-up", "followup"]),
+    ("slack", ["slack", "message", "dm"]),
     ("document", ["doc", "readme", "guide", "spec", "report"]),
-    ("call",     ["call", "meeting", "demo", "presentation"]),
+    ("call", ["call", "meeting", "demo", "presentation"]),
 ]
 
 # stakes inference: task keywords → stakes override
 _STAKES_KEYWORDS: list[tuple[str, list[str]]] = [
-    ("high",     ["demo", "call", "meeting", "presentation", "proposal", "critical"]),
-    ("low",      ["internal", "draft", "note"]),
+    ("high", ["demo", "call", "meeting", "presentation", "proposal", "critical"]),
+    ("low", ["internal", "draft", "note"]),
 ]
 
 
@@ -294,5 +322,16 @@ def scope_from_dict(data: dict[str, str]) -> RuleScope:
                   channel='', stakes='high')
     """
     valid_fields = {f for f in RuleScope.__dataclass_fields__}  # type: ignore[attr-defined]
-    filtered = {k: v for k, v in data.items() if k in valid_fields}
+    # Coerce int fields that were stringified by scope_to_dict
+    _INT_FIELDS = {"max_idle_sessions", "created_session"}
+    filtered = {}
+    for k, v in data.items():
+        if k not in valid_fields:
+            continue
+        if k in _INT_FIELDS:
+            try:
+                v = int(v)
+            except (ValueError, TypeError):
+                v = 0
+        filtered[k] = v
     return RuleScope(**filtered)
