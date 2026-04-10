@@ -418,17 +418,20 @@ class TestFullPipeline:
         assert max_conf > 0.40, f"Expected confidence > 0.40 after 5 corrections, got {max_conf}"
 
     def test_graduation_to_pattern(self, e2e_brain):
-        for i in range(8):
-            e2e_brain.correct(
-                draft=f"Per our earlier correspondence regarding item {i}, we wish to advise.",
-                final=f"Quick update on item {i}.",
-                category="TONE",
-            )
+        # Use 12 corrections across 3 simulated sessions for reliable graduation
+        for session in range(1, 4):
+            for i in range(4):
+                e2e_brain.correct(
+                    draft=f"Per our earlier correspondence regarding item {session}_{i}, we wish to advise.",
+                    final=f"Quick update on item {session}_{i}.",
+                    category="TONE",
+                    session=session,
+                )
         e2e_brain.end_session()
         lessons = e2e_brain.export_rules_json(min_state="PATTERN")
         pattern_lessons = [l for l in lessons if l["state"] in ("PATTERN", "RULE")]
         assert len(pattern_lessons) >= 1, (
-            f"Expected at least 1 PATTERN+ lesson after 8 corrections, "
+            f"Expected at least 1 PATTERN+ lesson after 12 corrections across 3 sessions, "
             f"got {len(pattern_lessons)}. All lessons: {e2e_brain.export_rules_json(min_state='INSTINCT')}"
         )
 
