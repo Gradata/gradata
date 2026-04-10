@@ -124,9 +124,10 @@ def main(data: dict) -> dict | None:
     else:
         scored = sorted(filtered, key=_score, reverse=True)[:MAX_RULES]
 
-    lines = []
-    for r in scored:
-        lines.append(f"[{r.state.name}:{r.confidence:.2f}] {r.category}: {r.description}")
+    lines = [
+        f"[{r.state.name}:{r.confidence:.2f}] {r.category}: {r.description}"
+        for r in scored
+    ]
 
     block = "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
     return {"result": block}

@@ -63,7 +63,7 @@ def _get_brain():
         return None
 
 
-def _extract_correction(tool_input: dict, tool_output: dict | None = None) -> tuple[str, str] | None:
+def _extract_correction(tool_input: dict, tool_output: dict | str | None = None) -> tuple[str, str] | None:
     """Extract before/after text from a tool call.
 
     Handles Edit (old_string/new_string) and Write (checks git diff).
@@ -82,7 +82,7 @@ def _extract_correction(tool_input: dict, tool_output: dict | None = None) -> tu
         # The hook receives the tool output which may include the old content
         new_content = tool_input.get("input", {}).get("content", "")
 
-        if tool_output and tool_output.get("old_content"):
+        if isinstance(tool_output, dict) and tool_output.get("old_content"):
             old_content = tool_output["old_content"]
             if old_content != new_content and old_content and new_content:
                 return (old_content[:5000], new_content[:5000])
@@ -243,7 +243,8 @@ def main(data: dict) -> dict | None:
     if not data:
         return None
 
-    correction = _extract_correction(data, data.get("tool_output"))
+    tool_output = data.get("tool_output") or data.get("output")
+    correction = _extract_correction(data, tool_output)
     if correction is None:
         return None
 
