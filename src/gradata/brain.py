@@ -336,6 +336,48 @@ class Brain(BrainInspectionMixin):
                              approval_required=approval_required, dry_run=dry_run,
                              min_severity=min_severity, scope=scope)
 
+    def patch_rule(self, category: str, old_description: str, new_description: str,
+                   reason: str = "") -> dict:
+        """Rewrite a rule's description. Preserves confidence/metadata. Emits RULE_PATCHED event."""
+        from gradata._db import write_lessons_safe
+        from gradata.enhancements.self_healing import apply_patch
+        from gradata.enhancements.self_improvement import format_lessons, parse_lessons
+
+        # Only patch the brain-local lessons file — never external fallbacks
+        lessons_path = self.dir / "lessons.md"
+        if not lessons_path.is_file():
+            return {"patched": False, "error": "not_found: no brain-local lessons file"}
+
+        lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+        patched = apply_patch(lessons, category, old_description, new_description)
+
+        if not patched:
+            return {"patched": False, "error": f"not_found: no rule matching category={category!r}"}
+
+        write_lessons_safe(lessons_path, format_lessons(lessons))
+
+        # Re-sign the patched rule so HMAC verification stays valid
+        try:
+            from gradata.enhancements.rule_integrity import sign_and_store
+            sign_and_store(self.db_path, new_description, category, patched.confidence)
+        except ImportError:
+            pass  # unsigned mode — no-op
+
+        self.emit("RULE_PATCHED", "brain.patch_rule", {
+            "category": category,
+            "old_description": old_description[:200],
+            "new_description": new_description[:200],
+            "reason": reason,
+            "confidence_preserved": patched.confidence,
+        }, [f"category:{category}", "self_healing"])
+
+        return {
+            "patched": True,
+            "old_description": old_description,
+            "new_description": new_description,
+            "confidence_preserved": patched.confidence,
+        }
+
     def end_session(self, session_corrections: list[dict] | None = None,
                     session_type: str = "full", machine_mode: bool | None = None,
                     skip_meta_rules: bool = False) -> dict:
@@ -665,6 +707,7 @@ class Brain(BrainInspectionMixin):
             import sqlite3
 
             from gradata._db import get_connection
+
             conn = get_connection(self.db_path)
             conn.row_factory = sqlite3.Row
             rows = conn.execute(

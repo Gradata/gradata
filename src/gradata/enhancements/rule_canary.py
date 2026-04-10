@@ -78,6 +78,7 @@ def _get_db_path(ctx=None) -> Path:
             return p
 
     # 3. Relative traversal (SDK installed alongside brain)
+    # Expects: src/gradata/enhancements/rule_canary.py -> 5 parents -> repo/brain/
     try:
         scripts_dir = Path(__file__).resolve().parent.parent.parent.parent.parent / "brain"
         p = scripts_dir / "system.db"
@@ -148,8 +149,9 @@ def check_canary_health(rule_category: str, session: int, db_path: Path | None =
             try:
                 corr_row = conn.execute(
                     "SELECT COUNT(*) as cnt FROM events WHERE type = 'CORRECTION' "
-                    "AND data_json LIKE ? AND CAST(session AS INTEGER) >= ?",
-                    (f'%"{rule_category}"%', start_session),
+                    "AND json_extract(data_json, '$.rule_category') = ? "
+                    "AND CAST(session AS INTEGER) >= ?",
+                    (rule_category, start_session),
                 ).fetchone()
                 if corr_row:
                     correction_count = corr_row["cnt"]
