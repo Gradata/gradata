@@ -440,7 +440,7 @@ def cmd_hooks(args):
     action = args.action
     if action == "install":
         from gradata.hooks.claude_code import install_hook
-        install_hook()
+        install_hook(profile=getattr(args, "profile", "standard"))
     elif action == "uninstall":
         from gradata.hooks.claude_code import uninstall_hook
         uninstall_hook()
@@ -561,6 +561,8 @@ def main():
 
     p_hooks = sub.add_parser("hooks", help="Manage Claude Code hook integration")
     p_hooks.add_argument("action", choices=["install", "uninstall", "status"], help="Hook action")
+    p_hooks.add_argument("--profile", choices=["minimal", "standard", "strict"],
+                         default="standard", help="Hook profile tier (default: standard)")
 
     args = parser.parse_args()
 

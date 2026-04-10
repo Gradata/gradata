@@ -30,6 +30,7 @@ Usage::
 
 from __future__ import annotations
 
+import contextlib
 import json
 import time
 from dataclasses import asdict, dataclass, field
@@ -197,10 +198,8 @@ class ObservationStore:
         if filepath.exists() and filepath.stat().st_size > self.max_file_size_bytes:
             # Use time_ns to avoid filename collisions within same second
             rotated = filepath.with_suffix(f".{time.time_ns()}.jsonl")
-            try:
+            with contextlib.suppress(OSError):
                 filepath.rename(rotated)
-            except OSError:
-                pass  # Rotation failed — continue writing to current file
 
         with open(filepath, "a", encoding="utf-8") as f:
             f.write(observation.to_jsonl() + "\n")

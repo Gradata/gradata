@@ -17,14 +17,7 @@ from typing import TYPE_CHECKING
 from gradata._types import CorrectionType, Lesson, LessonState
 
 if TYPE_CHECKING:
-    from gradata._edit_classifier import EditClassification
     from gradata.enhancements.edit_classifier import EditClassification
-
-# Try to import EditClassification from the real module, fall back to shim
-try:
-    pass
-except ImportError:
-    pass  # type: ignore[assignment]
 
 INITIAL_CONFIDENCE = 0.40  # Aligned with self_improvement.py (authoritative)
 _STOPWORDS = frozenset({

@@ -31,8 +31,17 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 from pathlib import Path
+
+from gradata.hooks._base import run_hook
+from gradata.hooks._profiles import Profile
+
+HOOK_META = {
+    "event": "PostToolUse",
+    "matcher": "Edit|Write",
+    "profile": Profile.MINIMAL,
+    "timeout": 5000,
+}
 
 
 def _get_brain():
@@ -54,7 +63,7 @@ def _get_brain():
         return None
 
 
-def _extract_correction(tool_input: dict, tool_output: dict | None = None) -> tuple[str, str] | None:
+def _extract_correction(tool_input: dict, tool_output: dict | str | None = None) -> tuple[str, str] | None:
     """Extract before/after text from a tool call.
 
     Handles Edit (old_string/new_string) and Write (checks git diff).
@@ -71,10 +80,9 @@ def _extract_correction(tool_input: dict, tool_output: dict | None = None) -> tu
     elif tool_name == "Write":
         # For Write, we need the previous file content
         # The hook receives the tool output which may include the old content
-        tool_input.get("input", {}).get("file_path", "")
         new_content = tool_input.get("input", {}).get("content", "")
 
-        if tool_output and tool_output.get("old_content"):
+        if isinstance(tool_output, dict) and tool_output.get("old_content"):
             old_content = tool_output["old_content"]
             if old_content != new_content and old_content and new_content:
                 return (old_content[:5000], new_content[:5000])
@@ -96,7 +104,7 @@ def process_hook_input(raw_input: str) -> dict:
     except json.JSONDecodeError:
         return {"captured": False, "reason": "invalid_json"}
 
-    correction = _extract_correction(data, data.get("output"))
+    correction = _extract_correction(data, data.get("tool_output"))
     if correction is None:
         return {"captured": False, "reason": "no_correction"}
 
@@ -149,7 +157,7 @@ def _build_progress(brain, event: dict) -> str:
 
     # Find the most relevant lesson (most recently modified or matching category)
     category = event.get("data", {}).get("category", "")
-    matching = [l for l in lessons if l.category == category] if category else []
+    matching = [lesson for lesson in lessons if lesson.category == category] if category else []
     lesson = matching[-1] if matching else lessons[-1]
 
     confidence = lesson.confidence
@@ -230,17 +238,36 @@ def generate_full_config(brain_dir: str | None = None) -> dict:
     return {**mcp_config, **hook_config}
 
 
-def main():
-    """Hook entry point: read stdin, process, write result to stdout."""
-    raw = sys.stdin.read()
-    if not raw.strip():
-        return
+def main(data: dict) -> dict | None:
+    """Hook entry point: receive parsed data from run_hook, process, return result."""
+    if not data:
+        return None
 
-    result = process_hook_input(raw)
+    tool_output = data.get("tool_output") or data.get("output")
+    correction = _extract_correction(data, tool_output)
+    if correction is None:
+        return None
 
-    # Write result to stdout (Claude Code reads this)
-    print(json.dumps(result))
+    draft, final = correction
+    brain = _get_brain()
+    if brain is None:
+        return None
+
+    try:
+        event = brain.correct(draft, final)
+        severity = event.get("data", {}).get("severity", "unknown")
+        progress = _build_progress(brain, event)
+        result = {
+            "captured": True,
+            "severity": severity,
+            "edit_distance": event.get("data", {}).get("edit_distance", 0),
+        }
+        if progress:
+            result["result"] = progress
+        return result
+    except Exception:
+        return None
 
 
 if __name__ == "__main__":
-    main()
+    run_hook(main, HOOK_META)

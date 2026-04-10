@@ -451,12 +451,8 @@ def _compound_score(
         recent_mean = statistics.mean(correction_density_trend[-5:])
         early_mean = statistics.mean(correction_density_trend[:5])
         if recent_mean < 0.10:
-            if early_mean >= 0.10:
-                # Genuine improvement: started high, now low
-                slope_pts = max(slope_pts, 10.0)
-            else:
-                # Always low — modest bonus (may indicate few corrections overall)
-                slope_pts = max(slope_pts, 5.0)
+            # Genuine improvement if started high, modest bonus if always low
+            slope_pts = max(slope_pts, 10.0) if early_mean >= 0.1 else max(slope_pts, 5.0)
 
     score += slope_pts
 
