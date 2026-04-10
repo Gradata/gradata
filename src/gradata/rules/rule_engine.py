@@ -120,22 +120,29 @@ _TASK_TYPE_PATTERNS: list[tuple[str, list[str]]] = [
 
 # Keywords signaling universal scope (AI quality issues, not personal style)
 _UNIVERSAL_SIGNALS: list[str] = [
-    "em dash", "em dashes",
-    "verify", "verification",
-    "fabricat", "hallucin",
+    "em dash",
+    "em dashes",
+    "verify",
+    "verification",
+    "fabricat",
+    "hallucin",
     "bold mid-paragraph",
     "rule of three",
     "promotional language",
     "never skip",
-    "don't assume", "never assume",
-    "check before", "verify before",
+    "don't assume",
+    "never assume",
+    "check before",
+    "verify before",
     "superficial analysis",
 ]
 
 # Keywords signaling team/org scope (tool or company specific).
 # Override via brain config to add your team's tooling keywords.
 _TEAM_SIGNALS: list[str] = [
-    "brain/", ".carl/", "domain/",
+    "brain/",
+    ".carl/",
+    "domain/",
 ]
 
 
@@ -304,9 +311,7 @@ def _make_rule_id(lesson: Lesson) -> str:
     Returns:
         Rule identifier string.
     """
-    digest = hashlib.sha256(
-        f"{lesson.category}:{lesson.description}".encode()
-    ).hexdigest()[:8]
+    digest = hashlib.sha256(f"{lesson.category}:{lesson.description}".encode()).hexdigest()[:8]
     return f"{lesson.category}:{digest}"
 
 
@@ -351,8 +356,7 @@ def validate_assumptions(
     if lesson.confidence < floor:
         return (
             False,
-            f"confidence {lesson.confidence:.2f} below {lesson.state.value} "
-            f"floor {floor:.2f}",
+            f"confidence {lesson.confidence:.2f} below {lesson.state.value} floor {floor:.2f}",
         )
 
     # (b) Category contradiction
@@ -372,8 +376,7 @@ def validate_assumptions(
             if rule_tt and rule_tt != current_tt:
                 return (
                     False,
-                    f"rule scoped to '{rule_tt}' but current task is "
-                    f"'{current_tt}'",
+                    f"rule scoped to '{rule_tt}' but current task is '{current_tt}'",
                 )
         except Exception:
             pass  # malformed scope_json — don't block on it
@@ -417,7 +420,9 @@ def filter_by_scope(
         if lesson.scope_json:
             try:
                 scope_dict = json.loads(lesson.scope_json)
-                lesson_scope = RuleScope(**{k: v for k, v in scope_dict.items() if k in RuleScope.__dataclass_fields__})
+                lesson_scope = RuleScope(
+                    **{k: v for k, v in scope_dict.items() if k in RuleScope.__dataclass_fields__}
+                )
             except Exception:
                 lesson_scope = RuleScope()
         else:
@@ -434,6 +439,7 @@ def _beta_ppf_05(alpha: float, beta_param: float) -> float:
     Uses normal approximation. For tiny samples, returns conservative estimate.
     """
     import math
+
     if alpha <= 0 or beta_param <= 0:
         return 0.0
     total = alpha + beta_param
@@ -503,6 +509,7 @@ def apply_rules(
     _context: str = "",
     bus: EventBus | None = None,
     graph: RuleGraph | None = None,
+    _ctx=None,
 ) -> list[AppliedRule]:
     """Select and rank lessons relevant to the given scope.
 
@@ -559,12 +566,24 @@ def apply_rules(
             if is_rule_disabled_for_domain(lesson, current_domain):
                 if bus:
                     scores = lesson.domain_scores.get(current_domain, {})
-                    bus.emit("rule_scoped_out", {
-                        "lesson_category": lesson.category,
-                        "lesson_description": lesson.description[:80],
-                        "domain": current_domain,
-                        "misfire_rate": scores.get("misfires", 0) / max(1, scores.get("fires", 1)),
-                    })
+                    bus.emit(
+                        "rule_scoped_out",
+                        {
+                            "lesson_category": lesson.category,
+                            "lesson_description": lesson.description[:80],
+                            "domain": current_domain,
+                            "misfire_rate": scores.get("misfires", 0)
+                            / max(1, scores.get("fires", 1)),
+                        },
+                    )
+                from gradata.rules.rule_tracker import log_suppression
+
+                log_suppression(
+                    rule_id=_make_rule_id(lesson),
+                    reason="domain_disabled",
+                    relevance=0.0,
+                    ctx=_ctx,
+                )
             else:
                 filtered.append(lesson)
         eligible = filtered
@@ -576,7 +595,9 @@ def apply_rules(
         if lesson.scope_json:
             try:
                 scope_dict = json.loads(lesson.scope_json)
-                lesson_scope = RuleScope(**{k: v for k, v in scope_dict.items() if k in RuleScope.__dataclass_fields__})
+                lesson_scope = RuleScope(
+                    **{k: v for k, v in scope_dict.items() if k in RuleScope.__dataclass_fields__}
+                )
             except Exception:
                 lesson_scope = RuleScope()
         else:
@@ -586,6 +607,15 @@ def apply_rules(
         relevance *= _CT_BOOST.get(lesson.correction_type, 1.0)
         if relevance >= 0.3:
             scored.append((lesson, relevance))
+        elif _ctx:
+            from gradata.rules.rule_tracker import log_suppression
+
+            log_suppression(
+                rule_id=_make_rule_id(lesson),
+                reason="relevance_threshold",
+                relevance=relevance,
+                ctx=_ctx,
+            )
 
     # Step 3.5 — assumption invalidation (dynamic runtime checks)
     if _context:
@@ -606,8 +636,18 @@ def apply_rules(
             else:
                 _log.debug(
                     "Skipping rule %s: assumption invalid — %s",
-                    lesson.category, reason,
+                    lesson.category,
+                    reason,
                 )
+                if _ctx:
+                    from gradata.rules.rule_tracker import log_suppression
+
+                    log_suppression(
+                        rule_id=_make_rule_id(lesson),
+                        reason="assumption_invalid",
+                        relevance=relevance,
+                        ctx=_ctx,
+                    )
         scored = validated
 
     # Step 4 — compute difficulty per rule
@@ -626,7 +666,9 @@ def apply_rules(
         key=lambda t: (
             _STATE_PRIORITY[t[0].state],
             # Difficulty: use event history if available, else lesson counters
-            compute_rule_difficulty(t[0].category, events) if events else _difficulty_from_lesson(t[0]),
+            compute_rule_difficulty(t[0].category, events)
+            if events
+            else _difficulty_from_lesson(t[0]),
             t[1],
             _effective_conf(t[0], current_domain),
         ),
@@ -648,6 +690,16 @@ def apply_rules(
             if not dominated:
                 filtered_scored.append((lesson, relevance))
                 selected_ids.add(rule_id)
+            elif _ctx:
+                from gradata.rules.rule_tracker import log_suppression
+
+                log_suppression(
+                    rule_id=rule_id,
+                    reason="conflict",
+                    relevance=relevance,
+                    competing_rule_ids=list(selected_ids),
+                    ctx=_ctx,
+                )
         scored = filtered_scored
 
     # Step 6 — assemble AppliedRule objects, capped at max_rules
@@ -655,10 +707,7 @@ def apply_rules(
     for lesson, relevance in scored[:max_rules]:
         rule_id = _make_rule_id(lesson)
         tier_label = _tier_label(lesson)
-        instruction = (
-            f"[{tier_label}]"
-            f" {lesson.category}: {lesson.description}"
-        )
+        instruction = f"[{tier_label}] {lesson.category}: {lesson.description}"
         applied.append(
             AppliedRule(
                 rule_id=rule_id,
@@ -782,10 +831,7 @@ def format_rules_for_prompt(
 
         # Include few-shot examples for rules that need reinforcement
         lesson = rule.lesson
-        needs_reinforcement = (
-            lesson.confidence < 0.80
-            or getattr(lesson, "misfire_count", 0) > 0
-        )
+        needs_reinforcement = lesson.confidence < 0.80 or getattr(lesson, "misfire_count", 0) > 0
         if (
             needs_reinforcement
             and getattr(lesson, "example_draft", None) is not None
