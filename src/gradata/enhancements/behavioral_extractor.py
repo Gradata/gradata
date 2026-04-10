@@ -423,11 +423,7 @@ def _is_actionable(instruction: str) -> bool:
     if not instruction or len(instruction) < 5:
         return False
     first_word = instruction.split()[0].lower().removesuffix("'t")
-    if first_word in _IMPERATIVE_STARTERS:
-        return True
-    # Accept only known PREFIX_INSTRUCTION patterns (explicit user rules like
-    # "User corrected: ...") — don't treat arbitrary capitalized sentences as actionable
-    return False
+    return first_word in _IMPERATIVE_STARTERS
 
 
 def _try_llm_extract(llm_provider, draft: str, final: str, classification) -> str | None:
