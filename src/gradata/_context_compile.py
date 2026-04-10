@@ -32,7 +32,7 @@ def _get_prospect_names(ctx: "BrainContext | None" = None) -> dict[str, str]:
         if f.name.startswith("_"):
             continue
         stem = f.stem
-        parts = re.split(r"(?:\s*—\s*|\s*--\s*|\s+-\s+)", stem, maxsplit=1)
+        parts = re.split(r"(?:\s*[—–]\s*|\s*--\s*|\s+-\s+)", stem, maxsplit=1)
         full_name = parts[0].strip()
         company = parts[1].strip() if len(parts) > 1 else ""
         names[full_name.lower()] = full_name

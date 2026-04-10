@@ -1,0 +1,213 @@
+<h2>Dashboard Structure: Three Views, One Sidebar</h2>
+<p class="subtitle">Based on SIM16 (200 agents), admin research (Linear/Vercel/PostHog/Stripe), and UX best practices. Click the view that should be the default landing page.</p>
+
+<div style="margin-bottom:32px;">
+  <div class="mockup">
+    <div class="mockup-header">Navigation Structure (Left Sidebar, 240px collapsed to 60px)</div>
+    <div class="mockup-body" style="display:flex; gap:0; min-height:500px; font-size:13px;">
+
+      <!-- Sidebar -->
+      <div style="width:220px; min-width:220px; background:#111; border-right:1px solid #333; padding:16px 12px; display:flex; flex-direction:column; gap:4px;">
+
+        <div style="padding:8px 12px; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+          <div style="width:24px; height:24px; background:linear-gradient(135deg, #6366f1, #8b5cf6); border-radius:6px;"></div>
+          <div>
+            <div style="font-weight:600; font-size:13px;">My Brain</div>
+            <div style="font-size:11px; color:#666;">oliver@gradata.com</div>
+          </div>
+        </div>
+
+        <div style="font-size:10px; color:#555; text-transform:uppercase; letter-spacing:1px; padding:8px 12px 4px;">Individual</div>
+        <div style="padding:8px 12px; background:#1a1a2e; border-radius:6px; color:#fff;">Overview</div>
+        <div style="padding:8px 12px; color:#999;">Corrections</div>
+        <div style="padding:8px 12px; color:#999;">Learned Rules</div>
+        <div style="padding:8px 12px; color:#999;">Notifications</div>
+
+        <div style="font-size:10px; color:#555; text-transform:uppercase; letter-spacing:1px; padding:12px 12px 4px;">Team</div>
+        <div style="padding:8px 12px; color:#999;">Team Overview</div>
+        <div style="padding:8px 12px; color:#999;">Members</div>
+        <div style="padding:8px 12px; color:#999;">Leaderboard</div>
+
+        <div style="font-size:10px; color:#555; text-transform:uppercase; letter-spacing:1px; padding:12px 12px 4px;">Settings</div>
+        <div style="padding:8px 12px; color:#999;">Billing</div>
+        <div style="padding:8px 12px; color:#999;">API Keys</div>
+        <div style="padding:8px 12px; color:#999;">Security</div>
+
+        <div style="margin-top:auto; border-top:1px solid #333; padding-top:12px;">
+          <div style="font-size:10px; color:#555; text-transform:uppercase; letter-spacing:1px; padding:4px 12px;">Admin</div>
+          <div style="padding:8px 12px; color:#666;">Operator Panel</div>
+        </div>
+      </div>
+
+      <!-- Content Area -->
+      <div style="flex:1; padding:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+          <div>
+            <h3 style="margin:0;">Overview</h3>
+            <p style="color:#888; font-size:12px; margin:4px 0 0;">Your brain's learning progress this week</p>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <div style="padding:6px 12px; background:#222; border:1px solid #333; border-radius:6px; font-size:12px; color:#888;">7d</div>
+            <div style="padding:6px 12px; background:#1a1a2e; border:1px solid #4f46e5; border-radius:6px; font-size:12px; color:#fff;">30d</div>
+            <div style="padding:6px 12px; background:#222; border:1px solid #333; border-radius:6px; font-size:12px; color:#888;">90d</div>
+          </div>
+        </div>
+
+        <!-- KPI Strip -->
+        <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; margin-bottom:24px;">
+          <div style="background:#111; border:1px solid #222; border-radius:8px; padding:16px;">
+            <div style="font-size:11px; color:#888; margin-bottom:4px;">Corrections This Week</div>
+            <div style="font-size:28px; font-weight:700;">12</div>
+            <div style="font-size:12px; color:#22c55e;">-38% vs last week</div>
+          </div>
+          <div style="background:#111; border:1px solid #222; border-radius:8px; padding:16px;">
+            <div style="font-size:11px; color:#888; margin-bottom:4px;">Time Saved</div>
+            <div style="font-size:28px; font-weight:700;">4.2h</div>
+            <div style="font-size:12px; color:#22c55e;">+1.1h vs last week</div>
+          </div>
+          <div style="background:#111; border:1px solid #222; border-radius:8px; padding:16px;">
+            <div style="font-size:11px; color:#888; margin-bottom:4px;">Rules Graduated</div>
+            <div style="font-size:28px; font-weight:700;">7</div>
+            <div style="font-size:12px; color:#6366f1;">2 new this week</div>
+          </div>
+          <div style="background:#111; border:1px solid #222; border-radius:8px; padding:16px;">
+            <div style="font-size:11px; color:#888; margin-bottom:4px;">Brain Confidence</div>
+            <div style="font-size:28px; font-weight:700;">0.84</div>
+            <div style="font-size:12px; color:#22c55e;">+0.06 vs last week</div>
+          </div>
+        </div>
+
+        <!-- Main Chart Area -->
+        <div style="background:#111; border:1px solid #222; border-radius:8px; padding:20px; margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:16px;">
+            <div style="font-size:14px; font-weight:600;">Correction Trend</div>
+            <div style="font-size:12px; color:#888;">Corrections per session, last 30 days</div>
+          </div>
+          <!-- Simulated chart -->
+          <div style="height:200px; display:flex; align-items:flex-end; gap:3px; padding:0 8px;">
+            <div style="flex:1;background:#4f46e5;height:85%;border-radius:3px 3px 0 0;opacity:0.7;"></div>
+            <div style="flex:1;background:#4f46e5;height:78%;border-radius:3px 3px 0 0;opacity:0.7;"></div>
+            <div style="flex:1;background:#4f46e5;height:82%;border-radius:3px 3px 0 0;opacity:0.7;"></div>
+            <div style="flex:1;background:#4f46e5;height:70%;border-radius:3px 3px 0 0;opacity:0.7;"></div>
+            <div style="flex:1;background:#4f46e5;height:65%;border-radius:3px 3px 0 0;opacity:0.7;"></div>
+            <div style="flex:1;background:#4f46e5;height:72%;border-radius:3px 3px 0 0;opacity:0.7;"></div>
+            <div style="flex:1;background:#4f46e5;height:55%;border-radius:3px 3px 0 0;opacity:0.75;"></div>
+            <div style="flex:1;background:#4f46e5;height:60%;border-radius:3px 3px 0 0;opacity:0.75;"></div>
+            <div style="flex:1;background:#4f46e5;height:48%;border-radius:3px 3px 0 0;opacity:0.8;"></div>
+            <div style="flex:1;background:#4f46e5;height:52%;border-radius:3px 3px 0 0;opacity:0.8;"></div>
+            <div style="flex:1;background:#4f46e5;height:45%;border-radius:3px 3px 0 0;opacity:0.8;"></div>
+            <div style="flex:1;background:#4f46e5;height:50%;border-radius:3px 3px 0 0;opacity:0.8;"></div>
+            <div style="flex:1;background:#4f46e5;height:42%;border-radius:3px 3px 0 0;opacity:0.85;"></div>
+            <div style="flex:1;background:#4f46e5;height:38%;border-radius:3px 3px 0 0;opacity:0.85;"></div>
+            <div style="flex:1;background:#4f46e5;height:40%;border-radius:3px 3px 0 0;opacity:0.85;"></div>
+            <div style="flex:1;background:#4f46e5;height:35%;border-radius:3px 3px 0 0;opacity:0.9;"></div>
+            <div style="flex:1;background:#4f46e5;height:32%;border-radius:3px 3px 0 0;opacity:0.9;"></div>
+            <div style="flex:1;background:#4f46e5;height:28%;border-radius:3px 3px 0 0;opacity:0.9;"></div>
+            <div style="flex:1;background:#4f46e5;height:30%;border-radius:3px 3px 0 0;opacity:0.9;"></div>
+            <div style="flex:1;background:#4f46e5;height:25%;border-radius:3px 3px 0 0;opacity:0.95;"></div>
+            <div style="flex:1;background:#4f46e5;height:22%;border-radius:3px 3px 0 0;opacity:0.95;"></div>
+            <div style="flex:1;background:#4f46e5;height:20%;border-radius:3px 3px 0 0;opacity:0.95;"></div>
+            <div style="flex:1;background:#4f46e5;height:18%;border-radius:3px 3px 0 0;"></div>
+            <div style="flex:1;background:#4f46e5;height:15%;border-radius:3px 3px 0 0;"></div>
+            <div style="flex:1;background:#4f46e5;height:16%;border-radius:3px 3px 0 0;"></div>
+            <div style="flex:1;background:#4f46e5;height:12%;border-radius:3px 3px 0 0;"></div>
+            <div style="flex:1;background:#4f46e5;height:14%;border-radius:3px 3px 0 0;"></div>
+            <div style="flex:1;background:#4f46e5;height:10%;border-radius:3px 3px 0 0;"></div>
+            <div style="flex:1;background:#22c55e;height:8%;border-radius:3px 3px 0 0;"></div>
+            <div style="flex:1;background:#22c55e;height:7%;border-radius:3px 3px 0 0;"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding:8px; font-size:11px; color:#555;">
+            <span>Mar 10</span><span>Mar 17</span><span>Mar 24</span><span>Mar 31</span><span>Apr 7</span>
+          </div>
+        </div>
+
+        <!-- Bottom row: Top Rules + Category Breakdown -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+          <div style="background:#111; border:1px solid #222; border-radius:8px; padding:16px;">
+            <div style="font-size:14px; font-weight:600; margin-bottom:12px;">Top Rules Learned</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <div style="display:flex; justify-content:space-between; padding:8px; background:#0a0a0a; border-radius:4px;">
+                <span style="font-size:12px;">Never use em dashes in emails</span>
+                <span style="font-size:11px; color:#22c55e;">RULE 0.94</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; padding:8px; background:#0a0a0a; border-radius:4px;">
+                <span style="font-size:12px;">Plan before implementing</span>
+                <span style="font-size:11px; color:#22c55e;">RULE 0.91</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; padding:8px; background:#0a0a0a; border-radius:4px;">
+                <span style="font-size:12px;">Use colons over dashes in prose</span>
+                <span style="font-size:11px; color:#6366f1;">PATTERN 0.78</span>
+              </div>
+            </div>
+          </div>
+          <div style="background:#111; border:1px solid #222; border-radius:8px; padding:16px;">
+            <div style="font-size:14px; font-weight:600; margin-bottom:12px;">Corrections by Category</div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div>
+                <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+                  <span>TONE</span><span style="color:#22c55e;">-62%</span>
+                </div>
+                <div style="height:6px; background:#222; border-radius:3px; overflow:hidden;">
+                  <div style="height:100%; width:38%; background:#22c55e; border-radius:3px;"></div>
+                </div>
+              </div>
+              <div>
+                <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+                  <span>PROCESS</span><span style="color:#eab308;">-15%</span>
+                </div>
+                <div style="height:6px; background:#222; border-radius:3px; overflow:hidden;">
+                  <div style="height:100%; width:85%; background:#eab308; border-radius:3px;"></div>
+                </div>
+              </div>
+              <div>
+                <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+                  <span>FORMAT</span><span style="color:#22c55e;">-44%</span>
+                </div>
+                <div style="height:6px; background:#222; border-radius:3px; overflow:hidden;">
+                  <div style="height:100%; width:56%; background:#6366f1; border-radius:3px;"></div>
+                </div>
+              </div>
+              <div>
+                <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+                  <span>ACCURACY</span><span style="color:#ef4444;">+8%</span>
+                </div>
+                <div style="height:6px; background:#222; border-radius:3px; overflow:hidden;">
+                  <div style="height:100%; width:92%; background:#ef4444; border-radius:3px;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>What's shown above</h3>
+<p class="subtitle">Individual user "Overview" page. This is the fitness tracker view that SIM16's 200 agents unanimously asked for.</p>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px;">
+  <div style="background:#111; border:1px solid #222; border-radius:8px; padding:16px;">
+    <h4 style="margin-top:0;">From SIM16</h4>
+    <ul style="font-size:13px; color:#ccc; line-height:1.6;">
+      <li>Hero metric: correction count change (week-over-week)</li>
+      <li>Main chart: 30-day correction trend going DOWN</li>
+      <li>Boss metric: hours saved</li>
+      <li>Category breakdown: which error types are dying</li>
+      <li>Top 3-5 rules as optional drill-down</li>
+    </ul>
+  </div>
+  <div style="background:#111; border:1px solid #222; border-radius:8px; padding:16px;">
+    <h4 style="margin-top:0;">From Admin Research</h4>
+    <ul style="font-size:13px; color:#ccc; line-height:1.6;">
+      <li>Sidebar: Linear-style grouped sections</li>
+      <li>RBAC: Individual / Team / Admin (operator)</li>
+      <li>Dark-first: matches cinematic website theme</li>
+      <li>KPI strip above fold (Vercel/Datadog pattern)</li>
+      <li>Settings: billing, API keys, security</li>
+    </ul>
+  </div>
+</div>
+
+<p class="subtitle">Take a look at <strong>http://localhost:64982</strong> and tell me: does this structure feel right? What would you change?</p>

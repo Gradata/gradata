@@ -43,7 +43,7 @@ import gradata
 from gradata._scope import RuleScope
 from gradata._types import LessonState
 from gradata.detection.addition_pattern import AdditionTracker, classify_addition, is_addition
-from gradata.detection.correction_conflict import ConflictTracker, extract_diff_tokens
+from gradata.detection.correction_conflict import ConflictTracker, detect_conflict, extract_diff_tokens, tokenize
 from gradata.detection.mode_classifier import classify_mode
 from gradata.enhancements.self_improvement import parse_lessons
 from gradata.rules.rule_engine import apply_rules, format_rules_for_prompt
@@ -204,9 +204,12 @@ class _Handler(BaseHTTPRequestHandler):
             })
             fired_ids.append(ar.rule_id)
 
-        # Store fired rule IDs for acceptance tracking
+        # Store fired rule IDs and instruction tokens for acceptance tracking
         if session_id:
             d._fired_rules[session_id] = fired_ids
+            d._fired_rule_tokens[session_id] = {
+                ar.rule_id: tokenize(ar.instruction) for ar in applied
+            }
 
         mode, mode_conf = classify_mode(prompt)
 
@@ -281,8 +284,12 @@ class _Handler(BaseHTTPRequestHandler):
 
         correction_conflict = None
         _, new_removed = extract_diff_tokens(old_string, new_string)
+        rule_tokens_map = d._fired_rule_tokens.get(session_id, {})
         if new_removed and misfired:
             for rule_id in misfired:
+                original_added = rule_tokens_map.get(rule_id, set())
+                if not detect_conflict(original_added, new_removed):
+                    continue
                 action = d._conflict_tracker.record_conflict(rule_id)
                 if action:
                     correction_conflict = {
@@ -366,6 +373,7 @@ class _Handler(BaseHTTPRequestHandler):
         if session_id:
             d._sessions.pop(session_id, None)
             d._fired_rules.pop(session_id, None)
+            d._fired_rule_tokens.pop(session_id, None)
 
         # Get convergence data
         try:
@@ -597,6 +605,7 @@ class GradataDaemon:
 
         self._sessions: dict[str, int] = {}
         self._fired_rules: dict[str, list[str]] = {}
+        self._fired_rule_tokens: dict[str, dict[str, set[str]]] = {}
         self._addition_tracker = AdditionTracker()
         self._conflict_tracker = ConflictTracker()
 
