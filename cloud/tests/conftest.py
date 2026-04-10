@@ -40,6 +40,9 @@ class MockSupabaseClient:
         self._inserts.extend(rows)
         return rows
 
+    async def update(self, table: str, data: dict, filters: dict | None = None) -> list[dict]:
+        return [data]
+
 
 @pytest.fixture
 def mock_supabase(monkeypatch):

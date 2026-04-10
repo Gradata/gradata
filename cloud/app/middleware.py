@@ -25,7 +25,13 @@ def setup_middleware(app: FastAPI, settings: Settings) -> None:
     @app.middleware("http")
     async def log_requests(request: Request, call_next):
         start = time.monotonic()
-        response = await call_next(request)
-        elapsed = (time.monotonic() - start) * 1000
-        _log.info("%s %s -> %d (%.0fms)", request.method, request.url.path, response.status_code, elapsed)
-        return response
+        try:
+            response = await call_next(request)
+        except Exception:
+            elapsed = (time.monotonic() - start) * 1000
+            _log.error("%s %s -> ERROR (%.0fms)", request.method, request.url.path, elapsed)
+            raise
+        else:
+            elapsed = (time.monotonic() - start) * 1000
+            _log.info("%s %s -> %d (%.0fms)", request.method, request.url.path, response.status_code, elapsed)
+            return response

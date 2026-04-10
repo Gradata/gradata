@@ -54,6 +54,18 @@ class SupabaseClient:
         resp.raise_for_status()
         return resp.json()
 
+    async def update(
+        self, table: str, data: dict[str, Any], filters: dict[str, Any] | None = None,
+    ) -> list[dict]:
+        """UPDATE rows matching eq filters."""
+        params: dict[str, str] = {}
+        if filters:
+            for key, val in filters.items():
+                params[key] = f"eq.{val}"
+        resp = await self._http.patch(f"/{table}", params=params, json=data)
+        resp.raise_for_status()
+        return resp.json()
+
     async def close(self):
         await self._http.aclose()
 

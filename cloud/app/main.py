@@ -2,20 +2,36 @@
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
 from app.config import get_settings
+from app.db import get_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage startup/shutdown resources (e.g. httpx client in SupabaseClient)."""
+    yield
+    db = get_db()
+    if hasattr(db, "close"):
+        await db.close()
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
     logging.basicConfig(level=settings.log_level)
 
+    is_prod = settings.environment == "production"
+
     app = FastAPI(
         title="Gradata Cloud API",
         version="0.1.0",
-        docs_url="/docs" if settings.environment != "production" else None,
+        docs_url=None if is_prod else "/docs",
+        openapi_url=None if is_prod else "/openapi.json",
+        redoc_url=None if is_prod else "/redoc",
+        lifespan=lifespan,
     )
 
     from app.middleware import setup_middleware

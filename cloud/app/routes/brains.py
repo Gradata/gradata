@@ -39,4 +39,9 @@ async def connect_brain(
 async def list_brains(brain: dict = Depends(get_current_brain)) -> list[dict]:
     """List all brains accessible to the authenticated user."""
     db = get_db()
-    return await db.select("brains", filters={"user_id": brain["user_id"]})
+    rows = await db.select(
+        "brains",
+        columns="id,user_id,brain_name,domain,manifest,last_sync_at,created_at",
+        filters={"user_id": brain["user_id"]},
+    )
+    return rows

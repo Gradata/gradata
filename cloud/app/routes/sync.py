@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 
@@ -95,6 +96,13 @@ async def sync_brain(
         ]
         await db.insert("meta_rules", rows)
         meta_rules_count = len(rows)
+
+    # Update last_sync_at timestamp
+    await db.update(
+        "brains",
+        data={"last_sync_at": datetime.now(timezone.utc).isoformat()},
+        filters={"id": brain_id},
+    )
 
     _log.info(
         "Synced brain=%s: %d corrections, %d lessons, %d events, %d meta-rules",
