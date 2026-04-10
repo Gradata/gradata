@@ -34,7 +34,8 @@ def _compute_fda(ctx: "BrainContext | None" = None, window: int = 20) -> float |
         try:
             # Get the most recent N real sessions with outputs (exclude system sessions)
             # Uses HAVING COUNT >= 2 to skip phantom sessions with stray events
-            sessions_with_outputs = conn.execute("""
+            sessions_with_outputs = conn.execute(
+                """
                 SELECT e.session FROM events e
                 LEFT JOIN session_metrics sm ON e.session = sm.session
                 WHERE e.type = 'OUTPUT'
@@ -42,7 +43,9 @@ def _compute_fda(ctx: "BrainContext | None" = None, window: int = 20) -> float |
                   AND (sm.session_type IS NULL OR sm.session_type != 'systems')
                 GROUP BY e.session HAVING COUNT(*) >= 2
                 ORDER BY e.session DESC LIMIT ?
-            """, (window,)).fetchall()
+            """,
+                (window,),
+            ).fetchall()
 
             if len(sessions_with_outputs) < 3:
                 return None
@@ -50,7 +53,8 @@ def _compute_fda(ctx: "BrainContext | None" = None, window: int = 20) -> float |
             # Single aggregate query replacing N+1 per-session queries
             session_ids = [s[0] for s in sessions_with_outputs]
             placeholders = ",".join("?" * len(session_ids))
-            correction_stats = conn.execute(f"""
+            correction_stats = conn.execute(
+                f"""
                 SELECT session,
                        SUM(CASE WHEN json_extract(data_json, '$.severity') IS NOT NULL THEN 1 ELSE 0 END) as has_sev,
                        SUM(CASE WHEN json_extract(data_json, '$.severity') IN ('moderate', 'major', 'discarded') THEN 1 ELSE 0 END) as major,
@@ -58,7 +62,9 @@ def _compute_fda(ctx: "BrainContext | None" = None, window: int = 20) -> float |
                 FROM events
                 WHERE type = 'CORRECTION' AND session IN ({placeholders})
                 GROUP BY session
-            """, session_ids).fetchall()
+            """,
+                session_ids,
+            ).fetchall()
 
             # Build lookup: session -> (has_severity, major_count, total_count)
             corr_by_session = {row[0]: (row[1], row[2], row[3]) for row in correction_stats}
@@ -96,23 +102,38 @@ def _categories_extinct(ctx: "BrainContext | None" = None, window: int = 20) -> 
         try:
             _, min_session = _session_window(conn, window)
 
-            all_cats = {r[0] for r in conn.execute("""
+            all_cats = {
+                r[0]
+                for r in conn.execute("""
                 SELECT DISTINCT json_extract(data_json, '$.category')
                 FROM events WHERE type = 'CORRECTION'
                   AND json_extract(data_json, '$.category') IS NOT NULL
-            """).fetchall()}
+            """).fetchall()
+            }
 
-            recent_cats = {r[0] for r in conn.execute("""
+            recent_cats = {
+                r[0]
+                for r in conn.execute(
+                    """
                 SELECT DISTINCT json_extract(data_json, '$.category')
                 FROM events WHERE type = 'CORRECTION' AND session >= ?
                   AND json_extract(data_json, '$.category') IS NOT NULL
-            """, (min_session,)).fetchall()}
+            """,
+                    (min_session,),
+                ).fetchall()
+            }
 
-            tested_cats = {r[0] for r in conn.execute("""
+            tested_cats = {
+                r[0]
+                for r in conn.execute(
+                    """
                 SELECT DISTINCT json_extract(data_json, '$.category')
                 FROM events WHERE type = 'OUTPUT' AND session >= ?
                   AND json_extract(data_json, '$.category') IS NOT NULL
-            """, (min_session,)).fetchall()}
+            """,
+                    (min_session,),
+                ).fetchall()
+            }
 
             extinct = sorted((all_cats - recent_cats) & tested_cats)
             return extinct
@@ -134,7 +155,8 @@ def _per_session_density(ctx: "BrainContext | None" = None, limit: int = 100) ->
         conn = get_connection(db)
         try:
             # DB-side windowing: fetch last N sessions, then reverse in Python
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT e.session,
                        SUM(CASE WHEN e.type='CORRECTION' THEN 1 ELSE 0 END) as corr,
                        SUM(CASE WHEN e.type='OUTPUT' THEN 1 ELSE 0 END) as out_cnt
@@ -145,7 +167,9 @@ def _per_session_density(ctx: "BrainContext | None" = None, limit: int = 100) ->
                 GROUP BY e.session
                 HAVING SUM(CASE WHEN e.type='OUTPUT' THEN 1 ELSE 0 END) >= 1
                 ORDER BY e.session DESC LIMIT ?
-            """, (limit,)).fetchall()
+            """,
+                (limit,),
+            ).fetchall()
             return [r[1] / r[2] for r in reversed(rows)]
         finally:
             conn.close()
@@ -165,11 +189,14 @@ def _severity_ratio(ctx: "BrainContext | None" = None, window: int = 20) -> floa
         conn = get_connection(db)
         try:
             _, min_session = _session_window(conn, window)
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT json_extract(data_json, '$.severity') as sev, COUNT(*) as cnt
                 FROM events WHERE type = 'CORRECTION' AND session >= ?
                 GROUP BY sev
-            """, (min_session,)).fetchall()
+            """,
+                (min_session,),
+            ).fetchall()
             total = sum(r[1] for r in rows)
             if total < 5:
                 return None
@@ -193,10 +220,11 @@ def _transfer_score(ctx: "BrainContext | None" = None, window: int = 10) -> floa
         if not lessons_file.exists():
             return None
         text = lessons_file.read_text(encoding="utf-8")
-        rule_cats = set(re.findall(
-            r"^\[20\d{2}-\d{2}-\d{2}\]\s+\[RULE:.*?category:\s*(\w+)",
-            text, re.MULTILINE
-        ))
+        rule_cats = set(
+            re.findall(
+                r"^\[20\d{2}-\d{2}-\d{2}\]\s+\[RULE:.*?category:\s*(\w+)", text, re.MULTILINE
+            )
+        )
         if not rule_cats:
             return None
 
@@ -208,16 +236,22 @@ def _transfer_score(ctx: "BrainContext | None" = None, window: int = 10) -> floa
             # Count corrections vs outputs in RULE categories in recent sessions
             cats_list = list(rule_cats)
             ph = ",".join("?" * len(cats_list))
-            corrections = conn.execute(
-                f"SELECT COUNT(*) FROM events WHERE type='CORRECTION' AND session >= ? "
-                f"AND json_extract(data_json, '$.category') IN ({ph})",
-                [min_session, *cats_list],
-            ).fetchone()[0] or 0
-            outputs = conn.execute(
-                f"SELECT COUNT(*) FROM events WHERE type='OUTPUT' AND session >= ? "
-                f"AND json_extract(data_json, '$.category') IN ({ph})",
-                [min_session, *cats_list],
-            ).fetchone()[0] or 0
+            corrections = (
+                conn.execute(
+                    f"SELECT COUNT(*) FROM events WHERE type='CORRECTION' AND session >= ? "
+                    f"AND json_extract(data_json, '$.category') IN ({ph})",
+                    [min_session, *cats_list],
+                ).fetchone()[0]
+                or 0
+            )
+            outputs = (
+                conn.execute(
+                    f"SELECT COUNT(*) FROM events WHERE type='OUTPUT' AND session >= ? "
+                    f"AND json_extract(data_json, '$.category') IN ({ph})",
+                    [min_session, *cats_list],
+                ).fetchone()[0]
+                or 0
+            )
 
             if outputs < 3:
                 return None
@@ -235,7 +269,12 @@ def _score_confidence(score: float, sessions: int) -> dict:
     Margin = 30 / sqrt(sessions). At 5 sessions: +/-13.4. At 50: +/-4.2.
     """
     if sessions < 3:
-        return {"score": round(score, 1), "ci_low": 0.0, "ci_high": 100.0, "confidence": "insufficient_data"}
+        return {
+            "score": round(score, 1),
+            "ci_low": 0.0,
+            "ci_high": 100.0,
+            "confidence": "insufficient_data",
+        }
     margin = 30.0 / math.sqrt(max(1, sessions))
     return {
         "score": round(score, 1),
@@ -260,6 +299,7 @@ def _counterfactual_percentile(
         return None
 
     import random as _rng
+
     _rng.seed(sessions * 7919)  # deterministic for reproducibility
 
     null_scores = []
@@ -290,10 +330,13 @@ def _counterfactual_percentile(
         "null_median": round(statistics.median(null_scores), 1),
         "null_p95": round(null_scores[int(len(null_scores) * 0.95)], 1),
         "interpretation": (
-            "strong" if percentile >= 80 else
-            "above_average" if percentile >= 60 else
-            "average" if percentile >= 40 else
-            "below_average"
+            "strong"
+            if percentile >= 80
+            else "above_average"
+            if percentile >= 60
+            else "average"
+            if percentile >= 40
+            else "below_average"
         ),
     }
 
@@ -315,11 +358,14 @@ def _severity_difficulty_weight(ctx: "BrainContext | None" = None) -> float | No
         try:
             _, min_session = _session_window(conn, 20)
 
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT json_extract(data_json, '$.severity') as sev,
                        json_extract(data_json, '$.fire_count') as fires
                 FROM events WHERE type = 'CORRECTION' AND session >= ?
-            """, (min_session,)).fetchall()
+            """,
+                (min_session,),
+            ).fetchall()
         finally:
             conn.close()
 
@@ -361,22 +407,29 @@ def _compound_score(
     correction_density_trend: list[float] | None = None,
     categories_extinct: int = 0,
     transfer: float | None = None,
+    cross_domain_rules: int = 0,
+    total_rules: int = 0,
+    severity_trend_improving: bool = False,
 ) -> float:
     """Compute weighted brain health score (0-100).
 
-    Uses Theil-Sen + Mann-Kendall for robust slope detection, severity
-    improvement ratio, task-verified category extinction, transfer score
-    for generalization, and anti-gaming floor for front-loaded patterns.
+    v3 formula informed by MiroFish expert panel (S101 sims 101-103):
+    - Replaced FDA (permanently 0 for most LLMs) with severity improvement
+    - Added cross-domain universality (rules that apply across 3+ domains)
+    - Added severity trend (reducing severity = deeper learning)
+    - Reduced active lessons weight (quantity != quality)
 
     Components:
       1. Correction improvement: 0-20 pts
-      2. Severity improvement:   0-25 pts
+      2. Severity improvement:   0-20 pts (was 25, rebalanced)
       3. Graduation rate:        0-15 pts
-      4. Active lessons:         0-8 pts
+      4. Active lessons:         0-5 pts  (was 8, reduced per MiroFish)
       5. Maturity/sessions:      0-3 pts
       6. Density slope:          0-15 pts (Theil-Sen + Mann-Kendall)
       7. Category extinction:    0-9 pts  (task-frequency verified)
       8. Transfer score:         0-5 pts
+      9. Cross-domain rules:     0-5 pts  (NEW: universal pattern discovery)
+     10. Severity trend:         0-3 pts  (NEW: corrections getting less severe)
     """
     score = 0.0
     max_achievable = 100.0
@@ -389,11 +442,11 @@ def _compound_score(
         # score isn't deflated by a zero-contribution component.
         max_achievable -= 20
 
-    # Component 2: Severity improvement (0-25 pts)
+    # Component 2: Severity improvement (0-20 pts, was 25 — rebalanced for new components)
     if severity_ratio is not None:
-        score += severity_ratio * 25
+        score += severity_ratio * 20
     else:
-        max_achievable -= 25
+        max_achievable -= 20
 
     # Component 3: Graduation rate (0-15 pts)
     total_lessons = lessons_graduated + lessons_active
@@ -404,8 +457,8 @@ def _compound_score(
         sample_factor = min(1.0, total_lessons / 10)
         score += grad_rate * sample_factor * 15
 
-    # Component 4: Active lessons (0-8 pts)
-    score += min(1.0, lessons_active / 10) * 8
+    # Component 4: Active lessons (0-5 pts, was 8 — MiroFish: quantity != quality)
+    score += min(1.0, lessons_active / 10) * 5
 
     # Component 5: Maturity (0-3 pts)
     score += min(1.0, sessions / 200) * 3
@@ -426,7 +479,11 @@ def _compound_score(
         second_half = statistics.mean(correction_density_trend[mid:])
         if first_half > 0:
             second_data = correction_density_trend[mid:]
-            cv = (statistics.stdev(second_data) / max(0.01, second_half)) if len(second_data) >= 2 else 0
+            cv = (
+                (statistics.stdev(second_data) / max(0.01, second_half))
+                if len(second_data) >= 2
+                else 0
+            )
             volatility_penalty = max(0.3, 1.0 - max(0.0, cv - 0.35))
             reduction = max(0.0, min(1.0, (first_half - second_half) / first_half))
             slope_pts = reduction * 15 * volatility_penalty
@@ -465,6 +522,17 @@ def _compound_score(
         score += max(0.0, min(1.0, transfer)) * 5
     else:
         max_achievable -= 5
+
+    # Component 9: Cross-domain universality (0-5 pts, NEW)
+    # Rewards brains that discover rules applicable across 3+ domains.
+    if total_rules > 0 and cross_domain_rules > 0:
+        universality = min(1.0, cross_domain_rules / max(3, total_rules * 0.2))
+        score += universality * 5
+
+    # Component 10: Severity trend (0-3 pts, NEW)
+    # Corrections getting less severe over time = deeper learning.
+    if severity_trend_improving:
+        score += 3.0
 
     # Normalize to achievable range when optional components are inactive.
     # Floor of 20 prevents extreme inflation when most components are missing.

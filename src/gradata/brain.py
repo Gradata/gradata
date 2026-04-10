@@ -472,7 +472,8 @@ class Brain(BrainInspectionMixin):
     # ── Rules ──────────────────────────────────────────────────────────
 
     def apply_brain_rules(self, task: str, context: dict | None = None,
-                          agent_type: str | None = None) -> str:
+                          agent_type: str | None = None,
+                          max_rules: int = 10) -> str:
         """Get applicable brain rules for a task, formatted for prompt injection."""
         self._query_budget.record("apply_rules")
         if self._query_budget.is_rate_exceeded("apply_rules"):
@@ -498,7 +499,38 @@ class Brain(BrainInspectionMixin):
         if not lessons_path:
             return ""
         lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
-        return format_rules_for_prompt(apply_rules(lessons, build_scope(ctx)))
+        return format_rules_for_prompt(apply_rules(lessons, build_scope(ctx),
+                                                   max_rules=max_rules))
+
+    def scope(self, domain: str = "", task_type: str = "",
+              agent_type: str = "", max_rules: int = 10) -> str:
+        """Get brain rules scoped to a specific domain and task type.
+
+        A convenience wrapper around :meth:`apply_brain_rules` that builds the
+        context dict from named domain/task_type parameters instead of a raw
+        task string.
+
+        Args:
+            domain: Operational domain, e.g. ``"sales"``, ``"engineering"``.
+            task_type: Task kind, e.g. ``"email_draft"``, ``"code_review"``.
+            agent_type: Agent role for scoped injection, e.g. ``"researcher"``.
+            max_rules: Maximum number of rules to return (default 10).
+
+        Returns:
+            Formatted rule string for prompt injection, or ``""`` if no rules
+            match or the brain has no graduated lessons.
+        """
+        context: dict = {}
+        if domain:
+            context["domain"] = domain
+        if task_type:
+            context["task_type"] = task_type
+        return self.apply_brain_rules(
+            task=f"{domain} {task_type}".strip() or "general",
+            context=context,
+            agent_type=agent_type or None,
+            max_rules=max_rules,
+        )
 
     def plan(self, task: str, context: dict | None = None) -> dict:
         """Generate a structured plan using graduated rules."""
