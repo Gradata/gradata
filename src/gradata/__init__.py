@@ -35,6 +35,7 @@ if _log_level in ("DEBUG", "INFO", "WARNING", "ERROR"):
 from gradata._paths import BrainContext  # noqa: E402
 from gradata._types import Lesson, LessonState, RuleTransferScope  # noqa: E402
 from gradata.brain import Brain  # noqa: E402
+from gradata.notifications import Notification  # noqa: E402
 from gradata.context_wrapper import brain_context  # noqa: E402
 from gradata.enhancements.self_improvement import (  # noqa: E402
     compute_learning_velocity,
@@ -65,6 +66,7 @@ __all__ = [
     "ExportError",
     "Lesson",
     "LessonState",
+    "Notification",
     "RuleTransferScope",
     "TaxonomyError",
     "ValidationError",
