@@ -444,6 +444,7 @@ def query_graduation_candidates(
     - Distinct sessions >= min_sessions
     - Sum of severity weights >= min_score
     """
+    ensure_pattern_table(db_path)
     conn = sqlite3.connect(str(db_path))
     try:
         conn.row_factory = sqlite3.Row
