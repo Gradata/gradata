@@ -33,6 +33,7 @@ AVAILABLE modules (open source, shipped in SDK):
   learning_pipeline    -- End-to-end: observe→cluster→discriminate→route→bracket
   eval_benchmark       -- (moved to contrib/enhancements/)
   router_warmstart     -- Bootstrap Q-Learning router from vault data
+  rule_to_hook         -- Deterministic rules auto-generate enforcement hooks
 
 CLOUD-ONLY modules (require gradata_cloud package):
   agent_graduation     -- Agent/subagent behavioral graduation
