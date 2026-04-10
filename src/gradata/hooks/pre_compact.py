@@ -31,7 +31,7 @@ def _get_session_number(brain_dir: Path) -> int | None:
                 # Extract number from lines like "Session: 97" or "## Session 97"
                 nums = re.findall(r"\d+", line)
                 if nums:
-                    return int(nums[-1])
+                    return int(nums[0])
     except Exception:
         pass
     return None

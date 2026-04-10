@@ -3,11 +3,15 @@ name: SDK CI
 on:
   push:
     paths:
-      - "sdk/**"
+      - "src/gradata/**"
+      - "tests/**"
+      - "pyproject.toml"
       - ".github/workflows/sdk-ci.yml"
   pull_request:
     paths:
-      - "sdk/**"
+      - "src/gradata/**"
+      - "tests/**"
+      - "pyproject.toml"
       - ".github/workflows/sdk-ci.yml"
 
 jobs:
@@ -38,33 +42,27 @@ jobs:
         run: uv pip install --system -e ".[dev]"
 
       - name: Lint (ruff)
-        working-directory: sdk
         run: ruff check src/gradata/
 
       - name: Type check (pyright)
-        working-directory: sdk
         run: pyright src/gradata/
 
       - name: Security scan (bandit)
-        working-directory: sdk
         run: bandit -r src/gradata/ -c pyproject.toml
 
       - name: Test suite
-        working-directory: sdk
         run: python -m pytest tests/ -v --tb=short --ignore=tests/test_spec_compliance.py
 
       - name: SPEC compliance
-        working-directory: sdk
         run: python -m pytest tests/test_spec_compliance.py -v
 
       - name: Build wheel
-        working-directory: sdk
         run: uv build
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
         with:
           name: "gradata-wheel-py${{ matrix.python-version }}"
-          path: sdk/dist/*.whl
+          path: dist/*.whl
           if-no-files-found: error
           retention-days: 30
