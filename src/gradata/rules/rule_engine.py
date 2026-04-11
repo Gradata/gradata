@@ -609,7 +609,7 @@ def apply_rules(
         # Use weighted scope matching (exact > partial > wildcard)
         relevance = compute_scope_weight(lesson_scope, scope)
         relevance *= _CT_BOOST.get(lesson.correction_type, 1.0)
-        if relevance >= 0.3:
+        if relevance >= 0.4:
             scored.append((lesson, relevance))
         elif _ctx:
             from gradata.rules.rule_tracker import log_suppression
