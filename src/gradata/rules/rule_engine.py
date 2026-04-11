@@ -555,8 +555,12 @@ def apply_rules(
                 stakes=scope.stakes,
             )
 
-    # Step 1 — eligibility gate
-    eligible = [lesson for lesson in lessons if lesson.state in _ELIGIBLE_STATES]
+    # Step 1 — eligibility gate: prefer RULEs, only include PATTERNs if needed
+    rules_only = [lesson for lesson in lessons if lesson.state == LessonState.RULE]
+    if len(rules_only) >= max_rules:
+        eligible = rules_only
+    else:
+        eligible = [lesson for lesson in lessons if lesson.state in _ELIGIBLE_STATES]
 
     # Step 1.5 — domain scoping: filter out rules disabled for current domain
     current_domain = scope.domain.upper() if scope.domain else ""
