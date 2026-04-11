@@ -172,12 +172,12 @@ def _load_drafting_context(ctx: "BrainContext | None" = None) -> dict:
                 for line in content.splitlines()
                 if "[PROVEN]" in line or "[EMERGING]" in line
             ]
-            result["patterns"] = "\n".join(relevant[:20])
+            result["patterns"] = "\n".join(relevant[:10])
         except Exception:
             pass
     domain_dir = ctx.domain_dir if ctx else _p.DOMAIN_DIR
     soul_path = domain_dir / "soul.md"
-    result["voice_guidelines"] = _safe_read_lines(soul_path, 50)
+    result["voice_guidelines"] = _safe_read_lines(soul_path, 20)
     return result
 
 
