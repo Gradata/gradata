@@ -449,7 +449,7 @@ def fsrs_penalty(confidence: float, *, machine: bool = False) -> float:
     """
     base = abs(MACHINE_CONTRADICTION_PENALTY) if machine else abs(CONTRADICTION_PENALTY)
     # Quadratic scaling: steeper at high confidence for faster reversal
-    # At 0.30: base * 0.545, at 0.75: base * 1.03, at 0.90: base * 1.21
+    # At 0.30: base * 0.572, at 0.75: base * 1.063, at 0.90: base * 1.229
     return round(base * (0.5 + confidence * confidence * 0.8), 4)
 
 
