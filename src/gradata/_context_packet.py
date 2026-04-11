@@ -140,7 +140,7 @@ def _load_prospect_context(prospect_name: str, ctx: "BrainContext | None" = None
     except Exception:
         pass
     try:
-        all_events = _events_query(limit=200)
+        all_events = _events_query(limit=50)
         prospect_lower = prospect_name.lower()
         interactions = []
         for e in all_events:
@@ -149,12 +149,11 @@ def _load_prospect_context(prospect_name: str, ctx: "BrainContext | None" = None
             if prospect_lower.split()[0] in tag_str:
                 interactions.append(
                     {
-                        "ts": e.get("ts", "")[:19],
                         "type": e.get("type", ""),
-                        "summary": json.dumps(e.get("data", {}))[:150],
+                        "summary": json.dumps(e.get("data", {}))[:80],
                     }
                 )
-                if len(interactions) >= 3:
+                if len(interactions) >= 2:
                     break
         result["recent_interactions"] = interactions
     except Exception:
