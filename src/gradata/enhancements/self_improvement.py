@@ -63,6 +63,9 @@ CONTRADICTION_SEVERITY_BOOST: dict[str, float] = {
     "major": 1.65,  # major contradictions get 65% boost
     "rewrite": 1.8,  # rewrite contradictions get 80% boost
 }
+# Cooling period: after N contradictions in a row, block survival bonus
+# for this many sessions. Prevents oscillation during preference changes.
+CONTRADICTION_COOLING_SESSIONS = 2
 
 # SPEC Section 1: maturity-aware kill switches (relevant cycles only)
 KILL_LIMITS: dict[str, int] = {
@@ -720,6 +723,10 @@ def update_confidence(
                     lesson.confidence = max(0.0, min(1.0, _bayesian_confidence(lesson)))
             else:
                 # Survived: category was testable, corrections exist elsewhere
+                # Cooling period: skip survival bonus if recently contradicted
+                streak = getattr(lesson, "_contradiction_streak", 0)
+                if streak >= CONTRADICTION_COOLING_SESSIONS:
+                    continue
                 base_bonus = fsrs_bonus(lesson.confidence, machine=is_machine)
                 if severity_data:
                     # Scale survival by severity of corrections elsewhere:
