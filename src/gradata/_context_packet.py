@@ -307,35 +307,32 @@ def _load_wrapup_context(session: int, ctx: "BrainContext | None" = None) -> dic
 
 def format_as_prompt(packet: dict, task_type: str) -> str:
     sections = [
-        f"# Context Packet -- task: {task_type or 'general'}",
-        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-        "",
+        f"# Context: {task_type or 'general'}",
     ]
 
     if "user_scope" in packet:
         us = packet["user_scope"]
-        sections.append("## Owner Preferences")
+        sections.append("## Preferences")
         if us.get("voice_summary"):
-            sections.append(f"**Voice:** {us['voice_summary'][:300]}...")
+            sections.append(f"Voice: {us['voice_summary'][:200]}")
         if us.get("recent_corrections"):
-            sections.append("**Recent corrections to avoid:**")
+            sections.append("Avoid:")
             for c in us["recent_corrections"][:3]:
-                sections.append(f"- [{c.get('category', '')}] {c.get('detail', '')[:100]}")
+                sections.append(f"- {c.get('category', '')}: {c.get('detail', '')[:80]}")
         sections.append("")
 
     if "prospect" in packet:
         pc = packet["prospect"]
-        sections.append("## Prospect Context")
+        sections.append("## Prospect")
         if pc.get("company"):
-            sections.append(f"**Company:** {pc['company']}")
+            sections.append(f"Company: {pc['company']}")
         if pc.get("stage"):
-            sections.append(f"**Stage:** {pc['stage']}")
+            sections.append(f"Stage: {pc['stage']}")
         if pc.get("file_content"):
-            sections.append(f"**Prospect file (truncated):**\n```\n{pc['file_content'][:400]}\n```")
+            sections.append(f"```\n{pc['file_content'][:250]}\n```")
         if pc.get("search_results"):
-            sections.append("**Related brain content:**")
-            for sr in pc["search_results"][:3]:
-                sections.append(f"- [{sr.get('source', '')}] {sr.get('text', '')[:120]}")
+            for sr in pc["search_results"][:2]:
+                sections.append(f"- [{sr.get('source', '')}] {sr.get('text', '')[:100]}")
         if pc.get("structured_facts"):
             sections.append("**Known facts:**")
             for f in pc["structured_facts"]:
@@ -346,38 +343,36 @@ def format_as_prompt(packet: dict, task_type: str) -> str:
 
     if "drafting" in packet:
         dc = packet["drafting"]
-        sections.append("## Drafting Context")
+        sections.append("## Drafting")
         if dc.get("patterns"):
-            sections.append("**Proven/Emerging patterns:**")
-            for line in dc["patterns"].splitlines()[:10]:
+            for line in dc["patterns"].splitlines()[:5]:
                 sections.append(f"- {line}")
         sections.append("")
 
     if "debug" in packet:
         dbg = packet["debug"]
-        sections.append("## Debug Context")
+        sections.append("## Debug")
         if dbg.get("search_results"):
-            sections.append("**Brain search results:**")
-            for sr in dbg["search_results"][:3]:
-                sections.append(f"- [{sr.get('source', '')}] {sr.get('text', '')[:150]}")
+            for sr in dbg["search_results"][:2]:
+                sections.append(f"- [{sr.get('source', '')}] {sr.get('text', '')[:100]}")
         sections.append("")
 
     if "audit" in packet:
         ac = packet["audit"]
-        sections.append("## Audit Context")
+        sections.append("## Audit")
         if ac.get("metrics"):
-            sections.append(f"**Session metrics:** {json.dumps(ac['metrics'], default=str)[:400]}")
+            sections.append(json.dumps(ac["metrics"], default=str)[:300])
         sections.append("")
 
     if "wrapup" in packet:
         wc = packet["wrapup"]
-        sections.append("## Wrap-Up Context")
+        sections.append("## Wrap-Up")
         if wc.get("session_events"):
-            type_counts = {}
+            type_counts: dict[str, int] = {}
             for e in wc["session_events"]:
                 t = e.get("type", "UNKNOWN")
                 type_counts[t] = type_counts.get(t, 0) + 1
-            sections.append(f"**Event summary:** {json.dumps(type_counts)}")
+            sections.append(json.dumps(type_counts))
         sections.append("")
 
     return "\n".join(sections)
