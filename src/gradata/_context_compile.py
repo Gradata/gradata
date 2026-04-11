@@ -80,12 +80,12 @@ def compile_context(
         try:
             from gradata._query import brain_search
 
-            results = brain_search(message[:100], top_k=3, mode="keyword")
+            results = brain_search(message[:100], top_k=2, mode="keyword")
             if results and results[0].get("score", 0) > 0.3:
-                lines = ["## Brain Context (auto-retrieved)"]
-                for r in results[:3]:
+                lines = ["## Context"]
+                for r in results[:2]:
                     src = r.get("source", "")
-                    txt = r.get("text", "")[:150]
+                    txt = r.get("text", "")[:100]
                     lines.append(f"- [{src}] {txt}")
                 return "\n".join(lines)
         except Exception:
