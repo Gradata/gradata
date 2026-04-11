@@ -234,3 +234,54 @@ class TestAutoClimb:
         tree = RuleTree([lesson])
         result = tree.evaluate_contract(lesson, contradictions_at_level=1, current_session=15)
         assert result is False  # need 2+
+
+
+class TestTreeRetrieval:
+    def test_tree_retrieval_prefers_specific(self):
+        """More specific (deeper) rules win tiebreaks over broader rules."""
+        lessons = [
+            Lesson(
+                date="2026-01-01",
+                state=LessonState.RULE,
+                confidence=0.90,
+                category="TONE",
+                description="General tone rule",
+                path="TONE",
+            ),
+            Lesson(
+                date="2026-01-02",
+                state=LessonState.RULE,
+                confidence=0.90,
+                category="TONE",
+                description="Sales-specific tone",
+                path="TONE/sales/email_draft",
+            ),
+        ]
+        tree = RuleTree(lessons)
+        rules = tree.get_rules_for_context("email_draft", "sales", max_rules=2)
+        # Same confidence — specific should come first
+        assert rules[0].description == "Sales-specific tone"
+
+    def test_tree_retrieval_confidence_beats_specificity(self):
+        """Higher confidence beats deeper specificity."""
+        lessons = [
+            Lesson(
+                date="2026-01-01",
+                state=LessonState.RULE,
+                confidence=0.95,
+                category="TONE",
+                description="High confidence broad",
+                path="TONE",
+            ),
+            Lesson(
+                date="2026-01-02",
+                state=LessonState.PATTERN,
+                confidence=0.65,
+                category="TONE",
+                description="Low confidence specific",
+                path="TONE/sales/email_draft",
+            ),
+        ]
+        tree = RuleTree(lessons)
+        rules = tree.get_rules_for_context("email_draft", "sales", max_rules=2)
+        assert rules[0].description == "High confidence broad"
