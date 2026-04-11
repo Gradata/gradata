@@ -287,3 +287,78 @@ class RuleTree:
         self.nodes[new_path].append(lesson)
         _log.info("Rule contracted: %s -> %s", old_path, new_path)
         return True
+
+
+# ── Export Functions ──────────────────────────────────────────────────
+
+
+def export_tree_json(tree: RuleTree, output_path: Path) -> None:
+    """Export the tree as a JSON file."""
+    import json
+
+    structure = tree.get_tree_structure()
+    output_path.write_text(json.dumps(structure, indent=2, default=str), encoding="utf-8")
+
+
+def export_tree_obsidian(tree: RuleTree, vault_path: Path) -> None:
+    """Export the tree as an Obsidian vault (folders + .md files).
+
+    Each rule becomes a .md file with YAML frontmatter.
+    Each tree node becomes a folder with an _index.md.
+    """
+    vault_path = Path(vault_path)
+    vault_path.mkdir(parents=True, exist_ok=True)
+
+    for path, lessons in sorted(tree.nodes.items()):
+        if path == "_flat":
+            continue
+
+        # Create folder
+        folder = vault_path / path.replace("/", "/")
+        folder.mkdir(parents=True, exist_ok=True)
+
+        # Write each rule as a .md file
+        for lesson in lessons:
+            slug = lesson.description[:40].replace(" ", "_").replace("/", "-")
+            slug = "".join(c for c in slug if c.isalnum() or c in "_-")
+            filename = f"{slug}.md"
+
+            content = f"""---
+id: {lesson.category}_{hash(lesson.description) % 10000:04d}
+confidence: {lesson.confidence}
+state: {lesson.state.value}
+path: {lesson.path}
+fires: {lesson.fire_count}
+misfires: {lesson.misfire_count}
+climb_count: {lesson.climb_count}
+tree_level: {lesson.tree_level}
+---
+
+{lesson.description}
+"""
+            if lesson.example_draft and lesson.example_corrected:
+                content += f"""
+## Evidence
+- Draft: {lesson.example_draft}
+- Corrected: {lesson.example_corrected}
+"""
+            if lesson.secondary_categories:
+                content += "\n## Also applies to\n"
+                for cat in lesson.secondary_categories:
+                    content += f"- [[{cat}]]\n"
+
+            (folder / filename).write_text(content, encoding="utf-8")
+
+        # Write _index.md for the folder
+        avg_conf = sum(l.confidence for l in lessons) / len(lessons) if lessons else 0
+        index_content = f"""---
+path: {path}
+rule_count: {len(lessons)}
+avg_confidence: {avg_conf:.2f}
+---
+
+# {path.split("/")[-1]}
+
+{len(lessons)} rules at this level.
+"""
+        (folder / "_index.md").write_text(index_content, encoding="utf-8")

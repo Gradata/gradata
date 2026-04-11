@@ -285,3 +285,57 @@ class TestTreeRetrieval:
         tree = RuleTree(lessons)
         rules = tree.get_rules_for_context("email_draft", "sales", max_rules=2)
         assert rules[0].description == "High confidence broad"
+
+
+import json
+from pathlib import Path
+
+
+class TestTreeExport:
+    def _make_lessons(self):
+        return [
+            Lesson(
+                date="2026-01-01",
+                state=LessonState.RULE,
+                confidence=0.95,
+                category="TONE",
+                description="Be casual with VPs",
+                path="TONE/sales/email_draft",
+            ),
+            Lesson(
+                date="2026-01-02",
+                state=LessonState.PATTERN,
+                confidence=0.70,
+                category="ACCURACY",
+                description="Always cite sources",
+                path="ACCURACY/sales/email_draft",
+            ),
+        ]
+
+    def test_export_json(self, tmp_path):
+        from gradata.rules.rule_tree import RuleTree, export_tree_json
+
+        tree = RuleTree(self._make_lessons())
+        output = tmp_path / "tree.json"
+        export_tree_json(tree, output)
+        data = json.loads(output.read_text())
+        assert "TONE" in data
+        assert "ACCURACY" in data
+
+    def test_export_obsidian(self, tmp_path):
+        from gradata.rules.rule_tree import RuleTree, export_tree_obsidian
+
+        tree = RuleTree(self._make_lessons())
+        vault = tmp_path / "vault"
+        export_tree_obsidian(tree, vault)
+        # Check folder structure
+        assert (vault / "TONE" / "sales" / "email_draft").is_dir()
+        # Check rule file exists
+        md_files = list((vault / "TONE" / "sales" / "email_draft").glob("*.md"))
+        assert len(md_files) >= 1
+        # Check frontmatter in a non-index file
+        rule_files = [f for f in md_files if f.name != "_index.md"]
+        assert len(rule_files) >= 1
+        content = rule_files[0].read_text()
+        assert "confidence:" in content
+        assert "Be casual with VPs" in content
