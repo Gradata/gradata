@@ -821,7 +821,7 @@ def format_rules_for_prompt(
 
     lines = [
         "<brain-rules>",
-        "Follow these learned behavioral rules exactly. They are derived from past corrections.",
+        "Follow these rules exactly:",
         "",
     ]
 
