@@ -821,8 +821,6 @@ def format_rules_for_prompt(
 
     lines = [
         "<brain-rules>",
-        "Follow these rules exactly:",
-        "",
     ]
 
     for i, rule in enumerate(rules, start=1):
