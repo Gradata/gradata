@@ -10,6 +10,7 @@ interface AuthState {
   signUp: (email: string, pw: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
   sendPasswordReset: (email: string) => Promise<{ error: Error | null }>
+  signInWithGoogle: () => Promise<{ error: Error | null }>
 }
 
 const defaultAuth: AuthState = {
@@ -20,6 +21,7 @@ const defaultAuth: AuthState = {
   signUp: async () => ({ error: null }),
   signOut: async () => {},
   sendPasswordReset: async () => ({ error: null }),
+  signInWithGoogle: async () => ({ error: null }),
 }
 
 export const AuthContext = createContext<AuthState>(defaultAuth)
@@ -70,6 +72,14 @@ export function useAuthProvider(): AuthState {
     return { error: result.error ? new Error(result.error.message) : null }
   }, [])
 
+  const signInWithGoogle = useCallback(async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin + '/dashboard' },
+    })
+    return { error: error ? new Error(error.message) : null }
+  }, [])
+
   return {
     user,
     session,
@@ -78,6 +88,7 @@ export function useAuthProvider(): AuthState {
     signUp,
     signOut,
     sendPasswordReset,
+    signInWithGoogle,
   }
 }
 

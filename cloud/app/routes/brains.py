@@ -40,16 +40,32 @@ async def connect_brain(
     return ConnectResponse(brain_id=brain["id"])
 
 
-@router.get("/brains")
-async def list_brains(brain: dict = Depends(get_current_brain)) -> list[dict]:
+@router.get("/brains", response_model=list[BrainDetail])
+async def list_brains(brain: dict = Depends(get_current_brain)) -> list[BrainDetail]:
     """List all brains accessible to the authenticated user."""
     db = get_db()
     rows = await db.select(
         "brains",
-        columns="id,user_id,brain_name,domain,manifest,last_sync_at,created_at",
+        columns="id,user_id,brain_name,domain,last_sync_at,created_at",
         filters={"user_id": brain["user_id"]},
     )
-    return rows
+    results = []
+    for row in rows:
+        lessons = await db.select("lessons", columns="id", filters={"brain_id": row["id"]})
+        corrections = await db.select("corrections", columns="id", filters={"brain_id": row["id"]})
+        results.append(
+            BrainDetail(
+                id=row["id"],
+                user_id=row["user_id"],
+                name=row.get("brain_name"),
+                domain=row.get("domain"),
+                lesson_count=len(lessons),
+                correction_count=len(corrections),
+                last_sync=row.get("last_sync_at"),
+                created_at=row.get("created_at"),
+            )
+        )
+    return results
 
 
 @router.get("/brains/{brain_id}", response_model=BrainDetail)
@@ -68,13 +84,12 @@ async def get_brain(
     return BrainDetail(
         id=brain["id"],
         user_id=brain["user_id"],
-        brain_name=brain.get("brain_name"),
+        name=brain.get("brain_name"),
         domain=brain.get("domain"),
-        last_sync_at=brain.get("last_sync_at"),
-        created_at=brain.get("created_at"),
-        deleted_at=brain.get("deleted_at"),
         lesson_count=len(lessons),
         correction_count=len(corrections),
+        last_sync=brain.get("last_sync_at"),
+        created_at=brain.get("created_at"),
     )
 
 
@@ -105,13 +120,12 @@ async def update_brain(
     return BrainDetail(
         id=brain["id"],
         user_id=brain["user_id"],
-        brain_name=brain.get("brain_name"),
+        name=brain.get("brain_name"),
         domain=brain.get("domain"),
-        last_sync_at=brain.get("last_sync_at"),
-        created_at=brain.get("created_at"),
-        deleted_at=brain.get("deleted_at"),
         lesson_count=len(lessons),
         correction_count=len(corrections),
+        last_sync=brain.get("last_sync_at"),
+        created_at=brain.get("created_at"),
     )
 
 

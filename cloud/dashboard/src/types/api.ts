@@ -7,7 +7,6 @@ export interface Brain {
   correction_count: number
   last_sync: string | null
   created_at: string
-  updated_at: string
 }
 
 export interface Lesson {
@@ -19,7 +18,6 @@ export interface Lesson {
   confidence: number
   fire_count: number
   created_at: string
-  updated_at: string
 }
 
 export interface Correction {
@@ -28,8 +26,8 @@ export interface Correction {
   severity: 'trivial' | 'minor' | 'moderate' | 'major' | 'rewrite'
   category: string
   description: string
-  draft_text: string | null
-  final_text: string | null
+  draft_preview: string | null
+  final_preview: string | null
   created_at: string
 }
 

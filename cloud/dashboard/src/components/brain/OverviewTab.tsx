@@ -29,7 +29,7 @@ export function OverviewTab({ brain }: OverviewTabProps) {
         <CardContent className="space-y-2 text-sm">
           <Row label="Brain ID" value={brain.id} mono />
           <Row label="Created" value={created} />
-          <Row label="Last updated" value={new Date(brain.updated_at).toLocaleString()} />
+          <Row label="Last sync" value={brain.last_sync ? new Date(brain.last_sync).toLocaleString() : 'Never'} />
         </CardContent>
       </Card>
     </div>

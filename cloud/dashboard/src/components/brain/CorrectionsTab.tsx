@@ -92,21 +92,21 @@ function CorrectionCard({ correction }: { correction: Correction }) {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm">{correction.description}</p>
-        {(correction.draft_text || correction.final_text) && (
+        {(correction.draft_preview || correction.final_preview) && (
           <div className="grid gap-3 sm:grid-cols-2">
-            {correction.draft_text && (
+            {correction.draft_preview && (
               <div className="rounded-md bg-red-500/5 p-3">
                 <p className="mb-1 text-xs font-medium text-red-400">Draft</p>
                 <p className="text-xs text-muted-foreground whitespace-pre-wrap">
-                  {correction.draft_text}
+                  {correction.draft_preview}
                 </p>
               </div>
             )}
-            {correction.final_text && (
+            {correction.final_preview && (
               <div className="rounded-md bg-green-500/5 p-3">
                 <p className="mb-1 text-xs font-medium text-green-400">Final</p>
                 <p className="text-xs text-muted-foreground whitespace-pre-wrap">
-                  {correction.final_text}
+                  {correction.final_preview}
                 </p>
               </div>
             )}

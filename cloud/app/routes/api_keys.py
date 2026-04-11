@@ -26,40 +26,27 @@ def _generate_key() -> str:
     return _KEY_PREFIX + secrets.token_hex(16)
 
 
-def _mask(raw: str) -> str:
-    return ("*" * (len(raw) - 4) + raw[-4:]) if len(raw) > 4 else raw
-
-
-def _make_key_response(**kwargs) -> CreateAPIKeyResponse:
-    """Construct CreateAPIKeyResponse without literal kwarg names that trip scanners."""
-    return CreateAPIKeyResponse(**kwargs)
-
-
 @router.post("/api-keys", response_model=CreateAPIKeyResponse)
 async def create_api_key(
     body: CreateAPIKeyRequest,
     request: Request,
     user_id: str = Depends(get_current_user_id),
 ) -> CreateAPIKeyResponse:
-    """Generate a new API key for a brain. Plaintext returned once only."""
+    """Generate a new API key for the user's brain. Plaintext returned once only."""
     db = get_db()
 
-    rows = await db.select("brains", filters={"id": body.brain_id})
+    rows = await db.select("brains", filters={"user_id": user_id})
     if not rows:
-        raise HTTPException(status_code=404, detail="Brain not found")
-    if rows[0].get("user_id") != user_id:
-        raise HTTPException(status_code=403, detail="Not your brain")
+        raise HTTPException(status_code=404, detail="No brain found")
+    brain = rows[0]
+    brain_id = brain["id"]
 
     new_key = _generate_key()
-    payload = {_KEY_FIELD: new_key, "brain_name": body.brain_name}
-    updated = await db.update("brains", data=payload, filters={"id": body.brain_id})
-
-    brain_id = body.brain_id
-    key_id = updated[0].get("id", brain_id) if updated else brain_id
+    await db.update("brains", data={_KEY_FIELD: new_key}, filters={"id": brain_id})
 
     _log.info("Generated key for brain=%s user=%s", brain_id, user_id)
 
-    return _make_key_response(key_id=key_id, brain_id=brain_id, **{_KEY_FIELD: new_key})
+    return CreateAPIKeyResponse(id=brain_id, key=new_key, name=body.name)
 
 
 @router.get("/api-keys", response_model=list[APIKeyResponse])
@@ -70,17 +57,19 @@ async def list_api_keys(
     """List API keys for all brains owned by the user (masked to last 4 chars)."""
     db = get_db()
 
-    cols = ",".join(["id", _KEY_FIELD, "created_at"])
+    cols = ",".join(["id", _KEY_FIELD, "brain_name", "created_at"])
     rows = await db.select("brains", columns=cols, filters={"user_id": user_id})
 
     return [
         APIKeyResponse(
-            key_id=row["id"],
-            brain_id=row["id"],
-            masked_key=_mask(row.get(_KEY_FIELD) or ""),
+            id=row["id"],
+            key_prefix=row.get(_KEY_FIELD, "")[-4:] if row.get(_KEY_FIELD) else "",
+            name=row.get("brain_name", "default"),
             created_at=row.get("created_at"),
+            last_used=None,
         )
         for row in rows
+        if row.get(_KEY_FIELD)
     ]
 
 

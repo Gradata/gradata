@@ -80,6 +80,7 @@ def test_list_api_keys(client, mock_supabase):
                 "id": "brain-1",
                 "user_id": "user-1",
                 "api_key": "gd_live_abcdef1234567890",
+                "brain_name": "default",
                 "created_at": None,
             }
         ],
@@ -89,8 +90,8 @@ def test_list_api_keys(client, mock_supabase):
     assert resp.status_code == 200
     keys = resp.json()
     assert len(keys) == 1
-    assert keys[0]["masked_key"].endswith("7890")
-    assert "gd_live" not in keys[0]["masked_key"]
+    assert keys[0]["key_prefix"] == "7890"
+    assert keys[0]["name"] == "default"
 
 
 def test_create_api_key(client, mock_supabase):
@@ -102,28 +103,29 @@ def test_create_api_key(client, mock_supabase):
 
     resp = client.post(
         "/api/v1/api-keys",
-        json={"brain_id": "brain-1", "brain_name": "default"},
+        json={"name": "Production"},
         headers=_jwt_headers(),
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["api_key"].startswith("gd_live_")
-    assert data["brain_id"] == "brain-1"
+    assert data["key"].startswith("gd_live_")
+    assert data["id"] == "brain-1"
+    assert data["name"] == "Production"
 
 
-def test_create_api_key_wrong_owner(client, mock_supabase):
+def test_create_api_key_no_brain(client, mock_supabase):
     mock_supabase.add_response(
         "brains",
         "select",
-        [{"id": "brain-1", "user_id": "other-user"}],
+        [],
     )
 
     resp = client.post(
         "/api/v1/api-keys",
-        json={"brain_id": "brain-1", "brain_name": "default"},
+        json={"name": "Test"},
         headers=_jwt_headers("user-1"),
     )
-    assert resp.status_code == 403
+    assert resp.status_code == 404
 
 
 def test_revoke_api_key(client, mock_supabase):

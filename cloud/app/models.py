@@ -122,21 +122,21 @@ class UpdateProfileRequest(BaseModel):
 
 
 class APIKeyResponse(BaseModel):
-    key_id: str
-    brain_id: str
-    masked_key: str  # last 4 chars only
+    id: str
+    key_prefix: str  # last 4 chars only
+    name: str = "default"
     created_at: str | None = None
+    last_used: str | None = None
 
 
 class CreateAPIKeyRequest(BaseModel):
-    brain_id: str
-    brain_name: str = "default"
+    name: str = "Default"
 
 
 class CreateAPIKeyResponse(BaseModel):
-    key_id: str
-    brain_id: str
-    api_key: str  # plaintext — shown once only
+    id: str
+    key: str  # plaintext — shown once only
+    name: str
 
 
 # ---------------------------------------------------------------------------
@@ -147,13 +147,12 @@ class CreateAPIKeyResponse(BaseModel):
 class BrainDetail(BaseModel):
     id: str
     user_id: str
-    brain_name: str | None = None
+    name: str | None = None
     domain: str | None = None
-    last_sync_at: str | None = None
-    created_at: str | None = None
-    deleted_at: str | None = None
     lesson_count: int = 0
     correction_count: int = 0
+    last_sync: str | None = None
+    created_at: str | None = None
 
 
 class UpdateBrainRequest(BaseModel):
