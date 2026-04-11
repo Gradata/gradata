@@ -713,6 +713,11 @@ def update_confidence(
                             1.0,
                         )
                         penalty *= CONTRADICTION_ACCELERATION * streak_mult * sev_boost
+                        # RULE-state override: when user explicitly contradicts
+                        # a proven rule, they're intentionally overriding it.
+                        # Apply additional 20% penalty for RULE-state lessons.
+                        if lesson.state == LessonState.RULE:
+                            penalty *= 1.2
                     else:
                         # Reset streak on non-contradicting correction
                         lesson._contradiction_streak = 0
