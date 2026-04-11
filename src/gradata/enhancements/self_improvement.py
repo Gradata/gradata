@@ -705,6 +705,10 @@ def update_confidence(
                 else:
                     bonus = base_bonus
                 lesson.confidence = round(max(0.0, min(1.0, lesson.confidence + bonus)), 2)
+                # Cold-start: survival counts as an application (lesson was
+                # injected and the user did NOT correct this category).
+                lesson.fire_count += 1
+                lesson.sessions_since_fire = 0
 
         # Track sessions since fire
         lesson.sessions_since_fire += 1
