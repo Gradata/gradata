@@ -55,6 +55,14 @@ PREFERENCE_DECAY_DAMPER = 0.5
 CONTRADICTION_ACCELERATION = 1.5
 # Consecutive contradictions accelerate: 1st=1.0x, 2nd=1.5x, 3rd=2.0x, etc.
 CONTRADICTION_STREAK_STEP = 0.5
+# Severity-aware contradiction boost: rewrite contradictions hit harder
+CONTRADICTION_SEVERITY_BOOST: dict[str, float] = {
+    "trivial": 0.8,  # trivial contradictions are soft
+    "minor": 0.9,
+    "moderate": 1.0,  # baseline
+    "major": 1.2,  # major contradictions get 20% boost
+    "rewrite": 1.5,  # rewrite contradictions get 50% boost
+}
 
 # SPEC Section 1: maturity-aware kill switches (relevant cycles only)
 KILL_LIMITS: dict[str, int] = {
@@ -696,7 +704,12 @@ def update_confidence(
                         streak = getattr(lesson, "_contradiction_streak", 0) + 1
                         lesson._contradiction_streak = streak
                         streak_mult = 1.0 + CONTRADICTION_STREAK_STEP * (streak - 1)
-                        penalty *= CONTRADICTION_ACCELERATION * streak_mult
+                        # Severity-aware boost for contradictions
+                        sev_boost = CONTRADICTION_SEVERITY_BOOST.get(
+                            severity if cat in severity_data else "moderate",
+                            1.0,
+                        )
+                        penalty *= CONTRADICTION_ACCELERATION * streak_mult * sev_boost
                     else:
                         # Reset streak on non-contradicting correction
                         lesson._contradiction_streak = 0
