@@ -666,6 +666,8 @@ def update_confidence(
                 if direction == "REINFORCING":
                     # Reinforcing: correction aligns with lesson direction → BONUS
                     lesson.alpha += 1.0
+                    # Reset contradiction streak on reinforcement
+                    lesson._contradiction_streak = 0
                     base_bonus = fsrs_bonus(lesson.confidence, machine=is_machine)
                     if cat in severity_data:
                         raw_severity = severity_data[cat]
