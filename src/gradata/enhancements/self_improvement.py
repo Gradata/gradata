@@ -722,7 +722,12 @@ def update_confidence(
                         # Reset streak on non-contradicting correction
                         lesson._contradiction_streak = 0
                     # Preferences decay slower — stable user taste signals
-                    if lesson.correction_type == CorrectionType.PREFERENCE:
+                    # But skip damping when user explicitly contradicts the
+                    # preference (they're intentionally reversing it)
+                    if (
+                        lesson.correction_type == CorrectionType.PREFERENCE
+                        and direction != "CONTRADICTING"
+                    ):
                         penalty *= PREFERENCE_DECAY_DAMPER
                     lesson.confidence = round(max(0.0, min(1.0, lesson.confidence - penalty)), 2)
                     lesson.confidence = max(0.0, min(1.0, _bayesian_confidence(lesson)))
