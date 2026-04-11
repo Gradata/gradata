@@ -728,6 +728,38 @@ def apply_rules(
     return applied
 
 
+def _deduplicate_rules(rules: list[AppliedRule], threshold: float = 0.85) -> list[AppliedRule]:
+    """Remove near-duplicate rules based on word overlap ratio.
+
+    Only removes rules that are nearly identical (85%+ word overlap).
+    Rules from different categories are never considered duplicates.
+    """
+    if len(rules) <= 1:
+        return rules
+
+    def _word_set(text: str) -> set[str]:
+        return set(text.lower().split())
+
+    kept: list[AppliedRule] = []
+    for rule in rules:
+        words = _word_set(rule.lesson.description)
+        is_dup = False
+        for existing in kept:
+            # Different categories are never duplicates
+            if existing.lesson.category != rule.lesson.category:
+                continue
+            existing_words = _word_set(existing.lesson.description)
+            if not words or not existing_words:
+                continue
+            overlap = len(words & existing_words) / min(len(words), len(existing_words))
+            if overlap >= threshold:
+                is_dup = True
+                break
+        if not is_dup:
+            kept.append(rule)
+    return kept
+
+
 def merge_related_rules(rules: list[AppliedRule], min_group_size: int = 2) -> list[AppliedRule]:
     """Merge rules sharing a category into compressed blocks.
 
@@ -792,7 +824,8 @@ def format_rules_for_prompt(
     if not rules:
         return ""
 
-    # Merge related rules to save tokens
+    # Deduplicate and merge related rules to save tokens
+    rules = _deduplicate_rules(rules)
     if merge:
         rules = merge_related_rules(rules)
 
