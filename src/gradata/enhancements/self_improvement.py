@@ -30,7 +30,7 @@ _log = logging.getLogger(__name__)
 # Constants (SPEC-aligned, research-backed)
 # ---------------------------------------------------------------------------
 
-INITIAL_CONFIDENCE = 0.40
+INITIAL_CONFIDENCE = 0.50
 PATTERN_THRESHOLD = 0.60
 RULE_THRESHOLD = 0.90
 MIN_APPLICATIONS_FOR_PATTERN = 3
