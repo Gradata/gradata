@@ -37,3 +37,111 @@ class TestLessonTreeFields:
         assert lesson.climb_count == 0
         assert lesson.last_climb_session == 0
         assert lesson.tree_level == 0
+
+
+from gradata.rules.rule_tree import RuleTree, build_path
+
+
+class TestBuildPath:
+    def test_full_path(self):
+        assert build_path("TONE", "sales", "email_draft") == "TONE/sales/email_draft"
+
+    def test_no_task_type(self):
+        assert build_path("TONE", "sales", "") == "TONE/sales"
+
+    def test_no_domain(self):
+        assert build_path("TONE", "", "") == "TONE"
+
+    def test_empty_all(self):
+        assert build_path("", "", "") == ""
+
+    def test_normalizes_lowercase(self):
+        assert build_path("Tone", "Sales", "Email_Draft") == "TONE/sales/email_draft"
+
+
+class TestRuleTreeBuild:
+    def _make_lessons(self):
+        return [
+            Lesson(
+                date="2026-01-01",
+                state=LessonState.RULE,
+                confidence=0.95,
+                category="TONE",
+                description="Be casual",
+                path="TONE/sales/email_draft",
+            ),
+            Lesson(
+                date="2026-01-02",
+                state=LessonState.PATTERN,
+                confidence=0.70,
+                category="TONE",
+                description="Match energy",
+                path="TONE/sales/demo_prep",
+            ),
+            Lesson(
+                date="2026-01-03",
+                state=LessonState.RULE,
+                confidence=0.92,
+                category="ACCURACY",
+                description="Cite sources",
+                path="ACCURACY/sales/email_draft",
+            ),
+            Lesson(
+                date="2026-01-04",
+                state=LessonState.RULE,
+                confidence=0.91,
+                category="TONE",
+                description="Be direct everywhere",
+                path="TONE/sales",
+            ),  # climbed to branch level
+        ]
+
+    def test_build_tree(self):
+        tree = RuleTree(self._make_lessons())
+        assert len(tree.nodes) > 0
+
+    def test_query_by_path(self):
+        tree = RuleTree(self._make_lessons())
+        rules = tree.get_rules_at("TONE/sales/email_draft")
+        assert len(rules) == 1
+        assert rules[0].description == "Be casual"
+
+    def test_query_walks_up(self):
+        tree = RuleTree(self._make_lessons())
+        # Query leaf — should get leaf rule + parent rule
+        rules = tree.get_rules_for_context("email_draft", "sales")
+        descriptions = [r.description for r in rules]
+        assert "Be casual" in descriptions  # leaf
+        assert "Be direct everywhere" in descriptions  # parent (climbed)
+
+    def test_query_unknown_task_falls_back(self):
+        tree = RuleTree(self._make_lessons())
+        rules = tree.get_rules_for_context("unknown_task", "sales")
+        # Should still find branch-level and trunk-level rules
+        descriptions = [r.description for r in rules]
+        assert "Be direct everywhere" in descriptions
+
+    def test_task_index_built(self):
+        tree = RuleTree(self._make_lessons())
+        assert "email_draft" in tree.task_index
+        assert "demo_prep" in tree.task_index
+
+
+class TestRuleTreeSecondaryCategories:
+    def test_secondary_category_surfaces(self):
+        lessons = [
+            Lesson(
+                date="2026-01-01",
+                state=LessonState.RULE,
+                confidence=0.90,
+                category="TONE",
+                description="No em dashes",
+                path="TONE/sales/email_draft",
+                secondary_categories=["FORMAT"],
+            ),
+        ]
+        tree = RuleTree(lessons)
+        # Query for FORMAT — should find the rule via secondary
+        rules = tree.get_rules_for_context("email_draft", "sales", category_filter="FORMAT")
+        assert len(rules) >= 1
+        assert rules[0].description == "No em dashes"
