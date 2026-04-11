@@ -13,7 +13,7 @@ def rank_rules(
     task_type: str | None = None,
     context_keywords: list[str] | None = None,
     effectiveness: dict[str, dict[str, Any]] | None = None,
-    max_rules: int = 10,
+    max_rules: int = 5,
 ) -> list[dict[str, Any]]:
     """Rank rules by composite score and return top *max_rules*.
 
@@ -48,6 +48,7 @@ def rank_rules(
 # Internal scoring helpers
 # ------------------------------------------------------------------
 
+
 def _score_rule(
     rule: dict[str, Any],
     *,
@@ -62,13 +63,7 @@ def _score_rule(
     recency = _recency_score(rule.get("last_session", 0), current_session)
     fire = _fire_count_score(rule.get("fire_count", 0))
 
-    base = (
-        0.30 * scope
-        + 0.25 * confidence
-        + 0.20 * context
-        + 0.15 * recency
-        + 0.10 * fire
-    )
+    base = 0.30 * scope + 0.25 * confidence + 0.20 * context + 0.15 * recency + 0.10 * fire
 
     bonus = _effectiveness_bonus(rule, effectiveness)
     return max(0.0, min(1.0, base + bonus))
