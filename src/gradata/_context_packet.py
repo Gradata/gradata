@@ -272,13 +272,11 @@ def _load_audit_context(session: int, ctx: "BrainContext | None" = None) -> dict
 def _load_wrapup_context(session: int, ctx: "BrainContext | None" = None) -> dict:
     result = {"session_events": [], "modified_prospects": [], "current_loop_state": ""}
     try:
-        events = _events_query(session=session, limit=200)
+        events = _events_query(session=session, limit=50)
         result["session_events"] = [
             {
                 "type": e.get("type", ""),
                 "source": e.get("source", ""),
-                "ts": e.get("ts", "")[:19],
-                "summary": json.dumps(e.get("data", {}))[:100],
             }
             for e in events
         ]
@@ -301,7 +299,7 @@ def _load_wrapup_context(session: int, ctx: "BrainContext | None" = None) -> dic
         pass
     loop_state = ctx.loop_state if ctx else _p.LOOP_STATE
     if loop_state.exists():
-        result["current_loop_state"] = _safe_read(loop_state, limit_chars=1500)
+        result["current_loop_state"] = _safe_read(loop_state, limit_chars=500)
     return result
 
 
