@@ -60,8 +60,8 @@ CONTRADICTION_SEVERITY_BOOST: dict[str, float] = {
     "trivial": 0.8,  # trivial contradictions are soft
     "minor": 0.9,
     "moderate": 1.0,  # baseline
-    "major": 1.2,  # major contradictions get 20% boost
-    "rewrite": 1.5,  # rewrite contradictions get 50% boost
+    "major": 1.65,  # major contradictions get 65% boost
+    "rewrite": 1.8,  # rewrite contradictions get 80% boost
 }
 
 # SPEC Section 1: maturity-aware kill switches (relevant cycles only)
