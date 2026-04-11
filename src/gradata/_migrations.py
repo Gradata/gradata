@@ -75,6 +75,8 @@ _MIGRATIONS: list[str] = [
         confidence REAL DEFAULT 0.5,
         detected_at TEXT NOT NULL
     )""",
+    # Hierarchical rule tree: path column for tree organization
+    "ALTER TABLE lesson_transitions ADD COLUMN path TEXT DEFAULT ''",
     # Super-meta-rules table
     "ALTER TABLE super_meta_rules ADD COLUMN applies_when TEXT",
     "ALTER TABLE super_meta_rules ADD COLUMN never_when TEXT",

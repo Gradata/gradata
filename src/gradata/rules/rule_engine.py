@@ -503,7 +503,7 @@ def is_rule_disabled_for_domain(lesson: Lesson, domain: str) -> bool:
 def apply_rules(
     lessons: list[Lesson],
     scope: RuleScope,
-    max_rules: int = 10,
+    max_rules: int = 5,
     events: list[dict[str, str]] | None = None,
     user_message: str = "",
     _context: str = "",
@@ -555,8 +555,12 @@ def apply_rules(
                 stakes=scope.stakes,
             )
 
-    # Step 1 — eligibility gate
-    eligible = [lesson for lesson in lessons if lesson.state in _ELIGIBLE_STATES]
+    # Step 1 — eligibility gate: prefer RULEs, only include PATTERNs if needed
+    rules_only = [lesson for lesson in lessons if lesson.state == LessonState.RULE]
+    if len(rules_only) >= max_rules:
+        eligible = rules_only
+    else:
+        eligible = [lesson for lesson in lessons if lesson.state in _ELIGIBLE_STATES]
 
     # Step 1.5 — domain scoping: filter out rules disabled for current domain
     current_domain = scope.domain.upper() if scope.domain else ""
@@ -605,7 +609,7 @@ def apply_rules(
         # Use weighted scope matching (exact > partial > wildcard)
         relevance = compute_scope_weight(lesson_scope, scope)
         relevance *= _CT_BOOST.get(lesson.correction_type, 1.0)
-        if relevance >= 0.3:
+        if relevance >= 0.4:
             scored.append((lesson, relevance))
         elif _ctx:
             from gradata.rules.rule_tracker import log_suppression
@@ -706,8 +710,7 @@ def apply_rules(
     applied: list[AppliedRule] = []
     for lesson, relevance in scored[:max_rules]:
         rule_id = _make_rule_id(lesson)
-        tier_label = _tier_label(lesson)
-        instruction = f"[{tier_label}] {lesson.category}: {lesson.description}"
+        instruction = f"{lesson.category}: {lesson.description}"
         applied.append(
             AppliedRule(
                 rule_id=rule_id,
@@ -723,6 +726,38 @@ def apply_rules(
         graph.add_co_occurrence(rule_ids)
 
     return applied
+
+
+def _deduplicate_rules(rules: list[AppliedRule], threshold: float = 0.85) -> list[AppliedRule]:
+    """Remove near-duplicate rules based on word overlap ratio.
+
+    Only removes rules that are nearly identical (85%+ word overlap).
+    Rules from different categories are never considered duplicates.
+    """
+    if len(rules) <= 1:
+        return rules
+
+    def _word_set(text: str) -> set[str]:
+        return set(text.lower().split())
+
+    kept: list[AppliedRule] = []
+    for rule in rules:
+        words = _word_set(rule.lesson.description)
+        is_dup = False
+        for existing in kept:
+            # Different categories are never duplicates
+            if existing.lesson.category != rule.lesson.category:
+                continue
+            existing_words = _word_set(existing.lesson.description)
+            if not words or not existing_words:
+                continue
+            overlap = len(words & existing_words) / min(len(words), len(existing_words))
+            if overlap >= threshold:
+                is_dup = True
+                break
+        if not is_dup:
+            kept.append(rule)
+    return kept
 
 
 def merge_related_rules(rules: list[AppliedRule], min_group_size: int = 2) -> list[AppliedRule]:
@@ -745,8 +780,7 @@ def merge_related_rules(rules: list[AppliedRule], min_group_size: int = 2) -> li
         best = max(group, key=lambda r: r.lesson.confidence)
         descriptions = [r.lesson.description for r in group]
         merged_desc = ". ".join(d.rstrip(".") for d in descriptions) + "."
-        merged_tier = _tier_label(best.lesson)
-        merged_instruction = f"[{merged_tier}] {cat}: {merged_desc}"
+        merged_instruction = f"{cat}: {merged_desc}"
         merged_rule = AppliedRule(
             rule_id=f"merged_{cat.lower()}",
             lesson=best.lesson,
@@ -790,7 +824,8 @@ def format_rules_for_prompt(
     if not rules:
         return ""
 
-    # Merge related rules to save tokens
+    # Deduplicate and merge related rules to save tokens
+    rules = _deduplicate_rules(rules)
     if merge:
         rules = merge_related_rules(rules)
 
@@ -821,32 +856,22 @@ def format_rules_for_prompt(
 
     lines = [
         "<brain-rules>",
-        "Follow these learned behavioral rules exactly. They are derived from past corrections.",
-        "",
     ]
 
-    for i, rule in enumerate(rules, start=1):
-        # Use positive framing: describe what TO do, not what not to do
-        lines.append(f"{i}. {rule.instruction}")
+    for rule in rules:
+        lines.append(f"- {rule.instruction}")
 
-        # Include few-shot examples for rules that need reinforcement
+        # Include few-shot examples only for low-confidence rules with misfires
         lesson = rule.lesson
-        needs_reinforcement = lesson.confidence < 0.80 or getattr(lesson, "misfire_count", 0) > 0
+        needs_reinforcement = lesson.confidence < 0.70 and getattr(lesson, "misfire_count", 0) > 1
         if (
             needs_reinforcement
             and getattr(lesson, "example_draft", None) is not None
             and getattr(lesson, "example_corrected", None) is not None
         ):
-            lines.append("   <example>")
-            lines.append(f'   DRAFT: "{lesson.example_draft}"')
-            lines.append(f'   CORRECTED: "{lesson.example_corrected}"')
-            lines.append("   </example>")
-
-    # Recency reminder: repeat the #1 rule briefly at the end
-    if rules:
-        top = rules[0]
-        lines.append("")
-        lines.append(f"REMINDER: {top.lesson.category}: {top.lesson.description}")
+            lines.append(
+                f'   e.g. "{lesson.example_draft[:80]}" -> "{lesson.example_corrected[:80]}"'
+            )
 
     lines.append("</brain-rules>")
     return "\n".join(lines)
@@ -938,7 +963,7 @@ def format_rules_styled(
 # Example Capture
 # ---------------------------------------------------------------------------
 
-_EXAMPLE_MAX_CHARS = 200
+_EXAMPLE_MAX_CHARS = 80
 
 
 def capture_example_from_correction(
@@ -967,3 +992,54 @@ def capture_example_from_correction(
     lesson.example_draft = draft[:_EXAMPLE_MAX_CHARS]
     lesson.example_corrected = corrected[:_EXAMPLE_MAX_CHARS]
     return lesson
+
+
+# ---------------------------------------------------------------------------
+# Tree-Based Rule Retrieval (opt-in, falls back to flat)
+# ---------------------------------------------------------------------------
+
+
+def apply_rules_with_tree(
+    lessons: list[Lesson],
+    scope: RuleScope,
+    *,
+    max_rules: int = 5,
+    event_bus: EventBus | None = None,
+    rule_graph: RuleGraph | None = None,
+) -> list[AppliedRule]:
+    """Apply rules using hierarchical tree retrieval.
+
+    Falls back to flat scoring if no lessons have paths.
+    """
+    from gradata.rules.rule_tree import RuleTree
+
+    # Check if any lessons have paths
+    has_paths = any(l.path for l in lessons)
+    if not has_paths:
+        # Fallback: use existing flat apply_rules
+        return apply_rules(lessons, scope, max_rules=max_rules, bus=event_bus, graph=rule_graph)
+
+    tree = RuleTree(lessons)
+    candidates = tree.get_rules_for_context(
+        task_type=scope.task_type,
+        domain=scope.domain,
+        max_rules=max_rules * 2,  # get extra, let formatting trim
+    )
+
+    # Format as AppliedRule objects
+    applied = []
+    for lesson in candidates[:max_rules]:
+        rule_id = f"{lesson.category}:{hash(lesson.description) % 10000:04d}"
+        instruction = (
+            f'<rule confidence="{lesson.confidence:.2f}">'
+            f"{lesson.category}: {lesson.description}</rule>"
+        )
+        applied.append(
+            AppliedRule(
+                rule_id=rule_id,
+                lesson=lesson,
+                relevance=1.0,  # tree already filtered for relevance
+                instruction=instruction,
+            )
+        )
+    return applied

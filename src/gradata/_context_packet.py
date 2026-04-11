@@ -20,18 +20,25 @@ if TYPE_CHECKING:
 # Lazy imports
 def _fts_search(query_text: str, **kwargs):
     from gradata._query import fts_search
+
     return fts_search(query_text, **kwargs)
+
 
 def _events_query(**kwargs):
     from gradata._events import query as eq
+
     return eq(**kwargs)
+
 
 def _correction_rate(**kwargs):
     from gradata._events import correction_rate
+
     return correction_rate(**kwargs)
+
 
 def _detect_session():
     from gradata._events import _detect_session as ds
+
     return ds()
 
 
@@ -74,28 +81,37 @@ def _load_user_scope(ctx: "BrainContext | None" = None) -> dict:
     result = {"voice_summary": "", "recent_corrections": [], "frameworks": ""}
     domain_dir = ctx.domain_dir if ctx else _p.DOMAIN_DIR
     soul_path = domain_dir / "soul.md"
-    result["voice_summary"] = _safe_read_lines(soul_path, 50)
+    result["voice_summary"] = _safe_read_lines(soul_path, 20)
     try:
-        corrections = _events_query(event_type="CORRECTION", limit=5)
+        corrections = _events_query(event_type="CORRECTION", limit=3)
         result["recent_corrections"] = [
-            {"session": e.get("session"), "category": e.get("data", {}).get("category", ""),
-             "detail": e.get("data", {}).get("detail", "")[:200]}
+            {
+                "session": e.get("session"),
+                "category": e.get("data", {}).get("category", ""),
+                "detail": e.get("data", {}).get("detail", "")[:120],
+            }
             for e in corrections
         ]
     except Exception:
         pass
     patterns_file = ctx.patterns_file if ctx else _p.PATTERNS_FILE
     if patterns_file.exists():
-        result["frameworks"] = _safe_read_lines(patterns_file, 30)
+        result["frameworks"] = _safe_read_lines(patterns_file, 15)
     return result
 
 
 def _load_prospect_context(prospect_name: str, ctx: "BrainContext | None" = None) -> dict:
-    result = {"file_content": "", "search_results": [], "recent_interactions": [],
-              "stage": "", "company": "", "persona": ""}
+    result = {
+        "file_content": "",
+        "search_results": [],
+        "recent_interactions": [],
+        "stage": "",
+        "company": "",
+        "persona": "",
+    }
     prospect_file = _fuzzy_match_prospect(prospect_name, ctx=ctx)
     if prospect_file:
-        raw = _safe_read(prospect_file, limit_chars=500)
+        raw = _safe_read(prospect_file, limit_chars=300)
         result["file_content"] = raw
         for line in raw.splitlines():
             if "Stage:" in line or "stage:" in line:
@@ -105,36 +121,39 @@ def _load_prospect_context(prospect_name: str, ctx: "BrainContext | None" = None
             if "Persona:" in line or "persona:" in line:
                 result["persona"] = line.split(":", 1)[-1].strip()
     try:
-        fts_results = _fts_search(prospect_name, top_k=3)
+        fts_results = _fts_search(prospect_name, top_k=2)
         result["search_results"] = [
-            {"source": r.get("source", ""), "text": r.get("text", "")[:200]}
-            for r in fts_results[:3]
+            {"source": r.get("source", ""), "text": r.get("text", "")[:120]}
+            for r in fts_results[:2]
         ]
     except Exception:
         pass
     try:
         from gradata._fact_extractor import query_facts
+
         facts = query_facts(prospect=prospect_name)
         if facts:
             result["structured_facts"] = [
                 {"type": f["fact_type"], "value": f["fact_value"], "confidence": f["confidence"]}
-                for f in facts[:10]
+                for f in facts[:5]
             ]
     except Exception:
         pass
     try:
-        all_events = _events_query(limit=200)
+        all_events = _events_query(limit=50)
         prospect_lower = prospect_name.lower()
         interactions = []
         for e in all_events:
             tags = e.get("tags", [])
             tag_str = " ".join(tags).lower()
             if prospect_lower.split()[0] in tag_str:
-                interactions.append({
-                    "ts": e.get("ts", "")[:19], "type": e.get("type", ""),
-                    "summary": json.dumps(e.get("data", {}))[:150],
-                })
-                if len(interactions) >= 3:
+                interactions.append(
+                    {
+                        "type": e.get("type", ""),
+                        "summary": json.dumps(e.get("data", {}))[:80],
+                    }
+                )
+                if len(interactions) >= 2:
                     break
         result["recent_interactions"] = interactions
     except Exception:
@@ -148,46 +167,55 @@ def _load_drafting_context(ctx: "BrainContext | None" = None) -> dict:
     if patterns_file.exists():
         try:
             content = patterns_file.read_text(encoding="utf-8", errors="replace")
-            relevant = [line.strip() for line in content.splitlines()
-                        if "[PROVEN]" in line or "[EMERGING]" in line]
-            result["patterns"] = "\n".join(relevant[:20])
+            relevant = [
+                line.strip()
+                for line in content.splitlines()
+                if "[PROVEN]" in line or "[EMERGING]" in line
+            ]
+            result["patterns"] = "\n".join(relevant[:10])
         except Exception:
             pass
     domain_dir = ctx.domain_dir if ctx else _p.DOMAIN_DIR
     soul_path = domain_dir / "soul.md"
-    result["voice_guidelines"] = _safe_read_lines(soul_path, 50)
+    result["voice_guidelines"] = _safe_read_lines(soul_path, 20)
     return result
 
 
 def _load_debug_context(topic: str, ctx: "BrainContext | None" = None) -> dict:
     result = {"search_results": [], "recent_failures": [], "corrections": []}
     try:
-        fts_results = _fts_search(topic, top_k=5)
+        fts_results = _fts_search(topic, top_k=3)
         result["search_results"] = [
-            {"source": r.get("source", ""), "text": r.get("text", "")[:300]}
-            for r in fts_results[:3]
+            {"source": r.get("source", ""), "text": r.get("text", "")[:150]}
+            for r in fts_results[:2]
         ]
     except Exception:
         pass
     try:
-        failures = _events_query(event_type="TOOL_FAILURE", limit=5)
+        failures = _events_query(event_type="TOOL_FAILURE", limit=3)
         result["recent_failures"] = [
-            {"ts": e.get("ts", "")[:19], "source": e.get("source", ""),
-             "detail": json.dumps(e.get("data", {}))[:200]}
+            {
+                "source": e.get("source", ""),
+                "detail": json.dumps(e.get("data", {}))[:120],
+            }
             for e in failures
         ]
     except Exception:
         pass
     try:
-        corrections = _events_query(event_type="CORRECTION", limit=20)
+        corrections = _events_query(event_type="CORRECTION", limit=10)
         topic_lower = topic.lower()
         related = []
         for e in corrections:
             data_str = json.dumps(e.get("data", {})).lower()
             if any(word in data_str for word in topic_lower.split()):
-                related.append({"session": e.get("session"),
-                                "detail": e.get("data", {}).get("detail", "")[:200]})
-                if len(related) >= 5:
+                related.append(
+                    {
+                        "session": e.get("session"),
+                        "detail": e.get("data", {}).get("detail", "")[:120],
+                    }
+                )
+                if len(related) >= 3:
                     break
         result["corrections"] = related
     except Exception:
@@ -208,21 +236,26 @@ def _load_audit_context(session: int, ctx: "BrainContext | None" = None) -> dict
     except Exception:
         pass
     try:
-        outputs = _events_query(event_type="OUTPUT", session=session, limit=50)
+        outputs = _events_query(event_type="OUTPUT", session=session, limit=20)
         result["outputs"] = [
-            {"ts": e.get("ts", "")[:19],
-             "data": {k: v for k, v in e.get("data", {}).items()
-                      if k in ("type", "self_score", "major_edit", "detail")}}
+            {
+                "data": {
+                    k: v
+                    for k, v in e.get("data", {}).items()
+                    if k in ("type", "self_score", "major_edit")
+                },
+            }
             for e in outputs
         ]
     except Exception:
         pass
     try:
-        gates = _events_query(event_type="GATE_RESULT", session=session, limit=50)
+        gates = _events_query(event_type="GATE_RESULT", session=session, limit=20)
         result["gates"] = [
-            {"gate": e.get("data", {}).get("gate", ""),
-             "result": e.get("data", {}).get("result", ""),
-             "detail": e.get("data", {}).get("detail", "")[:100]}
+            {
+                "gate": e.get("data", {}).get("gate", ""),
+                "result": e.get("data", {}).get("result", ""),
+            }
             for e in gates
         ]
     except Exception:
@@ -235,10 +268,12 @@ def _load_audit_context(session: int, ctx: "BrainContext | None" = None) -> dict
 def _load_wrapup_context(session: int, ctx: "BrainContext | None" = None) -> dict:
     result = {"session_events": [], "modified_prospects": [], "current_loop_state": ""}
     try:
-        events = _events_query(session=session, limit=200)
+        events = _events_query(session=session, limit=50)
         result["session_events"] = [
-            {"type": e.get("type", ""), "source": e.get("source", ""),
-             "ts": e.get("ts", "")[:19], "summary": json.dumps(e.get("data", {}))[:100]}
+            {
+                "type": e.get("type", ""),
+                "source": e.get("source", ""),
+            }
             for e in events
         ]
     except Exception:
@@ -260,38 +295,38 @@ def _load_wrapup_context(session: int, ctx: "BrainContext | None" = None) -> dic
         pass
     loop_state = ctx.loop_state if ctx else _p.LOOP_STATE
     if loop_state.exists():
-        result["current_loop_state"] = _safe_read(loop_state, limit_chars=1500)
+        result["current_loop_state"] = _safe_read(loop_state, limit_chars=500)
     return result
 
 
 def format_as_prompt(packet: dict, task_type: str) -> str:
-    sections = [f"# Context Packet -- task: {task_type or 'general'}",
-                f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", ""]
+    sections = [
+        f"# Context: {task_type or 'general'}",
+    ]
 
     if "user_scope" in packet:
         us = packet["user_scope"]
-        sections.append("## Owner Preferences")
+        sections.append("## Preferences")
         if us.get("voice_summary"):
-            sections.append(f"**Voice:** {us['voice_summary'][:300]}...")
+            sections.append(f"Voice: {us['voice_summary'][:200]}")
         if us.get("recent_corrections"):
-            sections.append("**Recent corrections to avoid:**")
+            sections.append("Avoid:")
             for c in us["recent_corrections"][:3]:
-                sections.append(f"- [{c.get('category', '')}] {c.get('detail', '')[:100]}")
+                sections.append(f"- {c.get('category', '')}: {c.get('detail', '')[:80]}")
         sections.append("")
 
     if "prospect" in packet:
         pc = packet["prospect"]
-        sections.append("## Prospect Context")
+        sections.append("## Prospect")
         if pc.get("company"):
-            sections.append(f"**Company:** {pc['company']}")
+            sections.append(f"Company: {pc['company']}")
         if pc.get("stage"):
-            sections.append(f"**Stage:** {pc['stage']}")
+            sections.append(f"Stage: {pc['stage']}")
         if pc.get("file_content"):
-            sections.append(f"**Prospect file (truncated):**\n```\n{pc['file_content'][:400]}\n```")
+            sections.append(f"```\n{pc['file_content'][:250]}\n```")
         if pc.get("search_results"):
-            sections.append("**Related brain content:**")
-            for sr in pc["search_results"][:3]:
-                sections.append(f"- [{sr.get('source', '')}] {sr.get('text', '')[:120]}")
+            for sr in pc["search_results"][:2]:
+                sections.append(f"- [{sr.get('source', '')}] {sr.get('text', '')[:100]}")
         if pc.get("structured_facts"):
             sections.append("**Known facts:**")
             for f in pc["structured_facts"]:
@@ -302,46 +337,48 @@ def format_as_prompt(packet: dict, task_type: str) -> str:
 
     if "drafting" in packet:
         dc = packet["drafting"]
-        sections.append("## Drafting Context")
+        sections.append("## Drafting")
         if dc.get("patterns"):
-            sections.append("**Proven/Emerging patterns:**")
-            for line in dc["patterns"].splitlines()[:10]:
+            for line in dc["patterns"].splitlines()[:5]:
                 sections.append(f"- {line}")
         sections.append("")
 
     if "debug" in packet:
         dbg = packet["debug"]
-        sections.append("## Debug Context")
+        sections.append("## Debug")
         if dbg.get("search_results"):
-            sections.append("**Brain search results:**")
-            for sr in dbg["search_results"][:3]:
-                sections.append(f"- [{sr.get('source', '')}] {sr.get('text', '')[:150]}")
+            for sr in dbg["search_results"][:2]:
+                sections.append(f"- [{sr.get('source', '')}] {sr.get('text', '')[:100]}")
         sections.append("")
 
     if "audit" in packet:
         ac = packet["audit"]
-        sections.append("## Audit Context")
+        sections.append("## Audit")
         if ac.get("metrics"):
-            sections.append(f"**Session metrics:** {json.dumps(ac['metrics'], default=str)[:400]}")
+            sections.append(json.dumps(ac["metrics"], default=str)[:300])
         sections.append("")
 
     if "wrapup" in packet:
         wc = packet["wrapup"]
-        sections.append("## Wrap-Up Context")
+        sections.append("## Wrap-Up")
         if wc.get("session_events"):
-            type_counts = {}
+            type_counts: dict[str, int] = {}
             for e in wc["session_events"]:
                 t = e.get("type", "UNKNOWN")
                 type_counts[t] = type_counts.get(t, 0) + 1
-            sections.append(f"**Event summary:** {json.dumps(type_counts)}")
+            sections.append(json.dumps(type_counts))
         sections.append("")
 
     return "\n".join(sections)
 
 
-def build_packet(prospect: str | None = None, task_type: str | None = None,
-                 topic: str | None = None, session: int | None = None,
-                 ctx: "BrainContext | None" = None) -> str:
+def build_packet(
+    prospect: str | None = None,
+    task_type: str | None = None,
+    topic: str | None = None,
+    session: int | None = None,
+    ctx: "BrainContext | None" = None,
+) -> str:
     packet = {}
     if session is None:
         session = _detect_session()

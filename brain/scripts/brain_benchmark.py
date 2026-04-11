@@ -23,6 +23,11 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+# Add SDK to path for graduation simulation
+_sdk_root = Path(__file__).resolve().parent.parent.parent / "src"
+if str(_sdk_root) not in sys.path:
+    sys.path.insert(0, str(_sdk_root))
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -312,6 +317,164 @@ def _score_graduation_speed(events: list[dict]) -> tuple[float, int | None]:
 
 
 # ---------------------------------------------------------------------------
+# Graduation simulation
+# ---------------------------------------------------------------------------
+
+
+def _simulate_graduation(events: list[dict]) -> list[dict]:
+    """Simulate graduation pipeline from CORRECTION events.
+
+    Creates Lesson objects from corrections, runs them through
+    update_confidence and graduate session-by-session, and returns
+    synthetic LESSON_CREATED / LESSON_GRADUATED events that the
+    scoring functions can measure.
+    """
+    try:
+        from gradata._types import Lesson, LessonState
+        from gradata.enhancements.self_improvement import (
+            INITIAL_CONFIDENCE,
+            graduate,
+            update_confidence,
+        )
+    except ImportError:
+        return []  # SDK not available, skip simulation
+
+    # Group corrections by session
+    corrections_by_session: dict[int, list[dict]] = defaultdict(list)
+    for ev in events:
+        if ev.get("type") == "CORRECTION":
+            sess = ev.get("session")
+            if sess is not None:
+                try:
+                    corrections_by_session[int(sess)] += 1  # type: ignore[assignment]
+                except (ValueError, TypeError):
+                    pass
+    # Fix: actually append the event dict, not increment
+    corrections_by_session = defaultdict(list)
+    for ev in events:
+        if ev.get("type") == "CORRECTION":
+            sess = ev.get("session")
+            if sess is not None:
+                try:
+                    corrections_by_session[int(sess)].append(ev)
+                except (ValueError, TypeError):
+                    pass
+
+    if not corrections_by_session:
+        return []
+
+    # Create lessons from unique correction categories
+    lessons: dict[str, Lesson] = {}
+    synthetic_events: list[dict] = []
+    sorted_sessions = sorted(corrections_by_session.keys())
+    first_session = sorted_sessions[0] if sorted_sessions else 0
+
+    for sess in sorted_sessions:
+        session_corrections = corrections_by_session[sess]
+
+        # Create new lessons for unseen categories
+        for corr in session_corrections:
+            data = corr.get("data") or {}
+            cat = data.get("category", "UNKNOWN")
+            detail = data.get("detail", "")
+            if cat not in lessons:
+                lessons[cat] = Lesson(
+                    date=corr.get("ts", ""),
+                    state=LessonState.INSTINCT,
+                    confidence=INITIAL_CONFIDENCE,
+                    category=cat,
+                    description=detail[:120],
+                    fire_count=0,
+                )
+                synthetic_events.append(
+                    {
+                        "type": "LESSON_CREATED",
+                        "session": sess,
+                        "ts": corr.get("ts", ""),
+                        "data": {
+                            "lesson_id": cat,
+                            "category": cat,
+                            "confidence": INITIAL_CONFIDENCE,
+                        },
+                    }
+                )
+
+        # Build correction list for update_confidence
+        corr_dicts = []
+        severity_data: dict[str, str] = {}
+        for corr in session_corrections:
+            data = corr.get("data") or {}
+            cat = data.get("category", "UNKNOWN")
+            sev = data.get("severity", "moderate")
+            corr_dicts.append({"category": cat})
+            severity_data[cat] = sev
+
+        # Run confidence update
+        lesson_list = list(lessons.values())
+        update_confidence(
+            lesson_list,
+            corr_dicts,
+            severity_data=severity_data,
+            session_type="full",
+        )
+
+        # Run graduation
+        active, graduated = graduate(lesson_list)
+
+        # Emit synthetic events for state changes
+        for lesson in lesson_list:
+            cat = lesson.category
+            conf = lesson.confidence
+            synthetic_events.append(
+                {
+                    "type": "LESSON_UPDATED",
+                    "session": sess,
+                    "ts": "",
+                    "data": {
+                        "lesson_id": cat,
+                        "confidence": conf,
+                        "state": lesson.state.value,
+                    },
+                }
+            )
+            if lesson.state == LessonState.RULE:
+                synthetic_events.append(
+                    {
+                        "type": "LESSON_GRADUATED",
+                        "session": sess,
+                        "ts": "",
+                        "data": {
+                            "lesson_id": cat,
+                            "new_state": "RULE",
+                            "confidence": conf,
+                        },
+                    }
+                )
+            elif lesson.state == LessonState.PATTERN:
+                synthetic_events.append(
+                    {
+                        "type": "LESSON_GRADUATED",
+                        "session": sess,
+                        "ts": "",
+                        "data": {
+                            "lesson_id": cat,
+                            "new_state": "PATTERN",
+                            "confidence": conf,
+                        },
+                    }
+                )
+
+        # Update lessons dict with post-graduation state
+        lessons = {
+            l.category: l
+            for l in lesson_list
+            if l.state not in (LessonState.KILLED, LessonState.ARCHIVED)
+        }
+
+    return synthetic_events
+
+
+# ---------------------------------------------------------------------------
 # Main scoring function
 # ---------------------------------------------------------------------------
 
@@ -359,6 +522,10 @@ def score_brain(
     with tempfile.TemporaryDirectory() as tmp:
         tmp_db = Path(tmp) / "benchmark.db"
         _replay_into_db(tmp_db, events)
+
+    # Simulate graduation from corrections using self_improvement.py
+    synthetic = _simulate_graduation(events)
+    events = events + synthetic
 
     # Compute each dimension
     grad_ratio = _score_graduation_ratio(events)

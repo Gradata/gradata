@@ -21,7 +21,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from gradata._types import Lesson, RuleTransferScope
+from gradata._types import Lesson, LessonState, RuleTransferScope
 
 _log = logging.getLogger(__name__)
 
@@ -548,6 +548,201 @@ def parse_lessons_from_markdown(text: str) -> list[Lesson]:
     from gradata.enhancements.self_improvement import parse_lessons
 
     return parse_lessons(text)
+
+
+# ---------------------------------------------------------------------------
+# LLM-Powered Batch Synthesis
+# ---------------------------------------------------------------------------
+
+
+def _resolve_llm_credentials() -> tuple[str, str, str]:
+    """Resolve LLM credentials from environment. Returns (key, base, model).
+
+    Delegates to the same env vars used by ``llm_synthesizer``.
+    """
+    import os
+
+    key = os.environ.get("GRADATA_LLM_KEY", "")
+    base = os.environ.get("GRADATA_LLM_BASE", "")
+    model = os.environ.get("GRADATA_LLM_MODEL", "gpt-4o-mini")
+    return key, base, model
+
+
+def _call_llm_for_synthesis(
+    category: str,
+    descriptions: list[str],
+    *,
+    provider: str = "anthropic",
+) -> str:
+    """Call the LLM to synthesize lesson descriptions into directives.
+
+    Returns raw JSON string from the LLM.  This function is the seam
+    that tests mock -- it isolates all network I/O.
+
+    Raises:
+        RuntimeError: On any LLM failure (caller catches).
+    """
+    from gradata.enhancements.llm_synthesizer import synthesise_principle_llm
+
+    key, base, model = _resolve_llm_credentials()
+    if not key or not base:
+        raise RuntimeError("No LLM credentials configured")
+
+    bullet_text = "\n".join(f"- {d}" for d in descriptions)
+    prompt = (
+        f'Given these {len(descriptions)} learned rules in the "{category}" category:\n'
+        f"{bullet_text}\n\n"
+        "Synthesize them into 1-3 high-level actionable directives.\n"
+        "Return ONLY a JSON array of objects, each with:\n"
+        '  - "directive": a 1-2 sentence actionable principle\n'
+        '  - "confidence": float 0.0-1.0 (how strongly supported by the rules)\n'
+        "No preamble, no markdown fencing, just the JSON array."
+    )
+
+    # Use the same HTTP machinery as llm_synthesizer
+    import urllib.request
+
+    payload = json.dumps(
+        {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 500,
+            "temperature": 0.3,
+        }
+    ).encode()
+
+    headers = {
+        "Content-Type": "application/json",
+    }
+    # Auth header uses same pattern as llm_synthesizer
+    headers["Authorization"] = f"Bearer {key}"
+
+    req = urllib.request.Request(
+        f"{base}/chat/completions",
+        data=payload,
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=15.0) as resp:
+        body = json.loads(resp.read().decode())
+
+    return body["choices"][0]["message"]["content"].strip()
+
+
+def llm_synthesize_rules(
+    lessons: list[Lesson],
+    provider: str = "anthropic",
+    max_lessons: int = 10,
+    max_calls: int = 1,
+) -> list[dict]:
+    """Synthesize graduated lessons into high-level directives via LLM.
+
+    Args:
+        lessons: Graduated lessons to synthesize.
+        provider: LLM provider (uses existing llm_synthesizer infrastructure).
+        max_lessons: Max lessons per synthesis call.
+        max_calls: Max LLM calls per invocation (cost cap).
+
+    Returns:
+        List of ``{"directive": str, "source_lessons": list[str], "confidence": float}``.
+
+    Falls back to empty list if no API key available or LLM call fails.
+    """
+    if not lessons:
+        return []
+
+    # 1. Filter to only RULE-state lessons
+    rule_lessons = [le for le in lessons if le.state == LessonState.RULE]
+    if not rule_lessons:
+        return []
+
+    # Check for credentials early -- graceful fallback
+    key, base, _ = _resolve_llm_credentials()
+    if not key or not base:
+        _log.debug("llm_synthesize_rules: no LLM credentials, returning empty")
+        return []
+
+    # 2. Group by category
+    groups: dict[str, list[Lesson]] = defaultdict(list)
+    for lesson in rule_lessons:
+        groups[lesson.category].append(lesson)
+
+    # Sort categories by group size descending (synthesize largest first)
+    sorted_categories = sorted(groups.keys(), key=lambda c: len(groups[c]), reverse=True)
+
+    # 3. For each category group (up to max_calls)
+    results: list[dict] = []
+    calls_made = 0
+
+    for category in sorted_categories:
+        if calls_made >= max_calls:
+            break
+
+        group = groups[category]
+        capped = group[:max_lessons]
+        descriptions = [le.description for le in capped]
+
+        try:
+            raw = _call_llm_for_synthesis(
+                category=category,
+                descriptions=descriptions,
+                provider=provider,
+            )
+            calls_made += 1
+
+            parsed = _parse_synthesis_response(raw, descriptions)
+            results.extend(parsed)
+
+        except Exception as exc:
+            _log.debug("LLM synthesis failed for category %s: %s", category, exc)
+            continue
+
+    return results
+
+
+def _parse_synthesis_response(
+    raw: str,
+    source_descriptions: list[str],
+) -> list[dict]:
+    """Parse LLM JSON response into structured dicts.
+
+    Returns:
+        List of ``{"directive": str, "source_lessons": list[str], "confidence": float}``.
+    """
+    text = raw.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        lines = [line for line in lines if not line.strip().startswith("```")]
+        text = "\n".join(lines)
+
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        _log.debug("Failed to parse LLM synthesis response as JSON")
+        return []
+
+    if not isinstance(data, list):
+        data = [data]
+
+    results = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        directive = item.get("directive", "")
+        if not directive:
+            continue
+        confidence = float(item.get("confidence", 0.8))
+        confidence = max(0.0, min(1.0, confidence))
+
+        results.append(
+            {
+                "directive": directive,
+                "source_lessons": list(source_descriptions),
+                "confidence": confidence,
+            }
+        )
+
+    return results
 
 
 # ---------------------------------------------------------------------------

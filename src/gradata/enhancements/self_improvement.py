@@ -30,21 +30,20 @@ _log = logging.getLogger(__name__)
 # Constants (SPEC-aligned, research-backed)
 # ---------------------------------------------------------------------------
 
-INITIAL_CONFIDENCE = 0.40
+INITIAL_CONFIDENCE = 0.60
 PATTERN_THRESHOLD = 0.60
-RULE_THRESHOLD = 0.90
+RULE_THRESHOLD = 0.80
 MIN_APPLICATIONS_FOR_PATTERN = 3
-MIN_APPLICATIONS_FOR_RULE = 5
+MIN_APPLICATIONS_FOR_RULE = 3
 
 # Misfire is worse than contradiction (rule was completely irrelevant)
 MISFIRE_PENALTY = -0.15
 # Calibrated from 2992 real events across 76 sessions (calibrate_constants.py).
 # Original: -0.24 (2:1 ratio). Calibrated: -0.10 (1:1 ratio).
 # Stress test confirmed: 2:1 caused 74 kills vs 19 promotions (over-punishing).
-# Opt iteration 1: increased to -0.15 for faster preference reversal.
-CONTRADICTION_PENALTY = -0.15
+CONTRADICTION_PENALTY = -0.17
 
-ACCEPTANCE_BONUS = 0.10
+ACCEPTANCE_BONUS = 0.20
 # v2.3: survival is flat (no severity scaling)
 SURVIVAL_BONUS = 0.08
 # Preferences (user taste) decay 50% slower — they're stable signals
@@ -102,7 +101,7 @@ SURVIVAL_SEVERITY_WEIGHTS: dict[str, float] = {
 # even softer treatment since ALL outputs get corrected (no approval signal).
 # ---------------------------------------------------------------------------
 MACHINE_CONTRADICTION_PENALTY = -0.06
-MACHINE_ACCEPTANCE_BONUS = 0.10
+MACHINE_ACCEPTANCE_BONUS = 0.16
 MACHINE_KILL_LIMITS: dict[str, int] = {
     "INFANT": 16,
     "ADOLESCENT": 20,
@@ -327,6 +326,11 @@ def parse_lessons(text: str) -> list[Lesson]:
         memory_ids: list[str] = []
         scope_json: str = ""
         domain_scores: dict = {}
+        path = ""
+        secondary_categories: list[str] = []
+        climb_count = 0
+        last_climb_session = 0
+        tree_level = 0
         alpha = 1.0
         beta_param_val = 1.0
         j = i + 1
@@ -369,6 +373,24 @@ def parse_lessons(text: str) -> list[Lesson]:
                     domain_scores = _json.loads(meta_line[len("Domain scores:") :].strip())
                 except _json.JSONDecodeError:
                     domain_scores = {}
+            elif meta_line.startswith("Path:"):
+                path = meta_line[len("Path:") :].strip()
+            elif meta_line.startswith("Secondary categories:"):
+                secondary_categories = [
+                    x.strip()
+                    for x in meta_line[len("Secondary categories:") :].strip().split(",")
+                    if x.strip()
+                ]
+            elif meta_line.startswith("Climb:"):
+                import json as _json_cl
+
+                try:
+                    _cl = _json_cl.loads(meta_line[len("Climb:") :].strip())
+                    climb_count = _cl.get("count", 0)
+                    last_climb_session = _cl.get("last_session", 0)
+                    tree_level = _cl.get("level", 0)
+                except _json_cl.JSONDecodeError:
+                    pass
             elif meta_line.startswith("Metadata:"):
                 import json as _json_md
 
@@ -408,6 +430,11 @@ def parse_lessons(text: str) -> list[Lesson]:
             domain_scores=domain_scores,
             alpha=alpha,
             beta_param=beta_param_val,
+            path=path,
+            secondary_categories=secondary_categories,
+            climb_count=climb_count,
+            last_climb_session=last_climb_session,
+            tree_level=tree_level,
         )
         if metadata_obj is not None:
             _lesson.metadata = metadata_obj
@@ -757,6 +784,10 @@ def update_confidence(
                 else:
                     bonus = base_bonus
                 lesson.confidence = round(max(0.0, min(1.0, lesson.confidence + bonus)), 2)
+                # Cold-start: survival counts as an application (lesson was
+                # injected and the user did NOT correct this category).
+                lesson.fire_count += 1
+                lesson.sessions_since_fire = 0
 
         # Track sessions since fire
         lesson.sessions_since_fire += 1
@@ -1127,6 +1158,19 @@ def format_lessons(lessons: list[Lesson]) -> str:
 
             lines.append(
                 f"  Beta params: {_json_bp.dumps({'alpha': lesson.alpha, 'beta': lesson.beta_param})}"
+            )
+
+        if lesson.path:
+            lines.append(f"  Path: {lesson.path}")
+
+        if lesson.secondary_categories:
+            lines.append(f"  Secondary categories: {','.join(lesson.secondary_categories)}")
+
+        if lesson.climb_count or lesson.last_climb_session or lesson.tree_level:
+            import json as _json_cl
+
+            lines.append(
+                f"  Climb: {_json_cl.dumps({'count': lesson.climb_count, 'last_session': lesson.last_climb_session, 'level': lesson.tree_level})}"
             )
 
         if hasattr(lesson, "metadata") and lesson.metadata is not None:

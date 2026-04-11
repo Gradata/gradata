@@ -60,12 +60,16 @@ def extract_entities(message: str, ctx: "BrainContext | None" = None) -> dict:
                 break
         if result["task_type"]:
             break
-    result["topic"] = message[:200]
+    result["topic"] = message[:100]
     return result
 
 
-def compile_context(message: str, prospect: str | None = None, task: str | None = None,
-                    ctx: "BrainContext | None" = None) -> str:
+def compile_context(
+    message: str,
+    prospect: str | None = None,
+    task: str | None = None,
+    ctx: "BrainContext | None" = None,
+) -> str:
     entities = extract_entities(message, ctx=ctx)
     if prospect:
         entities["prospect"] = prospect
@@ -75,12 +79,13 @@ def compile_context(message: str, prospect: str | None = None, task: str | None 
     if not entities["prospect"] and not entities["task_type"]:
         try:
             from gradata._query import brain_search
-            results = brain_search(message[:100], top_k=3, mode="keyword")
+
+            results = brain_search(message[:100], top_k=2, mode="keyword")
             if results and results[0].get("score", 0) > 0.3:
-                lines = ["## Brain Context (auto-retrieved)"]
-                for r in results[:3]:
+                lines = ["## Context"]
+                for r in results[:2]:
                     src = r.get("source", "")
-                    txt = r.get("text", "")[:150]
+                    txt = r.get("text", "")[:100]
                     lines.append(f"- [{src}] {txt}")
                 return "\n".join(lines)
         except Exception:
@@ -89,13 +94,14 @@ def compile_context(message: str, prospect: str | None = None, task: str | None 
 
     try:
         from gradata._context_packet import build_packet
+
         packet = build_packet(
             prospect=entities["prospect"],
             task_type=entities["task_type"],
             topic=entities["topic"],
         )
-        if len(packet) > 6000:
-            packet = packet[:6000] + "\n\n[...context truncated to 1500 tokens]"
+        if len(packet) > 3000:
+            packet = packet[:3000] + "\n\n[...context truncated]"
         return packet
     except Exception as e:
         return f"[context compile error: {e}]"
