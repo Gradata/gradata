@@ -848,7 +848,7 @@ def format_rules_for_prompt(
 # Example Capture
 # ---------------------------------------------------------------------------
 
-_EXAMPLE_MAX_CHARS = 200
+_EXAMPLE_MAX_CHARS = 80
 
 
 def capture_example_from_correction(
