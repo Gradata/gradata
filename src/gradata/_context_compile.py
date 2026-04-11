@@ -60,7 +60,7 @@ def extract_entities(message: str, ctx: "BrainContext | None" = None) -> dict:
                 break
         if result["task_type"]:
             break
-    result["topic"] = message[:200]
+    result["topic"] = message[:100]
     return result
 
 
