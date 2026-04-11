@@ -193,19 +193,18 @@ def _load_debug_context(topic: str, ctx: "BrainContext | None" = None) -> dict:
     except Exception:
         pass
     try:
-        failures = _events_query(event_type="TOOL_FAILURE", limit=5)
+        failures = _events_query(event_type="TOOL_FAILURE", limit=3)
         result["recent_failures"] = [
             {
-                "ts": e.get("ts", "")[:19],
                 "source": e.get("source", ""),
-                "detail": json.dumps(e.get("data", {}))[:200],
+                "detail": json.dumps(e.get("data", {}))[:120],
             }
             for e in failures
         ]
     except Exception:
         pass
     try:
-        corrections = _events_query(event_type="CORRECTION", limit=20)
+        corrections = _events_query(event_type="CORRECTION", limit=10)
         topic_lower = topic.lower()
         related = []
         for e in corrections:
@@ -214,10 +213,10 @@ def _load_debug_context(topic: str, ctx: "BrainContext | None" = None) -> dict:
                 related.append(
                     {
                         "session": e.get("session"),
-                        "detail": e.get("data", {}).get("detail", "")[:200],
+                        "detail": e.get("data", {}).get("detail", "")[:120],
                     }
                 )
-                if len(related) >= 5:
+                if len(related) >= 3:
                     break
         result["corrections"] = related
     except Exception:
