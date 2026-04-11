@@ -842,12 +842,6 @@ def format_rules_for_prompt(
             lines.append(f'   CORRECTED: "{lesson.example_corrected}"')
             lines.append("   </example>")
 
-    # Recency reminder: repeat the #1 rule briefly at the end
-    if rules:
-        top = rules[0]
-        lines.append("")
-        lines.append(f"REMINDER: {top.lesson.category}: {top.lesson.description}")
-
     lines.append("</brain-rules>")
     return "\n".join(lines)
 
