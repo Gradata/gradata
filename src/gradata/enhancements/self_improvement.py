@@ -41,7 +41,8 @@ MISFIRE_PENALTY = -0.15
 # Calibrated from 2992 real events across 76 sessions (calibrate_constants.py).
 # Original: -0.24 (2:1 ratio). Calibrated: -0.10 (1:1 ratio).
 # Stress test confirmed: 2:1 caused 74 kills vs 19 promotions (over-punishing).
-CONTRADICTION_PENALTY = -0.10
+# Opt iteration 1: increased to -0.15 for faster preference reversal.
+CONTRADICTION_PENALTY = -0.15
 
 ACCEPTANCE_BONUS = 0.10
 # v2.3: survival is flat (no severity scaling)
