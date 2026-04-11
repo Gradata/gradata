@@ -111,7 +111,7 @@ def _load_prospect_context(prospect_name: str, ctx: "BrainContext | None" = None
     }
     prospect_file = _fuzzy_match_prospect(prospect_name, ctx=ctx)
     if prospect_file:
-        raw = _safe_read(prospect_file, limit_chars=500)
+        raw = _safe_read(prospect_file, limit_chars=300)
         result["file_content"] = raw
         for line in raw.splitlines():
             if "Stage:" in line or "stage:" in line:
@@ -121,10 +121,10 @@ def _load_prospect_context(prospect_name: str, ctx: "BrainContext | None" = None
             if "Persona:" in line or "persona:" in line:
                 result["persona"] = line.split(":", 1)[-1].strip()
     try:
-        fts_results = _fts_search(prospect_name, top_k=3)
+        fts_results = _fts_search(prospect_name, top_k=2)
         result["search_results"] = [
-            {"source": r.get("source", ""), "text": r.get("text", "")[:200]}
-            for r in fts_results[:3]
+            {"source": r.get("source", ""), "text": r.get("text", "")[:120]}
+            for r in fts_results[:2]
         ]
     except Exception:
         pass
@@ -135,7 +135,7 @@ def _load_prospect_context(prospect_name: str, ctx: "BrainContext | None" = None
         if facts:
             result["structured_facts"] = [
                 {"type": f["fact_type"], "value": f["fact_value"], "confidence": f["confidence"]}
-                for f in facts[:10]
+                for f in facts[:5]
             ]
     except Exception:
         pass
