@@ -749,8 +749,7 @@ def merge_related_rules(rules: list[AppliedRule], min_group_size: int = 2) -> li
         best = max(group, key=lambda r: r.lesson.confidence)
         descriptions = [r.lesson.description for r in group]
         merged_desc = ". ".join(d.rstrip(".") for d in descriptions) + "."
-        merged_tier = _tier_label(best.lesson)
-        merged_instruction = f"[{merged_tier}] {cat}: {merged_desc}"
+        merged_instruction = f"{cat}: {merged_desc}"
         merged_rule = AppliedRule(
             rule_id=f"merged_{cat.lower()}",
             lesson=best.lesson,
