@@ -503,7 +503,7 @@ def is_rule_disabled_for_domain(lesson: Lesson, domain: str) -> bool:
 def apply_rules(
     lessons: list[Lesson],
     scope: RuleScope,
-    max_rules: int = 10,
+    max_rules: int = 7,
     events: list[dict[str, str]] | None = None,
     user_message: str = "",
     _context: str = "",
