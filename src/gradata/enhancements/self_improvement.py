@@ -50,8 +50,11 @@ SURVIVAL_BONUS = 0.08
 # Preferences (user taste) decay 50% slower — they're stable signals
 PREFERENCE_DECAY_DAMPER = 0.5
 # Explicit contradiction acceleration: when direction is CONTRADICTING,
-# multiply penalty by this factor for faster preference reversal
+# multiply penalty by this factor for faster preference reversal.
+# Applied on top of streak multiplier (see _contradiction_streak_multiplier).
 CONTRADICTION_ACCELERATION = 1.5
+# Consecutive contradictions accelerate: 1st=1.0x, 2nd=1.5x, 3rd=2.0x, etc.
+CONTRADICTION_STREAK_STEP = 0.5
 
 # SPEC Section 1: maturity-aware kill switches (relevant cycles only)
 KILL_LIMITS: dict[str, int] = {
@@ -686,8 +689,15 @@ def update_confidence(
                     else:
                         penalty = base_penalty
                     # Explicit contradictions get accelerated penalty
+                    # Streak tracking: consecutive contradictions hit harder
                     if direction == "CONTRADICTING":
-                        penalty *= CONTRADICTION_ACCELERATION
+                        streak = getattr(lesson, "_contradiction_streak", 0) + 1
+                        lesson._contradiction_streak = streak
+                        streak_mult = 1.0 + CONTRADICTION_STREAK_STEP * (streak - 1)
+                        penalty *= CONTRADICTION_ACCELERATION * streak_mult
+                    else:
+                        # Reset streak on non-contradicting correction
+                        lesson._contradiction_streak = 0
                     # Preferences decay slower — stable user taste signals
                     if lesson.correction_type == CorrectionType.PREFERENCE:
                         penalty *= PREFERENCE_DECAY_DAMPER
