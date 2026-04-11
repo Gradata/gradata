@@ -184,10 +184,10 @@ def _load_drafting_context(ctx: "BrainContext | None" = None) -> dict:
 def _load_debug_context(topic: str, ctx: "BrainContext | None" = None) -> dict:
     result = {"search_results": [], "recent_failures": [], "corrections": []}
     try:
-        fts_results = _fts_search(topic, top_k=5)
+        fts_results = _fts_search(topic, top_k=3)
         result["search_results"] = [
-            {"source": r.get("source", ""), "text": r.get("text", "")[:300]}
-            for r in fts_results[:3]
+            {"source": r.get("source", ""), "text": r.get("text", "")[:150]}
+            for r in fts_results[:2]
         ]
     except Exception:
         pass
