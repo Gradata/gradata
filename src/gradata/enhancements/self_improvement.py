@@ -49,6 +49,9 @@ ACCEPTANCE_BONUS = 0.10
 SURVIVAL_BONUS = 0.08
 # Preferences (user taste) decay 50% slower — they're stable signals
 PREFERENCE_DECAY_DAMPER = 0.5
+# Explicit contradiction acceleration: when direction is CONTRADICTING,
+# multiply penalty by this factor for faster preference reversal
+CONTRADICTION_ACCELERATION = 1.5
 
 # SPEC Section 1: maturity-aware kill switches (relevant cycles only)
 KILL_LIMITS: dict[str, int] = {
@@ -427,13 +430,16 @@ def fsrs_penalty(confidence: float, *, machine: bool = False) -> float:
     """Confidence-dependent contradiction penalty (FSRS-inspired).
 
     Higher confidence → larger penalty (more to lose).
-    At confidence 0.30: ~0.14. At 0.80: ~0.18. At 0.95: ~0.20.
+    Uses quadratic scaling: penalty grows faster at higher confidence levels,
+    enabling faster preference reversal for established rules.
 
     In machine mode, uses halved base penalty so high-volume corrections
     don't collapse confidence in 4 rounds.
     """
     base = abs(MACHINE_CONTRADICTION_PENALTY) if machine else abs(CONTRADICTION_PENALTY)
-    return round(base * (0.5 + confidence * 0.5), 4)
+    # Quadratic scaling: steeper at high confidence for faster reversal
+    # At 0.30: base * 0.545, at 0.75: base * 1.03, at 0.90: base * 1.21
+    return round(base * (0.5 + confidence * confidence * 0.8), 4)
 
 
 # ---------------------------------------------------------------------------
@@ -679,6 +685,9 @@ def update_confidence(
                         penalty = base_penalty * weight
                     else:
                         penalty = base_penalty
+                    # Explicit contradictions get accelerated penalty
+                    if direction == "CONTRADICTING":
+                        penalty *= CONTRADICTION_ACCELERATION
                     # Preferences decay slower — stable user taste signals
                     if lesson.correction_type == CorrectionType.PREFERENCE:
                         penalty *= PREFERENCE_DECAY_DAMPER
