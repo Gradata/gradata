@@ -823,9 +823,8 @@ def format_rules_for_prompt(
         "<brain-rules>",
     ]
 
-    for i, rule in enumerate(rules, start=1):
-        # Use positive framing: describe what TO do, not what not to do
-        lines.append(f"{i}. {rule.instruction}")
+    for rule in rules:
+        lines.append(f"- {rule.instruction}")
 
         # Include few-shot examples only for low-confidence rules with misfires
         lesson = rule.lesson
