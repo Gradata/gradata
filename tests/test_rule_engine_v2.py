@@ -37,6 +37,7 @@ from gradata.rules.rule_engine import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_lesson(
     category: str = "DRAFTING",
     description: str = "Test lesson",
@@ -74,6 +75,7 @@ def _make_applied(lesson: Lesson, relevance: float = 0.8) -> AppliedRule:
 # ===========================================================================
 # detect_task_type
 # ===========================================================================
+
 
 class TestDetectTaskType:
     """detect_task_type() maps user messages to task type strings."""
@@ -115,6 +117,7 @@ class TestDetectTaskType:
 # compute_rule_difficulty
 # ===========================================================================
 
+
 class TestComputeRuleDifficulty:
     """compute_rule_difficulty() scores how hard a rule is to follow."""
 
@@ -154,6 +157,7 @@ class TestComputeRuleDifficulty:
 # _difficulty_from_lesson
 # ===========================================================================
 
+
 class TestDifficultyFromLesson:
     """_difficulty_from_lesson() derives difficulty from lesson counters."""
 
@@ -178,6 +182,7 @@ class TestDifficultyFromLesson:
 # ===========================================================================
 # compute_scope_weight
 # ===========================================================================
+
 
 class TestComputeScopeWeight:
     """compute_scope_weight() adds task_type-aware bonuses to scope matching."""
@@ -214,6 +219,7 @@ class TestComputeScopeWeight:
 # merge_related_rules
 # ===========================================================================
 
+
 class TestMergeRelatedRules:
     """merge_related_rules() compresses same-category rules."""
 
@@ -231,7 +237,7 @@ class TestMergeRelatedRules:
         assert "merged_" in result[0].rule_id
         assert "Rule A" in result[0].instruction
         assert "Rule B" in result[0].instruction
-        assert "[RULE]" in result[0].instruction  # tier label, no raw float
+        assert "DRAFTING:" in result[0].instruction  # category prefix
 
     def test_different_categories_stay_separate(self):
         r1 = _make_applied(_make_lesson(category="DRAFTING", description="A"))
@@ -260,6 +266,7 @@ class TestMergeRelatedRules:
 # format_rules_for_prompt
 # ===========================================================================
 
+
 class TestFormatRulesForPrompt:
     """format_rules_for_prompt() produces XML-tagged output with primacy/recency."""
 
@@ -277,8 +284,8 @@ class TestFormatRulesForPrompt:
         output = format_rules_for_prompt([rule])
         assert "No em dashes in emails" in output
 
-    def test_recency_reminder_at_end(self):
-        """The top-priority rule should be repeated as REMINDER before closing tag."""
+    def test_rules_end_with_closing_tag(self):
+        """Output should end with closing brain-rules tag (no REMINDER)."""
         r1 = _make_applied(_make_lesson(description="Top rule", confidence=0.99))
         r2 = _make_applied(
             _make_lesson(
@@ -288,27 +295,22 @@ class TestFormatRulesForPrompt:
             )
         )
         output = format_rules_for_prompt([r1, r2])
-        lines = output.split("\n")
-        # REMINDER should appear near the end
-        reminder_lines = [l for l in lines if l.startswith("REMINDER:")]
-        assert len(reminder_lines) == 1
-        assert "Top rule" in reminder_lines[0] or "Lower rule" in reminder_lines[0]
+        assert output.strip().endswith("</brain-rules>")
 
     def test_few_shot_examples_included_for_low_confidence(self):
-        """Rules with examples and confidence < 0.80 or misfires get <example> tags."""
+        """Rules with examples and confidence < 0.70 and misfires > 1 get inline examples."""
         lesson = _make_lesson(
             description="Use colons not dashes",
-            confidence=0.70,
+            confidence=0.65,
             state=LessonState.PATTERN,
-            misfire_count=1,
+            misfire_count=2,
             example_draft="I wanted to say -- hello",
             example_corrected="I wanted to say: hello",
         )
         rule = _make_applied(lesson)
         output = format_rules_for_prompt([rule], merge=False)
-        assert "<example>" in output
-        assert "DRAFT:" in output
-        assert "CORRECTED:" in output
+        assert "e.g." in output
+        assert "->" in output
 
     def test_no_examples_for_high_confidence(self):
         """Rules at high confidence with no misfires should NOT get examples."""
@@ -333,7 +335,12 @@ class TestFormatRulesForPrompt:
     def test_primacy_ordering_rules_before_patterns(self):
         """RULE state lessons should appear before PATTERN state."""
         pattern = _make_applied(
-            _make_lesson(state=LessonState.PATTERN, confidence=0.75, description="Pattern rule", category="ACCURACY")
+            _make_lesson(
+                state=LessonState.PATTERN,
+                confidence=0.75,
+                description="Pattern rule",
+                category="ACCURACY",
+            )
         )
         rule = _make_applied(
             _make_lesson(state=LessonState.RULE, confidence=0.95, description="Firm rule")
@@ -348,6 +355,7 @@ class TestFormatRulesForPrompt:
 # capture_example_from_correction
 # ===========================================================================
 
+
 class TestCaptureExampleFromCorrection:
     """capture_example_from_correction() attaches draft/corrected pairs."""
 
@@ -355,9 +363,7 @@ class TestCaptureExampleFromCorrection:
         lesson = _make_lesson()
         assert lesson.example_draft is None
         assert lesson.example_corrected is None
-        result = capture_example_from_correction(
-            lesson, "bad draft text", "good corrected text"
-        )
+        result = capture_example_from_correction(lesson, "bad draft text", "good corrected text")
         assert result is lesson  # same object
         assert lesson.example_draft == "bad draft text"
         assert lesson.example_corrected == "good corrected text"
@@ -366,8 +372,8 @@ class TestCaptureExampleFromCorrection:
         lesson = _make_lesson()
         long_text = "x" * 500
         capture_example_from_correction(lesson, long_text, long_text)
-        assert len(lesson.example_draft) == 200
-        assert len(lesson.example_corrected) == 200
+        assert len(lesson.example_draft) == 80
+        assert len(lesson.example_corrected) == 80
 
     def test_overwrites_existing_example(self):
         lesson = _make_lesson(example_draft="old draft", example_corrected="old corrected")
@@ -379,6 +385,7 @@ class TestCaptureExampleFromCorrection:
 # ===========================================================================
 # _make_rule_id
 # ===========================================================================
+
 
 class TestMakeRuleId:
     """_make_rule_id() produces stable identifiers."""
@@ -405,6 +412,7 @@ class TestMakeRuleId:
 # ===========================================================================
 # apply_rules integration (smoke test with S71 features)
 # ===========================================================================
+
 
 class TestApplyRulesIntegration:
     """End-to-end: apply_rules with task detection and difficulty."""
@@ -440,9 +448,6 @@ class TestApplyRulesIntegration:
         assert result[0].lesson.category == "HARD"
 
     def test_max_rules_cap(self):
-        lessons = [
-            _make_lesson(description=f"Rule {i}", category=f"CAT{i}")
-            for i in range(20)
-        ]
+        lessons = [_make_lesson(description=f"Rule {i}", category=f"CAT{i}") for i in range(20)]
         result = apply_rules(lessons, scope=RuleScope(), max_rules=5)
         assert len(result) <= 5

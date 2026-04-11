@@ -138,11 +138,9 @@ class TestFormatRulesNoRawFloats:
         prompt = format_rules_for_prompt(applied)
 
         # Should NOT contain patterns like :0.95] — raw floats after colon
-        assert _SCORE_PATTERN.search(prompt) is None, (
-            f"Raw float leaked into prompt: {prompt}"
-        )
-        # Should contain the tier label without float
-        assert "[RULE]" in prompt
+        assert _SCORE_PATTERN.search(prompt) is None, f"Raw float leaked into prompt: {prompt}"
+        # Should contain the category (tier labels removed for conciseness)
+        assert "DRAFTING:" in prompt
 
 
 # ---------------------------------------------------------------------------
