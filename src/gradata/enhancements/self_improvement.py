@@ -48,6 +48,23 @@ ACCEPTANCE_BONUS = 0.20
 SURVIVAL_BONUS = 0.08
 # Preferences (user taste) decay 50% slower — they're stable signals
 PREFERENCE_DECAY_DAMPER = 0.5
+# Explicit contradiction acceleration: when direction is CONTRADICTING,
+# multiply penalty by this factor for faster preference reversal.
+# Applied on top of streak multiplier (see _contradiction_streak_multiplier).
+CONTRADICTION_ACCELERATION = 1.5
+# Consecutive contradictions accelerate: 1st=1.0x, 2nd=1.5x, 3rd=2.0x, etc.
+CONTRADICTION_STREAK_STEP = 0.5
+# Severity-aware contradiction boost: rewrite contradictions hit harder
+CONTRADICTION_SEVERITY_BOOST: dict[str, float] = {
+    "trivial": 0.8,  # trivial contradictions are soft
+    "minor": 0.9,
+    "moderate": 1.0,  # baseline
+    "major": 1.65,  # major contradictions get 65% boost
+    "rewrite": 1.8,  # rewrite contradictions get 80% boost
+}
+# Cooling period: after N contradictions in a row, block survival bonus
+# for this many sessions. Prevents oscillation during preference changes.
+CONTRADICTION_COOLING_SESSIONS = 2
 
 # SPEC Section 1: maturity-aware kill switches (relevant cycles only)
 KILL_LIMITS: dict[str, int] = {
@@ -309,6 +326,11 @@ def parse_lessons(text: str) -> list[Lesson]:
         memory_ids: list[str] = []
         scope_json: str = ""
         domain_scores: dict = {}
+        path = ""
+        secondary_categories: list[str] = []
+        climb_count = 0
+        last_climb_session = 0
+        tree_level = 0
         alpha = 1.0
         beta_param_val = 1.0
         j = i + 1
@@ -351,6 +373,24 @@ def parse_lessons(text: str) -> list[Lesson]:
                     domain_scores = _json.loads(meta_line[len("Domain scores:") :].strip())
                 except _json.JSONDecodeError:
                     domain_scores = {}
+            elif meta_line.startswith("Path:"):
+                path = meta_line[len("Path:") :].strip()
+            elif meta_line.startswith("Secondary categories:"):
+                secondary_categories = [
+                    x.strip()
+                    for x in meta_line[len("Secondary categories:") :].strip().split(",")
+                    if x.strip()
+                ]
+            elif meta_line.startswith("Climb:"):
+                import json as _json_cl
+
+                try:
+                    _cl = _json_cl.loads(meta_line[len("Climb:") :].strip())
+                    climb_count = _cl.get("count", 0)
+                    last_climb_session = _cl.get("last_session", 0)
+                    tree_level = _cl.get("level", 0)
+                except _json_cl.JSONDecodeError:
+                    pass
             elif meta_line.startswith("Metadata:"):
                 import json as _json_md
 
@@ -390,6 +430,11 @@ def parse_lessons(text: str) -> list[Lesson]:
             domain_scores=domain_scores,
             alpha=alpha,
             beta_param=beta_param_val,
+            path=path,
+            secondary_categories=secondary_categories,
+            climb_count=climb_count,
+            last_climb_session=last_climb_session,
+            tree_level=tree_level,
         )
         if metadata_obj is not None:
             _lesson.metadata = metadata_obj
@@ -426,13 +471,16 @@ def fsrs_penalty(confidence: float, *, machine: bool = False) -> float:
     """Confidence-dependent contradiction penalty (FSRS-inspired).
 
     Higher confidence → larger penalty (more to lose).
-    At confidence 0.30: ~0.14. At 0.80: ~0.18. At 0.95: ~0.20.
+    Uses quadratic scaling: penalty grows faster at higher confidence levels,
+    enabling faster preference reversal for established rules.
 
     In machine mode, uses halved base penalty so high-volume corrections
     don't collapse confidence in 4 rounds.
     """
     base = abs(MACHINE_CONTRADICTION_PENALTY) if machine else abs(CONTRADICTION_PENALTY)
-    return round(base * (0.5 + confidence * 0.5), 4)
+    # Quadratic scaling: steeper at high confidence for faster reversal
+    # At 0.30: base * 0.572, at 0.75: base * 1.063, at 0.90: base * 1.229
+    return round(base * (0.5 + confidence * confidence * 0.8), 4)
 
 
 # ---------------------------------------------------------------------------
@@ -656,6 +704,8 @@ def update_confidence(
                 if direction == "REINFORCING":
                     # Reinforcing: correction aligns with lesson direction → BONUS
                     lesson.alpha += 1.0
+                    # Reset contradiction streak on reinforcement
+                    lesson._contradiction_streak = 0
                     base_bonus = fsrs_bonus(lesson.confidence, machine=is_machine)
                     if cat in severity_data:
                         raw_severity = severity_data[cat]
@@ -678,13 +728,42 @@ def update_confidence(
                         penalty = base_penalty * weight
                     else:
                         penalty = base_penalty
+                    # Explicit contradictions get accelerated penalty
+                    # Streak tracking: consecutive contradictions hit harder
+                    if direction == "CONTRADICTING":
+                        streak = getattr(lesson, "_contradiction_streak", 0) + 1
+                        lesson._contradiction_streak = streak
+                        streak_mult = 1.0 + CONTRADICTION_STREAK_STEP * (streak - 1)
+                        # Severity-aware boost for contradictions
+                        sev_boost = CONTRADICTION_SEVERITY_BOOST.get(
+                            severity if cat in severity_data else "moderate",
+                            1.0,
+                        )
+                        penalty *= CONTRADICTION_ACCELERATION * streak_mult * sev_boost
+                        # RULE-state override: when user explicitly contradicts
+                        # a proven rule, they're intentionally overriding it.
+                        # Apply additional 20% penalty for RULE-state lessons.
+                        if lesson.state == LessonState.RULE:
+                            penalty *= 1.2
+                    else:
+                        # Reset streak on non-contradicting correction
+                        lesson._contradiction_streak = 0
                     # Preferences decay slower — stable user taste signals
-                    if lesson.correction_type == CorrectionType.PREFERENCE:
+                    # But skip damping when user explicitly contradicts the
+                    # preference (they're intentionally reversing it)
+                    if (
+                        lesson.correction_type == CorrectionType.PREFERENCE
+                        and direction != "CONTRADICTING"
+                    ):
                         penalty *= PREFERENCE_DECAY_DAMPER
                     lesson.confidence = round(max(0.0, min(1.0, lesson.confidence - penalty)), 2)
                     lesson.confidence = max(0.0, min(1.0, _bayesian_confidence(lesson)))
             else:
                 # Survived: category was testable, corrections exist elsewhere
+                # Cooling period: skip survival bonus if recently contradicted
+                streak = getattr(lesson, "_contradiction_streak", 0)
+                if streak >= CONTRADICTION_COOLING_SESSIONS:
+                    continue
                 base_bonus = fsrs_bonus(lesson.confidence, machine=is_machine)
                 if severity_data:
                     # Scale survival by severity of corrections elsewhere:
@@ -1079,6 +1158,19 @@ def format_lessons(lessons: list[Lesson]) -> str:
 
             lines.append(
                 f"  Beta params: {_json_bp.dumps({'alpha': lesson.alpha, 'beta': lesson.beta_param})}"
+            )
+
+        if lesson.path:
+            lines.append(f"  Path: {lesson.path}")
+
+        if lesson.secondary_categories:
+            lines.append(f"  Secondary categories: {','.join(lesson.secondary_categories)}")
+
+        if lesson.climb_count or lesson.last_climb_session or lesson.tree_level:
+            import json as _json_cl
+
+            lines.append(
+                f"  Climb: {_json_cl.dumps({'count': lesson.climb_count, 'last_session': lesson.last_climb_session, 'level': lesson.tree_level})}"
             )
 
         if hasattr(lesson, "metadata") and lesson.metadata is not None:

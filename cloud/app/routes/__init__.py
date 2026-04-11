@@ -1,11 +1,24 @@
 """Route aggregation."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.routes.sync import router as sync_router
+from app.routes.analytics import router as analytics_router
+from app.routes.api_keys import router as api_keys_router
+from app.routes.billing import router as billing_router
 from app.routes.brains import router as brains_router
+from app.routes.corrections import router as corrections_router
+from app.routes.lessons import router as lessons_router
+from app.routes.sync import router as sync_router
+from app.routes.users import router as users_router
 
 router = APIRouter()
 router.include_router(sync_router, tags=["sync"])
 router.include_router(brains_router, tags=["brains"])
+router.include_router(users_router, tags=["users"])
+router.include_router(api_keys_router, tags=["api-keys"])
+router.include_router(lessons_router, tags=["lessons"])
+router.include_router(corrections_router, tags=["corrections"])
+router.include_router(analytics_router, tags=["analytics"])
+router.include_router(billing_router, tags=["billing"])

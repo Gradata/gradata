@@ -60,6 +60,7 @@ def wilson_score_interval(successes: int, trials: int, z: float = 1.96) -> tuple
 @dataclass
 class ExperimentResult:
     """Result of evaluating an A/B experiment."""
+
     winner: str | None = None
     confidence: float = 0.0
     a_success_rate: float = 0.0
@@ -79,6 +80,7 @@ class ExperimentResult:
 @dataclass
 class RuleExperiment:
     """A/B test between two rule variants."""
+
     experiment_id: str
     variant_a: str
     variant_b: str
@@ -125,11 +127,16 @@ class RuleExperiment:
                 winner = "a" if a_rate > b_rate else "b"
                 confidence = min(1.0, margin / 0.5) * 0.7
         return ExperimentResult(
-            winner=winner, confidence=round(confidence, 4),
-            a_success_rate=round(a_rate, 4), b_success_rate=round(b_rate, 4),
-            a_interval=a_interval, b_interval=b_interval,
-            a_trials=self._a_trials, b_trials=self._b_trials,
-            sufficient_data=sufficient, margin=round(margin, 4),
+            winner=winner,
+            confidence=round(confidence, 4),
+            a_success_rate=round(a_rate, 4),
+            b_success_rate=round(b_rate, 4),
+            a_interval=a_interval,
+            b_interval=b_interval,
+            a_trials=self._a_trials,
+            b_trials=self._b_trials,
+            sufficient_data=sufficient,
+            margin=round(margin, 4),
         )
 
     @property
@@ -138,16 +145,24 @@ class RuleExperiment:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "experiment_id": self.experiment_id, "variant_a": self.variant_a,
-            "variant_b": self.variant_b, "category": self.category,
-            "a_successes": self._a_successes, "a_trials": self._a_trials,
-            "b_successes": self._b_successes, "b_trials": self._b_trials,
+            "experiment_id": self.experiment_id,
+            "variant_a": self.variant_a,
+            "variant_b": self.variant_b,
+            "category": self.category,
+            "a_successes": self._a_successes,
+            "a_trials": self._a_trials,
+            "b_successes": self._b_successes,
+            "b_trials": self._b_trials,
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> RuleExperiment:
-        exp = cls(experiment_id=data["experiment_id"], variant_a=data["variant_a"],
-                  variant_b=data["variant_b"], category=data.get("category", ""))
+        exp = cls(
+            experiment_id=data["experiment_id"],
+            variant_a=data["variant_a"],
+            variant_b=data["variant_b"],
+            category=data.get("category", ""),
+        )
         exp._a_successes = data.get("a_successes", 0)
         exp._a_trials = data.get("a_trials", 0)
         exp._b_successes = data.get("b_successes", 0)
@@ -162,8 +177,12 @@ class ExperimentManager:
         self._experiments: dict[str, RuleExperiment] = {}
         self._completed: list[dict[str, Any]] = []
 
-    def create(self, experiment_id: str, variant_a: str, variant_b: str, category: str = "") -> RuleExperiment:
-        exp = RuleExperiment(experiment_id=experiment_id, variant_a=variant_a, variant_b=variant_b, category=category)
+    def create(
+        self, experiment_id: str, variant_a: str, variant_b: str, category: str = ""
+    ) -> RuleExperiment:
+        exp = RuleExperiment(
+            experiment_id=experiment_id, variant_a=variant_a, variant_b=variant_b, category=category
+        )
         self._experiments[experiment_id] = exp
         return exp
 
@@ -177,10 +196,16 @@ class ExperimentManager:
             result = exp.evaluate()
             results.append(result)
             if result.is_conclusive:
-                self._completed.append({
-                    "experiment": exp.to_dict(),
-                    "result": {"winner": result.winner, "confidence": result.confidence, "margin": result.margin},
-                })
+                self._completed.append(
+                    {
+                        "experiment": exp.to_dict(),
+                        "result": {
+                            "winner": result.winner,
+                            "confidence": result.confidence,
+                            "margin": result.margin,
+                        },
+                    }
+                )
                 completed_ids.append(exp_id)
         for exp_id in completed_ids:
             del self._experiments[exp_id]
@@ -225,14 +250,72 @@ def _text_similarity(a: str, b: str) -> float:
 
 def _extract_keywords(text: str) -> set[str]:
     stopwords = {
-        "a", "an", "the", "is", "are", "was", "were", "be", "been",
-        "have", "has", "had", "do", "does", "did", "will", "would",
-        "could", "should", "may", "might", "can", "to", "of", "in",
-        "for", "on", "with", "at", "by", "from", "as", "it", "its",
-        "this", "that", "and", "but", "or", "not", "no", "if", "then",
-        "when", "so", "than", "too", "very", "just", "also", "all",
-        "each", "every", "any", "some", "only", "i", "we", "you",
-        "they", "he", "she", "my", "your", "our", "their",
+        "a",
+        "an",
+        "the",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "can",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "it",
+        "its",
+        "this",
+        "that",
+        "and",
+        "but",
+        "or",
+        "not",
+        "no",
+        "if",
+        "then",
+        "when",
+        "so",
+        "than",
+        "too",
+        "very",
+        "just",
+        "also",
+        "all",
+        "each",
+        "every",
+        "any",
+        "some",
+        "only",
+        "i",
+        "we",
+        "you",
+        "they",
+        "he",
+        "she",
+        "my",
+        "your",
+        "our",
+        "their",
     }
     words = set(re.sub(r"[^\w\s]", " ", text.lower()).split())
     return words - stopwords
@@ -242,12 +325,22 @@ def _detect_opposite_direction(a_desc: str, b_desc: str) -> bool:
     a_lower = a_desc.lower()
     b_lower = b_desc.lower()
     opposites = [
-        ("use", "avoid"), ("use", "don't use"), ("use", "do not use"),
-        ("include", "exclude"), ("include", "remove"), ("include", "omit"),
-        ("add", "remove"), ("add", "don't add"), ("add", "do not add"),
-        ("always", "never"), ("must", "must not"), ("keep", "remove"),
-        ("prefer", "avoid"), ("enable", "disable"),
-        ("before", "after"), ("first", "last"),
+        ("use", "avoid"),
+        ("use", "don't use"),
+        ("use", "do not use"),
+        ("include", "exclude"),
+        ("include", "remove"),
+        ("include", "omit"),
+        ("add", "remove"),
+        ("add", "don't add"),
+        ("add", "do not add"),
+        ("always", "never"),
+        ("must", "must not"),
+        ("keep", "remove"),
+        ("prefer", "avoid"),
+        ("enable", "disable"),
+        ("before", "after"),
+        ("first", "last"),
     ]
     for pos, neg in opposites:
         if (pos in a_lower and neg in b_lower) or (neg in a_lower and pos in b_lower):
@@ -255,9 +348,33 @@ def _detect_opposite_direction(a_desc: str, b_desc: str) -> bool:
     return False
 
 
+def replace_contradicted_rule(
+    old_rule: Lesson,
+    new_lesson: Lesson,
+) -> Lesson:
+    """Replace a contradicted rule with the new lesson's direction.
+
+    Transfers the old rule's metadata (fire_count, sessions_since_fire)
+    to preserve history, but resets confidence and description to the
+    new lesson. This enables instant preference reversal.
+
+    Returns the old_rule (mutated in place).
+    """
+    old_rule.description = new_lesson.description
+    old_rule.confidence = new_lesson.confidence
+    old_rule.root_cause = f"replaced: was '{old_rule.description[:60]}'"
+    # Reset contradiction tracking
+    if hasattr(old_rule, "_contradiction_streak"):
+        old_rule._contradiction_streak = 0
+    return old_rule
+
+
 def detect_rule_conflict(
-    new_lesson: Lesson, existing_rules: list[Lesson], *,
-    update_threshold: float = 0.80, extend_threshold: float = 0.60,
+    new_lesson: Lesson,
+    existing_rules: list[Lesson],
+    *,
+    update_threshold: float = 0.80,
+    extend_threshold: float = 0.60,
     derive_min_cluster: int = 3,
 ) -> tuple[RuleRelation, Lesson | None]:
     if not existing_rules:
@@ -278,9 +395,17 @@ def detect_rule_conflict(
             rule_keywords = _extract_keywords(rule.description)
             if new_keywords & rule_keywords:
                 category_cluster.append(rule)
-    if best_rule is not None and best_similarity > update_threshold and _detect_opposite_direction(new_desc, best_rule.description):
+    if (
+        best_rule is not None
+        and best_similarity > update_threshold
+        and _detect_opposite_direction(new_desc, best_rule.description)
+    ):
         return (RuleRelation.UPDATES, best_rule)
-    if best_rule is not None and best_similarity > extend_threshold and not _detect_opposite_direction(new_desc, best_rule.description):
+    if (
+        best_rule is not None
+        and best_similarity > extend_threshold
+        and not _detect_opposite_direction(new_desc, best_rule.description)
+    ):
         return (RuleRelation.EXTENDS, best_rule)
     if len(category_cluster) >= derive_min_cluster:
         return (RuleRelation.DERIVES, None)
@@ -288,7 +413,8 @@ def detect_rule_conflict(
 
 
 def classify_all_relations(
-    new_lesson: Lesson, existing_rules: list[Lesson],
+    new_lesson: Lesson,
+    existing_rules: list[Lesson],
 ) -> list[tuple[RuleRelation, Lesson, float]]:
     results: list[tuple[RuleRelation, Lesson, float]] = []
     new_desc = new_lesson.description

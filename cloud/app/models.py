@@ -1,4 +1,5 @@
 """Pydantic request/response models for the sync API."""
+
 from __future__ import annotations
 
 from enum import Enum
@@ -26,6 +27,7 @@ class LessonState(str, Enum):
 
 class CorrectionPayload(BaseModel):
     """A single correction from the SDK."""
+
     session: int
     category: str = "UNKNOWN"
     severity: Severity = Severity.minor
@@ -37,6 +39,7 @@ class CorrectionPayload(BaseModel):
 
 class LessonPayload(BaseModel):
     """A lesson (graduated rule) from the SDK."""
+
     category: str
     description: str
     state: LessonState = LessonState.INSTINCT
@@ -47,6 +50,7 @@ class LessonPayload(BaseModel):
 
 class EventPayload(BaseModel):
     """A raw event from events.jsonl."""
+
     type: str
     source: str = ""
     data: dict[str, Any] = Field(default_factory=dict)
@@ -64,6 +68,7 @@ class EventPayload(BaseModel):
 
 class MetaRulePayload(BaseModel):
     """A meta-rule from the SDK."""
+
     title: str
     description: str
     source_lesson_descriptions: list[str] = Field(default_factory=list)
@@ -75,6 +80,7 @@ class SyncRequest(BaseModel):
     The SDK calls this on end_session() when GRADATA_API_KEY is set.
     Sends all new corrections, lessons, events, and meta-rules since last sync.
     """
+
     brain_name: str = "default"
     corrections: list[CorrectionPayload] = Field(default_factory=list)
     lessons: list[LessonPayload] = Field(default_factory=list)
@@ -85,8 +91,115 @@ class SyncRequest(BaseModel):
 
 class SyncResponse(BaseModel):
     """POST /api/v1/sync response."""
+
     status: str = "ok"
     corrections_synced: int = 0
     lessons_synced: int = 0
     events_synced: int = 0
     meta_rules_synced: int = 0
+
+
+# ---------------------------------------------------------------------------
+# User profile models
+# ---------------------------------------------------------------------------
+
+
+class UserProfile(BaseModel):
+    user_id: str
+    display_name: str | None = None
+    email: str | None = None
+    workspaces: list[dict] = Field(default_factory=list)
+    created_at: str | None = None
+
+
+class UpdateProfileRequest(BaseModel):
+    display_name: str
+
+
+# ---------------------------------------------------------------------------
+# API key models
+# ---------------------------------------------------------------------------
+
+
+class APIKeyResponse(BaseModel):
+    key_id: str
+    brain_id: str
+    masked_key: str  # last 4 chars only
+    created_at: str | None = None
+
+
+class CreateAPIKeyRequest(BaseModel):
+    brain_id: str
+    brain_name: str = "default"
+
+
+class CreateAPIKeyResponse(BaseModel):
+    key_id: str
+    brain_id: str
+    api_key: str  # plaintext — shown once only
+
+
+# ---------------------------------------------------------------------------
+# Brain detail models
+# ---------------------------------------------------------------------------
+
+
+class BrainDetail(BaseModel):
+    id: str
+    user_id: str
+    brain_name: str | None = None
+    domain: str | None = None
+    last_sync_at: str | None = None
+    created_at: str | None = None
+    deleted_at: str | None = None
+    lesson_count: int = 0
+    correction_count: int = 0
+
+
+class UpdateBrainRequest(BaseModel):
+    brain_name: str | None = None
+    domain: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Analytics model
+# ---------------------------------------------------------------------------
+
+
+class BrainAnalytics(BaseModel):
+    total_corrections: int = 0
+    total_lessons: int = 0
+    total_events: int = 0
+    lessons_by_state: dict[str, int] = Field(default_factory=dict)
+    corrections_by_severity: dict[str, int] = Field(default_factory=dict)
+    corrections_by_category: dict[str, int] = Field(default_factory=dict)
+    avg_confidence: float = 0.0
+    graduation_rate: float = 0.0
+    last_sync_at: str | None = None
+    brain_created_at: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Billing models
+# ---------------------------------------------------------------------------
+
+
+class CheckoutRequest(BaseModel):
+    plan: str  # "pro" | "team"
+
+
+class CheckoutResponse(BaseModel):
+    checkout_url: str
+
+
+class SubscriptionUsage(BaseModel):
+    brains: int = 0
+    lessons: int = 0
+    events: int = 0
+
+
+class SubscriptionResponse(BaseModel):
+    plan: str | None = None
+    status: str | None = None
+    current_period_end: str | None = None
+    usage: SubscriptionUsage = Field(default_factory=SubscriptionUsage)

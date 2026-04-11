@@ -339,8 +339,6 @@ def run_simulation(config: dict[str, Any], output_dir: str | Path) -> Path:
     question = config["question"]
     model = config.get("model", DEFAULT_MODEL)
     num_rounds = config.get("rounds", 15)
-    agents_per_round = config.get("agents_per_round", 5)
-
     # Build agents
     agents = [
         Agent(
@@ -351,6 +349,7 @@ def run_simulation(config: dict[str, Any], output_dir: str | Path) -> Path:
         )
         for a in config["agents"]
     ]
+    agents_per_round = config.get("agents_per_round") or len(agents)
 
     forum = Forum()
     jsonl_path = output_dir / "posts.jsonl"

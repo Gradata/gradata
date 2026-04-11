@@ -910,3 +910,54 @@ def capture_example_from_correction(
     lesson.example_draft = draft[:_EXAMPLE_MAX_CHARS]
     lesson.example_corrected = corrected[:_EXAMPLE_MAX_CHARS]
     return lesson
+
+
+# ---------------------------------------------------------------------------
+# Tree-Based Rule Retrieval (opt-in, falls back to flat)
+# ---------------------------------------------------------------------------
+
+
+def apply_rules_with_tree(
+    lessons: list[Lesson],
+    scope: RuleScope,
+    *,
+    max_rules: int = 5,
+    event_bus: EventBus | None = None,
+    rule_graph: RuleGraph | None = None,
+) -> list[AppliedRule]:
+    """Apply rules using hierarchical tree retrieval.
+
+    Falls back to flat scoring if no lessons have paths.
+    """
+    from gradata.rules.rule_tree import RuleTree
+
+    # Check if any lessons have paths
+    has_paths = any(l.path for l in lessons)
+    if not has_paths:
+        # Fallback: use existing flat apply_rules
+        return apply_rules(lessons, scope, max_rules=max_rules, bus=event_bus, graph=rule_graph)
+
+    tree = RuleTree(lessons)
+    candidates = tree.get_rules_for_context(
+        task_type=scope.task_type,
+        domain=scope.domain,
+        max_rules=max_rules * 2,  # get extra, let formatting trim
+    )
+
+    # Format as AppliedRule objects
+    applied = []
+    for lesson in candidates[:max_rules]:
+        rule_id = f"{lesson.category}:{hash(lesson.description) % 10000:04d}"
+        instruction = (
+            f'<rule confidence="{lesson.confidence:.2f}">'
+            f"{lesson.category}: {lesson.description}</rule>"
+        )
+        applied.append(
+            AppliedRule(
+                rule_id=rule_id,
+                lesson=lesson,
+                relevance=1.0,  # tree already filtered for relevance
+                instruction=instruction,
+            )
+        )
+    return applied
