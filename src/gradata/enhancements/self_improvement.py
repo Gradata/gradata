@@ -327,6 +327,11 @@ def parse_lessons(text: str) -> list[Lesson]:
         memory_ids: list[str] = []
         scope_json: str = ""
         domain_scores: dict = {}
+        path = ""
+        secondary_categories: list[str] = []
+        climb_count = 0
+        last_climb_session = 0
+        tree_level = 0
         alpha = 1.0
         beta_param_val = 1.0
         j = i + 1
@@ -369,6 +374,24 @@ def parse_lessons(text: str) -> list[Lesson]:
                     domain_scores = _json.loads(meta_line[len("Domain scores:") :].strip())
                 except _json.JSONDecodeError:
                     domain_scores = {}
+            elif meta_line.startswith("Path:"):
+                path = meta_line[len("Path:") :].strip()
+            elif meta_line.startswith("Secondary categories:"):
+                secondary_categories = [
+                    x.strip()
+                    for x in meta_line[len("Secondary categories:") :].strip().split(",")
+                    if x.strip()
+                ]
+            elif meta_line.startswith("Climb:"):
+                import json as _json_cl
+
+                try:
+                    _cl = _json_cl.loads(meta_line[len("Climb:") :].strip())
+                    climb_count = _cl.get("count", 0)
+                    last_climb_session = _cl.get("last_session", 0)
+                    tree_level = _cl.get("level", 0)
+                except _json_cl.JSONDecodeError:
+                    pass
             elif meta_line.startswith("Metadata:"):
                 import json as _json_md
 
@@ -408,6 +431,11 @@ def parse_lessons(text: str) -> list[Lesson]:
             domain_scores=domain_scores,
             alpha=alpha,
             beta_param=beta_param_val,
+            path=path,
+            secondary_categories=secondary_categories,
+            climb_count=climb_count,
+            last_climb_session=last_climb_session,
+            tree_level=tree_level,
         )
         if metadata_obj is not None:
             _lesson.metadata = metadata_obj
@@ -1127,6 +1155,19 @@ def format_lessons(lessons: list[Lesson]) -> str:
 
             lines.append(
                 f"  Beta params: {_json_bp.dumps({'alpha': lesson.alpha, 'beta': lesson.beta_param})}"
+            )
+
+        if lesson.path:
+            lines.append(f"  Path: {lesson.path}")
+
+        if lesson.secondary_categories:
+            lines.append(f"  Secondary categories: {','.join(lesson.secondary_categories)}")
+
+        if lesson.climb_count or lesson.last_climb_session or lesson.tree_level:
+            import json as _json_cl
+
+            lines.append(
+                f"  Climb: {_json_cl.dumps({'count': lesson.climb_count, 'last_session': lesson.last_climb_session, 'level': lesson.tree_level})}"
             )
 
         if hasattr(lesson, "metadata") and lesson.metadata is not None:

@@ -66,6 +66,8 @@ _MIGRATIONS: list[str] = [
     "ALTER TABLE meta_rules ADD COLUMN transfer_scope TEXT DEFAULT 'personal'",
     # Rule provenance index
     "CREATE INDEX IF NOT EXISTS idx_provenance_rule_id ON rule_provenance(rule_id)",
+    # Hierarchical rule tree: path column for tree organization
+    "ALTER TABLE lesson_transitions ADD COLUMN path TEXT DEFAULT ''",
     # Super-meta-rules table
     "ALTER TABLE super_meta_rules ADD COLUMN applies_when TEXT",
     "ALTER TABLE super_meta_rules ADD COLUMN never_when TEXT",
