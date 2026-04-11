@@ -3,19 +3,298 @@
 Lightweight adjacency list tracking relationships between rules:
 - conflict: rules that contradict each other
 - co_occurrence: rules that frequently fire together
+- typed relationships: REINFORCES, CONTRADICTS, SPECIALIZES, GENERALIZES
 
-Persisted as JSON in the brain directory.
+Persisted as JSON (legacy edges) + SQLite (typed relationships).
 """
+
 from __future__ import annotations
 
 import json
 import logging
+import re
+import sqlite3
+from datetime import datetime, timezone
+from enum import Enum
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    pass
 
 _log = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Relationship types
+# ---------------------------------------------------------------------------
+
+
+class RuleRelationType(Enum):
+    """Typed relationship between two rules."""
+
+    REINFORCES = "reinforces"
+    CONTRADICTS = "contradicts"
+    SPECIALIZES = "specializes"
+    GENERALIZES = "generalizes"
+
+
+# ---------------------------------------------------------------------------
+# Contradiction detection patterns (reused from contradiction_detector)
+# ---------------------------------------------------------------------------
+
+_POLARITY_PAIRS: list[tuple[str, str]] = [
+    ("always", "never"),
+    ("must", "must not"),
+    ("must", "never"),
+    ("required", "forbidden"),
+    ("mandatory", "optional"),
+]
+
+_ACTION_OPPOSITES: list[tuple[str, str]] = [
+    ("use", "avoid"),
+    ("use", "don't use"),
+    ("use", "do not use"),
+    ("include", "exclude"),
+    ("include", "remove"),
+    ("include", "omit"),
+    ("add", "remove"),
+    ("add", "don't add"),
+    ("add", "do not add"),
+    ("enable", "disable"),
+    ("prefer", "avoid"),
+    ("keep", "remove"),
+    ("keep", "drop"),
+    ("keep", "delete"),
+    ("show", "hide"),
+    ("allow", "block"),
+    ("allow", "deny"),
+    ("accept", "reject"),
+]
+
+_STOPWORDS = {
+    "a",
+    "an",
+    "the",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "may",
+    "might",
+    "shall",
+    "can",
+    "to",
+    "of",
+    "in",
+    "for",
+    "on",
+    "with",
+    "at",
+    "by",
+    "from",
+    "as",
+    "into",
+    "through",
+    "during",
+    "it",
+    "its",
+    "this",
+    "that",
+    "these",
+    "those",
+    "i",
+    "we",
+    "you",
+    "they",
+    "he",
+    "she",
+    "and",
+    "but",
+    "or",
+    "not",
+    "no",
+    "if",
+    "then",
+    "else",
+    "when",
+    "while",
+    "so",
+    "than",
+    "too",
+    "very",
+    "just",
+    "also",
+    "all",
+    "each",
+    "every",
+    "any",
+    "some",
+    "only",
+}
+
+
+def _normalize(text: str) -> str:
+    """Lowercase and strip punctuation for matching."""
+    return re.sub(r"[^\w\s]", " ", text.lower()).strip()
+
+
+def _extract_keywords(text: str) -> set[str]:
+    """Extract meaningful keywords, skipping stopwords."""
+    words = set(_normalize(text).split())
+    return words - _STOPWORDS
+
+
+def _has_contradiction(desc_a: str, desc_b: str) -> bool:
+    """Check if two descriptions contradict each other."""
+    norm_a = _normalize(desc_a)
+    norm_b = _normalize(desc_b)
+
+    for pos, neg in _POLARITY_PAIRS:
+        if (pos in norm_a and neg in norm_b) or (neg in norm_a and pos in norm_b):
+            return True
+
+    for action, opposite in _ACTION_OPPOSITES:
+        if (action in norm_a and opposite in norm_b) or (opposite in norm_a and action in norm_b):
+            return True
+
+    return False
+
+
+def _keyword_overlap(desc_a: str, desc_b: str) -> float:
+    """Fraction of shared keywords (Jaccard similarity)."""
+    kw_a = _extract_keywords(desc_a)
+    kw_b = _extract_keywords(desc_b)
+    if not kw_a or not kw_b:
+        return 0.0
+    return len(kw_a & kw_b) / len(kw_a | kw_b)
+
+
+# ---------------------------------------------------------------------------
+# Relationship detection
+# ---------------------------------------------------------------------------
+
+
+def detect_relationship(rule_a: dict, rule_b: dict) -> RuleRelationType | None:
+    """Detect relationship between two rules.
+
+    Priority order:
+    1. SPECIALIZES / GENERALIZES (path hierarchy)
+    2. CONTRADICTS (polarity / action opposites)
+    3. REINFORCES (same category + keyword overlap > 50%)
+
+    Returns None if no relationship detected.
+    """
+    path_a = rule_a.get("path", "")
+    path_b = rule_b.get("path", "")
+    cat_a = rule_a.get("category", "")
+    cat_b = rule_b.get("category", "")
+    desc_a = rule_a.get("description", "")
+    desc_b = rule_b.get("description", "")
+
+    # 1. Path hierarchy (SPECIALIZES / GENERALIZES)
+    if path_a and path_b and path_a != path_b:
+        if path_a.startswith(path_b + "/"):
+            return RuleRelationType.SPECIALIZES
+        if path_b.startswith(path_a + "/"):
+            return RuleRelationType.GENERALIZES
+
+    # 2. Contradiction detection (same category required)
+    if cat_a and cat_b and cat_a == cat_b:
+        if _has_contradiction(desc_a, desc_b):
+            return RuleRelationType.CONTRADICTS
+
+    # 3. Reinforcement (same category + keyword overlap > 50%)
+    if cat_a and cat_b and cat_a == cat_b:
+        if _keyword_overlap(desc_a, desc_b) > 0.5:
+            return RuleRelationType.REINFORCES
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# SQLite storage
+# ---------------------------------------------------------------------------
+
+
+def store_relationship(
+    db_path: str | Path,
+    rule_a_id: str,
+    rule_b_id: str,
+    rel_type: RuleRelationType,
+    confidence: float = 0.5,
+) -> None:
+    """Store a typed relationship in SQLite."""
+    conn = sqlite3.connect(str(db_path))
+    conn.execute(
+        "INSERT INTO rule_relationships "
+        "(rule_a_id, rule_b_id, relationship, confidence, detected_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (
+            rule_a_id,
+            rule_b_id,
+            rel_type.value,
+            confidence,
+            datetime.now(timezone.utc).isoformat(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_related_rules(
+    db_path: str | Path,
+    rule_id: str,
+    rel_type: RuleRelationType | None = None,
+) -> list[dict]:
+    """Query rules related to a given rule (bidirectional).
+
+    Returns list of dicts with keys: related_rule_id, relationship, confidence.
+    """
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+
+    if rel_type is not None:
+        rows = conn.execute(
+            "SELECT rule_a_id, rule_b_id, relationship, confidence "
+            "FROM rule_relationships "
+            "WHERE (rule_a_id = ? OR rule_b_id = ?) AND relationship = ?",
+            (rule_id, rule_id, rel_type.value),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT rule_a_id, rule_b_id, relationship, confidence "
+            "FROM rule_relationships "
+            "WHERE rule_a_id = ? OR rule_b_id = ?",
+            (rule_id, rule_id),
+        ).fetchall()
+
+    conn.close()
+
+    results = []
+    for row in rows:
+        other_id = row["rule_b_id"] if row["rule_a_id"] == rule_id else row["rule_a_id"]
+        results.append(
+            {
+                "related_rule_id": other_id,
+                "relationship": row["relationship"],
+                "confidence": row["confidence"],
+            }
+        )
+    return results
 
 
 class RuleGraph:
@@ -48,12 +327,8 @@ class RuleGraph:
             self._ensure_node(a)
             for b in rule_ids[i + 1 :]:
                 self._ensure_node(b)
-                self._edges[a]["co_occurs"][b] = (
-                    self._edges[a]["co_occurs"].get(b, 0) + 1
-                )
-                self._edges[b]["co_occurs"][a] = (
-                    self._edges[b]["co_occurs"].get(a, 0) + 1
-                )
+                self._edges[a]["co_occurs"][b] = self._edges[a]["co_occurs"].get(b, 0) + 1
+                self._edges[b]["co_occurs"][a] = self._edges[b]["co_occurs"].get(a, 0) + 1
 
     def get_conflicts(self, rule_id: str) -> dict[str, int]:
         """Get all rules that conflict with this one. Returns {rule_id: count}."""
@@ -74,9 +349,7 @@ class RuleGraph:
     def save(self) -> None:
         """Persist graph to disk."""
         if self._path:
-            self._path.write_text(
-                json.dumps(self._edges, indent=2), encoding="utf-8"
-            )
+            self._path.write_text(json.dumps(self._edges, indent=2), encoding="utf-8")
 
     def _ensure_node(self, rule_id: str) -> None:
         if rule_id not in self._edges:

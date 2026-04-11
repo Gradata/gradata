@@ -55,14 +55,20 @@ def chunk_markdown(text: str, filepath: str, max_tokens: int = MAX_TOKENS_PER_CH
     prefix = f"[Source: {Path(filepath).name} | Type: {file_type}]\n\n"
     if estimated_tokens <= max_tokens:
         return [{"id": filepath, "text": prefix + text, "chunk": 0, "total_chunks": 1}]
-    sections = re.split(r'\n(?=## )', text)
+    sections = re.split(r"\n(?=## )", text)
     chunks = []
     for i, section in enumerate(sections):
         section = section.strip()
         if not section:
             continue
-        chunks.append({"id": f"{filepath}#chunk{i}", "text": prefix + section,
-                       "chunk": i, "total_chunks": len(sections)})
+        chunks.append(
+            {
+                "id": f"{filepath}#chunk{i}",
+                "text": prefix + section,
+                "chunk": i,
+                "total_chunks": len(sections),
+            }
+        )
     return chunks
 
 
@@ -99,7 +105,7 @@ def find_changed_files(base_dir: Path) -> tuple[list[Path], list[str], dict]:
 
 def extract_session_number(filepath: Path) -> int:
     name = filepath.stem
-    match = re.search(r'S(\d+)', name)
+    match = re.search(r"S(\d+)", name)
     if match:
         return int(match.group(1))
     return -1
@@ -116,12 +122,12 @@ def parse_outcome_links() -> dict[str, dict]:
             for line in text.split("\n"):
                 line_lower = line.lower().strip()
                 if "[outcome:" in line_lower:
-                    match = re.search(r'\[outcome:\s*([\w-]+)\]', line_lower)
+                    match = re.search(r"\[outcome:\s*([\w-]+)\]", line_lower)
                     if match:
                         outcome = match.group(1)
                 if "result:" in line_lower or "\u2192" in line:
                     result_text = line.strip()[:200]
-                for wl in re.findall(r'\[\[([\w/.-]+)\]\]', line):
+                for wl in re.findall(r"\[\[([\w/.-]+)\]\]", line):
                     sources.append(wl)
             for src in sources:
                 links[src] = {"outcome": outcome, "result": result_text}
@@ -149,6 +155,7 @@ def get_gemini_client():
     if EMBEDDING_PROVIDER == "local":
         return None
     from google import genai  # type: ignore[attr-defined]  # optional dep
+
     api_key = os.environ.get(API_KEY_ENV_VAR)
     if not api_key:
         logging.getLogger("gradata.embed").error("%s not set", API_KEY_ENV_VAR)
@@ -158,11 +165,13 @@ def get_gemini_client():
 
 _local_model = None
 
+
 def _get_local_model():
     """Load sentence-transformers model for local embedding generation."""
     global _local_model
     if _local_model is None:
         from sentence_transformers import SentenceTransformer
+
         _local_model = SentenceTransformer(LOCAL_MODEL)
     return _local_model
 
@@ -173,29 +182,86 @@ def embed_texts_local(texts: list[str]) -> list[list[float]]:
     return [e.tolist() for e in embeddings]
 
 
-def embed_texts(texts: list[str], client=None, task_type: str = "RETRIEVAL_DOCUMENT") -> list[list[float]]:
+def embed_texts(
+    texts: list[str], client=None, task_type: str = "RETRIEVAL_DOCUMENT"
+) -> list[list[float]]:
     if EMBEDDING_PROVIDER == "local":
         return embed_texts_local(texts)
     return embed_texts_gemini(texts, client, task_type)
 
 
-def embed_texts_gemini(texts: list[str], client, task_type: str = "RETRIEVAL_DOCUMENT") -> list[list[float]]:
+def embed_texts_gemini(
+    texts: list[str], client, task_type: str = "RETRIEVAL_DOCUMENT"
+) -> list[list[float]]:
     import time
 
     from google.genai import types
+
     all_embeddings = []
     batch_size = 20
     total_batches = (len(texts) + batch_size - 1) // batch_size
     for batch_num, i in enumerate(range(0, len(texts), batch_size)):
-        batch = texts[i:i + batch_size]
+        batch = texts[i : i + batch_size]
         result = client.models.embed_content(
-            model=EMBEDDING_MODEL, contents=batch,
-            config=types.EmbedContentConfig(output_dimensionality=EMBEDDING_DIMS, task_type=task_type),
+            model=EMBEDDING_MODEL,
+            contents=batch,
+            config=types.EmbedContentConfig(
+                output_dimensionality=EMBEDDING_DIMS, task_type=task_type
+            ),
         )
         all_embeddings.extend([e.values for e in result.embeddings])
         if batch_num < total_batches - 1:
             time.sleep(1.5)
     return all_embeddings
+
+
+def _cosine_distance(a: list[float], b: list[float]) -> float:
+    """Cosine distance between two vectors. 0=identical, 1=opposite."""
+    import math
+
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(x * x for x in b))
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    similarity = dot / (norm_a * norm_b)
+    return max(0.0, min(1.0, 1.0 - similarity))
+
+
+def embed_pair(draft: str, final: str) -> dict:
+    """Compute embeddings for a correction pair and return semantic delta.
+
+    Returns: {
+        "draft_embedding": list[float] | None,
+        "final_embedding": list[float] | None,
+        "cosine_distance": float,  # 0.0 = identical, 1.0 = opposite
+        "semantic_delta": float,   # normalized 0-1 severity from embeddings
+    }
+
+    Falls back gracefully: if embedding model unavailable, returns None
+    embeddings and cosine_distance=0.0.
+    """
+    fallback = {
+        "draft_embedding": None,
+        "final_embedding": None,
+        "cosine_distance": 0.0,
+        "semantic_delta": 0.0,
+    }
+    try:
+        embeddings = embed_texts([draft, final])
+        draft_emb, final_emb = embeddings[0], embeddings[1]
+        if draft_emb is None or final_emb is None:
+            return fallback
+
+        cos_dist = _cosine_distance(draft_emb, final_emb)
+        return {
+            "draft_embedding": draft_emb,
+            "final_embedding": final_emb,
+            "cosine_distance": round(cos_dist, 4),
+            "semantic_delta": round(min(1.0, cos_dist * 2.0), 4),
+        }
+    except Exception:
+        return fallback
 
 
 def _ensure_embeddings_table(conn):
@@ -222,6 +288,7 @@ def _ensure_embeddings_table(conn):
 def embed_files(files: list[Path], db_path, base_dir: Path, gemini_client):
     """Embed files and store in SQLite. db_path can be a Path or sqlite3 connection."""
     import sqlite3
+
     if not files:
         return 0
     outcome_links = parse_outcome_links()
@@ -250,17 +317,28 @@ def embed_files(files: list[Path], db_path, base_dir: Path, gemini_client):
     _ensure_embeddings_table(conn)
     for i, chunk in enumerate(all_chunks):
         embedding_blob = json.dumps(all_embeddings[i]).encode("utf-8")
-        conn.execute("""
+        conn.execute(
+            """
             INSERT OR REPLACE INTO brain_embeddings
             (id, source, file_type, text, embedding, modified, embed_date,
              session_num, chunk, total_chunks, outcome, outcome_result)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            chunk["id"], chunk["source"], chunk["file_type"],
-            chunk["text"], embedding_blob, chunk["modified"],
-            chunk["embed_date"], chunk["session_num"], chunk["chunk"],
-            chunk["total_chunks"], chunk["outcome"], chunk["outcome_result"],
-        ))
+        """,
+            (
+                chunk["id"],
+                chunk["source"],
+                chunk["file_type"],
+                chunk["text"],
+                embedding_blob,
+                chunk["modified"],
+                chunk["embed_date"],
+                chunk["session_num"],
+                chunk["chunk"],
+                chunk["total_chunks"],
+                chunk["outcome"],
+                chunk["outcome_result"],
+            ),
+        )
     conn.commit()
     conn.close()
     return len(all_chunks)
@@ -269,6 +347,7 @@ def embed_files(files: list[Path], db_path, base_dir: Path, gemini_client):
 def remove_deleted(deleted_keys: list[str], db_path):
     """Remove embeddings for deleted files from SQLite."""
     import sqlite3
+
     if not deleted_keys:
         return
     conn = sqlite3.connect(str(db_path))
@@ -282,6 +361,7 @@ def remove_deleted(deleted_keys: list[str], db_path):
 def get_stats(db_path) -> dict:
     """Get embedding stats from SQLite."""
     import sqlite3
+
     conn = sqlite3.connect(str(db_path))
     _ensure_embeddings_table(conn)
     count = conn.execute("SELECT COUNT(*) FROM brain_embeddings").fetchone()[0]
@@ -289,8 +369,13 @@ def get_stats(db_path) -> dict:
     return {"collection": "brain_embeddings", "total_chunks": count}
 
 
-def main(brain_dir: Path | None = None, full: bool = False, dry_run: bool = False,
-         stats_only: bool = False, ctx: BrainContext | None = None):
+def main(
+    brain_dir: Path | None = None,
+    full: bool = False,
+    dry_run: bool = False,
+    stats_only: bool = False,
+    ctx: BrainContext | None = None,
+):
     """Run embedding. Called by Brain.embed() or CLI.
 
     Embeddings stored in SQLite (brain_embeddings table).

@@ -853,6 +853,88 @@ def format_rules_for_prompt(
 
 
 # ---------------------------------------------------------------------------
+# Constitutional Format (Experimental)
+# ---------------------------------------------------------------------------
+
+# Category-to-value mapping for constitutional framing
+_CONSTITUTIONAL_VALUE_MAP: dict[str, str] = {
+    "TONE": "communication style",
+    "ACCURACY": "accuracy and precision",
+    "STRUCTURE": "clear organization",
+    "DRAFTING": "polished writing",
+    "FORMAT": "the user's formatting preferences",
+    "SECURITY": "security and safety",
+}
+
+# Imperative prefixes stripped during constitutional transformation
+_IMPERATIVE_PREFIXES: tuple[str, ...] = (
+    "Always ",
+    "Never ",
+    "Don't ",
+    "Do not ",
+    "Be ",
+    "Use ",
+    "Avoid ",
+)
+
+
+def format_rule_constitutional(category: str, description: str) -> str:
+    """Format a rule as a constitutional principle (experimental).
+
+    Transforms imperative rules into value statements:
+    - "Be concise" -> "You value communication style -- concise"
+    - "Always cite sources" -> "You value accuracy and precision -- cite sources"
+    - "Never use em dashes" -> "You value the user's formatting preferences -- use em dashes"
+
+    This is EXPERIMENTAL. Ship behind format_style="constitutional" flag.
+
+    Args:
+        category: The lesson category (e.g. "TONE", "ACCURACY").
+        description: The rule description text.
+
+    Returns:
+        XML-tagged principle string.
+    """
+    value = _CONSTITUTIONAL_VALUE_MAP.get(category.upper(), "quality")
+
+    desc = description.strip()
+    for prefix in _IMPERATIVE_PREFIXES:
+        if desc.startswith(prefix):
+            desc = desc[len(prefix) :]
+            break
+
+    return f"<principle>You value {value} — {desc.lower()}</principle>"
+
+
+def format_rules_styled(
+    rules: list[AppliedRule],
+    format_style: str = "imperative",
+) -> str:
+    """Format rules for prompt injection in the specified style.
+
+    Args:
+        rules: List of :class:`AppliedRule` objects from :func:`apply_rules`.
+        format_style: ``"imperative"`` (default) uses the existing bracket
+            format. ``"constitutional"`` (experimental) reframes each rule
+            as a value-based principle.
+
+    Returns:
+        Newline-joined formatted rules string. Empty string if *rules* is empty.
+    """
+    if not rules:
+        return ""
+
+    if format_style == "constitutional":
+        lines = []
+        for rule in rules:
+            lines.append(format_rule_constitutional(rule.lesson.category, rule.lesson.description))
+        return "\n".join(lines)
+    else:
+        # Default imperative format
+        return "\n".join(rule.instruction for rule in rules)
+
+
+# ---------------------------------------------------------------------------
 # Example Capture
 # ---------------------------------------------------------------------------
 

@@ -66,6 +66,15 @@ _MIGRATIONS: list[str] = [
     "ALTER TABLE meta_rules ADD COLUMN transfer_scope TEXT DEFAULT 'personal'",
     # Rule provenance index
     "CREATE INDEX IF NOT EXISTS idx_provenance_rule_id ON rule_provenance(rule_id)",
+    # Rule relationships table (typed edges: reinforces, contradicts, specializes, generalizes)
+    """CREATE TABLE IF NOT EXISTS rule_relationships (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rule_a_id TEXT NOT NULL,
+        rule_b_id TEXT NOT NULL,
+        relationship TEXT NOT NULL,
+        confidence REAL DEFAULT 0.5,
+        detected_at TEXT NOT NULL
+    )""",
     # Super-meta-rules table
     "ALTER TABLE super_meta_rules ADD COLUMN applies_when TEXT",
     "ALTER TABLE super_meta_rules ADD COLUMN never_when TEXT",
