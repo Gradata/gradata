@@ -56,6 +56,15 @@ _ACTION_OPPOSITES: list[tuple[str, str]] = [
     ("keep", "remove"),
     ("keep", "drop"),
     ("keep", "delete"),
+    ("show", "hide"),
+    ("show", "conceal"),
+    ("start", "stop"),
+    ("allow", "block"),
+    ("allow", "deny"),
+    ("accept", "reject"),
+    ("open", "close"),
+    ("expand", "collapse"),
+    ("attach", "detach"),
 ]
 
 # Sentiment opposites on same topic
