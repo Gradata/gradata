@@ -18,8 +18,8 @@ router = APIRouter()
 
 # Price IDs per plan — configured in env.
 _PLAN_PRICES: dict[str, str] = {
-    "pro": os.environ.get("GRADATA_STRIPE_PRO_PRICE", ""),
-    "team": os.environ.get("GRADATA_STRIPE_TEAM_PRICE", ""),
+    "pro": os.environ.get("GRADATA_STRIPE_PRICE_PRO", ""),
+    "team": os.environ.get("GRADATA_STRIPE_PRICE_TEAM", ""),
 }
 
 # Env var names stored as constants to avoid scanner false positives.
