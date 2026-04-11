@@ -30,20 +30,20 @@ _log = logging.getLogger(__name__)
 # Constants (SPEC-aligned, research-backed)
 # ---------------------------------------------------------------------------
 
-INITIAL_CONFIDENCE = 0.40
+INITIAL_CONFIDENCE = 0.60
 PATTERN_THRESHOLD = 0.60
-RULE_THRESHOLD = 0.90
+RULE_THRESHOLD = 0.80
 MIN_APPLICATIONS_FOR_PATTERN = 3
-MIN_APPLICATIONS_FOR_RULE = 5
+MIN_APPLICATIONS_FOR_RULE = 3
 
 # Misfire is worse than contradiction (rule was completely irrelevant)
 MISFIRE_PENALTY = -0.15
 # Calibrated from 2992 real events across 76 sessions (calibrate_constants.py).
 # Original: -0.24 (2:1 ratio). Calibrated: -0.10 (1:1 ratio).
 # Stress test confirmed: 2:1 caused 74 kills vs 19 promotions (over-punishing).
-CONTRADICTION_PENALTY = -0.10
+CONTRADICTION_PENALTY = -0.17
 
-ACCEPTANCE_BONUS = 0.10
+ACCEPTANCE_BONUS = 0.20
 # v2.3: survival is flat (no severity scaling)
 SURVIVAL_BONUS = 0.08
 # Preferences (user taste) decay 50% slower — they're stable signals
@@ -84,7 +84,7 @@ SURVIVAL_SEVERITY_WEIGHTS: dict[str, float] = {
 # even softer treatment since ALL outputs get corrected (no approval signal).
 # ---------------------------------------------------------------------------
 MACHINE_CONTRADICTION_PENALTY = -0.06
-MACHINE_ACCEPTANCE_BONUS = 0.10
+MACHINE_ACCEPTANCE_BONUS = 0.16
 MACHINE_KILL_LIMITS: dict[str, int] = {
     "INFANT": 16,
     "ADOLESCENT": 20,
@@ -705,6 +705,10 @@ def update_confidence(
                 else:
                     bonus = base_bonus
                 lesson.confidence = round(max(0.0, min(1.0, lesson.confidence + bonus)), 2)
+                # Cold-start: survival counts as an application (lesson was
+                # injected and the user did NOT correct this category).
+                lesson.fire_count += 1
+                lesson.sessions_since_fire = 0
 
         # Track sessions since fire
         lesson.sessions_since_fire += 1
