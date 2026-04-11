@@ -1,15 +1,13 @@
 """POST /api/v1/sync -- receives brain events from SDK."""
-
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 
 from app.auth import get_current_brain
 from app.db import get_db
-from app.middleware import limiter
 from app.models import SyncRequest, SyncResponse
 
 _log = logging.getLogger(__name__)
@@ -18,9 +16,7 @@ router = APIRouter()
 
 
 @router.post("/sync", response_model=SyncResponse)
-@limiter.limit("30/minute")
 async def sync_brain(
-    request: Request,
     body: SyncRequest,
     brain: dict = Depends(get_current_brain),
 ) -> SyncResponse:
@@ -112,11 +108,7 @@ async def sync_brain(
 
     _log.info(
         "Synced brain=%s: %d corrections, %d lessons, %d events, %d meta-rules",
-        brain_id,
-        corrections_count,
-        lessons_count,
-        events_count,
-        meta_rules_count,
+        brain_id, corrections_count, lessons_count, events_count, meta_rules_count,
     )
 
     return SyncResponse(

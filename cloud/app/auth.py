@@ -1,4 +1,5 @@
 """Authentication: API key validation + JWT verification."""
+
 from __future__ import annotations
 
 import logging
@@ -60,3 +61,38 @@ async def get_current_brain(
     if not rows:
         raise HTTPException(status_code=404, detail="No brain found for this user")
     return rows[0]
+
+
+async def get_current_user_id(
+    credentials: HTTPAuthorizationCredentials = Security(_bearer),
+) -> str:
+    """Extract user_id from JWT. For dashboard-only endpoints."""
+    return verify_jwt(credentials.credentials)
+
+
+async def verify_brain_ownership(brain_id: str, user_id: str) -> dict:
+    """Verify the authenticated user owns the brain. Returns brain or raises 403."""
+    db = get_db()
+    rows = await db.select("brains", filters={"id": brain_id})
+    if not rows:
+        raise HTTPException(status_code=404, detail="Brain not found")
+    brain = rows[0]
+    if brain.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Not your brain")
+    return brain
+
+
+async def get_brain_for_request(
+    brain_id: str,
+    credentials: HTTPAuthorizationCredentials = Security(_bearer),
+) -> dict:
+    """Dual-mode auth dependency: API key or JWT, verifies brain ownership."""
+    cred = credentials.credentials
+    if cred.startswith("gd_"):
+        brain = await verify_api_key(cred)
+        if brain.get("id") != brain_id:
+            raise HTTPException(status_code=403, detail="Not your brain")
+        return brain
+
+    user_id = verify_jwt(cred)
+    return await verify_brain_ownership(brain_id, user_id)

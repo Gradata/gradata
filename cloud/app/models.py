@@ -29,19 +29,19 @@ class CorrectionPayload(BaseModel):
     """A single correction from the SDK."""
 
     session: int
-    category: str = Field(default="UNKNOWN", max_length=100)
+    category: str = "UNKNOWN"
     severity: Severity = Severity.minor
-    description: str = Field(default="", max_length=2000)
-    draft_preview: str = Field(default="", max_length=500)
-    final_preview: str = Field(default="", max_length=500)
+    description: str = ""
+    draft_preview: str = ""
+    final_preview: str = ""
     created_at: str | None = None  # ISO timestamp from SDK; server uses now() if absent
 
 
 class LessonPayload(BaseModel):
     """A lesson (graduated rule) from the SDK."""
 
-    category: str = Field(max_length=100)
-    description: str = Field(max_length=2000)
+    category: str
+    description: str
     state: LessonState = LessonState.INSTINCT
     confidence: float = Field(ge=0.0, le=1.0, default=0.0)
     fire_count: int = 0
@@ -51,10 +51,10 @@ class LessonPayload(BaseModel):
 class EventPayload(BaseModel):
     """A raw event from events.jsonl."""
 
-    type: str = Field(max_length=100)
-    source: str = Field(default="", max_length=200)
+    type: str
+    source: str = ""
     data: dict[str, Any] = Field(default_factory=dict)
-    tags: list[str] = Field(default_factory=list, max_length=20)
+    tags: list[str] = Field(default_factory=list)
     session: int | None = None
     created_at: str | None = None
 
@@ -69,9 +69,9 @@ class EventPayload(BaseModel):
 class MetaRulePayload(BaseModel):
     """A meta-rule from the SDK."""
 
-    title: str = Field(max_length=200)
-    description: str = Field(max_length=2000)
-    source_lesson_descriptions: list[str] = Field(default_factory=list, max_length=20)
+    title: str
+    description: str
+    source_lesson_descriptions: list[str] = Field(default_factory=list)
 
 
 class SyncRequest(BaseModel):
@@ -81,11 +81,11 @@ class SyncRequest(BaseModel):
     Sends all new corrections, lessons, events, and meta-rules since last sync.
     """
 
-    brain_name: str = Field(default="default", max_length=100)
-    corrections: list[CorrectionPayload] = Field(default_factory=list, max_length=500)
-    lessons: list[LessonPayload] = Field(default_factory=list, max_length=500)
-    events: list[EventPayload] = Field(default_factory=list, max_length=1000)
-    meta_rules: list[MetaRulePayload] = Field(default_factory=list, max_length=100)
+    brain_name: str = "default"
+    corrections: list[CorrectionPayload] = Field(default_factory=list)
+    lessons: list[LessonPayload] = Field(default_factory=list)
+    events: list[EventPayload] = Field(default_factory=list)
+    meta_rules: list[MetaRulePayload] = Field(default_factory=list)
     manifest: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -97,3 +97,109 @@ class SyncResponse(BaseModel):
     lessons_synced: int = 0
     events_synced: int = 0
     meta_rules_synced: int = 0
+
+
+# ---------------------------------------------------------------------------
+# User profile models
+# ---------------------------------------------------------------------------
+
+
+class UserProfile(BaseModel):
+    user_id: str
+    display_name: str | None = None
+    email: str | None = None
+    workspaces: list[dict] = Field(default_factory=list)
+    created_at: str | None = None
+
+
+class UpdateProfileRequest(BaseModel):
+    display_name: str
+
+
+# ---------------------------------------------------------------------------
+# API key models
+# ---------------------------------------------------------------------------
+
+
+class APIKeyResponse(BaseModel):
+    key_id: str
+    brain_id: str
+    masked_key: str  # last 4 chars only
+    created_at: str | None = None
+
+
+class CreateAPIKeyRequest(BaseModel):
+    brain_id: str
+    brain_name: str = "default"
+
+
+class CreateAPIKeyResponse(BaseModel):
+    key_id: str
+    brain_id: str
+    api_key: str  # plaintext — shown once only
+
+
+# ---------------------------------------------------------------------------
+# Brain detail models
+# ---------------------------------------------------------------------------
+
+
+class BrainDetail(BaseModel):
+    id: str
+    user_id: str
+    brain_name: str | None = None
+    domain: str | None = None
+    last_sync_at: str | None = None
+    created_at: str | None = None
+    deleted_at: str | None = None
+    lesson_count: int = 0
+    correction_count: int = 0
+
+
+class UpdateBrainRequest(BaseModel):
+    brain_name: str | None = None
+    domain: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Analytics model
+# ---------------------------------------------------------------------------
+
+
+class BrainAnalytics(BaseModel):
+    total_corrections: int = 0
+    total_lessons: int = 0
+    total_events: int = 0
+    lessons_by_state: dict[str, int] = Field(default_factory=dict)
+    corrections_by_severity: dict[str, int] = Field(default_factory=dict)
+    corrections_by_category: dict[str, int] = Field(default_factory=dict)
+    avg_confidence: float = 0.0
+    graduation_rate: float = 0.0
+    last_sync_at: str | None = None
+    brain_created_at: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Billing models
+# ---------------------------------------------------------------------------
+
+
+class CheckoutRequest(BaseModel):
+    plan: str  # "pro" | "team"
+
+
+class CheckoutResponse(BaseModel):
+    checkout_url: str
+
+
+class SubscriptionUsage(BaseModel):
+    brains: int = 0
+    lessons: int = 0
+    events: int = 0
+
+
+class SubscriptionResponse(BaseModel):
+    plan: str | None = None
+    status: str | None = None
+    current_period_end: str | None = None
+    usage: SubscriptionUsage = Field(default_factory=SubscriptionUsage)
