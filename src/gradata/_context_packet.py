@@ -237,14 +237,13 @@ def _load_audit_context(session: int, ctx: "BrainContext | None" = None) -> dict
     except Exception:
         pass
     try:
-        outputs = _events_query(event_type="OUTPUT", session=session, limit=50)
+        outputs = _events_query(event_type="OUTPUT", session=session, limit=20)
         result["outputs"] = [
             {
-                "ts": e.get("ts", "")[:19],
                 "data": {
                     k: v
                     for k, v in e.get("data", {}).items()
-                    if k in ("type", "self_score", "major_edit", "detail")
+                    if k in ("type", "self_score", "major_edit")
                 },
             }
             for e in outputs
@@ -252,12 +251,11 @@ def _load_audit_context(session: int, ctx: "BrainContext | None" = None) -> dict
     except Exception:
         pass
     try:
-        gates = _events_query(event_type="GATE_RESULT", session=session, limit=50)
+        gates = _events_query(event_type="GATE_RESULT", session=session, limit=20)
         result["gates"] = [
             {
                 "gate": e.get("data", {}).get("gate", ""),
                 "result": e.get("data", {}).get("result", ""),
-                "detail": e.get("data", {}).get("detail", "")[:100],
             }
             for e in gates
         ]
