@@ -145,3 +145,92 @@ class TestRuleTreeSecondaryCategories:
         rules = tree.get_rules_for_context("email_draft", "sales", category_filter="FORMAT")
         assert len(rules) >= 1
         assert rules[0].description == "No em dashes"
+
+
+class TestAutoClimb:
+    def test_climb_trigger_two_siblings(self):
+        lesson = Lesson(
+            date="2026-01-01",
+            state=LessonState.RULE,
+            confidence=0.92,
+            category="TONE",
+            description="Be concise",
+            path="TONE/sales/email_draft",
+            climb_count=0,
+            last_climb_session=0,
+        )
+        tree = RuleTree([lesson])
+        # Simulate fires in sibling branches
+        fired_in = {"TONE/sales/email_draft", "TONE/sales/demo_prep"}
+        result = tree.evaluate_climb(lesson, fired_in, current_session=10)
+        assert result is True
+        assert lesson.path == "TONE/sales"
+        assert lesson.climb_count == 1
+        assert lesson.tree_level == 1
+
+    def test_climb_respects_dwell_time(self):
+        lesson = Lesson(
+            date="2026-01-01",
+            state=LessonState.RULE,
+            confidence=0.92,
+            category="TONE",
+            description="Be concise",
+            path="TONE/sales",
+            climb_count=1,
+            last_climb_session=8,
+            tree_level=1,
+        )
+        tree = RuleTree([lesson])
+        fired_in = {"TONE/sales", "TONE/engineering"}
+        # Session 10 is only 2 sessions after last climb (need 5)
+        result = tree.evaluate_climb(lesson, fired_in, current_session=10)
+        assert result is False
+        assert lesson.path == "TONE/sales"  # unchanged
+
+    def test_climb_cap_at_three(self):
+        lesson = Lesson(
+            date="2026-01-01",
+            state=LessonState.RULE,
+            confidence=0.92,
+            category="TONE",
+            description="Be concise",
+            path="TONE/sales",
+            climb_count=3,
+            last_climb_session=1,
+            tree_level=1,
+        )
+        tree = RuleTree([lesson])
+        fired_in = {"TONE/sales", "TONE/engineering"}
+        result = tree.evaluate_climb(lesson, fired_in, current_session=20)
+        assert result is False  # cap reached
+
+    def test_anti_climb_contracts(self):
+        lesson = Lesson(
+            date="2026-01-01",
+            state=LessonState.RULE,
+            confidence=0.92,
+            category="TONE",
+            description="Be concise",
+            path="TONE/sales",
+            climb_count=1,
+            tree_level=1,
+        )
+        tree = RuleTree([lesson])
+        result = tree.evaluate_contract(lesson, contradictions_at_level=2, current_session=15)
+        assert result is True
+        assert lesson.tree_level == 0
+
+    def test_anti_climb_needs_two_contradictions(self):
+        lesson = Lesson(
+            date="2026-01-01",
+            state=LessonState.RULE,
+            confidence=0.92,
+            category="TONE",
+            description="Be concise",
+            path="TONE/sales",
+            climb_count=1,
+            tree_level=1,
+        )
+        tree = RuleTree([lesson])
+        result = tree.evaluate_contract(lesson, contradictions_at_level=1, current_session=15)
+        assert result is False  # need 2+

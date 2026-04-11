@@ -191,3 +191,99 @@ class RuleTree:
                     for l in lessons
                 ]
         return result
+
+    # ── Auto-Climb ──────────────────────────────────────────────────────
+
+    CLIMB_DWELL_SESSIONS = 5  # Min sessions at a level before climbing again
+    CLIMB_MAX = 3  # Max total climbs per rule lifetime
+    CONTRACT_MIN_CONTRADICTIONS = 2  # Contradictions needed to contract
+
+    def evaluate_climb(
+        self,
+        lesson: Lesson,
+        fired_in_paths: set[str],
+        current_session: int,
+    ) -> bool:
+        """Check if a lesson should climb to its parent node.
+
+        Climb trigger: rule fired successfully in 2+ sibling branches.
+        Damping: 5-session dwell time, max 3 climbs lifetime.
+
+        Returns True if climb happened, False otherwise. Mutates lesson in-place.
+        """
+        # Guard: climb cap
+        if lesson.climb_count >= self.CLIMB_MAX:
+            return False
+
+        # Guard: dwell time
+        if lesson.last_climb_session > 0:
+            sessions_since = current_session - lesson.last_climb_session
+            if sessions_since < self.CLIMB_DWELL_SESSIONS:
+                return False
+
+        # Guard: already at trunk (level 2, category-only path)
+        if "/" not in lesson.path:
+            return False
+
+        # Check siblings: paths that share the same parent
+        parent = _parent_path(lesson.path)
+        sibling_fires = {
+            p for p in fired_in_paths if _parent_path(p) == parent and p != lesson.path
+        }
+
+        if len(sibling_fires) < 1:  # need fires in at least 1 sibling (+ own = 2 total)
+            return False
+
+        # Climb: remove from current node, move to parent
+        old_path = lesson.path
+        if old_path in self.nodes:
+            self.nodes[old_path] = [l for l in self.nodes[old_path] if l is not lesson]
+
+        lesson.path = parent
+        lesson.climb_count += 1
+        lesson.last_climb_session = current_session
+        lesson.tree_level = max(0, _depth(parent))
+
+        self.nodes[parent].append(lesson)
+        _log.info("Rule climbed: %s -> %s (climb #%d)", old_path, parent, lesson.climb_count)
+        return True
+
+    def evaluate_contract(
+        self,
+        lesson: Lesson,
+        contradictions_at_level: int,
+        current_session: int,
+        original_task_type: str = "",
+    ) -> bool:
+        """Check if a climbed rule should contract back down.
+
+        Contract trigger: 2+ contradictions at current level within recent sessions.
+        Contracts down one level. Sets dwell cooldown.
+
+        Returns True if contraction happened, False otherwise.
+        """
+        if contradictions_at_level < self.CONTRACT_MIN_CONTRADICTIONS:
+            return False
+
+        # Can't contract below level 0
+        if lesson.tree_level <= 0:
+            return False
+
+        # Contract: move down one level
+        old_path = lesson.path
+        if old_path in self.nodes:
+            self.nodes[old_path] = [l for l in self.nodes[old_path] if l is not lesson]
+
+        # Reconstruct a child path using original_task_type or category default
+        if original_task_type:
+            new_path = f"{old_path}/{original_task_type}"
+        else:
+            new_path = f"{old_path}/_contracted"
+
+        lesson.path = new_path
+        lesson.tree_level = max(0, lesson.tree_level - 1)
+        lesson.last_climb_session = current_session  # cooldown applies after contraction too
+
+        self.nodes[new_path].append(lesson)
+        _log.info("Rule contracted: %s -> %s", old_path, new_path)
+        return True
