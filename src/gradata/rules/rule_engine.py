@@ -707,7 +707,7 @@ def apply_rules(
     for lesson, relevance in scored[:max_rules]:
         rule_id = _make_rule_id(lesson)
         tier_label = _tier_label(lesson)
-        instruction = f"[{tier_label}] {lesson.category}: {lesson.description}"
+        instruction = f"{lesson.category}: {lesson.description}"
         applied.append(
             AppliedRule(
                 rule_id=rule_id,
