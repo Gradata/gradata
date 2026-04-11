@@ -20,18 +20,25 @@ if TYPE_CHECKING:
 # Lazy imports
 def _fts_search(query_text: str, **kwargs):
     from gradata._query import fts_search
+
     return fts_search(query_text, **kwargs)
+
 
 def _events_query(**kwargs):
     from gradata._events import query as eq
+
     return eq(**kwargs)
+
 
 def _correction_rate(**kwargs):
     from gradata._events import correction_rate
+
     return correction_rate(**kwargs)
+
 
 def _detect_session():
     from gradata._events import _detect_session as ds
+
     return ds()
 
 
@@ -74,25 +81,34 @@ def _load_user_scope(ctx: "BrainContext | None" = None) -> dict:
     result = {"voice_summary": "", "recent_corrections": [], "frameworks": ""}
     domain_dir = ctx.domain_dir if ctx else _p.DOMAIN_DIR
     soul_path = domain_dir / "soul.md"
-    result["voice_summary"] = _safe_read_lines(soul_path, 50)
+    result["voice_summary"] = _safe_read_lines(soul_path, 20)
     try:
-        corrections = _events_query(event_type="CORRECTION", limit=5)
+        corrections = _events_query(event_type="CORRECTION", limit=3)
         result["recent_corrections"] = [
-            {"session": e.get("session"), "category": e.get("data", {}).get("category", ""),
-             "detail": e.get("data", {}).get("detail", "")[:200]}
+            {
+                "session": e.get("session"),
+                "category": e.get("data", {}).get("category", ""),
+                "detail": e.get("data", {}).get("detail", "")[:120],
+            }
             for e in corrections
         ]
     except Exception:
         pass
     patterns_file = ctx.patterns_file if ctx else _p.PATTERNS_FILE
     if patterns_file.exists():
-        result["frameworks"] = _safe_read_lines(patterns_file, 30)
+        result["frameworks"] = _safe_read_lines(patterns_file, 15)
     return result
 
 
 def _load_prospect_context(prospect_name: str, ctx: "BrainContext | None" = None) -> dict:
-    result = {"file_content": "", "search_results": [], "recent_interactions": [],
-              "stage": "", "company": "", "persona": ""}
+    result = {
+        "file_content": "",
+        "search_results": [],
+        "recent_interactions": [],
+        "stage": "",
+        "company": "",
+        "persona": "",
+    }
     prospect_file = _fuzzy_match_prospect(prospect_name, ctx=ctx)
     if prospect_file:
         raw = _safe_read(prospect_file, limit_chars=500)
@@ -114,6 +130,7 @@ def _load_prospect_context(prospect_name: str, ctx: "BrainContext | None" = None
         pass
     try:
         from gradata._fact_extractor import query_facts
+
         facts = query_facts(prospect=prospect_name)
         if facts:
             result["structured_facts"] = [
@@ -130,10 +147,13 @@ def _load_prospect_context(prospect_name: str, ctx: "BrainContext | None" = None
             tags = e.get("tags", [])
             tag_str = " ".join(tags).lower()
             if prospect_lower.split()[0] in tag_str:
-                interactions.append({
-                    "ts": e.get("ts", "")[:19], "type": e.get("type", ""),
-                    "summary": json.dumps(e.get("data", {}))[:150],
-                })
+                interactions.append(
+                    {
+                        "ts": e.get("ts", "")[:19],
+                        "type": e.get("type", ""),
+                        "summary": json.dumps(e.get("data", {}))[:150],
+                    }
+                )
                 if len(interactions) >= 3:
                     break
         result["recent_interactions"] = interactions
@@ -148,8 +168,11 @@ def _load_drafting_context(ctx: "BrainContext | None" = None) -> dict:
     if patterns_file.exists():
         try:
             content = patterns_file.read_text(encoding="utf-8", errors="replace")
-            relevant = [line.strip() for line in content.splitlines()
-                        if "[PROVEN]" in line or "[EMERGING]" in line]
+            relevant = [
+                line.strip()
+                for line in content.splitlines()
+                if "[PROVEN]" in line or "[EMERGING]" in line
+            ]
             result["patterns"] = "\n".join(relevant[:20])
         except Exception:
             pass
@@ -172,8 +195,11 @@ def _load_debug_context(topic: str, ctx: "BrainContext | None" = None) -> dict:
     try:
         failures = _events_query(event_type="TOOL_FAILURE", limit=5)
         result["recent_failures"] = [
-            {"ts": e.get("ts", "")[:19], "source": e.get("source", ""),
-             "detail": json.dumps(e.get("data", {}))[:200]}
+            {
+                "ts": e.get("ts", "")[:19],
+                "source": e.get("source", ""),
+                "detail": json.dumps(e.get("data", {}))[:200],
+            }
             for e in failures
         ]
     except Exception:
@@ -185,8 +211,12 @@ def _load_debug_context(topic: str, ctx: "BrainContext | None" = None) -> dict:
         for e in corrections:
             data_str = json.dumps(e.get("data", {})).lower()
             if any(word in data_str for word in topic_lower.split()):
-                related.append({"session": e.get("session"),
-                                "detail": e.get("data", {}).get("detail", "")[:200]})
+                related.append(
+                    {
+                        "session": e.get("session"),
+                        "detail": e.get("data", {}).get("detail", "")[:200],
+                    }
+                )
                 if len(related) >= 5:
                     break
         result["corrections"] = related
@@ -210,9 +240,14 @@ def _load_audit_context(session: int, ctx: "BrainContext | None" = None) -> dict
     try:
         outputs = _events_query(event_type="OUTPUT", session=session, limit=50)
         result["outputs"] = [
-            {"ts": e.get("ts", "")[:19],
-             "data": {k: v for k, v in e.get("data", {}).items()
-                      if k in ("type", "self_score", "major_edit", "detail")}}
+            {
+                "ts": e.get("ts", "")[:19],
+                "data": {
+                    k: v
+                    for k, v in e.get("data", {}).items()
+                    if k in ("type", "self_score", "major_edit", "detail")
+                },
+            }
             for e in outputs
         ]
     except Exception:
@@ -220,9 +255,11 @@ def _load_audit_context(session: int, ctx: "BrainContext | None" = None) -> dict
     try:
         gates = _events_query(event_type="GATE_RESULT", session=session, limit=50)
         result["gates"] = [
-            {"gate": e.get("data", {}).get("gate", ""),
-             "result": e.get("data", {}).get("result", ""),
-             "detail": e.get("data", {}).get("detail", "")[:100]}
+            {
+                "gate": e.get("data", {}).get("gate", ""),
+                "result": e.get("data", {}).get("result", ""),
+                "detail": e.get("data", {}).get("detail", "")[:100],
+            }
             for e in gates
         ]
     except Exception:
@@ -237,8 +274,12 @@ def _load_wrapup_context(session: int, ctx: "BrainContext | None" = None) -> dic
     try:
         events = _events_query(session=session, limit=200)
         result["session_events"] = [
-            {"type": e.get("type", ""), "source": e.get("source", ""),
-             "ts": e.get("ts", "")[:19], "summary": json.dumps(e.get("data", {}))[:100]}
+            {
+                "type": e.get("type", ""),
+                "source": e.get("source", ""),
+                "ts": e.get("ts", "")[:19],
+                "summary": json.dumps(e.get("data", {}))[:100],
+            }
             for e in events
         ]
     except Exception:
@@ -265,8 +306,11 @@ def _load_wrapup_context(session: int, ctx: "BrainContext | None" = None) -> dic
 
 
 def format_as_prompt(packet: dict, task_type: str) -> str:
-    sections = [f"# Context Packet -- task: {task_type or 'general'}",
-                f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", ""]
+    sections = [
+        f"# Context Packet -- task: {task_type or 'general'}",
+        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        "",
+    ]
 
     if "user_scope" in packet:
         us = packet["user_scope"]
@@ -339,9 +383,13 @@ def format_as_prompt(packet: dict, task_type: str) -> str:
     return "\n".join(sections)
 
 
-def build_packet(prospect: str | None = None, task_type: str | None = None,
-                 topic: str | None = None, session: int | None = None,
-                 ctx: "BrainContext | None" = None) -> str:
+def build_packet(
+    prospect: str | None = None,
+    task_type: str | None = None,
+    topic: str | None = None,
+    session: int | None = None,
+    ctx: "BrainContext | None" = None,
+) -> str:
     packet = {}
     if session is None:
         session = _detect_session()
