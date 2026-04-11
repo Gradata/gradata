@@ -339,3 +339,49 @@ class TestTreeExport:
         content = rule_files[0].read_text()
         assert "confidence:" in content
         assert "Be casual with VPs" in content
+
+
+class TestConsolidation:
+    def test_consolidate_evaluates_climbs(self):
+        """After a session, consolidation checks which rules should climb."""
+        lessons = [
+            Lesson(
+                date="2026-01-01",
+                state=LessonState.RULE,
+                confidence=0.92,
+                category="TONE",
+                description="Be concise",
+                path="TONE/sales/email_draft",
+                climb_count=0,
+                last_climb_session=0,
+            ),
+        ]
+        tree = RuleTree(lessons)
+        # Simulate: rule fired in email_draft (home) + demo_prep (sibling)
+        session_fires = {
+            "TONE/sales/email_draft": [lessons[0]],
+            "TONE/sales/demo_prep": [lessons[0]],
+        }
+        results = tree.consolidate(session_fires, current_session=10)
+        assert results["climbed"] == 1
+
+    def test_consolidate_no_action_when_stable(self):
+        lessons = [
+            Lesson(
+                date="2026-01-01",
+                state=LessonState.RULE,
+                confidence=0.92,
+                category="TONE",
+                description="Be concise",
+                path="TONE/sales/email_draft",
+                climb_count=0,
+                last_climb_session=0,
+            ),
+        ]
+        tree = RuleTree(lessons)
+        # Only fired in home path — no climb
+        session_fires = {
+            "TONE/sales/email_draft": [lessons[0]],
+        }
+        results = tree.consolidate(session_fires, current_session=10)
+        assert results["climbed"] == 0

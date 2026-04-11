@@ -288,6 +288,57 @@ class RuleTree:
         _log.info("Rule contracted: %s -> %s", old_path, new_path)
         return True
 
+    # ── Consolidation ───────────────────────────────────────────────────
+
+    def consolidate(
+        self,
+        session_fires: dict[str, list[Lesson]],
+        current_session: int,
+        session_contradictions: dict[str, int] | None = None,
+    ) -> dict[str, int]:
+        """Post-session consolidation: evaluate climbs and contractions.
+
+        Called by the session_close hook as a background task.
+
+        Args:
+            session_fires: Dict mapping path -> list of lessons that fired at that path
+            current_session: Current session number
+            session_contradictions: Dict mapping path -> count of contradictions
+
+        Returns:
+            Summary: {"climbed": N, "contracted": N, "unchanged": N}
+        """
+        climbed = 0
+        contracted = 0
+        unchanged = 0
+
+        # Evaluate climbs: for each lesson, check if it fired in sibling paths
+        evaluated: set[int] = set()
+        for path, lessons in session_fires.items():
+            for lesson in lessons:
+                lid = id(lesson)
+                if lid in evaluated:
+                    continue
+                evaluated.add(lid)
+
+                # Collect all paths this lesson fired in
+                fired_in = {p for p, ls in session_fires.items() if lesson in ls}
+
+                if self.evaluate_climb(lesson, fired_in, current_session):
+                    climbed += 1
+                else:
+                    unchanged += 1
+
+        # Evaluate contractions
+        if session_contradictions:
+            for path, count in session_contradictions.items():
+                for lesson in list(self.nodes.get(path, [])):
+                    if count >= self.CONTRACT_MIN_CONTRADICTIONS:
+                        if self.evaluate_contract(lesson, count, current_session):
+                            contracted += 1
+
+        return {"climbed": climbed, "contracted": contracted, "unchanged": unchanged}
+
 
 # ── Export Functions ──────────────────────────────────────────────────
 
