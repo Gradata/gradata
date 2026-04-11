@@ -43,7 +43,7 @@ MISFIRE_PENALTY = -0.15
 # Stress test confirmed: 2:1 caused 74 kills vs 19 promotions (over-punishing).
 CONTRADICTION_PENALTY = -0.10
 
-ACCEPTANCE_BONUS = 0.10
+ACCEPTANCE_BONUS = 0.12
 # v2.3: survival is flat (no severity scaling)
 SURVIVAL_BONUS = 0.08
 # Preferences (user taste) decay 50% slower — they're stable signals
