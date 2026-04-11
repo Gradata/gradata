@@ -829,18 +829,17 @@ def format_rules_for_prompt(
         # Use positive framing: describe what TO do, not what not to do
         lines.append(f"{i}. {rule.instruction}")
 
-        # Include few-shot examples for rules that need reinforcement
+        # Include few-shot examples only for low-confidence rules with misfires
         lesson = rule.lesson
-        needs_reinforcement = lesson.confidence < 0.80 or getattr(lesson, "misfire_count", 0) > 0
+        needs_reinforcement = lesson.confidence < 0.70 and getattr(lesson, "misfire_count", 0) > 1
         if (
             needs_reinforcement
             and getattr(lesson, "example_draft", None) is not None
             and getattr(lesson, "example_corrected", None) is not None
         ):
-            lines.append("   <example>")
-            lines.append(f'   DRAFT: "{lesson.example_draft}"')
-            lines.append(f'   CORRECTED: "{lesson.example_corrected}"')
-            lines.append("   </example>")
+            lines.append(
+                f'   e.g. "{lesson.example_draft[:80]}" -> "{lesson.example_corrected[:80]}"'
+            )
 
     lines.append("</brain-rules>")
     return "\n".join(lines)
