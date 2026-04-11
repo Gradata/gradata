@@ -168,5 +168,12 @@ class Lesson:
     beta_param: float = 1.0  # Beta distribution β (prior + failures)
     metadata: RuleMetadata = field(default_factory=RuleMetadata)  # 5W1H + dual scores
 
+    # ── Hierarchical Rule Tree fields ──────────────────────────────────
+    path: str = ""  # Tree path: "CATEGORY/domain/task_type"
+    secondary_categories: list[str] = field(default_factory=list)  # Multi-category rules
+    climb_count: int = 0  # Total times this rule climbed (max 3)
+    last_climb_session: int = 0  # Session when last climb occurred
+    tree_level: int = 0  # Current depth: 0=leaf, 1=branch, 2=trunk
+
     def __post_init__(self) -> None:
         self.confidence = round(max(0.0, min(1.0, self.confidence)), 2)
