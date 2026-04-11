@@ -1,13 +1,15 @@
 """Brain registration and listing endpoints."""
+
 from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, Field
 
 from app.auth import get_current_brain
 from app.db import get_db
+from app.middleware import limiter
 
 _log = logging.getLogger(__name__)
 
@@ -15,8 +17,8 @@ router = APIRouter()
 
 
 class ConnectRequest(BaseModel):
-    brain_name: str = "default"
-    domain: str = ""
+    brain_name: str = Field(default="default", max_length=100)
+    domain: str = Field(default="", max_length=200)
     manifest: dict = {}
 
 
@@ -26,7 +28,9 @@ class ConnectResponse(BaseModel):
 
 
 @router.post("/brains/connect", response_model=ConnectResponse)
+@limiter.limit("5/15minutes")
 async def connect_brain(
+    request: Request,
     body: ConnectRequest,
     brain: dict = Depends(get_current_brain),
 ) -> ConnectResponse:
