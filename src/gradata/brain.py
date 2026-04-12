@@ -90,6 +90,11 @@ class Brain(BrainInspectionMixin):
         self._convergence_cache: dict | None = None
         self._convergence_session: int | None = None
 
+        # Rule cache (Pattern 2: session-scoped, invalidated on correct())
+        from gradata.rules.cache import RuleCache
+
+        self._rule_cache = RuleCache()
+
         from gradata.rules.rule_graph import RuleGraph
 
         self._rule_graph = RuleGraph(self.dir / "rule_graph.json")
@@ -370,6 +375,7 @@ class Brain(BrainInspectionMixin):
         scope: str | None = None,
     ) -> dict:
         """Record a correction: user edited draft into final version."""
+        self._rule_cache.invalidate()  # Correction invalidates cached rules
         from gradata._core import brain_correct
 
         return brain_correct(
@@ -601,8 +607,29 @@ class Brain(BrainInspectionMixin):
         lessons_path = self._find_lessons_path()
         if not lessons_path:
             return ""
+        scope = build_scope(ctx)
+
+        # Check rule cache first (Pattern 2: skip re-ranking if scope unchanged)
+        from gradata.rules.cache import RuleCache
+
+        cache_key = RuleCache.make_key(scope.task_type, scope.domain, scope.audience)
+        cached = self._rule_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
-        return format_rules_for_prompt(apply_rules(lessons, build_scope(ctx), max_rules=max_rules))
+
+        # Try tree-based retrieval first (falls back to flat if no paths)
+        try:
+            from gradata.rules.rule_engine import apply_rules_with_tree
+
+            applied = apply_rules_with_tree(lessons, scope, max_rules=max_rules)
+        except (ImportError, Exception):
+            applied = apply_rules(lessons, scope, max_rules=max_rules)
+
+        result = format_rules_for_prompt(applied)
+        self._rule_cache.put(cache_key, result)
+        return result
 
     def scope(
         self, domain: str = "", task_type: str = "", agent_type: str = "", max_rules: int = 10
