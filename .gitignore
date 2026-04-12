@@ -146,6 +146,7 @@ onboarding/
 templates/
 # examples/ — included for open source hygiene
 research/
+!docs/research/
 scripts/
 docs/cloud/
 docs/study-protocol.md
