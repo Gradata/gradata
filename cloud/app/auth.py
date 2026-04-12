@@ -4,16 +4,35 @@ from __future__ import annotations
 
 import logging
 
+import httpx
 from fastapi import HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from jose import JWTError, jwt as jose_jwt
+from jose import JWTError, jwt as jose_jwt, jwk
 
 from app.config import get_settings
 from app.db import get_db
 
 _log = logging.getLogger(__name__)
 _bearer = HTTPBearer()
+
+# Cache JWKS so we don't fetch on every request
+_jwks_cache: dict | None = None
+
+
+async def _get_jwks() -> dict:
+    """Fetch and cache the Supabase JWKS for ES256 verification."""
+    global _jwks_cache
+    if _jwks_cache is not None:
+        return _jwks_cache
+
+    settings = get_settings()
+    url = f"{settings.supabase_url}/auth/v1/.well-known/jwks.json"
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(url)
+        resp.raise_for_status()
+        _jwks_cache = resp.json()
+    return _jwks_cache
 
 
 async def verify_api_key(key: str) -> dict:
@@ -28,11 +47,41 @@ async def verify_api_key(key: str) -> dict:
     return rows[0]
 
 
-def verify_jwt(signed_jwt: str, hmac_key: str | None = None) -> str:
-    """Verify a Supabase JWT and return the user_id (sub claim)."""
-    key = hmac_key or get_settings().supabase_jwt_key
+async def verify_jwt(signed_jwt: str) -> str:
+    """Verify a Supabase JWT (ES256 or HS256) and return the user_id."""
+    settings = get_settings()
+
+    # Try ES256 with JWKS first (modern Supabase projects)
     try:
-        claims = jose_jwt.decode(signed_jwt, key, algorithms=["HS256"])
+        jwks_data = await _get_jwks()
+        keys = jwks_data.get("keys", [])
+        if keys:
+            # Get the signing key from JWKS
+            header = jose_jwt.get_unverified_header(signed_jwt)
+            kid = header.get("kid")
+            key_data = next((k for k in keys if k.get("kid") == kid), keys[0])
+            public_key = jwk.construct(key_data)
+            claims = jose_jwt.decode(
+                signed_jwt,
+                public_key,
+                algorithms=["ES256"],
+                options={"verify_aud": False},
+            )
+            user_id = claims.get("sub")
+            if not user_id:
+                raise HTTPException(status_code=401, detail="Invalid JWT: no sub claim")
+            return user_id
+    except JWTError:
+        pass  # Fall through to HS256
+
+    # Fallback: HS256 with JWT secret (older Supabase projects)
+    try:
+        claims = jose_jwt.decode(
+            signed_jwt,
+            settings.supabase_jwt_key,
+            algorithms=["HS256"],
+            options={"verify_aud": False},
+        )
         user_id = claims.get("sub")
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid JWT: no sub claim")
@@ -54,8 +103,7 @@ async def get_current_brain(
     if cred.startswith("gd_"):
         return await verify_api_key(cred)
 
-    # JWT path for dashboard frontend
-    user_id = verify_jwt(cred)
+    user_id = await verify_jwt(cred)
     db = get_db()
     rows = await db.select("brains", filters={"user_id": user_id})
     if not rows:
@@ -67,7 +115,7 @@ async def get_current_user_id(
     credentials: HTTPAuthorizationCredentials = Security(_bearer),
 ) -> str:
     """Extract user_id from JWT. For dashboard-only endpoints."""
-    return verify_jwt(credentials.credentials)
+    return await verify_jwt(credentials.credentials)
 
 
 async def verify_brain_ownership(brain_id: str, user_id: str) -> dict:
@@ -94,5 +142,5 @@ async def get_brain_for_request(
             raise HTTPException(status_code=403, detail="Not your brain")
         return brain
 
-    user_id = verify_jwt(cred)
+    user_id = await verify_jwt(cred)
     return await verify_brain_ownership(brain_id, user_id)

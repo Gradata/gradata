@@ -1,4 +1,5 @@
 """Shared test fixtures."""
+
 from __future__ import annotations
 
 import os
@@ -27,13 +28,12 @@ class MockSupabaseClient:
     def add_response(self, table: str, operation: str, data: list[Any]):
         self._responses[table][operation] = data
 
-    async def select(self, table: str, columns: str = "*", filters: dict | None = None) -> list[dict]:
+    async def select(
+        self, table: str, columns: str = "*", filters: dict | None = None
+    ) -> list[dict]:
         rows = self._responses[table].get("select", [])
         if filters:
-            rows = [
-                r for r in rows
-                if all(r.get(k) == v for k, v in filters.items())
-            ]
+            rows = [r for r in rows if all(r.get(k) == v for k, v in filters.items())]
         return rows
 
     async def insert(self, table: str, data: dict | list[dict]) -> list[dict]:
@@ -50,6 +50,21 @@ class MockSupabaseClient:
         return [data]
 
 
+@pytest.fixture(autouse=True)
+def mock_jwks(monkeypatch):
+    """Auto-mock JWKS fetch so tests fall back to HS256 verification."""
+
+    async def empty_jwks():
+        return {"keys": []}
+
+    try:
+        from app import auth
+
+        monkeypatch.setattr(auth, "_get_jwks", empty_jwks)
+    except ImportError:
+        pass
+
+
 @pytest.fixture
 def mock_supabase(monkeypatch):
     """Provide a mock Supabase client and patch it into app.db."""
@@ -62,6 +77,7 @@ def mock_supabase(monkeypatch):
 def client():
     """FastAPI test client."""
     from app.main import create_app
+
     app = create_app()
     return TestClient(app)
 

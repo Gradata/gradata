@@ -1,4 +1,5 @@
 """Tests for API key and JWT authentication."""
+
 from __future__ import annotations
 
 import pytest
@@ -36,26 +37,44 @@ async def test_verify_api_key_invalid(mock_supabase):
     assert exc_info.value.status_code == 401
 
 
-def test_verify_jwt_valid():
-    """Valid JWT extracts user_id."""
+@pytest.mark.asyncio
+async def test_verify_jwt_valid(monkeypatch):
+    """Valid HS256 JWT extracts user_id (JWKS fetch fails, falls back to HS256)."""
     from jose import jwt as jose_jwt
+    from app import auth
 
-    # Generate a test-only JWT (hmac_key is NOT a real credential)
+    # Force JWKS to return empty so we fall back to HS256
+    async def empty_jwks():
+        return {"keys": []}
+
+    monkeypatch.setattr(auth, "_get_jwks", empty_jwks)
+
     hmac_key = "test-only-hmac-not-a-real-credential-x"
+    monkeypatch.setattr(auth.get_settings(), "supabase_jwt_key", hmac_key, raising=False)
+
     payload = {"sub": "user-123", "role": "authenticated"}
     signed = jose_jwt.encode(payload, hmac_key, algorithm="HS256")
-    user_id = verify_jwt(signed, hmac_key)
+    user_id = await verify_jwt(signed)
     assert user_id == "user-123"
 
 
-def test_verify_jwt_expired():
+@pytest.mark.asyncio
+async def test_verify_jwt_expired(monkeypatch):
     """Expired JWT raises 401."""
     from jose import jwt as jose_jwt
     import time
+    from app import auth
+
+    async def empty_jwks():
+        return {"keys": []}
+
+    monkeypatch.setattr(auth, "_get_jwks", empty_jwks)
 
     hmac_key = "test-only-hmac-not-a-real-credential-x"
+    monkeypatch.setattr(auth.get_settings(), "supabase_jwt_key", hmac_key, raising=False)
+
     payload = {"sub": "user-123", "exp": int(time.time()) - 100}
     signed = jose_jwt.encode(payload, hmac_key, algorithm="HS256")
     with pytest.raises(HTTPException) as exc_info:
-        verify_jwt(signed, hmac_key)
+        await verify_jwt(signed)
     assert exc_info.value.status_code == 401
