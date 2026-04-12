@@ -23,6 +23,11 @@ def create_app() -> FastAPI:
     settings = get_settings()
     logging.basicConfig(level=settings.log_level)
 
+    # Sentry must init before FastAPI so the integration wraps the app.
+    # No-op if GRADATA_SENTRY_DSN is unset.
+    from app.sentry_init import init_sentry
+    init_sentry(settings)
+
     is_prod = settings.environment == "production"
 
     app = FastAPI(

@@ -2,6 +2,10 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
+import { initSentry } from './lib/sentry'
+
+// Must init BEFORE createRoot so Sentry wraps React's error boundary
+initSentry()
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Root element not found')

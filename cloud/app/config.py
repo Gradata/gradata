@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     cors_origins: list[str] = ["http://localhost:3000", "https://app.gradata.ai"]
 
+    # Sentry (all optional — empty DSN = disabled)
+    sentry_dsn: str = ""
+    sentry_traces_sample_rate: float = 0.1
+    sentry_release: str = ""  # Falls back to RAILWAY_GIT_COMMIT_SHA, then "dev"
+
     model_config = {"env_prefix": "GRADATA_", "env_file": ".env", "extra": "ignore"}
 
 
