@@ -53,48 +53,48 @@ _ROOT_FILE_REGEX = r"^[^/\\]+\.(py|md|json|txt|js|ts|yml|yaml)$"
 
 
 # Patterns that indicate a rule is deterministic.
-# Each entry: (regex matching rule description, check type, hook template name, block pattern)
-DETERMINISTIC_PATTERNS: list[tuple[str, DeterminismCheck, str, str | None]] = [
+# Each entry: (compiled regex matching rule description, check type, hook template name, template arg)
+DETERMINISTIC_PATTERNS: list[tuple[re.Pattern[str], DeterminismCheck, str, str | None]] = [
     # Em-dash regex replace
-    (r"never use em.?dash", DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
-    (r"no em.?dash", DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
-    (r"don.t use em.?dash", DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
-    (r"(avoid|prefer not to use) em.?dash", DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
-    (r"em.?dash.+(banned|forbidden|not allowed)", DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
+    (re.compile(r"never use em.?dash"), DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
+    (re.compile(r"no em.?dash"), DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
+    (re.compile(r"don.t use em.?dash"), DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
+    (re.compile(r"(avoid|prefer not to use) em.?dash"), DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
+    (re.compile(r"em.?dash.+(banned|forbidden|not allowed)"), DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
     # File size check — capture group 1 holds the line limit
-    (r"keep files? under (\d+) lines?", DeterminismCheck.FILE_CHECK, "file_size_check", None),
-    (r"files? must be under (\d+) lines?", DeterminismCheck.FILE_CHECK, "file_size_check", None),
-    (r"no files? over (\d+) lines?", DeterminismCheck.FILE_CHECK, "file_size_check", None),
-    (r"files? under (\d+) lines?", DeterminismCheck.FILE_CHECK, "file_size_check", None),
+    (re.compile(r"keep files? under (\d+) lines?"), DeterminismCheck.FILE_CHECK, "file_size_check", None),
+    (re.compile(r"files? must be under (\d+) lines?"), DeterminismCheck.FILE_CHECK, "file_size_check", None),
+    (re.compile(r"no files? over (\d+) lines?"), DeterminismCheck.FILE_CHECK, "file_size_check", None),
+    (re.compile(r"files? under (\d+) lines?"), DeterminismCheck.FILE_CHECK, "file_size_check", None),
     # Secret scan
-    (r"never (commit|push) secret", DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
-    (r"no (hardcod|hardcode).+secret", DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
-    (r"never commit secret|no secret|never push secret", DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
-    (r"no hardcoded api key|never hardcode api key|no api key in code", DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
+    (re.compile(r"never (commit|push) secret"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
+    (re.compile(r"no (hardcod|hardcode).+secret"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
+    (re.compile(r"never commit secret|no secret|never push secret"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
+    (re.compile(r"no hardcoded api key|never hardcode api key|no api key in code"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
     # Auto test — PostToolUse, runs pytest against test_<basename>.py after edits.
     # template_arg is a sentinel ("auto_test") because render_hook gates on
     # template_arg being non-None; the template itself ignores it.
-    (r"run tests? after", DeterminismCheck.TEST_TRIGGER, "auto_test", "auto_test"),
-    (r"always run tests?", DeterminismCheck.TEST_TRIGGER, "auto_test", "auto_test"),
+    (re.compile(r"run tests? after"), DeterminismCheck.TEST_TRIGGER, "auto_test", "auto_test"),
+    (re.compile(r"always run tests?"), DeterminismCheck.TEST_TRIGGER, "auto_test", "auto_test"),
     # Read before edit (not shipped yet — stateful)
-    (r"read.+before edit", DeterminismCheck.FILE_CHECK, "read_before_edit", None),
-    (r"always read.+before", DeterminismCheck.FILE_CHECK, "read_before_edit", None),
+    (re.compile(r"read.+before edit"), DeterminismCheck.FILE_CHECK, "read_before_edit", None),
+    (re.compile(r"always read.+before"), DeterminismCheck.FILE_CHECK, "read_before_edit", None),
     # Destructive command blocks
-    (r"never (rm|delete|remove).+-rf", DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"rm\s+-[rf]+|rm\s+.*-[rf]+"),
-    (r"never force.?push|don.t force.?push|no force push", DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"git\s+push.*--force|git\s+push.*-f\b|git\s+push.*\+"),
-    (r"never drop.*table|no drop table", DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"DROP\s+TABLE"),
-    (r"never kubectl delete|don.t kubectl delete", DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"kubectl\s+delete"),
-    (r"never reset.+hard|no git reset.*hard", DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"git\s+reset.*--hard"),
+    (re.compile(r"never (rm|delete|remove).+-rf"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"rm\s+-[rf]+|rm\s+.*-[rf]+"),
+    (re.compile(r"never force.?push|don.t force.?push|no force push"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"git\s+push.*--force|git\s+push.*-f\b|git\s+push.*\+"),
+    (re.compile(r"never drop.*table|no drop table"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"DROP\s+TABLE"),
+    (re.compile(r"never kubectl delete|don.t kubectl delete"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"kubectl\s+delete"),
+    (re.compile(r"never reset.+hard|no git reset.*hard"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"git\s+reset.*--hard"),
     # Legacy destructive fallbacks (kept for broader phrasing)
-    (r"never (rm|delete|remove).+rf", DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"rm\s+-[rf]+|rm\s+.*-[rf]+"),
-    (r"never force.?push", DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"git\s+push.*--force|git\s+push.*-f\b|git\s+push.*\+"),
+    (re.compile(r"never (rm|delete|remove).+rf"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"rm\s+-[rf]+|rm\s+.*-[rf]+"),
+    (re.compile(r"never force.?push"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"git\s+push.*--force|git\s+push.*-f\b|git\s+push.*\+"),
     # f-string block
-    (r"never.*format.*f.?string.*python.?-c", DeterminismCheck.COMMAND_BLOCK, "fstring_block", r"python\s+-c\s+[\"\'][^\"\']*f[\"\']"),
-    (r"never.*python.?-c.*f.?string", DeterminismCheck.COMMAND_BLOCK, "fstring_block", r"python\s+-c\s+[\"\'][^\"\']*f[\"\']"),
+    (re.compile(r"never.*format.*f.?string.*python.?-c"), DeterminismCheck.COMMAND_BLOCK, "fstring_block", r"python\s+-c\s+[\"\'][^\"\']*f[\"\']"),
+    (re.compile(r"never.*python.?-c.*f.?string"), DeterminismCheck.COMMAND_BLOCK, "fstring_block", r"python\s+-c\s+[\"\'][^\"\']*f[\"\']"),
     # Root-file save
-    (r"never save.+root|no files? (in|at) root|don.t save.+root", DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
-    (r"(keep|put) (files|scripts) in (subfolder|subdir)", DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
-    (r"never commit.+to root|no commits to root", DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
+    (re.compile(r"never save.+root|no files? (in|at) root|don.t save.+root"), DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
+    (re.compile(r"(keep|put) (files|scripts) in (subfolder|subdir)"), DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
+    (re.compile(r"never commit.+to root|no commits to root"), DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
 ]
 
 
@@ -109,7 +109,7 @@ def classify_rule(description: str, confidence: float) -> HookCandidate:
     desc_lower = description.lower()
 
     for pattern, check_type, template, tmpl_arg in DETERMINISTIC_PATTERNS:
-        m = re.search(pattern, desc_lower)
+        m = pattern.search(desc_lower)
         if m:
             # file_size_check: capture group 1 holds the line limit as a string
             if template == "file_size_check" and m.groups():
@@ -121,7 +121,7 @@ def classify_rule(description: str, confidence: float) -> HookCandidate:
                 enforcement=EnforcementType.HOOK,
                 hook_template=template,
                 template_arg=tmpl_arg,
-                reason=f"Matches deterministic pattern: {pattern}",
+                reason=f"Matches deterministic pattern: {pattern.pattern}",
             )
 
     return HookCandidate(
@@ -180,6 +180,12 @@ _POST_TOOL_TEMPLATES = {"auto_test"}
 # real test file on disk to exit 2; synthesizing that during graduation is more
 # noise than signal, so we trust the template and skip.
 _TEMPLATES_SKIP_SELFTEST = {"auto_test"}
+
+# Templates that receive the violating text as a Bash command rather than Write content.
+_BASH_TEMPLATES = {"destructive_block", "fstring_block"}
+
+# Templates that receive the violating text as a Write file_path rather than content.
+_WRITE_PATH_TEMPLATES = {"root_file_save"}
 
 
 def _source_hash(text: str) -> str:
@@ -394,13 +400,11 @@ def try_generate(
 
     if candidate.hook_template not in _TEMPLATES_SKIP_SELFTEST:
         positive = positive_example or _synthesize_positive(candidate)
-        BASH_TEMPLATES = {"destructive_block", "fstring_block"}
-        WRITE_PATH_TEMPLATES = {"root_file_save"}
 
-        if candidate.hook_template in BASH_TEMPLATES:
+        if candidate.hook_template in _BASH_TEMPLATES:
             tool_name = "Bash"
             tool_input_key = "command"
-        elif candidate.hook_template in WRITE_PATH_TEMPLATES:
+        elif candidate.hook_template in _WRITE_PATH_TEMPLATES:
             tool_name = "Write"
             tool_input_key = "file_path"
         else:
