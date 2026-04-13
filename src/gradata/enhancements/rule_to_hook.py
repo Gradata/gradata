@@ -305,7 +305,7 @@ def _hook_root() -> Path:
     return Path(".claude/hooks/pre-tool/generated")
 
 
-def install_hook(slug: str, hook_source: str, *, template: str | None = None) -> Path:
+def install_hook(slug: str, hook_source: str, *, template: str) -> Path:
     """Write rendered hook source. Routes to post-tool dir for PostToolUse templates.
 
     PreToolUse hooks -> GRADATA_HOOK_ROOT (default .claude/hooks/pre-tool/generated/).

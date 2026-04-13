@@ -164,7 +164,7 @@ class TestInstallHook:
     def test_install_writes_file_and_sets_executable(self, tmp_path, monkeypatch):
         from gradata.enhancements.rule_to_hook import install_hook
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
-        path = install_hook("em-dash", "console.log('hello');\n")
+        path = install_hook("em-dash", "console.log('hello');\n", template="regex_replace")
         assert path.exists()
         assert path.parent == tmp_path
         assert path.suffix == ".js"
