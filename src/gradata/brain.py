@@ -378,7 +378,7 @@ class Brain(BrainInspectionMixin):
         self._rule_cache.invalidate()  # Correction invalidates cached rules
         from gradata._core import brain_correct
 
-        return brain_correct(
+        result = brain_correct(
             self,
             draft,
             final,
@@ -391,6 +391,22 @@ class Brain(BrainInspectionMixin):
             min_severity=min_severity,
             scope=scope,
         )
+
+        # Activation telemetry — fires once per machine, only if opted in.
+        # Guarded so a telemetry bug can never break the learning loop.
+        try:
+            from gradata import _telemetry
+
+            _telemetry.send_once("first_correction_captured")
+            # If this correction produced a graduation, mark it too. The
+            # result dict contains a 'graduated' list on the happy path;
+            # be defensive in case the schema changes.
+            if not dry_run and result and result.get("graduated"):
+                _telemetry.send_once("first_graduation")
+        except Exception:
+            pass
+
+        return result
 
     def patch_rule(
         self, category: str, old_description: str, new_description: str, reason: str = ""

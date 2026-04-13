@@ -34,6 +34,8 @@ def _get_brain(args):
 
 def cmd_init(args):
     from gradata import Brain
+    from gradata import _telemetry
+
     kwargs = {}
     if args.domain:
         kwargs["domain"] = args.domain
@@ -46,6 +48,23 @@ def cmd_init(args):
     if args.no_interactive:
         kwargs["interactive"] = False
     Brain.init(args.path, **kwargs)
+
+    # Opt-in telemetry prompt — only on first init (when the user has never
+    # been asked). Stays silent in non-interactive mode so CI doesn't hang.
+    if not args.no_interactive and not _telemetry.has_been_asked():
+        try:
+            enabled = _telemetry.prompt_and_persist()
+            if enabled:
+                print("Telemetry enabled. Thanks for helping us improve Gradata.")
+                print("To disable later: edit ~/.gradata/config.toml or set GRADATA_TELEMETRY=0")
+            else:
+                print("Telemetry disabled. You can enable it later in ~/.gradata/config.toml")
+        except Exception:
+            # Prompting must never break init.
+            pass
+
+    # brain_initialized — once per machine, even across multiple `gradata init` runs.
+    _telemetry.send_once("brain_initialized")
 
 
 def cmd_search(args):

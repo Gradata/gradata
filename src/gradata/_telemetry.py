@@ -1,0 +1,303 @@
+"""
+Opt-in anonymous telemetry for SDK activation events.
+
+What this does
+--------------
+Sends named activation events (e.g. ``brain_initialized``,
+``first_correction_captured``) to the Gradata Cloud telemetry endpoint so
+we can measure time-to-first-value. Strictly opt-in. Strictly anonymous.
+
+What we send
+------------
+Exactly this shape — nothing else::
+
+    {
+        "event": "<event_name>",
+        "user_id": "<sha256(machine_id)>",
+        "ts": "<ISO 8601 UTC>",
+        "sdk_version": "<pyproject version>"
+    }
+
+What we DO NOT send
+-------------------
+Lesson text. Correction content. Draft/final previews. File paths. Names.
+Emails. Stack traces. Environment variables. Anything identifiable.
+
+Opt-in semantics
+----------------
+1. ``~/.gradata/config.toml`` holds ``[telemetry] enabled = true|false``.
+2. Default is OFF (missing file or missing key → off).
+3. ``GRADATA_TELEMETRY=0`` env var overrides to off, always. (Kill switch
+   for users who already opted in but need to silence one session.)
+4. ``GRADATA_TELEMETRY=1`` env var does NOT auto-enable. Users must opt in
+   via the prompt or by editing the config file.
+
+Idempotency
+-----------
+Activation events fire at most once per machine per SDK install (tracked
+in the same config file). Heartbeat/recurring events are not this module's
+concern.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import os
+import threading
+import urllib.error
+import urllib.request
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Final, Literal
+
+logger = logging.getLogger("gradata.telemetry")
+
+# ── Constants ─────────────────────────────────────────────────────────
+DEFAULT_ENDPOINT: Final[str] = "https://api.gradata.ai/telemetry/event"
+ENV_ENDPOINT: Final[str] = "GRADATA_TELEMETRY_ENDPOINT"
+ENV_KILL_SWITCH: Final[str] = "GRADATA_TELEMETRY"
+CONFIG_DIR: Final[Path] = Path.home() / ".gradata"
+CONFIG_PATH: Final[Path] = CONFIG_DIR / "config.toml"
+
+# The exhaustive set of activation events. Adding a new one here is the
+# only place you need to touch — the prompt copy and the docs reference
+# this tuple, the backend schema just validates string length.
+ACTIVATION_EVENTS: Final[tuple[str, ...]] = (
+    "brain_initialized",
+    "first_correction_captured",
+    "first_graduation",
+    "first_hook_installed",
+)
+
+ActivationEvent = Literal[
+    "brain_initialized",
+    "first_correction_captured",
+    "first_graduation",
+    "first_hook_installed",
+]
+
+
+# ── Config I/O ────────────────────────────────────────────────────────
+def _read_config() -> dict[str, str]:
+    """Read ``config.toml`` into a flat dict of top-level and ``[telemetry]``
+    keys. Zero-dep — we don't want to pull tomllib just for this."""
+    if not CONFIG_PATH.exists():
+        return {}
+    try:
+        text = CONFIG_PATH.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    out: dict[str, str] = {}
+    section = ""
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            section = line[1:-1].strip()
+            continue
+        if "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key = key.strip()
+        val = val.strip().strip('"').strip("'")
+        full_key = f"{section}.{key}" if section else key
+        out[full_key] = val
+    return out
+
+
+def _write_config_key(key: str, value: str) -> None:
+    """Idempotently set ``[section] key = "value"`` in the config file.
+    Preserves other content. Creates the file if needed."""
+    section, _, bare = key.partition(".")
+    if not bare:
+        section, bare = "", section
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    existing = CONFIG_PATH.read_text(encoding="utf-8") if CONFIG_PATH.exists() else ""
+
+    # Simple rewriter: find section, find key, replace; otherwise append.
+    lines = existing.splitlines()
+    out_lines: list[str] = []
+    in_section = section == ""
+    key_written = False
+    section_seen = section == ""
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            # Transitioning sections
+            if in_section and not key_written:
+                out_lines.append(f'{bare} = "{value}"')
+                key_written = True
+            in_section = stripped[1:-1].strip() == section
+            if in_section:
+                section_seen = True
+            out_lines.append(line)
+            continue
+        if in_section and not key_written and stripped.startswith(f"{bare}") and "=" in stripped:
+            lhs = stripped.split("=", 1)[0].strip()
+            if lhs == bare:
+                out_lines.append(f'{bare} = "{value}"')
+                key_written = True
+                continue
+        out_lines.append(line)
+
+    if not key_written:
+        if not section_seen and section:
+            if out_lines and out_lines[-1].strip():
+                out_lines.append("")
+            out_lines.append(f"[{section}]")
+        out_lines.append(f'{bare} = "{value}"')
+
+    CONFIG_PATH.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+
+
+# ── Opt-in check ──────────────────────────────────────────────────────
+def is_enabled() -> bool:
+    """True iff user opted in AND the kill-switch env var is not set to 0."""
+    # Kill switch always wins.
+    override = os.environ.get(ENV_KILL_SWITCH, "").strip()
+    if override == "0" or override.lower() in ("false", "off", "no"):
+        return False
+    cfg = _read_config()
+    return cfg.get("telemetry.enabled", "").lower() == "true"
+
+
+def set_enabled(enabled: bool) -> None:
+    """Persist the opt-in choice."""
+    _write_config_key("telemetry.enabled", "true" if enabled else "false")
+
+
+def has_been_asked() -> bool:
+    """Was the user shown the opt-in prompt already?"""
+    cfg = _read_config()
+    return "telemetry.enabled" in cfg
+
+
+# ── Anonymous user ID ─────────────────────────────────────────────────
+def _machine_id_seed() -> str:
+    """Stable per-machine seed. We use ``uuid.getnode()`` which returns the
+    hardware MAC — stable across reinstalls on the same machine but not
+    portable between machines. Good enough to dedupe, insufficient to
+    identify anyone (we hash it before sending)."""
+    # Keep the raw seed out of memory once hashed.
+    return f"gradata-v1:{uuid.getnode():x}"
+
+
+def anonymous_user_id() -> str:
+    """Return ``sha256(machine_id)`` as a hex digest.
+
+    Deterministic per machine, opaque to the backend, impossible to reverse
+    into a MAC or hostname.
+    """
+    seed = _machine_id_seed().encode("utf-8")
+    return hashlib.sha256(seed).hexdigest()
+
+
+# ── Send ──────────────────────────────────────────────────────────────
+def _endpoint() -> str:
+    return os.environ.get(ENV_ENDPOINT, "").strip() or DEFAULT_ENDPOINT
+
+
+def _sdk_version() -> str:
+    try:
+        from gradata import __version__
+
+        return str(__version__)
+    except Exception:
+        return "unknown"
+
+
+def _build_payload(event: str) -> dict[str, str]:
+    """Exact wire format. No extra fields, ever."""
+    return {
+        "event": event,
+        "user_id": anonymous_user_id(),
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "sdk_version": _sdk_version(),
+    }
+
+
+def _post(payload: dict[str, str], timeout: float = 3.0) -> bool:
+    """Best-effort POST. Never raises. Returns True on 2xx."""
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        _endpoint(),
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return 200 <= resp.status < 300
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        logger.debug("telemetry POST failed: %s", exc)
+        return False
+
+
+def send_event(event: str, *, blocking: bool = False) -> None:
+    """Fire an activation event if the user opted in.
+
+    Runs in a background thread by default so it never blocks the user.
+    Pass ``blocking=True`` in tests.
+    """
+    if event not in ACTIVATION_EVENTS:
+        raise ValueError(f"Unknown activation event: {event!r}")
+    if not is_enabled():
+        return
+    payload = _build_payload(event)
+
+    if blocking:
+        _post(payload)
+        return
+
+    thread = threading.Thread(target=_post, args=(payload,), daemon=True)
+    thread.start()
+
+
+# ── First-fire guard (activation events fire once per machine) ────────
+def _event_flag_key(event: str) -> str:
+    return f"telemetry.fired_{event}"
+
+
+def send_once(event: str, *, blocking: bool = False) -> bool:
+    """Fire ``event`` exactly once per machine.
+
+    Returns True if the event was actually sent (or queued), False if it
+    was already fired before OR the user has not opted in.
+    """
+    if not is_enabled():
+        return False
+    cfg = _read_config()
+    if cfg.get(_event_flag_key(event)) == "true":
+        return False
+    _write_config_key(_event_flag_key(event), "true")
+    send_event(event, blocking=blocking)
+    return True
+
+
+# ── Interactive prompt ────────────────────────────────────────────────
+PROMPT_TEXT = """\
+Gradata can send anonymous usage pings (brain_initialized,
+first_correction_captured, first_graduation, first_hook_installed) so we
+know the SDK is working for you. No code, no lesson text, no personal
+data — just event names + hashed user ID.
+
+Enable? [y/N]: """
+
+
+def prompt_and_persist(input_fn=input) -> bool:
+    """Ask the user once; persist the answer. Returns the chosen value.
+
+    Safe for non-interactive environments: any EOFError or missing stdin
+    is treated as "no". ``input_fn`` is injectable for tests.
+    """
+    try:
+        answer = input_fn(PROMPT_TEXT).strip().lower()
+    except (EOFError, OSError):
+        answer = ""
+    enabled = answer in ("y", "yes")
+    set_enabled(enabled)
+    return enabled
