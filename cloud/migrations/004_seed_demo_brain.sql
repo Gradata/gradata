@@ -48,7 +48,8 @@ BEGIN
     -- ------------------------------------------------------------------
     -- 1 brain
     -- ------------------------------------------------------------------
-    INSERT INTO brains (workspace_id, user_id, name, domain, metadata)
+    -- Schema uses brain_name, not name (per 001_initial_schema.sql).
+    INSERT INTO brains (workspace_id, user_id, brain_name, domain, metadata)
     VALUES (
         p_workspace_id,
         p_user_id,
