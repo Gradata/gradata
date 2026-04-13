@@ -206,3 +206,73 @@ class TestTryGenerate:
         result = try_generate(candidate, positive_example="plain ascii no dashes here")
         assert result.installed is False
         assert "self-test" in result.reason.lower() or "did not block" in result.reason.lower()
+
+
+import subprocess
+import sys
+
+
+class TestCliRuleAdd:
+    def test_rule_add_installs_hook_for_em_dash(self, tmp_path, monkeypatch):
+        # Set up an isolated brain + hook root
+        brain_dir = tmp_path / "brain"
+        hook_root = tmp_path / "generated"
+        hook_root.mkdir(parents=True)
+        monkeypatch.setenv("GRADATA_BRAIN", str(brain_dir))
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(hook_root))
+
+        # Run the CLI
+        import os
+        env = os.environ.copy()
+        src_dir = str(Path(__file__).resolve().parent.parent / "src")
+        env["PYTHONPATH"] = src_dir + os.pathsep + env.get("PYTHONPATH", "")
+        env["GRADATA_BRAIN"] = str(brain_dir)
+        env["GRADATA_HOOK_ROOT"] = str(hook_root)
+        result = subprocess.run(
+            [sys.executable, "-m", "gradata.cli", "rule", "add", "never use em dashes"],
+            capture_output=True, text=True,
+            cwd=str(tmp_path),
+            env=env,
+        )
+        assert result.returncode == 0, f"stderr: {result.stderr}\nstdout: {result.stdout}"
+        # Should report installation
+        assert "installed" in result.stdout.lower() or "graduated" in result.stdout.lower()
+        # Hook file should exist
+        js_files = list(hook_root.glob("*.js"))
+        assert len(js_files) == 1, f"found: {[f.name for f in hook_root.iterdir()]}"
+        # Lessons file should contain the [hooked] marker
+        lessons = brain_dir / "lessons.md"
+        assert lessons.exists()
+        content = lessons.read_text(encoding="utf-8")
+        assert "[hooked]" in content
+        assert "never use em dashes" in content
+
+    def test_rule_add_falls_back_to_soft_for_advisory(self, tmp_path, monkeypatch):
+        brain_dir = tmp_path / "brain"
+        hook_root = tmp_path / "generated"
+        hook_root.mkdir(parents=True)
+        monkeypatch.setenv("GRADATA_BRAIN", str(brain_dir))
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(hook_root))
+
+        import os
+        env = os.environ.copy()
+        src_dir = str(Path(__file__).resolve().parent.parent / "src")
+        env["PYTHONPATH"] = src_dir + os.pathsep + env.get("PYTHONPATH", "")
+        env["GRADATA_BRAIN"] = str(brain_dir)
+        env["GRADATA_HOOK_ROOT"] = str(hook_root)
+        result = subprocess.run(
+            [sys.executable, "-m", "gradata.cli", "rule", "add", "lead with the answer"],
+            capture_output=True, text=True,
+            cwd=str(tmp_path),
+            env=env,
+        )
+        assert result.returncode == 0
+        # No hook installed (advisory / non-deterministic)
+        js_files = list(hook_root.glob("*.js"))
+        assert len(js_files) == 0
+        # Lessons file has the rule but WITHOUT [hooked] marker
+        lessons = brain_dir / "lessons.md"
+        assert lessons.exists()
+        content = lessons.read_text(encoding="utf-8")
+        assert "lead with the answer" in content
+        assert "[hooked]" not in content
