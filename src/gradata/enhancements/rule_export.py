@@ -4,6 +4,9 @@ Supported targets:
 - cursor    -> .cursorrules (freeform markdown rule-per-line)
 - agents    -> AGENTS.md (markdown with headings + bullet rules)
 - aider     -> .aider.conf.yml (YAML with custom system prompt rules)
+- codex     -> .codex/AGENTS.md (Codex CLI rules, same AGENTS schema)
+- cline     -> .clinerules (Cline rules file — single markdown)
+- continue  -> .continue/rules/gradata-rules.md (Continue.dev rules)
 
 Usage (library):
     from gradata.enhancements.rule_export import export_rules
@@ -94,10 +97,107 @@ def _format_aider(rules: list[tuple[str, str]]) -> str:
     return "\n".join(yaml_lines) + "\n"
 
 
+def _format_codex(rules: list[tuple[str, str]]) -> str:
+    """Emit rules for the OpenAI Codex CLI.
+
+    Codex CLI reads project-level ``AGENTS.md`` conventions. We scope the
+    export to ``.codex/AGENTS.md`` (per DEFAULT_PATHS below) so it
+    doesn't collide with an existing top-level AGENTS.md when a user
+    runs multiple agent tools in the same repo.
+    """
+    if not rules:
+        return "# Codex AGENTS.md\n\nNo graduated rules yet.\n"
+    by_cat: dict[str, list[str]] = {}
+    for cat, desc in rules:
+        by_cat.setdefault(cat, []).append(desc)
+    lines = [
+        "# Codex AGENTS.md",
+        "",
+        "Graduated rules learned from corrections. Follow these in every response.",
+        "",
+    ]
+    for cat in sorted(by_cat):
+        lines.append(f"## {cat}")
+        lines.append("")
+        for desc in by_cat[cat]:
+            lines.append(f"- {desc}")
+        lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def _format_cline(rules: list[tuple[str, str]]) -> str:
+    """Emit rules for Cline (.clinerules — single markdown file).
+
+    Cline's ``.clinerules`` file at the repo root is consumed as custom
+    instructions appended to the system prompt. Plain markdown with
+    headings + bullets is the idiomatic format.
+    """
+    if not rules:
+        return "# Cline Rules\n\nNo graduated rules yet.\n"
+    by_cat: dict[str, list[str]] = {}
+    for cat, desc in rules:
+        by_cat.setdefault(cat, []).append(desc)
+    lines = [
+        "# Cline Rules",
+        "",
+        "Graduated rules learned from corrections. Follow these in every response.",
+        "",
+    ]
+    for cat in sorted(by_cat):
+        lines.append(f"## {cat}")
+        lines.append("")
+        for desc in by_cat[cat]:
+            lines.append(f"- {desc}")
+        lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def _format_continue(rules: list[tuple[str, str]]) -> str:
+    """Emit rules for Continue.dev (.continue/rules/*.md).
+
+    Continue's rules directory contains one or more markdown files whose
+    contents are appended to the system prompt. We emit a single file
+    (``gradata-rules.md``) grouped by category.
+    """
+    if not rules:
+        return "# Continue.dev Rules\n\nNo graduated rules yet.\n"
+    by_cat: dict[str, list[str]] = {}
+    for cat, desc in rules:
+        by_cat.setdefault(cat, []).append(desc)
+    lines = [
+        "# Continue.dev Rules",
+        "",
+        "Graduated rules learned from corrections. Follow these in every response.",
+        "",
+    ]
+    for cat in sorted(by_cat):
+        lines.append(f"## {cat}")
+        lines.append("")
+        for desc in by_cat[cat]:
+            lines.append(f"- {desc}")
+        lines.append("")
+    return "\n".join(lines) + "\n"
+
+
 _FORMATTERS = {
     "cursor": _format_cursor,
     "agents": _format_agents,
     "aider": _format_aider,
+    "codex": _format_codex,
+    "cline": _format_cline,
+    "continue": _format_continue,
+}
+
+
+# Default relative output paths per target — used by the CLI when --output
+# is not supplied, and documented for users who want the conventional path.
+DEFAULT_PATHS: dict[str, str] = {
+    "cursor": ".cursorrules",
+    "agents": "AGENTS.md",
+    "aider": ".aider.conf.yml",
+    "codex": ".codex/AGENTS.md",
+    "cline": ".clinerules",
+    "continue": ".continue/rules/gradata-rules.md",
 }
 
 

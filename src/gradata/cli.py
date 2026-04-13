@@ -773,8 +773,11 @@ def main():
     )
     p_export.add_argument("--mode", choices=["full", "no-prospects", "domain-only"],
                           default="full")
-    p_export.add_argument("--target", choices=["cursor", "agents", "aider"],
-                          help="Emit graduated RULE-tier lessons in platform-specific format")
+    p_export.add_argument(
+        "--target",
+        choices=["cursor", "agents", "aider", "codex", "cline", "continue"],
+        help="Emit graduated RULE-tier lessons in platform-specific format",
+    )
     p_export.add_argument("--output", "-o",
                           help="Output file when using --target (default: stdout)")
 
