@@ -31,8 +31,14 @@ const SECTIONS = [
     items: [
       { href: '/billing', label: 'Billing', icon: '▦' },
       { href: '/api-keys', label: 'API Keys', icon: '⌘' },
-      { href: '/settings', label: 'Security', icon: '⊙' },
+      { href: '/settings', label: 'Account', icon: '⊙' },
       { href: '/notifications', label: 'Notifications', icon: '◉' },
+    ],
+  },
+  {
+    label: 'Operator',
+    items: [
+      { href: '/operator', label: 'God mode', icon: '✦' },
     ],
   },
 ] as const
