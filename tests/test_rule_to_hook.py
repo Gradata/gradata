@@ -1024,3 +1024,54 @@ class TestCliRuleRemove:
         )
         assert proc.returncode == 0, proc.stderr
         assert not post_hook.exists()
+
+
+class TestRuleToHookEvents:
+    def _make_brain(self, tmp_path):
+        from gradata.brain import Brain
+        return Brain.init(
+            tmp_path / "brain",
+            name="EventsTest",
+            domain="Testing",
+            embedding="local",
+            interactive=False,
+        )
+
+    def test_emits_installed_event_on_success(self, tmp_path, monkeypatch):
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        brain = self._make_brain(tmp_path)
+
+        candidate = classify_rule("Never use em dashes", 0.95)
+        result = try_generate(candidate, brain=brain, source="user_declared")
+        assert result.installed
+
+        events = brain.query_events(event_type="RULE_TO_HOOK_INSTALLED", last_n_sessions=1)
+        assert len(events) == 1
+        data = events[0]["data"]
+        assert data["slug"]
+        assert data["template"] == "regex_replace"
+        assert "never use em dashes" in data["rule_text"].lower()
+        assert events[0]["source"] == "user_declared"
+
+    def test_emits_failed_event_on_skip(self, tmp_path, monkeypatch):
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        brain = self._make_brain(tmp_path)
+
+        candidate = classify_rule("Be concise and direct", 0.91)  # non-deterministic
+        result = try_generate(candidate, brain=brain, source="graduate")
+        assert not result.installed
+
+        events = brain.query_events(event_type="RULE_TO_HOOK_FAILED", last_n_sessions=1)
+        assert len(events) == 1
+        assert events[0]["data"]["reason"]
+        assert events[0]["source"] == "graduate"
+
+    def test_no_brain_skips_logging_gracefully(self, tmp_path, monkeypatch):
+        """try_generate without brain=... must still work (backward-compat)."""
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        candidate = classify_rule("Never use em dashes", 0.95)
+        result = try_generate(candidate)  # no brain kwarg
+        assert result.installed  # still works
