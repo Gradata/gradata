@@ -71,9 +71,11 @@ DETERMINISTIC_PATTERNS: list[tuple[str, DeterminismCheck, str, str | None]] = [
     (r"no (hardcod|hardcode).+secret", DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
     (r"never commit secret|no secret|never push secret", DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
     (r"no hardcoded api key|never hardcode api key|no api key in code", DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
-    # Auto test (not shipped yet — stateful)
-    (r"run tests? after", DeterminismCheck.TEST_TRIGGER, "auto_test", None),
-    (r"always run tests?", DeterminismCheck.TEST_TRIGGER, "auto_test", None),
+    # Auto test — PostToolUse, runs pytest against test_<basename>.py after edits.
+    # block_pattern is a sentinel ("auto_test") because render_hook gates on
+    # block_pattern being non-None; the template itself ignores it.
+    (r"run tests? after", DeterminismCheck.TEST_TRIGGER, "auto_test", "auto_test"),
+    (r"always run tests?", DeterminismCheck.TEST_TRIGGER, "auto_test", "auto_test"),
     # Read before edit (not shipped yet — stateful)
     (r"read.+before edit", DeterminismCheck.FILE_CHECK, "read_before_edit", None),
     (r"always read.+before", DeterminismCheck.FILE_CHECK, "read_before_edit", None),
@@ -167,7 +169,17 @@ _IMPLEMENTED_TEMPLATES = {
     "destructive_block",
     "secret_scan",
     "file_size_check",
+    "auto_test",
 }
+
+# Templates that fire on PostToolUse (after an edit/write) rather than PreToolUse.
+# install_hook routes these to GRADATA_HOOK_ROOT_POST instead of GRADATA_HOOK_ROOT.
+_POST_TOOL_TEMPLATES = {"auto_test"}
+
+# Templates whose self-test we skip during graduation. auto_test would need a
+# real test file on disk to exit 2; synthesizing that during graduation is more
+# noise than signal, so we trust the template and skip.
+_TEMPLATES_SKIP_SELFTEST = {"auto_test"}
 
 
 def _source_hash(text: str) -> str:
@@ -290,12 +302,20 @@ def _hook_root() -> Path:
     return Path(".claude/hooks/pre-tool/generated")
 
 
-def install_hook(slug: str, hook_source: str) -> Path:
-    """Write rendered hook source to GRADATA_HOOK_ROOT/<slug>.js.
+def install_hook(slug: str, hook_source: str, *, template: str | None = None) -> Path:
+    """Write rendered hook source. Routes to post-tool dir for PostToolUse templates.
+
+    PreToolUse hooks -> GRADATA_HOOK_ROOT (default .claude/hooks/pre-tool/generated/).
+    PostToolUse hooks (e.g. auto_test) -> GRADATA_HOOK_ROOT_POST
+    (default .claude/hooks/post-tool/generated/).
 
     Creates the directory if needed. Chmods to 0o755 on platforms that support it.
     """
-    root = _hook_root()
+    if template in _POST_TOOL_TEMPLATES:
+        override = os.environ.get("GRADATA_HOOK_ROOT_POST")
+        root = Path(override) if override else Path(".claude/hooks/post-tool/generated")
+    else:
+        root = _hook_root()
     root.mkdir(parents=True, exist_ok=True)
     path = root / f"{slug}.js"
     # Preserve LF line endings regardless of platform
@@ -372,27 +392,32 @@ def try_generate(
             reason=f"render skipped: template '{candidate.hook_template}' not implemented or missing pattern",
         )
 
-    positive = positive_example or _synthesize_positive(candidate)
-    BASH_TEMPLATES = {"destructive_block", "fstring_block"}
-    WRITE_PATH_TEMPLATES = {"root_file_save"}
+    if candidate.hook_template not in _TEMPLATES_SKIP_SELFTEST:
+        positive = positive_example or _synthesize_positive(candidate)
+        BASH_TEMPLATES = {"destructive_block", "fstring_block"}
+        WRITE_PATH_TEMPLATES = {"root_file_save"}
 
-    if candidate.hook_template in BASH_TEMPLATES:
-        tool_name = "Bash"
-        tool_input_key = "command"
-    elif candidate.hook_template in WRITE_PATH_TEMPLATES:
-        tool_name = "Write"
-        tool_input_key = "file_path"
-    else:
-        tool_name = "Write"
-        tool_input_key = "content"
+        if candidate.hook_template in BASH_TEMPLATES:
+            tool_name = "Bash"
+            tool_input_key = "command"
+        elif candidate.hook_template in WRITE_PATH_TEMPLATES:
+            tool_name = "Write"
+            tool_input_key = "file_path"
+        else:
+            tool_name = "Write"
+            tool_input_key = "content"
 
-    if not self_test(rendered, positive=positive, tool_name=tool_name, tool_input_key=tool_input_key):
-        return GenerationResult(
-            installed=False,
-            reason=f"self-test did not block positive example: {positive!r}",
-        )
+        if not self_test(rendered, positive=positive, tool_name=tool_name, tool_input_key=tool_input_key):
+            return GenerationResult(
+                installed=False,
+                reason=f"self-test did not block positive example: {positive!r}",
+            )
 
-    path = install_hook(_slug(candidate.rule_description), rendered)
+    path = install_hook(
+        _slug(candidate.rule_description),
+        rendered,
+        template=candidate.hook_template,
+    )
     return GenerationResult(
         installed=True,
         reason=f"installed at {path}",
