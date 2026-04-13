@@ -12,8 +12,10 @@ from app.routes.brains import router as brains_router
 from app.routes.corrections import router as corrections_router
 from app.routes.lessons import router as lessons_router
 from app.routes.meta_rules import router as meta_rules_router
+from app.routes.operator import router as operator_router
 from app.routes.rule_patches import router as rule_patches_router
 from app.routes.sync import router as sync_router
+from app.routes.team import router as team_router
 from app.routes.users import router as users_router
 
 router = APIRouter()
@@ -28,3 +30,5 @@ router.include_router(meta_rules_router, tags=["meta-rules"])
 router.include_router(activity_router, tags=["activity"])
 router.include_router(rule_patches_router, tags=["rule-patches"])
 router.include_router(billing_router, tags=["billing"])
+router.include_router(team_router, tags=["team"])
+router.include_router(operator_router, tags=["operator"])

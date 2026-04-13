@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class Severity(str, Enum):
@@ -240,3 +240,86 @@ class SubscriptionResponse(BaseModel):
     status: str | None = None
     current_period_end: str | None = None
     usage: SubscriptionUsage = Field(default_factory=SubscriptionUsage)
+
+
+# ---------------------------------------------------------------------------
+# Team / workspace member models
+# ---------------------------------------------------------------------------
+
+
+class MemberRole(str, Enum):
+    owner = "owner"
+    admin = "admin"
+    member = "member"
+
+
+class InviteRole(str, Enum):
+    admin = "admin"
+    member = "member"
+
+
+class MemberResponse(BaseModel):
+    user_id: str
+    email: str | None = None
+    display_name: str | None = None
+    role: str
+    joined_at: str | None = None
+    last_sync_at: str | None = None
+
+
+class InviteRequest(BaseModel):
+    email: EmailStr
+    role: InviteRole = InviteRole.member
+
+
+class InviteResponse(BaseModel):
+    id: str
+    email: str
+    role: str
+    token: str
+    accept_url: str
+    expires_at: str | None = None
+
+
+class UpdateRoleRequest(BaseModel):
+    role: InviteRole  # owner cannot be assigned through this endpoint
+
+
+# ---------------------------------------------------------------------------
+# Operator / admin models (god-mode panel)
+# ---------------------------------------------------------------------------
+
+
+class GlobalKpis(BaseModel):
+    """Aggregate KPIs across all workspaces. All monetary amounts in USD (dollars)."""
+
+    mrr_usd: float = 0.0
+    arr_usd: float = 0.0
+    mrr_delta_pct: float = 0.0  # month-over-month new-workspace growth %
+    customers_total: int = 0
+    customers_active: int = 0  # any brain synced within 14 days
+    churn_rate: float = 0.0  # workspaces deleted in last 30d / total at period start
+    net_revenue_retention: float = 1.0  # TODO: placeholder until sub-history tracked
+
+
+class AdminCustomer(BaseModel):
+    """One workspace row for the operator customer list."""
+
+    id: str
+    company: str
+    plan: str
+    mrr_usd: float = 0.0
+    active_users: int = 0
+    brains: int = 0
+    last_active: str | None = None  # ISO timestamp
+    health: str = "healthy"  # healthy | at-risk | churning
+
+
+class AdminAlert(BaseModel):
+    """A derived operational alert for the operator panel."""
+
+    id: str
+    kind: str  # churn-risk | failed-payment | usage-spike
+    customer: str
+    detail: str
+    created_at: str  # ISO timestamp

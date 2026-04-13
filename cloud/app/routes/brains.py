@@ -141,3 +141,69 @@ async def delete_brain(
     now = datetime.now(timezone.utc).isoformat()
     await db.update("brains", data={"deleted_at": now}, filters={"id": brain_id})
     _log.info("Soft-deleted brain=%s", brain_id)
+
+
+class ClearDemoResponse(BaseModel):
+    deleted: int
+    by_table: dict[str, int]
+
+
+@router.post("/brains/{brain_id}/clear-demo", response_model=ClearDemoResponse)
+async def clear_demo(
+    brain_id: str,
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+) -> ClearDemoResponse:
+    """Delete all demo rows (is_demo=true) scoped to this brain.
+
+    Auth: caller must own the brain. Returns per-table delete counts and a total.
+    """
+    await get_brain_for_request(brain_id, credentials)
+    db = get_db()
+
+    by_table: dict[str, int] = {}
+    total = 0
+
+    # Children first (FK order doesn't strictly matter here, but we delete
+    # narrowest-to-widest so counts are readable).
+    for table in ("corrections", "lessons", "meta_rules", "events"):
+        deleted = await _delete_demo_rows(db, table, brain_id)
+        by_table[table] = deleted
+        total += deleted
+
+    # Finally the brain itself — only if it was flagged is_demo in metadata.
+    brain_rows = await db.select(
+        "brains", columns="id,metadata", filters={"id": brain_id}
+    )
+    if brain_rows and _is_demo_metadata(brain_rows[0].get("metadata")):
+        await db.delete("brains", filters={"id": brain_id})
+        by_table["brains"] = 1
+        total += 1
+    else:
+        by_table["brains"] = 0
+
+    _log.info("Cleared demo data for brain=%s (deleted=%d)", brain_id, total)
+    return ClearDemoResponse(deleted=total, by_table=by_table)
+
+
+async def _delete_demo_rows(db, table: str, brain_id: str) -> int:
+    """Fetch rows for the brain, filter by is_demo marker, delete those ids."""
+    rows = await db.select(table, columns="id,data", filters={"brain_id": brain_id})
+    demo_rows = [r for r in rows if _is_demo_data(r.get("data"))]
+    if not demo_rows:
+        return 0
+    for row in demo_rows:
+        await db.delete(table, filters={"id": row["id"]})
+    return len(demo_rows)
+
+
+def _is_demo_data(data) -> bool:
+    if not data:
+        return False
+    if isinstance(data, dict):
+        return bool(data.get("is_demo"))
+    return False
+
+
+def _is_demo_metadata(metadata) -> bool:
+    return _is_demo_data(metadata)

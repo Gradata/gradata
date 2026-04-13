@@ -66,6 +66,21 @@ class SupabaseClient:
         resp.raise_for_status()
         return resp.json()
 
+    async def delete(
+        self, table: str, filters: dict[str, Any] | None = None,
+    ) -> list[dict]:
+        """DELETE rows matching eq filters. Returns deleted rows when PostgREST sends them back."""
+        params: dict[str, str] = {}
+        if filters:
+            for key, val in filters.items():
+                params[key] = f"eq.{val}"
+        resp = await self._http.delete(f"/{table}", params=params)
+        resp.raise_for_status()
+        try:
+            return resp.json()
+        except ValueError:
+            return []
+
     async def close(self):
         await self._http.aclose()
 
