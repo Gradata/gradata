@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -277,10 +278,8 @@ def self_test(
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return False
     finally:
-        try:
+        with contextlib.suppress(Exception):
             hook_path.unlink()
-        except Exception:
-            pass
 
 
 @dataclass
@@ -323,10 +322,9 @@ def install_hook(slug: str, hook_source: str, *, template: str) -> Path:
     path = root / f"{slug}.js"
     # Preserve LF line endings regardless of platform
     path.write_text(hook_source, encoding="utf-8", newline="\n")
-    try:
+    # Windows or filesystem that doesn't support chmod will raise; suppress.
+    with contextlib.suppress(Exception):
         path.chmod(0o755)
-    except Exception:
-        pass  # Windows or filesystem that doesn't support chmod
     return path
 
 

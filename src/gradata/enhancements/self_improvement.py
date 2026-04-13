@@ -504,7 +504,7 @@ def _bayesian_blend_weight(total_observations: int) -> float:
     )
 
 
-def _bayesian_confidence(lesson: "Lesson") -> float:
+def _bayesian_confidence(lesson: Lesson) -> float:
     """Compute blended confidence from beta posterior + FSRS."""
     from gradata._stats import beta_posterior
 
