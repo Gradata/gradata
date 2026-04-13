@@ -23,6 +23,7 @@ def _parse_rules(brain_root: Path) -> list[tuple[str, str]]:
     Delegates to the canonical lessons.md parser in self_improvement.py.
     """
     import re as _re
+
     from gradata.enhancements.self_improvement import parse_lessons
     lessons_file = brain_root / "lessons.md"
     if not lessons_file.exists():
