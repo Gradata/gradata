@@ -580,7 +580,7 @@ def cmd_rule_list(args):
 
     print()
     print("Hook files installed:")
-    for slug, path in sorted(installed_files.items()):
+    for _slug_key, path in sorted(installed_files.items()):
         print(f"  {path}")
 
     if orphan_slugs:

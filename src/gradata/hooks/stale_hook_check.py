@@ -16,7 +16,6 @@ import re
 import sys
 from pathlib import Path
 
-
 _HASH_LINE_RE = re.compile(r"^\s*\*\s*Source hash:\s*([0-9a-f]{12})", re.MULTILINE)
 _LESSON_RE = re.compile(
     r"^\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+\w+:\s+(.+)$"
