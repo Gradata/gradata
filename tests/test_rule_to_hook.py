@@ -341,3 +341,29 @@ class TestGraduateIntegration:
         )
         # Description should NOT be marked [hooked]
         assert not lesson.description.lstrip().startswith("[hooked]")
+
+
+class TestBypassEnv:
+    def test_bypass_env_disables_generated_hook(self, tmp_path, monkeypatch):
+        """Generated hooks must honor GRADATA_BYPASS=1 as a runtime escape hatch."""
+        import json as _j
+        import os as _os
+        import subprocess as _sp
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        candidate = classify_rule("Never use em dashes", 0.95)
+        result = try_generate(candidate)
+        assert result.installed and result.hook_path is not None
+
+        # Invoke the installed hook with GRADATA_BYPASS=1 and violating input
+        env = {**_os.environ, "GRADATA_BYPASS": "1"}
+        proc = _sp.run(
+            ["node", str(result.hook_path)],
+            input=_j.dumps({"tool_name": "Write",
+                            "tool_input": {"content": "this \u2014 should pass"}}),
+            capture_output=True, text=True, env=env, timeout=5,
+        )
+        assert proc.returncode == 0, (
+            f"bypass failed: rc={proc.returncode} stdout={proc.stdout!r}"
+        )
