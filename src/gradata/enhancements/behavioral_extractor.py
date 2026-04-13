@@ -660,14 +660,14 @@ def _synthesize_summary(category: str, descriptions: list[str]) -> str:
 
 
 def detect_recurring_patterns(
-    lessons: list["Lesson"],
+    lessons: list[Lesson],
     min_corrections: int = 3,
 ) -> list[RecurringPattern]:
     """Detect patterns spanning multiple corrections in the same category."""
     if not lessons:
         return []
 
-    by_cat: dict[str, list["Lesson"]] = {}
+    by_cat: dict[str, list[Lesson]] = {}
     for lesson in lessons:
         cat = lesson.category.upper()
         by_cat.setdefault(cat, []).append(lesson)
