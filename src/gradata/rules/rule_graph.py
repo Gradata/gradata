@@ -14,13 +14,9 @@ import json
 import logging
 import re
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
 
 _log = logging.getLogger(__name__)
 
@@ -213,14 +209,12 @@ def detect_relationship(rule_a: dict, rule_b: dict) -> RuleRelationType | None:
             return RuleRelationType.GENERALIZES
 
     # 2. Contradiction detection (same category required)
-    if cat_a and cat_b and cat_a == cat_b:
-        if _has_contradiction(desc_a, desc_b):
-            return RuleRelationType.CONTRADICTS
+    if cat_a and cat_b and cat_a == cat_b and _has_contradiction(desc_a, desc_b):
+        return RuleRelationType.CONTRADICTS
 
     # 3. Reinforcement (same category + keyword overlap > 50%)
-    if cat_a and cat_b and cat_a == cat_b:
-        if _keyword_overlap(desc_a, desc_b) > 0.5:
-            return RuleRelationType.REINFORCES
+    if cat_a and cat_b and cat_a == cat_b and _keyword_overlap(desc_a, desc_b) > 0.5:
+        return RuleRelationType.REINFORCES
 
     return None
 
@@ -248,7 +242,7 @@ def store_relationship(
             rule_b_id,
             rel_type.value,
             confidence,
-            datetime.now(timezone.utc).isoformat(),
+            datetime.now(UTC).isoformat(),
         ),
     )
     conn.commit()

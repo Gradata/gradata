@@ -582,7 +582,6 @@ def _call_llm_for_synthesis(
     Raises:
         RuntimeError: On any LLM failure (caller catches).
     """
-    from gradata.enhancements.llm_synthesizer import synthesise_principle_llm
 
     key, base, model = _resolve_llm_credentials()
     if not key or not base:
