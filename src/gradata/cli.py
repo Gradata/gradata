@@ -111,6 +111,31 @@ def cmd_audit(args):
 
 
 def cmd_export(args):
+    """Export brain. Two modes:
+
+    - With --target: emit graduated RULE-tier lessons in a platform-specific
+      rule file format (cursor/agents/aider).
+    - Otherwise: marketplace archive export via Brain.export(mode=...).
+    """
+    target = getattr(args, "target", None)
+    if target:
+        from gradata.enhancements.rule_export import export_rules
+        brain_root = _resolve_brain_root(args)
+        try:
+            text = export_rules(brain_root, target=target)
+        except ValueError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return
+        output = getattr(args, "output", None)
+        if output:
+            out_path = Path(output)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(text, encoding="utf-8")
+            print(f"exported {text.count(chr(10))} lines to {out_path}")
+        else:
+            print(text, end="")
+        return
+
     brain = _get_brain(args)
     path = brain.export(mode=args.mode)
     print(f"Exported: {path}")
@@ -536,10 +561,17 @@ def main():
     p_audit = sub.add_parser("audit", help="Data flow audit")
     p_audit.add_argument("--json", action="store_true")
 
-    # export
-    p_export = sub.add_parser("export", help="Export brain for marketplace")
+    # export — marketplace archive OR platform-specific rule export
+    p_export = sub.add_parser(
+        "export",
+        help="Export brain (marketplace archive, or graduated rules for cursor/agents/aider)",
+    )
     p_export.add_argument("--mode", choices=["full", "no-prospects", "domain-only"],
                           default="full")
+    p_export.add_argument("--target", choices=["cursor", "agents", "aider"],
+                          help="Emit graduated RULE-tier lessons in platform-specific format")
+    p_export.add_argument("--output", "-o",
+                          help="Output file when using --target (default: stdout)")
 
     # context
     p_ctx = sub.add_parser("context", help="Compile context for a message")
