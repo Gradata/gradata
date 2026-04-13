@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import deque
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from threading import Lock
 from typing import Literal
 
@@ -105,8 +105,15 @@ _ACCEPTED: dict[str, Literal["accepted"]] = {"status": "accepted"}
 
 
 def _is_hex64(s: str) -> bool:
-    """Guard against user_id being anything other than lowercase hex sha256."""
+    """Guard against user_id being anything other than lowercase hex sha256.
+
+    ``int(s, 16)`` accepts uppercase too, so we explicitly require lowercase
+    here to match the SDK's wire format and to keep the dedupe key
+    case-canonical in storage.
+    """
     if len(s) != 64:
+        return False
+    if s != s.lower():
         return False
     try:
         int(s, 16)
@@ -164,8 +171,8 @@ async def telemetry_event(request: Request) -> JSONResponse:
         return JSONResponse(status_code=202, content=_ACCEPTED)
 
     # Replay protection — event must be recent.
-    now = datetime.now(timezone.utc)
-    ts = body.ts if body.ts.tzinfo else body.ts.replace(tzinfo=timezone.utc)
+    now = datetime.now(UTC)
+    ts = body.ts if body.ts.tzinfo else body.ts.replace(tzinfo=UTC)
     if ts > now + timedelta(minutes=5):
         # Skewed-future event — drop silently.
         return JSONResponse(status_code=202, content=_ACCEPTED)

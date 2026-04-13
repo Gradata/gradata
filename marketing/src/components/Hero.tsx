@@ -49,6 +49,7 @@ export function Hero() {
             code={INSTALL_SNIPPET}
             copyable
             copyValue="pip install gradata"
+            copyAriaLabel="Copy install command"
           />
         </div>
       </div>

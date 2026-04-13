@@ -59,8 +59,6 @@ export default function HomePage() {
       </section>
 
       <HomeFooterCta />
-      {/* keep site object imported for metadata above */}
-      <span className="hidden" aria-hidden>{site.name}</span>
     </>
   );
 }

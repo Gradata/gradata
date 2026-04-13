@@ -40,14 +40,18 @@ concern.
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import logging
 import os
+import sys
 import threading
+import time
 import urllib.error
 import urllib.request
 import uuid
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, Literal
@@ -136,7 +140,10 @@ def _write_config_key(key: str, value: str) -> None:
                 section_seen = True
             out_lines.append(line)
             continue
-        if in_section and not key_written and stripped.startswith(f"{bare}") and "=" in stripped:
+        # Match the LHS exactly after splitting on '=' so we don't false-match
+        # keys that share a prefix (e.g. ``enabled_foo`` when looking for
+        # ``enabled``).
+        if in_section and not key_written and "=" in stripped:
             lhs = stripped.split("=", 1)[0].strip()
             if lhs == bare:
                 out_lines.append(f'{bare} = "{value}"')
@@ -174,6 +181,15 @@ def has_been_asked() -> bool:
     """Was the user shown the opt-in prompt already?"""
     cfg = _read_config()
     return "telemetry.enabled" in cfg
+
+
+def config_path() -> Path:
+    """Return the path to the gradata config file (where opt-in is stored).
+
+    Exposed so callers (e.g. the CLI) can render a portable path string
+    instead of hard-coding ``~/.gradata/config.toml``.
+    """
+    return CONFIG_PATH
 
 
 # ── Anonymous user ID ─────────────────────────────────────────────────
@@ -262,18 +278,80 @@ def _event_flag_key(event: str) -> str:
     return f"telemetry.fired_{event}"
 
 
+@contextlib.contextmanager
+def _config_lock(timeout: float = 2.0) -> Iterator[None]:
+    """Best-effort cross-process advisory lock around the config file.
+
+    Uses ``fcntl`` on POSIX and ``msvcrt`` on Windows. If locking is not
+    available we degrade silently — telemetry is best-effort and the
+    worst-case race only causes a duplicate one-shot event, which the
+    backend already tolerates.
+    """
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    lock_path = CONFIG_DIR / ".config.lock"
+    try:
+        fp = open(lock_path, "a+b")  # noqa: SIM115 — closed in finally below
+    except OSError:
+        yield
+        return
+
+    acquired = False
+    try:
+        if sys.platform == "win32":
+            import msvcrt  # type: ignore[import-not-found]
+
+            deadline = time.monotonic() + timeout
+            while True:
+                try:
+                    msvcrt.locking(fp.fileno(), msvcrt.LK_NBLCK, 1)
+                    acquired = True
+                    break
+                except OSError:
+                    if time.monotonic() >= deadline:
+                        break
+                    time.sleep(0.05)
+        else:
+            import fcntl  # type: ignore[import-not-found]
+
+            with contextlib.suppress(OSError):
+                fcntl.flock(fp.fileno(), fcntl.LOCK_EX)
+                acquired = True
+        yield
+    finally:
+        if acquired:
+            with contextlib.suppress(Exception):
+                if sys.platform == "win32":
+                    import msvcrt  # type: ignore[import-not-found]
+
+                    with contextlib.suppress(OSError):
+                        fp.seek(0)
+                        msvcrt.locking(fp.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl  # type: ignore[import-not-found]
+
+                    with contextlib.suppress(OSError):
+                        fcntl.flock(fp.fileno(), fcntl.LOCK_UN)
+        with contextlib.suppress(OSError):
+            fp.close()
+
+
 def send_once(event: str, *, blocking: bool = False) -> bool:
     """Fire ``event`` exactly once per machine.
 
     Returns True if the event was actually sent (or queued), False if it
     was already fired before OR the user has not opted in.
+
+    The read-modify-write on the config flag is wrapped in a cross-process
+    advisory lock so two concurrent ``gradata init`` runs can't both fire
+    the same event.
     """
     if not is_enabled():
         return False
-    cfg = _read_config()
-    if cfg.get(_event_flag_key(event)) == "true":
-        return False
-    _write_config_key(_event_flag_key(event), "true")
+    with _config_lock():
+        cfg = _read_config()
+        if cfg.get(_event_flag_key(event)) == "true":
+            return False
+        _write_config_key(_event_flag_key(event), "true")
     send_event(event, blocking=blocking)
     return True
 

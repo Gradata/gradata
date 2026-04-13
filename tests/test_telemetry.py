@@ -37,19 +37,19 @@ class TestOptIn:
         _telemetry.set_enabled(False)
         assert _telemetry.is_enabled() is False
 
-    def test_env_kill_switch_overrides_opt_in(self, monkeypatch):
+    @pytest.mark.parametrize("value", ["0", "false", "False", "FALSE", "off", "Off", "no", "No"])
+    def test_env_kill_switch_disables(self, monkeypatch, value):
+        """Any of the recognized off-values must force telemetry off, even
+        when the user previously opted in."""
         _telemetry.set_enabled(True)
-        monkeypatch.setenv(_telemetry.ENV_KILL_SWITCH, "0")
+        monkeypatch.setenv(_telemetry.ENV_KILL_SWITCH, value)
         assert _telemetry.is_enabled() is False
 
-    def test_env_kill_switch_false_literal(self, monkeypatch):
-        _telemetry.set_enabled(True)
-        monkeypatch.setenv(_telemetry.ENV_KILL_SWITCH, "false")
-        assert _telemetry.is_enabled() is False
-
-    def test_env_kill_switch_1_does_not_auto_enable(self, monkeypatch):
-        # GRADATA_TELEMETRY=1 must NOT opt the user in. Only the prompt can.
-        monkeypatch.setenv(_telemetry.ENV_KILL_SWITCH, "1")
+    @pytest.mark.parametrize("value", ["1", "true", "yes", "on"])
+    def test_env_kill_switch_does_not_auto_enable(self, monkeypatch, value):
+        """GRADATA_TELEMETRY=<truthy> must NOT opt the user in. Only the
+        interactive prompt or explicit config edit can."""
+        monkeypatch.setenv(_telemetry.ENV_KILL_SWITCH, value)
         assert _telemetry.is_enabled() is False
 
 
@@ -66,16 +66,36 @@ class TestUserId:
         int(uid, 16)  # raises if not hex
 
     def test_does_not_leak_mac(self):
-        """Hash must not be reversible — any substring of the raw MAC
-        must not appear in the output."""
+        """Hash must not contain the raw MAC. Catches regressions where
+        someone accidentally returns the raw seed instead of the digest.
+
+        We test both branches explicitly: the real MAC and a synthetic short
+        MAC (which the original ``or len(mac_hex) < 4`` clause was meant to
+        cover but was always false in practice — real MACs are >=12 chars).
+        """
         import uuid
 
         mac_hex = f"{uuid.getnode():x}"
+        # Real MACs are at least 12 hex chars; assert that so the test
+        # actually validates the property we care about.
+        assert len(mac_hex) >= 12
         uid = _telemetry.anonymous_user_id()
-        # The MAC hex itself obviously can't appear in a sha256 output
-        # with overwhelming probability, but assert it to catch regressions
-        # where someone accidentally returns the raw seed.
-        assert mac_hex not in uid or len(mac_hex) < 4
+        assert mac_hex not in uid
+
+    def test_does_not_leak_synthetic_short_mac(self, monkeypatch):
+        """Cover the short-MAC edge case explicitly by stubbing the seed.
+
+        We assert the digest equals the known sha256 of the stubbed seed —
+        this proves we hashed it (didn't return the raw seed) without
+        relying on probabilistic substring checks.
+        """
+        import hashlib
+
+        seed = "gradata-v1:abc"
+        monkeypatch.setattr(_telemetry, "_machine_id_seed", lambda: seed)
+        uid = _telemetry.anonymous_user_id()
+        assert uid == hashlib.sha256(seed.encode("utf-8")).hexdigest()
+        assert uid != seed
 
 
 # ── Payload shape ────────────────────────────────────────────────────

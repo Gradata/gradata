@@ -13,6 +13,8 @@ type CodeBlockProps = {
   copyable?: boolean;
   /** When present, first line of copied text is this command instead of `code`. */
   copyValue?: string;
+  /** Override the aria-label for the copy button. Defaults to "Copy code". */
+  copyAriaLabel?: string;
 };
 
 export function CodeBlock({
@@ -22,6 +24,7 @@ export function CodeBlock({
   caption,
   copyable = false,
   copyValue,
+  copyAriaLabel = "Copy code",
 }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
 
@@ -56,7 +59,7 @@ export function CodeBlock({
             <button
               type="button"
               onClick={onCopy}
-              aria-label="Copy install command"
+              aria-label={copyAriaLabel}
               className="rounded border border-[color:var(--color-border)]/60 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-[color:var(--color-muted-foreground)] transition-colors hover:bg-[color:var(--color-card)] hover:text-[color:var(--color-foreground)]"
             >
               {copied ? "Copied" : "Copy"}

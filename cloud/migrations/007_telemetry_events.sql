@@ -33,5 +33,13 @@ CREATE INDEX IF NOT EXISTS idx_telemetry_events_user_id
 -- leaked anon key can't enumerate the install base.
 ALTER TABLE telemetry_events ENABLE ROW LEVEL SECURITY;
 
--- No policy = default deny for all roles that rely on RLS. Service role
--- bypasses RLS, which is what the backend uses.
+-- Explicit deny-all policy. PostgreSQL's "no policy = deny" default is
+-- robust, but an explicit policy makes the intent visible to anyone reading
+-- the schema and survives later additions of permissive policies for other
+-- roles. Service role bypasses RLS, which is what the backend uses.
+DROP POLICY IF EXISTS telemetry_events_deny_all ON telemetry_events;
+CREATE POLICY telemetry_events_deny_all
+    ON telemetry_events
+    FOR ALL
+    USING (false)
+    WITH CHECK (false);
