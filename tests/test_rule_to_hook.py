@@ -1,11 +1,39 @@
 """Tests for rule-to-hook graduation."""
+from pathlib import Path
+
 import pytest
+
+from gradata.brain import Brain
 from gradata.enhancements.rule_to_hook import (
     DeterminismCheck,
     EnforcementType,
     classify_rule,
     find_hook_candidates,
 )
+
+
+def test_correction_event_captures_draft_text(tmp_path: Path) -> None:
+    """CORRECTION events must carry the raw violating assistant draft under
+    ``data['draft_text']`` so later tasks can use it as ground truth when
+    self-testing generated hooks."""
+    brain = Brain.init(
+        tmp_path / "brain",
+        name="RuleToHookTest",
+        domain="Testing",
+        embedding="local",
+        interactive=False,
+    )
+
+    brain.record_correction(
+        text="no don't use em dashes",
+        assistant_draft="Subject: Let me — help you out",
+        category="FORMATTING",
+    )
+
+    events = brain.query_events(event_type="CORRECTION", last_n_sessions=1)
+    assert len(events) == 1
+    assert events[0]["data"]["draft_text"] == "Subject: Let me — help you out"
+    assert events[0]["data"]["category"] == "FORMATTING"
 
 
 class TestClassifyRule:
