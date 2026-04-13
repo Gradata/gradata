@@ -116,6 +116,24 @@ class UpdateProfileRequest(BaseModel):
     display_name: str
 
 
+class NotificationPrefs(BaseModel):
+    """User notification preferences. SIM16 default: weekly digest, alerts opt-in."""
+
+    alert_correction_spike: bool = True
+    alert_rule_regression: bool = True
+    alert_meta_rule_emerged: bool = False
+    digest_cadence: str = "weekly"  # daily|weekly|monthly|off
+    digest_email: str = ""           # blank = use account email
+    slack_webhook: str = ""          # blank = no Slack delivery
+
+    @field_validator("digest_cadence")
+    @classmethod
+    def cadence_valid(cls, v: str) -> str:
+        if v not in {"daily", "weekly", "monthly", "off"}:
+            raise ValueError("digest_cadence must be daily|weekly|monthly|off")
+        return v
+
+
 # ---------------------------------------------------------------------------
 # API key models
 # ---------------------------------------------------------------------------

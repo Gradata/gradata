@@ -1,0 +1,117 @@
+<!-- Subject: Confirm it's you -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="supported-color-schemes" content="dark light" />
+    <title>Confirm it's you</title>
+  </head>
+  <body style="margin:0;padding:0;background:#0C1120;color:#F8FAFC;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,system-ui,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0C1120;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;background:#10172A;border:1px solid #1F2937;border-radius:14px;overflow:hidden;">
+            <tr>
+              <td style="padding:28px 32px 8px 32px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td align="left">
+                      <span style="display:inline-block;font-weight:700;font-size:18px;letter-spacing:-0.01em;color:#F8FAFC;">
+                        <span style="background:linear-gradient(135deg,#3A82FF,#7C3AED);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;color:#7C3AED;">Gradata</span>
+                      </span>
+                    </td>
+                    <td align="right" style="font-size:12px;color:#94A3B8;">Security check</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:16px 32px 8px 32px;">
+                <h1 style="margin:16px 0 12px 0;font-size:24px;line-height:1.25;font-weight:700;color:#F8FAFC;letter-spacing:-0.01em;">Confirm it's you</h1>
+                <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#CBD5E1;">
+                  A sensitive action was requested on your Gradata account. Enter this code to confirm. It expires in 10 minutes.
+                </p>
+              </td>
+            </tr>
+
+            <!-- OTP code block -->
+            <tr>
+              <td align="center" style="padding:8px 32px 8px 32px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="background:#0C1120;border:1px solid #1F2937;border-radius:12px;">
+                  <tr>
+                    <td align="center" style="padding:20px 36px;">
+                      <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:32px;font-weight:700;letter-spacing:0.3em;color:#F8FAFC;">
+                        {{ .Token }}
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td align="center" style="padding:16px 32px 8px 32px;">
+                <p style="margin:0 0 12px 0;font-size:12px;color:#94A3B8;">Or confirm with one click:</p>
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td align="center" style="border-radius:10px;background:linear-gradient(135deg,#3A82FF,#7C3AED);">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#FFFFFF;text-decoration:none;border-radius:10px;min-width:140px;text-align:center;">
+                        Confirm
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:16px 32px 8px 32px;">
+                <p style="margin:0 0 6px 0;font-size:12px;color:#94A3B8;">
+                  Or paste this URL into your browser:
+                </p>
+                <p style="margin:0;font-size:12px;line-height:1.5;color:#7C3AED;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-all;">
+                  <a href="{{ .ConfirmationURL }}" style="color:#7C3AED;text-decoration:underline;">{{ .ConfirmationURL }}</a>
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:16px 32px 8px 32px;">
+                <p style="margin:8px 0 0 0;font-size:12px;line-height:1.6;color:#94A3B8;">
+                  Requested for <span style="color:#CBD5E1;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">{{ .Email }}</span>
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:20px 32px 24px 32px;">
+                <p style="margin:0;font-size:12px;color:#64748B;font-style:italic;">
+                  Mem0 remembers. Gradata learns.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:16px 32px 28px 32px;border-top:1px solid #1F2937;">
+                <p style="margin:0 0 6px 0;font-size:11px;line-height:1.6;color:#64748B;opacity:0.85;">
+                  Didn't request this? Ignore this email and consider changing your password at <a href="https://app.gradata.ai" style="color:#94A3B8;text-decoration:underline;">app.gradata.ai</a>.
+                </p>
+                <p style="margin:8px 0 0 0;font-size:11px;line-height:1.6;color:#64748B;opacity:0.85;">
+                  <a href="https://app.gradata.ai/legal/privacy" style="color:#94A3B8;text-decoration:underline;">Privacy</a>
+                  &nbsp;&middot;&nbsp;
+                  <a href="https://app.gradata.ai/legal/terms" style="color:#94A3B8;text-decoration:underline;">Terms</a>
+                  &nbsp;&middot;&nbsp;
+                  &copy; 2026 Gradata
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

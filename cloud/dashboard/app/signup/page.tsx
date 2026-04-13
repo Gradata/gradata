@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { AuthLegalLinks } from '@/components/layout/AuthLegalLinks'
 import { useAuth } from '@/hooks/useAuth'
 
 export default function SignupPage() {
@@ -39,7 +40,7 @@ export default function SignupPage() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
+      <div className="flex min-h-screen flex-col items-center justify-center px-4">
         <Card className="w-full max-w-sm">
           <CardHeader className="text-center">
             <CardTitle className="text-xl">Check your email</CardTitle>
@@ -53,12 +54,13 @@ export default function SignupPage() {
             </Link>
           </CardContent>
         </Card>
+        <AuthLegalLinks />
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <div className="mx-auto mb-2 h-10 w-10 rounded-xl bg-gradient-brand shadow-[0_0_16px_rgba(58,130,255,0.3)] flex items-center justify-center">
@@ -99,6 +101,7 @@ export default function SignupPage() {
           </form>
         </CardContent>
       </Card>
+      <AuthLegalLinks />
     </div>
   )
 }
