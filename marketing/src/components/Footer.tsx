@@ -32,6 +32,9 @@ export function Footer() {
           <ul className="space-y-2 text-sm">
             <li><Link href="/legal/privacy/" className="hover:text-[color:var(--color-foreground)] text-[color:var(--color-muted-foreground)]">Privacy</Link></li>
             <li><Link href="/legal/terms/" className="hover:text-[color:var(--color-foreground)] text-[color:var(--color-muted-foreground)]">Terms</Link></li>
+            <li><Link href="/legal/dpa/" className="hover:text-[color:var(--color-foreground)] text-[color:var(--color-muted-foreground)]">DPA</Link></li>
+            <li><Link href="/legal/sla/" className="hover:text-[color:var(--color-foreground)] text-[color:var(--color-muted-foreground)]">SLA</Link></li>
+            <li><Link href="/legal/subprocessors/" className="hover:text-[color:var(--color-foreground)] text-[color:var(--color-muted-foreground)]">Subprocessors</Link></li>
             <li><a href={site.social.github} className="hover:text-[color:var(--color-foreground)] text-[color:var(--color-muted-foreground)]">GitHub</a></li>
           </ul>
         </div>
