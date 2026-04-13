@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { site } from "@/lib/site";
+import { track } from "@/lib/analytics";
 
 const nav = [
   { href: "/", label: "Home" },
@@ -21,6 +24,7 @@ export function Header() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={item.href === "/docs/" ? () => track("docs_click", { location: "header" }) : undefined}
               className="transition-colors hover:text-[color:var(--color-foreground)]"
             >
               {item.label}
@@ -36,6 +40,7 @@ export function Header() {
           </a>
           <a
             href={`${site.appUrl}/signup`}
+            onClick={() => track("signup_click", { location: "header" })}
             className="inline-flex items-center rounded-md bg-[color:var(--color-primary)] px-3 py-1.5 text-sm font-medium text-[color:var(--color-primary-foreground)] transition-opacity hover:opacity-90"
           >
             Get started

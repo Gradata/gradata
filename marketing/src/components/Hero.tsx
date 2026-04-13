@@ -1,5 +1,13 @@
+"use client";
+
 import { site } from "@/lib/site";
+import { track } from "@/lib/analytics";
 import { CodeBlock } from "./CodeBlock";
+
+const INSTALL_SNIPPET = `pip install gradata
+
+brain = Gradata()
+brain.correct(draft, final)   # every edit teaches your brain`;
 
 export function Hero() {
   return (
@@ -22,6 +30,7 @@ export function Hero() {
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <a
               href={`${site.appUrl}/signup`}
+              onClick={() => track("signup_click", { location: "hero" })}
               className="inline-flex w-full items-center justify-center rounded-md bg-[color:var(--color-primary)] px-5 py-2.5 text-sm font-medium text-[color:var(--color-primary-foreground)] transition-opacity hover:opacity-90 sm:w-auto"
             >
               Start free
@@ -37,10 +46,9 @@ export function Hero() {
         <div className="mx-auto mt-14 max-w-xl">
           <CodeBlock
             language="bash"
-            code={`pip install gradata
-
-brain = Gradata()
-brain.correct(draft, final)   # every edit teaches your brain`}
+            code={INSTALL_SNIPPET}
+            copyable
+            copyValue="pip install gradata"
           />
         </div>
       </div>

@@ -80,6 +80,20 @@ INFO:app.sentry_init:Sentry initialized: environment=production release=...
 
 and confirm the app started without missing-env errors.
 
+## Marketing site (Cloudflare Pages, not Railway)
+
+The marketing site at `gradata.ai` runs on Cloudflare Pages, not Railway, but
+its env vars are documented here for single-source-of-truth. See also
+`marketing/.env.example`.
+
+| Var | Default | Purpose |
+|-----|---------|---------|
+| `NEXT_PUBLIC_ENABLE_ANALYTICS` | `false` | Set to `true` for prod only. Gates Plausible event firing so local dev stays clean. |
+| `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | `gradata.ai` | Domain key Plausible groups stats by. |
+
+Events tracked (all client-side, no PII):
+`signup_click`, `signup_complete`, `docs_click`, `install_copy`.
+
 ## Verify locally
 
 ```bash
