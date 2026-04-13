@@ -183,12 +183,32 @@ class BrainAnalytics(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class PlanTier(str, Enum):
+    """Canonical Gradata plan tiers.
+
+    `free` is the default tier (no Stripe sub).
+    `cloud` and `team` are the paid Stripe tiers (S104: $29 / $99).
+    `enterprise` is sales-only (never goes through Stripe Checkout).
+    """
+
+    free = "free"
+    cloud = "cloud"
+    team = "team"
+    enterprise = "enterprise"
+
+
 class CheckoutRequest(BaseModel):
-    plan: str  # "pro" | "team"
+    plan: PlanTier  # canonical tier; enterprise rejected at the route layer
 
 
 class CheckoutResponse(BaseModel):
     checkout_url: str
+
+
+class PortalResponse(BaseModel):
+    """Stripe customer portal session URL."""
+
+    url: str
 
 
 class SubscriptionUsage(BaseModel):
