@@ -647,7 +647,7 @@ def _extract_common_verbs(descriptions: list[str]) -> list[str]:
                 if word.startswith(prefix):
                     counts[prefix] = counts.get(prefix, 0) + 1
                     break
-    return sorted(counts, key=counts.get, reverse=True)[:3]
+    return sorted(counts, key=lambda k: counts[k], reverse=True)[:3]
 
 
 def _synthesize_summary(category: str, descriptions: list[str]) -> str:
@@ -660,14 +660,14 @@ def _synthesize_summary(category: str, descriptions: list[str]) -> str:
 
 
 def detect_recurring_patterns(
-    lessons: list["Lesson"],
+    lessons: list[Lesson],
     min_corrections: int = 3,
 ) -> list[RecurringPattern]:
     """Detect patterns spanning multiple corrections in the same category."""
     if not lessons:
         return []
 
-    by_cat: dict[str, list["Lesson"]] = {}
+    by_cat: dict[str, list[Lesson]] = {}
     for lesson in lessons:
         cat = lesson.category.upper()
         by_cat.setdefault(cat, []).append(lesson)
