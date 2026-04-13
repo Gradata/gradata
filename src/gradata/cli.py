@@ -522,6 +522,7 @@ def cmd_rule_list(args):
     import re as _re
 
     from gradata.enhancements.rule_to_hook import _slug
+    from gradata.hooks import _manifest as _mf
 
     brain_root = _resolve_brain_root(args)
     lessons_file = brain_root / "lessons.md"
@@ -542,7 +543,8 @@ def cmd_rule_list(args):
             clean_desc = desc[len("[hooked] "):] if hooked_marker else desc
             rules.append((category, clean_desc, hooked_marker))
 
-    # Discover installed hook files (pre + post)
+    # Discover installed hook files (pre + post) AND bundled manifest entries.
+    # A rule is considered "installed" if it appears in either.
     pre_dir = Path(os.environ.get("GRADATA_HOOK_ROOT")
                    or ".claude/hooks/pre-tool/generated")
     post_dir = Path(os.environ.get("GRADATA_HOOK_ROOT_POST")
@@ -552,7 +554,22 @@ def cmd_rule_list(args):
     for d in (pre_dir, post_dir):
         if d.exists():
             for js in d.glob("*.js"):
+                if js.name in {"_dispatcher.js"}:
+                    continue
                 installed_files[js.stem] = js
+
+    # Manifest-only slugs (post-migration installs may have no legacy .js).
+    manifest_slugs: set[str] = set()
+    for kind in ("pre", "post"):
+        for entry in _mf.read_manifest(kind):
+            slug = entry.get("slug")
+            if not slug:
+                continue
+            manifest_slugs.add(slug)
+            if slug not in installed_files:
+                # Synthesize a pseudo-path so the rest of the function can
+                # treat manifest-only entries uniformly.
+                installed_files[slug] = (pre_dir if kind == "pre" else post_dir) / f"{slug} (bundled)"
 
     if not rules and not installed_files:
         print("No RULE-tier rules or installed hooks.")
@@ -580,7 +597,7 @@ def cmd_rule_list(args):
 
     print()
     print("Hook files installed:")
-    for slug, path in sorted(installed_files.items()):
+    for _slug_key, path in sorted(installed_files.items()):
         print(f"  {path}")
 
     if orphan_slugs:
@@ -610,7 +627,10 @@ def cmd_rule_remove(args):
         s = _re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
         return s[:60] or "rule"
 
-    # 1. Delete hook file from whichever generated dir holds it
+    # 1. Delete hook file from whichever generated dir holds it AND drop the
+    #    matching manifest entry (bundled dispatcher source of truth).
+    from gradata.hooks import _manifest as _mf
+
     pre_dir = Path(os.environ.get("GRADATA_HOOK_ROOT")
                    or ".claude/hooks/pre-tool/generated")
     post_dir = Path(os.environ.get("GRADATA_HOOK_ROOT_POST")
@@ -623,6 +643,12 @@ def cmd_rule_remove(args):
             candidate.unlink()
             removed_file = candidate
             break
+
+    # Remove from both manifests (pre + post). remove_entry returns False if
+    # there was no match, so this is cheap and idempotent.
+    removed_manifest_pre = _mf.remove_entry(slug, kind="pre")
+    removed_manifest_post = _mf.remove_entry(slug, kind="post")
+    removed_manifest = removed_manifest_pre or removed_manifest_post
 
     # 2. Find matching lesson by slug → description
     touched_lesson = False
@@ -658,11 +684,13 @@ def cmd_rule_remove(args):
 
     if removed_file:
         print(f"Removed hook: {removed_file}")
+    if removed_manifest:
+        print(f"Removed manifest entry: {slug}")
     if touched_lesson and args.purge:
         print("Deleted lesson from lessons.md")
     elif touched_lesson:
         print("Unmarked lesson in lessons.md (rule kept as soft injection)")
-    if not removed_file and not touched_lesson:
+    if not removed_file and not touched_lesson and not removed_manifest:
         print(f"nothing to remove for slug: {slug}")
 
 
@@ -691,6 +719,26 @@ def cmd_hooks(args):
     elif action == "status":
         from gradata.hooks.claude_code import hook_status
         hook_status()
+    elif action == "migrate":
+        from gradata.hooks import _manifest as _mf
+
+        delete_legacy = getattr(args, "delete_legacy", False)
+        total = {"migrated": 0, "skipped": 0, "removed_legacy": 0}
+        for kind in ("pre", "post"):
+            summary = _mf.migrate_from_legacy_files(kind=kind, delete_legacy=delete_legacy)
+            total["migrated"] += summary["migrated"]
+            total["skipped"] += summary["skipped"]
+            total["removed_legacy"] += summary["removed_legacy"]
+            if summary["migrated"] or summary["skipped"]:
+                print(
+                    f"[{kind}] root={summary['root']} migrated={summary['migrated']} "
+                    f"skipped={summary['skipped']} removed_legacy={summary['removed_legacy']}"
+                )
+            _mf.refresh_dispatcher(kind)
+        print(
+            f"Migration complete: {total['migrated']} rule(s) bundled into the "
+            f"dispatcher manifest. Legacy files removed: {total['removed_legacy']}."
+        )
 
 
 def main():
@@ -811,9 +859,12 @@ def main():
     p_demo.add_argument("target", nargs="?", default="./demo-brain", help="Target directory")
 
     p_hooks = sub.add_parser("hooks", help="Manage Claude Code hook integration")
-    p_hooks.add_argument("action", choices=["install", "uninstall", "status"], help="Hook action")
+    p_hooks.add_argument("action", choices=["install", "uninstall", "status", "migrate"],
+                         help="Hook action")
     p_hooks.add_argument("--profile", choices=["minimal", "standard", "strict"],
                          default="standard", help="Hook profile tier (default: standard)")
+    p_hooks.add_argument("--delete-legacy", action="store_true",
+                         help="After migrate: delete the per-rule .js files (default: keep for safety)")
 
     # rule — user-declared rules (fast-track to RULE tier, try hook install)
     p_rule = sub.add_parser("rule", help="Manage user-declared rules")
