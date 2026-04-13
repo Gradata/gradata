@@ -61,7 +61,9 @@ DETERMINISTIC_PATTERNS: list[tuple[str, DeterminismCheck, str, str | None]] = [
     (r"always read.+before", DeterminismCheck.FILE_CHECK, "read_before_edit", None),
     (r"never (rm|delete|remove).+rf", DeterminismCheck.COMMAND_BLOCK, "destructive_block", None),
     (r"never force.?push", DeterminismCheck.COMMAND_BLOCK, "destructive_block", None),
-    (r"never.*format.*f.?string.*python.?-c", DeterminismCheck.COMMAND_BLOCK, "fstring_block", None),
+    (r"never.*format.*f.?string.*python.?-c", DeterminismCheck.COMMAND_BLOCK, "fstring_block", r"python\s+-c\s+[\"\'][^\"\']*f[\"\']"),
+    (r"never.*python.?-c.*f.?string", DeterminismCheck.COMMAND_BLOCK, "fstring_block", r"python\s+-c\s+[\"\'][^\"\']*f[\"\']"),
+    (r"never save.+root|no files? (in|at) root|don.t save.+root", DeterminismCheck.FILE_CHECK, "root_file_save", r"^[^/\\]+\.(py|md|json|txt|js|ts|yml|yaml)$"),
 ]
 
 
@@ -125,7 +127,7 @@ def find_hook_candidates(
 
 
 _TEMPLATE_DIR = Path(__file__).parent.parent / "hooks" / "templates"
-_IMPLEMENTED_TEMPLATES = {"regex_replace"}
+_IMPLEMENTED_TEMPLATES = {"regex_replace", "fstring_block", "root_file_save"}
 
 
 def _source_hash(text: str) -> str:
@@ -173,6 +175,7 @@ def self_test(
     *,
     positive: str,
     tool_name: str = "Write",
+    tool_input_key: str | None = None,
 ) -> bool:
     """Run a rendered hook against a positive example.
 
@@ -192,7 +195,8 @@ def self_test(
         f.write(hook_source)
         hook_path = Path(f.name)
     try:
-        tool_input_key = "command" if tool_name == "Bash" else "content"
+        if tool_input_key is None:
+            tool_input_key = "command" if tool_name == "Bash" else "content"
         payload = {
             "tool_name": tool_name,
             "tool_input": {tool_input_key: positive},
@@ -261,6 +265,11 @@ def _synthesize_positive(candidate: HookCandidate) -> str:
     # Em-dash: the pattern IS the literal, wrap in ascii context
     if "\u2014" in p:
         return "hello \u2014 world"
+    # Template-specific synthesis
+    if candidate.hook_template == "fstring_block":
+        return "python -c \"f'{x}'\""
+    if candidate.hook_template == "root_file_save":
+        return "foo.py"
     # Best-effort: embed the literal pattern
     return f"x{p}y"
 
@@ -295,9 +304,20 @@ def try_generate(
         )
 
     positive = positive_example or _synthesize_positive(candidate)
-    tool_name = "Bash" if candidate.hook_template in {"destructive_block", "fstring_block", "secret_scan"} else "Write"
+    BASH_TEMPLATES = {"destructive_block", "fstring_block", "secret_scan"}
+    WRITE_PATH_TEMPLATES = {"root_file_save"}
 
-    if not self_test(rendered, positive=positive, tool_name=tool_name):
+    if candidate.hook_template in BASH_TEMPLATES:
+        tool_name = "Bash"
+        tool_input_key = "command"
+    elif candidate.hook_template in WRITE_PATH_TEMPLATES:
+        tool_name = "Write"
+        tool_input_key = "file_path"
+    else:
+        tool_name = "Write"
+        tool_input_key = "content"
+
+    if not self_test(rendered, positive=positive, tool_name=tool_name, tool_input_key=tool_input_key):
         return GenerationResult(
             installed=False,
             reason=f"self-test did not block positive example: {positive!r}",

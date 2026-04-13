@@ -367,3 +367,77 @@ class TestBypassEnv:
         assert proc.returncode == 0, (
             f"bypass failed: rc={proc.returncode} stdout={proc.stdout!r}"
         )
+
+
+class TestFstringBlockTemplate:
+    def test_fstring_rule_graduates_to_bash_hook(self, tmp_path, monkeypatch):
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        candidate = classify_rule(
+            "Never use python -c to format an f-string", 0.95
+        )
+        assert candidate.hook_template == "fstring_block"
+        result = try_generate(candidate)
+        assert result.installed is True, result.reason
+
+    def test_fstring_hook_blocks_violating_bash_command(self, tmp_path, monkeypatch):
+        import subprocess, json as _j
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        candidate = classify_rule("Never use python -c to format an f-string", 0.95)
+        result = try_generate(candidate)
+        assert result.installed
+
+        # Violating bash command
+        proc = subprocess.run(
+            ["node", str(result.hook_path)],
+            input=_j.dumps({"tool_name": "Bash",
+                            "tool_input": {"command": "python -c \"f'{x}'\""}}),
+            capture_output=True, text=True, timeout=5,
+        )
+        assert proc.returncode == 2
+
+        # Clean command — no f-string
+        proc = subprocess.run(
+            ["node", str(result.hook_path)],
+            input=_j.dumps({"tool_name": "Bash",
+                            "tool_input": {"command": "python -c \"print(1)\""}}),
+            capture_output=True, text=True, timeout=5,
+        )
+        assert proc.returncode == 0
+
+
+class TestRootFileSaveTemplate:
+    def test_root_file_rule_graduates(self, tmp_path, monkeypatch):
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        candidate = classify_rule("Never save files to the root folder", 0.95)
+        assert candidate.hook_template == "root_file_save"
+        result = try_generate(candidate)
+        assert result.installed is True, result.reason
+
+    def test_root_file_hook_blocks_root_path_but_allows_nested(self, tmp_path, monkeypatch):
+        import subprocess, json as _j
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        candidate = classify_rule("Never save files to the root folder", 0.95)
+        result = try_generate(candidate)
+        assert result.installed
+
+        # Root-level write → blocked
+        proc = subprocess.run(
+            ["node", str(result.hook_path)],
+            input=_j.dumps({"tool_name": "Write",
+                            "tool_input": {"file_path": "foo.py"}}),
+            capture_output=True, text=True, timeout=5,
+        )
+        assert proc.returncode == 2
+
+        # Nested write → allowed
+        proc = subprocess.run(
+            ["node", str(result.hook_path)],
+            input=_j.dumps({"tool_name": "Write",
+                            "tool_input": {"file_path": "sdk/foo.py"}}),
+            capture_output=True, text=True, timeout=5,
+        )
+        assert proc.returncode == 0
