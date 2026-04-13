@@ -1075,3 +1075,104 @@ class TestRuleToHookEvents:
         candidate = classify_rule("Never use em dashes", 0.95)
         result = try_generate(candidate)  # no brain kwarg
         assert result.installed  # still works
+
+
+class TestStaleHookCheck:
+    def test_detects_stale_hook_when_rule_text_changes(self, tmp_path, monkeypatch):
+        """Install an em-dash hook, then modify the lesson text -> SessionStart check warns."""
+        import subprocess, sys, os
+        from pathlib import Path as _P
+
+        brain = tmp_path / "brain"
+        pre = tmp_path / "pre"
+        post = tmp_path / "post"
+        pre.mkdir(parents=True)
+        post.mkdir(parents=True)
+        brain.mkdir(parents=True)
+
+        # Install a real hook
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(pre))
+        monkeypatch.setenv("GRADATA_HOOK_ROOT_POST", str(post))
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        candidate = classify_rule("Never use em dashes", 0.95)
+        result = try_generate(candidate)
+        assert result.installed
+
+        # Write a lesson with MODIFIED text (different hash)
+        (brain / "lessons.md").write_text(
+            "[2026-04-13] [RULE:1.00] FORMATTING: [hooked] avoid em dashes everywhere\n",
+            encoding="utf-8",
+        )
+
+        env = {**os.environ,
+               "GRADATA_BRAIN": str(brain),
+               "GRADATA_HOOK_ROOT": str(pre),
+               "GRADATA_HOOK_ROOT_POST": str(post),
+               "PYTHONPATH": str(_P(__file__).resolve().parents[1] / "src")}
+        proc = subprocess.run(
+            [sys.executable, "-m", "gradata.hooks.stale_hook_check"],
+            capture_output=True, text=True, env=env, cwd=str(tmp_path), timeout=10,
+        )
+        assert proc.returncode == 0  # never block session
+        assert "stale" in proc.stdout.lower()
+        assert "never-use-em-dashes" in proc.stdout.lower() or "em" in proc.stdout.lower()
+
+    def test_no_warning_when_hashes_match(self, tmp_path, monkeypatch):
+        """Install + leave lesson text unchanged -> no stale warning."""
+        import subprocess, sys, os
+        from pathlib import Path as _P
+
+        brain = tmp_path / "brain"
+        pre = tmp_path / "pre"
+        post = tmp_path / "post"
+        pre.mkdir(parents=True)
+        post.mkdir(parents=True)
+        brain.mkdir(parents=True)
+
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(pre))
+        monkeypatch.setenv("GRADATA_HOOK_ROOT_POST", str(post))
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        candidate = classify_rule("Never use em dashes", 0.95)
+        result = try_generate(candidate)
+        assert result.installed
+
+        (brain / "lessons.md").write_text(
+            "[2026-04-13] [RULE:1.00] FORMATTING: [hooked] Never use em dashes\n",
+            encoding="utf-8",
+        )
+
+        env = {**os.environ,
+               "GRADATA_BRAIN": str(brain),
+               "GRADATA_HOOK_ROOT": str(pre),
+               "GRADATA_HOOK_ROOT_POST": str(post),
+               "PYTHONPATH": str(_P(__file__).resolve().parents[1] / "src")}
+        proc = subprocess.run(
+            [sys.executable, "-m", "gradata.hooks.stale_hook_check"],
+            capture_output=True, text=True, env=env, cwd=str(tmp_path), timeout=10,
+        )
+        assert proc.returncode == 0
+        assert "stale" not in proc.stdout.lower()
+
+    def test_no_hooks_installed_exits_silently(self, tmp_path):
+        """Fresh install, no generated hooks -> no output, exit 0."""
+        import subprocess, sys, os
+        from pathlib import Path as _P
+
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        env = {**os.environ,
+               "GRADATA_HOOK_ROOT": str(empty),
+               "GRADATA_HOOK_ROOT_POST": str(empty),
+               "PYTHONPATH": str(_P(__file__).resolve().parents[1] / "src")}
+        proc = subprocess.run(
+            [sys.executable, "-m", "gradata.hooks.stale_hook_check"],
+            capture_output=True, text=True, env=env, timeout=10,
+        )
+        assert proc.returncode == 0
+        assert proc.stdout.strip() == ""
+
+    def test_installer_registers_session_start_entry(self):
+        from gradata.hooks._installer import HOOK_REGISTRY
+        entries = [e for e in HOOK_REGISTRY if e[0] == "stale_hook_check"]
+        assert len(entries) == 1
+        assert entries[0][1] == "SessionStart"
