@@ -100,6 +100,39 @@ def test_on_chat_model_start_inserts_system_message(brain_with_em_dash_rule: Pat
     assert "<brain-rules>" in first.content
 
 
+def test_on_llm_start_prepends_block_to_every_prompt_in_batch(
+    brain_with_em_dash_rule: Path,
+):
+    from gradata.middleware.langchain_adapter import LangChainCallback
+
+    cb = LangChainCallback(brain_path=brain_with_em_dash_rule)
+    prompts = ["User: first", "User: second", "User: third"]
+    cb.on_llm_start({}, prompts)
+    for p in prompts:
+        assert p.startswith("<brain-rules>")
+
+
+def test_on_chat_model_start_preserves_multimodal_list_system(
+    brain_with_em_dash_rule: Path,
+):
+    from gradata.middleware.langchain_adapter import LangChainCallback
+
+    cb = LangChainCallback(brain_path=brain_with_em_dash_rule)
+    original_blocks = [{"type": "text", "text": "You are kind."}]
+    sys_msg = _FakeMessage.__new__(_FakeMessage)
+    sys_msg.content = original_blocks
+    sys_msg.type = "system"
+    batches = [[sys_msg, _FakeMessage("hi", "human")]]
+    cb.on_chat_model_start({}, batches)
+    # List structure preserved; new block appended, not stringified.
+    assert isinstance(sys_msg.content, list)
+    assert sys_msg.content[0] == {"type": "text", "text": "You are kind."}
+    assert any(
+        isinstance(b, dict) and "<brain-rules>" in str(b.get("text", ""))
+        for b in sys_msg.content
+    )
+
+
 def test_on_chat_model_start_extends_existing_system(brain_with_em_dash_rule: Path):
     from gradata.middleware.langchain_adapter import LangChainCallback
 
@@ -111,21 +144,18 @@ def test_on_chat_model_start_extends_existing_system(brain_with_em_dash_rule: Pa
     assert "<brain-rules>" in batches[0][0].content
 
 
-def test_on_llm_end_strict_raises_on_violation(brain_with_em_dash_rule: Path):
+@pytest.mark.parametrize("strict", [True, False])
+def test_on_llm_end_strictness(brain_with_em_dash_rule: Path, strict: bool):
     from gradata.middleware import RuleViolation
     from gradata.middleware.langchain_adapter import LangChainCallback
 
-    cb = LangChainCallback(brain_path=brain_with_em_dash_rule, strict=True)
+    cb = LangChainCallback(brain_path=brain_with_em_dash_rule, strict=strict)
     result = _FakeLLMResult("bad \u2014 output")
-    with pytest.raises(RuleViolation):
-        cb.on_llm_end(result)
-
-
-def test_on_llm_end_non_strict_does_not_raise(brain_with_em_dash_rule: Path):
-    from gradata.middleware.langchain_adapter import LangChainCallback
-
-    cb = LangChainCallback(brain_path=brain_with_em_dash_rule, strict=False)
-    cb.on_llm_end(_FakeLLMResult("bad \u2014 output"))  # must not raise
+    if strict:
+        with pytest.raises(RuleViolation):
+            cb.on_llm_end(result)
+    else:
+        cb.on_llm_end(result)  # must not raise
 
 
 def test_bypass_env_skips_injection(brain_with_em_dash_rule: Path, monkeypatch):

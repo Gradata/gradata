@@ -99,29 +99,51 @@ def test_wrap_openai_extends_existing_system(brain_with_em_dash_rule: Path):
     assert "<brain-rules>" in sent[0]["content"]
 
 
-def test_wrap_openai_strict_raises_on_violation(brain_with_em_dash_rule: Path):
+@pytest.mark.parametrize("strict", [True, False])
+def test_wrap_openai_strictness(brain_with_em_dash_rule: Path, strict: bool):
     from gradata.middleware import RuleViolation, wrap_openai
 
     client = _FakeClient(reply="bad \u2014 output")
-    wrapped = wrap_openai(client, brain_path=brain_with_em_dash_rule, strict=True)
-    with pytest.raises(RuleViolation):
-        wrapped.chat.completions.create(
+    wrapped = wrap_openai(client, brain_path=brain_with_em_dash_rule, strict=strict)
+    if strict:
+        with pytest.raises(RuleViolation):
+            wrapped.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": "hi"}],
+            )
+    else:
+        resp = wrapped.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": "hi"}],
         )
+        # Non-strict: response passes through unchanged.
+        assert resp.choices[0].message.content == "bad \u2014 output"
 
 
-def test_wrap_openai_non_strict_does_not_raise(brain_with_em_dash_rule: Path):
+def test_wrap_openai_preserves_multimodal_system_content(brain_with_em_dash_rule: Path):
     from gradata.middleware import wrap_openai
 
-    client = _FakeClient(reply="bad \u2014 output")
-    wrapped = wrap_openai(client, brain_path=brain_with_em_dash_rule, strict=False)
-    # Must not raise
-    resp = wrapped.chat.completions.create(
+    client = _FakeClient()
+    wrapped = wrap_openai(client, brain_path=brain_with_em_dash_rule)
+    multimodal_content = [
+        {"type": "text", "text": "Base system instructions."},
+        {"type": "image_url", "image_url": {"url": "https://example.com/x.png"}},
+    ]
+    wrapped.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[{"role": "user", "content": "hi"}],
+        messages=[
+            {"role": "system", "content": multimodal_content},
+            {"role": "user", "content": "hi"},
+        ],
     )
-    assert resp is not None
+    sent = client.chat.completions.last_kwargs["messages"]
+    # Original structured system message must be preserved unchanged.
+    assert sent[1]["role"] == "system"
+    assert sent[1]["content"] == multimodal_content
+    # A new string-content system message carrying the rules was prepended.
+    assert sent[0]["role"] == "system"
+    assert isinstance(sent[0]["content"], str)
+    assert "<brain-rules>" in sent[0]["content"]
 
 
 def test_wrap_openai_bypass_env(brain_with_em_dash_rule: Path, monkeypatch):

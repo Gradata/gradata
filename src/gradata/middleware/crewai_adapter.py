@@ -49,7 +49,7 @@ class CrewAIGuard:
         *,
         brain_path: str | Path | None = None,
         source: RuleSource | None = None,
-        strict: bool = True,
+        strict: bool = False,
     ) -> None:
         self._source = source or RuleSource(brain_path=brain_path)
         self._strict = strict

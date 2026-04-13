@@ -72,11 +72,13 @@ def _inject_into_messages(messages: list[Any], block: str) -> list[Any]:
         return list(messages)
     out = [dict(m) if isinstance(m, dict) else m for m in messages]
     if out and isinstance(out[0], dict) and out[0].get("role") == "system":
-        existing = out[0].get("content") or ""
-        out[0]["content"] = inject_into_system(
-            existing if isinstance(existing, str) else str(existing),
-            block,
-        )
+        existing = out[0].get("content")
+        if isinstance(existing, str) or existing is None:
+            out[0]["content"] = inject_into_system(existing, block)
+        else:
+            # Structured (e.g. multimodal list) content — don't stringify it;
+            # prepend a fresh system message so the original payload is preserved.
+            out.insert(0, {"role": "system", "content": block})
     else:
         out.insert(0, {"role": "system", "content": block})
     return out

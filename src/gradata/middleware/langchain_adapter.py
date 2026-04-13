@@ -72,8 +72,10 @@ class LangChainCallback(_BaseCallbackHandler):  # type: ignore[misc,valid-type]
         block = build_brain_rules_block(self._source)
         if not block or not prompts:
             return
-        # Prepend block to the first prompt. LangChain uses the list in-place.
-        prompts[0] = f"{block}\n\n{prompts[0]}"
+        # Prepend block to every prompt in the batch (LangChain uses the list
+        # in-place and a batch call can contain multiple prompts).
+        for i, prompt in enumerate(prompts):
+            prompts[i] = f"{block}\n\n{prompt}"
 
     def on_chat_model_start(
         self,
@@ -82,22 +84,32 @@ class LangChainCallback(_BaseCallbackHandler):  # type: ignore[misc,valid-type]
         **kwargs: Any,
     ) -> None:
         block = build_brain_rules_block(self._source)
-        if not block or not messages or not messages[0]:
+        if not block or not messages:
             return
-        first_batch = messages[0]
-        # If the first message is a system-style message, extend its content.
-        first = first_batch[0]
-        content = getattr(first, "content", None)
-        msg_type = getattr(first, "type", "")
-        if content is not None and msg_type == "system":
-            first.content = f"{content}\n\n{block}"
-            return
-        # Otherwise, prepend a SystemMessage if langchain_core is available.
-        try:
-            from langchain_core.messages import SystemMessage
-        except ImportError:  # pragma: no cover
-            return
-        first_batch.insert(0, SystemMessage(content=block))
+        system_cls = None
+        for batch in messages:
+            if not batch:
+                continue
+            first = batch[0]
+            content = getattr(first, "content", None)
+            msg_type = getattr(first, "type", "")
+            if content is not None and msg_type == "system":
+                # BaseMessage.content may be a str or a list of content blocks
+                # (multimodal). Preserve structure in both cases.
+                if isinstance(content, str):
+                    first.content = f"{content}\n\n{block}"
+                elif isinstance(content, list):
+                    first.content = [*content, {"type": "text", "text": block}]
+                else:
+                    first.content = [content, {"type": "text", "text": block}]
+                continue
+            if system_cls is None:
+                try:
+                    from langchain_core.messages import SystemMessage
+                except ImportError:  # pragma: no cover
+                    return
+                system_cls = SystemMessage
+            batch.insert(0, system_cls(content=block))
 
     # -- enforcement ------------------------------------------------------
 

@@ -52,6 +52,10 @@ def _extract_text(response: Any) -> str:
         content = response.get("content")
     if not content:
         return ""
+    # Anthropic responses may expose content as a plain string (older SDKs,
+    # dict-shaped responses) or as a list of typed content blocks.
+    if isinstance(content, str):
+        return content
     parts: list[str] = []
     for block in content:
         # SDK object: block.type == 'text', block.text == '...'

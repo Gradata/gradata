@@ -71,6 +71,17 @@ class _ScoredLesson:
     confidence: float
 
 
+def _clamp_confidence(value: float) -> float:
+    """Clamp a confidence value into the [0.0, 1.0] range.
+
+    Out-of-range inputs are logged at debug level and clamped rather than
+    raised — middleware must not fail on malformed lesson inputs.
+    """
+    if value < 0.0 or value > 1.0:
+        _log.debug("Confidence %s out of [0.0, 1.0]; clamping", value)
+    return max(0.0, min(value, 1.0))
+
+
 class RuleSource:
     """Reads lessons from the same brain directory Claude Code hooks use.
 
@@ -122,7 +133,7 @@ class RuleSource:
         out: list[_ScoredLesson] = []
         for lesson in self._static_lessons or []:
             state = str(lesson.get("state") or lesson.get("status") or "").upper()
-            conf = float(lesson.get("confidence", 0.0) or 0.0)
+            conf = _clamp_confidence(float(lesson.get("confidence", 0.0) or 0.0))
             category = str(lesson.get("category", "") or "")
             description = str(lesson.get("description", "") or "")
             if not description:
@@ -197,7 +208,7 @@ def _lesson_to_scored(lesson: Lesson) -> _ScoredLesson:
         category=lesson.category,
         description=lesson.description,
         state=state_name,
-        confidence=float(lesson.confidence),
+        confidence=_clamp_confidence(float(lesson.confidence)),
     )
 
 

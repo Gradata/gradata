@@ -49,7 +49,7 @@ def test_build_brain_rules_block_wraps_in_xml():
 
 def test_build_brain_rules_block_respects_max_rules():
     lessons = [
-        {"state": "RULE", "confidence": 0.90 + i / 100, "category": f"C{i}",
+        {"state": "RULE", "confidence": min(1.0, 0.90 + i / 200), "category": f"C{i}",
          "description": f"desc {i}"}
         for i in range(20)
     ]
