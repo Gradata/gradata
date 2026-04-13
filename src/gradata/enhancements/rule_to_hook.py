@@ -42,7 +42,7 @@ class HookCandidate:
     enforcement: EnforcementType
     hook_template: str  # Template name or inline script
     reason: str  # Why this rule is/isn't promotable
-    block_pattern: str | None = None  # Literal regex pattern the hook blocks on
+    template_arg: str | None = None  # Template-specific argument: regex literal, line count, sentinel, etc.
 
 
 # Shared secret detection regex (API keys, tokens, private keys)
@@ -72,8 +72,8 @@ DETERMINISTIC_PATTERNS: list[tuple[str, DeterminismCheck, str, str | None]] = [
     (r"never commit secret|no secret|never push secret", DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
     (r"no hardcoded api key|never hardcode api key|no api key in code", DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
     # Auto test — PostToolUse, runs pytest against test_<basename>.py after edits.
-    # block_pattern is a sentinel ("auto_test") because render_hook gates on
-    # block_pattern being non-None; the template itself ignores it.
+    # template_arg is a sentinel ("auto_test") because render_hook gates on
+    # template_arg being non-None; the template itself ignores it.
     (r"run tests? after", DeterminismCheck.TEST_TRIGGER, "auto_test", "auto_test"),
     (r"always run tests?", DeterminismCheck.TEST_TRIGGER, "auto_test", "auto_test"),
     # Read before edit (not shipped yet — stateful)
@@ -108,19 +108,19 @@ def classify_rule(description: str, confidence: float) -> HookCandidate:
         raise ValueError("confidence must be in [0.0, 1.0]")
     desc_lower = description.lower()
 
-    for pattern, check_type, template, block_pat in DETERMINISTIC_PATTERNS:
+    for pattern, check_type, template, tmpl_arg in DETERMINISTIC_PATTERNS:
         m = re.search(pattern, desc_lower)
         if m:
             # file_size_check: capture group 1 holds the line limit as a string
             if template == "file_size_check" and m.groups():
-                block_pat = m.group(1)
+                tmpl_arg = m.group(1)
             return HookCandidate(
                 rule_description=description,
                 rule_confidence=confidence,
                 determinism=check_type,
                 enforcement=EnforcementType.HOOK,
                 hook_template=template,
-                block_pattern=block_pat,
+                template_arg=tmpl_arg,
                 reason=f"Matches deterministic pattern: {pattern}",
             )
 
@@ -130,7 +130,7 @@ def classify_rule(description: str, confidence: float) -> HookCandidate:
         determinism=DeterminismCheck.NOT_DETERMINISTIC,
         enforcement=EnforcementType.PROMPT_INJECTION,
         hook_template="",
-        block_pattern=None,
+        template_arg=None,
         reason="Requires LLM judgment — stays as prompt injection",
     )
 
@@ -196,7 +196,7 @@ def render_hook(candidate: HookCandidate) -> str | None:
         return None
     if candidate.hook_template not in _IMPLEMENTED_TEMPLATES:
         return None
-    if candidate.block_pattern is None:
+    if candidate.template_arg is None:
         return None
 
     template_path = _TEMPLATE_DIR / f"{candidate.hook_template}.js.tmpl"
@@ -213,9 +213,9 @@ def render_hook(candidate: HookCandidate) -> str | None:
         .replace("\n", " ")
     )
 
-    # file_size_check: block_pattern holds the line limit as a string
+    # file_size_check: template_arg holds the line limit as a string
     if candidate.hook_template == "file_size_check":
-        limit = candidate.block_pattern or "500"
+        limit = candidate.template_arg or "500"
         return (
             tmpl
             .replace("{{LINE_LIMIT}}", limit)
@@ -223,7 +223,7 @@ def render_hook(candidate: HookCandidate) -> str | None:
             .replace("{{SOURCE_HASH}}", _source_hash(candidate.rule_description))
         )
 
-    pattern_literal = f"new RegExp({json.dumps(candidate.block_pattern)})"
+    pattern_literal = f"new RegExp({json.dumps(candidate.template_arg)})"
     return (
         tmpl
         .replace("{{PATTERN_LITERAL}}", pattern_literal)
@@ -328,10 +328,10 @@ def install_hook(slug: str, hook_source: str, *, template: str | None = None) ->
 
 
 def _synthesize_positive(candidate: HookCandidate) -> str:
-    """Produce a minimal string that should match the block_pattern for self-test
+    """Produce a minimal string that should match the template_arg for self-test
     when no captured violating text is supplied.
     """
-    p = candidate.block_pattern or ""
+    p = candidate.template_arg or ""
     # Em-dash: the pattern IS the literal, wrap in ascii context
     if "\u2014" in p:
         return "hello \u2014 world"
@@ -357,7 +357,7 @@ def _synthesize_positive(candidate: HookCandidate) -> str:
         # Synthetic test key (broken into pieces to avoid pre-commit secret scanner).
         return "sk" + "-" + "abc123def456ghi789jklmno"
     if candidate.hook_template == "file_size_check":
-        limit = int(candidate.block_pattern or "500")
+        limit = int(candidate.template_arg or "500")
         return "x\n" * (limit + 10)
     # Best-effort: embed the literal pattern
     return f"x{p}y"
@@ -375,7 +375,7 @@ def try_generate(
     Args:
         candidate: A HookCandidate from classify_rule.
         positive_example: Optional captured violating text to self-test against.
-            If None, a minimal example is synthesized from block_pattern.
+            If None, a minimal example is synthesized from template_arg.
 
     Returns a GenerationResult describing the outcome.
     """

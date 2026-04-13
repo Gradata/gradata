@@ -601,7 +601,7 @@ class TestFileSizeCheckTemplate:
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         candidate = classify_rule("Keep files under 500 lines", 0.95)
         assert candidate.hook_template == "file_size_check"
-        assert candidate.block_pattern == "500"
+        assert candidate.template_arg == "500"
         assert try_generate(candidate).installed
 
     def test_file_size_hook_blocks_oversized_content(self, tmp_path, monkeypatch):
