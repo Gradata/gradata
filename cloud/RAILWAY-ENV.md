@@ -32,12 +32,21 @@ Complete list of env vars for the `gradata-production` service on Railway. Every
 - Events: `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`, `checkout.session.completed`
 - Copy the signing secret → `GRADATA_STRIPE_WEBHOOK_SECRET`
 
+**Webhook hardening** (automatic, no env vars):
+
+- Signature is verified via `stripe.Webhook.construct_event`.
+- Events with `created` older than 5 minutes are rejected with 400.
+- Events already seen (keyed by `event.id` in `processed_webhooks`) return 200 without re-running the handler.
+
+**Migration required**: `migrations/005_processed_webhooks.sql` — run in Supabase SQL Editor before enabling webhook hardening in production, otherwise duplicate deliveries may double-apply.
+
 ## Optional — Sentry error tracking
 
 | Var | Purpose |
 |-----|---------|
 | `GRADATA_SENTRY_DSN` | DSN from Sentry project `gradata-cloud`. Unset = Sentry disabled (prod-safe) |
 | `GRADATA_SENTRY_TRACES_SAMPLE_RATE` | Default `0.1`. Drop to `0.02` if cost becomes an issue |
+| `GRADATA_SENTRY_PROFILES_SAMPLE_RATE` | Default `0.1`. Requires traces to be sampled first |
 | `GRADATA_SENTRY_RELEASE` | Override the release tag. Default uses `RAILWAY_GIT_COMMIT_SHA` |
 
 ## Optional — App config

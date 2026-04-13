@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -125,10 +126,71 @@ async def create_portal_session(
     return PortalResponse(url=session.url)
 
 
+# Stripe retries failed webhooks for up to 3 days. We only replay-reject
+# events whose `created` timestamp is older than this window — longer than
+# Stripe's own retry schedule would backdate a legitimate delivery.
+WEBHOOK_MAX_AGE_SECONDS = 5 * 60
+
+
+def _event_id(event) -> str | None:
+    """Extract `id` from either a dict event or a Stripe.Event object."""
+    if isinstance(event, dict):
+        return event.get("id")
+    return getattr(event, "id", None)
+
+
+def _event_type(event) -> str:
+    if isinstance(event, dict):
+        return event.get("type", "") or ""
+    return getattr(event, "type", "") or ""
+
+
+def _event_created(event) -> int | None:
+    """Stripe's `created` field is a Unix timestamp (seconds)."""
+    if isinstance(event, dict):
+        created = event.get("created")
+    else:
+        created = getattr(event, "created", None)
+    if isinstance(created, (int, float)):
+        return int(created)
+    return None
+
+
+async def _already_processed(event_id: str) -> bool:
+    """Return True when we've seen this event.id before (idempotency check)."""
+    db = get_db()
+    try:
+        rows = await db.select("processed_webhooks", columns="event_id", filters={"event_id": event_id})
+    except Exception as exc:  # pragma: no cover - defensive
+        # If the table doesn't exist yet (migration not applied), fall back
+        # to "not processed" — better than 5xxing every webhook during rollout.
+        _log.warning("processed_webhooks lookup failed (table missing?): %s", exc)
+        return False
+    return bool(rows)
+
+
+async def _mark_processed(event_id: str, event_type: str) -> None:
+    """Record that we successfully handled this event.id. Best-effort."""
+    db = get_db()
+    try:
+        await db.insert("processed_webhooks", {"event_id": event_id, "event_type": event_type})
+    except Exception as exc:  # pragma: no cover - defensive
+        # A race between two parallel deliveries can both try to insert —
+        # the PK conflict is the whole point of the table. Log and move on.
+        _log.info("processed_webhooks insert swallowed (likely PK race): %s", exc)
+
+
 @router.post("/billing/webhook")
 @sensitive_limit
 async def stripe_webhook(request: Request) -> JSONResponse:
-    """Handle Stripe webhook events. No JWT auth — verified by Stripe signature."""
+    """Handle Stripe webhook events. No JWT auth — verified by Stripe signature.
+
+    Hardening:
+    - signature verified via stripe.Webhook.construct_event (unchanged).
+    - replay protection: reject events whose `created` is older than 5 min.
+    - idempotency: if we've already processed event.id, return 200 without
+      re-running the handler.
+    """
     payload = await request.body()
     sig = request.headers.get("stripe-signature", "")
     webhook_sig_key = get_settings().stripe_webhook_secret
@@ -144,7 +206,33 @@ async def stripe_webhook(request: Request) -> JSONResponse:
         _log.warning("Invalid Stripe signature: %s", exc)
         raise HTTPException(status_code=400, detail="Invalid signature") from exc
 
+    # --- Replay protection -------------------------------------------------
+    created = _event_created(event)
+    if created is None:
+        # Stripe always sets `created`; absence implies the body was tampered
+        # with (and signature-verified events shouldn't reach here without it).
+        _log.warning("Stripe event missing `created` — treating as replay")
+        raise HTTPException(status_code=400, detail="Event missing `created` timestamp")
+    now = int(time.time())
+    age = now - created
+    if age > WEBHOOK_MAX_AGE_SECONDS:
+        _log.warning(
+            "Rejecting stale Stripe event id=%s type=%s age=%ss",
+            _event_id(event), _event_type(event), age,
+        )
+        raise HTTPException(status_code=400, detail="Event too old")
+
+    # --- Idempotency -------------------------------------------------------
+    event_id = _event_id(event)
+    if event_id and await _already_processed(event_id):
+        _log.info("Ignoring duplicate Stripe event id=%s", event_id)
+        return JSONResponse({"status": "ok", "duplicate": True})
+
     await _handle_event(event)
+
+    if event_id:
+        await _mark_processed(event_id, _event_type(event))
+
     return JSONResponse({"status": "ok"})
 
 

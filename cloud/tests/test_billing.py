@@ -225,6 +225,11 @@ class TestPortal:
 
 class TestWebhook:
     def _post_event(self, client, fake_stripe, event: dict):
+        # Inject defaults so hardening checks pass: every real Stripe event
+        # carries both `id` and `created`. Individual tests can override.
+        import time as _time
+        event.setdefault("id", f"evt_test_{id(event)}")
+        event.setdefault("created", int(_time.time()))
         fake_stripe.Webhook.construct_event = MagicMock(return_value=event)
         return client.post(
             "/api/v1/billing/webhook",
@@ -319,3 +324,113 @@ class TestWebhook:
             headers={"stripe-signature": "wrong"},
         )
         assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# /billing/webhook — hardening: idempotency + replay protection
+# ---------------------------------------------------------------------------
+
+
+class TestWebhookHardening:
+    def _post_with(self, client, fake_stripe, event: dict):
+        fake_stripe.Webhook.construct_event = MagicMock(return_value=event)
+        return client.post(
+            "/api/v1/billing/webhook",
+            content=json.dumps(event),
+            headers={"stripe-signature": "test-sig"},
+        )
+
+    def test_rejects_stale_event_older_than_five_minutes(
+        self, client, mock_supabase, configured_prices, fake_stripe
+    ):
+        """Events where `created` is > 5min old must 400 (replay protection)."""
+        import time as _time
+        stale_event = {
+            "id": "evt_replay_1",
+            "type": "customer.subscription.updated",
+            "created": int(_time.time()) - (6 * 60),  # 6 min old
+            "data": {"object": {"customer": "cus_x"}},
+        }
+        resp = self._post_with(client, fake_stripe, stale_event)
+        assert resp.status_code == 400
+        assert "too old" in resp.json()["detail"].lower()
+
+    def test_rejects_event_missing_created_field(
+        self, client, mock_supabase, configured_prices, fake_stripe
+    ):
+        """Signature-verified events missing `created` are treated as malformed."""
+        event = {
+            "id": "evt_no_ts",
+            "type": "customer.subscription.updated",
+            "data": {"object": {"customer": "cus_x"}},
+        }
+        resp = self._post_with(client, fake_stripe, event)
+        assert resp.status_code == 400
+
+    def test_duplicate_event_id_returns_200_without_reprocessing(
+        self, client, mock_supabase, configured_prices, fake_stripe
+    ):
+        """Once an event.id is in processed_webhooks, re-delivery is a no-op."""
+        import time as _time
+
+        # Seed the idempotency table with this event_id.
+        mock_supabase.add_response(
+            "processed_webhooks", "select",
+            [{"event_id": "evt_duplicate_1"}],
+        )
+
+        # Capture update calls so we can assert the handler did NOT run.
+        captured: list[dict] = []
+
+        async def _capture_update(table, data, filters=None):
+            captured.append({"table": table, "data": data, "filters": filters})
+            return [data]
+
+        mock_supabase.update = _capture_update  # type: ignore[method-assign]
+
+        event = {
+            "id": "evt_duplicate_1",
+            "type": "customer.subscription.updated",
+            "created": int(_time.time()),
+            "data": {"object": {"customer": "cus_x", "status": "active"}},
+        }
+        resp = self._post_with(client, fake_stripe, event)
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body.get("duplicate") is True
+        assert not captured, "Handler must NOT run for duplicate events"
+
+    def test_new_event_id_is_recorded_in_processed_webhooks(
+        self, client, mock_supabase, configured_prices, fake_stripe
+    ):
+        """Successful handling must insert the event.id so the next delivery skips."""
+        import time as _time
+
+        inserts: list[dict] = []
+
+        async def _capture_insert(table, data):
+            inserts.append({"table": table, "data": data})
+            return [data] if isinstance(data, dict) else list(data)
+
+        async def _noop_update(*_a, **_kw):
+            return []
+
+        mock_supabase.insert = _capture_insert  # type: ignore[method-assign]
+        mock_supabase.update = _noop_update  # type: ignore[method-assign]
+
+        event = {
+            "id": "evt_fresh_1",
+            "type": "invoice.payment_failed",
+            "created": int(_time.time()),
+            "data": {"object": {"customer": "cus_x"}},
+        }
+        resp = self._post_with(client, fake_stripe, event)
+
+        assert resp.status_code == 200
+        # Exactly one insert into processed_webhooks with the right keys.
+        marker_rows = [row for row in inserts if row["table"] == "processed_webhooks"]
+        assert len(marker_rows) == 1
+        payload = marker_rows[0]["data"]
+        assert payload["event_id"] == "evt_fresh_1"
+        assert payload["event_type"] == "invoice.payment_failed"
