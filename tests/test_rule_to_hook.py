@@ -712,3 +712,126 @@ class TestGeneratedRunnerPost:
             capture_output=True, text=True, env=env, timeout=10,
         )
         assert proc.returncode == 0
+
+
+class TestRuleExport:
+    def _write_lessons(self, brain_dir, lines):
+        brain_dir.mkdir(parents=True, exist_ok=True)
+        (brain_dir / "lessons.md").write_text(
+            "\n".join(lines) + "\n", encoding="utf-8"
+        )
+
+    def test_export_cursor_format(self, tmp_path):
+        from gradata.enhancements.rule_export import export_rules
+        brain = tmp_path / "brain"
+        self._write_lessons(brain, [
+            "[2026-04-12] [RULE:1.00] [hooked] FORMATTING: never use em dashes",
+            "[2026-04-12] [RULE:0.95] STRUCTURE: lead with the answer",
+            "[2026-04-12] [PATTERN:0.70] TONE: be friendly",  # should skip non-RULE
+        ])
+        output = export_rules(brain, target="cursor")
+        assert "never use em dashes" in output
+        assert "lead with the answer" in output
+        assert "be friendly" not in output  # PATTERN-tier excluded
+        # Cursor format: each rule on its own line or bullet
+        assert output.count("never use em dashes") == 1
+
+    def test_export_agents_format(self, tmp_path):
+        from gradata.enhancements.rule_export import export_rules
+        brain = tmp_path / "brain"
+        self._write_lessons(brain, [
+            "[2026-04-12] [RULE:1.00] FORMATTING: never use em dashes",
+            "[2026-04-12] [RULE:0.95] STRUCTURE: lead with the answer",
+        ])
+        output = export_rules(brain, target="agents")
+        # AGENTS.md has a heading and bullet rules
+        assert "# " in output or "## " in output
+        assert "- " in output
+        assert "never use em dashes" in output
+
+    def test_export_aider_format(self, tmp_path):
+        from gradata.enhancements.rule_export import export_rules
+        brain = tmp_path / "brain"
+        self._write_lessons(brain, [
+            "[2026-04-12] [RULE:1.00] FORMATTING: never use em dashes",
+        ])
+        output = export_rules(brain, target="aider")
+        # Aider format: YAML-safe. Should validate as YAML.
+        try:
+            import yaml
+            parsed = yaml.safe_load(output)
+            assert parsed is not None
+        except ImportError:
+            assert "message:" in output
+            assert "  - " in output
+
+    def test_export_strips_hooked_marker(self, tmp_path):
+        """The [hooked] marker is internal — exported rules shouldn't include it."""
+        from gradata.enhancements.rule_export import export_rules
+        brain = tmp_path / "brain"
+        self._write_lessons(brain, [
+            "[2026-04-12] [RULE:1.00] [hooked] FORMATTING: never use em dashes",
+        ])
+        output = export_rules(brain, target="cursor")
+        assert "[hooked]" not in output
+        assert "never use em dashes" in output
+
+    def test_export_empty_brain(self, tmp_path):
+        from gradata.enhancements.rule_export import export_rules
+        brain = tmp_path / "brain"
+        brain.mkdir()
+        (brain / "lessons.md").write_text("", encoding="utf-8")
+        output = export_rules(brain, target="cursor")
+        # Empty is fine, don't crash
+        assert isinstance(output, str)
+
+
+class TestCliExport:
+    def test_cli_export_writes_cursorrules(self, tmp_path, monkeypatch):
+        import subprocess, sys, os
+        brain = tmp_path / "brain"
+        brain.mkdir()
+        (brain / "lessons.md").write_text(
+            "[2026-04-12] [RULE:1.00] FORMATTING: never use em dashes\n",
+            encoding="utf-8",
+        )
+        out_dir = tmp_path / "project"
+        out_dir.mkdir()
+
+        # Resolve src/ to absolute path so cwd=tmp_path doesn't break imports
+        repo_src = str((__import__("pathlib").Path(__file__).resolve().parent.parent / "src"))
+        existing_pp = os.environ.get("PYTHONPATH", "")
+        env = {**os.environ,
+               "GRADATA_BRAIN": str(brain),
+               "PYTHONPATH": (repo_src + os.pathsep + existing_pp) if existing_pp else repo_src}
+        proc = subprocess.run(
+            [sys.executable, "-m", "gradata.cli", "export",
+             "--target", "cursor",
+             "--output", str(out_dir / ".cursorrules")],
+            capture_output=True, text=True, env=env, cwd=str(tmp_path),
+        )
+        assert proc.returncode == 0, f"stderr: {proc.stderr}\nstdout: {proc.stdout}"
+        written = out_dir / ".cursorrules"
+        assert written.exists()
+        assert "never use em dashes" in written.read_text(encoding="utf-8")
+
+    def test_cli_export_writes_stdout_when_no_output_flag(self, tmp_path):
+        import subprocess, sys, os
+        brain = tmp_path / "brain"
+        brain.mkdir()
+        (brain / "lessons.md").write_text(
+            "[2026-04-12] [RULE:1.00] FORMATTING: never use em dashes\n",
+            encoding="utf-8",
+        )
+        # Resolve src/ to absolute path so cwd=tmp_path doesn't break imports
+        repo_src = str((__import__("pathlib").Path(__file__).resolve().parent.parent / "src"))
+        existing_pp = os.environ.get("PYTHONPATH", "")
+        env = {**os.environ,
+               "GRADATA_BRAIN": str(brain),
+               "PYTHONPATH": (repo_src + os.pathsep + existing_pp) if existing_pp else repo_src}
+        proc = subprocess.run(
+            [sys.executable, "-m", "gradata.cli", "export", "--target", "agents"],
+            capture_output=True, text=True, env=env, cwd=str(tmp_path),
+        )
+        assert proc.returncode == 0
+        assert "never use em dashes" in proc.stdout
