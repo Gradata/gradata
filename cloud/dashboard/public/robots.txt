@@ -1,0 +1,8 @@
+# The dashboard is behind auth. Crawlers have nothing to see here.
+# Marketing content lives at gradata.ai (separate project), not here.
+User-agent: *
+Disallow: /
+
+# Allow health checks
+User-agent: *
+Allow: /favicon.ico
