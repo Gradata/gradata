@@ -72,7 +72,7 @@ export default function SubprocessorsPage() {
       <div className="space-y-6">
         <section className="rounded border border-yellow-500/30 bg-yellow-500/5 p-4 text-sm text-yellow-200/90">
           This page lists the third parties Gradata engages to deliver the
-          hosted Gradata Cloud service. The open source SDK running locally
+          hosted Gradata Cloud service. The open-source SDK running locally
           uses none of these. See our{" "}
           <a href="/legal/dpa/" className="underline">DPA</a> for the terms
           under which subprocessors handle Personal Data.

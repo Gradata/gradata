@@ -246,6 +246,7 @@ async def _send_deletion_confirmation(user_id: str, email: str | None) -> None:
 
     Deliberately a stub: we don't have an ESP wired in yet. Logged so ops
     can verify the request landed while we build the email pipeline.
+    Tracked follow-up: wire to the admin/ESP client once provider is chosen.
     """
     _log.info("GDPR deletion confirmation queued user=%s email=%s", user_id, email)
 
@@ -266,6 +267,23 @@ async def delete_me(
     now_iso = _iso(now)
     purge_iso = _iso(purge_after)
 
+    # Idempotency: if this user is already soft-deleted, return the existing
+    # ledger state instead of re-cascading. Repeated calls otherwise reset
+    # the 30-day purge window and re-tombstone owned rows for no reason.
+    existing_rows = await db.select(
+        "users",
+        columns="id,email,deleted_at,purge_after",
+        filters={"id": user_id},
+    )
+    if existing_rows and existing_rows[0].get("deleted_at"):
+        existing = existing_rows[0]
+        return DeleteAccountResponse(
+            status="accepted",
+            user_id=user_id,
+            deleted_at=existing["deleted_at"],
+            purge_after=existing.get("purge_after") or purge_iso,
+        )
+
     # Tombstone the user row. Upsert so we don't 500 if the row is absent.
     await db.upsert(
         "users",
@@ -277,6 +295,9 @@ async def delete_me(
     )
 
     # Cascade to workspaces they own.
+    # NOTE: per-row UPDATE (N+1) is intentional — db.select has no IN/transaction
+    # support yet. Tracked follow-up: switch to a single PATCH with PostgREST
+    # `id=in.(...)` filter once SupabaseClient grows that helper.
     owned_workspaces = await _collect_user_workspaces(user_id, include_deleted=False)
     for ws in owned_workspaces:
         await db.update(
@@ -295,10 +316,8 @@ async def delete_me(
         )
 
     # Resolve email from the shadow users table if present (best-effort).
-    email: str | None = None
-    user_rows = await db.select("users", columns="email", filters={"id": user_id})
-    if user_rows:
-        email = user_rows[0].get("email")
+    # Reuses the pre-cascade fetch above to avoid a second round-trip.
+    email: str | None = existing_rows[0].get("email") if existing_rows else None
     await _send_deletion_confirmation(user_id, email)
 
     _log.info(

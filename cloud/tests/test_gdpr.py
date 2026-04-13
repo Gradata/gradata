@@ -318,6 +318,38 @@ def test_delete_is_idempotent_when_no_owned_resources(gdpr_client):
     assert resp.status_code == 202
 
 
+def test_delete_is_idempotent_when_already_soft_deleted(gdpr_client, mock_supabase):
+    """Repeat /me/delete returns the existing ledger state without re-cascading.
+
+    Without this guard, calling /me/delete twice would reset the 30-day purge
+    window and re-tombstone owned rows on every call.
+    """
+    existing_deleted_at = "2026-04-01T00:00:00+00:00"
+    existing_purge_after = "2026-05-01T00:00:00+00:00"
+    client = gdpr_client(
+        workspaces=[],
+        brains=[],
+        users=[
+            {
+                "id": CALLER_UID,
+                "email": None,
+                "deleted_at": existing_deleted_at,
+                "purge_after": existing_purge_after,
+            }
+        ],
+    )
+    resp = client.post("/api/v1/me/delete")
+    assert resp.status_code == 202
+    body = resp.json()
+    assert body["deleted_at"] == existing_deleted_at
+    assert body["purge_after"] == existing_purge_after
+    # No second tombstone upsert should have fired.
+    second_tombstones = [
+        r for r in mock_supabase._inserts if r.get("id") == CALLER_UID and r.get("deleted_at")
+    ]
+    assert second_tombstones == [], "expected no re-tombstone on repeat delete"
+
+
 # ---------------------------------------------------------------------------
 # Backwards-compat: existing /workspaces/{id}/members must still work
 # after soft-delete filter was added in auth.py / users.py.

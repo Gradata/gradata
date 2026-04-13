@@ -62,6 +62,9 @@ CREATE INDEX IF NOT EXISTS idx_gdpr_export_requests_user_created
 
 ALTER TABLE gdpr_export_requests ENABLE ROW LEVEL SECURITY;
 
+-- Postgres does not support `CREATE POLICY IF NOT EXISTS`; drop-then-create
+-- keeps the migration idempotent across re-runs (local dev / SQL Editor).
+DROP POLICY IF EXISTS gdpr_export_self ON gdpr_export_requests;
 CREATE POLICY gdpr_export_self ON gdpr_export_requests
     FOR ALL USING (user_id = auth.uid());
 
