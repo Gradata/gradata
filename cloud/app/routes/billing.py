@@ -1,35 +1,42 @@
-"""Billing endpoints: Stripe Checkout, webhook, and subscription status."""
+"""Billing endpoints: Stripe Checkout, customer portal, webhook, and subscription status."""
 
 from __future__ import annotations
 
 import logging
-import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.auth import get_current_user_id
+from app.config import get_settings
 from app.db import get_db
-from app.models import CheckoutRequest, CheckoutResponse, SubscriptionResponse, SubscriptionUsage
+from app.models import (
+    CheckoutRequest,
+    CheckoutResponse,
+    PlanTier,
+    PortalResponse,
+    SubscriptionResponse,
+    SubscriptionUsage,
+)
 
 _log = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Price IDs per plan — configured in env.
-_PLAN_PRICES: dict[str, str] = {
-    "pro": os.environ.get("GRADATA_STRIPE_PRICE_PRO", ""),
-    "team": os.environ.get("GRADATA_STRIPE_PRICE_TEAM", ""),
-}
 
-# Env var names stored as constants to avoid scanner false positives.
-_ENV_STRIPE_KEY = "GRADATA_STRIPE_SECRET_KEY"
-_ENV_WEBHOOK = "GRADATA_STRIPE_WEBHOOK_SECRET"
+def _price_id_for(plan: PlanTier) -> str:
+    """Return the configured Stripe price_id for a paid plan, or empty if missing."""
+    settings = get_settings()
+    if plan == PlanTier.cloud:
+        return settings.stripe_price_id_cloud
+    if plan == PlanTier.team:
+        return settings.stripe_price_id_team
+    return ""
 
 
 def _configure_stripe(stripe_mod) -> None:
     """Inject the Stripe auth credential via setattr (avoids literal key assignment)."""
-    cred = os.environ.get(_ENV_STRIPE_KEY, "")
+    cred = get_settings().stripe_secret_key
     setattr(stripe_mod, "api" + "_key", cred)
 
 
@@ -51,29 +58,68 @@ async def create_checkout(
     user_id: str = Depends(get_current_user_id),
 ) -> CheckoutResponse:
     """Create a Stripe Checkout Session and return its URL."""
-    if body.plan not in _PLAN_PRICES:
-        raise HTTPException(status_code=400, detail=f"Unknown plan: {body.plan}")
+    settings = get_settings()
 
-    price_id = _PLAN_PRICES[body.plan]
+    # Enterprise tier never goes through Stripe Checkout.
+    if body.plan == PlanTier.enterprise:
+        raise HTTPException(
+            status_code=400,
+            detail="Enterprise plans are sales-only — please contact sales.",
+        )
+
+    # Free is not a checkout target.
+    if body.plan == PlanTier.free:
+        raise HTTPException(
+            status_code=400,
+            detail="Free plan does not require checkout.",
+        )
+
+    price_id = _price_id_for(body.plan)
     if not price_id:
-        raise HTTPException(status_code=503, detail=f"Price not configured for plan: {body.plan}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Checkout for the {body.plan.value} plan is not configured yet.",
+        )
 
     stripe = _stripe()
 
     session = stripe.checkout.Session.create(
         mode="subscription",
         line_items=[{"price": price_id, "quantity": 1}],
-        success_url=os.environ.get(
-            "GRADATA_STRIPE_SUCCESS_URL", "https://app.gradata.ai/billing?success=1"
-        ),
-        cancel_url=os.environ.get(
-            "GRADATA_STRIPE_CANCEL_URL", "https://app.gradata.ai/billing?cancel=1"
-        ),
-        metadata={"user_id": user_id},
+        success_url=settings.stripe_success_url,
+        cancel_url=settings.stripe_cancel_url,
+        metadata={"user_id": user_id, "plan": body.plan.value},
     )
 
-    _log.info("Created checkout session for user=%s plan=%s", user_id, body.plan)
+    _log.info("Created checkout session for user=%s plan=%s", user_id, body.plan.value)
     return CheckoutResponse(checkout_url=session.url)
+
+
+@router.post("/billing/portal", response_model=PortalResponse)
+async def create_portal_session(
+    request: Request,
+    user_id: str = Depends(get_current_user_id),
+) -> PortalResponse:
+    """Create a Stripe customer portal session for the requesting user."""
+    settings = get_settings()
+    db = get_db()
+
+    ws_rows = await db.select("workspaces", filters={"owner_id": user_id})
+    if not ws_rows:
+        raise HTTPException(status_code=404, detail="no active subscription")
+
+    customer_id = ws_rows[0].get("stripe_customer_id")
+    if not customer_id:
+        raise HTTPException(status_code=404, detail="no active subscription")
+
+    stripe = _stripe()
+    session = stripe.billing_portal.Session.create(
+        customer=customer_id,
+        return_url=settings.stripe_portal_return_url,
+    )
+
+    _log.info("Created portal session for user=%s customer=%s", user_id, customer_id)
+    return PortalResponse(url=session.url)
 
 
 @router.post("/billing/webhook")
@@ -81,7 +127,7 @@ async def stripe_webhook(request: Request) -> JSONResponse:
     """Handle Stripe webhook events. No JWT auth — verified by Stripe signature."""
     payload = await request.body()
     sig = request.headers.get("stripe-signature", "")
-    webhook_sig_key = os.environ.get(_ENV_WEBHOOK, "")
+    webhook_sig_key = get_settings().stripe_webhook_secret
 
     if not webhook_sig_key:
         raise HTTPException(status_code=503, detail="Webhook not configured")
@@ -115,10 +161,10 @@ async def _handle_event(event: dict) -> None:
             )
             _log.info("Linked Stripe customer=%s to user=%s", customer_id, user_id)
 
-    elif etype in ("customer.subscription.updated", "customer.subscription.deleted"):
+    elif etype in ("customer.subscription.updated", "customer.subscription.created"):
         customer_id = data.get("customer")
-        plan = "free" if etype.endswith("deleted") else _extract_plan(data)
-        status = data.get("status", "canceled")
+        plan = _extract_plan(data)
+        status = data.get("status", "active")
         period_end = data.get("current_period_end")
         if customer_id:
             upd: dict = {"plan": plan, "subscription_status": status}
@@ -126,6 +172,17 @@ async def _handle_event(event: dict) -> None:
                 upd["subscription_period_end"] = period_end
             await db.update("workspaces", data=upd, filters={"stripe_customer_id": customer_id})
             _log.info("Subscription %s customer=%s plan=%s", etype, customer_id, plan)
+
+    elif etype == "customer.subscription.deleted":
+        customer_id = data.get("customer")
+        status = data.get("status", "canceled")
+        if customer_id:
+            await db.update(
+                "workspaces",
+                data={"plan": "free", "subscription_status": status},
+                filters={"stripe_customer_id": customer_id},
+            )
+            _log.info("Subscription deleted customer=%s -> free", customer_id)
 
     elif etype == "invoice.payment_failed":
         customer_id = data.get("customer")
@@ -139,13 +196,35 @@ async def _handle_event(event: dict) -> None:
 
 
 def _extract_plan(subscription: dict) -> str:
-    """Extract plan name from a Stripe subscription object."""
+    """Extract canonical plan name from a Stripe subscription object.
+
+    Lookup order:
+    1. subscription.metadata.plan
+    2. items[0].price.metadata.plan
+    3. items[0].price.id matched against configured price IDs
+    4. items[0].price.nickname (legacy)
+    """
+    meta_plan = (subscription.get("metadata") or {}).get("plan")
+    if meta_plan:
+        return meta_plan
+
     items = (subscription.get("items") or {}).get("data") or []
     if not items:
         return "unknown"
+
     price = items[0].get("price") or {}
     metadata = price.get("metadata") or {}
-    return metadata.get("plan", price.get("nickname", "unknown"))
+    if metadata.get("plan"):
+        return metadata["plan"]
+
+    settings = get_settings()
+    price_id = price.get("id", "")
+    if price_id and price_id == settings.stripe_price_id_cloud:
+        return "cloud"
+    if price_id and price_id == settings.stripe_price_id_team:
+        return "team"
+
+    return price.get("nickname", "unknown")
 
 
 @router.get("/billing/subscription", response_model=SubscriptionResponse)
