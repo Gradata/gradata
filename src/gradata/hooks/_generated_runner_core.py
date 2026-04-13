@@ -9,6 +9,11 @@ from pathlib import Path
 
 def run_generated_hooks(*, env_var: str, default_dir: str, per_hook_timeout: int) -> int:
     """Iterate generated hooks in the configured dir, run each, relay first block."""
+    # Short-circuit before any I/O so GRADATA_BYPASS truly zeros the overhead
+    # (no stdin drain, no filesystem scan).
+    if os.environ.get("GRADATA_BYPASS") == "1":
+        return 0
+
     try:
         raw = sys.stdin.read()
         if not raw.strip():
@@ -24,9 +29,6 @@ def run_generated_hooks(*, env_var: str, default_dir: str, per_hook_timeout: int
 
     hooks = sorted(root.glob("*.js"))
     if not hooks:
-        return 0
-
-    if os.environ.get("GRADATA_BYPASS") == "1":
         return 0
 
     for hook_path in hooks:

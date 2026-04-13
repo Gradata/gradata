@@ -121,8 +121,16 @@ def cmd_export(args):
     if target:
         from gradata.enhancements.rule_export import export_rules
         brain_root = _resolve_brain_root(args)
+        # Prefer the canonical lessons path the rest of the SDK uses, rather
+        # than hardcoding brain_root/"lessons.md" inside the exporter.
+        lessons_path: Path | None = None
         try:
-            text = export_rules(brain_root, target=target)
+            brain = _get_brain(args)
+            lessons_path = brain._find_lessons_path()
+        except Exception:
+            lessons_path = None
+        try:
+            text = export_rules(brain_root, target=target, lessons_path=lessons_path)
         except ValueError as e:
             print(f"error: {e}", file=sys.stderr)
             return
