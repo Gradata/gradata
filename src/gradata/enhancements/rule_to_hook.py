@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -277,10 +278,8 @@ def self_test(
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return False
     finally:
-        try:
+        with contextlib.suppress(Exception):
             hook_path.unlink()
-        except Exception:
-            pass
 
 
 @dataclass
@@ -305,28 +304,60 @@ def _hook_root() -> Path:
     return Path(".claude/hooks/pre-tool/generated")
 
 
-def install_hook(slug: str, hook_source: str, *, template: str) -> Path:
-    """Write rendered hook source. Routes to post-tool dir for PostToolUse templates.
+def install_hook(
+    slug: str,
+    hook_source: str,
+    *,
+    template: str,
+    candidate: HookCandidate | None = None,
+) -> Path:
+    """Write rendered hook source AND register the rule in the bundled manifest.
 
     PreToolUse hooks -> GRADATA_HOOK_ROOT (default .claude/hooks/pre-tool/generated/).
     PostToolUse hooks (e.g. auto_test) -> GRADATA_HOOK_ROOT_POST
     (default .claude/hooks/post-tool/generated/).
 
     Creates the directory if needed. Chmods to 0o755 on platforms that support it.
+
+    Also upserts a manifest entry alongside the legacy .js file so the bundled
+    dispatcher (_dispatcher.js) can evaluate this rule in one shared node
+    process. The .js file is kept for backwards compatibility and for rules
+    that the dispatcher doesn't implement inline (e.g. auto_test runs pytest).
     """
     if template in _POST_TOOL_TEMPLATES:
         override = os.environ.get("GRADATA_HOOK_ROOT_POST")
         root = Path(override) if override else Path(".claude/hooks/post-tool/generated")
+        kind = "post"
     else:
         root = _hook_root()
+        kind = "pre"
     root.mkdir(parents=True, exist_ok=True)
     path = root / f"{slug}.js"
     # Preserve LF line endings regardless of platform
     path.write_text(hook_source, encoding="utf-8", newline="\n")
-    try:
+    with contextlib.suppress(Exception):
+        # Windows or filesystem that doesn't support chmod — never fatal.
         path.chmod(0o755)
+
+    # Best-effort: update the bundled manifest. Never fail install on manifest
+    # error — the legacy per-file runner still works as a fallback.
+    try:
+        from gradata.hooks import _manifest as mf
+
+        rule_text = (
+            candidate.rule_description if candidate is not None else slug.replace("-", " ")
+        )
+        template_arg = candidate.template_arg if candidate is not None else None
+        mf.upsert_entry(
+            slug=slug,
+            template=template,
+            template_arg=template_arg,
+            rule_text=rule_text,
+            kind=kind,
+        )
     except Exception:
-        pass  # Windows or filesystem that doesn't support chmod
+        pass
+
     return path
 
 
@@ -460,6 +491,7 @@ def _compute_generation(
         _slug(candidate.rule_description),
         rendered,
         template=candidate.hook_template,
+        candidate=candidate,
     )
     return GenerationResult(
         installed=True,
