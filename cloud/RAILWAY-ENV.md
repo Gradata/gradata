@@ -89,7 +89,7 @@ to `POST /telemetry/event` when the user has explicitly opted in via
 
 No Railway env vars required — the endpoint is public, rate-limited
 (100/min/IP), and writes to the `telemetry_events` table.
-Migration: `cloud/migrations/006_telemetry_events.sql`.
+Migration: `cloud/migrations/007_telemetry_events.sql`.
 
 Client-side kill switch: `GRADATA_TELEMETRY=0` (always wins, even if
 the user opted in). See `src/gradata/_telemetry.py`.
