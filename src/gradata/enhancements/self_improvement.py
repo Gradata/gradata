@@ -1039,6 +1039,26 @@ def graduate(
             except Exception:
                 pass  # ToT is optional; graduate with original wording
             lesson.state = transition(lesson.state, "promote")
+
+            # Rule-to-hook graduation: attempt to install a deterministic
+            # PreToolUse hook for this newly-minted RULE. On success, prefix
+            # the description with "[hooked] " so the Python-side
+            # rule_enforcement soft-reminder dedups it (the hook now enforces).
+            # Never raises out of graduate() — any failure falls back to
+            # soft prompt injection silently.
+            try:
+                from gradata.enhancements import rule_to_hook
+
+                desc = lesson.description or ""
+                if desc and not desc.lstrip().startswith("[hooked]"):
+                    candidate = rule_to_hook.classify_rule(
+                        desc, confidence=float(lesson.confidence)
+                    )
+                    gen_result = rule_to_hook.try_generate(candidate)
+                    if gen_result.installed:
+                        lesson.description = f"[hooked] {desc}"
+            except Exception:
+                pass  # Hook generation is best-effort; never break graduation.
             continue
 
         # Promote INSTINCT -> PATTERN
