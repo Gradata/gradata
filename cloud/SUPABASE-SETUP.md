@@ -114,3 +114,35 @@ SELECT * FROM pg_trigger WHERE tgname LIKE '%handle_new_user%';
 ```
 
 Should return at least one row. If missing, re-run the relevant migration.
+
+## 7. Demo seed on signup (migration 004)
+
+Migration `004_seed_demo_brain.sql` seeds a fully-populated demo brain when a new user signs up. Sims (S101–S103) showed users abandon when day-1 dashboards are empty.
+
+**What gets created:** 1 brain (`metadata.is_demo = true`), 8 lessons across the 6-dim taxonomy, 25 corrections in a Wozniak decay shape, 4 meta-rules, 6 events.
+
+**How users clear it:**
+
+```
+POST /api/v1/brains/{brain_id}/clear-demo
+```
+
+Response: `{ deleted: int, by_table: {...} }`. Only rows with `is_demo` flag are removed; real lessons are never touched.
+
+**Test signup → seed locally:**
+
+```sql
+SELECT handle_new_user_test(
+  '00000000-0000-0000-0000-000000000001'::uuid,
+  'Local Dev'
+);
+SELECT count(*) FROM lessons WHERE brain_id = '<returned uuid>';      -- expect 8
+SELECT count(*) FROM corrections WHERE brain_id = '<returned uuid>';  -- expect 25
+```
+
+**Tear down:**
+
+```sql
+DELETE FROM brains WHERE id = '<returned uuid>';
+-- ON DELETE CASCADE removes child rows.
+```

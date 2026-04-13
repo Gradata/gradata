@@ -50,7 +50,8 @@ class MockSupabaseClient:
         return [data]
 
     async def delete(self, table: str, filters: dict | None = None) -> list[dict]:
-        return []
+        """Mock delete: returns pre-seeded delete response rows (treat as 'deleted rows')."""
+        return list(self._responses[table].get("delete", []))
 
 
 @pytest.fixture(autouse=True)
