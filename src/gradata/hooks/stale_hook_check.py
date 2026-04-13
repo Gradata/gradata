@@ -18,7 +18,6 @@ from pathlib import Path
 
 
 _HASH_LINE_RE = re.compile(r"^\s*\*\s*Source hash:\s*([0-9a-f]{12})", re.MULTILINE)
-_RULE_LINE_RE = re.compile(r"^\s*\*\s*Rule:\s*(.+?)\s*$", re.MULTILINE)
 _LESSON_RE = re.compile(
     r"^\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+\w+:\s+(.+)$"
 )
@@ -40,16 +39,6 @@ def _read_hash_from_hook(path: Path) -> str | None:
         return None
     m = _HASH_LINE_RE.search(text)
     return m.group(1) if m else None
-
-
-def _read_rule_from_hook(path: Path) -> str | None:
-    """Extract the original Rule text from a generated hook's header."""
-    try:
-        text = path.read_text(encoding="utf-8")
-    except Exception:
-        return None
-    m = _RULE_LINE_RE.search(text)
-    return m.group(1).strip() if m else None
 
 
 def _parse_lessons(brain_root: Path) -> tuple[dict[str, str], list[str]]:
