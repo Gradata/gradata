@@ -34,6 +34,8 @@ async def get_profile(
     workspaces: list[dict] = []
     for ws_id in workspace_ids:
         rows = await db.select("workspaces", filters={"id": ws_id})
+        # Hide soft-deleted workspaces from the profile response.
+        rows = [r for r in rows if not r.get("deleted_at")]
         if rows:
             ws = rows[0]
             role = next((m["role"] for m in memberships if m["workspace_id"] == ws_id), None)
@@ -79,6 +81,7 @@ async def update_profile(
     workspaces: list[dict] = []
     for m in memberships:
         rows = await db.select("workspaces", filters={"id": m["workspace_id"]})
+        rows = [r for r in rows if not r.get("deleted_at")]
         if rows:
             workspaces.append({**rows[0], "role": m["role"]})
 
