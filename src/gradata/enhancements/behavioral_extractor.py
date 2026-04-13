@@ -647,7 +647,7 @@ def _extract_common_verbs(descriptions: list[str]) -> list[str]:
                 if word.startswith(prefix):
                     counts[prefix] = counts.get(prefix, 0) + 1
                     break
-    return sorted(counts, key=lambda k: counts[k], reverse=True)[:3]
+    return sorted(counts, key=lambda k: counts.get(k, 0), reverse=True)[:3]
 
 
 def _synthesize_summary(category: str, descriptions: list[str]) -> str:
