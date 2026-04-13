@@ -175,5 +175,10 @@ class Lesson:
     last_climb_session: int = 0  # Session when last climb occurred
     tree_level: int = 0  # Current depth: 0=leaf, 1=branch, 2=trunk
 
+    # Transient runtime state (not persisted to lessons.md).  Tracks how many
+    # consecutive contradictions this lesson has accrued in the current
+    # session so self_improvement / rule_evolution can decay confidence.
+    _contradiction_streak: int = 0
+
     def __post_init__(self) -> None:
         self.confidence = round(max(0.0, min(1.0, self.confidence)), 2)
