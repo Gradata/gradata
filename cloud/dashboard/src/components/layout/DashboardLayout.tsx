@@ -18,6 +18,7 @@ const SECTIONS = [
       { href: '/observability', label: 'Observability', icon: '◐' },
       { href: '/privacy', label: 'Privacy', icon: '◉' },
       { href: '/setup', label: 'Setup', icon: '⌨' },
+      { href: '/docs', label: 'Docs', icon: '◰' },
     ],
   },
   {
