@@ -48,7 +48,7 @@ import threading
 import urllib.error
 import urllib.request
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, Literal
 
@@ -215,7 +215,7 @@ def _build_payload(event: str) -> dict[str, str]:
     return {
         "event": event,
         "user_id": anonymous_user_id(),
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": datetime.now(UTC).isoformat(),
         "sdk_version": _sdk_version(),
     }
 

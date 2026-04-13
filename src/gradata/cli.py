@@ -33,8 +33,7 @@ def _get_brain(args):
 
 
 def cmd_init(args):
-    from gradata import Brain
-    from gradata import _telemetry
+    from gradata import Brain, _telemetry
 
     kwargs = {}
     if args.domain:
