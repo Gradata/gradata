@@ -48,6 +48,15 @@ Complete list of env vars for the `gradata-production` service on Railway. Every
 | `GRADATA_LOG_LEVEL` | `INFO` | Use `DEBUG` only when actively diagnosing |
 | `GRADATA_CORS_ORIGINS` | `http://localhost:3000,https://app.gradata.ai` | Comma-separated allow-list |
 
+## Optional — Rate limiting (slowapi)
+
+| Var | Default | Purpose |
+|-----|---------|---------|
+| `GRADATA_RATE_LIMIT_ENABLED` | `true` in prod, `false` in tests | Global kill switch |
+| `GRADATA_RATE_LIMIT_PUBLIC` | `60/minute` | Per-IP cap on `/health`, `/ready`, public GETs |
+| `GRADATA_RATE_LIMIT_AUTHENTICATED` | `300/minute` | Per-user cap on authenticated API routes |
+| `GRADATA_RATE_LIMIT_SENSITIVE` | `10/minute` | Per-IP cap on `/billing/webhook` and auth callbacks |
+
 ## Auto-provided by Railway
 
 Railway sets these for you — reference them in code, don't set them:

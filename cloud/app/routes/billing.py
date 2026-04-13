@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from app.auth import get_current_user_id
 from app.config import get_settings
 from app.db import get_db
+from app.rate_limit import auth_limit, sensitive_limit
 from app.models import (
     CheckoutRequest,
     CheckoutResponse,
@@ -52,9 +53,10 @@ def _stripe():
 
 
 @router.post("/billing/checkout", response_model=CheckoutResponse)
+@auth_limit
 async def create_checkout(
-    body: CheckoutRequest,
     request: Request,
+    body: CheckoutRequest,
     user_id: str = Depends(get_current_user_id),
 ) -> CheckoutResponse:
     """Create a Stripe Checkout Session and return its URL."""
@@ -96,6 +98,7 @@ async def create_checkout(
 
 
 @router.post("/billing/portal", response_model=PortalResponse)
+@auth_limit
 async def create_portal_session(
     request: Request,
     user_id: str = Depends(get_current_user_id),
@@ -123,6 +126,7 @@ async def create_portal_session(
 
 
 @router.post("/billing/webhook")
+@sensitive_limit
 async def stripe_webhook(request: Request) -> JSONResponse:
     """Handle Stripe webhook events. No JWT auth — verified by Stripe signature."""
     payload = await request.body()
@@ -228,6 +232,7 @@ def _extract_plan(subscription: dict) -> str:
 
 
 @router.get("/billing/subscription", response_model=SubscriptionResponse)
+@auth_limit
 async def get_subscription(
     request: Request,
     user_id: str = Depends(get_current_user_id),

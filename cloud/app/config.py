@@ -23,7 +23,15 @@ class Settings(BaseSettings):
     # Sentry (all optional — empty DSN = disabled)
     sentry_dsn: str = ""
     sentry_traces_sample_rate: float = 0.1
+    sentry_profiles_sample_rate: float = 0.1
     sentry_release: str = ""  # Falls back to RAILWAY_GIT_COMMIT_SHA, then "dev"
+
+    # Rate limiting — disabled in tests (env=test) by default.
+    # Limits (slowapi syntax): "<count>/<period>". Set blank to disable a bucket.
+    rate_limit_enabled: bool = True
+    rate_limit_public: str = "60/minute"      # /health, /ready, GETs
+    rate_limit_authenticated: str = "300/minute"  # API routes
+    rate_limit_sensitive: str = "10/minute"   # /auth/*, /billing/webhook
 
     # Stripe (all optional — empty values mean "not configured")
     # Env vars: GRADATA_STRIPE_SECRET_KEY, GRADATA_STRIPE_WEBHOOK_SECRET,
