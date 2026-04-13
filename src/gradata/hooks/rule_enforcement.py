@@ -37,6 +37,14 @@ def main(data: dict) -> dict | None:
     all_lessons = parse_lessons(text)
     rule_lessons = [lesson for lesson in all_lessons if lesson.state.name == "RULE"]
 
+    # Dedup: skip rules whose description is marked [hooked] — a generated
+    # PreToolUse hook under .claude/hooks/pre-tool/generated/ is enforcing them
+    # deterministically, so firing the soft text reminder here is noise.
+    rule_lessons = [
+        lesson for lesson in rule_lessons
+        if not lesson.description.lstrip().startswith("[hooked]")
+    ]
+
     if not rule_lessons:
         return None
 
