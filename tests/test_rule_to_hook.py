@@ -136,9 +136,9 @@ class TestRenderHook:
         assert rendered is None
 
     def test_render_returns_none_for_unimplemented_template(self):
-        # file_size_check template doesn't exist yet (v1 = regex_replace only)
+        # auto_test / read_before_edit templates remain unimplemented (stateful)
         from gradata.enhancements.rule_to_hook import classify_rule, render_hook
-        candidate = classify_rule("Keep files under 500 lines", 0.92)
+        candidate = classify_rule("Always run tests after code changes", 0.92)
         rendered = render_hook(candidate)
         assert rendered is None  # gracefully skip unimplemented templates
 
@@ -193,7 +193,8 @@ class TestTryGenerate:
     def test_try_generate_skips_unimplemented_template(self, tmp_path, monkeypatch):
         from gradata.enhancements.rule_to_hook import try_generate, classify_rule
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
-        candidate = classify_rule("Keep files under 500 lines", 0.92)
+        # auto_test remains unimplemented (requires post-edit/stateful event)
+        candidate = classify_rule("Always run tests after code changes", 0.92)
         result = try_generate(candidate)
         assert result.installed is False
 
@@ -523,3 +524,116 @@ class TestInstallerRegistry:
         from gradata.hooks._installer import HOOK_REGISTRY
         modules = [entry[0] for entry in HOOK_REGISTRY]
         assert "generated_runner" in modules
+
+
+class TestDestructiveBlockTemplate:
+    def test_rm_rf_rule_graduates(self, tmp_path, monkeypatch):
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        candidate = classify_rule("Never rm -rf anything", 0.95)
+        assert candidate.hook_template == "destructive_block"
+        assert try_generate(candidate).installed
+
+    def test_force_push_rule_graduates(self, tmp_path, monkeypatch):
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        candidate = classify_rule("Never force push", 0.95)
+        assert candidate.hook_template == "destructive_block"
+        assert try_generate(candidate).installed
+
+    def test_destructive_hook_blocks_rm_rf(self, tmp_path, monkeypatch):
+        import subprocess, json as _j
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        candidate = classify_rule("Never rm -rf anything", 0.95)
+        result = try_generate(candidate)
+        proc = subprocess.run(
+            ["node", str(result.hook_path)],
+            input=_j.dumps({"tool_name": "Bash",
+                            "tool_input": {"command": "rm -rf /tmp/foo"}}),
+            capture_output=True, text=True, timeout=5,
+        )
+        assert proc.returncode == 2
+        # Safe command passes
+        proc = subprocess.run(
+            ["node", str(result.hook_path)],
+            input=_j.dumps({"tool_name": "Bash",
+                            "tool_input": {"command": "ls -la"}}),
+            capture_output=True, text=True, timeout=5,
+        )
+        assert proc.returncode == 0
+
+
+class TestSecretScanTemplate:
+    def test_secret_rule_graduates(self, tmp_path, monkeypatch):
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        candidate = classify_rule("Never commit secrets", 0.95)
+        assert candidate.hook_template == "secret_scan"
+        assert try_generate(candidate).installed
+
+    def test_secret_hook_blocks_openai_key(self, tmp_path, monkeypatch):
+        import subprocess, json as _j
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        candidate = classify_rule("Never commit secrets", 0.95)
+        result = try_generate(candidate)
+        proc = subprocess.run(
+            ["node", str(result.hook_path)],
+            input=_j.dumps({"tool_name": "Write",
+                            "tool_input": {"content": "OPENAI_KEY = 'sk-abc123def456ghi789jklmno'"}}),
+            capture_output=True, text=True, timeout=5,
+        )
+        assert proc.returncode == 2
+        # Clean content passes
+        proc = subprocess.run(
+            ["node", str(result.hook_path)],
+            input=_j.dumps({"tool_name": "Write",
+                            "tool_input": {"content": "OPENAI_KEY = os.environ['OPENAI_API_KEY']"}}),
+            capture_output=True, text=True, timeout=5,
+        )
+        assert proc.returncode == 0
+
+
+class TestFileSizeCheckTemplate:
+    def test_file_size_rule_graduates_with_limit(self, tmp_path, monkeypatch):
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        candidate = classify_rule("Keep files under 500 lines", 0.95)
+        assert candidate.hook_template == "file_size_check"
+        assert candidate.block_pattern == "500"
+        assert try_generate(candidate).installed
+
+    def test_file_size_hook_blocks_oversized_content(self, tmp_path, monkeypatch):
+        import subprocess, json as _j
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        candidate = classify_rule("Keep files under 100 lines", 0.95)
+        result = try_generate(candidate)
+        big = "line\n" * 150
+        proc = subprocess.run(
+            ["node", str(result.hook_path)],
+            input=_j.dumps({"tool_name": "Write",
+                            "tool_input": {"content": big}}),
+            capture_output=True, text=True, timeout=5,
+        )
+        assert proc.returncode == 2
+        small = "line\n" * 50
+        proc = subprocess.run(
+            ["node", str(result.hook_path)],
+            input=_j.dumps({"tool_name": "Write",
+                            "tool_input": {"content": small}}),
+            capture_output=True, text=True, timeout=5,
+        )
+        assert proc.returncode == 0
+
+
+class TestPhrasingCoverage:
+    def test_em_dash_paraphrasing(self):
+        from gradata.enhancements.rule_to_hook import classify_rule, EnforcementType
+        c1 = classify_rule("Avoid em dashes in prose", 0.95)
+        c2 = classify_rule("Em dashes are banned", 0.95)
+        assert c1.enforcement == EnforcementType.HOOK
+        assert c2.enforcement == EnforcementType.HOOK
+        assert c1.hook_template == "regex_replace"
+        assert c2.hook_template == "regex_replace"

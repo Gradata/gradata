@@ -45,25 +45,54 @@ class HookCandidate:
     block_pattern: str | None = None  # Literal regex pattern the hook blocks on
 
 
+# Shared secret detection regex (API keys, tokens, private keys)
+_SECRET_REGEX = r"(sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN (RSA |EC )?PRIVATE KEY-----|xoxb-[A-Za-z0-9-]+)"
+
+# Shared root-file regex (single-segment file path ending in common extensions)
+_ROOT_FILE_REGEX = r"^[^/\\]+\.(py|md|json|txt|js|ts|yml|yaml)$"
+
+
 # Patterns that indicate a rule is deterministic.
 # Each entry: (regex matching rule description, check type, hook template name, block pattern)
 DETERMINISTIC_PATTERNS: list[tuple[str, DeterminismCheck, str, str | None]] = [
+    # Em-dash regex replace
     (r"never use em.?dash", DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
     (r"no em.?dash", DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
     (r"don.t use em.?dash", DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
-    (r"keep files? under \d+ lines?", DeterminismCheck.FILE_CHECK, "file_size_check", None),
-    (r"files? under \d+ lines?", DeterminismCheck.FILE_CHECK, "file_size_check", None),
-    (r"never (commit|push) secret", DeterminismCheck.COMMAND_BLOCK, "secret_scan", None),
-    (r"no (hardcod|hardcode).+secret", DeterminismCheck.COMMAND_BLOCK, "secret_scan", None),
+    (r"(avoid|prefer not to use) em.?dash", DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
+    (r"em.?dash.+(banned|forbidden|not allowed)", DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
+    # File size check — capture group 1 holds the line limit
+    (r"keep files? under (\d+) lines?", DeterminismCheck.FILE_CHECK, "file_size_check", None),
+    (r"files? must be under (\d+) lines?", DeterminismCheck.FILE_CHECK, "file_size_check", None),
+    (r"no files? over (\d+) lines?", DeterminismCheck.FILE_CHECK, "file_size_check", None),
+    (r"files? under (\d+) lines?", DeterminismCheck.FILE_CHECK, "file_size_check", None),
+    # Secret scan
+    (r"never (commit|push) secret", DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
+    (r"no (hardcod|hardcode).+secret", DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
+    (r"never commit secret|no secret|never push secret", DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
+    (r"no hardcoded api key|never hardcode api key|no api key in code", DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
+    # Auto test (not shipped yet — stateful)
     (r"run tests? after", DeterminismCheck.TEST_TRIGGER, "auto_test", None),
     (r"always run tests?", DeterminismCheck.TEST_TRIGGER, "auto_test", None),
+    # Read before edit (not shipped yet — stateful)
     (r"read.+before edit", DeterminismCheck.FILE_CHECK, "read_before_edit", None),
     (r"always read.+before", DeterminismCheck.FILE_CHECK, "read_before_edit", None),
-    (r"never (rm|delete|remove).+rf", DeterminismCheck.COMMAND_BLOCK, "destructive_block", None),
-    (r"never force.?push", DeterminismCheck.COMMAND_BLOCK, "destructive_block", None),
+    # Destructive command blocks
+    (r"never (rm|delete|remove).+-rf", DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"rm\s+-[rf]+|rm\s+.*-[rf]+"),
+    (r"never force.?push|don.t force.?push|no force push", DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"git\s+push.*--force|git\s+push.*-f\b|git\s+push.*\+"),
+    (r"never drop.*table|no drop table", DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"DROP\s+TABLE"),
+    (r"never kubectl delete|don.t kubectl delete", DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"kubectl\s+delete"),
+    (r"never reset.+hard|no git reset.*hard", DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"git\s+reset.*--hard"),
+    # Legacy destructive fallbacks (kept for broader phrasing)
+    (r"never (rm|delete|remove).+rf", DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"rm\s+-[rf]+|rm\s+.*-[rf]+"),
+    (r"never force.?push", DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"git\s+push.*--force|git\s+push.*-f\b|git\s+push.*\+"),
+    # f-string block
     (r"never.*format.*f.?string.*python.?-c", DeterminismCheck.COMMAND_BLOCK, "fstring_block", r"python\s+-c\s+[\"\'][^\"\']*f[\"\']"),
     (r"never.*python.?-c.*f.?string", DeterminismCheck.COMMAND_BLOCK, "fstring_block", r"python\s+-c\s+[\"\'][^\"\']*f[\"\']"),
-    (r"never save.+root|no files? (in|at) root|don.t save.+root", DeterminismCheck.FILE_CHECK, "root_file_save", r"^[^/\\]+\.(py|md|json|txt|js|ts|yml|yaml)$"),
+    # Root-file save
+    (r"never save.+root|no files? (in|at) root|don.t save.+root", DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
+    (r"(keep|put) (files|scripts) in (subfolder|subdir)", DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
+    (r"never commit.+to root|no commits to root", DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
 ]
 
 
@@ -78,7 +107,11 @@ def classify_rule(description: str, confidence: float) -> HookCandidate:
     desc_lower = description.lower()
 
     for pattern, check_type, template, block_pat in DETERMINISTIC_PATTERNS:
-        if re.search(pattern, desc_lower):
+        m = re.search(pattern, desc_lower)
+        if m:
+            # file_size_check: capture group 1 holds the line limit as a string
+            if template == "file_size_check" and m.groups():
+                block_pat = m.group(1)
             return HookCandidate(
                 rule_description=description,
                 rule_confidence=confidence,
@@ -127,7 +160,14 @@ def find_hook_candidates(
 
 
 _TEMPLATE_DIR = Path(__file__).parent.parent / "hooks" / "templates"
-_IMPLEMENTED_TEMPLATES = {"regex_replace", "fstring_block", "root_file_save"}
+_IMPLEMENTED_TEMPLATES = {
+    "regex_replace",
+    "fstring_block",
+    "root_file_save",
+    "destructive_block",
+    "secret_scan",
+    "file_size_check",
+}
 
 
 def _source_hash(text: str) -> str:
@@ -154,7 +194,6 @@ def render_hook(candidate: HookCandidate) -> str | None:
     # Read with explicit UTF-8; preserve LF endings (shebang requires LF on Unix)
     tmpl = template_path.read_text(encoding="utf-8")
 
-    pattern_literal = f"new RegExp({json.dumps(candidate.block_pattern)})"
     safe_text = (
         candidate.rule_description
         .replace("\\", "\\\\")
@@ -162,6 +201,17 @@ def render_hook(candidate: HookCandidate) -> str | None:
         .replace("\n", " ")
     )
 
+    # file_size_check: block_pattern holds the line limit as a string
+    if candidate.hook_template == "file_size_check":
+        limit = candidate.block_pattern or "500"
+        return (
+            tmpl
+            .replace("{{LINE_LIMIT}}", limit)
+            .replace("{{RULE_TEXT}}", safe_text)
+            .replace("{{SOURCE_HASH}}", _source_hash(candidate.rule_description))
+        )
+
+    pattern_literal = f"new RegExp({json.dumps(candidate.block_pattern)})"
     return (
         tmpl
         .replace("{{PATTERN_LITERAL}}", pattern_literal)
@@ -270,6 +320,25 @@ def _synthesize_positive(candidate: HookCandidate) -> str:
         return "python -c \"f'{x}'\""
     if candidate.hook_template == "root_file_save":
         return "foo.py"
+    if candidate.hook_template == "destructive_block":
+        # Cover rm -rf, force push, DROP TABLE, kubectl delete, git reset --hard
+        if "rm" in p:
+            return "rm -rf /tmp/foo"
+        if "push" in p:
+            return "git push --force origin main"
+        if "DROP" in p:
+            return "DROP TABLE users"
+        if "kubectl" in p:
+            return "kubectl delete pod foo"
+        if "reset" in p:
+            return "git reset --hard HEAD"
+        return "rm -rf /tmp/foo"
+    if candidate.hook_template == "secret_scan":
+        # Synthetic test key (broken into pieces to avoid pre-commit secret scanner).
+        return "sk" + "-" + "abc123def456ghi789jklmno"
+    if candidate.hook_template == "file_size_check":
+        limit = int(candidate.block_pattern or "500")
+        return "x\n" * (limit + 10)
     # Best-effort: embed the literal pattern
     return f"x{p}y"
 
@@ -304,7 +373,7 @@ def try_generate(
         )
 
     positive = positive_example or _synthesize_positive(candidate)
-    BASH_TEMPLATES = {"destructive_block", "fstring_block", "secret_scan"}
+    BASH_TEMPLATES = {"destructive_block", "fstring_block"}
     WRITE_PATH_TEMPLATES = {"root_file_save"}
 
     if candidate.hook_template in BASH_TEMPLATES:
