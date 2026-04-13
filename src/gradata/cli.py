@@ -583,6 +583,79 @@ def cmd_rule_list(args):
     print(f"{hooked_count} hooked / {len(rules)} total rules")
 
 
+def cmd_rule_remove(args):
+    """Remove a graduated hook: delete the .js file and unmark (or purge) its lesson."""
+    import os
+    import re as _re
+
+    slug = args.slug.strip()
+    if not slug:
+        print("error: slug required", file=sys.stderr)
+        return
+
+    brain_root = _resolve_brain_root(args)
+    lessons_file = brain_root / "lessons.md"
+
+    def _slug(text: str) -> str:
+        s = _re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+        return s[:60] or "rule"
+
+    # 1. Delete hook file from whichever generated dir holds it
+    pre_dir = Path(os.environ.get("GRADATA_HOOK_ROOT")
+                   or ".claude/hooks/pre-tool/generated")
+    post_dir = Path(os.environ.get("GRADATA_HOOK_ROOT_POST")
+                    or ".claude/hooks/post-tool/generated")
+
+    removed_file = None
+    for d in (pre_dir, post_dir):
+        candidate = d / f"{slug}.js"
+        if candidate.exists():
+            candidate.unlink()
+            removed_file = candidate
+            break
+
+    # 2. Find matching lesson by slug → description
+    touched_lesson = False
+    if lessons_file.exists():
+        lines = lessons_file.read_text(encoding="utf-8").splitlines()
+        out_lines = []
+        lesson_re = _re.compile(
+            r"^(\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+\w+):\s+(.+)$"
+        )
+        for line in lines:
+            m = lesson_re.match(line.strip())
+            if not m:
+                out_lines.append(line)
+                continue
+            prefix = m.group(1)
+            desc = m.group(2).strip()
+            was_hooked = desc.startswith("[hooked] ")
+            clean_desc = desc[len("[hooked] "):] if was_hooked else desc
+            if _slug(clean_desc) == slug:
+                if args.purge:
+                    touched_lesson = True
+                    continue  # drop the line entirely
+                if was_hooked:
+                    touched_lesson = True
+                    out_lines.append(f"{prefix}: {clean_desc}")
+                else:
+                    # Already unmarked — no change needed
+                    out_lines.append(line)
+            else:
+                out_lines.append(line)
+        if touched_lesson:
+            lessons_file.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+
+    if removed_file:
+        print(f"Removed hook: {removed_file}")
+    if touched_lesson and args.purge:
+        print("Deleted lesson from lessons.md")
+    elif touched_lesson:
+        print("Unmarked lesson in lessons.md (rule kept as soft injection)")
+    if not removed_file and not touched_lesson:
+        print(f"nothing to remove for slug: {slug}")
+
+
 def cmd_rule(args):
     """Dispatch `gradata rule <subcommand>`."""
     sub = getattr(args, "rule_cmd", None)
@@ -590,6 +663,8 @@ def cmd_rule(args):
         cmd_rule_add(args)
     elif sub == "list":
         cmd_rule_list(args)
+    elif sub == "remove":
+        cmd_rule_remove(args)
     else:
         print(f"error: unknown rule subcommand: {sub}", file=sys.stderr)
 
@@ -736,6 +811,10 @@ def main():
     p_rule_add = rule_sub.add_parser("add", help="Declare a rule at RULE tier (fast-track)")
     p_rule_add.add_argument("text", nargs="+", help="Rule text")
     rule_sub.add_parser("list", help="List RULE-tier lessons and hook status")
+    p_rule_remove = rule_sub.add_parser("remove", help="Remove a graduated hook by slug")
+    p_rule_remove.add_argument("slug", help="Hook slug (from `gradata rule list`)")
+    p_rule_remove.add_argument("--purge", action="store_true",
+                               help="Also delete the lesson (default: keep as soft injection)")
 
     args = parser.parse_args()
 

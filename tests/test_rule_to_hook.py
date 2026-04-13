@@ -922,3 +922,105 @@ class TestCliRuleList:
         assert proc.returncode == 0
         # Empty lessons → should still print header or "no rules"
         assert "rules" in proc.stdout.lower() or proc.stdout.strip() == ""
+
+
+class TestCliRuleRemove:
+    def _write_lessons(self, brain_dir, lines):
+        brain_dir.mkdir(parents=True, exist_ok=True)
+        (brain_dir / "lessons.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def _env(self, tmp_path):
+        import os
+        from pathlib import Path as _P
+        return {**os.environ,
+                "GRADATA_BRAIN": str(tmp_path / "brain"),
+                "GRADATA_HOOK_ROOT": str(tmp_path / "pre"),
+                "GRADATA_HOOK_ROOT_POST": str(tmp_path / "post"),
+                "PYTHONPATH": str(_P(__file__).resolve().parents[1] / "src")}
+
+    def test_rule_remove_deletes_hook_and_unmarks_lesson(self, tmp_path):
+        import subprocess, sys
+        brain = tmp_path / "brain"
+        pre = tmp_path / "pre"
+        pre.mkdir(parents=True)
+        (tmp_path / "post").mkdir()
+
+        self._write_lessons(brain, [
+            "[2026-04-13] [RULE:1.00] FORMATTING: [hooked] never use em dashes",
+            "[2026-04-13] [RULE:0.95] STRUCTURE: lead with the answer",
+        ])
+        hook_file = pre / "never-use-em-dashes.js"
+        hook_file.write_text("// stub\n", encoding="utf-8")
+
+        proc = subprocess.run(
+            [sys.executable, "-m", "gradata.cli", "rule", "remove", "never-use-em-dashes"],
+            capture_output=True, text=True, env=self._env(tmp_path), cwd=str(tmp_path),
+        )
+        assert proc.returncode == 0, proc.stderr
+        assert not hook_file.exists(), "hook file should be deleted"
+        # Lesson still exists but [hooked] marker removed
+        lessons_text = (brain / "lessons.md").read_text(encoding="utf-8")
+        assert "never use em dashes" in lessons_text
+        assert "[hooked] never use em dashes" not in lessons_text
+        # Other lesson untouched
+        assert "lead with the answer" in lessons_text
+
+    def test_rule_remove_purge_deletes_lesson(self, tmp_path):
+        import subprocess, sys
+        brain = tmp_path / "brain"
+        pre = tmp_path / "pre"
+        pre.mkdir(parents=True)
+        (tmp_path / "post").mkdir()
+
+        self._write_lessons(brain, [
+            "[2026-04-13] [RULE:1.00] FORMATTING: [hooked] never use em dashes",
+            "[2026-04-13] [RULE:0.95] STRUCTURE: lead with the answer",
+        ])
+        (pre / "never-use-em-dashes.js").write_text("// stub\n", encoding="utf-8")
+
+        proc = subprocess.run(
+            [sys.executable, "-m", "gradata.cli", "rule", "remove", "never-use-em-dashes", "--purge"],
+            capture_output=True, text=True, env=self._env(tmp_path), cwd=str(tmp_path),
+        )
+        assert proc.returncode == 0, proc.stderr
+        lessons_text = (brain / "lessons.md").read_text(encoding="utf-8")
+        assert "never use em dashes" not in lessons_text
+        assert "lead with the answer" in lessons_text  # unchanged
+
+    def test_rule_remove_idempotent(self, tmp_path):
+        """Running remove on a non-existent slug is a no-op, exit 0."""
+        import subprocess, sys
+        brain = tmp_path / "brain"
+        brain.mkdir()
+        (brain / "lessons.md").write_text("", encoding="utf-8")
+        (tmp_path / "pre").mkdir()
+        (tmp_path / "post").mkdir()
+
+        proc = subprocess.run(
+            [sys.executable, "-m", "gradata.cli", "rule", "remove", "nonexistent-slug"],
+            capture_output=True, text=True, env=self._env(tmp_path), cwd=str(tmp_path),
+        )
+        assert proc.returncode == 0
+        assert "nothing to remove" in proc.stdout.lower() or "no" in proc.stdout.lower()
+
+    def test_rule_remove_finds_hook_in_post_dir(self, tmp_path):
+        """auto_test lives in post-tool dir; remove should find it there too."""
+        import subprocess, sys
+        brain = tmp_path / "brain"
+        pre = tmp_path / "pre"
+        post = tmp_path / "post"
+        pre.mkdir(parents=True)
+        post.mkdir(parents=True)
+
+        self._write_lessons(brain, [
+            "[2026-04-13] [RULE:1.00] TEST_TRIGGER: [hooked] always run tests after edit",
+        ])
+        post_hook = post / "always-run-tests-after-edit.js"
+        post_hook.write_text("// stub\n", encoding="utf-8")
+
+        proc = subprocess.run(
+            [sys.executable, "-m", "gradata.cli", "rule", "remove", "always-run-tests-after-edit"],
+            capture_output=True, text=True, env=self._env(tmp_path), cwd=str(tmp_path),
+        )
+        assert proc.returncode == 0, proc.stderr
+        assert not post_hook.exists()
