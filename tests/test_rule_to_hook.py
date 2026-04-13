@@ -441,3 +441,85 @@ class TestRootFileSaveTemplate:
             capture_output=True, text=True, timeout=5,
         )
         assert proc.returncode == 0
+
+
+class TestGeneratedRunner:
+    @staticmethod
+    def _runner_env(gen_dir):
+        import os
+        env = os.environ.copy()
+        src_dir = str(Path(__file__).resolve().parent.parent / "src")
+        env["PYTHONPATH"] = src_dir + os.pathsep + env.get("PYTHONPATH", "")
+        env["GRADATA_HOOK_ROOT"] = str(gen_dir)
+        return env
+
+    def test_runner_invokes_matching_generated_hook(self, tmp_path, monkeypatch):
+        """The generated_runner scans GRADATA_HOOK_ROOT and runs each .js hook,
+        relaying block decisions back to Claude Code."""
+        import json as _j
+        import subprocess as _sp
+        import sys as _sys
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
+        gen_dir = tmp_path / "generated"
+        gen_dir.mkdir(parents=True)
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(gen_dir))
+
+        # Install an em-dash hook
+        candidate = classify_rule("Never use em dashes", 0.95)
+        assert try_generate(candidate).installed
+
+        # Run the runner with violating payload — should block
+        payload = {"tool_name": "Write",
+                   "tool_input": {"content": "this \u2014 violates"}}
+        proc = _sp.run(
+            [_sys.executable, "-m", "gradata.hooks.generated_runner"],
+            input=_j.dumps(payload),
+            capture_output=True, text=True, env=self._runner_env(gen_dir),
+            timeout=10,
+        )
+        assert proc.returncode == 2, f"expected block (2), got {proc.returncode}; stdout={proc.stdout!r}; stderr={proc.stderr!r}"
+
+    def test_runner_passes_clean_input(self, tmp_path, monkeypatch):
+        import json as _j, subprocess as _sp, sys as _sys
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
+        gen_dir = tmp_path / "generated"
+        gen_dir.mkdir(parents=True)
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(gen_dir))
+        try_generate(classify_rule("Never use em dashes", 0.95))
+
+        payload = {"tool_name": "Write", "tool_input": {"content": "plain ascii"}}
+        proc = _sp.run(
+            [_sys.executable, "-m", "gradata.hooks.generated_runner"],
+            input=_j.dumps(payload),
+            capture_output=True, text=True,
+            env=self._runner_env(gen_dir),
+            timeout=10,
+        )
+        assert proc.returncode == 0, f"stderr={proc.stderr!r}"
+
+    def test_runner_exits_zero_when_no_hooks_installed(self, tmp_path, monkeypatch):
+        """No hooks → exit 0 silently. Never break Claude Code."""
+        import json as _j, subprocess as _sp, sys as _sys
+        gen_dir = tmp_path / "generated"
+        gen_dir.mkdir(parents=True)
+
+        payload = {"tool_name": "Write", "tool_input": {"content": "anything"}}
+        proc = _sp.run(
+            [_sys.executable, "-m", "gradata.hooks.generated_runner"],
+            input=_j.dumps(payload),
+            capture_output=True, text=True,
+            env=self._runner_env(gen_dir),
+            timeout=10,
+        )
+        assert proc.returncode == 0, f"stderr={proc.stderr!r}"
+
+
+class TestInstallerRegistry:
+    def test_generated_runner_in_hook_registry(self):
+        """The installer must register the generated runner so fresh
+        `gradata hooks install` picks it up automatically."""
+        from gradata.hooks._installer import HOOK_REGISTRY
+        modules = [entry[0] for entry in HOOK_REGISTRY]
+        assert "generated_runner" in modules
