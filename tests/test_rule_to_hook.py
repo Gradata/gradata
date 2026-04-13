@@ -835,3 +835,90 @@ class TestCliExport:
         )
         assert proc.returncode == 0
         assert "never use em dashes" in proc.stdout
+
+
+class TestCliRuleList:
+    def _write_lessons(self, brain_dir, lines):
+        brain_dir.mkdir(parents=True, exist_ok=True)
+        (brain_dir / "lessons.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def test_rule_list_shows_hooked_markers(self, tmp_path):
+        import subprocess, sys, os
+        brain = tmp_path / "brain"
+        pre = tmp_path / "pre"
+        post = tmp_path / "post"
+        pre.mkdir(parents=True)
+        post.mkdir(parents=True)
+
+        self._write_lessons(brain, [
+            "[2026-04-13] [RULE:1.00] FORMATTING: [hooked] never use em dashes",
+            "[2026-04-13] [RULE:0.95] STRUCTURE: lead with the answer",
+        ])
+        # Install matching .js for the em-dash rule
+        (pre / "never-use-em-dashes.js").write_text("// stub\n", encoding="utf-8")
+
+        repo_src = str((__import__("pathlib").Path(__file__).resolve().parent.parent / "src"))
+        existing_pp = os.environ.get("PYTHONPATH", "")
+        env = {**os.environ,
+               "GRADATA_BRAIN": str(brain),
+               "GRADATA_HOOK_ROOT": str(pre),
+               "GRADATA_HOOK_ROOT_POST": str(post),
+               "PYTHONPATH": (repo_src + os.pathsep + existing_pp) if existing_pp else repo_src}
+        proc = subprocess.run(
+            [sys.executable, "-m", "gradata.cli", "rule", "list"],
+            capture_output=True, text=True, env=env, cwd=str(tmp_path),
+        )
+        assert proc.returncode == 0, proc.stderr
+        out = proc.stdout
+        assert "never use em dashes" in out
+        assert "lead with the answer" in out
+        assert "[hooked]" in out
+        assert "1 hooked" in out or "1 / 2" in out or "1 hooked / 2" in out
+
+    def test_rule_list_flags_stale_and_orphan(self, tmp_path):
+        """[hooked] in lessons but no .js file = STALE. .js file without [hooked] = ORPHAN."""
+        import subprocess, sys, os
+        brain = tmp_path / "brain"
+        pre = tmp_path / "pre"
+        post = tmp_path / "post"
+        pre.mkdir(parents=True)
+        post.mkdir(parents=True)
+
+        self._write_lessons(brain, [
+            "[2026-04-13] [RULE:1.00] FORMATTING: [hooked] this rule is stale",
+        ])
+        # Orphan hook file — no matching lessons.md entry
+        (pre / "orphan-hook.js").write_text("// orphan\n", encoding="utf-8")
+
+        repo_src = str((__import__("pathlib").Path(__file__).resolve().parent.parent / "src"))
+        existing_pp = os.environ.get("PYTHONPATH", "")
+        env = {**os.environ,
+               "GRADATA_BRAIN": str(brain),
+               "GRADATA_HOOK_ROOT": str(pre),
+               "GRADATA_HOOK_ROOT_POST": str(post),
+               "PYTHONPATH": (repo_src + os.pathsep + existing_pp) if existing_pp else repo_src}
+        proc = subprocess.run(
+            [sys.executable, "-m", "gradata.cli", "rule", "list"],
+            capture_output=True, text=True, env=env, cwd=str(tmp_path),
+        )
+        assert proc.returncode == 0, proc.stderr
+        assert "STALE" in proc.stdout
+        assert "orphan-hook" in proc.stdout.lower() or "ORPHAN" in proc.stdout
+
+    def test_rule_list_empty_is_fine(self, tmp_path):
+        import subprocess, sys, os
+        brain = tmp_path / "brain"
+        brain.mkdir()
+        (brain / "lessons.md").write_text("", encoding="utf-8")
+        repo_src = str((__import__("pathlib").Path(__file__).resolve().parent.parent / "src"))
+        existing_pp = os.environ.get("PYTHONPATH", "")
+        env = {**os.environ,
+               "GRADATA_BRAIN": str(brain),
+               "PYTHONPATH": (repo_src + os.pathsep + existing_pp) if existing_pp else repo_src}
+        proc = subprocess.run(
+            [sys.executable, "-m", "gradata.cli", "rule", "list"],
+            capture_output=True, text=True, env=env, cwd=str(tmp_path),
+        )
+        assert proc.returncode == 0
+        # Empty lessons → should still print header or "no rules"
+        assert "rules" in proc.stdout.lower() or proc.stdout.strip() == ""

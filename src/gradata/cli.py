@@ -506,6 +506,94 @@ def cmd_rule_add(args):
         print(f"rule added as soft injection ({result.reason})")
 
 
+def cmd_rule_list(args):
+    """List RULE-tier lessons and their hook status."""
+    import os
+    import re as _re
+
+    from gradata.enhancements.rule_to_hook import _slug
+
+    brain_root = _resolve_brain_root(args)
+    lessons_file = brain_root / "lessons.md"
+
+    # Parse RULE-tier entries WITH [hooked] marker preserved
+    rules: list[tuple[str, str, bool]] = []  # (category, description, hooked_marker_in_lessons)
+    if lessons_file.exists():
+        lesson_re = _re.compile(
+            r"^\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+(\w+):\s+(.+)$"
+        )
+        for line in lessons_file.read_text(encoding="utf-8").splitlines():
+            m = lesson_re.match(line.strip())
+            if not m:
+                continue
+            category = m.group(1)
+            desc = m.group(2).strip()
+            hooked_marker = desc.startswith("[hooked] ")
+            clean_desc = desc[len("[hooked] "):] if hooked_marker else desc
+            rules.append((category, clean_desc, hooked_marker))
+
+    # Discover installed hook files (pre + post)
+    pre_dir = Path(os.environ.get("GRADATA_HOOK_ROOT")
+                   or ".claude/hooks/pre-tool/generated")
+    post_dir = Path(os.environ.get("GRADATA_HOOK_ROOT_POST")
+                    or ".claude/hooks/post-tool/generated")
+
+    installed_files: dict[str, Path] = {}  # slug (file stem) -> path
+    for d in (pre_dir, post_dir):
+        if d.exists():
+            for js in d.glob("*.js"):
+                installed_files[js.stem] = js
+
+    if not rules and not installed_files:
+        print("No RULE-tier rules or installed hooks.")
+        return
+
+    print("RULE-tier lessons")
+    print("-" * 17)
+
+    hooked_count = 0
+    matched_slugs: set[str] = set()
+    for category, desc, marker in rules:
+        slug = _slug(desc)
+        file_exists = slug in installed_files
+        if marker and file_exists:
+            tag = "[hooked]"
+            hooked_count += 1
+            matched_slugs.add(slug)
+        elif marker and not file_exists:
+            tag = "[STALE] "
+        else:
+            tag = "        "
+        print(f"{tag}  {category:<18} {desc}")
+
+    orphan_slugs = [s for s in installed_files if s not in matched_slugs]
+
+    print()
+    print("Hook files installed:")
+    for slug, path in sorted(installed_files.items()):
+        print(f"  {path}")
+
+    if orphan_slugs:
+        print()
+        print("Orphan hook files (no matching lesson):")
+        for slug in sorted(orphan_slugs):
+            print(f"  [ORPHAN] {installed_files[slug]}")
+
+    print()
+    print(f"{hooked_count} hooked / {len(rules)} total rules")
+
+
+def cmd_rule(args):
+    """Dispatch `gradata rule <subcommand>`."""
+    sub = getattr(args, "rule_cmd", None)
+    if sub == "add":
+        cmd_rule_add(args)
+    elif sub == "list":
+        cmd_rule_list(args)
+    else:
+        print(f"error: unknown rule subcommand: {sub}", file=sys.stderr)
+
+
 def cmd_hooks(args):
     """Manage Claude Code hook integration."""
     action = args.action
@@ -647,6 +735,7 @@ def main():
     rule_sub = p_rule.add_subparsers(dest="rule_cmd", required=True)
     p_rule_add = rule_sub.add_parser("add", help="Declare a rule at RULE tier (fast-track)")
     p_rule_add.add_argument("text", nargs="+", help="Rule text")
+    rule_sub.add_parser("list", help="List RULE-tier lessons and hook status")
 
     args = parser.parse_args()
 
@@ -673,7 +762,7 @@ def main():
     commands["convergence"] = cmd_convergence
     commands["demo"] = cmd_demo
     commands["hooks"] = cmd_hooks
-    commands["rule"] = cmd_rule_add
+    commands["rule"] = cmd_rule
 
     if args.command in commands:
         commands[args.command](args)
