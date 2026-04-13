@@ -136,9 +136,9 @@ class TestRenderHook:
         assert rendered is None
 
     def test_render_returns_none_for_unimplemented_template(self):
-        # auto_test / read_before_edit templates remain unimplemented (stateful)
+        # read_before_edit template remains unimplemented (stateful)
         from gradata.enhancements.rule_to_hook import classify_rule, render_hook
-        candidate = classify_rule("Always run tests after code changes", 0.92)
+        candidate = classify_rule("Always read files before editing", 0.92)
         rendered = render_hook(candidate)
         assert rendered is None  # gracefully skip unimplemented templates
 
@@ -193,8 +193,8 @@ class TestTryGenerate:
     def test_try_generate_skips_unimplemented_template(self, tmp_path, monkeypatch):
         from gradata.enhancements.rule_to_hook import try_generate, classify_rule
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
-        # auto_test remains unimplemented (requires post-edit/stateful event)
-        candidate = classify_rule("Always run tests after code changes", 0.92)
+        # read_before_edit remains unimplemented (stateful)
+        candidate = classify_rule("Always read files before editing", 0.92)
         result = try_generate(candidate)
         assert result.installed is False
 
@@ -637,3 +637,78 @@ class TestPhrasingCoverage:
         assert c2.enforcement == EnforcementType.HOOK
         assert c1.hook_template == "regex_replace"
         assert c2.hook_template == "regex_replace"
+
+
+class TestAutoTestTemplate:
+    def test_auto_test_rule_classifies(self):
+        from gradata.enhancements.rule_to_hook import classify_rule, EnforcementType
+        candidate = classify_rule("Run tests after code changes", 0.95)
+        assert candidate.enforcement == EnforcementType.HOOK
+        assert candidate.hook_template == "auto_test"
+
+    def test_auto_test_installs_to_post_tool_dir(self, tmp_path, monkeypatch):
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        post_dir = tmp_path / "post-tool-generated"
+        post_dir.mkdir()
+        monkeypatch.setenv("GRADATA_HOOK_ROOT_POST", str(post_dir))
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path / "pre-tool"))
+
+        candidate = classify_rule("Always run tests after editing", 0.95)
+        result = try_generate(candidate)
+        assert result.installed is True, result.reason
+        # Hook lands in POST dir, not PRE dir
+        assert result.hook_path is not None
+        assert str(post_dir) in str(result.hook_path)
+
+    def test_auto_test_hook_runs_pytest_and_exits_zero_if_no_test_file(self, tmp_path, monkeypatch):
+        """If no matching test file exists, hook silently exits 0 — don't noise up every edit."""
+        import subprocess, json as _j
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+        post_dir = tmp_path / "post-tool-generated"
+        post_dir.mkdir()
+        monkeypatch.setenv("GRADATA_HOOK_ROOT_POST", str(post_dir))
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path / "pre-tool"))
+
+        candidate = classify_rule("Run tests after code changes", 0.95)
+        result = try_generate(candidate)
+        assert result.installed
+
+        # Fake Write to a file with no matching test
+        target = tmp_path / "orphan.py"
+        target.write_text("def f(): pass\n", encoding="utf-8")
+        payload = {"tool_name": "Write", "tool_input": {"file_path": str(target)}}
+        proc = subprocess.run(
+            ["node", str(result.hook_path)],
+            input=_j.dumps(payload),
+            capture_output=True, text=True, timeout=10,
+        )
+        assert proc.returncode == 0
+
+
+class TestGeneratedRunnerPost:
+    def test_post_runner_registered_in_installer(self):
+        from gradata.hooks._installer import HOOK_REGISTRY
+        modules = [entry[0] for entry in HOOK_REGISTRY]
+        assert "generated_runner_post" in modules
+
+    def test_post_runner_iterates_post_tool_dir(self, tmp_path, monkeypatch):
+        import json as _j, subprocess as _sp, sys as _sys, os as _os
+        post_dir = tmp_path / "post-tool-generated"
+        post_dir.mkdir()
+        # Install a no-op hook file directly
+        noop = post_dir / "noop.js"
+        noop.write_text(
+            "process.stdin.on('data', ()=>{}); "
+            "process.stdin.on('end', ()=>process.exit(0));\n",
+            encoding="utf-8", newline="\n",
+        )
+
+        env = {**_os.environ,
+               "GRADATA_HOOK_ROOT_POST": str(post_dir),
+               "PYTHONPATH": "src"}
+        proc = _sp.run(
+            [_sys.executable, "-m", "gradata.hooks.generated_runner_post"],
+            input=_j.dumps({"tool_name": "Write", "tool_input": {"file_path": "x.py"}}),
+            capture_output=True, text=True, env=env, timeout=10,
+        )
+        assert proc.returncode == 0
