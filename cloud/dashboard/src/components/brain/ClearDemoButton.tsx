@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { Button } from '@/components/ui/button'
 import {
@@ -25,10 +26,20 @@ function readApiError(err: unknown, fallback: string): string {
 }
 
 export function ClearDemoButton({ brainId, onCleared }: Props) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ClearDemoResponse | null>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Clean up any pending close/redirect timer on unmount so navigating away
+  // during the success banner delay can't force-navigate a different page.
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [])
 
   const handleConfirm = async () => {
     setBusy(true)
@@ -37,12 +48,20 @@ export function ClearDemoButton({ brainId, onCleared }: Props) {
       const res = await api.post<ClearDemoResponse>(`/brains/${brainId}/clear-demo`)
       setResult(res.data)
       onCleared?.(res.data)
-      // Close + refresh shortly after the success banner has had a beat.
-      setTimeout(() => {
+      // If the brain row itself was deleted (seeded demo brain), redirect to
+      // the brains list instead of reloading this page — reloading would land
+      // the user on the "Brain not found" state.
+      const brainDeleted = (res.data.by_table?.brains ?? 0) > 0
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => {
         setOpen(false)
         setResult(null)
-        // Refresh the page so every card reflects the cleared state.
-        if (typeof window !== 'undefined') window.location.reload()
+        if (brainDeleted) {
+          router.push('/dashboard')
+        } else if (typeof window !== 'undefined') {
+          // Non-destructive refresh so every card reflects the cleared state.
+          window.location.reload()
+        }
       }, 900)
     } catch (err) {
       setError(readApiError(err, 'Could not clear demo data. Try again.'))

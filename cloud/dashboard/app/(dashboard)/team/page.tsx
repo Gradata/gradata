@@ -8,10 +8,20 @@ import type { TeamMember, UserProfile } from '@/types/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { ErrorState } from '@/components/shared/ErrorState'
 import { TeamLeaderboard } from '@/components/team/TeamLeaderboard'
-import { computeTeamAggregate, pickWorkspaceId } from '@/lib/team'
+import {
+  computeTeamAggregate,
+  isMemberActive,
+  normalizeRole,
+  pickWorkspaceId,
+} from '@/lib/team'
 
 export default function TeamOverviewPage() {
-  const { data: profile, loading: profileLoading } = useApi<UserProfile>('/users/me')
+  const {
+    data: profile,
+    loading: profileLoading,
+    error: profileError,
+    refetch: refetchProfile,
+  } = useApi<UserProfile>('/users/me')
   const workspaceId = pickWorkspaceId(profile?.workspaces)
 
   const {
@@ -22,6 +32,8 @@ export default function TeamOverviewPage() {
   } = useApi<TeamMember[]>(workspaceId ? `/workspaces/${workspaceId}/members` : null)
 
   if (profileLoading || membersLoading) return <LoadingSpinner className="py-20" />
+
+  if (profileError) return <ErrorState message={profileError} onRetry={refetchProfile} />
 
   const currentPlan = (profile?.plan?.toLowerCase() ?? 'free') as PlanTier
 
@@ -35,8 +47,9 @@ export default function TeamOverviewPage() {
 
   // Leaderboard: rank active members by most recent sync (no per-member delta
   // in the real API yet — sort by freshest activity as a proxy for engagement).
+  // Reuse the shared activity helper so KPIs and leaderboard stay consistent.
   const leaderboard = [...roster]
-    .filter((m) => m.last_sync_at !== null)
+    .filter((m) => isMemberActive(m))
     .sort((a, b) => {
       const aT = a.last_sync_at ? new Date(a.last_sync_at).getTime() : 0
       const bT = b.last_sync_at ? new Date(b.last_sync_at).getTime() : 0
@@ -67,9 +80,13 @@ export default function TeamOverviewPage() {
                sub={`${agg.activeBrains}/${agg.totalMembers} synced recently`}
                tone={agg.activeBrains > 0 ? 'pos' : 'neu'} />
           <Kpi label="Owners + admins"
-               value={roster.filter((m) => m.role === 'owner' || m.role === 'admin').length.toString()}
+               value={roster.filter((m) => {
+                 const r = normalizeRole(m.role)
+                 return r === 'owner' || r === 'admin'
+               }).length.toString()}
                sub="can manage team" tone="neu" />
-          <Kpi label="Members" value={roster.filter((m) => m.role === 'member').length.toString()}
+          <Kpi label="Members"
+               value={roster.filter((m) => normalizeRole(m.role) === 'member').length.toString()}
                sub="read-own-brain" tone="neu" />
         </div>
 

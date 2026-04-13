@@ -26,19 +26,36 @@ const ALERT_STYLE: Record<string, string> = {
 export default function OperatorPage() {
   const { data: profile, loading: profileLoading } = useApi<UserProfile>('/users/me')
 
-  const { data: kpis, loading: kpisLoading, error: kpisError, refetch: refetchKpis } =
-    useApi<AdminGlobalKpis>('/admin/global-kpis')
-  const { data: customers, loading: customersLoading, error: customersError } =
-    useApi<AdminCustomer[]>('/admin/customers')
-  const { data: alerts, loading: alertsLoading, error: alertsError } =
-    useApi<AdminAlert[]>('/admin/alerts')
+  const {
+    data: kpis,
+    loading: kpisLoading,
+    error: kpisError,
+    errorStatus: kpisStatus,
+    refetch: refetchKpis,
+  } = useApi<AdminGlobalKpis>('/admin/global-kpis')
+  const {
+    data: customers,
+    loading: customersLoading,
+    error: customersError,
+    errorStatus: customersStatus,
+    refetch: refetchCustomers,
+  } = useApi<AdminCustomer[]>('/admin/customers')
+  const {
+    data: alerts,
+    loading: alertsLoading,
+    error: alertsError,
+    errorStatus: alertsStatus,
+    refetch: refetchAlerts,
+  } = useApi<AdminAlert[]>('/admin/alerts')
 
   if (profileLoading) return <LoadingSpinner className="py-20" />
 
   // The backend is the source of truth for operator access, but we surface
   // a friendlier screen when it returns 403 rather than the raw error.
   const blocked =
-    isForbidden(kpisError) || isForbidden(customersError) || isForbidden(alertsError)
+    isForbidden({ message: kpisError, status: kpisStatus }) ||
+    isForbidden({ message: customersError, status: customersStatus }) ||
+    isForbidden({ message: alertsError, status: alertsStatus })
 
   if (blocked) {
     return (
@@ -55,7 +72,21 @@ export default function OperatorPage() {
     return <LoadingSpinner className="py-20" />
   }
 
-  if (kpisError) return <ErrorState message={kpisError} onRetry={refetchKpis} />
+  // Any non-403 fetch failure should surface as a retryable error instead of
+  // falling through to an empty customer/alert list.
+  const loadError = kpisError || customersError || alertsError
+  if (loadError) {
+    return (
+      <ErrorState
+        message={loadError}
+        onRetry={() => {
+          refetchKpis()
+          refetchCustomers()
+          refetchAlerts()
+        }}
+      />
+    )
+  }
 
   const customerRows = customers ?? []
   const alertRows = alerts ?? []

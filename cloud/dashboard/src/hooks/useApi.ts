@@ -6,6 +6,8 @@ interface UseApiResult<T> {
   data: T | null
   loading: boolean
   error: string | null
+  /** HTTP status code of the last failure (null on success or network error). */
+  errorStatus: number | null
   refetch: () => void
 }
 
@@ -21,6 +23,7 @@ export function useApi<T>(
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState(url !== null)
   const [error, setError] = useState<string | null>(null)
+  const [errorStatus, setErrorStatus] = useState<number | null>(null)
 
   const filteredParams = params
     ? Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined))
@@ -35,12 +38,14 @@ export function useApi<T>(
     }
     setLoading(true)
     setError(null)
+    setErrorStatus(null)
     try {
       const response = await api.get<T>(url, { params: filteredParams })
       setData(response.data)
     } catch (err) {
       const axiosError = err as AxiosError<{ detail?: string }>
       setError(axiosError.response?.data?.detail || axiosError.message || 'An error occurred')
+      setErrorStatus(axiosError.response?.status ?? null)
     } finally {
       setLoading(false)
     }
@@ -51,5 +56,5 @@ export function useApi<T>(
     fetchData()
   }, [fetchData])
 
-  return { data, loading, error, refetch: fetchData }
+  return { data, loading, error, errorStatus, refetch: fetchData }
 }

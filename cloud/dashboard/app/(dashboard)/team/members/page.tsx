@@ -9,13 +9,13 @@ import { Label } from '@/components/ui/label'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
-import { PlanGate, type PlanTier } from '@/components/brain/PlanBadge'
+import { PlanGate, PLANS, type PlanTier } from '@/components/brain/PlanBadge'
 import { useApi } from '@/hooks/useApi'
 import type { InviteResponse, InviteRole, MemberRole, TeamMember, UserProfile } from '@/types/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { ErrorState } from '@/components/shared/ErrorState'
 import api from '@/lib/api'
-import { formatSyncAgo, pickWorkspaceId } from '@/lib/team'
+import { formatSyncAgo, normalizeRole, pickWorkspaceId } from '@/lib/team'
 
 const ROLE_BADGE: Record<MemberRole, string> = {
   owner:  'bg-[rgba(124,58,237,0.12)] text-[var(--color-accent-violet)]',
@@ -33,7 +33,12 @@ function readApiError(err: unknown, fallback: string): string {
 }
 
 export default function TeamMembersPage() {
-  const { data: profile, loading: profileLoading } = useApi<UserProfile>('/users/me')
+  const {
+    data: profile,
+    loading: profileLoading,
+    error: profileError,
+    refetch: refetchProfile,
+  } = useApi<UserProfile>('/users/me')
   const workspaceId = pickWorkspaceId(profile?.workspaces)
 
   const {
@@ -54,7 +59,11 @@ export default function TeamMembersPage() {
 
   if (profileLoading || membersLoading) return <LoadingSpinner className="py-20" />
 
+  if (profileError) return <ErrorState message={profileError} onRetry={refetchProfile} />
+
   const currentPlan = (profile?.plan?.toLowerCase() ?? 'free') as PlanTier
+  const planAllowsInvites =
+    (PLANS[currentPlan]?.rank ?? 0) >= PLANS.team.rank
 
   if (!workspaceId) {
     return (
@@ -71,6 +80,10 @@ export default function TeamMembersPage() {
   const roster = members ?? []
 
   const handleInvite = async () => {
+    if (!planAllowsInvites) {
+      setInviteError('Invites require the Team plan. Upgrade to enable this.')
+      return
+    }
     setInviting(true)
     setInviteStatus(null)
     setInviteError(null)
@@ -145,7 +158,7 @@ export default function TeamMembersPage() {
           ) : (
             <ul className="divide-y divide-[var(--color-border)]">
               {roster.map((m) => {
-                const role = (m.role || 'member') as MemberRole
+                const role: MemberRole = normalizeRole(m.role)
                 const busy = busyUserId === m.user_id
                 return (
                   <li

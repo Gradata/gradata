@@ -10,8 +10,15 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
+// `useRouter` requires an AppRouter context at runtime; tests don't render one.
+const pushMock = vi.fn()
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: pushMock, replace: vi.fn(), refresh: vi.fn() }),
+}))
+
 beforeEach(() => {
   postMock.mockReset()
+  pushMock.mockReset()
 })
 
 describe('ClearDemoButton', () => {

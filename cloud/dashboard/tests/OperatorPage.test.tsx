@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { CustomerRow, isForbidden } from '@/components/operator/CustomerRow'
@@ -14,7 +15,7 @@ const mk = (over: Partial<AdminCustomer> = {}): AdminCustomer => ({
   health: over.health ?? 'healthy',
 })
 
-const wrap = (children: React.ReactNode) => (
+const wrap = (children: ReactNode) => (
   <ul>{children}</ul>
 )
 
@@ -54,18 +55,29 @@ describe('isForbidden', () => {
     expect(isForbidden(null)).toBe(false)
   })
 
-  it('matches the FastAPI 403 detail string', () => {
+  it('returns true when the HTTP status is 403', () => {
+    expect(isForbidden({ message: 'Operator access denied', status: 403 })).toBe(true)
+    expect(isForbidden({ message: 'anything', status: 403 })).toBe(true)
+  })
+
+  it('returns false for non-403 statuses even with operator-sounding text', () => {
+    expect(isForbidden({ message: 'operator sync failed', status: 500 })).toBe(false)
+    expect(isForbidden({ message: 'Session expired', status: 401 })).toBe(false)
+    expect(isForbidden({ message: 'not authorized', status: 401 })).toBe(false)
+  })
+
+  it('falls back to the exact backend detail when status is unknown', () => {
+    expect(isForbidden({ message: 'Operator access denied', status: null })).toBe(true)
+    expect(isForbidden({ message: 'Operator access requires a verified email', status: null })).toBe(true)
+  })
+
+  it('returns false for unrelated errors with no status', () => {
+    expect(isForbidden({ message: 'Network Error', status: null })).toBe(false)
+    expect(isForbidden({ message: 'Not found', status: null })).toBe(false)
+  })
+
+  it('still accepts a raw string for legacy call sites', () => {
     expect(isForbidden('Operator access denied')).toBe(true)
-    expect(isForbidden('Operator access requires a verified email')).toBe(true)
-  })
-
-  it('matches a generic forbidden string', () => {
-    expect(isForbidden('Request failed with status code 403')).toBe(true)
-    expect(isForbidden('Forbidden')).toBe(true)
-  })
-
-  it('returns false for unrelated errors', () => {
     expect(isForbidden('Network Error')).toBe(false)
-    expect(isForbidden('Not found')).toBe(false)
   })
 })

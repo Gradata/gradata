@@ -56,17 +56,23 @@ function formatAgo(iso: string): string {
 }
 
 /**
- * True when a useApi error string looks like a 403 from the operator allowlist.
- * `useApi` only exposes the detail string so we pattern-match; the backend's
- * `require_operator` uses "Operator access …" detail messages.
+ * True when a useApi error looks like a 403 from the operator allowlist.
+ *
+ * We prefer the structured HTTP status code from `useApi.errorStatus` — the
+ * string-message fallback only matches the exact backend detail phrase set by
+ * `require_operator` ("Operator access …"), so a 401 session error or an
+ * unrelated 500 no longer misrenders as the friendly no-access state.
  */
-export function isForbidden(errorMessage: string | null): boolean {
-  if (!errorMessage) return false
-  const lower = errorMessage.toLowerCase()
-  return (
-    lower.includes('forbidden') ||
-    lower.includes('not authorized') ||
-    lower.includes('operator') ||
-    lower.includes('status code 403')
-  )
+export function isForbidden(
+  error: { message: string | null; status: number | null } | string | null,
+): boolean {
+  if (!error) return false
+  if (typeof error === 'string') {
+    // Legacy string-only call sites: only match the exact backend detail.
+    return error.startsWith('Operator access')
+  }
+  if (error.status === 403) return true
+  if (error.status !== null) return false
+  // Network-level failure with no status: match the exact backend detail.
+  return error.message !== null && error.message.startsWith('Operator access')
 }
