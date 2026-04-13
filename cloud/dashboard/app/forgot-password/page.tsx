@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { AuthLegalLinks } from '@/components/layout/AuthLegalLinks'
 import { useAuth } from '@/hooks/useAuth'
 
 export default function ForgotPasswordPage() {
@@ -27,7 +28,7 @@ export default function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
+      <div className="flex min-h-screen flex-col items-center justify-center px-4">
         <Card className="w-full max-w-sm">
           <CardHeader className="text-center">
             <CardTitle className="text-xl">Check your email</CardTitle>
@@ -41,12 +42,13 @@ export default function ForgotPasswordPage() {
             </Link>
           </CardContent>
         </Card>
+        <AuthLegalLinks />
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-xl">Reset your password</CardTitle>
@@ -73,6 +75,7 @@ export default function ForgotPasswordPage() {
           </form>
         </CardContent>
       </Card>
+      <AuthLegalLinks />
     </div>
   )
 }

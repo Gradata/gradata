@@ -161,6 +161,28 @@ function Header({ onMenuClick }: { onMenuClick: () => void }) {
   )
 }
 
+function LegalFooter() {
+  return (
+    <div className="mt-12 flex items-center justify-center gap-3 font-mono text-[10px] uppercase tracking-wider text-[var(--color-body)] opacity-50">
+      <Link
+        href="/legal/privacy"
+        className="transition-colors hover:text-[var(--color-accent-blue)] hover:opacity-100"
+      >
+        Privacy
+      </Link>
+      <span aria-hidden>·</span>
+      <Link
+        href="/legal/terms"
+        className="transition-colors hover:text-[var(--color-accent-blue)] hover:opacity-100"
+      >
+        Terms
+      </Link>
+      <span aria-hidden>·</span>
+      <span>© 2026 Gradata</span>
+    </div>
+  )
+}
+
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   return (
@@ -170,7 +192,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header onMenuClick={() => setMobileOpen(true)} />
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="mx-auto max-w-[1280px]">{children}</div>
+          <div className="mx-auto max-w-[1280px]">
+            {children}
+            <LegalFooter />
+          </div>
         </main>
       </div>
     </div>
