@@ -36,14 +36,14 @@ export default function RulesPage() {
 
   return (
     <>
-      <header className="mb-7 flex items-baseline justify-between">
+      <header className="mb-7 flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <h1 className="text-[22px]">Latest Rules</h1>
           <p className="mt-1 text-[13px] text-[var(--color-body)]">
             Every lesson · ranked by confidence · <span className="font-mono">{filtered.length}</span> shown
           </p>
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {states.map((s) => (
             <button
               key={s}

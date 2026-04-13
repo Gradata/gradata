@@ -37,7 +37,7 @@ export default function CorrectionsPage() {
 
   return (
     <>
-      <header className="mb-7 flex items-baseline justify-between">
+      <header className="mb-7 flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <h1 className="text-[22px]">Corrections</h1>
           <p className="mt-1 text-[13px] text-[var(--color-body)]">
@@ -69,7 +69,7 @@ export default function CorrectionsPage() {
           <ul className="divide-y divide-[var(--color-border)]">
             {filtered.slice(0, 50).map((c) => (
               <li key={c.id} className="py-3 first:pt-0 last:pb-0">
-                <div className="mb-1 flex items-baseline gap-2.5">
+                <div className="mb-1 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                   <span className={`rounded-[0.25rem] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${SEVERITY_STYLE[c.severity]}`}>
                     {c.severity}
                   </span>

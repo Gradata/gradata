@@ -71,14 +71,14 @@ export default function DashboardPage() {
   return (
     <>
       {/* Page header + time range pills */}
-      <header className="mb-7 flex items-center justify-between">
+      <header className="mb-7 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-[22px]">Overview</h1>
           <p className="mt-1 text-[13px] text-[var(--color-body)]">
             Your brain&apos;s learning progress
           </p>
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {(['7d', '30d', '90d'] as const).map((r) => (
             <button
               key={r}

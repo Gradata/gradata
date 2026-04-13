@@ -62,7 +62,7 @@ export function KpiStrip({ metrics }: { metrics: KpiMetrics }) {
           <div className="mb-2 text-[12px] font-medium text-[var(--color-body)]">
             {item.label}
           </div>
-          <div className="font-[var(--font-heading)] text-[32px] font-bold tabular-nums text-gradient-brand">
+          <div className="font-[var(--font-heading)] text-[26px] sm:text-[32px] font-bold tabular-nums text-gradient-brand break-words">
             {item.value}
           </div>
           {item.change && (

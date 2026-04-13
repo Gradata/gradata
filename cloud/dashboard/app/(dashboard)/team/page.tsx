@@ -21,7 +21,7 @@ export default function TeamOverviewPage() {
 
   return (
     <>
-      <header className="mb-7 flex items-baseline justify-between">
+      <header className="mb-7 flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <h1 className="text-[22px]">Team Overview</h1>
           <p className="mt-1 text-[13px] text-[var(--color-body)]">
@@ -77,7 +77,7 @@ function Kpi({ label, value, sub, tone }: {
   return (
     <GlassCard className="p-5">
       <div className="mb-2 text-[12px] font-medium text-[var(--color-body)]">{label}</div>
-      <div className="font-[var(--font-heading)] text-[32px] font-bold tabular-nums text-gradient-brand">
+      <div className="font-[var(--font-heading)] text-[26px] sm:text-[32px] font-bold tabular-nums text-gradient-brand break-words">
         {value}
       </div>
       {sub && (
@@ -99,23 +99,23 @@ function LeaderRow({ member, rank }: { member: MockMember; rank: number }) {
       : member.correction_delta_pct > 0 ? 'text-[var(--color-destructive)]'
         : 'text-[var(--color-body)]'
   return (
-    <li className="flex items-center gap-4 rounded-[0.5rem] border border-[var(--color-border)] bg-white/[0.02] p-3">
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-[0.5rem] border border-[var(--color-border)] bg-white/[0.02] p-3 sm:flex-nowrap">
       <span className="w-6 font-mono text-[12px] text-[var(--color-body)]">#{rank}</span>
-      <div className="flex-1 min-w-0">
-        <div className="text-[13px] font-medium">{member.name}</div>
-        <div className="font-mono text-[10px] text-[var(--color-body)]">{member.email}</div>
+      <div className="min-w-0 flex-1 basis-[calc(100%-3rem)] sm:basis-auto">
+        <div className="text-[13px] font-medium truncate">{member.name}</div>
+        <div className="font-mono text-[10px] text-[var(--color-body)] truncate">{member.email}</div>
       </div>
-      <div className="w-28 text-right">
+      <div className="flex-1 sm:w-28 sm:flex-none sm:text-right">
         <div className={`font-mono text-[13px] tabular-nums ${deltaTone}`}>
           {member.correction_delta_pct > 0 ? '+' : ''}{member.correction_delta_pct.toFixed(0)}%
         </div>
         <div className="font-mono text-[10px] text-[var(--color-body)]">corrections Δ</div>
       </div>
-      <div className="w-20 text-right">
+      <div className="flex-1 sm:w-20 sm:flex-none sm:text-right">
         <div className="font-mono text-[13px] tabular-nums">{member.rules_graduated_30d}</div>
         <div className="font-mono text-[10px] text-[var(--color-body)]">rules 30d</div>
       </div>
-      <div className="w-24 text-right">
+      <div className="flex-1 sm:w-24 sm:flex-none sm:text-right">
         <div className="font-mono text-[13px] tabular-nums">{(member.recurrence_rate * 100).toFixed(0)}%</div>
         <div className="font-mono text-[10px] text-[var(--color-body)]">recurrence</div>
       </div>

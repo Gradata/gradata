@@ -45,7 +45,7 @@ export default function OperatorPage() {
 
   return (
     <>
-      <header className="mb-7 flex items-baseline justify-between">
+      <header className="mb-7 flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <h1 className="text-[22px]">Operator</h1>
           <p className="mt-1 text-[13px] text-[var(--color-body)]">
@@ -80,15 +80,15 @@ export default function OperatorPage() {
           <ul className="space-y-2">
             {mockAlerts.map((a) => (
               <li key={a.id} className={`rounded-[0.5rem] border p-3 ${ALERT_STYLE[a.kind]}`}>
-                <div className="flex items-baseline justify-between gap-3">
-                  <div>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                  <div className="min-w-0 flex-1">
                     <span className="font-mono text-[10px] uppercase tracking-wider">
                       {a.kind.replace('-', ' ')}
                     </span>
                     <span className="ml-3 text-[13px] font-medium">{a.customer}</span>
                     <span className="ml-2 text-[13px] text-[var(--color-body)]">· {a.detail}</span>
                   </div>
-                  <span className="font-mono text-[10px] text-[var(--color-body)]">
+                  <span className="font-mono text-[10px] text-[var(--color-body)] shrink-0">
                     {formatAgo(a.created_at)}
                   </span>
                 </div>
@@ -108,9 +108,9 @@ export default function OperatorPage() {
         </div>
         <ul className="divide-y divide-[var(--color-border)]">
           {mockCustomers.map((c) => (
-            <li key={c.id} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2.5">
+            <li key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 py-3 first:pt-0 last:pb-0 sm:flex-nowrap">
+              <div className="min-w-0 flex-1 basis-full sm:basis-auto">
+                <div className="flex flex-wrap items-baseline gap-2.5">
                   <span className="text-[13px] font-medium">{c.company}</span>
                   <PlanBadge tier={c.plan as PlanTier} />
                   <span className={`rounded-[0.25rem] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${HEALTH_STYLE[c.health]}`}>
@@ -121,15 +121,15 @@ export default function OperatorPage() {
                   last active {formatAgo(c.last_active)}
                 </div>
               </div>
-              <div className="w-24 text-right">
+              <div className="flex-1 sm:w-24 sm:flex-none sm:text-right">
                 <div className="font-mono text-[13px] tabular-nums">${c.mrr_usd}</div>
                 <div className="font-mono text-[10px] text-[var(--color-body)]">MRR</div>
               </div>
-              <div className="w-20 text-right">
+              <div className="flex-1 sm:w-20 sm:flex-none sm:text-right">
                 <div className="font-mono text-[13px] tabular-nums">{c.active_users}</div>
                 <div className="font-mono text-[10px] text-[var(--color-body)]">users</div>
               </div>
-              <div className="w-20 text-right">
+              <div className="flex-1 sm:w-20 sm:flex-none sm:text-right">
                 <div className="font-mono text-[13px] tabular-nums">{c.brains}</div>
                 <div className="font-mono text-[10px] text-[var(--color-body)]">brains</div>
               </div>
@@ -147,7 +147,7 @@ function Kpi({ label, value, sub, tone }: {
   return (
     <GlassCard className="p-5">
       <div className="mb-2 text-[12px] font-medium text-[var(--color-body)]">{label}</div>
-      <div className="font-[var(--font-heading)] text-[28px] font-bold tabular-nums text-gradient-brand">
+      <div className="font-[var(--font-heading)] text-[22px] sm:text-[28px] font-bold tabular-nums text-gradient-brand break-words">
         {value}
       </div>
       <div className={`mt-1 text-[12px] font-medium ${

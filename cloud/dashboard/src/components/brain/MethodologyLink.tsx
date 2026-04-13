@@ -43,7 +43,7 @@ export function MethodologyLink() {
               <h3 className="text-[18px] font-semibold">Methodology &amp; limitations</h3>
               <button
                 onClick={() => setOpen(false)}
-                className="text-[var(--color-body)] hover:text-[var(--color-text)]"
+                className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-[0.5rem] text-[24px] leading-none text-[var(--color-body)] hover:bg-white/[0.04] hover:text-[var(--color-text)]"
                 aria-label="Close"
               >
                 ×

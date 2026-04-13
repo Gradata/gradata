@@ -44,7 +44,7 @@ export default function TeamMembersPage() {
 
   return (
     <>
-      <header className="mb-7 flex items-baseline justify-between">
+      <header className="mb-7 flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <h1 className="text-[22px]">Members</h1>
           <p className="mt-1 text-[13px] text-[var(--color-body)]">
@@ -58,9 +58,9 @@ export default function TeamMembersPage() {
         <GlassCard gradTop>
           <ul className="divide-y divide-[var(--color-border)]">
             {mockTeam.map((m) => (
-              <li key={m.id} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2.5">
+              <li key={m.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0 sm:flex-nowrap">
+                <div className="min-w-0 flex-1 basis-full sm:basis-auto">
+                  <div className="flex flex-wrap items-baseline gap-2.5">
                     <span className="text-[13px] font-medium">{m.name}</span>
                     <span className={`rounded-[0.25rem] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${ROLE_BADGE[m.role]}`}>
                       {m.role}
@@ -69,9 +69,9 @@ export default function TeamMembersPage() {
                       <span className="font-mono text-[10px] text-[var(--color-warning)]">inactive</span>
                     )}
                   </div>
-                  <div className="font-mono text-[10px] text-[var(--color-body)]">{m.email}</div>
+                  <div className="font-mono text-[10px] text-[var(--color-body)] truncate">{m.email}</div>
                 </div>
-                <div className="w-32 text-right font-mono text-[11px] text-[var(--color-body)]">
+                <div className="font-mono text-[11px] text-[var(--color-body)] sm:w-32 sm:text-right">
                   {m.last_sync_at
                     ? `synced ${formatAgo(m.last_sync_at)}`
                     : 'never synced'}
@@ -80,7 +80,7 @@ export default function TeamMembersPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-[var(--color-destructive)] hover:text-[var(--color-destructive)]"
+                    className="ml-auto text-[var(--color-destructive)] hover:text-[var(--color-destructive)] sm:ml-0"
                   >
                     Remove
                   </Button>
