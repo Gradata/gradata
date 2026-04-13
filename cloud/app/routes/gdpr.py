@@ -13,7 +13,7 @@ Notes:
       signed Supabase Storage URL (TODO: wire up bucket + signed URL once
       we see real payloads breach the threshold — 99% of users won't).
     * Actual row purge (hard delete) is done by a nightly Railway cron
-      (out of scope for this PR — see ``005_soft_delete.sql`` TODO).
+      (out of scope for this PR — see ``006_soft_delete.sql`` TODO).
     * Rate limit on /me/export is enforced via the ``gdpr_export_requests``
       ledger: max 1 call per rolling 24h per user.
 """
