@@ -158,3 +158,51 @@ class TestSelfTest:
         # Plain ASCII content shouldn't match em-dash pattern
         ok = self_test(rendered, positive="hello - world (plain hyphen)", tool_name="Write")
         assert ok is False
+
+
+class TestInstallHook:
+    def test_install_writes_file_and_sets_executable(self, tmp_path, monkeypatch):
+        from gradata.enhancements.rule_to_hook import install_hook
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        path = install_hook("em-dash", "console.log('hello');\n")
+        assert path.exists()
+        assert path.parent == tmp_path
+        assert path.suffix == ".js"
+        assert "hello" in path.read_text(encoding="utf-8")
+
+
+class TestTryGenerate:
+    def test_try_generate_installs_for_em_dash(self, tmp_path, monkeypatch):
+        from gradata.enhancements.rule_to_hook import try_generate, classify_rule
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        candidate = classify_rule("Never use em dashes", 0.95)
+        result = try_generate(candidate, positive_example="this \u2014 fails")
+        assert result.installed is True
+        assert result.hook_path is not None
+        assert result.hook_path.exists()
+        assert "never-use-em-dashes" in result.hook_path.name.lower() or "em-dash" in result.hook_path.name.lower()
+
+    def test_try_generate_skips_nondeterministic(self, tmp_path, monkeypatch):
+        from gradata.enhancements.rule_to_hook import try_generate, classify_rule
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        candidate = classify_rule("Be concise and direct", 0.91)
+        result = try_generate(candidate)
+        assert result.installed is False
+        assert "not deterministic" in result.reason.lower() or "not a hook" in result.reason.lower() or "advisory" in result.reason.lower()
+
+    def test_try_generate_skips_unimplemented_template(self, tmp_path, monkeypatch):
+        from gradata.enhancements.rule_to_hook import try_generate, classify_rule
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        candidate = classify_rule("Keep files under 500 lines", 0.92)
+        result = try_generate(candidate)
+        assert result.installed is False
+
+    def test_try_generate_fails_self_test_if_positive_does_not_match(self, tmp_path, monkeypatch):
+        # If caller passes a positive_example that the generated regex doesn't match,
+        # self-test will fail and hook should NOT be installed.
+        from gradata.enhancements.rule_to_hook import try_generate, classify_rule
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        candidate = classify_rule("Never use em dashes", 0.95)
+        result = try_generate(candidate, positive_example="plain ascii no dashes here")
+        assert result.installed is False
+        assert "self-test" in result.reason.lower() or "did not block" in result.reason.lower()
