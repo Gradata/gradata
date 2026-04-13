@@ -435,6 +435,53 @@ def cmd_demo(args):
     print(f"Try: gradata convergence --brain-dir {target}")
 
 
+def _resolve_brain_root(args):
+    """Figure out where brain lives. Prefer env override for tests, then --brain-dir arg, then default."""
+    import os
+    override = os.environ.get("GRADATA_BRAIN")
+    if override:
+        return Path(override)
+    brain_dir = getattr(args, "brain_dir", None)
+    if brain_dir:
+        return Path(brain_dir)
+    return Path("brain")
+
+
+def cmd_rule_add(args):
+    """Fast-track a user-declared rule. Writes at RULE tier conf=1.0, tries to install a hook."""
+    from datetime import date
+
+    from gradata.enhancements import rule_to_hook
+
+    text = " ".join(args.text).strip() if isinstance(args.text, list) else str(args.text).strip()
+    if not text:
+        print("error: rule text required", file=sys.stderr)
+        return 2
+
+    # Classify first to see if a hook is possible
+    candidate = rule_to_hook.classify_rule(text, confidence=1.0)
+    result = rule_to_hook.try_generate(candidate)
+
+    # Persist to lessons.md — prefix description with [hooked] if hook installed
+    brain_root = _resolve_brain_root(args)
+    lessons = brain_root / "lessons.md"
+    lessons.parent.mkdir(parents=True, exist_ok=True)
+    if candidate.enforcement == rule_to_hook.EnforcementType.HOOK:
+        category = candidate.determinism.value.upper()
+    else:
+        category = "USER"
+    description = f"[hooked] {text}" if result.installed else text
+    line = f"[{date.today().isoformat()}] [RULE:1.00] {category}: {description}\n"
+    with lessons.open("a", encoding="utf-8") as f:
+        f.write(line)
+
+    if result.installed:
+        print(f"rule graduated to hook: installed at {result.hook_path}")
+    else:
+        print(f"rule added as soft injection ({result.reason})")
+    return 0
+
+
 def cmd_hooks(args):
     """Manage Claude Code hook integration."""
     action = args.action
@@ -564,6 +611,12 @@ def main():
     p_hooks.add_argument("--profile", choices=["minimal", "standard", "strict"],
                          default="standard", help="Hook profile tier (default: standard)")
 
+    # rule — user-declared rules (fast-track to RULE tier, try hook install)
+    p_rule = sub.add_parser("rule", help="Manage user-declared rules")
+    rule_sub = p_rule.add_subparsers(dest="rule_cmd", required=True)
+    p_rule_add = rule_sub.add_parser("add", help="Declare a rule at RULE tier (fast-track)")
+    p_rule_add.add_argument("text", nargs="+", help="Rule text")
+
     args = parser.parse_args()
 
     commands = {
@@ -589,6 +642,7 @@ def main():
     commands["convergence"] = cmd_convergence
     commands["demo"] = cmd_demo
     commands["hooks"] = cmd_hooks
+    commands["rule"] = cmd_rule_add
 
     if args.command in commands:
         commands[args.command](args)
