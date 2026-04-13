@@ -175,5 +175,10 @@ class Lesson:
     last_climb_session: int = 0  # Session when last climb occurred
     tree_level: int = 0  # Current depth: 0=leaf, 1=branch, 2=trunk
 
+    # ── Contradiction streak tracking (runtime-only, not persisted) ──
+    # Increments on consecutive CONTRADICTING corrections for accelerated
+    # confidence decay; resets on reinforcement or non-contradicting updates.
+    _contradiction_streak: int = 0
+
     def __post_init__(self) -> None:
         self.confidence = round(max(0.0, min(1.0, self.confidence)), 2)
