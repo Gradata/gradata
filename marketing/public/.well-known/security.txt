@@ -11,7 +11,7 @@ Acknowledgments: https://gradata.ai/legal/security-policy/#acknowledgments
 
 # Scope:
 #   - gradata.ai, app.gradata.ai, api.gradata.ai
-#   - The Gradata open source SDK (github.com/Gradata/gradata)
+#   - The Gradata open-source SDK (github.com/Gradata/gradata)
 #
 # Out of scope:
 #   - Third-party sub-processors (Railway, Supabase, Stripe, Cloudflare, Sentry) —

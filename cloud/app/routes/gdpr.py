@@ -173,6 +173,18 @@ async def export_me(
     await _enforce_export_rate_limit(user_id)
     db = get_db()
 
+    # Record the export request BEFORE generating the payload to shrink the
+    # TOCTOU window between _enforce_export_rate_limit and the ledger insert.
+    # A concurrent request arriving between the check and this insert will
+    # either see this row (and 429) or race by milliseconds; either way the
+    # 24h window bounds abuse. For true atomicity we'd need either a DB
+    # uniqueness constraint on (user_id, date_bucket) or a row-level lock,
+    # neither of which the current PostgREST wrapper exposes.
+    await db.insert(
+        "gdpr_export_requests",
+        {"user_id": user_id, "created_at": _iso(_utcnow())},
+    )
+
     workspaces = await _collect_user_workspaces(user_id, include_deleted=True)
     brains = await _collect_user_brains(user_id, include_deleted=True)
     brain_ids = [b["id"] for b in brains]
@@ -201,12 +213,6 @@ async def export_me(
 
     serialized = json.dumps(payload, default=str)
     size_bytes = len(serialized.encode("utf-8"))
-
-    # Log the export request for rate-limit enforcement on the next call.
-    await db.insert(
-        "gdpr_export_requests",
-        {"user_id": user_id, "created_at": _iso(_utcnow())},
-    )
     _log.info("GDPR export generated for user=%s size=%d", user_id, size_bytes)
 
     response = DataExportResponse(

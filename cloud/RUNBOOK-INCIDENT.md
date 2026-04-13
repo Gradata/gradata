@@ -155,8 +155,16 @@ SELECT id, deleted_at FROM workspaces WHERE owner_id = '<uuid>';
 SELECT id, deleted_at FROM brains WHERE user_id = '<uuid>';
 ```
 
-- **False 429.** Clear one ledger row: `DELETE FROM gdpr_export_requests
-  WHERE id = '<id>';`. Leave a note in the incident doc explaining why.
+- **False 429.** Do NOT delete ledger rows — the `gdpr_export_requests`
+  ledger is an audit trail for DSR compliance and must remain immutable.
+  Instead, use an operator-approved, time-boxed override: document the
+  request in the incident doc with (a) the approver (must be a different
+  human than the requester), (b) the customer-verified reason, (c) the
+  window of the override, and (d) a follow-up ticket. If ops tooling is
+  unavailable, manually honor the request out-of-band and record the
+  same fields in the incident doc. Never fabricate a newer `created_at`
+  on an existing row; any override must be a new row with a clear audit
+  marker (e.g., `override_by`, `override_reason`).
 - **Data still visible after delete.** Verify the filter was applied in
   `auth.py` and `routes/users.py`. If a route is missing the filter,
   patch it immediately and write a test.

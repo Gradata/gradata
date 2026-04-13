@@ -6,7 +6,8 @@ export const metadata: Metadata = {
   description:
     "Third-party subprocessors Gradata engages to deliver the hosted service.",
   alternates: { canonical: `${site.url}/legal/subprocessors/` },
-  robots: { index: true, follow: true },
+  // Draft — pending legal review. Do not index until sign-off.
+  robots: { index: false, follow: false },
 };
 
 type Subprocessor = {

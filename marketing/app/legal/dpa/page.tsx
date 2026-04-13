@@ -6,7 +6,8 @@ export const metadata: Metadata = {
   description:
     "Gradata's Data Processing Agreement — GDPR Article 28 clauses covering how we process customer data on your behalf.",
   alternates: { canonical: `${site.url}/legal/dpa/` },
-  robots: { index: true, follow: true },
+  // Draft — pending legal review. Do not index until sign-off.
+  robots: { index: false, follow: false },
 };
 
 export default function DpaPage() {
@@ -123,8 +124,9 @@ export default function DpaPage() {
             Gradata provides self-service tools for access, export, and erasure
             (Articles 15 &amp; 17) via the account settings UI and the{" "}
             <code>/me/export</code> and <code>/me/delete</code> API endpoints. Upon
-            erasure, Personal Data enters a 30-day soft-delete window and is then
-            purged. Gradata will assist Customer in responding to Data Subject
+            erasure, Personal Data enters a soft-delete window with a target
+            purge horizon of 30 days, executed via a scheduled purge workflow.
+            Gradata will assist Customer in responding to Data Subject
             requests within 10 business days of a written request to{" "}
             <a href="mailto:privacy@gradata.ai" className="underline">privacy@gradata.ai</a>.
           </p>
@@ -164,9 +166,9 @@ export default function DpaPage() {
           <h2 className="font-heading text-xl font-semibold">13. Return or deletion</h2>
           <p className="mt-2 text-sm text-[color:var(--color-muted-foreground)]">
             Upon termination, Customer may export all Personal Data via the
-            self-service tools described in Section 9. Gradata will delete
-            remaining Personal Data within 30 days of termination, except where
-            retention is required by law.
+            self-service tools described in Section 9. Gradata targets deletion
+            of remaining Personal Data within 30 days of termination via its
+            scheduled purge workflow, except where retention is required by law.
           </p>
         </section>
 
