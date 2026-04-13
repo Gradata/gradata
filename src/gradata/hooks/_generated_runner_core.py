@@ -1,14 +1,34 @@
 """Shared implementation for PreToolUse / PostToolUse generated-hook runners."""
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import sys
 from pathlib import Path
 
+from gradata.hooks._base import should_run
+from gradata.hooks._profiles import Profile
+
+_log = logging.getLogger(__name__)
+
 
 def run_generated_hooks(*, env_var: str, default_dir: str, per_hook_timeout: int) -> int:
-    """Iterate generated hooks in the configured dir, run each, relay first block."""
+    """Iterate generated hooks in the configured dir, run each, relay first block.
+
+    Respects ``GRADATA_HOOK_PROFILE=minimal`` — under the minimal profile
+    the runner no-ops (logs a debug line + exits 0). This matches every
+    other Gradata hook, which is registered at ``Profile.STANDARD`` in
+    ``_installer.HOOK_REGISTRY`` and gated via ``run_hook``. Without this
+    check, ``minimal`` users would still have generated rule-hooks
+    executed on every Edit/Write/Bash.
+    """
+    # Profile gating — match the registry entry in _installer.HOOK_REGISTRY
+    # (both generated_runner + generated_runner_post are Profile.STANDARD).
+    if not should_run(Profile.STANDARD):
+        _log.debug("generated_runner: skipped (profile=minimal, env_var=%s)", env_var)
+        return 0
+
     try:
         raw = sys.stdin.read()
         if not raw.strip():
