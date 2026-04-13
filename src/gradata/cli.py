@@ -474,8 +474,6 @@ def _resolve_brain_root(args):
 
 def cmd_rule_add(args):
     """Fast-track a user-declared rule. Writes at RULE tier conf=1.0, tries to install a hook."""
-    from datetime import date
-
     from gradata.enhancements import rule_to_hook
 
     text = " ".join(args.text).strip() if isinstance(args.text, list) else str(args.text).strip()
@@ -486,9 +484,9 @@ def cmd_rule_add(args):
     # Classify first to see if a hook is possible
     candidate = rule_to_hook.classify_rule(text, confidence=1.0)
 
-    # Best-effort brain handle for event logging.  A user running `gradata rule
-    # add` without an initialized brain should still succeed; try_generate
-    # treats brain=None as "skip logging".
+    # Best-effort brain handle for event logging + add_rule API.  A user
+    # running `gradata rule add` without an initialized brain should still
+    # succeed; try_generate treats brain=None as "skip logging".
     brain = None
     try:
         brain = _get_brain(args)
@@ -497,18 +495,52 @@ def cmd_rule_add(args):
 
     result = rule_to_hook.try_generate(candidate, brain=brain, source="user_declared")
 
-    # Persist to lessons.md — prefix description with [hooked] if hook installed
-    brain_root = _resolve_brain_root(args)
-    lessons = brain_root / "lessons.md"
-    lessons.parent.mkdir(parents=True, exist_ok=True)
+    # Persist to lessons.md via the canonical parse/format pipeline — the
+    # same code path graduation uses, so any future lesson-schema change
+    # automatically propagates here. Prefix description with [hooked]
+    # marker if a hook was installed, so `gradata rule list` can show
+    # hook status.
     if candidate.enforcement == rule_to_hook.EnforcementType.HOOK:
         category = candidate.determinism.value.upper()
     else:
         category = "USER"
     description = f"[hooked] {text}" if result.installed else text
-    line = f"[{date.today().isoformat()}] [RULE:1.00] {category}: {description}\n"
-    with lessons.open("a", encoding="utf-8") as f:
-        f.write(line)
+
+    # Resolve the brain root the user intends (respects GRADATA_BRAIN env
+    # + --brain-dir). Do NOT use _get_brain() here — that falls back to
+    # CWD which would write to the wrong brain when running from a
+    # project that happens to contain brain files.
+    brain_root = _resolve_brain_root(args)
+    lessons_path = brain_root / "lessons.md"
+    lessons_path.parent.mkdir(parents=True, exist_ok=True)
+    if not lessons_path.exists():
+        lessons_path.write_text("", encoding="utf-8")
+
+    # Prefer Brain.add_rule when the resolved brain root has a system.db
+    # (i.e. an initialized brain). Otherwise, write via the same canonical
+    # parse/format helpers Brain.add_rule uses internally — no hand-formatting.
+    if (brain_root / "system.db").is_file():
+        from gradata import Brain as _Brain
+
+        _b = _Brain(brain_root)
+        _b.add_rule(description=description, category=category,
+                    state="RULE", confidence=1.0)
+    else:
+        from datetime import date
+
+        from gradata._db import write_lessons_safe
+        from gradata._types import Lesson, LessonState
+        from gradata.enhancements.self_improvement import format_lessons, parse_lessons
+
+        existing = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+        existing.append(Lesson(
+            date=date.today().isoformat(),
+            state=LessonState.RULE,
+            confidence=1.0,
+            category=category,
+            description=description,
+        ))
+        write_lessons_safe(lessons_path, format_lessons(existing))
 
     if result.installed:
         print(f"rule graduated to hook: installed at {result.hook_path}")
