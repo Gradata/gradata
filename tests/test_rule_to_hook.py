@@ -276,3 +276,68 @@ class TestCliRuleAdd:
         content = lessons.read_text(encoding="utf-8")
         assert "lead with the answer" in content
         assert "[hooked]" not in content
+
+
+class TestGraduateIntegration:
+    """Task 7: graduate() should auto-attempt hook install on PATTERN->RULE promotion."""
+
+    def test_graduate_promotes_and_installs_hook_for_em_dash(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        from gradata.enhancements.self_improvement import graduate
+        from gradata._types import Lesson, LessonState
+
+        # Build a lesson at PATTERN tier with high confidence + enough fires
+        # to promote to RULE. The description matches rule_to_hook's em-dash
+        # deterministic pattern, so a hook should render, self-test, and install.
+        lesson = Lesson(
+            date="2026-04-12",
+            state=LessonState.PATTERN,
+            confidence=0.95,
+            category="FORMATTING",
+            description="Never use em dashes",
+            fire_count=10,  # past MIN_APPLICATIONS_FOR_RULE=5 threshold
+        )
+        active, graduated = graduate([lesson], maturity="MATURE")
+
+        # Assertion 1: lesson reached RULE state
+        ended_at_rule = any(
+            getattr(l, "state", None) == LessonState.RULE for l in (active + graduated)
+        )
+        assert ended_at_rule, f"lesson didn't reach RULE: state={lesson.state}"
+
+        # Assertion 2: a hook file got installed under GRADATA_HOOK_ROOT
+        js_files = list(tmp_path.glob("*.js"))
+        assert len(js_files) == 1, (
+            f"expected 1 hook file, found: {[f.name for f in tmp_path.iterdir()]}"
+        )
+
+        # Assertion 3: lesson description now carries [hooked] marker so
+        # rule_enforcement dedup skips it.
+        assert lesson.description.lstrip().startswith("[hooked]"), (
+            f"lesson should be marked hooked, got: {lesson.description!r}"
+        )
+
+    def test_graduate_non_deterministic_rule_not_hooked(self, tmp_path, monkeypatch):
+        """A graduated rule whose description is non-deterministic should
+        reach RULE but NOT install a hook and NOT get the [hooked] marker."""
+        monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
+        from gradata.enhancements.self_improvement import graduate
+        from gradata._types import Lesson, LessonState
+
+        lesson = Lesson(
+            date="2026-04-12",
+            state=LessonState.PATTERN,
+            confidence=0.95,
+            category="VOICE",
+            description="Be concise and direct",
+            fire_count=10,
+        )
+        graduate([lesson], maturity="MATURE")
+
+        # No hook file should exist
+        js_files = list(tmp_path.glob("*.js"))
+        assert len(js_files) == 0, (
+            f"advisory rule should not install a hook, got: {[f.name for f in js_files]}"
+        )
+        # Description should NOT be marked [hooked]
+        assert not lesson.description.lstrip().startswith("[hooked]")
