@@ -80,14 +80,11 @@ DETERMINISTIC_PATTERNS: list[tuple[re.Pattern[str], DeterminismCheck, str, str |
     (re.compile(r"read.+before edit"), DeterminismCheck.FILE_CHECK, "read_before_edit", None),
     (re.compile(r"always read.+before"), DeterminismCheck.FILE_CHECK, "read_before_edit", None),
     # Destructive command blocks
-    (re.compile(r"never (rm|delete|remove).+-rf"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"rm\s+-[rf]+|rm\s+.*-[rf]+"),
+    (re.compile(r"never (rm|delete|remove).+-?rf"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"rm\s+-[rf]+|rm\s+.*-[rf]+"),
     (re.compile(r"never force.?push|don.t force.?push|no force push"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"git\s+push.*--force|git\s+push.*-f\b|git\s+push.*\+"),
     (re.compile(r"never drop.*table|no drop table"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"DROP\s+TABLE"),
     (re.compile(r"never kubectl delete|don.t kubectl delete"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"kubectl\s+delete"),
     (re.compile(r"never reset.+hard|no git reset.*hard"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"git\s+reset.*--hard"),
-    # Legacy destructive fallbacks (kept for broader phrasing)
-    (re.compile(r"never (rm|delete|remove).+rf"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"rm\s+-[rf]+|rm\s+.*-[rf]+"),
-    (re.compile(r"never force.?push"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"git\s+push.*--force|git\s+push.*-f\b|git\s+push.*\+"),
     # f-string block
     (re.compile(r"never.*format.*f.?string.*python.?-c"), DeterminismCheck.COMMAND_BLOCK, "fstring_block", r"python\s+-c\s+[\"\'][^\"\']*f[\"\']"),
     (re.compile(r"never.*python.?-c.*f.?string"), DeterminismCheck.COMMAND_BLOCK, "fstring_block", r"python\s+-c\s+[\"\'][^\"\']*f[\"\']"),
@@ -195,8 +192,8 @@ def _source_hash(text: str) -> str:
 def render_hook(candidate: HookCandidate) -> str | None:
     """Render a HookCandidate into executable JS hook source.
 
-    Returns None if the candidate is non-deterministic OR the candidate's
-    template isn't implemented yet (v1 ships regex_replace only).
+    Returns None if the candidate is non-deterministic OR the template file
+    isn't present.
     """
     if candidate.enforcement != EnforcementType.HOOK:
         return None
@@ -206,11 +203,11 @@ def render_hook(candidate: HookCandidate) -> str | None:
         return None
 
     template_path = _TEMPLATE_DIR / f"{candidate.hook_template}.js.tmpl"
-    if not template_path.exists():
-        return None
-
     # Read with explicit UTF-8; preserve LF endings (shebang requires LF on Unix)
-    tmpl = template_path.read_text(encoding="utf-8")
+    try:
+        tmpl = template_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
 
     safe_text = (
         candidate.rule_description
