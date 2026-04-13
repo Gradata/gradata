@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class Severity(str, Enum):
@@ -240,3 +240,46 @@ class SubscriptionResponse(BaseModel):
     status: str | None = None
     current_period_end: str | None = None
     usage: SubscriptionUsage = Field(default_factory=SubscriptionUsage)
+
+
+# ---------------------------------------------------------------------------
+# Team / workspace member models
+# ---------------------------------------------------------------------------
+
+
+class MemberRole(str, Enum):
+    owner = "owner"
+    admin = "admin"
+    member = "member"
+
+
+class InviteRole(str, Enum):
+    admin = "admin"
+    member = "member"
+
+
+class MemberResponse(BaseModel):
+    user_id: str
+    email: str | None = None
+    display_name: str | None = None
+    role: str
+    joined_at: str | None = None
+    last_sync_at: str | None = None
+
+
+class InviteRequest(BaseModel):
+    email: EmailStr
+    role: InviteRole = InviteRole.member
+
+
+class InviteResponse(BaseModel):
+    id: str
+    email: str
+    role: str
+    token: str
+    accept_url: str
+    expires_at: str | None = None
+
+
+class UpdateRoleRequest(BaseModel):
+    role: InviteRole  # owner cannot be assigned through this endpoint

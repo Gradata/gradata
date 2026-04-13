@@ -49,6 +49,9 @@ class MockSupabaseClient:
     async def update(self, table: str, data: dict, filters: dict | None = None) -> list[dict]:
         return [data]
 
+    async def delete(self, table: str, filters: dict | None = None) -> list[dict]:
+        return []
+
 
 @pytest.fixture(autouse=True)
 def mock_jwks(monkeypatch):
