@@ -1,10 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { GlassCard } from '@/components/layout/GlassCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
+import { useApi } from '@/hooks/useApi'
+import api from '@/lib/api'
 
 /**
  * Notification preferences per SIM16 validation:
@@ -25,22 +28,41 @@ interface Toggles {
   slack_webhook: string
 }
 
+const DEFAULTS: Toggles = {
+  alert_correction_spike: true,
+  alert_rule_regression: true,
+  alert_meta_rule_emerged: false,
+  digest_cadence: 'weekly',
+  digest_email: '',
+  slack_webhook: '',
+}
+
 export default function NotificationsPage() {
-  const [toggles, setToggles] = useState<Toggles>({
-    alert_correction_spike: true,
-    alert_rule_regression: true,
-    alert_meta_rule_emerged: false,
-    digest_cadence: 'weekly',
-    digest_email: '',
-    slack_webhook: '',
-  })
+  const { data: serverPrefs, loading } = useApi<Toggles>('/users/me/notifications')
+  const [toggles, setToggles] = useState<Toggles>(DEFAULTS)
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (serverPrefs) setToggles(serverPrefs)
+  }, [serverPrefs])
+
+  if (loading) return <LoadingSpinner className="py-20" />
 
   const handleSave = async () => {
-    // TODO(backend): POST /users/me/notifications
-    await new Promise((r) => setTimeout(r, 300))
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const res = await api.put<Toggles>('/users/me/notifications', toggles)
+      setToggles(res.data)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (err: any) {
+      setSaveError(err?.response?.data?.detail ?? 'Could not save preferences')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -120,12 +142,19 @@ export default function NotificationsPage() {
         </GlassCard>
 
         <div className="flex items-center justify-end gap-3">
+          {saveError && (
+            <span className="font-mono text-[11px] text-[var(--color-destructive)]">
+              {saveError}
+            </span>
+          )}
           {saved && (
             <span className="font-mono text-[11px] text-[var(--color-success)]">
               ✓ preferences saved
             </span>
           )}
-          <Button onClick={handleSave}>Save preferences</Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : 'Save preferences'}
+          </Button>
         </div>
       </div>
     </>
