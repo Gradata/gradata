@@ -34,6 +34,12 @@ _SENSITIVE_KEYS = {
     "access_token",
     "refresh_token",
     "api_key",
+    # PII — opaque user.id is fine (set via set_user), but raw email never
+    # belongs in event extras/contexts. Scrub defensively even though
+    # send_default_pii=False covers the default integrations.
+    "email",
+    "email_address",
+    "user_email",
 }
 
 
@@ -100,6 +106,7 @@ def init_sentry(settings: Settings) -> None:
         environment=settings.environment,
         release=release,
         traces_sample_rate=settings.sentry_traces_sample_rate,
+        profiles_sample_rate=settings.sentry_profiles_sample_rate,
         send_default_pii=False,
         # Never capture request bodies — Stripe webhooks contain customer data
         max_request_body_size="never",
@@ -112,8 +119,38 @@ def init_sentry(settings: Settings) -> None:
         before_send=_scrub_event,
     )
     _log.info(
-        "Sentry initialized: environment=%s release=%s traces_sample_rate=%.2f",
+        "Sentry initialized: environment=%s release=%s "
+        "traces_sample_rate=%.2f profiles_sample_rate=%.2f",
         settings.environment,
         release,
         settings.sentry_traces_sample_rate,
+        settings.sentry_profiles_sample_rate,
     )
+
+
+def tag_user(user_id: str, workspace_id: str | None = None) -> None:
+    """Attach user.id + workspace_id to the current Sentry scope.
+
+    No-op when Sentry isn't initialised. Call from auth dependencies
+    (get_current_user_id, get_current_brain, require_operator) so any
+    exception raised downstream already carries the request's owner.
+    """
+    client = sentry_sdk.get_client()
+    if client is None or not client.is_active():
+        return
+    # Use the isolation scope so the tag lives for the whole request,
+    # not just the current task. Both FastAPI and Starlette integrations
+    # push an isolation scope per request.
+    scope = sentry_sdk.get_isolation_scope()
+    # `set_user` only sends the opaque UUID — no email/username — which
+    # matches our GDPR-minimal stance (send_default_pii=False).
+    scope.set_user({"id": user_id})
+    if workspace_id:
+        scope.set_tag("workspace_id", workspace_id)
+
+
+# Enrich every event with the sensitive-key scrubbing AND the active user
+# when one was tagged earlier in the request. The scope-level user is
+# already serialised by Sentry, so we only handle the explicit scrub path.
+def _scrub_and_enrich(event: Any, hint: Any) -> Any:
+    return _scrub_event(event, hint)

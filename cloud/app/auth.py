@@ -12,6 +12,7 @@ from jose import JWTError, jwt as jose_jwt, jwk
 
 from app.config import get_settings
 from app.db import get_db
+from app.sentry_init import tag_user
 
 _log = logging.getLogger(__name__)
 _bearer = HTTPBearer()
@@ -108,13 +109,17 @@ async def get_current_brain(
     """
     cred = credentials.credentials
     if cred.startswith("gd_"):
-        return await verify_api_key(cred)
+        brain = await verify_api_key(cred)
+        tag_user(str(brain.get("user_id") or brain.get("id") or ""),
+                 workspace_id=str(brain.get("workspace_id") or "") or None)
+        return brain
 
     user_id = await verify_jwt(cred)
     db = get_db()
     rows = await db.select("brains", filters={"user_id": user_id})
     if not rows:
         raise HTTPException(status_code=404, detail="No brain found for this user")
+    tag_user(user_id, workspace_id=str(rows[0].get("workspace_id") or "") or None)
     return rows[0]
 
 
@@ -122,7 +127,9 @@ async def get_current_user_id(
     credentials: HTTPAuthorizationCredentials = Security(_bearer),
 ) -> str:
     """Extract user_id from JWT. For dashboard-only endpoints."""
-    return await verify_jwt(credentials.credentials)
+    user_id = await verify_jwt(credentials.credentials)
+    tag_user(user_id)
+    return user_id
 
 
 async def verify_brain_ownership(brain_id: str, user_id: str) -> dict:
@@ -192,4 +199,5 @@ async def require_operator(
     if domain not in OPERATOR_DOMAINS:
         raise HTTPException(status_code=403, detail="Operator access denied")
 
+    tag_user(user_id)
     return user_id
