@@ -485,7 +485,17 @@ def cmd_rule_add(args):
 
     # Classify first to see if a hook is possible
     candidate = rule_to_hook.classify_rule(text, confidence=1.0)
-    result = rule_to_hook.try_generate(candidate)
+
+    # Best-effort brain handle for event logging.  A user running `gradata rule
+    # add` without an initialized brain should still succeed; try_generate
+    # treats brain=None as "skip logging".
+    brain = None
+    try:
+        brain = _get_brain(args)
+    except Exception:
+        brain = None
+
+    result = rule_to_hook.try_generate(candidate, brain=brain, source="user_declared")
 
     # Persist to lessons.md — prefix description with [hooked] if hook installed
     brain_root = _resolve_brain_root(args)
