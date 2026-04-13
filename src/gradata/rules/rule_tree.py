@@ -314,7 +314,7 @@ class RuleTree:
 
         # Evaluate climbs: for each lesson, check if it fired in sibling paths
         evaluated: set[int] = set()
-        for path, lessons in session_fires.items():
+        for _path, lessons in session_fires.items():
             for lesson in lessons:
                 lid = id(lesson)
                 if lid in evaluated:
@@ -333,9 +333,11 @@ class RuleTree:
         if session_contradictions:
             for path, count in session_contradictions.items():
                 for lesson in list(self.nodes.get(path, [])):
-                    if count >= self.CONTRACT_MIN_CONTRADICTIONS:
-                        if self.evaluate_contract(lesson, count, current_session):
-                            contracted += 1
+                    if (
+                        count >= self.CONTRACT_MIN_CONTRADICTIONS
+                        and self.evaluate_contract(lesson, count, current_session)
+                    ):
+                        contracted += 1
 
         return {"climbed": climbed, "contracted": contracted, "unchanged": unchanged}
 
