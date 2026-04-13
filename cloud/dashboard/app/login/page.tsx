@@ -1,21 +1,25 @@
-import { useState, type FormEvent } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+'use client'
+
+import { useState, useEffect, type FormEvent } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/hooks/useAuth'
 
-export function Login() {
+export default function LoginPage() {
   const { signIn, signInWithGoogle, session, loading } = useAuth()
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  if (!loading && session) {
-    return <Navigate to="/dashboard" replace />
-  }
+  useEffect(() => {
+    if (!loading && session) router.replace('/dashboard')
+  }, [loading, session, router])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -32,8 +36,8 @@ export function Login() {
     <div className="flex min-h-screen items-center justify-center px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-2 h-10 w-10 rounded-xl bg-primary flex items-center justify-center">
-            <span className="text-sm font-bold text-primary-foreground">G</span>
+          <div className="mx-auto mb-2 h-10 w-10 rounded-xl bg-gradient-brand shadow-[0_0_16px_rgba(58,130,255,0.3)] flex items-center justify-center">
+            <span className="text-sm font-bold text-white">G</span>
           </div>
           <CardTitle className="text-xl">Welcome back</CardTitle>
           <CardDescription>Sign in to your Gradata dashboard</CardDescription>
@@ -47,33 +51,22 @@ export function Login() {
             )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+              <Input id="email" type="email" placeholder="you@example.com"
+                value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="pw">Password</Label>
-              <Input
-                id="pw"
-                type="password"
-                value={pw}
-                onChange={(e) => setPw(e.target.value)}
-                required
-              />
+              <Input id="pw" type="password" value={pw}
+                onChange={(e) => setPw(e.target.value)} required />
             </div>
             <Button type="submit" className="w-full" disabled={submitting}>
               {submitting ? 'Signing in...' : 'Sign in'}
             </Button>
             <div className="flex justify-between text-sm">
-              <Link to="/forgot-password" className="text-primary hover:underline">
+              <Link href="/forgot-password" className="text-primary hover:underline">
                 Forgot password?
               </Link>
-              <Link to="/signup" className="text-primary hover:underline">
+              <Link href="/signup" className="text-primary hover:underline">
                 Create account
               </Link>
             </div>
@@ -86,12 +79,8 @@ export function Login() {
               <span className="bg-card px-2 text-muted-foreground">Or</span>
             </div>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={() => signInWithGoogle()}
-          >
+          <Button type="button" variant="outline" className="w-full"
+            onClick={() => signInWithGoogle()}>
             <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />

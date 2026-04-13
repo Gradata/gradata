@@ -1,12 +1,14 @@
+'use client'
+
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/hooks/useAuth'
 
-export function ForgotPassword() {
+export default function ForgotPasswordPage() {
   const { sendPasswordReset } = useAuth()
   const [email, setEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -18,11 +20,8 @@ export function ForgotPassword() {
     setError(null)
     setSubmitting(true)
     const result = await sendPasswordReset(email)
-    if (result.error) {
-      setError(result.error.message)
-    } else {
-      setSent(true)
-    }
+    if (result.error) setError(result.error.message)
+    else setSent(true)
     setSubmitting(false)
   }
 
@@ -37,7 +36,7 @@ export function ForgotPassword() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Link to="/login">
+            <Link href="/login">
               <Button variant="outline" className="w-full">Back to login</Button>
             </Link>
           </CardContent>
@@ -51,9 +50,7 @@ export function ForgotPassword() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-xl">Reset your password</CardTitle>
-          <CardDescription>
-            Enter your email and we will send you a reset link
-          </CardDescription>
+          <CardDescription>Enter your email and we will send you a reset link</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -64,20 +61,14 @@ export function ForgotPassword() {
             )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+              <Input id="email" type="email" placeholder="you@example.com"
+                value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             <Button type="submit" className="w-full" disabled={submitting}>
               {submitting ? 'Sending...' : 'Send reset link'}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
-              <Link to="/login" className="text-primary hover:underline">Back to login</Link>
+              <Link href="/login" className="text-primary hover:underline">Back to login</Link>
             </p>
           </form>
         </CardContent>
