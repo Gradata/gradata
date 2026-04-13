@@ -456,7 +456,7 @@ def cmd_rule_add(args):
     text = " ".join(args.text).strip() if isinstance(args.text, list) else str(args.text).strip()
     if not text:
         print("error: rule text required", file=sys.stderr)
-        return 2
+        return
 
     # Classify first to see if a hook is possible
     candidate = rule_to_hook.classify_rule(text, confidence=1.0)
@@ -479,7 +479,6 @@ def cmd_rule_add(args):
         print(f"rule graduated to hook: installed at {result.hook_path}")
     else:
         print(f"rule added as soft injection ({result.reason})")
-    return 0
 
 
 def cmd_hooks(args):
