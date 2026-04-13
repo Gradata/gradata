@@ -51,7 +51,15 @@ def limits_enabled() -> bool:
     return get_settings().environment != "test"
 
 
-# IP-keyed limiter (public + sensitive buckets)
+# IP-keyed limiter (public + sensitive buckets).
+#
+# `headers_enabled=False` is deliberate: enabling it makes slowapi try to
+# inject X-RateLimit-* headers into every decorated response, which requires
+# a `response: Response` parameter on every route AND is incompatible with
+# routes that return `JSONResponse` or Pydantic models directly. CodeRabbit
+# flagged this as a "nice to have" nit — deferred until we migrate routes
+# to explicitly accept a Response param (tracked separately). On rejection,
+# the `Retry-After` header is still emitted from `_rate_limit_handler`.
 limiter = Limiter(
     key_func=get_remote_address,
     enabled=limits_enabled(),

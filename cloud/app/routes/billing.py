@@ -130,6 +130,11 @@ async def create_portal_session(
 # events whose `created` timestamp is older than this window — longer than
 # Stripe's own retry schedule would backdate a legitimate delivery.
 WEBHOOK_MAX_AGE_SECONDS = 5 * 60
+# Extra grace for clock skew between Stripe's edge and our servers. NTP
+# normally keeps drift <1s, but Stripe's `created` is server-side so
+# transient delivery delays or a dozing NTP daemon can push real events
+# right up to the threshold.
+WEBHOOK_MAX_AGE_GRACE_SECONDS = 30
 
 
 def _event_id(event) -> str | None:
@@ -157,10 +162,19 @@ def _event_created(event) -> int | None:
 
 
 async def _already_processed(event_id: str) -> bool:
-    """Return True when we've seen this event.id before (idempotency check)."""
+    """Return True when we've already FINISHED handling this event.id.
+
+    Kept for observability/tests. The main race-proof guard is
+    `_claim_event` below — this is only a cheap short-circuit so duplicates
+    return early without even attempting an insert.
+    """
     db = get_db()
     try:
-        rows = await db.select("processed_webhooks", columns="event_id", filters={"event_id": event_id})
+        rows = await db.select(
+            "processed_webhooks",
+            columns="event_id,status",
+            filters={"event_id": event_id},
+        )
     except Exception as exc:  # pragma: no cover - defensive
         # If the table doesn't exist yet (migration not applied), fall back
         # to "not processed" — better than 5xxing every webhook during rollout.
@@ -169,15 +183,60 @@ async def _already_processed(event_id: str) -> bool:
     return bool(rows)
 
 
-async def _mark_processed(event_id: str, event_type: str) -> None:
-    """Record that we successfully handled this event.id. Best-effort."""
+async def _claim_event(event_id: str, event_type: str) -> bool:
+    """Atomically claim an event_id before running the handler.
+
+    Returns True if this worker won the claim (we must run the handler),
+    False if another delivery already claimed it (skip — duplicate).
+
+    Implementation: INSERT with status='processing'. The PK on event_id
+    means only one writer can succeed. Any exception from the insert
+    (conflict, network, table missing) is treated as "did not claim" and
+    we skip processing — safer to drop a duplicate than to double-apply
+    a subscription update.
+    """
     db = get_db()
     try:
-        await db.insert("processed_webhooks", {"event_id": event_id, "event_type": event_type})
+        rows = await db.insert(
+            "processed_webhooks",
+            {
+                "event_id": event_id,
+                "event_type": event_type,
+                "status": "processing",
+            },
+        )
+    except Exception as exc:
+        # Most common: PK conflict from a concurrent delivery. Also covers
+        # missing-table during rollout — in that case we can't safely claim,
+        # so we fall through to legacy behaviour (skip processing).
+        _log.info(
+            "processed_webhooks claim failed for event=%s (likely duplicate): %s",
+            event_id, exc,
+        )
+        return False
+    # PostgREST returns the inserted row(s); an empty list would indicate the
+    # row was suppressed by an upstream policy — treat that as "not claimed".
+    return bool(rows)
+
+
+async def _mark_processed(event_id: str, event_type: str) -> None:
+    """Flip the claimed row from 'processing' -> 'processed' after success.
+
+    event_type is accepted for symmetry with the claim call but not written
+    (it's already set at claim time). Best-effort — a failed update just
+    leaves status='processing', which still blocks future duplicates.
+    """
+    db = get_db()
+    try:
+        await db.update(
+            "processed_webhooks",
+            data={"status": "processed", "processed_at": "now()"},
+            filters={"event_id": event_id},
+        )
     except Exception as exc:  # pragma: no cover - defensive
-        # A race between two parallel deliveries can both try to insert —
-        # the PK conflict is the whole point of the table. Log and move on.
-        _log.info("processed_webhooks insert swallowed (likely PK race): %s", exc)
+        # Update failure is non-fatal: the claim row already exists with
+        # status='processing' which still guarantees idempotency. Just log.
+        _log.info("processed_webhooks status-update swallowed: %s", exc)
 
 
 @router.post("/billing/webhook")
@@ -215,22 +274,37 @@ async def stripe_webhook(request: Request) -> JSONResponse:
         raise HTTPException(status_code=400, detail="Event missing `created` timestamp")
     now = int(time.time())
     age = now - created
-    if age > WEBHOOK_MAX_AGE_SECONDS:
+    max_age = WEBHOOK_MAX_AGE_SECONDS + WEBHOOK_MAX_AGE_GRACE_SECONDS
+    if age > max_age:
         _log.warning(
-            "Rejecting stale Stripe event id=%s type=%s age=%ss",
-            _event_id(event), _event_type(event), age,
+            "Rejecting stale Stripe event id=%s type=%s age=%ss (max=%ss)",
+            _event_id(event), _event_type(event), age, max_age,
         )
         raise HTTPException(status_code=400, detail="Event too old")
 
-    # --- Idempotency -------------------------------------------------------
+    # --- Idempotency (atomic claim-first) ---------------------------------
+    # Cheap short-circuit: if we've seen this event.id before, return early.
+    # The REAL race-proof guard is _claim_event below — this just avoids a
+    # pointless INSERT round-trip for the 99% case of a retried delivery.
     event_id = _event_id(event)
     if event_id and await _already_processed(event_id):
         _log.info("Ignoring duplicate Stripe event id=%s", event_id)
         return JSONResponse({"status": "ok", "duplicate": True})
 
+    # Atomic claim: INSERT with status='processing'. If a concurrent delivery
+    # beats us to the PK, claim_won=False and we treat it as a duplicate.
+    claim_won = True
+    if event_id:
+        claim_won = await _claim_event(event_id, _event_type(event))
+        if not claim_won:
+            _log.info("Lost claim race for Stripe event id=%s — skipping", event_id)
+            return JSONResponse({"status": "ok", "duplicate": True})
+
     await _handle_event(event)
 
-    if event_id:
+    if event_id and claim_won:
+        # Flip status=processing -> processed. Non-fatal on failure —
+        # the claim row already blocks duplicates.
         await _mark_processed(event_id, _event_type(event))
 
     return JSONResponse({"status": "ok"})

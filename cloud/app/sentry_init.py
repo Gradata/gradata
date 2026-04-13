@@ -66,22 +66,47 @@ def _scrub_event(event: Any, _hint: Any) -> Any:
         if isinstance(query, str) and ("token=" in query.lower() or "access_token=" in query.lower()):
             request["query_string"] = "[Filtered]"
 
-    # Scrub extras and contexts
+    # Scrub extras and contexts — Sentry sometimes nests lists of dicts here
+    # (e.g. breadcrumb-like items under contexts), so the scrubber must walk
+    # list/tuple containers as well as dicts.
     for section in ("extra", "contexts"):
         block = event.get(section)
-        if isinstance(block, dict):
-            _scrub_dict(block)
+        if block is not None:
+            event[section] = _scrub_value(block)
 
     return event
 
 
+def _scrub_value(value: Any) -> Any:
+    """Recursively scrub sensitive keys inside dicts / lists / tuples.
+
+    - dict: replace values whose keys match _SENSITIVE_KEYS (case-insensitive)
+      with "[Filtered]"; recurse into other values in-place.
+    - list: recurse into each element in-place.
+    - tuple: return a new tuple with each element scrubbed (tuples are immutable).
+    - other: return as-is.
+    """
+    if isinstance(value, dict):
+        for key, child in list(value.items()):
+            if isinstance(key, str) and key.lower() in _SENSITIVE_KEYS:
+                value[key] = "[Filtered]"
+            else:
+                value[key] = _scrub_value(child)
+        return value
+    if isinstance(value, list):
+        for i, child in enumerate(value):
+            value[i] = _scrub_value(child)
+        return value
+    if isinstance(value, tuple):
+        return tuple(_scrub_value(child) for child in value)
+    return value
+
+
+# Kept for backwards compatibility with any external callers. New code should
+# use `_scrub_value` which handles list/tuple containers too.
 def _scrub_dict(d: dict[str, Any]) -> None:
-    """Recursively replace values whose keys look sensitive."""
-    for key, value in list(d.items()):
-        if isinstance(key, str) and key.lower() in _SENSITIVE_KEYS:
-            d[key] = "[Filtered]"
-        elif isinstance(value, dict):
-            _scrub_dict(value)
+    """Recursively replace values whose keys look sensitive (in-place)."""
+    _scrub_value(d)
 
 
 def _resolve_release(settings: Settings) -> str:

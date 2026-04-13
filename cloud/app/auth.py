@@ -98,6 +98,18 @@ async def verify_jwt(signed_jwt: str) -> str:
     return claims["sub"]
 
 
+def _tag_brain(brain: dict, user_id: str | None = None) -> None:
+    """Tag the Sentry scope with the brain's owner + workspace.
+
+    Centralised so every auth path (API key, JWT, ownership check) produces
+    the same Sentry context. `user_id` wins when provided (JWT path); otherwise
+    fall back to the brain record's own user_id/id fields (API-key path).
+    """
+    resolved = user_id or str(brain.get("user_id") or brain.get("id") or "")
+    ws = str(brain.get("workspace_id") or "") or None
+    tag_user(resolved, workspace_id=ws)
+
+
 async def get_current_brain(
     credentials: HTTPAuthorizationCredentials = Security(_bearer),
 ) -> dict:
@@ -110,8 +122,7 @@ async def get_current_brain(
     cred = credentials.credentials
     if cred.startswith("gd_"):
         brain = await verify_api_key(cred)
-        tag_user(str(brain.get("user_id") or brain.get("id") or ""),
-                 workspace_id=str(brain.get("workspace_id") or "") or None)
+        _tag_brain(brain)
         return brain
 
     user_id = await verify_jwt(cred)
@@ -119,7 +130,7 @@ async def get_current_brain(
     rows = await db.select("brains", filters={"user_id": user_id})
     if not rows:
         raise HTTPException(status_code=404, detail="No brain found for this user")
-    tag_user(user_id, workspace_id=str(rows[0].get("workspace_id") or "") or None)
+    _tag_brain(rows[0], user_id=user_id)
     return rows[0]
 
 
@@ -154,10 +165,13 @@ async def get_brain_for_request(
         brain = await verify_api_key(cred)
         if brain.get("id") != brain_id:
             raise HTTPException(status_code=403, detail="Not your brain")
+        _tag_brain(brain)
         return brain
 
     user_id = await verify_jwt(cred)
-    return await verify_brain_ownership(brain_id, user_id)
+    brain = await verify_brain_ownership(brain_id, user_id)
+    _tag_brain(brain, user_id=user_id)
+    return brain
 
 
 async def _resolve_user_email(user_id: str, claims: dict) -> str | None:

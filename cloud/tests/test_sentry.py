@@ -113,6 +113,33 @@ def test_resolve_release_falls_back_to_dev(monkeypatch):
     assert _resolve_release(settings) == "gradata-cloud@dev"
 
 
+def test_scrub_event_scrubs_keys_inside_lists_and_tuples():
+    """PII protection must recurse through list/tuple containers.
+
+    Sentry sometimes serialises nested arrays (breadcrumbs, trail items,
+    batched values) under extras/contexts. If the scrubber only walks
+    dicts, sensitive keys embedded in lists slip through unfiltered.
+    """
+    event = {
+        "extra": {
+            "batch": [
+                {"email": "a@b.c", "ok": 1},
+                {"password": "hunter2", "other": "safe"},
+            ],
+            "tuple_case": ({"user_email": "x@y.z"}, {"safe": "keep"}),
+            "deep": [[{"api_key": "should-scrub"}]],
+        },
+    }
+    scrubbed = _scrub_event(event, {})
+    assert scrubbed["extra"]["batch"][0]["email"] == "[Filtered]"
+    assert scrubbed["extra"]["batch"][0]["ok"] == 1
+    assert scrubbed["extra"]["batch"][1]["password"] == "[Filtered]"
+    assert scrubbed["extra"]["batch"][1]["other"] == "safe"
+    assert scrubbed["extra"]["tuple_case"][0]["user_email"] == "[Filtered]"
+    assert scrubbed["extra"]["tuple_case"][1]["safe"] == "keep"
+    assert scrubbed["extra"]["deep"][0][0]["api_key"] == "[Filtered]"
+
+
 def test_scrub_event_scrubs_email_fields():
     """PII: email keys under extras/contexts must be [Filtered]."""
     event = {

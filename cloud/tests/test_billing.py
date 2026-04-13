@@ -262,11 +262,13 @@ class TestWebhook:
             resp = self._post_event(client, fake_stripe, event)
 
         assert resp.status_code == 200
-        assert len(captured) == 1
-        assert captured[0]["table"] == "workspaces"
-        assert captured[0]["data"]["plan"] == "team"
-        assert captured[0]["data"]["subscription_status"] == "active"
-        assert captured[0]["filters"]["stripe_customer_id"] == "cus_test_123"
+        # The webhook handler also updates processed_webhooks to flip
+        # status=processing -> processed; filter to workspace writes only.
+        workspace_writes = [c for c in captured if c["table"] == "workspaces"]
+        assert len(workspace_writes) == 1
+        assert workspace_writes[0]["data"]["plan"] == "team"
+        assert workspace_writes[0]["data"]["subscription_status"] == "active"
+        assert workspace_writes[0]["filters"]["stripe_customer_id"] == "cus_test_123"
 
     def test_subscription_deleted_downgrades_to_free(
         self, client, mock_supabase, configured_prices, fake_stripe
@@ -288,8 +290,9 @@ class TestWebhook:
             resp = self._post_event(client, fake_stripe, event)
 
         assert resp.status_code == 200
-        assert captured[0]["data"]["plan"] == "free"
-        assert captured[0]["data"]["subscription_status"] == "canceled"
+        workspace_writes = [c for c in captured if c["table"] == "workspaces"]
+        assert workspace_writes[0]["data"]["plan"] == "free"
+        assert workspace_writes[0]["data"]["subscription_status"] == "canceled"
 
     def test_invoice_payment_failed_marks_past_due(
         self, client, mock_supabase, configured_prices, fake_stripe
@@ -309,7 +312,8 @@ class TestWebhook:
             resp = self._post_event(client, fake_stripe, event)
 
         assert resp.status_code == 200
-        assert captured[0]["data"]["subscription_status"] == "past_due"
+        workspace_writes = [c for c in captured if c["table"] == "workspaces"]
+        assert workspace_writes[0]["data"]["subscription_status"] == "past_due"
 
     def test_invalid_signature_returns_400(
         self, client, mock_supabase, configured_prices, fake_stripe
@@ -404,20 +408,27 @@ class TestWebhookHardening:
     def test_new_event_id_is_recorded_in_processed_webhooks(
         self, client, mock_supabase, configured_prices, fake_stripe
     ):
-        """Successful handling must insert the event.id so the next delivery skips."""
+        """Claim-first design: a new event.id is INSERTED (claim) before handling.
+
+        Atomicity guarantee: the row exists with status='processing' from the
+        moment the handler starts, so a concurrent delivery's PK conflict is
+        what blocks double-apply — not a post-success insert.
+        """
         import time as _time
 
         inserts: list[dict] = []
+        updates: list[dict] = []
 
         async def _capture_insert(table, data):
             inserts.append({"table": table, "data": data})
             return [data] if isinstance(data, dict) else list(data)
 
-        async def _noop_update(*_a, **_kw):
-            return []
+        async def _capture_update(table, data, filters=None):
+            updates.append({"table": table, "data": data, "filters": filters})
+            return [data]
 
         mock_supabase.insert = _capture_insert  # type: ignore[method-assign]
-        mock_supabase.update = _noop_update  # type: ignore[method-assign]
+        mock_supabase.update = _capture_update  # type: ignore[method-assign]
 
         event = {
             "id": "evt_fresh_1",
@@ -428,9 +439,61 @@ class TestWebhookHardening:
         resp = self._post_with(client, fake_stripe, event)
 
         assert resp.status_code == 200
-        # Exactly one insert into processed_webhooks with the right keys.
+        # Exactly one claim insert with status='processing'.
         marker_rows = [row for row in inserts if row["table"] == "processed_webhooks"]
         assert len(marker_rows) == 1
-        payload = marker_rows[0]["data"]
-        assert payload["event_id"] == "evt_fresh_1"
-        assert payload["event_type"] == "invoice.payment_failed"
+        claim = marker_rows[0]["data"]
+        assert claim["event_id"] == "evt_fresh_1"
+        assert claim["event_type"] == "invoice.payment_failed"
+        assert claim["status"] == "processing"
+
+        # And a completion update flipping status -> processed.
+        completions = [
+            u for u in updates
+            if u["table"] == "processed_webhooks"
+            and u["data"].get("status") == "processed"
+        ]
+        assert len(completions) == 1
+        assert completions[0]["filters"] == {"event_id": "evt_fresh_1"}
+
+    def test_claim_race_loss_short_circuits_handler(
+        self, client, mock_supabase, configured_prices, fake_stripe
+    ):
+        """If two deliveries race and we lose the claim, the handler MUST NOT run.
+
+        This is the core correctness guarantee of the claim-first design: a
+        concurrent delivery that inserts first wins; any later inserter gets
+        a PK conflict (simulated here by insert raising) and must skip
+        processing entirely to avoid double-apply.
+        """
+        import time as _time
+
+        async def _raise_pk_conflict(table, data):
+            # Simulate Supabase/Postgres returning 409 on PK violation.
+            if table == "processed_webhooks":
+                raise RuntimeError("duplicate key value violates unique constraint")
+            return [data] if isinstance(data, dict) else list(data)
+
+        handler_updates: list[dict] = []
+
+        async def _capture_update(table, data, filters=None):
+            handler_updates.append({"table": table, "data": data, "filters": filters})
+            return [data]
+
+        mock_supabase.insert = _raise_pk_conflict  # type: ignore[method-assign]
+        mock_supabase.update = _capture_update  # type: ignore[method-assign]
+
+        event = {
+            "id": "evt_race_loser",
+            "type": "customer.subscription.updated",
+            "created": int(_time.time()),
+            "data": {"object": {"customer": "cus_x", "status": "active"}},
+        }
+        resp = self._post_with(client, fake_stripe, event)
+
+        assert resp.status_code == 200
+        assert resp.json().get("duplicate") is True
+        # Handler must NOT have touched workspaces — the winner handles it.
+        workspace_writes = [u for u in handler_updates if u["table"] == "workspaces"]
+        assert not workspace_writes, \
+            "Claim-race loser must skip the handler to prevent double-apply"

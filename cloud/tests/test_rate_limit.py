@@ -84,6 +84,8 @@ def test_rate_limit_disabled_in_test_env_by_default(monkeypatch):
     from app import rate_limit
     rate_limit.refresh_enabled_flag()
     rate_limit.limiter.reset()
+    # Reset BOTH limiters so auth bucket state doesn't leak from prior tests.
+    rate_limit.auth_limiter.reset()
 
     from app.main import create_app
     client = TestClient(create_app())
@@ -93,6 +95,8 @@ def test_rate_limit_disabled_in_test_env_by_default(monkeypatch):
         assert client.get("/health").status_code == 200
 
     get_settings.cache_clear()
+    rate_limit.limiter.reset()
+    rate_limit.auth_limiter.reset()
 
 
 def test_auth_limiter_keys_by_bearer_token(monkeypatch):

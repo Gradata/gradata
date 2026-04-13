@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import time
 
 from fastapi import FastAPI, Request
@@ -21,12 +22,17 @@ MAX_BODY_BYTES = 2 * 1024 * 1024
 
 def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
     """Return a 429 with a uniform JSON shape and the `Retry-After` header."""
-    # slowapi sets `X-RateLimit-*` headers on success responses via
-    # `headers_enabled=True`. On rejection, expose `Retry-After`.
+    # slowapi's `headers_enabled=True` path requires route handlers to take a
+    # `response: Response` param, which our Pydantic-returning routes don't.
+    # Keep limiter headers off on success responses; on rejection, always
+    # expose `Retry-After` so clients back off correctly.
     retry_after = getattr(exc, "retry_after", None)
     headers = {}
     if retry_after is not None:
-        headers["Retry-After"] = str(int(retry_after))
+        # Round UP (ceil) and clamp to >=1 — truncating 0.8s to 0 would tell
+        # clients to retry immediately and keep hitting 429s. RFC 9110 §10.2.3
+        # allows any non-negative integer; 1s is the safe floor.
+        headers["Retry-After"] = str(max(1, math.ceil(retry_after)))
     return JSONResponse(
         status_code=429,
         content={
