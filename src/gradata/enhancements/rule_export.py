@@ -14,28 +14,35 @@ Usage (CLI):
 """
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 
-_LESSON_RE = re.compile(
-    r"^\[[\d-]+\]\s+\[RULE:[\d.]+\](?:\s+\[hooked\])?\s+(\w+):\s+(.+)$"
-)
-
-
 def _parse_rules(brain_root: Path) -> list[tuple[str, str]]:
-    """Return [(category, description), ...] for every RULE-tier lesson."""
+    """Return [(category, description), ...] for every RULE-tier lesson.
+
+    Delegates to the canonical lessons.md parser in self_improvement.py.
+    """
+    import re as _re
+    from gradata.enhancements.self_improvement import parse_lessons
     lessons_file = brain_root / "lessons.md"
     if not lessons_file.exists():
         return []
-    out = []
-    for line in lessons_file.read_text(encoding="utf-8").splitlines():
-        m = _LESSON_RE.match(line.strip())
-        if not m:
+    # The [hooked] marker can appear between the state bracket and the
+    # category. The canonical parser doesn't know about this marker, so we
+    # strip it before parsing (it's internal metadata, not part of the rule).
+    raw = lessons_file.read_text(encoding="utf-8")
+    raw = _re.sub(r"(\[\w+:[\d.]+\])\s+\[hooked\]\s+", r"\1 ", raw)
+    lessons = parse_lessons(raw)
+    out: list[tuple[str, str]] = []
+    for lesson in lessons:
+        # Only RULE-tier
+        state = getattr(lesson, "state", None)
+        state_value = getattr(state, "value", state)
+        if str(state_value).upper() != "RULE":
             continue
-        category, description = m.group(1), m.group(2).strip()
-        # Strip any leading [hooked] from description (belt-and-suspenders)
-        description = re.sub(r"^\[hooked\]\s*", "", description)
+        category = getattr(lesson, "category", "") or ""
+        description = getattr(lesson, "description", "") or ""
+        description = _re.sub(r"^\[hooked\]\s*", "", description.strip())
         out.append((category, description))
     return out
 
