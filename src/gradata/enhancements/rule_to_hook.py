@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -211,3 +212,100 @@ def self_test(
             hook_path.unlink()
         except Exception:
             pass
+
+
+@dataclass
+class GenerationResult:
+    """Outcome of attempting to graduate a HookCandidate into an installed hook."""
+
+    installed: bool
+    reason: str
+    hook_path: Path | None = None
+
+
+def _slug(text: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    return s[:60] or "rule"
+
+
+def _hook_root() -> Path:
+    """Where generated hooks get installed. Overridable via env for tests."""
+    override = os.environ.get("GRADATA_HOOK_ROOT")
+    if override:
+        return Path(override)
+    return Path(".claude/hooks/pre-tool/generated")
+
+
+def install_hook(slug: str, hook_source: str) -> Path:
+    """Write rendered hook source to GRADATA_HOOK_ROOT/<slug>.js.
+
+    Creates the directory if needed. Chmods to 0o755 on platforms that support it.
+    """
+    root = _hook_root()
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / f"{slug}.js"
+    # Preserve LF line endings regardless of platform
+    path.write_text(hook_source, encoding="utf-8", newline="\n")
+    try:
+        path.chmod(0o755)
+    except Exception:
+        pass  # Windows or filesystem that doesn't support chmod
+    return path
+
+
+def _synthesize_positive(candidate: HookCandidate) -> str:
+    """Produce a minimal string that should match the block_pattern for self-test
+    when no captured violating text is supplied.
+    """
+    p = candidate.block_pattern or ""
+    # Em-dash: the pattern IS the literal, wrap in ascii context
+    if "\u2014" in p:
+        return "hello \u2014 world"
+    # Best-effort: embed the literal pattern
+    return f"x{p}y"
+
+
+def try_generate(
+    candidate: HookCandidate,
+    *,
+    positive_example: str | None = None,
+) -> GenerationResult:
+    """Attempt to graduate a HookCandidate into an installed PreToolUse hook.
+
+    Flow: render -> self-test -> install on pass.
+
+    Args:
+        candidate: A HookCandidate from classify_rule.
+        positive_example: Optional captured violating text to self-test against.
+            If None, a minimal example is synthesized from block_pattern.
+
+    Returns a GenerationResult describing the outcome.
+    """
+    if candidate.enforcement != EnforcementType.HOOK:
+        return GenerationResult(
+            installed=False,
+            reason="candidate is not a hook (advisory / not deterministic)",
+        )
+
+    rendered = render_hook(candidate)
+    if rendered is None:
+        return GenerationResult(
+            installed=False,
+            reason=f"render skipped: template '{candidate.hook_template}' not implemented or missing pattern",
+        )
+
+    positive = positive_example or _synthesize_positive(candidate)
+    tool_name = "Bash" if candidate.hook_template in {"destructive_block", "fstring_block", "secret_scan"} else "Write"
+
+    if not self_test(rendered, positive=positive, tool_name=tool_name):
+        return GenerationResult(
+            installed=False,
+            reason=f"self-test did not block positive example: {positive!r}",
+        )
+
+    path = install_hook(_slug(candidate.rule_description), rendered)
+    return GenerationResult(
+        installed=True,
+        reason=f"installed at {path}",
+        hook_path=path,
+    )
