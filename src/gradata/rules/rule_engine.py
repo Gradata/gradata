@@ -864,13 +864,11 @@ def format_rules_for_prompt(
         # Include few-shot examples only for low-confidence rules with misfires
         lesson = rule.lesson
         needs_reinforcement = lesson.confidence < 0.70 and getattr(lesson, "misfire_count", 0) > 1
-        if (
-            needs_reinforcement
-            and getattr(lesson, "example_draft", None) is not None
-            and getattr(lesson, "example_corrected", None) is not None
-        ):
+        example_draft = getattr(lesson, "example_draft", None)
+        example_corrected = getattr(lesson, "example_corrected", None)
+        if needs_reinforcement and example_draft is not None and example_corrected is not None:
             lines.append(
-                f'   e.g. "{lesson.example_draft[:80]}" -> "{lesson.example_corrected[:80]}"'
+                f'   e.g. "{example_draft[:80]}" -> "{example_corrected[:80]}"'
             )
 
     lines.append("</brain-rules>")
