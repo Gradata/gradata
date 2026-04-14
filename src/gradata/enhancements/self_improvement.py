@@ -32,7 +32,13 @@ _log = logging.getLogger(__name__)
 
 INITIAL_CONFIDENCE = 0.60
 PATTERN_THRESHOLD = 0.60
-RULE_THRESHOLD = 0.80
+# RULE_THRESHOLD is 0.90 to match the hard floor enforced at injection time
+# by validate_assumptions in rule_engine.py. Keeping graduation below that
+# floor silently blocks freshly-promoted rules from ever being injected,
+# which the audit (gap-analysis/01-internal-audit.md #1.1) flagged as
+# non-deterministic behaviour. The injection gate wins because it is the
+# one that actually governs which rules reach the model.
+RULE_THRESHOLD = 0.90
 MIN_APPLICATIONS_FOR_PATTERN = 3
 MIN_APPLICATIONS_FOR_RULE = 3
 

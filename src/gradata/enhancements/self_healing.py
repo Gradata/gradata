@@ -20,7 +20,11 @@ if TYPE_CHECKING:
     from gradata._scope import RuleScope
     from gradata._types import Lesson
 
-# Only RULE state with confidence >= this threshold triggers self-healing
+# Only RULE state with confidence >= this threshold triggers self-healing.
+# This is intentionally lower than RULE_THRESHOLD (0.90): self-healing must
+# catch rules whose confidence recently dipped after penalties but that are
+# still near-RULE and should have covered the correction. Kept at 0.80 so a
+# rule penalised this session can still be detected as "it should have fired".
 DEFAULT_MIN_CONFIDENCE = 0.80
 
 
