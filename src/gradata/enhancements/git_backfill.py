@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,24 @@ __all__ = [
     "backfill_from_git",
     "scan_git_diffs",
 ]
+
+
+@dataclass
+class _GitResult:
+    """Result of a `_git` invocation.
+
+    ``completed`` is set when the subprocess ran to completion (even with
+    non-zero exit). ``error`` is set when the subprocess failed to launch
+    or timed out — callers can surface ``type(error).__name__`` and
+    ``str(error)`` in log messages to preserve root cause.
+    """
+
+    completed: subprocess.CompletedProcess | None = None
+    error: Exception | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.completed is not None and self.completed.returncode == 0
 
 
 class BackfillStats:
@@ -85,50 +104,78 @@ def scan_git_diffs(
     repo_path = Path(repo_path).resolve()
     since_date = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
 
-    def _git(args: list[str], timeout: int = 10) -> subprocess.CompletedProcess | None:
+    def _git(args: list[str], timeout: int = 10) -> _GitResult:
         try:
-            return subprocess.run(
+            completed = subprocess.run(
                 ["git", *args],
                 capture_output=True, text=True, timeout=timeout,
                 encoding="utf-8", errors="replace", cwd=str(repo_path),
             )
-        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-            return None
+            return _GitResult(completed=completed)
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
+            return _GitResult(error=exc)
 
-    # Get commit hashes
-    result = _git(["log", f"--since={since_date}", "--format=%H", f"-{max_commits}"], timeout=30)
-    if result is None:
-        _log.warning("git not available at %s", repo_path)
+    # Get commit hashes AND commit dates in one pass ("<hash> <iso-date>").
+    # Avoids N+1 subprocesses (previously one `git log -1` per commit).
+    result = _git(
+        ["log", f"--since={since_date}", "--format=%H %cI", f"-{max_commits}"],
+        timeout=30,
+    )
+    if result.completed is None:
+        exc = result.error
+        _log.warning(
+            "git not available at %s: %s: %s",
+            repo_path,
+            type(exc).__name__ if exc else "UnknownError",
+            exc,
+        )
         return []
-    if result.returncode != 0:
-        _log.warning("git log failed: %s", result.stderr)
+    if result.completed.returncode != 0:
+        _log.warning(
+            "git log failed at %s (rc=%d): %s",
+            repo_path,
+            result.completed.returncode,
+            result.completed.stderr.strip(),
+        )
         return []
 
-    commits = [h.strip() for h in result.stdout.strip().splitlines() if h.strip()]
-    if not commits:
+    commit_entries: list[tuple[str, str]] = []
+    for line in result.completed.stdout.strip().splitlines():
+        parts = line.strip().split(" ", 1)
+        if not parts or not parts[0]:
+            continue
+        commit_hash = parts[0]
+        commit_date = parts[1] if len(parts) > 1 else ""
+        commit_entries.append((commit_hash, commit_date))
+
+    if not commit_entries:
         return []
 
     diffs: list[dict[str, Any]] = []
     patterns = file_patterns or ["*.py", "*.md", "*.ts", "*.js", "*.txt"]
 
-    for commit_hash in commits:
+    for commit_hash, commit_date in commit_entries:
         files_result = _git(["diff-tree", "--no-commit-id", "-r", "--name-only", commit_hash])
-        if files_result is None or files_result.returncode != 0:
+        if not files_result.ok:
+            if files_result.error is not None:
+                _log.warning(
+                    "git diff-tree failed at %s for %s: %s: %s",
+                    repo_path, commit_hash[:8],
+                    type(files_result.error).__name__, files_result.error,
+                )
             continue
 
+        assert files_result.completed is not None
         filtered_files = [
-            f.strip() for f in files_result.stdout.strip().splitlines()
+            f.strip() for f in files_result.completed.stdout.strip().splitlines()
             if any(Path(f.strip()).match(p) for p in patterns)
         ]
-
-        date_result = _git(["log", "-1", "--format=%aI", commit_hash], timeout=5)
-        commit_date = date_result.stdout.strip() if date_result and date_result.returncode == 0 else ""
 
         for file_path in filtered_files[:10]:  # Cap files per commit
             old_result = _git(["show", f"{commit_hash}~1:{file_path}"])
             new_result = _git(["show", f"{commit_hash}:{file_path}"])
-            old_content = old_result.stdout if old_result and old_result.returncode == 0 else ""
-            new_content = new_result.stdout if new_result and new_result.returncode == 0 else ""
+            old_content = old_result.completed.stdout if old_result.ok and old_result.completed else ""
+            new_content = new_result.completed.stdout if new_result.ok and new_result.completed else ""
 
             if not old_content or not new_content or old_content == new_content:
                 continue

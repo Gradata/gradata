@@ -417,7 +417,7 @@ class Brain(BrainInspectionMixin):
         try:
             from gradata.enhancements.rule_integrity import sign_and_store
 
-            sign_and_store(self.db_path, new_description, category, patched.confidence)
+            sign_and_store(self.ctx, new_description, category, patched.confidence)
         except ImportError:
             pass  # unsigned mode — no-op
 

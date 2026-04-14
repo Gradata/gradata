@@ -140,8 +140,11 @@ class AntiPatternDetector:
         return max(0.0, 1.0 - total_weight / 10.0)
 
     def add_pattern(self, pattern: AntiPattern) -> None:
+        # Compile first so a regex error leaves both lists untouched
+        # (atomic add — no partial state if compilation raises).
+        compiled = _compile_anti_pattern(pattern)
         self._patterns.append(pattern)
-        self._compiled.append((pattern, _compile_anti_pattern(pattern)))
+        self._compiled.append((pattern, compiled))
 
     @property
     def pattern_count(self) -> int:
