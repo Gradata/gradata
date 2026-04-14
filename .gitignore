@@ -79,6 +79,7 @@ Graph
 bool
 dict[str
 site/
+_site/
 __pycache__/
 *.pyc
 *.egg-info/
