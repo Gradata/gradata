@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LegalDraftBanner, LegalPageHeader } from "@/components/LegalPageHeader";
 import { site } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -59,25 +60,22 @@ const subprocessors: Subprocessor[] = [
 export default function SubprocessorsPage() {
   return (
     <article className="mx-auto max-w-3xl px-4 py-20 sm:px-6">
-      <header className="mb-10">
-        <div className="mb-4 text-xs uppercase tracking-widest text-[color:var(--color-muted-foreground)]">
-          Legal
-        </div>
-        <h1 className="font-heading text-4xl font-semibold tracking-tight">Subprocessors</h1>
-        <p className="mt-3 text-sm text-[color:var(--color-muted-foreground)]">
-          Last updated: April 2026 &middot; DRAFT — pending legal review
-        </p>
-      </header>
+      <LegalPageHeader
+        title="Subprocessors"
+        lastUpdated="April 2026"
+        status="DRAFT — pending legal review"
+        banner={
+          <LegalDraftBanner>
+            This page lists the third parties Gradata engages to deliver the
+            hosted Gradata Cloud service. The open-source SDK running locally
+            uses none of these. See our{" "}
+            <a href="/legal/dpa/" className="underline">DPA</a> for the terms
+            under which subprocessors handle Personal Data.
+          </LegalDraftBanner>
+        }
+      />
 
       <div className="space-y-6">
-        <section className="rounded border border-yellow-500/30 bg-yellow-500/5 p-4 text-sm text-yellow-200/90">
-          This page lists the third parties Gradata engages to deliver the
-          hosted Gradata Cloud service. The open-source SDK running locally
-          uses none of these. See our{" "}
-          <a href="/legal/dpa/" className="underline">DPA</a> for the terms
-          under which subprocessors handle Personal Data.
-        </section>
-
         <section>
           <h2 className="font-heading text-xl font-semibold">Current subprocessors</h2>
           <div className="mt-4 space-y-4">

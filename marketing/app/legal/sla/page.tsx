@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LegalDraftBanner, LegalPageHeader } from "@/components/LegalPageHeader";
 import { site } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -12,25 +13,20 @@ export const metadata: Metadata = {
 export default function SlaPage() {
   return (
     <article className="mx-auto max-w-3xl px-4 py-20 sm:px-6">
-      <header className="mb-10">
-        <div className="mb-4 text-xs uppercase tracking-widest text-[color:var(--color-muted-foreground)]">
-          Legal
-        </div>
-        <h1 className="font-heading text-4xl font-semibold tracking-tight">
-          Service Level Agreement
-        </h1>
-        <p className="mt-3 text-sm text-[color:var(--color-muted-foreground)]">
-          Last updated: April 2026 &middot; DRAFT — pending legal review
-        </p>
-      </header>
+      <LegalPageHeader
+        title="Service Level Agreement"
+        lastUpdated="April 2026"
+        status="DRAFT — pending legal review"
+        banner={
+          <LegalDraftBanner>
+            This SLA is a draft provided as a reasonable starting point for
+            procurement discussions. It has not been reviewed by outside counsel.
+            Executed enterprise SLAs may supersede this document via order form.
+          </LegalDraftBanner>
+        }
+      />
 
       <div className="space-y-6">
-        <section className="rounded border border-yellow-500/30 bg-yellow-500/5 p-4 text-sm text-yellow-200/90">
-          This SLA is a draft provided as a reasonable starting point for
-          procurement discussions. It has not been reviewed by outside counsel.
-          Executed enterprise SLAs may supersede this document via order form.
-        </section>
-
         <section>
           <h2 className="font-heading text-xl font-semibold">1. Uptime target</h2>
           <p className="mt-2 text-sm text-[color:var(--color-muted-foreground)]">

@@ -20,6 +20,7 @@ Notes:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timedelta, timezone
@@ -89,14 +90,44 @@ async def _collect_user_workspaces(user_id: str, *, include_deleted: bool = Fals
     return [r for r in rows if not r.get("deleted_at")]
 
 
-def _min_created_at(rows: list[dict]) -> str | None:
+def _created_at_range(rows: list[dict]) -> tuple[str | None, str | None]:
+    """Return (oldest, newest) ``created_at`` across rows, ignoring missing values."""
     vals = [r.get("created_at") for r in rows if r.get("created_at")]
-    return min(vals) if vals else None
+    if not vals:
+        return None, None
+    return min(vals), max(vals)
 
 
-def _max_created_at(rows: list[dict]) -> str | None:
-    vals = [r.get("created_at") for r in rows if r.get("created_at")]
-    return max(vals) if vals else None
+# Child tables that hang off ``brain_id``. Order matters only for stable output.
+_BRAIN_CHILD_TABLES: tuple[str, ...] = ("corrections", "lessons", "events", "meta_rules")
+
+
+async def _collect_brain_children(brain_ids: list[str]) -> dict[str, list[dict]]:
+    """Fetch all child rows (corrections/lessons/events/meta_rules) for every brain.
+
+    Returns a dict keyed by table name. Each (table, brain_id) select runs
+    concurrently via ``asyncio.gather`` — the db wrapper has no ``in.(...)``
+    support yet, so this still issues N*M round-trips, but at least they
+    overlap. If ``brain_ids`` is empty, returns empty lists for every table.
+    """
+    db = get_db()
+    if not brain_ids:
+        return {table: [] for table in _BRAIN_CHILD_TABLES}
+
+    tasks = [
+        db.select(table, filters={"brain_id": bid})
+        for table in _BRAIN_CHILD_TABLES
+        for bid in brain_ids
+    ]
+    results = await asyncio.gather(*tasks)
+    out: dict[str, list[dict]] = {table: [] for table in _BRAIN_CHILD_TABLES}
+    # Results come back in the same order tasks were scheduled: for each table,
+    # len(brain_ids) consecutive result lists.
+    for table_idx, table in enumerate(_BRAIN_CHILD_TABLES):
+        start = table_idx * len(brain_ids)
+        for rows in results[start : start + len(brain_ids)]:
+            out[table].extend(rows)
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -110,34 +141,31 @@ async def data_summary(
 ) -> DataSummaryResponse:
     """Return counts + oldest/newest timestamps for the account settings UI."""
     await _require_active_user(user_id)
-    db = get_db()
 
-    workspaces = await _collect_user_workspaces(user_id)
-    brains = await _collect_user_brains(user_id)
-    brain_ids = [b["id"] for b in brains]
+    workspaces, brains = await asyncio.gather(
+        _collect_user_workspaces(user_id),
+        _collect_user_brains(user_id),
+    )
+    children = await _collect_brain_children([b["id"] for b in brains])
 
-    all_corrections: list[dict] = []
-    all_lessons: list[dict] = []
-    all_events: list[dict] = []
-    all_meta_rules: list[dict] = []
-
-    for bid in brain_ids:
-        all_corrections.extend(await db.select("corrections", filters={"brain_id": bid}))
-        all_lessons.extend(await db.select("lessons", filters={"brain_id": bid}))
-        all_events.extend(await db.select("events", filters={"brain_id": bid}))
-        all_meta_rules.extend(await db.select("meta_rules", filters={"brain_id": bid}))
-
-    all_rows = workspaces + brains + all_corrections + all_lessons + all_events + all_meta_rules
+    oldest, newest = _created_at_range(
+        workspaces
+        + brains
+        + children["corrections"]
+        + children["lessons"]
+        + children["events"]
+        + children["meta_rules"]
+    )
     return DataSummaryResponse(
         user_id=user_id,
         workspaces=len(workspaces),
         brains=len(brains),
-        corrections=len(all_corrections),
-        lessons=len(all_lessons),
-        meta_rules=len(all_meta_rules),
-        events=len(all_events),
-        oldest_record=_min_created_at(all_rows),
-        newest_record=_max_created_at(all_rows),
+        corrections=len(children["corrections"]),
+        lessons=len(children["lessons"]),
+        meta_rules=len(children["meta_rules"]),
+        events=len(children["events"]),
+        oldest_record=oldest,
+        newest_record=newest,
     )
 
 
@@ -197,19 +225,11 @@ async def export_me(
     await _enforce_export_rate_limit(user_id)
     db = get_db()
 
-    workspaces = await _collect_user_workspaces(user_id, include_deleted=True)
-    brains = await _collect_user_brains(user_id, include_deleted=True)
-    brain_ids = [b["id"] for b in brains]
-
-    corrections: list[dict] = []
-    lessons: list[dict] = []
-    events: list[dict] = []
-    meta_rules: list[dict] = []
-    for bid in brain_ids:
-        corrections.extend(await db.select("corrections", filters={"brain_id": bid}))
-        lessons.extend(await db.select("lessons", filters={"brain_id": bid}))
-        events.extend(await db.select("events", filters={"brain_id": bid}))
-        meta_rules.extend(await db.select("meta_rules", filters={"brain_id": bid}))
+    workspaces, brains = await asyncio.gather(
+        _collect_user_workspaces(user_id, include_deleted=True),
+        _collect_user_brains(user_id, include_deleted=True),
+    )
+    children = await _collect_brain_children([b["id"] for b in brains])
 
     payload: dict[str, Any] = {
         "schema_version": 1,
@@ -217,10 +237,10 @@ async def export_me(
         "generated_at": _iso(_utcnow()),
         "workspaces": workspaces,
         "brains": brains,
-        "corrections": corrections,
-        "lessons": lessons,
-        "meta_rules": meta_rules,
-        "events": events,
+        "corrections": children["corrections"],
+        "lessons": children["lessons"],
+        "meta_rules": children["meta_rules"],
+        "events": children["events"],
     }
 
     serialized = json.dumps(payload, default=str)
