@@ -67,11 +67,10 @@ def cmd_init(args):
             _log.debug("telemetry prompt failed: %s", exc)
 
     # brain_initialized — once per machine, even across multiple `gradata init`
-    # runs. Wrapped in is_enabled() + try/except so a telemetry bug or DNS
-    # hiccup can never break ``gradata init``.
+    # runs. ``send_once`` already gates on ``is_enabled()`` internally; the
+    # try/except guards against a telemetry bug or DNS hiccup breaking init.
     try:
-        if _telemetry.is_enabled():
-            _telemetry.send_once("brain_initialized")
+        _telemetry.send_once("brain_initialized")
     except Exception as exc:
         _log.debug("telemetry send_once(brain_initialized) failed: %s", exc)
 
