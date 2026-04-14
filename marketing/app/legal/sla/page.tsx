@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description:
     "Gradata's uptime target, support response times, and incident communication commitments.",
   alternates: { canonical: `${site.url}/legal/sla/` },
-  robots: { index: true, follow: true },
+  robots: { index: false, follow: false },
 };
 
 export default function SlaPage() {
@@ -48,10 +48,11 @@ export default function SlaPage() {
         <section>
           <h2 className="font-heading text-xl font-semibold">2. Service credits</h2>
           <table className="mt-3 w-full text-sm">
+            <caption className="sr-only">Service credit tiers by monthly uptime</caption>
             <thead>
               <tr className="text-left text-[color:var(--color-muted-foreground)]">
-                <th className="py-2">Monthly uptime</th>
-                <th className="py-2">Service credit</th>
+                <th scope="col" className="py-2">Monthly uptime</th>
+                <th scope="col" className="py-2">Service credit</th>
               </tr>
             </thead>
             <tbody className="text-[color:var(--color-muted-foreground)]">
@@ -72,11 +73,12 @@ export default function SlaPage() {
         <section>
           <h2 className="font-heading text-xl font-semibold">3. Support response times</h2>
           <table className="mt-3 w-full text-sm">
+            <caption className="sr-only">Support response targets by severity</caption>
             <thead>
               <tr className="text-left text-[color:var(--color-muted-foreground)]">
-                <th className="py-2">Severity</th>
-                <th className="py-2">First response</th>
-                <th className="py-2">Coverage</th>
+                <th scope="col" className="py-2">Severity</th>
+                <th scope="col" className="py-2">First response</th>
+                <th scope="col" className="py-2">Coverage</th>
               </tr>
             </thead>
             <tbody className="text-[color:var(--color-muted-foreground)]">

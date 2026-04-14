@@ -119,7 +119,7 @@ export default function DpaPage() {
           <p className="mt-2 text-sm text-[color:var(--color-muted-foreground)]">
             Gradata provides self-service tools for access, export, and erasure
             (Articles 15 &amp; 17) via the account settings UI and the{" "}
-            <code>/me/export</code> and <code>/me/delete</code> API endpoints. Upon
+            <code>/api/v1/me/export</code> and <code>/api/v1/me/delete</code> API endpoints. Upon
             erasure, Personal Data enters a soft-delete window with a target
             purge horizon of 30 days, executed via a scheduled purge workflow.
             Gradata will assist Customer in responding to Data Subject
