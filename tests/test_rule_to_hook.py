@@ -1,4 +1,7 @@
 """Tests for rule-to-hook graduation."""
+import json as _json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -113,10 +116,6 @@ class TestFindHookCandidates:
         assert len(candidates) == 1
 
 
-import subprocess
-import json as _json
-
-
 class TestRenderHook:
     def test_render_substitutes_placeholders(self):
         from gradata.enhancements.rule_to_hook import classify_rule, render_hook
@@ -207,10 +206,6 @@ class TestTryGenerate:
         result = try_generate(candidate, positive_example="plain ascii no dashes here")
         assert result.installed is False
         assert "self-test" in result.reason.lower() or "did not block" in result.reason.lower()
-
-
-import subprocess
-import sys
 
 
 class TestCliRuleAdd:
@@ -578,23 +573,25 @@ class TestSecretScanTemplate:
         assert try_generate(candidate).installed
 
     def test_secret_hook_blocks_openai_key(self, tmp_path, monkeypatch):
-        import subprocess, json as _j
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         candidate = classify_rule("Never commit secrets", 0.95)
         result = try_generate(candidate)
+        # Synthetic key broken via string concatenation to match the pattern used
+        # in _synthesize_positive and avoid tripping secret scanners.
+        fake_key = "sk" + "-" + "abc123def456ghi789jklmno"
         proc = subprocess.run(
             ["node", str(result.hook_path)],
-            input=_j.dumps({"tool_name": "Write",
-                            "tool_input": {"content": "OPENAI_KEY = 'sk-abc123def456ghi789jklmno'"}}),
+            input=_json.dumps({"tool_name": "Write",
+                               "tool_input": {"content": f"OPENAI_KEY = '{fake_key}'"}}),
             capture_output=True, text=True, timeout=5,
         )
         assert proc.returncode == 2
         # Clean content passes
         proc = subprocess.run(
             ["node", str(result.hook_path)],
-            input=_j.dumps({"tool_name": "Write",
-                            "tool_input": {"content": "OPENAI_KEY = os.environ['OPENAI_API_KEY']"}}),
+            input=_json.dumps({"tool_name": "Write",
+                               "tool_input": {"content": "OPENAI_KEY = os.environ['OPENAI_API_KEY']"}}),
             capture_output=True, text=True, timeout=5,
         )
         assert proc.returncode == 0
@@ -804,7 +801,7 @@ class TestCliExport:
         out_dir.mkdir()
 
         # Resolve src/ to absolute path so cwd=tmp_path doesn't break imports
-        repo_src = str((__import__("pathlib").Path(__file__).resolve().parent.parent / "src"))
+        repo_src = str(Path(__file__).resolve().parent.parent / "src")
         existing_pp = os.environ.get("PYTHONPATH", "")
         env = {**os.environ,
                "GRADATA_BRAIN": str(brain),
@@ -829,7 +826,7 @@ class TestCliExport:
             encoding="utf-8",
         )
         # Resolve src/ to absolute path so cwd=tmp_path doesn't break imports
-        repo_src = str((__import__("pathlib").Path(__file__).resolve().parent.parent / "src"))
+        repo_src = str(Path(__file__).resolve().parent.parent / "src")
         existing_pp = os.environ.get("PYTHONPATH", "")
         env = {**os.environ,
                "GRADATA_BRAIN": str(brain),

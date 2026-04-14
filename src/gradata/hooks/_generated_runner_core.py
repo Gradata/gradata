@@ -42,6 +42,11 @@ def _read_manifest_slugs(manifest_file: Path) -> set[str]:
 
 def run_generated_hooks(*, env_var: str, default_dir: str, per_hook_timeout: int) -> int:
     """Iterate generated hooks in the configured dir, run each, relay first block."""
+    # Short-circuit before any I/O so GRADATA_BYPASS truly zeros the overhead
+    # (no stdin drain, no filesystem scan).
+    if os.environ.get("GRADATA_BYPASS") == "1":
+        return 0
+
     try:
         raw = sys.stdin.read()
         if not raw.strip():
@@ -53,9 +58,6 @@ def run_generated_hooks(*, env_var: str, default_dir: str, per_hook_timeout: int
     override = os.environ.get(env_var)
     root = Path(override) if override else Path(default_dir)
     if not root.exists():
-        return 0
-
-    if os.environ.get("GRADATA_BYPASS") == "1":
         return 0
 
     dispatcher = root / _DISPATCHER_FILENAME

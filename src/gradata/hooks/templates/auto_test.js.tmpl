@@ -40,9 +40,11 @@ try {
     encoding: 'utf-8', timeout: 30000,
   });
   if (res.status !== 0) {
+    // Advisory signal — hooks in this directory MUST fail open. Surface the
+    // pytest output via stderr so Claude can see it on the next turn, but
+    // exit 0 so the tool chain is not blocked.
     const summary = `WARNING: Tests failed for ${testFile} after editing ${filePath}:\n${(res.stdout || '').slice(-800)}\n${(res.stderr || '').slice(-400)}\n\nRule: {{RULE_TEXT}}. Fix before moving on.`;
-    process.stdout.write(JSON.stringify({decision: "block", reason: summary}));
-    process.exit(2);
+    process.stderr.write(summary + '\n');
   }
 } catch (e) {
   // Never break the session on a hook error

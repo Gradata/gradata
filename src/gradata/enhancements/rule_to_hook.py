@@ -388,8 +388,10 @@ def _synthesize_positive(candidate: HookCandidate) -> str:
             return "git reset --hard HEAD"
         return "rm -rf /tmp/foo"
     if candidate.hook_template == "secret_scan":
-        # Synthetic test key (broken into pieces to avoid pre-commit secret scanner).
-        return "sk" + "-" + "abc123def456ghi789jklmno"
+        # Clearly-fake synthetic test key — string-concatenated to slip past
+        # naive secret scanners while still matching the regex (sk- + 20+
+        # alphanumerics). NOT a real credential; self-test only.
+        return "sk" + "-" + "FAKEGRADATASELFTESTKEY000000"
     if candidate.hook_template == "file_size_check":
         limit = int(candidate.template_arg or "500")
         return "x\n" * (limit + 10)

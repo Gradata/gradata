@@ -121,8 +121,16 @@ def cmd_export(args):
     if target:
         from gradata.enhancements.rule_export import export_rules
         brain_root = _resolve_brain_root(args)
+        # Prefer the canonical lessons path the rest of the SDK uses, rather
+        # than hardcoding brain_root/"lessons.md" inside the exporter.
+        lessons_path: Path | None = None
         try:
-            text = export_rules(brain_root, target=target)
+            brain = _get_brain(args)
+            lessons_path = brain._find_lessons_path()
+        except Exception:
+            lessons_path = None
+        try:
+            text = export_rules(brain_root, target=target, lessons_path=lessons_path)
         except ValueError as e:
             print(f"error: {e}", file=sys.stderr)
             return
@@ -486,9 +494,8 @@ def cmd_rule_add(args):
     # Classify first to see if a hook is possible
     candidate = rule_to_hook.classify_rule(text, confidence=1.0)
 
-    # Best-effort brain handle for event logging.  A user running `gradata rule
-    # add` without an initialized brain should still succeed; try_generate
-    # treats brain=None as "skip logging".
+    # Best-effort brain handle for event logging. Users without an initialized
+    # brain still succeed — try_generate treats brain=None as "skip logging".
     brain = None
     try:
         brain = _get_brain(args)
@@ -516,9 +523,16 @@ def cmd_rule_add(args):
         print(f"rule added as soft injection ({result.reason})")
 
 
+def _generated_hook_dirs() -> list[Path]:
+    """Pre- and post-tool generated-hook directories, honoring env overrides."""
+    import os
+    pre = os.environ.get("GRADATA_HOOK_ROOT") or ".claude/hooks/pre-tool/generated"
+    post = os.environ.get("GRADATA_HOOK_ROOT_POST") or ".claude/hooks/post-tool/generated"
+    return [Path(pre), Path(post)]
+
+
 def cmd_rule_list(args):
     """List RULE-tier lessons and their hook status."""
-    import os
     import re as _re
 
     from gradata.enhancements.rule_to_hook import _slug
@@ -527,8 +541,7 @@ def cmd_rule_list(args):
     brain_root = _resolve_brain_root(args)
     lessons_file = brain_root / "lessons.md"
 
-    # Parse RULE-tier entries WITH [hooked] marker preserved
-    rules: list[tuple[str, str, bool]] = []  # (category, description, hooked_marker_in_lessons)
+    rules: list[tuple[str, str, bool]] = []  # (category, description, hooked_marker)
     if lessons_file.exists():
         lesson_re = _re.compile(
             r"^\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+(\w+):\s+(.+)$"
@@ -544,32 +557,29 @@ def cmd_rule_list(args):
             rules.append((category, clean_desc, hooked_marker))
 
     # Discover installed hook files (pre + post) AND bundled manifest entries.
-    # A rule is considered "installed" if it appears in either.
-    pre_dir = Path(os.environ.get("GRADATA_HOOK_ROOT")
-                   or ".claude/hooks/pre-tool/generated")
-    post_dir = Path(os.environ.get("GRADATA_HOOK_ROOT_POST")
-                    or ".claude/hooks/post-tool/generated")
+    # A rule is counted as "installed" if it appears in either.
+    hook_dirs = _generated_hook_dirs()
+    pre_dir, post_dir = hook_dirs[0], hook_dirs[1]
 
     installed_files: dict[str, Path] = {}  # slug (file stem) -> path
-    for d in (pre_dir, post_dir):
+    for d in hook_dirs:
         if d.exists():
             for js in d.glob("*.js"):
-                if js.name in {"_dispatcher.js"}:
+                if js.name == "_dispatcher.js":
                     continue
                 installed_files[js.stem] = js
 
     # Manifest-only slugs (post-migration installs may have no legacy .js).
-    manifest_slugs: set[str] = set()
     for kind in ("pre", "post"):
         for entry in _mf.read_manifest(kind):
             slug = entry.get("slug")
             if not slug:
                 continue
-            manifest_slugs.add(slug)
             if slug not in installed_files:
                 # Synthesize a pseudo-path so the rest of the function can
                 # treat manifest-only entries uniformly.
                 installed_files[slug] = (pre_dir if kind == "pre" else post_dir) / f"{slug} (bundled)"
+
 
     if not rules and not installed_files:
         print("No RULE-tier rules or installed hooks.")
@@ -612,8 +622,10 @@ def cmd_rule_list(args):
 
 def cmd_rule_remove(args):
     """Remove a graduated hook: delete the .js file and unmark (or purge) its lesson."""
-    import os
     import re as _re
+
+    from gradata.enhancements.rule_to_hook import _slug
+    from gradata.hooks import _manifest as _mf
 
     slug = args.slug.strip()
     if not slug:
@@ -623,21 +635,10 @@ def cmd_rule_remove(args):
     brain_root = _resolve_brain_root(args)
     lessons_file = brain_root / "lessons.md"
 
-    def _slug(text: str) -> str:
-        s = _re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-        return s[:60] or "rule"
-
     # 1. Delete hook file from whichever generated dir holds it AND drop the
     #    matching manifest entry (bundled dispatcher source of truth).
-    from gradata.hooks import _manifest as _mf
-
-    pre_dir = Path(os.environ.get("GRADATA_HOOK_ROOT")
-                   or ".claude/hooks/pre-tool/generated")
-    post_dir = Path(os.environ.get("GRADATA_HOOK_ROOT_POST")
-                    or ".claude/hooks/post-tool/generated")
-
     removed_file = None
-    for d in (pre_dir, post_dir):
+    for d in _generated_hook_dirs():
         candidate = d / f"{slug}.js"
         if candidate.exists():
             candidate.unlink()
@@ -649,6 +650,7 @@ def cmd_rule_remove(args):
     removed_manifest_pre = _mf.remove_entry(slug, kind="pre")
     removed_manifest_post = _mf.remove_entry(slug, kind="post")
     removed_manifest = removed_manifest_pre or removed_manifest_post
+
 
     # 2. Find matching lesson by slug → description
     touched_lesson = False

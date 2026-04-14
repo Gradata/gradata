@@ -231,7 +231,12 @@ def store_relationship(
     rel_type: RuleRelationType,
     confidence: float = 0.5,
 ) -> None:
-    """Store a typed relationship in SQLite."""
+    """Store a typed relationship in SQLite.
+
+    Confidence is clamped to [0.0, 1.0] before persistence per the SDK
+    coding guideline ("Confidence values must be in [0.0, 1.0]").
+    """
+    clamped = max(0.0, min(1.0, confidence))
     conn = sqlite3.connect(str(db_path))
     conn.execute(
         "INSERT INTO rule_relationships "
@@ -241,7 +246,7 @@ def store_relationship(
             rule_a_id,
             rule_b_id,
             rel_type.value,
-            confidence,
+            clamped,
             datetime.now(UTC).isoformat(),
         ),
     )
