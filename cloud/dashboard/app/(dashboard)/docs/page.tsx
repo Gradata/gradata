@@ -131,6 +131,60 @@ system = "You are an assistant.\\n\\nFollow these:\\n" + "\\n".join(f"- {r}" for
     ],
   },
   {
+    section: 'CLI',
+    items: [
+      {
+        id: 'cli-init',
+        title: 'Initialize a brain from the command line',
+        language: 'bash',
+        code: `gradata init my-brain --domain engineering`,
+        notes: 'Same as Brain.init() but driven from the shell. Use GRADATA_API_KEY env var to enable cloud sync.',
+      },
+      {
+        id: 'cli-stats',
+        title: 'See what the brain has learned',
+        language: 'bash',
+        code: `gradata stats my-brain
+gradata search my-brain "tone"`,
+        notes: 'stats prints lesson + correction counts grouped by state. search returns matching lessons by query.',
+      },
+      {
+        id: 'cli-context',
+        title: 'Print the active rules for a prompt',
+        language: 'bash',
+        code: `gradata context my-brain "Draft a follow-up email to investors"`,
+        notes: 'Same as brain.rules_for() but pipes to stdout — handy for scripts and other LLM tools.',
+      },
+    ],
+  },
+  {
+    section: 'MCP server',
+    items: [
+      {
+        id: 'mcp-claude',
+        title: 'Run as an MCP server (Claude Desktop, Cursor, etc.)',
+        language: 'bash',
+        code: `python -m gradata.mcp_server --brain my-brain`,
+        notes: "Serves brain.rules_for(), brain.search(), and brain.lessons() over MCP. Add to your MCP host's config.",
+      },
+      {
+        id: 'mcp-config',
+        title: 'Sample claude_desktop_config.json',
+        language: 'typescript',
+        code: `{
+  "mcpServers": {
+    "gradata": {
+      "command": "python",
+      "args": ["-m", "gradata.mcp_server", "--brain", "my-brain"],
+      "env": { "GRADATA_API_KEY": "gd_YOUR_KEY" }
+    }
+  }
+}`,
+        notes: 'Drop this into ~/Library/Application Support/Claude/claude_desktop_config.json (mac) or %APPDATA%/Claude/ (win).',
+      },
+    ],
+  },
+  {
     section: 'TypeScript / JavaScript',
     items: [
       {

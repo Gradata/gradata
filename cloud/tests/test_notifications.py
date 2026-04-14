@@ -32,8 +32,10 @@ class TestGetNotifications:
         assert body["slack_webhook"] == ""
 
     def test_returns_stored_prefs(self, client, mock_supabase, auth_headers, stub_user):
+        # Single row satisfies both selects: the workspace_id resolver and the
+        # subsequent prefs fetch (which filters on user_id + workspace_id).
         mock_supabase.add_response("workspace_members", "select", [
-            {"user_id": "test-user-1", "notification_prefs": {
+            {"user_id": "test-user-1", "workspace_id": "ws-1", "notification_prefs": {
                 "alert_correction_spike": False,
                 "alert_rule_regression": True,
                 "alert_meta_rule_emerged": True,
@@ -50,7 +52,11 @@ class TestGetNotifications:
         assert body["alert_correction_spike"] is False
 
     def test_falls_back_to_defaults_when_prefs_blank(self, client, mock_supabase, auth_headers, stub_user):
-        mock_supabase.add_response("workspace_members", "select", [{"user_id": "test-user-1", "notification_prefs": None}])
+        mock_supabase.add_response(
+            "workspace_members",
+            "select",
+            [{"user_id": "test-user-1", "workspace_id": "ws-1", "notification_prefs": None}],
+        )
         resp = client.get("/api/v1/users/me/notifications", headers=auth_headers)
         assert resp.status_code == 200
         assert resp.json()["digest_cadence"] == "weekly"
