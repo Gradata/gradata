@@ -533,7 +533,8 @@ def cmd_rule(args):
     handlers = {
         "add": cmd_rule_add,
     }
-    handler = handlers.get(getattr(args, "rule_cmd", None))
+    rule_cmd = getattr(args, "rule_cmd", None)
+    handler = handlers.get(rule_cmd) if isinstance(rule_cmd, str) else None
     if handler is None:
         print("error: unknown rule subcommand (expected one of: add)", file=sys.stderr)
         return
