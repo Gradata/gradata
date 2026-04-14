@@ -602,6 +602,7 @@ def update_confidence(
     renter: bool = False,
     machine_mode: bool | None = None,
     salt: str = "",
+    injected_lesson_keys: set[str] | None = None,
 ) -> list[Lesson]:
     """Update confidence for each lesson based on session corrections.
 
@@ -631,6 +632,15 @@ def update_confidence(
         machine_mode: If None, auto-detect from correction volume (>10 = machine).
             If True/False, override auto-detection. Machine mode uses softer
             penalties and higher kill limits for high-volume correction contexts.
+        injected_lesson_keys: Optional set of "CATEGORY:description[:60]" keys
+            (same key format as _core._lesson_key) identifying lessons that
+            were actually injected into the session prompt. The per-lesson
+            attribute ``_was_injected_this_session`` is also honoured for
+            callers that prefer to mark evidence inline. When neither signal
+            is present for a surviving lesson, the confidence bonus is still
+            applied but ``fire_count`` is NOT incremented — this preserves
+            the "no promotion from silence" invariant documented on
+            ``graduate()`` (see gap-analysis/01-internal-audit.md #1.10).
     """
     if renter:
         return lessons
@@ -790,10 +800,20 @@ def update_confidence(
                 else:
                     bonus = base_bonus
                 lesson.confidence = round(max(0.0, min(1.0, lesson.confidence + bonus)), 2)
-                # Cold-start: survival counts as an application (lesson was
-                # injected and the user did NOT correct this category).
-                lesson.fire_count += 1
-                lesson.sessions_since_fire = 0
+                # Gate fire_count increment on evidence of actual injection.
+                # gap-analysis/01-internal-audit.md #1.10: auto-incrementing
+                # fire_count on "survived" bypasses the no-promotion-from-silence
+                # gate asserted in graduate(). Without injection evidence we
+                # still apply the confidence bonus (legacy behaviour) but leave
+                # fire_count untouched so promotion remains gated on real fires.
+                lesson_key = f"{lesson.category.upper()}:{lesson.description[:60]}"
+                was_injected = bool(
+                    getattr(lesson, "_was_injected_this_session", False)
+                    or (injected_lesson_keys and lesson_key in injected_lesson_keys)
+                )
+                if was_injected:
+                    lesson.fire_count += 1
+                    lesson.sessions_since_fire = 0
 
         # Track sessions since fire
         lesson.sessions_since_fire += 1

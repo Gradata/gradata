@@ -19,6 +19,7 @@ from gradata.enhancements.self_improvement import (
     PATTERN_THRESHOLD,
     RULE_THRESHOLD,
     graduate,
+    update_confidence,
 )
 
 
@@ -166,3 +167,66 @@ class TestConfidenceJumpWarning:
         with caplog.at_level(logging.WARNING, logger="gradata.enhancements.self_improvement"):
             graduate([lesson])
         assert not any("Safety assertion" in r.message for r in caplog.records)
+
+
+class TestSurvivalBonusRequiresInjectionEvidence:
+    """Fix for gap-analysis/01-internal-audit.md #1.10.
+
+    Survival path must not bypass the no-promotion-from-silence invariant
+    by auto-incrementing fire_count for lessons that were never injected.
+    """
+
+    def test_silent_survival_does_not_increment_fire_count(self) -> None:
+        lesson = _make_lesson(
+            state=LessonState.INSTINCT,
+            confidence=0.30,
+            fire_count=0,
+            category="DRAFTING",
+        )
+        update_confidence([lesson], [{"category": "ACCURACY"}])
+        assert lesson.fire_count == 0, (
+            "Survival without injection evidence must NOT increment fire_count"
+        )
+        # Confidence bonus is still applied (legacy behaviour preserved)
+        assert lesson.confidence > 0.30
+
+    def test_injected_flag_allows_fire_count_increment(self) -> None:
+        lesson = _make_lesson(
+            state=LessonState.INSTINCT,
+            confidence=0.30,
+            fire_count=0,
+            category="DRAFTING",
+        )
+        lesson._was_injected_this_session = True  # type: ignore[attr-defined]
+        update_confidence([lesson], [{"category": "ACCURACY"}])
+        assert lesson.fire_count == 1
+
+    def test_injected_keys_set_allows_fire_count_increment(self) -> None:
+        lesson = _make_lesson(
+            state=LessonState.INSTINCT,
+            confidence=0.30,
+            fire_count=0,
+            category="DRAFTING",
+            description="keep prose tight",
+        )
+        key = f"DRAFTING:{'keep prose tight'[:60]}"
+        update_confidence(
+            [lesson],
+            [{"category": "ACCURACY"}],
+            injected_lesson_keys={key},
+        )
+        assert lesson.fire_count == 1
+
+    def test_silent_survival_cannot_graduate_from_zero(self) -> None:
+        """Sybil scenario: 3 silent survivals must not promote INSTINCT->PATTERN."""
+        lesson = _make_lesson(
+            state=LessonState.INSTINCT,
+            confidence=0.55,
+            fire_count=0,  # never actually injected
+            category="DRAFTING",
+        )
+        for _ in range(5):
+            update_confidence([lesson], [{"category": "ACCURACY"}])
+        # Without injection evidence, fire_count gate must still block promotion
+        assert lesson.fire_count == 0
+        assert lesson.state == LessonState.INSTINCT
