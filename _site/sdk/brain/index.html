@@ -1,0 +1,3232 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Learns from corrections. Enforces with hooks. Procedural memory for AI agents.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.gradata.ai/sdk/brain/">
+      
+      
+        <link rel="prev" href="../../concepts/meta-rules/">
+      
+      
+        <link rel="next" href="../middleware/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Brain Class - Gradata</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/theme.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#brain-class" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Gradata" class="md-header__button md-logo" aria-label="Gradata" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Gradata
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Brain Class
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="deep-purple"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="deep-purple"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Gradata/gradata" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Gradata/gradata
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/install/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../concepts/corrections/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+    
+  
+  SDK
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../cloud/overview/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Cloud
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../cli/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  CLI
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../changelog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Gradata" class="md-nav__button md-logo" aria-label="Gradata" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    Gradata
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Gradata/gradata" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Gradata/gradata
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/first-brain/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Brain
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/claude-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Claude Code Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/corrections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corrections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/graduation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Graduation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/meta-rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Meta-Rules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDK
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    SDK
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Brain Class
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Brain Class
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructor
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Constructor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainbrain_dir-working_dirnone-encryption_keynone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Brain(brain_dir, working_dir=None, encryption_key=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#braininitbrain_dir-domainnone-namenone-companynone-embeddingnone-interactivetrue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Brain.init(brain_dir, *, domain=None, name=None, company=None, embedding=None, interactive=True)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Properties
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Properties">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainsession-int" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.session → int
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#braindir-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.dir → Path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#braindb_path-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.db_path → Path
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#core-learning-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core learning loop
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Core learning loop">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#braincorrectdraft-final-categorynone-contextnone-sessionnone-agent_typenone-approval_requiredfalse-dry_runfalse-min_severitynone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.correct(draft, final, category=None, context=None, session=None, agent_type=None, approval_required=False, dry_run=False, min_severity=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainapply_brain_rulestask-contextnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.apply_brain_rules(task, context=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainend_sessionsession_correctionsnone-session_typefull-machine_modenone-skip_meta_rulesfalse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.end_session(session_corrections=None, session_type="full", machine_mode=None, skip_meta_rules=False)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainauto_evolveoutput-task-agent_typenone-evaluatornone-dimensionsnone-threshold80" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.auto_evolve(output, task, agent_type=None, evaluator=None, dimensions=None, threshold=8.0)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#braindetect_implicit_feedbackuser_message-sessionnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.detect_implicit_feedback(user_message, session=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#human-in-the-loop-approval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Human-in-the-loop approval
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Human-in-the-loop approval">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainreview_pending-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.review_pending() → list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainapprove_lessonapproval_id-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.approve_lesson(approval_id) → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainreject_lessonapproval_id-reason-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.reject_lesson(approval_id, reason="") → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#search" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Search
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Search">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainsearchquery-modeauto-top_k5-file_typenone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.search(query, mode="auto", top_k=5, file_type=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#embeddings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Embeddings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Embeddings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainembedfullfalse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.embed(full=False)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainemitevent_type-source-data-tagsnone-sessionnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.emit(event_type, source, data, tags=None, session=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainquery_eventsevent_typenone-sessionnone-last_n_sessionsnone-limitnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.query_events(event_type=None, session=None, last_n_sessions=None, limit=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#facts-and-observation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Facts and observation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Facts and observation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainget_factsprospectnone-fact_typenone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.get_facts(prospect=None, fact_type=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainobservemessages-user_iddefault" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.observe(messages, user_id="default")
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lesson-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lesson management
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lesson management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainforgetwhatlast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.forget(what="last")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainrollbacklesson_idnone-descriptionnone-categorynone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.rollback(lesson_id=None, description=None, category=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainpatch_rulerule_id-new_description" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.patch_rule(rule_id, new_description)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainlineagecategorynone-limit50-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.lineage(category=None, limit=50) → list
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#manifest-and-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest and health
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Manifest and health">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainmanifest-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.manifest() → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainhealth-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.health() → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainstats-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.stats() → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainprove-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.prove() → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainconvergence-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.convergence() → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainefficiency-estimate_timefalse-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.efficiency(*, estimate_time=False) → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#patterns-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patterns API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Patterns API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainguardtext-directioninput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.guard(text, direction="input")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainreflectdraft-checklist-evaluator-refiner-max_cycles3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.reflect(draft, checklist, evaluator, refiner, max_cycles=3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainpipelinestages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.pipeline(*stages)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainplantask-contextnone-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.plan(task, context=None) → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#braintrack_rulerule_id-acceptedfalse-misfiredfalse-contradictedfalse-sessionnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.track_rule(rule_id, accepted=False, misfired=False, contradicted=False, session=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainregister_task_typename-keywords-domain_hintnone-prependfalse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.register_task_type(name, keywords, domain_hint=None, prepend=False)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#export-and-share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Export and share
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Export and share">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainexportoutput_pathnone-modefull-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.export(output_path=None, mode="full") → Path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainshare-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.share() → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainabsorbpackage-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.absorb(package) → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainexport_rulesmin_statepattern-skill_name-str" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.export_rules(min_state="PATTERN", skill_name="") → str
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainbackfill_from_gitrepo_path-lookback_days90" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.backfill_from_git(repo_path=".", lookback_days=90)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Context">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#braincontext_formessage-str" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.context_for(message) → str
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainlog_outputtext-output_typenone-self_scorenone-sessionnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.log_output(text, output_type=None, self_score=None, session=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope-classification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope classification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scope classification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainscopetasknone-audiencenone-kwargs-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.scope(task=None, audience=None, **kwargs) → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#budget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Budget
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Budget">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#braincheck_budgetapi_name-count1-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.check_budget(api_name, count=1) → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainspend_budgetapi_name-count1-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.spend_budget(api_name, count=1) → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainbudget_summary-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.budget_summary() → list
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#context-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context manager
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Context manager">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainclose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.close()
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Errors
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../middleware/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Middleware
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rule-to-hook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rule-to-Hook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cloud
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cloud
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cloud/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cloud/dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cloud/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructor
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Constructor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainbrain_dir-working_dirnone-encryption_keynone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Brain(brain_dir, working_dir=None, encryption_key=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#braininitbrain_dir-domainnone-namenone-companynone-embeddingnone-interactivetrue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Brain.init(brain_dir, *, domain=None, name=None, company=None, embedding=None, interactive=True)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Properties
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Properties">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainsession-int" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.session → int
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#braindir-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.dir → Path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#braindb_path-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.db_path → Path
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#core-learning-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core learning loop
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Core learning loop">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#braincorrectdraft-final-categorynone-contextnone-sessionnone-agent_typenone-approval_requiredfalse-dry_runfalse-min_severitynone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.correct(draft, final, category=None, context=None, session=None, agent_type=None, approval_required=False, dry_run=False, min_severity=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainapply_brain_rulestask-contextnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.apply_brain_rules(task, context=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainend_sessionsession_correctionsnone-session_typefull-machine_modenone-skip_meta_rulesfalse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.end_session(session_corrections=None, session_type="full", machine_mode=None, skip_meta_rules=False)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainauto_evolveoutput-task-agent_typenone-evaluatornone-dimensionsnone-threshold80" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.auto_evolve(output, task, agent_type=None, evaluator=None, dimensions=None, threshold=8.0)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#braindetect_implicit_feedbackuser_message-sessionnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.detect_implicit_feedback(user_message, session=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#human-in-the-loop-approval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Human-in-the-loop approval
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Human-in-the-loop approval">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainreview_pending-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.review_pending() → list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainapprove_lessonapproval_id-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.approve_lesson(approval_id) → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainreject_lessonapproval_id-reason-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.reject_lesson(approval_id, reason="") → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#search" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Search
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Search">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainsearchquery-modeauto-top_k5-file_typenone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.search(query, mode="auto", top_k=5, file_type=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#embeddings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Embeddings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Embeddings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainembedfullfalse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.embed(full=False)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainemitevent_type-source-data-tagsnone-sessionnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.emit(event_type, source, data, tags=None, session=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainquery_eventsevent_typenone-sessionnone-last_n_sessionsnone-limitnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.query_events(event_type=None, session=None, last_n_sessions=None, limit=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#facts-and-observation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Facts and observation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Facts and observation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainget_factsprospectnone-fact_typenone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.get_facts(prospect=None, fact_type=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainobservemessages-user_iddefault" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.observe(messages, user_id="default")
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lesson-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lesson management
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lesson management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainforgetwhatlast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.forget(what="last")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainrollbacklesson_idnone-descriptionnone-categorynone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.rollback(lesson_id=None, description=None, category=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainpatch_rulerule_id-new_description" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.patch_rule(rule_id, new_description)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainlineagecategorynone-limit50-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.lineage(category=None, limit=50) → list
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#manifest-and-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest and health
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Manifest and health">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainmanifest-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.manifest() → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainhealth-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.health() → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainstats-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.stats() → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainprove-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.prove() → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainconvergence-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.convergence() → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainefficiency-estimate_timefalse-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.efficiency(*, estimate_time=False) → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#patterns-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patterns API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Patterns API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainguardtext-directioninput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.guard(text, direction="input")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainreflectdraft-checklist-evaluator-refiner-max_cycles3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.reflect(draft, checklist, evaluator, refiner, max_cycles=3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainpipelinestages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.pipeline(*stages)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainplantask-contextnone-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.plan(task, context=None) → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#braintrack_rulerule_id-acceptedfalse-misfiredfalse-contradictedfalse-sessionnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.track_rule(rule_id, accepted=False, misfired=False, contradicted=False, session=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainregister_task_typename-keywords-domain_hintnone-prependfalse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.register_task_type(name, keywords, domain_hint=None, prepend=False)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#export-and-share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Export and share
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Export and share">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainexportoutput_pathnone-modefull-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.export(output_path=None, mode="full") → Path
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainshare-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.share() → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainabsorbpackage-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.absorb(package) → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainexport_rulesmin_statepattern-skill_name-str" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.export_rules(min_state="PATTERN", skill_name="") → str
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainbackfill_from_gitrepo_path-lookback_days90" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.backfill_from_git(repo_path=".", lookback_days=90)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Context">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#braincontext_formessage-str" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.context_for(message) → str
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainlog_outputtext-output_typenone-self_scorenone-sessionnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.log_output(text, output_type=None, self_score=None, session=None)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope-classification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope classification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scope classification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainscopetasknone-audiencenone-kwargs-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.scope(task=None, audience=None, **kwargs) → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#budget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Budget
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Budget">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#braincheck_budgetapi_name-count1-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.check_budget(api_name, count=1) → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainspend_budgetapi_name-count1-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.spend_budget(api_name, count=1) → dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brainbudget_summary-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.budget_summary() → list
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#context-manager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context manager
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Context manager">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#brainclose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        brain.close()
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Errors
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="brain-class">Brain Class<a class="headerlink" href="#brain-class" title="Permanent link">&para;</a></h1>
+<p>The <code>Brain</code> class is the primary interface to the SDK. All correction, graduation, search, and export operations go through it.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">gradata</span><span class="w"> </span><span class="kn">import</span> <span class="n">Brain</span>
+</span></code></pre></div>
+<h2 id="constructor">Constructor<a class="headerlink" href="#constructor" title="Permanent link">&para;</a></h2>
+<h3 id="brainbrain_dir-working_dirnone-encryption_keynone"><code>Brain(brain_dir, working_dir=None, encryption_key=None)</code><a class="headerlink" href="#brainbrain_dir-working_dirnone-encryption_keynone" title="Permanent link">&para;</a></h3>
+<p>Open an existing brain.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">brain</span> <span class="o">=</span> <span class="n">Brain</span><span class="p">(</span><span class="s2">&quot;./my-brain&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>Args:</strong></p>
+<ul>
+<li><code>brain_dir</code> (str | Path) — Path to the brain directory. Must exist.</li>
+<li><code>working_dir</code> (str | Path | None) — Optional working directory for context.</li>
+<li><code>encryption_key</code> (str | None) — At-rest encryption key. Also reads <code>GRADATA_ENCRYPTION_KEY</code>.</li>
+</ul>
+<p><strong>Raises:</strong> <code>BrainNotFoundError</code> if the directory doesn't exist.</p>
+<h3 id="braininitbrain_dir-domainnone-namenone-companynone-embeddingnone-interactivetrue"><code>Brain.init(brain_dir, *, domain=None, name=None, company=None, embedding=None, interactive=True)</code><a class="headerlink" href="#braininitbrain_dir-domainnone-namenone-companynone-embeddingnone-interactivetrue" title="Permanent link">&para;</a></h3>
+<p>Bootstrap a new brain. Creates the directory, initializes SQLite, runs migrations, writes the initial manifest.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">brain</span> <span class="o">=</span> <span class="n">Brain</span><span class="o">.</span><span class="n">init</span><span class="p">(</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="s2">&quot;./my-brain&quot;</span><span class="p">,</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">domain</span><span class="o">=</span><span class="s2">&quot;Engineering&quot;</span><span class="p">,</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Code Review Brain&quot;</span><span class="p">,</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">interactive</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>Returns a <code>Brain</code> instance pointing at the new directory.</p>
+<hr />
+<h2 id="properties">Properties<a class="headerlink" href="#properties" title="Permanent link">&para;</a></h2>
+<h3 id="brainsession-int"><code>brain.session</code> → int<a class="headerlink" href="#brainsession-int" title="Permanent link">&para;</a></h3>
+<p>Current session number, auto-tracked from the event log.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Session </span><span class="si">{</span><span class="n">brain</span><span class="o">.</span><span class="n">session</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="braindir-path"><code>brain.dir</code> → Path<a class="headerlink" href="#braindir-path" title="Permanent link">&para;</a></h3>
+<p>Absolute path to the brain directory.</p>
+<h3 id="braindb_path-path"><code>brain.db_path</code> → Path<a class="headerlink" href="#braindb_path-path" title="Permanent link">&para;</a></h3>
+<p>Absolute path to <code>system.db</code>.</p>
+<hr />
+<h2 id="core-learning-loop">Core learning loop<a class="headerlink" href="#core-learning-loop" title="Permanent link">&para;</a></h2>
+<h3 id="braincorrectdraft-final-categorynone-contextnone-sessionnone-agent_typenone-approval_requiredfalse-dry_runfalse-min_severitynone"><code>brain.correct(draft, final, category=None, context=None, session=None, agent_type=None, approval_required=False, dry_run=False, min_severity=None)</code><a class="headerlink" href="#braincorrectdraft-final-categorynone-contextnone-sessionnone-agent_typenone-approval_requiredfalse-dry_runfalse-min_severitynone" title="Permanent link">&para;</a></h3>
+<p>Record a correction. This is the primary learning signal.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">event</span> <span class="o">=</span> <span class="n">brain</span><span class="o">.</span><span class="n">correct</span><span class="p">(</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">draft</span><span class="o">=</span><span class="s2">&quot;We are pleased to inform you of our new product offering.&quot;</span><span class="p">,</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">final</span><span class="o">=</span><span class="s2">&quot;Hey, check out what we just shipped.&quot;</span><span class="p">,</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="p">)</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;severity&quot;</span><span class="p">],</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;classifications&quot;</span><span class="p">])</span>
+</span></code></pre></div>
+<p>Runs the full pipeline: edit distance → severity → classification → behavioral extraction → INSTINCT lesson → <code>CORRECTION</code> event.</p>
+<p>Returns a dict with <code>diff</code>, <code>severity</code>, <code>classifications</code>, and <code>patterns_extracted</code>.</p>
+<h3 id="brainapply_brain_rulestask-contextnone"><code>brain.apply_brain_rules(task, context=None)</code><a class="headerlink" href="#brainapply_brain_rulestask-contextnone" title="Permanent link">&para;</a></h3>
+<p>Get graduated rules for a task, formatted for prompt injection.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">rules</span> <span class="o">=</span> <span class="n">brain</span><span class="o">.</span><span class="n">apply_brain_rules</span><span class="p">(</span><span class="s2">&quot;write an email to a prospect&quot;</span><span class="p">)</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="c1"># Returns a formatted &lt;brain-rules&gt; string ready for LLM context.</span>
+</span></code></pre></div>
+<h3 id="brainend_sessionsession_correctionsnone-session_typefull-machine_modenone-skip_meta_rulesfalse"><code>brain.end_session(session_corrections=None, session_type="full", machine_mode=None, skip_meta_rules=False)</code><a class="headerlink" href="#brainend_sessionsession_correctionsnone-session_typefull-machine_modenone-skip_meta_rulesfalse" title="Permanent link">&para;</a></h3>
+<p>Run the graduation sweep at end of session.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">brain</span><span class="o">.</span><span class="n">end_session</span><span class="p">()</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="c1"># {&quot;session&quot;: 42, &quot;total_lessons&quot;: 15, &quot;promotions&quot;: 2, &quot;new_rules&quot;: 1, ...}</span>
+</span></code></pre></div>
+<p>Updates confidence, graduates lessons, discovers meta-rules, emits <code>SESSION_END</code>.</p>
+<h3 id="brainauto_evolveoutput-task-agent_typenone-evaluatornone-dimensionsnone-threshold80"><code>brain.auto_evolve(output, task, agent_type=None, evaluator=None, dimensions=None, threshold=8.0)</code><a class="headerlink" href="#brainauto_evolveoutput-task-agent_typenone-evaluatornone-dimensionsnone-threshold80" title="Permanent link">&para;</a></h3>
+<p>Evaluate output along multiple dimensions and auto-generate corrections for anything scoring below <code>threshold</code>.</p>
+<h3 id="braindetect_implicit_feedbackuser_message-sessionnone"><code>brain.detect_implicit_feedback(user_message, session=None)</code><a class="headerlink" href="#braindetect_implicit_feedbackuser_message-sessionnone" title="Permanent link">&para;</a></h3>
+<p>Scan a user message for implicit pushback (e.g., "stop doing that"). Returns a dict describing any detected correction.</p>
+<hr />
+<h2 id="human-in-the-loop-approval">Human-in-the-loop approval<a class="headerlink" href="#human-in-the-loop-approval" title="Permanent link">&para;</a></h2>
+<h3 id="brainreview_pending-list"><code>brain.review_pending()</code> → list<a class="headerlink" href="#brainreview_pending-list" title="Permanent link">&para;</a></h3>
+<p>List lessons awaiting human approval.</p>
+<h3 id="brainapprove_lessonapproval_id-dict"><code>brain.approve_lesson(approval_id)</code> → dict<a class="headerlink" href="#brainapprove_lessonapproval_id-dict" title="Permanent link">&para;</a></h3>
+<p>Approve a pending lesson for graduation.</p>
+<h3 id="brainreject_lessonapproval_id-reason-dict"><code>brain.reject_lesson(approval_id, reason="")</code> → dict<a class="headerlink" href="#brainreject_lessonapproval_id-reason-dict" title="Permanent link">&para;</a></h3>
+<p>Reject a pending lesson.</p>
+<hr />
+<h2 id="search">Search<a class="headerlink" href="#search" title="Permanent link">&para;</a></h2>
+<h3 id="brainsearchquery-modeauto-top_k5-file_typenone"><code>brain.search(query, mode="auto", top_k=5, file_type=None)</code><a class="headerlink" href="#brainsearchquery-modeauto-top_k5-file_typenone" title="Permanent link">&para;</a></h3>
+<p>Search the brain using FTS5 keyword search (and semantic search if embeddings are available).</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">hits</span> <span class="o">=</span> <span class="n">brain</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="s2">&quot;code review patterns&quot;</span><span class="p">,</span> <span class="n">top_k</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">for</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">hits</span><span class="p">:</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">h</span><span class="p">[</span><span class="s1">&#39;confidence&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">h</span><span class="p">[</span><span class="s1">&#39;source&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">h</span><span class="p">[</span><span class="s1">&#39;text&#39;</span><span class="p">][:</span><span class="mi">80</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Returns a list of dicts with <code>source</code>, <code>text</code>, <code>score</code>, <code>confidence</code>.</p>
+<hr />
+<h2 id="embeddings">Embeddings<a class="headerlink" href="#embeddings" title="Permanent link">&para;</a></h2>
+<h3 id="brainembedfullfalse"><code>brain.embed(full=False)</code><a class="headerlink" href="#brainembedfullfalse" title="Permanent link">&para;</a></h3>
+<p>Embed brain files into SQLite for semantic search.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">brain</span><span class="o">.</span><span class="n">embed</span><span class="p">()</span>           <span class="c1"># Delta — only changed files.</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">brain</span><span class="o">.</span><span class="n">embed</span><span class="p">(</span><span class="n">full</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># Full re-embed.</span>
+</span></code></pre></div>
+<p>Requires <code>pip install "gradata[embeddings]"</code>.</p>
+<hr />
+<h2 id="events">Events<a class="headerlink" href="#events" title="Permanent link">&para;</a></h2>
+<h3 id="brainemitevent_type-source-data-tagsnone-sessionnone"><code>brain.emit(event_type, source, data, tags=None, session=None)</code><a class="headerlink" href="#brainemitevent_type-source-data-tagsnone-sessionnone" title="Permanent link">&para;</a></h3>
+<p>Emit an event to the brain's append-only event log.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">brain</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="s2">&quot;CUSTOM_EVENT&quot;</span><span class="p">,</span> <span class="s2">&quot;my_module&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;key&quot;</span><span class="p">:</span> <span class="s2">&quot;value&quot;</span><span class="p">},</span> <span class="p">[</span><span class="s2">&quot;tag:custom&quot;</span><span class="p">])</span>
+</span></code></pre></div>
+<h3 id="brainquery_eventsevent_typenone-sessionnone-last_n_sessionsnone-limitnone"><code>brain.query_events(event_type=None, session=None, last_n_sessions=None, limit=None)</code><a class="headerlink" href="#brainquery_eventsevent_typenone-sessionnone-last_n_sessionsnone-limitnone" title="Permanent link">&para;</a></h3>
+<p>Query events.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">corrections</span> <span class="o">=</span> <span class="n">brain</span><span class="o">.</span><span class="n">query_events</span><span class="p">(</span><span class="n">event_type</span><span class="o">=</span><span class="s2">&quot;CORRECTION&quot;</span><span class="p">,</span> <span class="n">last_n_sessions</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Built-in event types:</p>
+<ul>
+<li><code>CORRECTION</code> — from <code>correct()</code></li>
+<li><code>SESSION_END</code> — from <code>end_session()</code></li>
+<li><code>GRADUATION</code> — when a lesson is promoted</li>
+<li><code>RULE_APPLICATION</code> — from <code>track_rule()</code></li>
+</ul>
+<hr />
+<h2 id="facts-and-observation">Facts and observation<a class="headerlink" href="#facts-and-observation" title="Permanent link">&para;</a></h2>
+<h3 id="brainget_factsprospectnone-fact_typenone"><code>brain.get_facts(prospect=None, fact_type=None)</code><a class="headerlink" href="#brainget_factsprospectnone-fact_typenone" title="Permanent link">&para;</a></h3>
+<p>Query structured facts from the brain.</p>
+<h3 id="brainobservemessages-user_iddefault"><code>brain.observe(messages, user_id="default")</code><a class="headerlink" href="#brainobservemessages-user_iddefault" title="Permanent link">&para;</a></h3>
+<p>Extract facts from a conversation without requiring a correction.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">facts</span> <span class="o">=</span> <span class="n">brain</span><span class="o">.</span><span class="n">observe</span><span class="p">([</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    <span class="p">{</span><span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;I prefer short emails&quot;</span><span class="p">},</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    <span class="p">{</span><span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;assistant&quot;</span><span class="p">,</span> <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;Got it, keeping it brief.&quot;</span><span class="p">},</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="p">])</span>
+</span></code></pre></div>
+<hr />
+<h2 id="lesson-management">Lesson management<a class="headerlink" href="#lesson-management" title="Permanent link">&para;</a></h2>
+<h3 id="brainforgetwhatlast"><code>brain.forget(what="last")</code><a class="headerlink" href="#brainforgetwhatlast" title="Permanent link">&para;</a></h3>
+<p>Delete specific lessons. Supports GDPR right-to-erasure.</p>
+<h3 id="brainrollbacklesson_idnone-descriptionnone-categorynone"><code>brain.rollback(lesson_id=None, description=None, category=None)</code><a class="headerlink" href="#brainrollbacklesson_idnone-descriptionnone-categorynone" title="Permanent link">&para;</a></h3>
+<p>Disable a lesson with audit trail (soft delete). Returns the previous state and confidence for later restoration.</p>
+<h3 id="brainpatch_rulerule_id-new_description"><code>brain.patch_rule(rule_id, new_description)</code><a class="headerlink" href="#brainpatch_rulerule_id-new_description" title="Permanent link">&para;</a></h3>
+<p>Edit a graduated rule's description in-place. Logged as a <code>RULE_PATCH</code> event.</p>
+<h3 id="brainlineagecategorynone-limit50-list"><code>brain.lineage(category=None, limit=50)</code> → list<a class="headerlink" href="#brainlineagecategorynone-limit50-list" title="Permanent link">&para;</a></h3>
+<p>Full correction-to-rule provenance chain.</p>
+<hr />
+<h2 id="manifest-and-health">Manifest and health<a class="headerlink" href="#manifest-and-health" title="Permanent link">&para;</a></h2>
+<h3 id="brainmanifest-dict"><code>brain.manifest()</code> → dict<a class="headerlink" href="#brainmanifest-dict" title="Permanent link">&para;</a></h3>
+<p>Generate (or refresh) <code>brain.manifest.json</code> — mathematical proof the brain is improving.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">m</span> <span class="o">=</span> <span class="n">brain</span><span class="o">.</span><span class="n">manifest</span><span class="p">()</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">m</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;sessions_trained&quot;</span><span class="p">])</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">m</span><span class="p">[</span><span class="s2">&quot;quality&quot;</span><span class="p">][</span><span class="s2">&quot;correction_rate&quot;</span><span class="p">])</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;compound_score&quot;</span><span class="p">))</span>      <span class="c1"># 0-100</span>
+</span></code></pre></div>
+<h3 id="brainhealth-dict"><code>brain.health()</code> → dict<a class="headerlink" href="#brainhealth-dict" title="Permanent link">&para;</a></h3>
+<p>Generate a health report with diagnostics.</p>
+<h3 id="brainstats-dict"><code>brain.stats()</code> → dict<a class="headerlink" href="#brainstats-dict" title="Permanent link">&para;</a></h3>
+<p>Brain statistics: file counts, DB size, embedding status.</p>
+<h3 id="brainprove-dict"><code>brain.prove()</code> → dict<a class="headerlink" href="#brainprove-dict" title="Permanent link">&para;</a></h3>
+<p>Return the compact "prove" object for public display (no raw corrections).</p>
+<h3 id="brainconvergence-dict"><code>brain.convergence()</code> → dict<a class="headerlink" href="#brainconvergence-dict" title="Permanent link">&para;</a></h3>
+<p>Corrections-per-session trend analysis.</p>
+<h3 id="brainefficiency-estimate_timefalse-dict"><code>brain.efficiency(*, estimate_time=False)</code> → dict<a class="headerlink" href="#brainefficiency-estimate_timefalse-dict" title="Permanent link">&para;</a></h3>
+<p>Ops efficiency metrics: rule hit rate, misfire rate, time saved.</p>
+<hr />
+<h2 id="patterns-api">Patterns API<a class="headerlink" href="#patterns-api" title="Permanent link">&para;</a></h2>
+<h3 id="brainguardtext-directioninput"><code>brain.guard(text, direction="input")</code><a class="headerlink" href="#brainguardtext-directioninput" title="Permanent link">&para;</a></h3>
+<p>Run guardrail checks. <code>direction</code> is <code>"input"</code> or <code>"output"</code>.</p>
+<h3 id="brainreflectdraft-checklist-evaluator-refiner-max_cycles3"><code>brain.reflect(draft, checklist, evaluator, refiner, max_cycles=3)</code><a class="headerlink" href="#brainreflectdraft-checklist-evaluator-refiner-max_cycles3" title="Permanent link">&para;</a></h3>
+<p>Run a generate-critique-refine loop.</p>
+<h3 id="brainpipelinestages"><code>brain.pipeline(*stages)</code><a class="headerlink" href="#brainpipelinestages" title="Permanent link">&para;</a></h3>
+<p>Create a Pipeline with Stage instances.</p>
+<h3 id="brainplantask-contextnone-dict"><code>brain.plan(task, context=None)</code> → dict<a class="headerlink" href="#brainplantask-contextnone-dict" title="Permanent link">&para;</a></h3>
+<p>Compile a plan for a task, applying relevant rules and meta-rules.</p>
+<h3 id="braintrack_rulerule_id-acceptedfalse-misfiredfalse-contradictedfalse-sessionnone"><code>brain.track_rule(rule_id, accepted=False, misfired=False, contradicted=False, session=None)</code><a class="headerlink" href="#braintrack_rulerule_id-acceptedfalse-misfiredfalse-contradictedfalse-sessionnone" title="Permanent link">&para;</a></h3>
+<p>Log a rule application event.</p>
+<h3 id="brainregister_task_typename-keywords-domain_hintnone-prependfalse"><code>brain.register_task_type(name, keywords, domain_hint=None, prepend=False)</code><a class="headerlink" href="#brainregister_task_typename-keywords-domain_hintnone-prependfalse" title="Permanent link">&para;</a></h3>
+<p>Register a custom task type in the scope classifier.</p>
+<hr />
+<h2 id="export-and-share">Export and share<a class="headerlink" href="#export-and-share" title="Permanent link">&para;</a></h2>
+<h3 id="brainexportoutput_pathnone-modefull-path"><code>brain.export(output_path=None, mode="full")</code> → Path<a class="headerlink" href="#brainexportoutput_pathnone-modefull-path" title="Permanent link">&para;</a></h3>
+<p>Export brain as a shareable archive.</p>
+<p><strong>Modes:</strong></p>
+<ul>
+<li><code>"full"</code> — everything</li>
+<li><code>"no-prospects"</code> — exclude personal data</li>
+<li><code>"domain-only"</code> — patterns and rules only</li>
+</ul>
+<h3 id="brainshare-dict"><code>brain.share()</code> → dict<a class="headerlink" href="#brainshare-dict" title="Permanent link">&para;</a></h3>
+<p>Package the brain's graduated rules for sharing (no events, no raw data).</p>
+<h3 id="brainabsorbpackage-dict"><code>brain.absorb(package)</code> → dict<a class="headerlink" href="#brainabsorbpackage-dict" title="Permanent link">&para;</a></h3>
+<p>Install a brain package from another user, applying their graduated rules to this brain.</p>
+<h3 id="brainexport_rulesmin_statepattern-skill_name-str"><code>brain.export_rules(min_state="PATTERN", skill_name="")</code> → str<a class="headerlink" href="#brainexport_rulesmin_statepattern-skill_name-str" title="Permanent link">&para;</a></h3>
+<p>Export rules as markdown for cross-platform agent hosts (see <a href="../rule-to-hook/">Rule-to-Hook</a>).</p>
+<h3 id="brainbackfill_from_gitrepo_path-lookback_days90"><code>brain.backfill_from_git(repo_path=".", lookback_days=90)</code><a class="headerlink" href="#brainbackfill_from_gitrepo_path-lookback_days90" title="Permanent link">&para;</a></h3>
+<p>Bootstrap a brain from git commit history.</p>
+<hr />
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<h3 id="braincontext_formessage-str"><code>brain.context_for(message)</code> → str<a class="headerlink" href="#braincontext_formessage-str" title="Permanent link">&para;</a></h3>
+<p>Compile relevant brain context for a user message. Returns a formatted string suitable for prompt injection.</p>
+<h3 id="brainlog_outputtext-output_typenone-self_scorenone-sessionnone"><code>brain.log_output(text, output_type=None, self_score=None, session=None)</code><a class="headerlink" href="#brainlog_outputtext-output_typenone-self_scorenone-sessionnone" title="Permanent link">&para;</a></h3>
+<p>Log an AI-generated output before a correction happens. Enables measurement of improvement over time.</p>
+<hr />
+<h2 id="scope-classification">Scope classification<a class="headerlink" href="#scope-classification" title="Permanent link">&para;</a></h2>
+<h3 id="brainscopetasknone-audiencenone-kwargs-dict"><code>brain.scope(task=None, audience=None, **kwargs)</code> → dict<a class="headerlink" href="#brainscopetasknone-audiencenone-kwargs-dict" title="Permanent link">&para;</a></h3>
+<p>Classify a task into <code>(task_type, audience_tier, domain, stakes)</code>.</p>
+<hr />
+<h2 id="budget">Budget<a class="headerlink" href="#budget" title="Permanent link">&para;</a></h2>
+<h3 id="braincheck_budgetapi_name-count1-dict"><code>brain.check_budget(api_name, count=1)</code> → dict<a class="headerlink" href="#braincheck_budgetapi_name-count1-dict" title="Permanent link">&para;</a></h3>
+<p>Check if an API call is within the daily budget.</p>
+<h3 id="brainspend_budgetapi_name-count1-dict"><code>brain.spend_budget(api_name, count=1)</code> → dict<a class="headerlink" href="#brainspend_budgetapi_name-count1-dict" title="Permanent link">&para;</a></h3>
+<p>Record an API call against the daily budget.</p>
+<h3 id="brainbudget_summary-list"><code>brain.budget_summary()</code> → list<a class="headerlink" href="#brainbudget_summary-list" title="Permanent link">&para;</a></h3>
+<p>Daily budget status for all tracked APIs.</p>
+<hr />
+<h2 id="context-manager">Context manager<a class="headerlink" href="#context-manager" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">with</span> <span class="n">Brain</span><span class="p">(</span><span class="s2">&quot;./my-brain&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">brain</span><span class="p">:</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    <span class="n">brain</span><span class="o">.</span><span class="n">correct</span><span class="p">(</span><span class="n">draft</span><span class="o">=...</span><span class="p">,</span> <span class="n">final</span><span class="o">=...</span><span class="p">)</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="n">brain</span><span class="o">.</span><span class="n">end_session</span><span class="p">()</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># auto-closes on exit</span>
+</span></code></pre></div>
+<h3 id="brainclose"><code>brain.close()</code><a class="headerlink" href="#brainclose" title="Permanent link">&para;</a></h3>
+<p>Release DB handles. Idempotent.</p>
+<hr />
+<h2 id="errors">Errors<a class="headerlink" href="#errors" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">gradata</span><span class="w"> </span><span class="kn">import</span> <span class="n">BrainError</span><span class="p">,</span> <span class="n">BrainNotFoundError</span><span class="p">,</span> <span class="n">ValidationError</span><span class="p">,</span> <span class="n">ExportError</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="k">try</span><span class="p">:</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    <span class="n">brain</span> <span class="o">=</span> <span class="n">Brain</span><span class="p">(</span><span class="s2">&quot;/nope&quot;</span><span class="p">)</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="k">except</span> <span class="n">BrainNotFoundError</span><span class="p">:</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>    <span class="o">...</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Exception</th>
+<th>Raised when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BrainError</code></td>
+<td>Base class</td>
+</tr>
+<tr>
+<td><code>BrainNotFoundError</code></td>
+<td>Brain directory missing</td>
+</tr>
+<tr>
+<td><code>ValidationError</code></td>
+<td>Argument validation failed</td>
+</tr>
+<tr>
+<td><code>ExportError</code></td>
+<td>Export pipeline failed</td>
+</tr>
+<tr>
+<td><code>EmbeddingError</code></td>
+<td>Embedding provider failed</td>
+</tr>
+<tr>
+<td><code>EventPersistenceError</code></td>
+<td>Event log write failed</td>
+</tr>
+<tr>
+<td><code>TaxonomyError</code></td>
+<td>Tag taxonomy violation</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="../middleware/">Middleware</a> for wrapping LLM APIs, and <a href="../rule-to-hook/">Rule-to-Hook</a> for cross-platform export.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/Gradata/gradata" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://pypi.org/project/gradata/" target="_blank" rel="noopener" title="pypi.org" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.indexes", "toc.follow", "content.code.copy", "content.code.annotate", "content.tabs.link", "search.highlight", "search.suggest", "search.share"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -6,9 +6,9 @@ Graduation is how a correction becomes a rule your AI actually enforces. Lessons
 
 | State | Meaning | Confidence range | Applies to prompts? |
 |-------|---------|------------------|---------------------|
-| `INSTINCT` | Tentative. New correction, not yet proven. | ≈ 0.30 – 0.60 | No |
-| `PATTERN` | Proven. At least 3 applications, confidence ≥ 0.60. | ≥ 0.60 | Yes, as `SHOULD` |
-| `RULE` | Battle-tested. 3+ applications at ≥ 0.80 confidence. | ≥ 0.80 | Yes, as `MUST` |
+| `INSTINCT` | Tentative. New correction, not yet proven. | ≈ 0.30 – 0.59 | No |
+| `PATTERN` | Proven. At least 3 applications, confidence in the 0.60–0.89 band. | 0.60 – 0.89 | Yes, as `SHOULD` |
+| `RULE` | Battle-tested. 3+ applications at ≥ 0.90 confidence. | ≥ 0.90 | Yes, as `MUST` |
 
 Archived lessons are RULEs that have been promoted to cross-session reference and are no longer actively re-evaluated.
 
@@ -16,7 +16,7 @@ Archived lessons are RULEs that have been promoted to cross-session reference an
 stateDiagram-v2
     [*] --> INSTINCT: Correction captured
     INSTINCT --> PATTERN: confidence ≥ 0.60 and applications ≥ 3
-    PATTERN --> RULE: confidence ≥ 0.80 and applications ≥ 3
+    PATTERN --> RULE: confidence ≥ 0.90 and applications ≥ 3
     RULE --> ARCHIVED: Promoted to cross-session reference
     INSTINCT --> KILLED: Contradicted or idle past kill limit
     PATTERN --> INSTINCT: Confidence dropped below 0.60

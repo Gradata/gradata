@@ -2,7 +2,7 @@
 
 The Gradata Cloud API is a REST API rooted at:
 
-```
+```text
 https://api.gradata.ai/api/v1
 ```
 
@@ -12,7 +12,7 @@ All endpoints require authentication. All responses are JSON.
 
 Gradata Cloud uses bearer tokens:
 
-```
+```http
 Authorization: Bearer <your-api-key>
 ```
 
@@ -128,33 +128,63 @@ Remove demo / seed data from a brain. Used after onboarding.
 
 ### `POST /sync`
 
-Stream events from a local brain to Cloud. Incremental — send only events since your last cursor.
+Push the brain's local state to Cloud. The brain is identified by the API key in the `Authorization` header — there is no `brain_id` in the body. The endpoint accepts four bulk arrays; any combination may be omitted or empty.
 
 **Request:**
 
 ```json
 {
-  "brain_id": "brn_abc",
-  "cursor": "evt_000123",
+  "corrections": [
+    {
+      "session": 42,
+      "category": "TONE",
+      "severity": "moderate",
+      "description": "Use colons over em dashes",
+      "draft_preview": "...",
+      "final_preview": "...",
+      "created_at": "2026-04-13T12:00:00Z"
+    }
+  ],
+  "lessons": [
+    {
+      "category": "TONE",
+      "description": "Avoid em dashes in prose",
+      "state": "RULE",
+      "confidence": 0.92,
+      "fire_count": 14,
+      "recurrence_days": null
+    }
+  ],
   "events": [
     {
-      "event_type": "CORRECTION",
-      "source": "cli",
+      "type": "GRADUATION",
+      "source": "brain.graduate",
+      "data": { "category": "TONE" },
+      "tags": ["tone"],
       "session": 42,
-      "timestamp": "2026-04-13T12:00:00Z",
-      "data": { "severity": "moderate", "classifications": ["TONE"] }
+      "created_at": "2026-04-13T12:00:00Z"
+    }
+  ],
+  "meta_rules": [
+    {
+      "title": "Drafting Discipline",
+      "description": "Always reread before sending."
     }
   ]
 }
 ```
 
+`corrections` are inserted; `lessons` are upserted (idempotent by `brain_id, description`); `events` and `meta_rules` are inserted.
+
 **Response:**
 
 ```json
 {
-  "accepted": 1,
-  "rejected": 0,
-  "next_cursor": "evt_000124"
+  "status": "ok",
+  "corrections_synced": 1,
+  "lessons_synced": 1,
+  "events_synced": 1,
+  "meta_rules_synced": 1
 }
 ```
 
@@ -172,9 +202,9 @@ Query parameters:
 |-----------|------|-------------|
 | `session` | int | Filter to a single session |
 | `category` | string | Filter by category |
-| `severity` | string | `trivial`, `minor`, `moderate`, `major`, `rewrite` |
+| `severity` | string | `as-is`, `minor`, `moderate`, `major`, `discarded` |
 | `limit` | int | Default 50, max 500 |
-| `cursor` | string | Pagination cursor |
+| `offset` | int | Pagination offset (starting index). Default `0`. |
 
 ---
 
@@ -222,7 +252,14 @@ Aggregated brain analytics: convergence trend, rule hit rate, misfire rate, comp
 
 ### `GET /brains/{brain_id}/activity`
 
-Recent activity feed (corrections, graduations, rule applications).
+Recent activity feed of curated learning events (newest first). Raw corrections are filtered out — only visible events are returned: `graduation`, `self-healing`, `recurrence`, `meta-rule-emerged`, `convergence`, `alert`.
+
+Query parameters:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | int | Default 50, max 200 |
+| `offset` | int | Pagination offset. Default `0`. |
 
 ---
 
@@ -291,7 +328,11 @@ Per-workspace usage and health.
 
 ### `GET /admin/alerts`
 
-Active anomalies: correction spikes, rule kill storms, sync failures.
+Derived alerts across workspaces. Three `kind` values are produced by the operator route:
+
+- `churn-risk` — workspace has been inactive for 14+ days.
+- `failed-payment` — Stripe subscription is `past_due`.
+- `usage-spike` — weekly correction volume is more than 3× the prior week.
 
 ---
 
@@ -311,7 +352,7 @@ Readiness probe. Returns `200` only once Postgres, Redis, and Stripe are reachab
 
 The full OpenAPI 3.1 schema is available at:
 
-```
+```text
 https://api.gradata.ai/api/v1/openapi.json
 ```
 

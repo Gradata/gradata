@@ -46,13 +46,13 @@ Every correction is labelled with one of five severity tiers, computed from edit
 
 | Tier | Meaning | Survival weight | Contradiction weight |
 |------|---------|-----------------|----------------------|
-| `trivial` | Typo, punctuation, whitespace | 0.30 | 0.80 |
+| `as-is` | Edit so small the draft was effectively kept | 0.30 | 0.80 |
 | `minor` | Single word or short phrase swap | 0.60 | 0.90 |
 | `moderate` | Sentence-level rewrite | 0.80 | 1.00 (baseline) |
 | `major` | Multi-sentence change | 1.00 | 1.65 |
-| `rewrite` | Output discarded, full rewrite | 1.20 | 1.80 |
+| `discarded` | Draft thrown out and fully rewritten | 1.20 | 1.80 |
 
-Higher severity moves confidence faster in both directions. A `trivial` correction barely dents confidence; a `rewrite` hits hard.
+Higher severity moves confidence faster in both directions. An `as-is` correction barely dents confidence; a `discarded` rewrite hits hard.
 
 ## Edit-distance math
 
@@ -66,11 +66,11 @@ Mapping to severity (approximate):
 
 | Edit distance | Tier |
 |---------------|------|
-| `0.00 – 0.05` | `trivial` |
-| `0.05 – 0.20` | `minor` |
-| `0.20 – 0.50` | `moderate` |
-| `0.50 – 0.80` | `major` |
-| `0.80 – 1.00` | `rewrite` |
+| `< 0.02` | `as-is` |
+| `0.02 – 0.10` | `minor` |
+| `0.10 – 0.40` | `moderate` |
+| `0.40 – 0.80` | `major` |
+| `≥ 0.80` | `discarded` |
 
 Thresholds adjust per category: a typo fix on code weighs differently than a typo fix on prose.
 

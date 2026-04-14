@@ -116,7 +116,7 @@ m = brain.manifest()
 print(m["metadata"]["sessions_trained"])   # 1
 print(m["quality"]["correction_rate"])     # 0.75 (this session)
 print(m["quality"]["rules_active"])        # 1
-print(m.get("compound_score"))             # 0-100 quality score
+print(m.get("compound_score"))             # 0-10 quality score
 ```
 
 The manifest regenerates from event data every session. It's the brain's resume: cryptographically grounded evidence of training without exposing raw corrections.

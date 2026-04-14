@@ -37,7 +37,7 @@ For internal Gradata ops (and self-hosted deployments with `operator` role), the
 
 - **Global KPIs** — total brains, total events, revenue, active accounts.
 - **Customer table** — per-workspace usage and health.
-- **Alerts** — anomalies: sudden correction spikes, rule kill storms, sync failures.
+- **Alerts** — derived anomalies returned by `/api/v1/admin/alerts`: `churn-risk` (workspace inactive 14+ days), `failed-payment` (Stripe `past_due`), `usage-spike` (weekly correction volume > 3× the prior week).
 
 See the API endpoints under `/api/v1/admin/*` in the [API Reference](api.md).
 
@@ -61,7 +61,8 @@ From the dashboard **Settings → Notifications** you can opt into:
 - **Rule killed** — notified when a rule drops below kill threshold.
 - **Sync failure** — notified if a scheduled sync fails.
 
-Delivery channels: email, webhook, Slack (via Incoming Webhook).
+!!! info "Delivery channels are on the roadmap"
+    The Notifications UI surfaces the events above; outbound delivery (email, webhook, Slack) is not wired up yet. For now, alerts live in the dashboard feed only. Track progress in the [public roadmap](../faq.md).
 
 ## Billing
 

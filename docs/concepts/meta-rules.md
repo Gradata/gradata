@@ -6,7 +6,7 @@ A **meta-rule** is a higher-order behavioral principle that emerges when 3 or mo
 
 Individual rules are narrow. Consider three graduated rules:
 
-```
+```text
 [RULE:0.92] PROCESS: Never jump to implementation. Always plan → adversary → fix → THEN build.
 [RULE:0.88] PROCESS: Always audit existing code before proposing new files.
 [RULE:0.85] PROCESS: When the user asks "what's next", refresh Gmail and calendar first.
@@ -14,7 +14,7 @@ Individual rules are narrow. Consider three graduated rules:
 
 Each rule is useful in its own scope. But they share a principle: *don't act on stale assumptions*. The brain clusters them into a single meta-rule:
 
-```
+```text
 META-RULE [process_discipline] (confidence: 0.88, sources: 3)
   "Verify before acting. Check existing state (code, email, calendar) before
    creating new artifacts or making assumptions. Plan before building."

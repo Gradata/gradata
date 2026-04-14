@@ -34,10 +34,10 @@ The SDK is AGPL-3.0 and will stay that way. Cloud is a proprietary service layer
 
 **Use Cloud if:**
 
-- You want meta-rule synthesis out of the box (no LLM wiring on your side).
-- You run a team and need shared, version-controlled brains.
-- You want the dashboard, alerts, and billing.
-- You want managed backups and cross-device sync.
+- Get meta-rule synthesis out of the box (no LLM wiring on your side).
+- Teams can maintain shared, version-controlled brains across multiple operators.
+- Includes dashboard, alerts, and billing.
+- Managed backups and cross-device sync handled for you.
 
 ## Architecture
 

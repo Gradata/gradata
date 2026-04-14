@@ -60,7 +60,7 @@ Built-in export targets:
 |------|------|--------|
 | Claude Code | `BRAIN-RULES.md` | Markdown with `MUST` / `SHOULD` / `MAY` priorities |
 | Cursor | `.cursorrules` | Plain text rules |
-| Copilot | `.github/copilot-instructions.md` | Markdown |
+| GitHub Copilot | `.github/copilot-instructions.md` | Markdown |
 | Generic | `brain-briefing.md` | Markdown (any tool) |
 
 Exporting:

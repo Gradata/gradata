@@ -61,7 +61,7 @@ Target: zero ruff errors, zero pyright errors, zero bandit HIGH findings.
 
 Short imperative subject line, optional body:
 
-```
+```text
 fix(brain): guard against empty draft in correct()
 
 correct() used to KeyError when draft was empty. Return a no-op event

@@ -75,8 +75,8 @@ chain.predict(input="Draft an email to the CFO")
 
 `BrainMemory`:
 
-- `memory_variables` — exposes `brain_rules` and `brain_facts` as prompt variables.
-- `load_memory_variables(inputs)` — pulls relevant rules and facts for the current input.
+- `memory_variables` — exposes a single combined prompt variable, `brain_context`, that contains both relevant rules and facts joined together. The variable name is configurable via the `memory_key` argument (default `"brain_context"`).
+- `load_memory_variables(inputs)` — returns `{memory_key: <rules + facts as text>}` for the current input.
 - `save_context(inputs, outputs)` — logs the exchange and captures any implicit feedback.
 - `clear()` — does not delete brain data, only clears in-memory cache.
 

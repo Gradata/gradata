@@ -36,7 +36,7 @@ jobs:
         run: mkdocs build --strict --site-dir _site
 
       - name: Install wrangler
-        run: npm install --global wrangler@latest
+        run: npm install --global wrangler@3
 
       - name: Publish to Cloudflare Pages
         env:
