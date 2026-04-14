@@ -2,7 +2,7 @@ import axios from 'axios'
 import { supabase } from './supabase'
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://gradata-production.up.railway.app/api/v1',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://api.gradata.ai/api/v1',
 })
 
 api.interceptors.request.use(async (config) => {

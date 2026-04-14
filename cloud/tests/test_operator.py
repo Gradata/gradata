@@ -125,8 +125,11 @@ def test_global_kpis_aggregates_mrr(operator_client, mock_supabase):
     assert data["net_revenue_retention"] == 1.0
 
 
-def test_global_kpis_excludes_enterprise_from_mrr(operator_client, mock_supabase):
-    """Enterprise plan is custom-priced -> not included in auto MRR."""
+def test_global_kpis_enterprise_default_rate(operator_client, mock_supabase):
+    """Enterprise plan contributes a default rate ($500) to MRR until real
+    Stripe-invoiced amounts are mirrored. Override later by reading
+    stripe_customer.balance instead of a fixed default.
+    """
     mock_supabase.add_response(
         "workspaces",
         "select",
@@ -139,7 +142,7 @@ def test_global_kpis_excludes_enterprise_from_mrr(operator_client, mock_supabase
 
     resp = operator_client.get("/api/v1/admin/global-kpis")
     assert resp.status_code == 200
-    assert resp.json()["mrr_usd"] == 29.0
+    assert resp.json()["mrr_usd"] == 529.0  # 500 (enterprise default) + 29 (pro)
 
 
 # ---------------------------------------------------------------------------

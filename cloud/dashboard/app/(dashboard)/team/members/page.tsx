@@ -10,36 +10,80 @@ import {
 } from '@/components/ui/dialog'
 import { PlanGate, type PlanTier } from '@/components/brain/PlanBadge'
 import { useApi } from '@/hooks/useApi'
+import api from '@/lib/api'
 import type { UserProfile } from '@/types/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
-import { mockTeam, type MemberRole } from '@/lib/fixtures/mock-team'
 
-const ROLE_BADGE: Record<MemberRole, string> = {
+type Role = 'owner' | 'admin' | 'member'
+
+interface Member {
+  user_id: string
+  email: string | null
+  display_name: string | null
+  role: Role | string
+  joined_at: string | null
+  last_sync_at: string | null
+}
+
+const ROLE_BADGE: Record<Role, string> = {
   owner:  'bg-[rgba(124,58,237,0.12)] text-[var(--color-accent-violet)]',
   admin:  'bg-[rgba(58,130,255,0.12)] text-[var(--color-accent-blue)]',
   member: 'bg-white/[0.06] text-[var(--color-body)]',
 }
 
 export default function TeamMembersPage() {
-  const { data: profile, loading } = useApi<UserProfile>('/users/me')
+  const { data: profile, loading: loadingProfile } = useApi<UserProfile>('/users/me')
+  const workspaceId = profile?.workspaces?.[0]?.id ?? null
+  const myRole = (profile?.workspaces?.[0]?.role as Role | null) ?? 'member'
+  const canAdmin = myRole === 'owner' || myRole === 'admin'
+
+  const { data: members, loading: loadingMembers, refetch } = useApi<Member[]>(
+    workspaceId ? `/workspaces/${workspaceId}/members` : null,
+  )
+
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState<MemberRole>('member')
+  const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member')
   const [inviting, setInviting] = useState(false)
   const [inviteStatus, setInviteStatus] = useState<string | null>(null)
+  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<string | null>(null)
 
-  if (loading) return <LoadingSpinner className="py-20" />
+  if (loadingProfile) return <LoadingSpinner className="py-20" />
 
   const currentPlan = (profile?.plan?.toLowerCase() ?? 'free') as PlanTier
+  const memberList: Member[] = members ?? []
 
   const handleInvite = async () => {
+    if (!workspaceId) return
     setInviting(true)
+    setInviteError(null)
     setInviteStatus(null)
-    // TODO(backend): POST /workspaces/{id}/invites — fake for now
-    await new Promise((r) => setTimeout(r, 600))
-    setInviteStatus(`Invite sent to ${inviteEmail}`)
-    setInviteEmail('')
-    setInviting(false)
+    try {
+      await api.post(`/workspaces/${workspaceId}/invites`, {
+        email: inviteEmail,
+        role: inviteRole,
+      })
+      setInviteStatus(`Invite sent to ${inviteEmail}`)
+      setInviteEmail('')
+      refetch()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Invite failed'
+      setInviteError(msg)
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  const handleRemove = async (userId: string) => {
+    if (!workspaceId) return
+    setRemoving(userId)
+    try {
+      await api.delete(`/workspaces/${workspaceId}/members/${userId}`)
+      refetch()
+    } finally {
+      setRemoving(null)
+    }
   }
 
   return (
@@ -51,43 +95,58 @@ export default function TeamMembersPage() {
             Invite teammates and manage roles
           </p>
         </div>
-        <Button onClick={() => setInviteOpen(true)}>Invite member</Button>
+        {canAdmin && (
+          <Button onClick={() => { setInviteOpen(true); setInviteStatus(null); setInviteError(null) }}>
+            Invite member
+          </Button>
+        )}
       </header>
 
       <PlanGate current={currentPlan} requires="team" featureName="Team member management">
         <GlassCard gradTop>
-          <ul className="divide-y divide-[var(--color-border)]">
-            {mockTeam.map((m) => (
-              <li key={m.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0 sm:flex-nowrap">
-                <div className="min-w-0 flex-1 basis-full sm:basis-auto">
-                  <div className="flex flex-wrap items-baseline gap-2.5">
-                    <span className="text-[13px] font-medium">{m.name}</span>
-                    <span className={`rounded-[0.25rem] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${ROLE_BADGE[m.role]}`}>
-                      {m.role}
-                    </span>
-                    {m.status === 'inactive' && (
-                      <span className="font-mono text-[10px] text-[var(--color-warning)]">inactive</span>
+          {loadingMembers ? (
+            <LoadingSpinner className="py-10" />
+          ) : memberList.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-[13px] text-[var(--color-body)]">
+                No members yet. {canAdmin && 'Invite your first teammate above.'}
+              </p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-[var(--color-border)]">
+              {memberList.map((m) => (
+                <li key={m.user_id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0 sm:flex-nowrap">
+                  <div className="min-w-0 flex-1 basis-full sm:basis-auto">
+                    <div className="flex flex-wrap items-baseline gap-2.5">
+                      <span className="text-[13px] font-medium">
+                        {m.display_name || m.email || m.user_id.slice(0, 8)}
+                      </span>
+                      <span className={`rounded-[0.25rem] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${ROLE_BADGE[(m.role as Role) || 'member']}`}>
+                        {m.role}
+                      </span>
+                    </div>
+                    {m.email && m.display_name && (
+                      <div className="font-mono text-[10px] text-[var(--color-body)] truncate">{m.email}</div>
                     )}
                   </div>
-                  <div className="font-mono text-[10px] text-[var(--color-body)] truncate">{m.email}</div>
-                </div>
-                <div className="font-mono text-[11px] text-[var(--color-body)] sm:w-32 sm:text-right">
-                  {m.last_sync_at
-                    ? `synced ${formatAgo(m.last_sync_at)}`
-                    : 'never synced'}
-                </div>
-                {m.role !== 'owner' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="ml-auto text-[var(--color-destructive)] hover:text-[var(--color-destructive)] sm:ml-0"
-                  >
-                    Remove
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
+                  <div className="font-mono text-[11px] text-[var(--color-body)] sm:w-32 sm:text-right">
+                    {m.last_sync_at ? `synced ${formatAgo(m.last_sync_at)}` : 'never synced'}
+                  </div>
+                  {canAdmin && m.role !== 'owner' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={removing === m.user_id}
+                      onClick={() => handleRemove(m.user_id)}
+                      className="ml-auto text-[var(--color-destructive)] hover:text-[var(--color-destructive)] sm:ml-0"
+                    >
+                      {removing === m.user_id ? 'Removing…' : 'Remove'}
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </GlassCard>
       </PlanGate>
 
@@ -105,6 +164,11 @@ export default function TeamMembersPage() {
                 {inviteStatus}
               </p>
             )}
+            {inviteError && (
+              <p className="rounded-md bg-[rgba(239,68,68,0.1)] px-3 py-2 text-sm text-[var(--color-destructive)]">
+                {inviteError}
+              </p>
+            )}
             <div className="space-y-2">
               <Label htmlFor="inviteEmail">Email</Label>
               <Input id="inviteEmail" type="email" placeholder="teammate@company.com"
@@ -115,7 +179,7 @@ export default function TeamMembersPage() {
               <select
                 id="inviteRole"
                 value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value as MemberRole)}
+                onChange={(e) => setInviteRole(e.target.value as 'admin' | 'member')}
                 className="w-full rounded-[0.5rem] border border-[var(--color-border)] bg-[rgba(21,29,48,0.6)] px-3 py-2 text-sm"
               >
                 <option value="member">Member — see own brain only</option>
@@ -124,7 +188,7 @@ export default function TeamMembersPage() {
             </div>
             <Button
               onClick={handleInvite}
-              disabled={inviting || !inviteEmail}
+              disabled={inviting || !inviteEmail || !workspaceId}
               className="w-full"
             >
               {inviting ? 'Sending…' : 'Send invite'}

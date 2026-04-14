@@ -5,10 +5,15 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.auth import get_brain_for_request, get_current_brain
+from app.auth import (
+    get_brain_for_request,
+    get_current_brain,
+    get_current_user_id,
+    get_current_user_id_flexible,
+)
 from app.db import get_db
 from app.models import BrainDetail, UpdateBrainRequest
 
@@ -56,15 +61,113 @@ async def connect_brain(
 
 
 @router.get("/brains", response_model=list[BrainDetail])
-async def list_brains(brain: dict = Depends(get_current_brain)) -> list[BrainDetail]:
-    """List all brains accessible to the authenticated user."""
+async def list_brains(user_id: str = Depends(get_current_user_id_flexible)) -> list[BrainDetail]:
+    """List all brains for the authenticated user. Returns [] for new users."""
     db = get_db()
     rows = await db.select(
         "brains",
         columns="id,user_id,brain_name,domain,last_sync_at,created_at",
-        filters={"user_id": brain["user_id"]},
+        filters={"user_id": user_id},
     )
-    return [await _brain_detail(db, row) for row in rows]
+    if not rows:
+        return []
+
+    brain_ids = [r["id"] for r in rows]
+    # Two batched fetches instead of 2*N — count lessons + corrections per brain.
+    lessons = await db.select("lessons", columns="brain_id", in_={"brain_id": brain_ids})
+    corrections = await db.select("corrections", columns="brain_id", in_={"brain_id": brain_ids})
+    lesson_count: dict[str, int] = {}
+    correction_count: dict[str, int] = {}
+    for l in lessons:
+        bid = l.get("brain_id")
+        if bid:
+            lesson_count[bid] = lesson_count.get(bid, 0) + 1
+    for c in corrections:
+        bid = c.get("brain_id")
+        if bid:
+            correction_count[bid] = correction_count.get(bid, 0) + 1
+
+    return [
+        BrainDetail(
+            id=row["id"],
+            user_id=row["user_id"],
+            name=row.get("brain_name"),
+            domain=row.get("domain"),
+            lesson_count=lesson_count.get(row["id"], 0),
+            correction_count=correction_count.get(row["id"], 0),
+            last_sync=row.get("last_sync_at"),
+            created_at=row.get("created_at"),
+        )
+        for row in rows
+    ]
+
+
+class CreateBrainRequest(BaseModel):
+    brain_name: str = "default"
+    domain: str = ""
+
+
+@router.post("/brains", response_model=BrainDetail, status_code=201)
+async def create_brain(
+    body: CreateBrainRequest,
+    user_id: str = Depends(get_current_user_id),
+) -> BrainDetail:
+    """Explicitly create a new brain for the authenticated user.
+
+    Used as a fallback when the signup auto-trigger didn't create one, and as
+    the primary path for users who want multiple named brains. A workspace is
+    auto-created if the user doesn't belong to one yet.
+    """
+    db = get_db()
+
+    # Find or create a workspace for the user.
+    memberships = await db.select(
+        "workspace_members", columns="workspace_id", filters={"user_id": user_id}
+    )
+    if memberships:
+        workspace_id = memberships[0]["workspace_id"]
+    else:
+        ws_rows = await db.insert(
+            "workspaces",
+            {"name": "My Workspace", "owner_id": user_id, "plan": "free"},
+        )
+        if not ws_rows:
+            raise HTTPException(status_code=500, detail="Failed to create workspace")
+        workspace_id = ws_rows[0]["id"]
+        await db.insert(
+            "workspace_members",
+            {"workspace_id": workspace_id, "user_id": user_id, "role": "owner"},
+        )
+
+    # Generate a cloud-scope API key so the SDK can authenticate right away.
+    # Delegate to the canonical helper so prefix + entropy stays consistent.
+    from app.routes.api_keys import _generate_key
+    api_key = _generate_key()
+
+    brain_rows = await db.insert(
+        "brains",
+        {
+            "user_id": user_id,
+            "workspace_id": workspace_id,
+            "brain_name": body.brain_name,
+            "domain": body.domain,
+            "api_key": api_key,
+        },
+    )
+    if not brain_rows:
+        raise HTTPException(status_code=500, detail="Failed to create brain")
+    b = brain_rows[0]
+    _log.info("Brain created: %s (user=%s workspace=%s)", b["id"], user_id, workspace_id)
+    return BrainDetail(
+        id=b["id"],
+        user_id=b["user_id"],
+        name=b.get("brain_name"),
+        domain=b.get("domain"),
+        lesson_count=0,
+        correction_count=0,
+        last_sync=b.get("last_sync_at"),
+        created_at=b.get("created_at"),
+    )
 
 
 @router.get("/brains/{brain_id}", response_model=BrainDetail)
