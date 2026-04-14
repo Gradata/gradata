@@ -24,6 +24,7 @@ from typing import Any
 
 from gradata.middleware._core import (
     RuleSource,
+    _get,
     build_brain_rules_block,
     check_output,
     inject_into_system,
@@ -42,21 +43,13 @@ def _require_openai() -> None:
 
 def _extract_text(response: Any) -> str:
     """Best-effort text extraction from an OpenAI chat.completions response."""
-    choices = getattr(response, "choices", None)
-    if choices is None and isinstance(response, dict):
-        choices = response.get("choices")
-    if not choices:
-        return ""
+    choices = _get(response, "choices") or []
     parts: list[str] = []
     for choice in choices:
-        message = getattr(choice, "message", None)
-        if message is None and isinstance(choice, dict):
-            message = choice.get("message")
+        message = _get(choice, "message")
         if message is None:
             continue
-        content = getattr(message, "content", None)
-        if content is None and isinstance(message, dict):
-            content = message.get("content")
+        content = _get(message, "content")
         if content:
             parts.append(str(content))
     return "\n".join(parts)
@@ -65,20 +58,19 @@ def _extract_text(response: Any) -> str:
 def _inject_into_messages(messages: list[Any], block: str) -> list[Any]:
     """Return a new messages list with rules folded into the system message.
 
-    If a leading system message exists, its ``content`` is extended with the
-    block; otherwise a new system message is prepended.
+    If a leading system message with string content exists, its content is
+    extended with the block. In every other case (no system message, or a
+    system message whose content is a structured multimodal list) a fresh
+    system message is prepended so the original payload is preserved.
     """
-    if not block:
-        return list(messages)
     out = [dict(m) if isinstance(m, dict) else m for m in messages]
-    if out and isinstance(out[0], dict) and out[0].get("role") == "system":
-        existing = out[0].get("content")
-        if isinstance(existing, str) or existing is None:
-            out[0]["content"] = inject_into_system(existing, block)
-        else:
-            # Structured (e.g. multimodal list) content — don't stringify it;
-            # prepend a fresh system message so the original payload is preserved.
-            out.insert(0, {"role": "system", "content": block})
+    head = out[0] if out else None
+    if (
+        isinstance(head, dict)
+        and head.get("role") == "system"
+        and isinstance(head.get("content"), (str, type(None)))
+    ):
+        head["content"] = inject_into_system(head.get("content"), block)
     else:
         out.insert(0, {"role": "system", "content": block})
     return out
@@ -125,8 +117,9 @@ class _CompletionsProxy:
     def create(self, *args: Any, **kwargs: Any) -> Any:
         block = build_brain_rules_block(self._mw._source)
         if block:
-            messages = kwargs.get("messages") or []
-            kwargs["messages"] = _inject_into_messages(list(messages), block)
+            kwargs["messages"] = _inject_into_messages(
+                kwargs.get("messages") or [], block,
+            )
 
         response = self._mw._orig_chat.completions.create(*args, **kwargs)
         text = _extract_text(response)

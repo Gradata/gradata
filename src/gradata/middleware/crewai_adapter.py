@@ -30,8 +30,11 @@ from typing import Any
 from gradata.middleware._core import (
     RuleSource,
     RuleViolation,
+    _get,
     check_output,
 )
+
+_OUTPUT_TEXT_KEYS = ("raw", "output", "text", "content")
 
 
 class CrewAIGuard:
@@ -78,13 +81,8 @@ def _coerce_text(output: Any) -> str:
         return ""
     if isinstance(output, str):
         return output
-    for attr in ("raw", "output", "text", "content"):
-        val = getattr(output, attr, None)
+    for key in _OUTPUT_TEXT_KEYS:
+        val = _get(output, key)
         if isinstance(val, str) and val:
             return val
-    if isinstance(output, dict):
-        for key in ("raw", "output", "text", "content"):
-            val = output.get(key)
-            if isinstance(val, str) and val:
-                return val
     return str(output)

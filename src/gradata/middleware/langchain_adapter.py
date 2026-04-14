@@ -27,6 +27,7 @@ from typing import Any
 
 from gradata.middleware._core import (
     RuleSource,
+    _get,
     build_brain_rules_block,
     check_output,
 )
@@ -122,17 +123,11 @@ class LangChainCallback(_BaseCallbackHandler):  # type: ignore[misc,valid-type]
 
 def _extract_llm_text(response: Any) -> str:
     """Best-effort text extraction from a LangChain ``LLMResult``."""
-    generations = getattr(response, "generations", None)
-    if generations is None and isinstance(response, dict):
-        generations = response.get("generations")
-    if not generations:
-        return ""
+    generations = _get(response, "generations") or []
     parts: list[str] = []
     for batch in generations:
         for gen in batch:
-            text = getattr(gen, "text", None)
-            if text is None and isinstance(gen, dict):
-                text = gen.get("text", "")
+            text = _get(gen, "text")
             if text:
                 parts.append(str(text))
     return "\n".join(parts)

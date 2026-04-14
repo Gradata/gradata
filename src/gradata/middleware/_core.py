@@ -13,7 +13,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from gradata.enhancements.rule_to_hook import DeterminismCheck, classify_rule
 
@@ -56,6 +56,21 @@ class RuleViolation(Exception):  # noqa: N818 — public API name specified in s
 def is_bypassed() -> bool:
     """Return True if GRADATA_BYPASS=1 is set (kill switch for middleware)."""
     return os.environ.get("GRADATA_BYPASS", "").strip() == "1"
+
+
+def _get(obj: Any, key: str, default: Any = None) -> Any:
+    """Fetch ``key`` from a response-like object using attr-then-dict lookup.
+
+    LLM SDK responses are inconsistently typed across versions — modern
+    clients expose pydantic objects while older ones (and cassette fixtures)
+    return plain dicts. Adapters would otherwise repeat
+    ``getattr(x, k) or (x.get(k) if isinstance(x, dict) else None)``
+    for every field they touch.
+    """
+    val = getattr(obj, key, None)
+    if val is None and isinstance(obj, dict):
+        return obj.get(key, default)
+    return val if val is not None else default
 
 
 # ---------------------------------------------------------------------------

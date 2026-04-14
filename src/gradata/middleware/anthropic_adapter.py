@@ -29,6 +29,7 @@ from typing import Any
 
 from gradata.middleware._core import (
     RuleSource,
+    _get,
     build_brain_rules_block,
     check_output,
     inject_into_system,
@@ -46,28 +47,23 @@ def _require_anthropic() -> None:
 
 
 def _extract_text(response: Any) -> str:
-    """Best-effort extraction of the assistant text from an Anthropic response."""
-    content = getattr(response, "content", None)
-    if content is None and isinstance(response, dict):
-        content = response.get("content")
+    """Best-effort extraction of the assistant text from an Anthropic response.
+
+    Anthropic responses expose ``content`` either as a plain string (older
+    SDKs, dict-shaped responses) or as a list of typed content blocks.
+    """
+    content = _get(response, "content")
     if not content:
         return ""
-    # Anthropic responses may expose content as a plain string (older SDKs,
-    # dict-shaped responses) or as a list of typed content blocks.
     if isinstance(content, str):
         return content
     parts: list[str] = []
     for block in content:
-        # SDK object: block.type == 'text', block.text == '...'
-        block_type = getattr(block, "type", None)
-        if block_type is None and isinstance(block, dict):
-            block_type = block.get("type")
-        if block_type == "text":
-            text = getattr(block, "text", None)
-            if text is None and isinstance(block, dict):
-                text = block.get("text", "")
-            if text:
-                parts.append(str(text))
+        if _get(block, "type") != "text":
+            continue
+        text = _get(block, "text")
+        if text:
+            parts.append(str(text))
     return "\n".join(parts)
 
 
