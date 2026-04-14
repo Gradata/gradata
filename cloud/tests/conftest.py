@@ -47,6 +47,12 @@ class MockSupabaseClient:
         return rows
 
     async def update(self, table: str, data: dict, filters: dict | None = None) -> list[dict]:
+        # Match prod wrapper semantics: empty list filter = no-op (returns []
+        # rather than patching every row in the table).
+        if filters:
+            for val in filters.values():
+                if isinstance(val, (list, tuple, set)) and not val:
+                    return []
         return [data]
 
     async def delete(self, table: str, filters: dict | None = None) -> list[dict]:

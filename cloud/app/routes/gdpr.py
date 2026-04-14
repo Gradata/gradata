@@ -332,33 +332,38 @@ async def delete_me(
             purge_after=existing.get("purge_after") or purge_iso,
         )
 
-    # Cascade ORDER matters — the db wrapper has no transactions yet, so we
-    # tombstone subordinate resources (workspaces, brains) FIRST and the
-    # ``users`` row LAST. A mid-cascade failure this way leaves the account
-    # still active (recoverable on retry) rather than tombstoned-with-live-
-    # resources (orphaned and invisible to the user). Tracked follow-up:
-    # switch to a single transaction or PostgREST ``id=in.(...)`` bulk PATCH
-    # once SupabaseClient supports either (see db wrapper TODO).
+    # Cascade strategy: use PostgREST ``id=in.(...)`` bulk PATCH so each
+    # resource table gets tombstoned in a single round-trip. This collapses
+    # the old N+1 per-row loop into 3 writes total (workspaces, brains,
+    # users) and removes most of the mid-cascade failure window. Order still
+    # matters because the db wrapper has no cross-table transaction: we
+    # tombstone subordinates (workspaces, brains) FIRST and the ``users`` row
+    # LAST so a mid-cascade failure leaves the account recoverable (still
+    # active + some subordinates down) rather than orphaned (user tombstoned
+    # + subordinates still live and invisible). A best-effort rollback
+    # clears any partial subordinate tombstone before we raise.
     owned_workspaces = await _collect_user_workspaces(user_id, include_deleted=False)
     owned_brains = await _collect_user_brains(user_id, include_deleted=False)
+    workspace_ids = [ws["id"] for ws in owned_workspaces]
+    brain_ids = [b["id"] for b in owned_brains]
 
-    updated_workspaces: list[str] = []
-    updated_brains: list[str] = []
+    patched_workspaces = False
+    patched_brains = False
     try:
-        for ws in owned_workspaces:
+        if workspace_ids:
             await db.update(
                 "workspaces",
                 data={"deleted_at": now_iso},
-                filters={"id": ws["id"]},
+                filters={"id": workspace_ids},
             )
-            updated_workspaces.append(ws["id"])
-        for b in owned_brains:
+            patched_workspaces = True
+        if brain_ids:
             await db.update(
                 "brains",
                 data={"deleted_at": now_iso},
-                filters={"id": b["id"]},
+                filters={"id": brain_ids},
             )
-            updated_brains.append(b["id"])
+            patched_brains = True
 
         # Subordinates tombstoned — now mark the user deleted. Upsert so we
         # don't 500 if the shadow users row is absent.
@@ -371,33 +376,34 @@ async def delete_me(
             },
         )
     except Exception as exc:
-        # Best-effort rollback: revert the partial subordinate tombstones so
-        # the account stays in a consistent "still active" state. Any rollback
-        # failure is swallowed and logged — the user sees a 500 and retries.
+        # Best-effort rollback: revert whichever bulk tombstone(s) already
+        # landed so the account stays in a consistent "still active" state.
+        # Any rollback failure is swallowed and logged — the user sees a 500
+        # and retries.
         _log.error(
-            "GDPR soft-delete cascade failed mid-flight partial_workspaces=%d partial_brains=%d",
-            len(updated_workspaces),
-            len(updated_brains),
+            "GDPR soft-delete cascade failed mid-flight patched_workspaces=%s patched_brains=%s",
+            patched_workspaces,
+            patched_brains,
             exc_info=True,
         )
-        for ws_id in updated_workspaces:
+        if patched_workspaces and workspace_ids:
             try:
                 await db.update(
                     "workspaces",
                     data={"deleted_at": None},
-                    filters={"id": ws_id},
+                    filters={"id": workspace_ids},
                 )
             except Exception:  # pragma: no cover - defensive best-effort
-                _log.warning("Rollback failed for workspace tombstone")
-        for b_id in updated_brains:
+                _log.warning("Rollback failed for workspace tombstones")
+        if patched_brains and brain_ids:
             try:
                 await db.update(
                     "brains",
                     data={"deleted_at": None},
-                    filters={"id": b_id},
+                    filters={"id": brain_ids},
                 )
             except Exception:  # pragma: no cover - defensive best-effort
-                _log.warning("Rollback failed for brain tombstone")
+                _log.warning("Rollback failed for brain tombstones")
         raise HTTPException(
             status_code=500,
             detail="Account deletion failed mid-cascade. Please retry.",

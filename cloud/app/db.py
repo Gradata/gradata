@@ -57,11 +57,25 @@ class SupabaseClient:
     async def update(
         self, table: str, data: dict[str, Any], filters: dict[str, Any] | None = None,
     ) -> list[dict]:
-        """UPDATE rows matching eq filters."""
+        """UPDATE rows matching filters.
+
+        Filter values may be a scalar (eq match) or a list/tuple (in match).
+        Empty list filter values are treated as a no-op and return ``[]`` —
+        we never issue an unfiltered PATCH which would rewrite every row in
+        the table (GDPR cascade safety).
+        """
         params: dict[str, str] = {}
         if filters:
             for key, val in filters.items():
-                params[key] = f"eq.{val}"
+                if isinstance(val, (list, tuple, set)):
+                    if not val:
+                        # No matches possible; refuse to PATCH without a filter.
+                        return []
+                    # PostgREST in.() syntax: column=in.(a,b,c)
+                    joined = ",".join(str(v) for v in val)
+                    params[key] = f"in.({joined})"
+                else:
+                    params[key] = f"eq.{val}"
         resp = await self._http.patch(f"/{table}", params=params, json=data)
         resp.raise_for_status()
         return resp.json()

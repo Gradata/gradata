@@ -482,7 +482,11 @@ def test_delete_rolls_back_partial_cascade_on_mid_flight_failure(
     app_with_user, mock_supabase
 ):
     """If brain tombstoning fails mid-cascade, roll back the workspace
-    tombstones and refuse to mark the user deleted. User sees 500 and retries."""
+    tombstone and refuse to mark the user deleted. User sees 500 and retries.
+
+    Cascade is now bulk (one PATCH per table with ``id=in.(...)``), so the
+    rollback is a single PATCH that clears the full set of affected IDs.
+    """
     rollback_calls: list[dict] = []
     user_upserts: list[dict] = []
 
@@ -499,7 +503,7 @@ def test_delete_rolls_back_partial_cascade_on_mid_flight_failure(
     original_update = mock_supabase.update
 
     async def failing_update(table, data=None, filters=None):
-        # Let workspace tombstones succeed, fail on the first brain tombstone,
+        # Let workspace tombstones succeed, fail on the brains bulk tombstone,
         # then let rollback updates (data={"deleted_at": None}) pass so we can
         # observe them.
         if table == "brains" and (data or {}).get("deleted_at") is not None:
@@ -524,11 +528,18 @@ def test_delete_rolls_back_partial_cascade_on_mid_flight_failure(
     # User row must NOT be tombstoned on failure — that's the whole point of
     # ordering subordinates-first with a rollback.
     assert user_upserts == [], "user must not be tombstoned when cascade fails"
-    # The already-updated workspace tombstone must have been rolled back.
-    assert any(
-        c["table"] == "workspaces" and c["filters"] == {"id": WORKSPACE_ID}
-        for c in rollback_calls
-    ), "expected workspace rollback after mid-cascade failure"
+    # The already-updated workspace tombstones must have been rolled back via
+    # a single bulk PATCH carrying every affected ID.
+    ws_rollbacks = [c for c in rollback_calls if c["table"] == "workspaces"]
+    assert ws_rollbacks, "expected workspace rollback after mid-cascade failure"
+    ws_filter = ws_rollbacks[0]["filters"]
+    rolled_ids = ws_filter.get("id")
+    # Accept either scalar (single-workspace) or list (bulk) rollback filter
+    # so the assertion stays useful if the cascade shape changes again.
+    if isinstance(rolled_ids, (list, tuple, set)):
+        assert WORKSPACE_ID in rolled_ids
+    else:
+        assert rolled_ids == WORKSPACE_ID
 
 
 # ---------------------------------------------------------------------------
