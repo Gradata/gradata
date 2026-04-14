@@ -333,9 +333,8 @@ class RuleTree:
         if session_contradictions:
             for path, count in session_contradictions.items():
                 for lesson in list(self.nodes.get(path, [])):
-                    if (
-                        count >= self.CONTRACT_MIN_CONTRADICTIONS
-                        and self.evaluate_contract(lesson, count, current_session)
+                    if count >= self.CONTRACT_MIN_CONTRADICTIONS and self.evaluate_contract(
+                        lesson, count, current_session
                     ):
                         contracted += 1
 

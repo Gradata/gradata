@@ -19,6 +19,9 @@ _bearer = HTTPBearer()
 # Cache JWKS so we don't fetch on every request
 _jwks_cache: dict | None = None
 
+# Operator allowlist — god-mode admin access
+OPERATOR_DOMAINS = {"gradata.ai", "sprites.ai"}
+
 
 async def _get_jwks() -> dict:
     """Fetch and cache the Supabase JWKS for ES256 verification."""
@@ -47,8 +50,8 @@ async def verify_api_key(key: str) -> dict:
     return rows[0]
 
 
-async def verify_jwt(signed_jwt: str) -> str:
-    """Verify a Supabase JWT (ES256 or HS256) and return the user_id."""
+async def verify_jwt_claims(signed_jwt: str) -> dict:
+    """Verify a Supabase JWT (ES256 or HS256) and return the full claims dict."""
     settings = get_settings()
 
     # Try ES256 with JWKS first (modern Supabase projects)
@@ -67,10 +70,9 @@ async def verify_jwt(signed_jwt: str) -> str:
                 algorithms=["ES256"],
                 options={"verify_aud": False},
             )
-            user_id = claims.get("sub")
-            if not user_id:
+            if not claims.get("sub"):
                 raise HTTPException(status_code=401, detail="Invalid JWT: no sub claim")
-            return user_id
+            return claims
     except JWTError:
         pass  # Fall through to HS256
 
@@ -82,12 +84,17 @@ async def verify_jwt(signed_jwt: str) -> str:
             algorithms=["HS256"],
             options={"verify_aud": False},
         )
-        user_id = claims.get("sub")
-        if not user_id:
+        if not claims.get("sub"):
             raise HTTPException(status_code=401, detail="Invalid JWT: no sub claim")
-        return user_id
+        return claims
     except JWTError as e:
         raise HTTPException(status_code=401, detail=f"Invalid JWT: {e}") from e
+
+
+async def verify_jwt(signed_jwt: str) -> str:
+    """Verify a Supabase JWT and return just the user_id."""
+    claims = await verify_jwt_claims(signed_jwt)
+    return claims["sub"]
 
 
 async def get_current_brain(
@@ -144,3 +151,45 @@ async def get_brain_for_request(
 
     user_id = await verify_jwt(cred)
     return await verify_brain_ownership(brain_id, user_id)
+
+
+async def _resolve_user_email(user_id: str, claims: dict) -> str | None:
+    """Resolve the caller's email — prefer JWT claim, fall back to auth.users lookup."""
+    email = claims.get("email")
+    if email:
+        return email
+
+    # Fallback: query auth.users via the Supabase service-role client.
+    # Supabase exposes auth users through the admin REST endpoint, not PostgREST.
+    # If your db wrapper doesn't expose that, the JWT claim path is the primary route.
+    try:
+        db = get_db()
+        rows = await db.select("users", columns="email", filters={"id": user_id})
+        if rows:
+            return rows[0].get("email")
+    except Exception as exc:  # pragma: no cover - defensive
+        _log.warning("Failed to resolve email for user=%s: %s", user_id, exc)
+    return None
+
+
+async def require_operator(
+    credentials: HTTPAuthorizationCredentials = Security(_bearer),
+) -> str:
+    """Require the caller's email domain to be in OPERATOR_DOMAINS.
+
+    Resolves email from the JWT's ``email`` claim when present; otherwise falls
+    back to a ``users`` table lookup by ``user_id``. Raises 403 otherwise.
+    Returns the user_id for downstream use.
+    """
+    claims = await verify_jwt_claims(credentials.credentials)
+    user_id = claims["sub"]
+
+    email = await _resolve_user_email(user_id, claims)
+    if not email:
+        raise HTTPException(status_code=403, detail="Operator access requires a verified email")
+
+    domain = email.split("@", 1)[1].lower() if "@" in email else ""
+    if domain not in OPERATOR_DOMAINS:
+        raise HTTPException(status_code=403, detail="Operator access denied")
+
+    return user_id

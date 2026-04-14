@@ -9,9 +9,17 @@ interface UseApiResult<T> {
   refetch: () => void
 }
 
-export function useApi<T>(url: string, params?: Record<string, string | number | undefined>): UseApiResult<T> {
+/**
+ * GET a URL with optional query params. Pass `null` as url to skip
+ * fetching (useful for conditional requests that depend on another
+ * resource being loaded first).
+ */
+export function useApi<T>(
+  url: string | null,
+  params?: Record<string, string | number | undefined>,
+): UseApiResult<T> {
   const [data, setData] = useState<T | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(url !== null)
   const [error, setError] = useState<string | null>(null)
 
   const filteredParams = params
@@ -21,6 +29,10 @@ export function useApi<T>(url: string, params?: Record<string, string | number |
   const paramsKey = filteredParams ? JSON.stringify(filteredParams) : ''
 
   const fetchData = useCallback(async () => {
+    if (url === null) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError(null)
     try {
