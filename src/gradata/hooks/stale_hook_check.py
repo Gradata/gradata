@@ -10,25 +10,17 @@ Never blocks: prints a warning, exits 0.
 """
 from __future__ import annotations
 
-import hashlib
 import os
 import re
 import sys
 from pathlib import Path
 
+from gradata.enhancements.rule_to_hook import _slug, _source_hash
+
 _HASH_LINE_RE = re.compile(r"^\s*\*\s*Source hash:\s*([0-9a-f]{12})", re.MULTILINE)
 _LESSON_RE = re.compile(
     r"^\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+\w+:\s+(.+)$"
 )
-
-
-def _source_hash(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
-
-
-def _slug(text: str) -> str:
-    s = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-    return s[:60] or "rule"
 
 
 def _read_hash_from_hook(path: Path) -> str | None:

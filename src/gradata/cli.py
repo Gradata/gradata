@@ -494,10 +494,8 @@ def cmd_rule_add(args):
     # Classify first to see if a hook is possible
     candidate = rule_to_hook.classify_rule(text, confidence=1.0)
 
-    # Best-effort brain handle for event logging.  A user running `gradata rule
-    # add` without an initialized brain should still succeed; try_generate
-    # treats brain=None as "skip logging".
-    brain = None
+    # Best-effort brain handle for event logging. Users without an initialized
+    # brain still succeed — try_generate treats brain=None as "skip logging".
     try:
         brain = _get_brain(args)
     except Exception:
@@ -524,9 +522,16 @@ def cmd_rule_add(args):
         print(f"rule added as soft injection ({result.reason})")
 
 
+def _generated_hook_dirs() -> list[Path]:
+    """Pre- and post-tool generated-hook directories, honoring env overrides."""
+    import os
+    pre = os.environ.get("GRADATA_HOOK_ROOT") or ".claude/hooks/pre-tool/generated"
+    post = os.environ.get("GRADATA_HOOK_ROOT_POST") or ".claude/hooks/post-tool/generated"
+    return [Path(pre), Path(post)]
+
+
 def cmd_rule_list(args):
     """List RULE-tier lessons and their hook status."""
-    import os
     import re as _re
 
     from gradata.enhancements.rule_to_hook import _slug
@@ -534,8 +539,7 @@ def cmd_rule_list(args):
     brain_root = _resolve_brain_root(args)
     lessons_file = brain_root / "lessons.md"
 
-    # Parse RULE-tier entries WITH [hooked] marker preserved
-    rules: list[tuple[str, str, bool]] = []  # (category, description, hooked_marker_in_lessons)
+    rules: list[tuple[str, str, bool]] = []  # (category, description, hooked_marker)
     if lessons_file.exists():
         lesson_re = _re.compile(
             r"^\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+(\w+):\s+(.+)$"
@@ -550,14 +554,8 @@ def cmd_rule_list(args):
             clean_desc = desc[len("[hooked] "):] if hooked_marker else desc
             rules.append((category, clean_desc, hooked_marker))
 
-    # Discover installed hook files (pre + post)
-    pre_dir = Path(os.environ.get("GRADATA_HOOK_ROOT")
-                   or ".claude/hooks/pre-tool/generated")
-    post_dir = Path(os.environ.get("GRADATA_HOOK_ROOT_POST")
-                    or ".claude/hooks/post-tool/generated")
-
     installed_files: dict[str, Path] = {}  # slug (file stem) -> path
-    for d in (pre_dir, post_dir):
+    for d in _generated_hook_dirs():
         if d.exists():
             for js in d.glob("*.js"):
                 installed_files[js.stem] = js
@@ -603,8 +601,9 @@ def cmd_rule_list(args):
 
 def cmd_rule_remove(args):
     """Remove a graduated hook: delete the .js file and unmark (or purge) its lesson."""
-    import os
     import re as _re
+
+    from gradata.enhancements.rule_to_hook import _slug
 
     slug = args.slug.strip()
     if not slug:
@@ -614,18 +613,9 @@ def cmd_rule_remove(args):
     brain_root = _resolve_brain_root(args)
     lessons_file = brain_root / "lessons.md"
 
-    def _slug(text: str) -> str:
-        s = _re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-        return s[:60] or "rule"
-
     # 1. Delete hook file from whichever generated dir holds it
-    pre_dir = Path(os.environ.get("GRADATA_HOOK_ROOT")
-                   or ".claude/hooks/pre-tool/generated")
-    post_dir = Path(os.environ.get("GRADATA_HOOK_ROOT_POST")
-                    or ".claude/hooks/post-tool/generated")
-
     removed_file = None
-    for d in (pre_dir, post_dir):
+    for d in _generated_hook_dirs():
         candidate = d / f"{slug}.js"
         if candidate.exists():
             candidate.unlink()
