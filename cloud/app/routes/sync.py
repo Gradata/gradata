@@ -93,12 +93,33 @@ async def sync_brain(
         # (otherwise the table stays empty and the UI never lights up).
         patched = [e for e in body.events if e.type == "RULE_PATCHED"]
         if patched:
-            categories = sorted({
-                (e.data.get("category") or "").upper()
-                for e in patched
-                if isinstance(e.data, dict) and e.data.get("category")
-            })
-            if categories:
+            # First pass: validate every RULE_PATCHED event so missing-field
+            # warnings are always emitted, even if *all* events are malformed
+            # (i.e. `categories` below would be empty).
+            valid_events: list[tuple] = []  # (ev, cat, old_desc, new_desc)
+            for ev in patched:
+                data = ev.data if isinstance(ev.data, dict) else {}
+                cat = (data.get("category") or "").upper()
+                old_desc = data.get("old_description") or ""
+                new_desc = data.get("new_description") or ""
+                if not cat or not old_desc or not new_desc:
+                    missing = [
+                        name for name, val in (
+                            ("category", cat),
+                            ("old_description", old_desc),
+                            ("new_description", new_desc),
+                        ) if not val
+                    ]
+                    _log.warning(
+                        "rule-patches: skipping RULE_PATCHED event for brain=%s "
+                        "(missing %s; created_at=%s)",
+                        brain_id, ",".join(missing), ev.created_at or "?",
+                    )
+                    continue
+                valid_events.append((ev, cat, old_desc, new_desc))
+
+            if valid_events:
+                categories = sorted({cat for _, cat, _, _ in valid_events})
                 # One query per category (our thin PostgREST wrapper only
                 # supports eq filters). Small N — one per patched category.
                 by_cat: dict[str, list[dict]] = {}
@@ -123,25 +144,8 @@ async def sync_brain(
                     return candidates[0]["id"]
 
                 patch_rows: list[dict] = []
-                for ev in patched:
+                for ev, cat, old_desc, new_desc in valid_events:
                     data = ev.data if isinstance(ev.data, dict) else {}
-                    cat = (data.get("category") or "").upper()
-                    old_desc = data.get("old_description") or ""
-                    new_desc = data.get("new_description") or ""
-                    if not cat or not old_desc or not new_desc:
-                        missing = [
-                            name for name, val in (
-                                ("category", cat),
-                                ("old_description", old_desc),
-                                ("new_description", new_desc),
-                            ) if not val
-                        ]
-                        _log.warning(
-                            "rule-patches: skipping RULE_PATCHED event for brain=%s "
-                            "(missing %s; created_at=%s)",
-                            brain_id, ",".join(missing), ev.created_at or "?",
-                        )
-                        continue
                     lesson_id = _resolve_lesson_id(cat, old_desc, new_desc)
                     if lesson_id is None:
                         _log.warning(

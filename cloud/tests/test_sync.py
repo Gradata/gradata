@@ -1,6 +1,8 @@
 """Tests for POST /api/v1/sync endpoint."""
 from __future__ import annotations
 
+import logging
+
 import pytest
 
 
@@ -174,6 +176,78 @@ def test_sync_rule_patched_event_without_matching_lesson_is_skipped(client, mock
     # The event row itself still gets inserted — only the rule_patches side is skipped
     assert resp.json()["events_synced"] == 1
     rule_patch_inserts = [row for row in mock_supabase._inserts if "old_description" in row and "new_description" in row]
+    assert rule_patch_inserts == []
+
+
+def test_sync_rule_patched_malformed_payload_is_warned_and_skipped(
+    client, mock_supabase, auth_headers, caplog
+):
+    """Malformed RULE_PATCHED events (missing required fields) are warned + skipped.
+
+    Guards the telemetry observability path: we must log a warning and NOT
+    insert a rule_patches row, even when *every* patched event is malformed
+    (no lesson lookup happens because there's no valid category to query).
+    """
+    mock_supabase.add_response(
+        "brains", "select",
+        [{"id": "brain-1", "workspace_id": "ws-1", "user_id": "user-1", "api_key": "gd_TVAL"}],
+    )
+
+    with caplog.at_level(logging.WARNING, logger="app.routes.sync"):
+        resp = client.post(
+            "/api/v1/sync",
+            json={
+                "brain_name": "default",
+                "corrections": [],
+                "lessons": [],
+                "events": [
+                    # Missing category entirely
+                    {
+                        "type": "RULE_PATCHED",
+                        "source": "brain.patch_rule",
+                        "data": {
+                            "old_description": "old",
+                            "new_description": "new",
+                        },
+                        "tags": [],
+                        "session": None,
+                    },
+                    # Missing old_description + new_description
+                    {
+                        "type": "RULE_PATCHED",
+                        "source": "brain.patch_rule",
+                        "data": {
+                            "category": "TONE",
+                            "reason": "self_healing",
+                        },
+                        "tags": [],
+                        "session": None,
+                    },
+                ],
+            },
+            headers=auth_headers,
+        )
+
+    assert resp.status_code == 200, resp.text
+    # Both events still land in the events table — only the rule_patches side is skipped
+    assert resp.json()["events_synced"] == 2
+
+    # A warning must have been emitted for each malformed event
+    warning_msgs = [
+        r.getMessage() for r in caplog.records
+        if r.levelno >= logging.WARNING and "rule-patches" in r.getMessage()
+    ]
+    assert len(warning_msgs) >= 2, f"expected >=2 warnings, got {warning_msgs}"
+    assert any("missing category" in m for m in warning_msgs)
+    assert any(
+        "old_description" in m and "new_description" in m for m in warning_msgs
+    )
+
+    # No rule_patches insert should have been attempted
+    rule_patch_inserts = [
+        row for row in mock_supabase._inserts
+        if "old_description" in row and "new_description" in row
+    ]
     assert rule_patch_inserts == []
 
 
