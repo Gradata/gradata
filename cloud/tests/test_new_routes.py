@@ -54,6 +54,56 @@ class TestMetaRulesEndpoint:
         assert resp.status_code == 200
         assert len(resp.json()) == 3
 
+    def test_dp_off_by_default_passes_text_through(
+        self, client, mock_supabase, auth_headers, valid_bearer_patches, monkeypatch,
+    ):
+        """When GRADATA_DP_ENABLED is unset, raw description + lesson IDs pass through.
+
+        This is the current (pre-marketplace) behavior.  Confirms the DP
+        scaffold is truly off-by-default.
+        """
+        monkeypatch.delenv("GRADATA_DP_ENABLED", raising=False)
+        mock_supabase.add_response("meta_rules", "select", [
+            {"id": "m1", "brain_id": "brain-1", "title": "plain",
+             "description": "raw principle text",
+             "source_lesson_ids": ["l1", "l2", "l3"],
+             "created_at": "2026-04-10T00:00:00Z"},
+        ])
+        resp = client.get("/api/v1/brains/brain-1/meta-rules", headers=auth_headers)
+        assert resp.status_code == 200
+        row = resp.json()[0]
+        assert row["description"] == "raw principle text"
+        assert row["source_lesson_ids"] == ["l1", "l2", "l3"]
+
+    def test_dp_on_suppresses_text_and_noises_counts(
+        self, client, mock_supabase, auth_headers, valid_bearer_patches, monkeypatch,
+    ):
+        """Flipping GRADATA_DP_ENABLED=true must suppress text and noise counts.
+
+        Covers the adversary-relevant export path: with DP on, raw
+        principle text must NOT leak and the source-lesson cardinality
+        must be replaced by a noised integer (not the raw count).
+        """
+        monkeypatch.setenv("GRADATA_DP_ENABLED", "true")
+        monkeypatch.setenv("GRADATA_DP_EPSILON", "1.0")
+        monkeypatch.setenv("GRADATA_DP_CLIP_NORM", "1.0")
+        mock_supabase.add_response("meta_rules", "select", [
+            {"id": "m1", "brain_id": "brain-1", "title": "t",
+             "description": "SENSITIVE OPERATOR FINGERPRINT",
+             "source_lesson_ids": ["l1", "l2", "l3", "l4", "l5"],
+             "created_at": "2026-04-10T00:00:00Z"},
+        ])
+        resp = client.get("/api/v1/brains/brain-1/meta-rules", headers=auth_headers)
+        assert resp.status_code == 200
+        row = resp.json()[0]
+        # Text field MUST be suppressed under DP — Laplace doesn't cover NL.
+        assert row["description"] == "[DP-SUPPRESSED]"
+        # Raw IDs MUST be dropped; a noised cardinality is exposed instead.
+        assert row["source_lesson_ids"] == []
+        assert "source_lesson_count" in row
+        assert isinstance(row["source_lesson_count"], int)
+        assert row["source_lesson_count"] >= 0
+
 
 class TestActivityEndpoint:
     def test_filters_to_visible_types_only(self, client, mock_supabase, auth_headers, valid_bearer_patches):

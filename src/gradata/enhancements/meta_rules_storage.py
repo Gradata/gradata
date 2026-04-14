@@ -3,14 +3,28 @@ Meta-Rule SQLite Persistence — load/save for meta_rules and super_meta_rules t
 =====================================================================================
 All database I/O for meta-rules lives here.  Core logic and discovery live in
 ``meta_rules.py``; tier-2/3 super-meta-rule logic lives in ``super_meta_rules.py``.
+
+Also exposes a *differential-privacy scaffold* (:class:`DPConfig`,
+:func:`apply_dp_to_export_row`) used by the cloud export path when meta-rules
+are shared across brains.  The scaffold is OFF by default.  See
+``cloud/app/routes/meta_rules.py`` for the integration point and
+:func:`apply_dp_to_export_row` for the security model + composition caveats.
+
+References:
+  - Dwork & Roth 2014, "Algorithmic Foundations of Differential Privacy"
+    https://www.cis.upenn.edu/~aaroth/Papers/privacybook.pdf
+  - Abadi et al. 2016, "Deep Learning with Differential Privacy"
+    https://arxiv.org/abs/1607.00133
 """
 
 from __future__ import annotations
 
 import contextlib
 import json
+import random
 import sqlite3
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from gradata._types import RuleTransferScope
 from gradata.enhancements.meta_rules import TIER_SUPER_META, MetaRule, SuperMetaRule
@@ -451,6 +465,193 @@ def upsert_correction_patterns_batch(
         return len(rows)
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Differential-Privacy Export Scaffold (off by default)
+# ---------------------------------------------------------------------------
+#
+# Meta-rules are compressed behavioral fingerprints by construction: they
+# encode *what a specific operator consistently corrects*.  If marketplace
+# consumers can query meta-rules across brains without perturbation, a
+# Carlini-style membership-inference attack (Carlini et al. 2021; see also
+# Dwork & Roth 2014 §1.1 "reconstruction attacks") becomes trivial — a
+# sufficiently motivated consumer learns, at minimum, which correction
+# categories a brain's operator cares about, and at worst, recovers
+# verbatim principle text that may contain private context.
+#
+# Today ε = ∞ (no noise, no DP, raw aggregation).  This scaffold lets
+# marketplace (Phase 4) flip on Laplace-mechanism perturbation via a
+# single config toggle.  It is deliberately *off-by-default* — no current
+# API path is affected unless DPConfig.enabled is explicitly True.
+#
+# COMPOSITION WARNING (adversary check):
+#   Basic sequential composition (Dwork & Roth 2014 Theorem 3.16): K
+#   ε-DP queries compose to Kε.  With ε=1.0 and a marketplace consumer
+#   querying 100 meta-rules from the same brain, the effective ε is
+#   **100.0** — i.e. essentially no privacy.  Defenses require one of:
+#     (a) a per-brain ε-budget tracker that blocks queries once spent,
+#     (b) approximate (ε, δ)-DP with advanced composition
+#         (Theorem 3.20: ε' ≈ √(2K·ln(1/δ'))·ε),
+#     (c) RDP / moments-accountant per Abadi et al. 2016 §3, suitable for
+#         Gaussian mechanism and much tighter for repeated queries.
+#   This scaffold implements (a)'s audit-log hook but does NOT yet
+#   enforce budgets — that's Phase 4 marketplace work.  Consumers that
+#   flip DP on in production MUST add budget enforcement before
+#   exposing the endpoint to untrusted clients.
+
+
+@dataclass
+class DPConfig:
+    """Configuration for differential-privacy noise on meta-rule exports.
+
+    Off by default.  Flip ``enabled=True`` to apply the Laplace mechanism
+    (Dwork et al. 2006) to numerical fields and suppress raw text fields
+    on the cloud export path.
+
+    Attributes:
+        enabled: Master switch.  When False, :func:`apply_dp_to_export_row`
+            is a no-op — rows pass through unchanged.  Default: ``False``.
+        epsilon: Privacy budget *per query*.  Smaller = more noise = more
+            privacy.  Default ``1.0``.  Note that composition across K
+            queries yields Kε under basic composition — see module-level
+            COMPOSITION WARNING above.
+        mechanism: Noise mechanism identifier.  Currently only
+            ``"laplace"`` is implemented; ``"gaussian"`` is reserved for
+            RDP accounting (Abadi et al. 2016) when marketplace ships.
+        clip_norm: Per-field L1 clipping bound applied *before* noise.
+            Bounds the sensitivity of numerical fields (confidence,
+            fire_count, source counts) to ``clip_norm`` so the Laplace
+            scale ``sensitivity/epsilon`` is well-defined.  Default
+            ``1.0`` — matches the natural [0, 1] range of ``confidence``.
+    """
+
+    enabled: bool = False
+    epsilon: float = 1.0
+    mechanism: str = "laplace"
+    clip_norm: float = 1.0
+
+
+def _laplace_noise(scale: float, rng: random.Random) -> float:
+    """Draw a sample from Laplace(0, scale).
+
+    Inverse-CDF method: if U ~ Uniform(-0.5, 0.5), then
+    ``-scale * sign(U) * log(1 - 2|U|)`` is Laplace(0, scale).  Using a
+    ``random.Random`` instance lets callers pass ``random.SystemRandom``
+    in production; tests use a seeded PRNG for reproducibility.
+    """
+    import math
+    u = rng.random() - 0.5
+    if u == 0:
+        return 0.0
+    return -scale * math.copysign(1.0, u) * math.log(1.0 - 2.0 * abs(u))
+
+
+def _clip(value: float, bound: float) -> float:
+    """Clip a value to [-bound, bound].  Required before Laplace noise
+    so the per-field sensitivity ≤ ``bound``."""
+    return max(-bound, min(bound, value))
+
+
+def apply_dp_to_export_row(
+    row: dict[str, Any],
+    config: DPConfig,
+    *,
+    rng: random.Random | None = None,
+) -> dict[str, Any]:
+    """Transform a meta-rule export row in-place for DP-safe release.
+
+    When ``config.enabled`` is False (the default), returns ``row``
+    unchanged — this function is a scaffold, not an enforcement layer.
+
+    When enabled, applies the Laplace mechanism (Dwork et al. 2006) to
+    numerical fields and strips raw text fields:
+
+    **Numerical fields** (``confidence``, ``fire_count``, any integer
+    source-count derived from ``source_lesson_ids``):
+        1. Clip to ``[-clip_norm, clip_norm]`` to bound sensitivity.
+        2. Add Laplace noise with scale ``clip_norm / epsilon``.
+        3. ``round``/``max(0, …)`` to preserve type sanity.  This is
+           post-processing (Dwork & Roth 2014 Proposition 2.1) and does
+           not weaken the DP guarantee.
+
+    **Text fields** (``principle``, ``description``, ``examples``,
+    ``representative_text``): raw text is **replaced with a placeholder
+    under DP**.  The Laplace mechanism is defined for numerical queries;
+    releasing raw natural-language text from a behavioral fingerprint
+    would leak high-entropy operator-identifying content that no
+    per-query noise can meaningfully mask.  Only *structural features*
+    (category, source count, tier, confidence bucket) are shared.  This
+    is a deliberate scoping choice, not DP itself — marketplace clients
+    should consume structural features only; text remains on-device.
+
+    Args:
+        row: A mutable dict representing one meta-rule as returned from
+            the cloud DB layer.  Must be safe to modify (copy upstream
+            if the caller reuses it).
+        config: DP configuration.  ``config.enabled=False`` -> no-op.
+        rng: Optional ``random.Random`` instance for noise draws.
+            Defaults to ``random.SystemRandom()`` for non-deterministic
+            draws in production.  Tests pass a seeded PRNG.
+
+    Returns:
+        The same ``row`` dict, mutated.  Returned for call-chaining.
+
+    Raises:
+        ValueError: If ``config.mechanism`` is not ``"laplace"`` (other
+            mechanisms reserved for future RDP accounting).
+    """
+    if not config.enabled:
+        return row
+
+    if config.mechanism != "laplace":
+        raise ValueError(
+            f"DPConfig.mechanism={config.mechanism!r} not implemented; "
+            "only 'laplace' is currently supported"
+        )
+    if config.epsilon <= 0:
+        raise ValueError(f"DPConfig.epsilon must be > 0, got {config.epsilon}")
+    if config.clip_norm <= 0:
+        raise ValueError(f"DPConfig.clip_norm must be > 0, got {config.clip_norm}")
+
+    if rng is None:
+        rng = random.SystemRandom()
+
+    scale = config.clip_norm / config.epsilon
+
+    # --- Numerical perturbation -------------------------------------------
+    if "confidence" in row and row["confidence"] is not None:
+        clipped = _clip(float(row["confidence"]), config.clip_norm)
+        noised = clipped + _laplace_noise(scale, rng)
+        # confidence is naturally in [0, 1]; clamp post-noise for display sanity
+        row["confidence"] = max(0.0, min(1.0, noised))
+
+    if "fire_count" in row and row["fire_count"] is not None:
+        clipped = _clip(float(row["fire_count"]), config.clip_norm)
+        noised = clipped + _laplace_noise(scale, rng)
+        # fire_count is a non-negative integer count
+        row["fire_count"] = max(0, round(noised))
+
+    # Source-count: replace list of IDs with a noised cardinality so we
+    # neither leak lesson IDs nor publish an un-noised count.
+    if "source_lesson_ids" in row:
+        ids = row.get("source_lesson_ids") or []
+        raw_count = len(ids) if isinstance(ids, list) else 0
+        clipped = _clip(float(raw_count), config.clip_norm)
+        noised = clipped + _laplace_noise(scale, rng)
+        row["source_lesson_count"] = max(0, round(noised))
+        row["source_lesson_ids"] = []  # never export raw IDs under DP
+
+    # --- Text suppression --------------------------------------------------
+    # Replace raw principle/description/examples with a structural token.
+    # See docstring for rationale — Laplace doesn't cover natural language.
+    for text_field in ("principle", "description", "representative_text"):
+        if row.get(text_field):
+            row[text_field] = "[DP-SUPPRESSED]"
+    if "examples" in row:
+        row["examples"] = []  # examples are verbatim correction text
+
+    return row
 
 
 def query_graduation_candidates(
