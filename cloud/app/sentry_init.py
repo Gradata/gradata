@@ -172,10 +172,3 @@ def tag_user(user_id: str, workspace_id: str | None = None) -> None:
     scope.set_user({"id": user_id})
     if workspace_id:
         scope.set_tag("workspace_id", workspace_id)
-
-
-# Enrich every event with the sensitive-key scrubbing AND the active user
-# when one was tagged earlier in the request. The scope-level user is
-# already serialised by Sentry, so we only handle the explicit scrub path.
-def _scrub_and_enrich(event: Any, hint: Any) -> Any:
-    return _scrub_event(event, hint)
