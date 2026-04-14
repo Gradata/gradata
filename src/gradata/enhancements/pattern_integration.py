@@ -410,7 +410,7 @@ def register_brain_tools(brain: Brain) -> int:
 
     count = 0
 
-    try:
+    if brain.tools.get("brain_correct") is None:
         brain.tools.register(ToolSpec(
             name="brain_correct",
             description="Log a user correction for the learning pipeline",
@@ -418,10 +418,8 @@ def register_brain_tools(brain: Brain) -> int:
             parameters={"draft": "str", "final": "str"},
         ))
         count += 1
-    except Exception:
-        pass  # Already registered
 
-    try:
+    if brain.tools.get("brain_apply_rules") is None:
         brain.tools.register(ToolSpec(
             name="brain_apply_rules",
             description="Get graduated rules for prompt injection",
@@ -430,8 +428,6 @@ def register_brain_tools(brain: Brain) -> int:
             returns="str",
         ))
         count += 1
-    except Exception:
-        pass  # Already registered
 
     return count
 

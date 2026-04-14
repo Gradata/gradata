@@ -118,12 +118,13 @@ def _check_pair_list(
     pairs: list[tuple[str, str]],
     score: float,
 ) -> float:
-    """Return *score* if any pair's two sides appear on opposite sides, else 0.0."""
+    """Return *score* (clamped to [0.0, 1.0]) if any pair matches on opposite sides, else 0.0."""
+    clamped = min(max(score, 0.0), 1.0)
     for left, right in pairs:
         if (left in new_norm and right in existing_norm) or (
             right in new_norm and left in existing_norm
         ):
-            return score
+            return clamped
     return 0.0
 
 

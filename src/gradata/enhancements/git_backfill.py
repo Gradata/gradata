@@ -163,6 +163,13 @@ def scan_git_diffs(
                     repo_path, commit_hash[:8],
                     type(files_result.error).__name__, files_result.error,
                 )
+            elif files_result.completed is not None:
+                _log.warning(
+                    "git diff-tree failed at %s for %s (rc=%d): %s",
+                    repo_path, commit_hash[:8],
+                    files_result.completed.returncode,
+                    (files_result.completed.stderr or files_result.completed.stdout or "").strip(),
+                )
             continue
 
         assert files_result.completed is not None
