@@ -16,22 +16,23 @@ from __future__ import annotations
 
 import pytest
 
-from gradata._types import Lesson, LessonState
 from gradata._scope import RuleScope
+from gradata._types import Lesson, LessonState
+from gradata.events_bus import EventBus
 from gradata.rules.rule_engine import (
+    DEFAULT_TTL_SESSIONS,
     AppliedRule,
+    _difficulty_from_lesson,
+    _make_rule_id,
     apply_rules,
     capture_example_from_correction,
     compute_rule_difficulty,
     compute_scope_weight,
+    demote_stale_rules,
     detect_task_type,
-    filter_by_scope,
     format_rules_for_prompt,
     merge_related_rules,
-    _difficulty_from_lesson,
-    _make_rule_id,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -48,6 +49,7 @@ def _make_lesson(
     scope_json: str = "",
     example_draft: str | None = None,
     example_corrected: str | None = None,
+    sessions_since_fire: int = 0,
 ) -> Lesson:
     return Lesson(
         date="2026-03-26",
@@ -60,6 +62,7 @@ def _make_lesson(
         scope_json=scope_json,
         example_draft=example_draft,
         example_corrected=example_corrected,
+        sessions_since_fire=sessions_since_fire,
     )
 
 
@@ -451,3 +454,121 @@ class TestApplyRulesIntegration:
         lessons = [_make_lesson(description=f"Rule {i}", category=f"CAT{i}") for i in range(20)]
         result = apply_rules(lessons, scope=RuleScope(), max_rules=5)
         assert len(result) <= 5
+
+
+# ===========================================================================
+# Rule TTL — zombie-rule mitigation (red-team finding A7)
+# ===========================================================================
+
+
+class TestRuleTTL:
+    """demote_stale_rules() and apply_rules TTL integration.
+
+    Rules idle for >= ttl_sessions are demoted from RULE -> PATTERN with
+    stale=True. No deletion — preserves history for user review.
+    """
+
+    def test_fresh_rule_not_demoted(self):
+        lesson = _make_lesson(state=LessonState.RULE, sessions_since_fire=0)
+        demoted = demote_stale_rules([lesson], ttl_sessions=50)
+        assert demoted == []
+        assert lesson.state is LessonState.RULE
+        assert lesson.stale is False
+
+    def test_below_ttl_not_demoted(self):
+        lesson = _make_lesson(state=LessonState.RULE, sessions_since_fire=49)
+        demoted = demote_stale_rules([lesson], ttl_sessions=50)
+        assert demoted == []
+        assert lesson.state is LessonState.RULE
+        assert lesson.stale is False
+
+    def test_at_ttl_demoted(self):
+        lesson = _make_lesson(state=LessonState.RULE, sessions_since_fire=50)
+        demoted = demote_stale_rules([lesson], ttl_sessions=50)
+        assert demoted == [lesson]
+        assert lesson.state is LessonState.PATTERN
+        assert lesson.stale is True
+
+    def test_above_ttl_demoted(self):
+        lesson = _make_lesson(state=LessonState.RULE, sessions_since_fire=999)
+        demoted = demote_stale_rules([lesson], ttl_sessions=50)
+        assert demoted == [lesson]
+        assert lesson.state is LessonState.PATTERN
+        assert lesson.stale is True
+
+    def test_pattern_lesson_untouched(self):
+        """PATTERN-tier lessons are not demoted further by TTL (no deletion)."""
+        lesson = _make_lesson(state=LessonState.PATTERN, sessions_since_fire=500)
+        demoted = demote_stale_rules([lesson], ttl_sessions=50)
+        assert demoted == []
+        assert lesson.state is LessonState.PATTERN
+        # stale flag only set on demotion, not on already-below-RULE lessons
+        assert lesson.stale is False
+
+    def test_ttl_zero_disables(self):
+        lesson = _make_lesson(state=LessonState.RULE, sessions_since_fire=10_000)
+        demoted = demote_stale_rules([lesson], ttl_sessions=0)
+        assert demoted == []
+        assert lesson.state is LessonState.RULE
+
+    def test_configurable_ttl(self):
+        lesson = _make_lesson(state=LessonState.RULE, sessions_since_fire=20)
+        # Default would keep it; tight TTL of 10 should demote.
+        demoted = demote_stale_rules([lesson], ttl_sessions=10)
+        assert lesson.state is LessonState.PATTERN
+        assert lesson.stale is True
+        assert len(demoted) == 1
+
+    def test_event_bus_emits_demotion(self):
+        lesson = _make_lesson(
+            category="DRAFTING",
+            description="Ancient lesson",
+            state=LessonState.RULE,
+            sessions_since_fire=100,
+        )
+        bus = EventBus()
+        captured: list[dict] = []
+        bus.on("rule_demoted_ttl", lambda payload: captured.append(payload))
+        demote_stale_rules([lesson], ttl_sessions=50, bus=bus)
+        assert len(captured) == 1
+        payload = captured[0]
+        assert payload["category"] == "DRAFTING"
+        assert payload["sessions_since_fire"] == 100
+        assert payload["ttl_sessions"] == 50
+        assert "rule_id" in payload
+
+    def test_apply_rules_integrates_ttl(self):
+        """Stale RULE -> PATTERN demotion happens inside apply_rules."""
+        fresh = _make_lesson(
+            category="FRESH",
+            description="Fresh rule",
+            state=LessonState.RULE,
+            sessions_since_fire=0,
+        )
+        stale = _make_lesson(
+            category="STALE",
+            description="Stale rule",
+            state=LessonState.RULE,
+            sessions_since_fire=200,
+        )
+        result = apply_rules([fresh, stale], scope=RuleScope(), ttl_sessions=50)
+        # Both still surface (PATTERN is eligible), but stale one was demoted
+        assert stale.state is LessonState.PATTERN
+        assert stale.stale is True
+        assert fresh.state is LessonState.RULE
+        # The fresh RULE-tier rule should rank above the demoted stale PATTERN
+        categories = [r.lesson.category for r in result]
+        assert categories.index("FRESH") < categories.index("STALE")
+
+    def test_apply_rules_ttl_disabled_with_zero(self):
+        stale = _make_lesson(
+            category="STALE",
+            state=LessonState.RULE,
+            sessions_since_fire=10_000,
+        )
+        apply_rules([stale], scope=RuleScope(), ttl_sessions=0)
+        assert stale.state is LessonState.RULE
+        assert stale.stale is False
+
+    def test_default_ttl_constant(self):
+        assert DEFAULT_TTL_SESSIONS == 50

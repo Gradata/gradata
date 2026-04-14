@@ -177,6 +177,7 @@ class Lesson:
     # Transient runtime state (not persisted to lessons.md) — self_improvement
     # / rule_evolution decay confidence once this crosses a threshold.
     _contradiction_streak: int = 0  # Consecutive contradictions; triggers self-correction / penalty acceleration
+    stale: bool = False  # True = demoted via TTL (sessions_since_fire >= ttl); flagged for review
 
     def __post_init__(self) -> None:
         self.confidence = round(max(0.0, min(1.0, self.confidence)), 2)

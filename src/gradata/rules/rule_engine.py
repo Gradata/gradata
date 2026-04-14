@@ -78,6 +78,74 @@ class AppliedRule:
 
 
 # ---------------------------------------------------------------------------
+# TTL / Zombie-rule mitigation
+# ---------------------------------------------------------------------------
+
+# Default TTL for graduated rules, expressed in sessions-since-last-fire.
+# Red-team finding A7: obsolete rules never decay and eventually contaminate
+# output. Any RULE-tier lesson idle for >= DEFAULT_TTL_SESSIONS sessions is
+# demoted back to PATTERN tier with a `stale=True` flag instead of being
+# deleted — preserves history for review while blocking injection dominance.
+DEFAULT_TTL_SESSIONS: int = 50
+
+
+def demote_stale_rules(
+    lessons: list[Lesson],
+    ttl_sessions: int = DEFAULT_TTL_SESSIONS,
+    bus: EventBus | None = None,
+) -> list[Lesson]:
+    """Demote RULE-tier lessons that have exceeded their injection TTL.
+
+    Any lesson with ``state == RULE`` and ``sessions_since_fire >=
+    ttl_sessions`` is mutated in place to state ``PATTERN`` with
+    ``stale=True``. Demoted lessons are returned so callers can persist the
+    change or surface it to the user. A ``rule_demoted_ttl`` event is emitted
+    on *bus* for each demotion (if a bus is provided).
+
+    This is the injection-time counterpart to the existing kill path in
+    ``self_improvement.py`` — it runs every time ``apply_rules`` is called,
+    so idle rules never reach the prompt on a stale tier.
+
+    Args:
+        lessons: Lessons to evaluate. Mutated in place when demotion fires.
+        ttl_sessions: Idle-session threshold. Rules with
+            ``sessions_since_fire >= ttl_sessions`` are demoted. Default:
+            ``DEFAULT_TTL_SESSIONS`` (50).
+        bus: Optional event bus. When provided, a ``rule_demoted_ttl``
+            event is emitted per demoted rule with payload
+            ``{rule_id, category, description, sessions_since_fire,
+            ttl_sessions}``.
+
+    Returns:
+        Newly-demoted lessons (empty list when none tripped). Already-stale
+        lessons are not re-reported.
+    """
+    demoted: list[Lesson] = []
+    if ttl_sessions <= 0:
+        return demoted
+    for lesson in lessons:
+        if lesson.state is not LessonState.RULE:
+            continue
+        if lesson.sessions_since_fire < ttl_sessions:
+            continue
+        lesson.state = LessonState.PATTERN
+        lesson.stale = True
+        demoted.append(lesson)
+        if bus is not None:
+            bus.emit(
+                "rule_demoted_ttl",
+                {
+                    "rule_id": _make_rule_id(lesson),
+                    "category": lesson.category,
+                    "description": lesson.description[:120],
+                    "sessions_since_fire": lesson.sessions_since_fire,
+                    "ttl_sessions": ttl_sessions,
+                },
+            )
+    return demoted
+
+
+# ---------------------------------------------------------------------------
 # State Priority
 # ---------------------------------------------------------------------------
 
@@ -510,10 +578,13 @@ def apply_rules(
     bus: EventBus | None = None,
     graph: RuleGraph | None = None,
     _ctx=None,
+    ttl_sessions: int = DEFAULT_TTL_SESSIONS,
 ) -> list[AppliedRule]:
     """Select and rank lessons relevant to the given scope.
 
     Pipeline:
+        0. Demote RULE-tier lessons idle for ``ttl_sessions`` sessions back
+           to PATTERN with ``stale=True`` (zombie-rule mitigation).
         1. Filter to PATTERN and RULE lessons only.
         2. Score each against *scope* via weighted scope matching
            (exact task_type > partial > wildcard).
@@ -535,12 +606,23 @@ def apply_rules(
             ``"code"``). Reserved for future use with context-dependent
             weighting of meta-rules (see
             :func:`~gradata.enhancements.meta_rules.rank_meta_rules_by_context`).
+        ttl_sessions: Idle-session TTL for RULE-tier lessons. Lessons with
+            ``sessions_since_fire >= ttl_sessions`` are demoted to PATTERN
+            with ``stale=True`` before scoring. Pass ``0`` to disable TTL.
+            Default: :data:`DEFAULT_TTL_SESSIONS`.
 
     Returns:
         Ordered list of :class:`AppliedRule` objects, most relevant first.
         Empty list if no lessons pass the filters.
     """
     events = events or []
+
+    # Step 0 — TTL demotion: demote RULE-tier lessons idle for >= ttl_sessions
+    # back to PATTERN with stale=True. Blocks zombie-rule accumulation
+    # (red-team finding A7). Runs before eligibility/scoring so stale rules
+    # only survive on their demoted tier.
+    if ttl_sessions > 0:
+        demote_stale_rules(lessons, ttl_sessions=ttl_sessions, bus=bus)
 
     # Enrich scope with detected task type if not already set
     if user_message and not scope.task_type:
