@@ -184,8 +184,16 @@ function LegalFooter() {
   )
 }
 
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ?? 'https://api.gradata.ai/api/v1'
+
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  // Send one heartbeat per dashboard session so "last activity" on the
+  // marketing site reflects real users tapping around.
+  useEffect(() => {
+    fetch(`${API_BASE}/public/heartbeat?source=dashboard`, { method: 'POST' }).catch(() => {})
+  }, [])
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />

@@ -99,9 +99,7 @@ export default function OperatorPage() {
       <header className="mb-7 flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <h1 className="text-[22px]">Operator</h1>
-          <p className="mt-1 text-[13px] text-[var(--color-body)]">
-            Customer fleet overview
-          </p>
+          <p className="mt-1 text-[13px] text-[var(--color-body)]">Customer fleet overview · live data</p>
         </div>
         <span className="font-mono text-[11px] uppercase tracking-wider text-[var(--color-accent-violet)]">
           god mode{domain ? ` · ${domain}` : ''}
@@ -173,20 +171,22 @@ export default function OperatorPage() {
   )
 }
 
-function Kpi({ label, value, sub, tone }: {
-  label: string; value: string; sub: string; tone: 'pos' | 'neg' | 'neu'
-}) {
+function Kpi({ label, value, sub, tone }: { label: string; value: string; sub: string; tone: 'pos' | 'neg' | 'neu' }) {
   return (
     <GlassCard className="p-5">
       <div className="mb-2 text-[12px] font-medium text-[var(--color-body)]">{label}</div>
       <div className="font-[var(--font-heading)] text-[22px] sm:text-[28px] font-bold tabular-nums text-gradient-brand break-words">
         {value}
       </div>
-      <div className={`mt-1 text-[12px] font-medium ${
-        tone === 'pos' ? 'text-[var(--color-success)]'
-          : tone === 'neg' ? 'text-[var(--color-destructive)]'
-            : 'text-[var(--color-accent-blue)]'
-      }`}>
+      <div
+        className={`mt-1 text-[12px] font-medium ${
+          tone === 'pos'
+            ? 'text-[var(--color-success)]'
+            : tone === 'neg'
+              ? 'text-[var(--color-destructive)]'
+              : 'text-[var(--color-accent-blue)]'
+        }`}
+      >
         {sub}
       </div>
     </GlassCard>

@@ -15,13 +15,12 @@ import logging
 import random
 import sys
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import urllib.request
-import urllib.error
+from _common import DEFAULT_OLLAMA_MODEL, DEFAULT_OLLAMA_URL, ollama_generate
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("mirofish")
@@ -146,11 +145,6 @@ class Forum:
                 p.likes = len(self._likes[post_id])
                 break
 
-    def add_disagree(self, post_id: str, agent_name: str) -> None:
-        """Register a disagreement (tracked but doesn't affect like count)."""
-        # Could be extended with a separate disagree counter
-        pass
-
     def get_likes(self, post_id: str) -> int:
         return len(self._likes.get(post_id, set()))
 
@@ -185,37 +179,21 @@ class Forum:
 # ---------------------------------------------------------------------------
 # Ollama generation
 # ---------------------------------------------------------------------------
-DEFAULT_MODEL = "gemma4:e4b"
-OLLAMA_URL = "http://localhost:11434/api/generate"
+DEFAULT_MODEL = DEFAULT_OLLAMA_MODEL
+OLLAMA_URL = DEFAULT_OLLAMA_URL
 
 
 def _generate(prompt: str, system: str = "", model: str = DEFAULT_MODEL) -> str:
     """Call Ollama generate endpoint. Returns response text."""
-    payload = json.dumps(
-        {
-            "model": model,
-            "prompt": prompt,
-            "system": system,
-            "stream": False,
-            "options": {
-                "temperature": 0.8,
-                "num_predict": 500,
-            },
-        }
-    ).encode("utf-8")
-
-    req = urllib.request.Request(
-        OLLAMA_URL,
-        data=payload,
-        headers={"Content-Type": "application/json"},
+    return ollama_generate(
+        prompt,
+        system=system,
+        model=model,
+        url=OLLAMA_URL,
+        timeout=120,
+        num_predict=500,
+        temperature=0.8,
     )
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data.get("response", "").strip()
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
-        log.warning("Ollama generation failed: %s", e)
-        return f"[Generation failed: {e}]"
 
 
 # ---------------------------------------------------------------------------

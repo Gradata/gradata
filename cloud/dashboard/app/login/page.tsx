@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AuthLegalLinks } from '@/components/layout/AuthLegalLinks'
 import { useAuth } from '@/hooks/useAuth'
+import { friendlyAuthError } from '@/lib/auth-errors'
 
 export default function LoginPage() {
   const { signIn, signInWithGoogle, session, loading } = useAuth()
@@ -28,7 +29,7 @@ export default function LoginPage() {
     setSubmitting(true)
     const result = await signIn(email, pw)
     if (result.error) {
-      setError(result.error.message)
+      setError(friendlyAuthError(result.error.message))
     }
     setSubmitting(false)
   }

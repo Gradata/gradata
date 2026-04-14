@@ -25,18 +25,23 @@ export default function ObservabilityPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <GlassCard gradTop>
-          <h3 className="mb-4 text-[15px] font-semibold">Convergence Signal</h3>
+          <div className="mb-4 flex items-baseline justify-between gap-3">
+            <h3 className="text-[15px] font-semibold">Convergence Signal</h3>
+            <span className="rounded-[0.25rem] bg-[rgba(234,179,8,0.12)] px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider text-[var(--color-warning)]">
+              demo · coming soon
+            </span>
+          </div>
           <p className="mb-5 text-[12px] text-[var(--color-body)]">
             When multiple independent users correct in the same direction, the principle is cohort-validated.
           </p>
-          <div className="space-y-3">
+          <div className="space-y-3 opacity-70">
             <ConvergenceRow name='"Verify URLs before citing"' cosine={0.94} users={4} />
             <ConvergenceRow name='"Cut ceremony in prose"'     cosine={0.91} users={3} />
             <ConvergenceRow name='"Confirm before acting"'     cosine={0.87} users={3} />
             <ConvergenceRow name='"Actionable close"'          cosine={0.78} users={2} />
           </div>
-          <p className="mt-6 font-mono text-[11px] text-[var(--color-body)]">
-            TODO(backend): wire to real cross-user cosine similarity when endpoint ships.
+          <p className="mt-6 text-[11px] text-[var(--color-body)]">
+            Your cohort signal appears once 2+ users graduate semantically similar rules.
           </p>
         </GlassCard>
 

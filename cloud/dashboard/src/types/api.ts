@@ -63,14 +63,14 @@ export interface WorkspaceSummary {
 }
 
 export interface UserProfile {
-  id: string
+  user_id: string
   // `email` and `plan` may be omitted by /users/me depending on backend
   // version (auth payload can be thin). Mark optional so the compiler
   // catches missing-field usages in callers.
   email?: string | null
   display_name: string | null
   plan?: string | null
-  created_at: string
+  created_at: string | null
   workspaces?: WorkspaceSummary[]
 }
 
@@ -107,7 +107,7 @@ export interface InviteResponse {
 }
 
 // -----------------------------------------------------------------------------
-// Operator / admin panel
+// Operator / god-mode (require_operator gated)
 // -----------------------------------------------------------------------------
 
 export interface AdminGlobalKpis {

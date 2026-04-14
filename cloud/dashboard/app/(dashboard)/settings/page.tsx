@@ -19,9 +19,11 @@ export default function SettingsPage() {
   if (error) return <ErrorState message={error} onRetry={refetch} />
   if (!profile) return <ErrorState message="Could not load profile" />
 
-  const memberSince = new Date(profile.created_at).toLocaleDateString('en-US', {
-    year: 'numeric', month: 'long', day: 'numeric',
-  })
+  const memberSince = profile.created_at
+    ? new Date(profile.created_at).toLocaleDateString('en-US', {
+        year: 'numeric', month: 'long', day: 'numeric',
+      })
+    : 'unknown'
 
   const currentPlan = (profile.plan?.toLowerCase() ?? 'free') as PlanTier
 

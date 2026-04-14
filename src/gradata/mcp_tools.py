@@ -105,42 +105,30 @@ def correct(
     }
 
 
+# Category signal words. Order matters — first match wins.
+_CATEGORY_SIGNALS: list[tuple[str, tuple[str, ...]]] = [
+    ("FORMATTING", ("bold", "italic", "heading", "bullet", "indent",
+                    "em dash", "colon", "comma", "spacing", "markdown")),
+    ("ACCURACY", ("wrong", "incorrect", "inaccurate", "outdated",
+                  "error", "mistake", "not true", "false")),
+    ("TONE", ("tone", "formal", "casual", "aggressive", "softer",
+              "professional", "friendly", "polite")),
+    ("PROCESS", ("step", "order", "first", "before", "after",
+                 "verify", "check", "validate", "workflow")),
+]
+
+
 def _auto_detect_category(draft: str, final: str, severity: str) -> str:
     """Heuristic category detection from diff content.
 
     Categories match the Gradata lesson taxonomy:
     DRAFTING, ACCURACY, FORMATTING, PROCESS, TONE, COMPLIANCE, UNKNOWN.
     """
+    del severity  # reserved for future heuristics
     combined = (draft + " " + final).lower()
-
-    # Check for formatting signals
-    format_signals = ["bold", "italic", "heading", "bullet", "indent",
-                      "em dash", "colon", "comma", "spacing", "markdown"]
-    if any(s in combined for s in format_signals):
-        return "FORMATTING"
-
-    # Check for accuracy signals
-    accuracy_signals = ["wrong", "incorrect", "inaccurate", "outdated",
-                        "error", "mistake", "not true", "false"]
-    if any(s in combined for s in accuracy_signals):
-        return "ACCURACY"
-
-    # Check for tone signals
-    tone_signals = ["tone", "formal", "casual", "aggressive", "softer",
-                    "professional", "friendly", "polite"]
-    if any(s in combined for s in tone_signals):
-        return "TONE"
-
-    # Check for process signals
-    process_signals = ["step", "order", "first", "before", "after",
-                       "verify", "check", "validate", "workflow"]
-    if any(s in combined for s in process_signals):
-        return "PROCESS"
-
-    # Default based on severity
-    if severity in ("major", "discarded"):
-        return "DRAFTING"
-
+    for category, signals in _CATEGORY_SIGNALS:
+        if any(s in combined for s in signals):
+            return category
     return "DRAFTING"
 
 
@@ -264,7 +252,7 @@ def _load_lessons(lessons_path: str | Path | None = None) -> list[Lesson]:
     try:
         from gradata.enhancements.self_improvement import parse_lessons
         return parse_lessons(path.read_text(encoding="utf-8"))
-    except (ImportError, Exception):
+    except Exception:
         return []
 
 
@@ -284,13 +272,15 @@ def _load_meta_rules(meta_rules_path: str | Path | None = None) -> list[dict]:
 
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(data, list):
-            return data
-        if isinstance(data, dict) and "meta_rules" in data:
-            return data["meta_rules"]
+    except Exception:
         return []
-    except (json.JSONDecodeError, Exception):
-        return []
+    if isinstance(data, list):
+        return [m for m in data if isinstance(m, dict)]
+    if isinstance(data, dict):
+        rules = data.get("meta_rules", [])
+        if isinstance(rules, list):
+            return [m for m in rules if isinstance(m, dict)]
+    return []
 
 
 # ---------------------------------------------------------------------------

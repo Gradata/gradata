@@ -48,7 +48,9 @@ export default function TeamMembersPage() {
   // Track busy state per-member so concurrent mutations on different rows
   // don't stomp on each other's loading flags or re-enable controls early.
   const [busyUserIds, setBusyUserIds] = useState<Set<string>>(new Set())
-  const [rowError, setRowError] = useState<string | null>(null)
+  // Track row errors per user_id so failures on one row aren't cleared by
+  // concurrent or subsequent actions on other rows (CR feedback).
+  const [rowErrors, setRowErrors] = useState<Record<string, string | null>>({})
 
   const setRowBusy = (userId: string, busy: boolean) => {
     setBusyUserIds((prev) => {
@@ -59,7 +61,20 @@ export default function TeamMembersPage() {
     })
   }
 
-  if (profileLoading || membersLoading) return <LoadingSpinner className="py-20" />
+  const setRowErrorFor = (userId: string, message: string | null) => {
+    setRowErrors((prev) => {
+      const next = { ...prev }
+      if (message) next[userId] = message
+      else delete next[userId]
+      return next
+    })
+  }
+
+  // Only show the full-page spinner on the initial load. Once data arrives,
+  // background refetches after an invite/remove/role-change must not blank
+  // the dialog or row context (CR feedback).
+  const initialMembersLoad = Boolean(workspaceId) && members === null && !membersError
+  if (profileLoading || initialMembersLoad) return <LoadingSpinner className="py-20" />
 
   if (profileError) return <ErrorState message={profileError} onRetry={refetchProfile} />
 
@@ -92,8 +107,8 @@ export default function TeamMembersPage() {
       return
     }
     setInviting(true)
-    setInviteStatus(null)
     setInviteError(null)
+    setInviteStatus(null)
     try {
       const res = await api.post<InviteResponse>(
         `/workspaces/${workspaceId}/invites`,
@@ -112,13 +127,12 @@ export default function TeamMembersPage() {
   const handleRemove = async (m: TeamMember) => {
     if (!confirm(`Remove ${m.display_name || m.email || m.user_id} from the workspace?`)) return
     setRowBusy(m.user_id, true)
-    setRowError(null)
+    setRowErrorFor(m.user_id, null)
     try {
       await api.delete(`/workspaces/${workspaceId}/members/${m.user_id}`)
       await refetch()
-      setRowError(null)
     } catch (err) {
-      setRowError(readApiError(err, 'Could not remove member.'))
+      setRowErrorFor(m.user_id, readApiError(err, 'Could not remove member.'))
     } finally {
       setRowBusy(m.user_id, false)
     }
@@ -126,13 +140,12 @@ export default function TeamMembersPage() {
 
   const handleRoleChange = async (m: TeamMember, nextRole: InviteRole) => {
     setRowBusy(m.user_id, true)
-    setRowError(null)
+    setRowErrorFor(m.user_id, null)
     try {
       await api.patch(`/workspaces/${workspaceId}/members/${m.user_id}`, { role: nextRole })
       await refetch()
-      setRowError(null)
     } catch (err) {
-      setRowError(readApiError(err, 'Could not update role.'))
+      setRowErrorFor(m.user_id, readApiError(err, 'Could not update role.'))
     } finally {
       setRowBusy(m.user_id, false)
     }
@@ -153,12 +166,6 @@ export default function TeamMembersPage() {
       </header>
 
       <PlanGate current={currentPlan} requires="team" featureName="Team member management">
-        {rowError && (
-          <div className="mb-4 rounded-md border border-[var(--color-destructive)]/30 bg-[var(--color-destructive)]/10 px-3 py-2 text-[13px] text-[var(--color-destructive)]">
-            {rowError}
-          </div>
-        )}
-
         <GlassCard gradTop>
           {roster.length === 0 ? (
             <p className="py-6 text-center text-[13px] text-[var(--color-body)]">
@@ -169,49 +176,60 @@ export default function TeamMembersPage() {
               {roster.map((m) => {
                 const role: MemberRole = normalizeRole(m.role)
                 const busy = busyUserIds.has(m.user_id)
+                const rowError = rowErrors[m.user_id] ?? null
                 return (
                   <li
                     key={m.user_id}
-                    className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0 sm:flex-nowrap"
+                    className="flex flex-col gap-y-1 py-3 first:pt-0 last:pb-0"
                   >
-                    <div className="min-w-0 flex-1 basis-full sm:basis-auto">
-                      <div className="flex flex-wrap items-baseline gap-2.5">
-                        <span className="text-[13px] font-medium">
-                          {m.display_name || m.email || m.user_id}
-                        </span>
-                        <span className={`rounded-[0.25rem] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${ROLE_BADGE[role]}`}>
-                          {role}
-                        </span>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:flex-nowrap">
+                      <div className="min-w-0 flex-1 basis-full sm:basis-auto">
+                        <div className="flex flex-wrap items-baseline gap-2.5">
+                          <span className="text-[13px] font-medium">
+                            {m.display_name || m.email || m.user_id}
+                          </span>
+                          <span className={`rounded-[0.25rem] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${ROLE_BADGE[role]}`}>
+                            {role}
+                          </span>
+                        </div>
+                        <div className="font-mono text-[10px] text-[var(--color-body)] truncate">
+                          {m.email || '—'}
+                        </div>
                       </div>
-                      <div className="font-mono text-[10px] text-[var(--color-body)] truncate">
-                        {m.email || '—'}
+                      <div className="font-mono text-[11px] text-[var(--color-body)] sm:w-32 sm:text-right">
+                        {formatSyncAgo(m.last_sync_at)}
                       </div>
+                      {role !== 'owner' && (
+                        <>
+                          <select
+                            aria-label={`Role for ${m.email ?? m.user_id}`}
+                            disabled={busy}
+                            value={role === 'admin' ? 'admin' : 'member'}
+                            onChange={(e) => handleRoleChange(m, e.target.value as InviteRole)}
+                            className="rounded-[0.5rem] border border-[var(--color-border)] bg-[rgba(21,29,48,0.6)] px-2 py-1 text-xs"
+                          >
+                            <option value="member">member</option>
+                            <option value="admin">admin</option>
+                          </select>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => handleRemove(m)}
+                            className="text-[var(--color-destructive)] hover:text-[var(--color-destructive)]"
+                          >
+                            {busy ? '…' : 'Remove'}
+                          </Button>
+                        </>
+                      )}
                     </div>
-                    <div className="font-mono text-[11px] text-[var(--color-body)] sm:w-32 sm:text-right">
-                      {formatSyncAgo(m.last_sync_at)}
-                    </div>
-                    {role !== 'owner' && (
-                      <>
-                        <select
-                          aria-label={`Role for ${m.email ?? m.user_id}`}
-                          disabled={busy}
-                          value={role === 'admin' ? 'admin' : 'member'}
-                          onChange={(e) => handleRoleChange(m, e.target.value as InviteRole)}
-                          className="rounded-[0.5rem] border border-[var(--color-border)] bg-[rgba(21,29,48,0.6)] px-2 py-1 text-xs"
-                        >
-                          <option value="member">member</option>
-                          <option value="admin">admin</option>
-                        </select>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={busy}
-                          onClick={() => handleRemove(m)}
-                          className="text-[var(--color-destructive)] hover:text-[var(--color-destructive)]"
-                        >
-                          {busy ? '…' : 'Remove'}
-                        </Button>
-                      </>
+                    {rowError && (
+                      <div
+                        role="alert"
+                        className="ml-0 mt-1 rounded-md border border-[var(--color-destructive)]/30 bg-[var(--color-destructive)]/10 px-3 py-1.5 text-[12px] text-[var(--color-destructive)]"
+                      >
+                        {rowError}
+                      </div>
                     )}
                   </li>
                 )
