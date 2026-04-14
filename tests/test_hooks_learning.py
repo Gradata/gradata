@@ -73,6 +73,56 @@ def test_inject_rules_no_lessons_file(tmp_path):
     assert result is None
 
 
+def test_inject_also_emits_meta_rules_block_when_db_has_them(tmp_path):
+    """When meta-rules exist in system.db, the injection block includes
+    <brain-meta-rules> alongside <brain-rules>. Previously meta-rules were
+    created and stored but never reached the LLM."""
+    # Seed lessons so the hook gets past the "no rules" guard
+    (tmp_path / "lessons.md").write_text(
+        "[2026-04-01] [RULE:0.92] PROCESS: Always plan before implementing\n",
+        encoding="utf-8",
+    )
+
+    # Seed a meta-rule into system.db
+    from gradata.enhancements.meta_rules import MetaRule
+    from gradata.enhancements.meta_rules_storage import save_meta_rules
+
+    db_path = tmp_path / "system.db"
+    meta = MetaRule(
+        id="m-1",
+        principle="Verify before acting — check existing state before creating new artifacts.",
+        source_categories=["PROCESS", "CODE"],
+        source_lesson_ids=["l-1", "l-2", "l-3"],
+        confidence=0.88,
+        created_session=1,
+        last_validated_session=1,
+    )
+    save_meta_rules(db_path, [meta])
+
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+        result = inject_main({})
+    assert result is not None
+    text = result.get("result", "")
+    assert "<brain-rules>" in text
+    assert "<brain-meta-rules>" in text
+    assert "Verify before acting" in text
+
+
+def test_inject_tolerates_missing_meta_rules_db(tmp_path):
+    """No system.db file → still returns the rules block, no meta-rules block,
+    and no exception."""
+    (tmp_path / "lessons.md").write_text(
+        "[2026-04-01] [RULE:0.92] PROCESS: Always plan before implementing\n",
+        encoding="utf-8",
+    )
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+        result = inject_main({})
+    assert result is not None
+    text = result.get("result", "")
+    assert "<brain-rules>" in text
+    assert "<brain-meta-rules>" not in text
+
+
 def test_session_close_emits_event(tmp_path):
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
         with patch("gradata.hooks.session_close._emit_session_end") as mock_emit:

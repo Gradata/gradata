@@ -20,6 +20,13 @@ try:
 except ImportError:
     parse_lessons = None
 
+try:
+    from gradata.enhancements.meta_rules import format_meta_rules_for_prompt
+    from gradata.enhancements.meta_rules_storage import load_meta_rules
+except ImportError:
+    format_meta_rules_for_prompt = None  # type: ignore[assignment]
+    load_meta_rules = None  # type: ignore[assignment]
+
 _log = logging.getLogger(__name__)
 
 HOOK_META = {
@@ -30,6 +37,7 @@ HOOK_META = {
 
 MAX_RULES = 10
 MIN_CONFIDENCE = 0.60
+MAX_META_RULES = 5  # meta-rules are high-level principles — separate cap from MAX_RULES
 
 
 def _score(lesson) -> float:
@@ -129,8 +137,29 @@ def main(data: dict) -> dict | None:
         for r in scored
     ]
 
-    block = "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
-    return {"result": block}
+    rules_block = "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
+
+    # Also inject tier-1 meta-rules (compound principles across 3+ lessons).
+    # Without this, meta-rules are created + stored but never reach the LLM —
+    # they only exist in the brain's memory, not in the prompt. Bounded by
+    # MAX_META_RULES and context-ranked inside format_meta_rules_for_prompt.
+    meta_block = ""
+    db_path = Path(brain_dir) / "system.db"
+    if load_meta_rules and format_meta_rules_for_prompt and db_path.is_file():
+        try:
+            metas = load_meta_rules(db_path)
+        except Exception as exc:
+            _log.debug("meta-rule load failed (%s) — skipping injection", exc)
+            metas = []
+        if metas:
+            metas_sorted = sorted(
+                metas, key=lambda m: getattr(m, "confidence", 0.0), reverse=True,
+            )[:MAX_META_RULES]
+            formatted = format_meta_rules_for_prompt(metas_sorted, context=context)
+            if formatted:
+                meta_block = "\n<brain-meta-rules>\n" + formatted + "\n</brain-meta-rules>"
+
+    return {"result": rules_block + meta_block}
 
 
 if __name__ == "__main__":
