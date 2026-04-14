@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Security
+from fastapi.security import HTTPAuthorizationCredentials
 
-from app.auth import get_current_user_id
+from app.auth import (
+    _bearer,
+    _resolve_user_email,
+    get_current_user_id,
+    verify_jwt_claims,
+)
 from app.db import get_db
 from app.models import NotificationPrefs, UpdateProfileRequest, UserProfile
 
@@ -15,15 +21,31 @@ _log = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _derive_plan(workspaces: list[dict]) -> str | None:
+    """Pick the best plan across the user's workspaces (highest tier wins)."""
+    priority = {"free": 0, "cloud": 1, "team": 2, "enterprise": 3}
+    best: str | None = None
+    best_rank = -1
+    for ws in workspaces:
+        plan = (ws.get("plan") or "").lower()
+        rank = priority.get(plan, -1)
+        if rank > best_rank:
+            best_rank = rank
+            best = plan or None
+    return best
+
+
 @router.get("/users/me", response_model=UserProfile)
 async def get_profile(
-    request: Request,
-    user_id: str = Depends(get_current_user_id),
+    credentials: HTTPAuthorizationCredentials = Security(_bearer),
 ) -> UserProfile:
     """Return the authenticated user's profile and workspace memberships."""
+    claims = await verify_jwt_claims(credentials.credentials)
+    user_id = claims["sub"]
+    email = await _resolve_user_email(user_id, claims)
+
     db = get_db()
 
-    # Fetch workspace memberships
     memberships = await db.select(
         "workspace_members",
         columns="workspace_id,role",
@@ -39,7 +61,6 @@ async def get_profile(
             role = next((m["role"] for m in memberships if m["workspace_id"] == ws_id), None)
             workspaces.append({**ws, "role": role})
 
-    # Fetch user record from brains table (user_id is our identity anchor)
     brain_rows = await db.select(
         "brains",
         columns="user_id,created_at",
@@ -49,6 +70,8 @@ async def get_profile(
 
     return UserProfile(
         user_id=user_id,
+        email=email,
+        plan=_derive_plan(workspaces),
         workspaces=workspaces,
         created_at=created_at,
     )
@@ -57,10 +80,13 @@ async def get_profile(
 @router.patch("/users/me", response_model=UserProfile)
 async def update_profile(
     body: UpdateProfileRequest,
-    request: Request,
-    user_id: str = Depends(get_current_user_id),
+    credentials: HTTPAuthorizationCredentials = Security(_bearer),
 ) -> UserProfile:
     """Update the authenticated user's display name."""
+    claims = await verify_jwt_claims(credentials.credentials)
+    user_id = claims["sub"]
+    email = await _resolve_user_email(user_id, claims)
+
     db = get_db()
 
     await db.update(
@@ -84,6 +110,8 @@ async def update_profile(
 
     return UserProfile(
         user_id=user_id,
+        email=email,
+        plan=_derive_plan(workspaces),
         display_name=body.display_name,
         workspaces=workspaces,
     )
@@ -91,14 +119,8 @@ async def update_profile(
 
 @router.get("/users/me/notifications", response_model=NotificationPrefs)
 async def get_notifications(
-    request: Request,
     user_id: str = Depends(get_current_user_id),
 ) -> NotificationPrefs:
-    """Return the authenticated user's notification preferences.
-
-    Stored as a single JSON column on workspace_members for now (one workspace
-    per user during launch). Falls back to defaults if no row.
-    """
     db = get_db()
     rows = await db.select(
         "workspace_members",
@@ -112,16 +134,13 @@ async def get_notifications(
 
 @router.put("/users/me/notifications", response_model=NotificationPrefs)
 async def update_notifications(
-    body: NotificationPrefs,
-    request: Request,
+    prefs: NotificationPrefs,
     user_id: str = Depends(get_current_user_id),
 ) -> NotificationPrefs:
-    """Replace the authenticated user's notification preferences."""
     db = get_db()
     await db.update(
         "workspace_members",
-        data={"notification_prefs": body.model_dump()},
+        data={"notification_prefs": prefs.model_dump()},
         filters={"user_id": user_id},
     )
-    _log.info("Updated notification_prefs for user=%s cadence=%s", user_id, body.digest_cadence)
-    return body
+    return prefs
