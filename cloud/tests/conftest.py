@@ -53,16 +53,25 @@ class MockSupabaseClient:
         return rows
 
     async def update(self, table: str, data: dict, filters: dict | None = None) -> list[dict]:
-        # Match prod wrapper semantics: empty list filter = no-op (returns []
-        # rather than patching every row in the table).
-        if filters:
-            for val in filters.values():
-                if isinstance(val, (list, tuple, set)) and not val:
-                    return []
+        # Match prod wrapper semantics:
+        # - Missing/empty filters = refuse (full-table PATCH guard).
+        # - Empty list filter value = no-op returning [] (no matches possible).
+        if not filters:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=500, detail="Database error")
+        for val in filters.values():
+            if isinstance(val, (list, tuple, set)) and not val:
+                return []
         return [data]
 
     async def delete(self, table: str, filters: dict | None = None) -> list[dict]:
-        """Mock delete: returns pre-seeded delete response rows (treat as 'deleted rows')."""
+        """Mock delete: returns pre-seeded delete response rows (treat as 'deleted rows').
+
+        Matches prod wrapper semantics: refuses unfiltered delete.
+        """
+        if not filters:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=500, detail="Database error")
         return list(self._responses[table].get("delete", []))
 
 
