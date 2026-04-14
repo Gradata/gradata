@@ -418,7 +418,7 @@ def register_brain_tools(brain: Brain) -> int:
             parameters={"draft": "str", "final": "str"},
         ))
         count += 1
-    except (ValueError, Exception):
+    except Exception:
         pass  # Already registered
 
     try:
@@ -430,8 +430,8 @@ def register_brain_tools(brain: Brain) -> int:
             returns="str",
         ))
         count += 1
-    except (ValueError, Exception):
-        pass
+    except Exception:
+        pass  # Already registered
 
     return count
 

@@ -234,16 +234,13 @@ def store_signature(db_path: Path, category: str, signature: str) -> None:
     if not signature:
         return
     _ensure_table(db_path)
-    conn = sqlite3.connect(str(db_path))
-    try:
+    with sqlite3.connect(str(db_path)) as conn:
         conn.execute(
             """INSERT OR REPLACE INTO rule_signatures (category, signature, signed_at)
                VALUES (?, ?, ?)""",
             (category.upper(), signature, datetime.now(UTC).isoformat()),
         )
         conn.commit()
-    finally:
-        conn.close()
 
 
 def load_signatures(db_path: Path) -> dict[str, str]:
@@ -253,12 +250,9 @@ def load_signatures(db_path: Path) -> dict[str, str]:
         Dict mapping category -> signature. Empty if table doesn't exist.
     """
     _ensure_table(db_path)
-    conn = sqlite3.connect(str(db_path))
-    try:
+    with sqlite3.connect(str(db_path)) as conn:
         rows = conn.execute("SELECT category, signature FROM rule_signatures").fetchall()
         return {row[0]: row[1] for row in rows}
-    finally:
-        conn.close()
 
 
 def sign_and_store(
@@ -286,15 +280,12 @@ def _load_signature(db_path: Path, category: str) -> str:
         Hex signature string, or empty string if not found.
     """
     _ensure_table(db_path)
-    conn = sqlite3.connect(str(db_path))
-    try:
+    with sqlite3.connect(str(db_path)) as conn:
         row = conn.execute(
             "SELECT signature FROM rule_signatures WHERE category = ?",
             (category.upper(),),
         ).fetchone()
         return row[0] if row else ""
-    finally:
-        conn.close()
 
 
 def verify_from_db(
