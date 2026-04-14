@@ -73,17 +73,13 @@ def test_inject_rules_no_lessons_file(tmp_path):
     assert result is None
 
 
-def test_inject_also_emits_meta_rules_block_when_db_has_them(tmp_path):
-    """When meta-rules exist in system.db, the injection block includes
-    <brain-meta-rules> alongside <brain-rules>. Previously meta-rules were
-    created and stored but never reached the LLM."""
-    # Seed lessons so the hook gets past the "no rules" guard
+def test_inject_emits_meta_rules_block_for_llm_synth_source(tmp_path):
+    """Meta-rules with source='llm_synth' or 'human_curated' get injected."""
     (tmp_path / "lessons.md").write_text(
         "[2026-04-01] [RULE:0.92] PROCESS: Always plan before implementing\n",
         encoding="utf-8",
     )
 
-    # Seed a meta-rule into system.db
     from gradata.enhancements.meta_rules import MetaRule
     from gradata.enhancements.meta_rules_storage import save_meta_rules
 
@@ -96,6 +92,7 @@ def test_inject_also_emits_meta_rules_block_when_db_has_them(tmp_path):
         confidence=0.88,
         created_session=1,
         last_validated_session=1,
+        source="llm_synth",
     )
     save_meta_rules(db_path, [meta])
 
@@ -106,6 +103,41 @@ def test_inject_also_emits_meta_rules_block_when_db_has_them(tmp_path):
     assert "<brain-rules>" in text
     assert "<brain-meta-rules>" in text
     assert "Verify before acting" in text
+
+
+def test_inject_skips_meta_rules_with_deterministic_source(tmp_path):
+    """Meta-rules with source='deterministic' (the default for auto-generated
+    cluster output) are EXCLUDED from injection. Empirical: 2026-04-14 ablation
+    showed deterministic principles regress correctness."""
+    (tmp_path / "lessons.md").write_text(
+        "[2026-04-01] [RULE:0.92] PROCESS: Always plan before implementing\n",
+        encoding="utf-8",
+    )
+
+    from gradata.enhancements.meta_rules import MetaRule
+    from gradata.enhancements.meta_rules_storage import save_meta_rules
+
+    db_path = tmp_path / "system.db"
+    # Default source is 'deterministic' — should NOT be injected
+    meta = MetaRule(
+        id="m-2",
+        principle="Code: Avoid: foo. Prefer: bar.",  # the ablation-confirmed garbage shape
+        source_categories=["CODE"],
+        source_lesson_ids=["l-9"],
+        confidence=1.00,  # confidence is high BUT source disqualifies it
+        created_session=1,
+        last_validated_session=1,
+    )
+    save_meta_rules(db_path, [meta])
+
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+        result = inject_main({})
+    assert result is not None
+    text = result.get("result", "")
+    assert "<brain-rules>" in text
+    # Critical: the deterministic meta-rule must NOT appear in the prompt
+    assert "<brain-meta-rules>" not in text
+    assert "Avoid: foo" not in text
 
 
 def test_inject_tolerates_missing_meta_rules_db(tmp_path):

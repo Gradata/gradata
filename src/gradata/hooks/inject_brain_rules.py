@@ -21,11 +21,15 @@ except ImportError:
     parse_lessons = None
 
 try:
-    from gradata.enhancements.meta_rules import format_meta_rules_for_prompt
+    from gradata.enhancements.meta_rules import (
+        INJECTABLE_META_SOURCES,
+        format_meta_rules_for_prompt,
+    )
     from gradata.enhancements.meta_rules_storage import load_meta_rules
 except ImportError:
     format_meta_rules_for_prompt = None  # type: ignore[assignment]
     load_meta_rules = None  # type: ignore[assignment]
+    INJECTABLE_META_SOURCES = frozenset()  # type: ignore[assignment]
 
 _log = logging.getLogger(__name__)
 
@@ -140,9 +144,12 @@ def main(data: dict) -> dict | None:
     rules_block = "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
 
     # Also inject tier-1 meta-rules (compound principles across 3+ lessons).
-    # Without this, meta-rules are created + stored but never reach the LLM —
-    # they only exist in the brain's memory, not in the prompt. Bounded by
-    # MAX_META_RULES and context-ranked inside format_meta_rules_for_prompt.
+    # Without this, meta-rules are created + stored but never reach the LLM.
+    # Quality gate: only inject metas whose principle text was LLM-synthesized
+    # or human-curated. Deterministic auto-generated principles (the OSS
+    # default) are excluded — the 2026-04-14 ablation (432 trials) showed they
+    # regress correctness on Sonnet (-1.1%), DeepSeek (-1.4%), and halve the
+    # qwen14b lift from +8.1% to +2.9%. Better to inject nothing than noise.
     meta_block = ""
     db_path = Path(brain_dir) / "system.db"
     if load_meta_rules and format_meta_rules_for_prompt and db_path.is_file():
@@ -151,13 +158,23 @@ def main(data: dict) -> dict | None:
         except Exception as exc:
             _log.debug("meta-rule load failed (%s) — skipping injection", exc)
             metas = []
-        if metas:
-            metas_sorted = sorted(
-                metas, key=lambda m: getattr(m, "confidence", 0.0), reverse=True,
+        injectable = [
+            m for m in metas
+            if getattr(m, "source", "deterministic") in INJECTABLE_META_SOURCES
+        ]
+        if injectable:
+            top_metas = sorted(
+                injectable, key=lambda m: getattr(m, "confidence", 0.0), reverse=True,
             )[:MAX_META_RULES]
-            formatted = format_meta_rules_for_prompt(metas_sorted, context=context)
+            formatted = format_meta_rules_for_prompt(top_metas, context=context)
             if formatted:
                 meta_block = "\n<brain-meta-rules>\n" + formatted + "\n</brain-meta-rules>"
+        elif metas:
+            _log.debug(
+                "Skipped meta-rule injection: %d metas in DB, none with "
+                "injectable source (llm_synth or human_curated)",
+                len(metas),
+            )
 
     return {"result": rules_block + meta_block}
 

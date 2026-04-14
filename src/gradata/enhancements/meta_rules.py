@@ -36,7 +36,17 @@ TIER_UNIVERSAL = 3  # Universal principle: emerges from 3+ super-meta-rules
 
 @dataclass
 class MetaRule:
-    """Emergent principle from 3+ related corrections."""
+    """Emergent principle from 3+ related corrections.
+
+    The ``source`` field tracks how the principle text was generated:
+      - ``"deterministic"`` (default): produced by token-frequency / cluster
+        heuristics. Empirically (2026-04-14 ablation) these regress
+        correctness when injected into prompts. Excluded from injection.
+      - ``"llm_synth"``: produced by cloud-side LLM synthesis from the
+        source rules. Eligible for injection.
+      - ``"human_curated"``: hand-written or human-edited principle. Always
+        eligible for injection.
+    """
 
     id: str
     principle: str
@@ -51,6 +61,13 @@ class MetaRule:
     applies_when: list[str] = field(default_factory=list)
     never_when: list[str] = field(default_factory=list)
     transfer_scope: RuleTransferScope = RuleTransferScope.PERSONAL
+    source: str = "deterministic"  # provenance of the principle text — see class docstring
+
+
+# Sources whose principle text is trusted enough to inject into LLM prompts.
+# Deterministic auto-generated principles regress correctness empirically
+# (2026-04-14 ablation, 432 trials, judged blind).
+INJECTABLE_META_SOURCES = frozenset({"llm_synth", "human_curated"})
 
 
 @dataclass
