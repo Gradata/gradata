@@ -21,10 +21,25 @@ from gradata._types import (
     CorrectionType,
     Lesson,
     LessonState,
+    RuleMetadata,
     transition,
 )
 
 _log = logging.getLogger(__name__)
+
+
+def is_hook_enforced(lesson: Lesson) -> bool:
+    """True if this lesson is enforced by an installed generated hook.
+
+    Reads structured metadata first (``lesson.metadata.how_enforced == "hooked"``).
+    Falls back to the legacy ``[hooked]`` description prefix so existing
+    lessons.md files still work until they're rewritten.
+    """
+    md = getattr(lesson, "metadata", None)
+    if md is not None and getattr(md, "how_enforced", "") == "hooked":
+        return True
+    desc = getattr(lesson, "description", "") or ""
+    return desc.lstrip().startswith("[hooked]")
 
 # ---------------------------------------------------------------------------
 # Constants (SPEC-aligned, research-backed)
@@ -1041,8 +1056,8 @@ def graduate(
             lesson.state = transition(lesson.state, "promote")
 
             # Rule-to-hook graduation: attempt to install a deterministic
-            # PreToolUse hook for this newly-minted RULE. On success, prefix
-            # the description with "[hooked] " so the Python-side
+            # PreToolUse hook for this newly-minted RULE. On success, mark
+            # ``lesson.metadata.how_enforced = "hooked"`` so the Python-side
             # rule_enforcement soft-reminder dedups it (the hook now enforces).
             # Never raises out of graduate() — any failure falls back to
             # soft prompt injection silently.
@@ -1050,13 +1065,15 @@ def graduate(
                 from gradata.enhancements import rule_to_hook
 
                 desc = lesson.description or ""
-                if desc and not desc.lstrip().startswith("[hooked]"):
+                if desc and not is_hook_enforced(lesson):
                     candidate = rule_to_hook.classify_rule(
                         desc, confidence=float(lesson.confidence)
                     )
                     gen_result = rule_to_hook.try_generate(candidate)
                     if gen_result.installed:
-                        lesson.description = f"[hooked] {desc}"
+                        if lesson.metadata is None:
+                            lesson.metadata = RuleMetadata()
+                        lesson.metadata.how_enforced = "hooked"
             except Exception:
                 pass  # Hook generation is best-effort; never break graduation.
             continue
