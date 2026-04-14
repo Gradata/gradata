@@ -114,10 +114,14 @@ def _resolve_brain_path():
     return None
 
 
+def _skip(name: str) -> dict:
+    return {"name": name, "status": "skip", "detail": "no brain dir resolved"}
+
+
 def _check_system_db(brain_path):
     """Check system.db exists and is readable."""
     if brain_path is None:
-        return {"name": "system_db", "status": "skip", "detail": "no brain dir resolved"}
+        return _skip("system_db")
     db = brain_path / "system.db"
     if not db.exists():
         return {"name": "system_db", "status": "skip", "detail": "system.db not found (brain may not be initialized)"}
@@ -134,7 +138,7 @@ def _check_system_db(brain_path):
 def _check_events_jsonl(brain_path):
     """Check events.jsonl exists."""
     if brain_path is None:
-        return {"name": "events_jsonl", "status": "skip", "detail": "no brain dir resolved"}
+        return _skip("events_jsonl")
     ej = brain_path / "events.jsonl"
     if not ej.exists():
         return {"name": "events_jsonl", "status": "skip", "detail": "events.jsonl not found (brain may not be initialized)"}
@@ -148,7 +152,7 @@ def _check_events_jsonl(brain_path):
 def _check_manifest(brain_path):
     """Check brain.manifest.json is valid JSON."""
     if brain_path is None:
-        return {"name": "brain_manifest", "status": "skip", "detail": "no brain dir resolved"}
+        return _skip("brain_manifest")
     mf = brain_path / "brain.manifest.json"
     if not mf.exists():
         return {"name": "brain_manifest", "status": "skip", "detail": "brain.manifest.json not found (optional)"}
@@ -165,7 +169,7 @@ def _check_manifest(brain_path):
 def _check_vectorstore(brain_path):
     """Check .vectorstore/ directory."""
     if brain_path is None:
-        return {"name": "vectorstore", "status": "skip", "detail": "no brain dir resolved"}
+        return _skip("vectorstore")
     vs = brain_path / ".vectorstore"
     if not vs.exists():
         return {"name": "vectorstore", "status": "skip", "detail": ".vectorstore/ not found (embeddings not enabled)"}
