@@ -69,16 +69,18 @@ class TestUserId:
         """Hash must not contain the raw MAC. Catches regressions where
         someone accidentally returns the raw seed instead of the digest.
 
-        We test both branches explicitly: the real MAC and a synthetic short
-        MAC (which the original ``or len(mac_hex) < 4`` clause was meant to
-        cover but was always false in practice — real MACs are >=12 chars).
+        CI runners (e.g. GitHub-hosted) can produce a shorter ``uuid.getnode()``
+        hex than a typical workstation's 12-char MAC, so we don't gate on
+        length — we only assert the non-inclusion property, which is the
+        actual security-relevant invariant. The stronger deterministic
+        check lives in ``test_does_not_leak_synthetic_short_mac``.
         """
         import uuid
 
         mac_hex = f"{uuid.getnode():x}"
-        # Real MACs are at least 12 hex chars; assert that so the test
-        # actually validates the property we care about.
-        assert len(mac_hex) >= 12
+        # Only assert the property we care about: the raw MAC hex must not
+        # appear in the hashed user_id. Length can vary across environments.
+        assert len(mac_hex) > 0
         uid = _telemetry.anonymous_user_id()
         assert mac_hex not in uid
 
