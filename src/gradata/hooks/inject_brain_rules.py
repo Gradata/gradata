@@ -163,10 +163,13 @@ def main(data: dict) -> dict | None:
             if getattr(m, "source", "deterministic") in INJECTABLE_META_SOURCES
         ]
         if injectable:
-            top_metas = sorted(
-                injectable, key=lambda m: getattr(m, "confidence", 0.0), reverse=True,
-            )[:MAX_META_RULES]
-            formatted = format_meta_rules_for_prompt(top_metas, context=context)
+            # Pass the full injectable set with `limit=MAX_META_RULES` so the
+            # cap is applied AFTER context-aware ranking inside the formatter.
+            # Pre-slicing by raw confidence would let a lower-confidence rule
+            # with a strong context weight get silently excluded.
+            formatted = format_meta_rules_for_prompt(
+                injectable, context=context, limit=MAX_META_RULES,
+            )
             if formatted:
                 meta_block = "\n<brain-meta-rules>\n" + formatted + "\n</brain-meta-rules>"
         elif metas:

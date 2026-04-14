@@ -322,6 +322,7 @@ def format_meta_rules_for_prompt(
     context: str = "",
     condition_context: dict | None = None,
     scope_filter: RuleTransferScope | None = None,
+    limit: int | None = None,
 ) -> str:
     """Format meta-rules for injection into LLM context.
 
@@ -339,6 +340,10 @@ def format_meta_rules_for_prompt(
     When *scope_filter* is provided, only meta-rules with the matching
     ``transfer_scope`` are included.
 
+    When *limit* is provided, the cap is applied AFTER context-aware
+    ranking so a lower-confidence rule with a stronger context weight
+    can still be promoted into the final set.
+
     Args:
         metas: Meta-rules to format.
         context: Optional task-context label (e.g. ``"drafting"``,
@@ -349,6 +354,9 @@ def format_meta_rules_for_prompt(
             :func:`evaluate_conditions` are included.
         scope_filter: When set, only include meta-rules with this
             transfer scope.
+        limit: Optional maximum number of meta-rules to include.
+            Applied AFTER context-aware ranking so context weight can
+            influence which rules make the cut. ``None`` means no cap.
 
     Returns:
         Formatted string block, or ``""`` if *metas* is empty.
@@ -366,9 +374,15 @@ def format_meta_rules_for_prompt(
     if not metas:
         return ""
 
-    # Re-rank by context weight when a context is provided
+    # Re-rank by context weight when a context is provided. Pass `limit`
+    # through as `max_rules` so ranking + capping happens atomically;
+    # otherwise apply the cap after the fact (no ranking case).
     if context:
-        metas = rank_meta_rules_by_context(metas, context)
+        metas = rank_meta_rules_by_context(
+            metas, context, max_rules=limit if limit is not None else len(metas),
+        )
+    elif limit is not None:
+        metas = metas[:limit]
 
     lines = ["## Brain Meta-Rules (compound principles)"]
     for i, meta in enumerate(metas, start=1):
