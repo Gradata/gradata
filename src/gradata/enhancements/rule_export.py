@@ -60,15 +60,19 @@ def _format_cursor(rules: list[tuple[str, str]]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _format_agents(rules: list[tuple[str, str]]) -> str:
+def _format_grouped_markdown(title: str, rules: list[tuple[str, str]]) -> str:
+    """Render rules as a markdown doc with a title, intro, and ``## CATEGORY``
+    sections of bullet points. Shared body for AGENTS.md / Codex / Cline /
+    Continue.dev exports — they all consume the same schema (markdown
+    appended to a system prompt), only the H1 title and output path differ.
+    """
     if not rules:
-        return "# AGENTS.md\n\nNo graduated rules yet.\n"
-    # Group by category for readability
+        return f"# {title}\n\nNo graduated rules yet.\n"
     by_cat: dict[str, list[str]] = {}
     for cat, desc in rules:
         by_cat.setdefault(cat, []).append(desc)
     lines = [
-        "# AGENTS.md",
+        f"# {title}",
         "",
         "Graduated rules learned from corrections. Follow these in every response.",
         "",
@@ -98,95 +102,27 @@ def _format_aider(rules: list[tuple[str, str]]) -> str:
     return "\n".join(yaml_lines) + "\n"
 
 
-def _format_codex(rules: list[tuple[str, str]]) -> str:
-    """Emit rules for the OpenAI Codex CLI.
-
-    Codex CLI reads project-level ``AGENTS.md`` conventions. We scope the
-    export to ``.codex/AGENTS.md`` (per DEFAULT_PATHS below) so it
-    doesn't collide with an existing top-level AGENTS.md when a user
-    runs multiple agent tools in the same repo.
-    """
-    if not rules:
-        return "# Codex AGENTS.md\n\nNo graduated rules yet.\n"
-    by_cat: dict[str, list[str]] = {}
-    for cat, desc in rules:
-        by_cat.setdefault(cat, []).append(desc)
-    lines = [
-        "# Codex AGENTS.md",
-        "",
-        "Graduated rules learned from corrections. Follow these in every response.",
-        "",
-    ]
-    for cat in sorted(by_cat):
-        lines.append(f"## {cat}")
-        lines.append("")
-        for desc in by_cat[cat]:
-            lines.append(f"- {desc}")
-        lines.append("")
-    return "\n".join(lines) + "\n"
+# Grouped-markdown targets share _format_grouped_markdown; each picks its
+# own H1 title. Codex scopes to .codex/AGENTS.md to avoid collisions with
+# a top-level AGENTS.md when multiple agent tools share a repo.
+_GROUPED_MARKDOWN_TITLES = {
+    "agents": "AGENTS.md",
+    "codex": "Codex AGENTS.md",
+    "cline": "Cline Rules",
+    "continue": "Continue.dev Rules",
+}
 
 
-def _format_cline(rules: list[tuple[str, str]]) -> str:
-    """Emit rules for Cline (.clinerules — single markdown file).
-
-    Cline's ``.clinerules`` file at the repo root is consumed as custom
-    instructions appended to the system prompt. Plain markdown with
-    headings + bullets is the idiomatic format.
-    """
-    if not rules:
-        return "# Cline Rules\n\nNo graduated rules yet.\n"
-    by_cat: dict[str, list[str]] = {}
-    for cat, desc in rules:
-        by_cat.setdefault(cat, []).append(desc)
-    lines = [
-        "# Cline Rules",
-        "",
-        "Graduated rules learned from corrections. Follow these in every response.",
-        "",
-    ]
-    for cat in sorted(by_cat):
-        lines.append(f"## {cat}")
-        lines.append("")
-        for desc in by_cat[cat]:
-            lines.append(f"- {desc}")
-        lines.append("")
-    return "\n".join(lines) + "\n"
-
-
-def _format_continue(rules: list[tuple[str, str]]) -> str:
-    """Emit rules for Continue.dev (.continue/rules/*.md).
-
-    Continue's rules directory contains one or more markdown files whose
-    contents are appended to the system prompt. We emit a single file
-    (``gradata-rules.md``) grouped by category.
-    """
-    if not rules:
-        return "# Continue.dev Rules\n\nNo graduated rules yet.\n"
-    by_cat: dict[str, list[str]] = {}
-    for cat, desc in rules:
-        by_cat.setdefault(cat, []).append(desc)
-    lines = [
-        "# Continue.dev Rules",
-        "",
-        "Graduated rules learned from corrections. Follow these in every response.",
-        "",
-    ]
-    for cat in sorted(by_cat):
-        lines.append(f"## {cat}")
-        lines.append("")
-        for desc in by_cat[cat]:
-            lines.append(f"- {desc}")
-        lines.append("")
-    return "\n".join(lines) + "\n"
+def _make_grouped_formatter(title: str):
+    def _fmt(rules: list[tuple[str, str]]) -> str:
+        return _format_grouped_markdown(title, rules)
+    return _fmt
 
 
 _FORMATTERS = {
     "cursor": _format_cursor,
-    "agents": _format_agents,
     "aider": _format_aider,
-    "codex": _format_codex,
-    "cline": _format_cline,
-    "continue": _format_continue,
+    **{k: _make_grouped_formatter(v) for k, v in _GROUPED_MARKDOWN_TITLES.items()},
 }
 
 

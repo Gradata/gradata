@@ -511,36 +511,16 @@ def cmd_rule_add(args):
     # CWD which would write to the wrong brain when running from a
     # project that happens to contain brain files.
     brain_root = _resolve_brain_root(args)
-    lessons_path = brain_root / "lessons.md"
-    lessons_path.parent.mkdir(parents=True, exist_ok=True)
-    if not lessons_path.exists():
-        lessons_path.write_text("", encoding="utf-8")
+    brain_root.mkdir(parents=True, exist_ok=True)
 
-    # Prefer Brain.add_rule when the resolved brain root has a system.db
-    # (i.e. an initialized brain). Otherwise, write via the same canonical
-    # parse/format helpers Brain.add_rule uses internally — no hand-formatting.
-    if (brain_root / "system.db").is_file():
-        from gradata import Brain as _Brain
+    # Route through Brain.add_rule — the canonical parse/format pipeline.
+    # Brain() works whether or not system.db exists (run_migrations no-ops
+    # on a missing db), so we don't need a second hand-rolled write path.
+    from gradata import Brain as _Brain
 
-        _b = _Brain(brain_root)
-        _b.add_rule(description=description, category=category,
-                    state="RULE", confidence=1.0)
-    else:
-        from datetime import date
-
-        from gradata._db import write_lessons_safe
-        from gradata._types import Lesson, LessonState
-        from gradata.enhancements.self_improvement import format_lessons, parse_lessons
-
-        existing = parse_lessons(lessons_path.read_text(encoding="utf-8"))
-        existing.append(Lesson(
-            date=date.today().isoformat(),
-            state=LessonState.RULE,
-            confidence=1.0,
-            category=category,
-            description=description,
-        ))
-        write_lessons_safe(lessons_path, format_lessons(existing))
+    _Brain(brain_root).add_rule(
+        description=description, category=category, state="RULE", confidence=1.0,
+    )
 
     if result.installed:
         print(f"rule graduated to hook: installed at {result.hook_path}")
