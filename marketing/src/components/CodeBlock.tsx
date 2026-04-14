@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { track } from "@/lib/analytics";
 
@@ -27,6 +27,16 @@ export function CodeBlock({
   copyAriaLabel = "Copy code",
 }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimerRef.current !== null) {
+        clearTimeout(resetTimerRef.current);
+        resetTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const onCopy = async () => {
     try {
@@ -34,7 +44,13 @@ export function CodeBlock({
       await navigator.clipboard.writeText(text);
       track("install_copy", { language: language ?? "text" });
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      if (resetTimerRef.current !== null) {
+        clearTimeout(resetTimerRef.current);
+      }
+      resetTimerRef.current = setTimeout(() => {
+        setCopied(false);
+        resetTimerRef.current = null;
+      }, 1500);
     } catch {
       // Clipboard blocked — ignore silently.
     }

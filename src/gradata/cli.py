@@ -58,10 +58,10 @@ def cmd_init(args):
             cfg_path = _telemetry.config_path()
             enabled = _telemetry.prompt_and_persist()
             if enabled:
-                print("Telemetry enabled. Thanks for helping us improve Gradata.")
-                print(f"To disable later: edit {cfg_path} or set GRADATA_TELEMETRY=0")
+                _log.info("Telemetry enabled. Thanks for helping us improve Gradata.")
+                _log.info("To disable later: edit %s or set GRADATA_TELEMETRY=0", cfg_path)
             else:
-                print(f"Telemetry disabled. You can enable it later in {cfg_path}")
+                _log.info("Telemetry disabled. You can enable it later in %s", cfg_path)
         except Exception as exc:
             # Prompting must never break init.
             _log.debug("telemetry prompt failed: %s", exc)

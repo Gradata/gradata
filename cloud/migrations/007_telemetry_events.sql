@@ -2,13 +2,14 @@
 -- Run this in Supabase SQL Editor (Dashboard -> SQL -> New Query)
 --
 -- What lives here: event name, sha256(machine_id), UTC timestamp, sdk version,
--- the backend's received_at timestamp, and the source IP (truncated to /24 for
--- v4 or /48 for v6 upstream — we record the raw IP here only for the rate
--- limiter; it is NOT exposed in any read path).
+-- and the backend's received_at timestamp.
 --
 -- What does NOT live here: user email, user ID, workspace ID, lesson text,
--- correction content, draft/final previews, file paths. The SDK strips all
--- of that before sending.
+-- correction content, draft/final previews, file paths, or source IP. The
+-- SDK strips payload PII before sending; the backend does not persist the
+-- client IP (it is used only for the in-memory rate limiter and dropped
+-- once the sliding window expires). The ``source_ip`` column is retained
+-- as nullable for backward compatibility and is always NULL going forward.
 
 CREATE TABLE IF NOT EXISTS telemetry_events (
     id BIGSERIAL PRIMARY KEY,

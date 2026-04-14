@@ -31,6 +31,7 @@ from typing import Literal
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError
+from slowapi.util import get_remote_address
 
 from app.db import get_db
 
@@ -122,8 +123,16 @@ def _is_hex64(s: str) -> bool:
     return True
 
 
-async def _record(body: TelemetryEvent, source_ip: str | None) -> None:
-    """Insert the event. Errors are logged but never re-raised."""
+async def _record(body: TelemetryEvent) -> None:
+    """Insert the event. Errors are logged but never re-raised.
+
+    Note: ``source_ip`` is intentionally *not* persisted. Raw IPs are PII
+    under GDPR; we only need the live client IP for the in-memory sliding
+    window rate limiter, which keeps it resident for at most ``RATE_WINDOW``
+    seconds. The ``source_ip`` column on ``telemetry_events`` is left
+    nullable for backward compatibility and will always be NULL from this
+    writer.
+    """
     try:
         db = get_db()
         await db.insert(
@@ -133,7 +142,6 @@ async def _record(body: TelemetryEvent, source_ip: str | None) -> None:
                 "user_id": body.user_id,
                 "sdk_version": body.sdk_version,
                 "event_ts": body.ts.isoformat(),
-                "source_ip": source_ip,
             },
         )
     except Exception as exc:
@@ -144,7 +152,11 @@ async def _record(body: TelemetryEvent, source_ip: str | None) -> None:
 @router.post("/telemetry/event")
 async def telemetry_event(request: Request) -> JSONResponse:
     """Accept an activation event. Always returns 202 (public surface)."""
-    source_ip = request.client.host if request.client else None
+    # Use slowapi's ``get_remote_address`` so the real client IP is used
+    # behind proxies (respects X-Forwarded-For / X-Real-IP the same way the
+    # shared limiter does). This IP is used only for the in-memory rate
+    # limiter — it is never persisted.
+    source_ip = get_remote_address(request)
 
     # Rate limit FIRST so a flood can't DOS the JSON parser.
     if source_ip and not _allow(source_ip):
@@ -179,5 +191,5 @@ async def telemetry_event(request: Request) -> JSONResponse:
     if now - ts > _MAX_AGE:
         return JSONResponse(status_code=202, content=_ACCEPTED)
 
-    await _record(body, source_ip)
+    await _record(body)
     return JSONResponse(status_code=202, content=_ACCEPTED)
