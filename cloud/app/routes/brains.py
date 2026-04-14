@@ -9,8 +9,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
-import secrets
-
 from app.auth import (
     get_brain_for_request,
     get_current_brain,
@@ -113,7 +111,9 @@ async def create_brain(
         )
 
     # Generate a cloud-scope API key so the SDK can authenticate right away.
-    api_key = f"gd_{secrets.token_urlsafe(32)}"
+    # Delegate to the canonical helper so prefix + entropy stays consistent.
+    from app.routes.api_keys import _generate_key
+    api_key = _generate_key()
 
     brain_rows = await db.insert(
         "brains",
