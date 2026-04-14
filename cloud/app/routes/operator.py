@@ -220,11 +220,12 @@ async def list_customers(
             )
         )
 
-    # None sorts to the end regardless of order direction.
+    # Sort Nones consistently: actual dates rank before None in both asc and desc
+    # (True > False, so `is not None` ensures real dates always sort before None).
     sort_keys = {
         "mrr": lambda r: r.mrr_usd,
         "active_users": lambda r: r.active_users,
-        "last_active": lambda r: (r.last_active is None, r.last_active or ""),
+        "last_active": lambda r: (r.last_active is not None, r.last_active or ""),
     }
     rows.sort(key=sort_keys[sort], reverse=(order == "desc"))
 

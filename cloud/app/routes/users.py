@@ -23,12 +23,19 @@ async def _hydrate_workspaces(db, user_id: str) -> list[dict]:
         filters={"user_id": user_id},
     )
     role_by_ws = {m["workspace_id"]: m.get("role") for m in memberships}
+    if not role_by_ws:
+        return []
+
+    # Batch fetch: one IN(...) query instead of per-workspace selects.
+    workspace_ids = list(role_by_ws.keys())
+    rows = await db.select("workspaces", filters={"id": workspace_ids})
+    row_by_id = {r["id"]: r for r in rows}
 
     workspaces: list[dict] = []
     for ws_id, role in role_by_ws.items():
-        rows = await db.select("workspaces", filters={"id": ws_id})
-        if rows:
-            workspaces.append({**rows[0], "role": role})
+        row = row_by_id.get(ws_id)
+        if row is not None:
+            workspaces.append({**row, "role": role})
     return workspaces
 
 

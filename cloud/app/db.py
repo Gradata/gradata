@@ -32,11 +32,22 @@ class SupabaseClient:
     async def select(
         self, table: str, columns: str = "*", filters: dict[str, Any] | None = None,
     ) -> list[dict]:
-        """SELECT rows from a table with optional eq filters."""
+        """SELECT rows from a table with optional filters.
+
+        Scalar values become eq filters. List/tuple values become PostgREST
+        ``in.(...)`` filters so callers can batch lookups by id without an N+1.
+        """
         params: dict[str, str] = {"select": columns}
         if filters:
             for key, val in filters.items():
-                params[key] = f"eq.{val}"
+                if isinstance(val, (list, tuple, set)):
+                    vals = list(val)
+                    if not vals:
+                        # Empty list → no possible match; short-circuit without a request.
+                        return []
+                    params[key] = "in.(" + ",".join(str(v) for v in vals) + ")"
+                else:
+                    params[key] = f"eq.{val}"
         resp = await self._http.get(f"/{table}", params=params)
         resp.raise_for_status()
         return resp.json()
