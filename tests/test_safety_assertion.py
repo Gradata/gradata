@@ -14,6 +14,7 @@ import logging
 
 from gradata._types import Lesson, LessonState
 from gradata.enhancements.self_improvement import (
+    MAX_PER_SESSION_DELTA,
     MAX_PER_STEP_PENALTY,
     MIN_APPLICATIONS_FOR_PATTERN,
     MIN_APPLICATIONS_FOR_RULE,
@@ -267,6 +268,43 @@ class TestPenaltyCap:
         assert drop > 0, "Penalty must still apply"
         assert drop <= MAX_PER_STEP_PENALTY + 1e-9, (
             f"Penalty {drop} exceeded cap {MAX_PER_STEP_PENALTY}"
+        )
+
+    def test_sybil_burst_cannot_chain_tier_transitions(self) -> None:
+        """10 same-session reinforcements must not push INSTINCT through RULE.
+
+        gap-analysis/01-internal-audit.md Gap 4: without a per-session cap,
+        a fresh lesson can be pushed 0 -> PATTERN -> RULE in one call by
+        stacking +0.12/rewrite reinforcements. The cap allows at most ONE
+        tier transition (INSTINCT->PATTERN OR PATTERN->RULE) per session.
+        """
+        lesson = _make_lesson(
+            state=LessonState.INSTINCT,
+            confidence=0.50,
+            fire_count=10,  # satisfy fire_count gate
+            category="DRAFTING",
+            description="tighten prose",
+        )
+        lesson._was_injected_this_session = True  # type: ignore[attr-defined]
+        update_confidence(
+            [lesson],
+            [
+                {
+                    "category": "DRAFTING",
+                    "direction": "REINFORCING",
+                    "severity_label": "rewrite",
+                }
+            ] * 10,
+            severity_data={"DRAFTING": "rewrite"},
+        )
+        # Cannot chain INSTINCT -> PATTERN -> RULE in a single tick
+        assert lesson.state != LessonState.RULE, (
+            f"Sybil burst promoted past ONE tier: {lesson.state} at {lesson.confidence}"
+        )
+        # Net confidence delta bounded by MAX_PER_SESSION_DELTA
+        drop = abs(lesson.confidence - 0.50)
+        assert drop <= MAX_PER_SESSION_DELTA + 1e-9, (
+            f"Per-session delta {drop} exceeded cap {MAX_PER_SESSION_DELTA}"
         )
 
     def test_monotone_under_alternating_corrections(self) -> None:

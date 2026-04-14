@@ -700,6 +700,19 @@ def update_confidence(
         if lesson.state in (LessonState.KILLED, LessonState.ARCHIVED):
             continue
 
+        # Snapshot pre-session state for the per-session invariant enforced
+        # below. graduate() also reads _pre_session_confidence to emit its
+        # safety-jump warning; setting it here makes update_confidence the
+        # single source of truth.
+        # Invariant (gap-analysis/01-internal-audit.md Gap 4 red-team note):
+        # a single session can at most cause ONE graduation tier transition
+        # and ONE MAX_PER_SESSION_DELTA-sized move in confidence. Blocks the
+        # Sybil scenario where 10 coordinated corrections push a fresh
+        # lesson 0 -> RULE in a single tick.
+        if not hasattr(lesson, "_pre_session_confidence"):
+            lesson._pre_session_confidence = lesson.confidence  # type: ignore[attr-defined]
+            lesson._pre_session_state = lesson.state  # type: ignore[attr-defined]
+
         cat = lesson.category.upper()
 
         # Session-type immunity: skip lessons whose category isn't testable
@@ -866,6 +879,32 @@ def update_confidence(
         ):
             lesson.state = LessonState.UNTESTABLE
 
+    # Enforce per-session delta invariant BEFORE graduation evaluates
+    # state transitions. A session can move confidence by at most
+    # MAX_PER_SESSION_DELTA (0.30), which permits exactly one tier
+    # transition (INSTINCT->PATTERN spans 0.20, PATTERN->RULE spans 0.30)
+    # but blocks the Sybil scenario where coordinated corrections chain
+    # two transitions in a single tick. See module-top comment and
+    # gap-analysis/01-internal-audit.md Gap 4.
+    for lesson in lessons:
+        if lesson.state in (LessonState.KILLED, LessonState.ARCHIVED):
+            continue
+        pre = getattr(lesson, "_pre_session_confidence", None)
+        if isinstance(pre, (int, float)):
+            low = max(0.0, pre - MAX_PER_SESSION_DELTA)
+            high = min(1.0, pre + MAX_PER_SESSION_DELTA)
+            clamped = max(low, min(high, lesson.confidence))
+            if clamped != lesson.confidence:
+                _log.debug(
+                    "Per-session delta cap: %s %.2f->%.2f clamped from %.2f (pre=%.2f)",
+                    lesson.category,
+                    pre,
+                    clamped,
+                    lesson.confidence,
+                    pre,
+                )
+                lesson.confidence = round(clamped, 2)
+
     # Inline promotion/demotion after confidence updates
     # (UNTESTABLE detection already handled above — don't re-run
     # full graduate() which would kill newly-flagged UNTESTABLE lessons)
@@ -882,19 +921,30 @@ def update_confidence(
     for lesson in lessons:
         if lesson.state in (LessonState.KILLED, LessonState.ARCHIVED, LessonState.UNTESTABLE):
             continue
+        # Per-session tier cap: at most one graduation tier transition
+        # per session, regardless of supporting corrections. If the
+        # lesson already moved in this session, block the next move.
+        pre_state = getattr(lesson, "_pre_session_state", None)
+        already_transitioned = pre_state is not None and pre_state != lesson.state
         # Promote PATTERN -> RULE
         if (
-            lesson.state == LessonState.PATTERN
+            not already_transitioned
+            and lesson.state == LessonState.PATTERN
             and lesson.confidence >= _uc_rule_thr
             and lesson.fire_count >= MIN_APPLICATIONS_FOR_RULE
         ) or (
-            lesson.state == LessonState.INSTINCT
+            not already_transitioned
+            and lesson.state == LessonState.INSTINCT
             and lesson.confidence >= _uc_pattern_thr
             and lesson.fire_count >= MIN_APPLICATIONS_FOR_PATTERN
         ):
             lesson.state = transition(lesson.state, "promote")
         # Demote PATTERN -> INSTINCT
-        elif lesson.state == LessonState.PATTERN and lesson.confidence < _uc_pattern_thr:
+        elif (
+            not already_transitioned
+            and lesson.state == LessonState.PATTERN
+            and lesson.confidence < _uc_pattern_thr
+        ):
             lesson.state = transition(lesson.state, "demote")
 
     return lessons
@@ -992,6 +1042,15 @@ def graduate(
                     block_promotion = True
             except (ValueError, TypeError):
                 pass
+
+        # Per-session invariant: at most ONE graduation tier transition per
+        # session. If update_confidence already moved this lesson between
+        # tiers (INSTINCT->PATTERN or PATTERN->INSTINCT), do not stack
+        # another transition in graduate(). See MAX_PER_SESSION_DELTA
+        # comment and gap-analysis/01-internal-audit.md Gap 4.
+        pre_state_graduate = getattr(lesson, "_pre_session_state", None)
+        if pre_state_graduate is not None and pre_state_graduate != lesson.state:
+            block_promotion = True
 
         # UNTESTABLE lessons: check if they should be killed (enough idle sessions)
         if lesson.state == LessonState.UNTESTABLE:
