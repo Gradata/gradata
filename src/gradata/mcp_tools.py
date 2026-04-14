@@ -275,9 +275,11 @@ def _load_meta_rules(meta_rules_path: str | Path | None = None) -> list[dict]:
     except Exception:
         return []
     if isinstance(data, list):
-        return data
-    if isinstance(data, dict) and "meta_rules" in data:
-        return data["meta_rules"]
+        return [m for m in data if isinstance(m, dict)]
+    if isinstance(data, dict):
+        rules = data.get("meta_rules", [])
+        if isinstance(rules, list):
+            return [m for m in rules if isinstance(m, dict)]
     return []
 
 
