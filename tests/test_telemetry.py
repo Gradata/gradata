@@ -103,14 +103,12 @@ class TestUserId:
 # ── Payload shape ────────────────────────────────────────────────────
 class TestPayload:
     def test_exact_keys(self):
+        """The payload must contain exactly these four keys — no more, no
+        less. Guards against accidental leakage of secret fields (this is
+        the security-relevant invariant that ``test_no_extra_fields`` used
+        to assert redundantly)."""
         payload = _telemetry._build_payload("brain_initialized")
         assert set(payload.keys()) == {"event", "user_id", "ts", "sdk_version"}
-
-    def test_no_extra_fields(self):
-        payload = _telemetry._build_payload("brain_initialized")
-        # Defensive: nobody has added secret fields
-        for key in payload:
-            assert key in {"event", "user_id", "ts", "sdk_version"}
 
     def test_serializable(self):
         payload = _telemetry._build_payload("first_graduation")

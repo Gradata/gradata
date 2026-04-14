@@ -183,8 +183,16 @@ async def telemetry_event(request: Request) -> JSONResponse:
         return JSONResponse(status_code=202, content=_ACCEPTED)
 
     # Replay protection — event must be recent.
+    # Defense-in-depth: the SDK always sends explicit UTC ISO 8601
+    # timestamps (``datetime.now(UTC).isoformat()``). A naive timestamp
+    # is not a valid SDK payload and could be abused by a malicious
+    # client to extend the replay window by interpreting its local tz.
+    # Reject naive timestamps at the API boundary — silently, to stay
+    # consistent with the "always 202" public-surface contract.
+    if body.ts.tzinfo is None:
+        return JSONResponse(status_code=202, content=_ACCEPTED)
     now = datetime.now(UTC)
-    ts = body.ts if body.ts.tzinfo else body.ts.replace(tzinfo=UTC)
+    ts = body.ts
     if ts > now + timedelta(minutes=5):
         # Skewed-future event — drop silently.
         return JSONResponse(status_code=202, content=_ACCEPTED)

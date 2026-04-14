@@ -138,6 +138,16 @@ class TestReplay:
         assert resp.status_code == 202
         assert mock_supabase._inserts == []
 
+    def test_drops_naive_timestamps(self, client, mock_supabase):
+        """Naive (no-tz) timestamps are not a valid SDK payload — reject at
+        the API boundary (defense-in-depth) so a malicious client can't
+        extend the replay window by picking a favourable local tz."""
+        naive = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+        assert "+" not in naive and not naive.endswith("Z")  # confirm naive
+        resp = client.post("/telemetry/event", json=_valid_body(ts=naive))
+        assert resp.status_code == 202
+        assert mock_supabase._inserts == []
+
 
 # ── Rate limiting ────────────────────────────────────────────────────
 class TestRateLimit:

@@ -11,7 +11,7 @@ type CodeBlockProps = {
   caption?: string;
   /** When true, shows a copy button and fires the `install_copy` event on copy. */
   copyable?: boolean;
-  /** When present, first line of copied text is this command instead of `code`. */
+  /** When present, the entire copied text is `copyValue` instead of the rendered `code`. */
   copyValue?: string;
   /** Override the aria-label for the copy button. Defaults to "Copy code". */
   copyAriaLabel?: string;
