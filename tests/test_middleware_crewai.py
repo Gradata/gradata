@@ -27,23 +27,19 @@ def test_crewai_guard_passes_clean_output(brain_with_em_dash_rule: Path):
     assert result == "A perfectly clean string."
 
 
-def test_crewai_guard_blocks_violation_when_strict(brain_with_em_dash_rule: Path):
+@pytest.mark.parametrize("strict", [True, False])
+def test_crewai_guard_strictness(brain_with_em_dash_rule: Path, strict: bool):
     from gradata.middleware import CrewAIGuard
 
-    guard = CrewAIGuard(brain_path=brain_with_em_dash_rule, strict=True)
-    ok, result = guard("has em dash \u2014 here")
-    assert ok is False
-    assert "em-dash" in result or "em dash" in result.lower()
-
-
-def test_crewai_guard_non_strict_allows_violation(brain_with_em_dash_rule: Path):
-    from gradata.middleware import CrewAIGuard
-
-    guard = CrewAIGuard(brain_path=brain_with_em_dash_rule, strict=False)
+    guard = CrewAIGuard(brain_path=brain_with_em_dash_rule, strict=strict)
     text = "has em dash \u2014 here"
     ok, result = guard(text)
-    assert ok is True
-    assert result == text
+    if strict:
+        assert ok is False
+        assert "em-dash" in result or "em dash" in result.lower()
+    else:
+        assert ok is True
+        assert result == text
 
 
 def test_crewai_guard_extracts_text_from_object(brain_with_em_dash_rule: Path):
@@ -74,3 +70,19 @@ def test_crewai_guard_empty_output_passes(brain_with_em_dash_rule: Path):
     ok, result = guard("")
     assert ok is True
     assert result == ""
+
+
+def test_crewai_guard_preserves_empty_raw_field(brain_with_em_dash_rule: Path):
+    """An explicitly empty ``raw`` must hit the empty-output fast path,
+    not fall through to ``str(output)`` (object repr)."""
+    from gradata.middleware import CrewAIGuard
+
+    class FakeOutput:
+        def __init__(self) -> None:
+            self.raw = ""
+
+    guard = CrewAIGuard(brain_path=brain_with_em_dash_rule, strict=True)
+    ok, result = guard(FakeOutput())
+    assert ok is True
+    # Output passes through unchanged (not stringified).
+    assert isinstance(result, FakeOutput)

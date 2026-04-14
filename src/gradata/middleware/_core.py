@@ -148,7 +148,16 @@ class RuleSource:
         out: list[_ScoredLesson] = []
         for lesson in self._static_lessons or []:
             state = str(lesson.get("state") or lesson.get("status") or "").upper()
-            conf = _clamp_confidence(float(lesson.get("confidence", 0.0) or 0.0))
+            raw_conf = lesson.get("confidence", 0.0)
+            try:
+                conf = _clamp_confidence(float(raw_conf) if raw_conf is not None else 0.0)
+            except (TypeError, ValueError):
+                # Malformed caller-supplied lessons (e.g. confidence="high")
+                # must not abort the whole injection/enforcement path.
+                _log.debug(
+                    "Skipping lesson with non-numeric confidence %r", raw_conf,
+                )
+                continue
             category = str(lesson.get("category", "") or "")
             description = str(lesson.get("description", "") or "")
             if not description:

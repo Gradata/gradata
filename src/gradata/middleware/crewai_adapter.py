@@ -30,7 +30,6 @@ from typing import Any
 from gradata.middleware._core import (
     RuleSource,
     RuleViolation,
-    _get,
     check_output,
 )
 
@@ -76,13 +75,24 @@ class CrewAIGuard:
 
 
 def _coerce_text(output: Any) -> str:
-    """Best-effort text extraction for CrewAI agent outputs."""
+    """Best-effort text extraction for CrewAI agent outputs.
+
+    Preserves explicitly empty string fields (``raw=""``, ``output=""``, ...)
+    so the guard's empty-output fast path still applies instead of falling
+    through to ``str(output)`` and producing an object repr.
+    """
     if output is None:
         return ""
     if isinstance(output, str):
         return output
+    # Prefer attribute lookup first (typed CrewAI outputs), then dict lookup.
     for key in _OUTPUT_TEXT_KEYS:
-        val = _get(output, key)
-        if isinstance(val, str) and val:
+        val = getattr(output, key, None)
+        if isinstance(val, str):
             return val
+    if isinstance(output, dict):
+        for key in _OUTPUT_TEXT_KEYS:
+            val = output.get(key)
+            if isinstance(val, str):
+                return val
     return str(output)

@@ -133,3 +133,18 @@ def test_rule_source_missing_brain_returns_empty(tmp_path: Path):
     src = RuleSource(brain_path=tmp_path / "does-not-exist")
     assert src.select() == []
     assert build_brain_rules_block(src) == ""
+
+
+def test_rule_source_skips_non_numeric_confidence():
+    # Malformed caller-supplied lessons must not abort the injection path.
+    src = RuleSource(
+        lessons=[
+            {"state": "RULE", "confidence": "high", "category": "TONE",
+             "description": "malformed"},
+            {"state": "RULE", "confidence": 0.95, "category": "TONE",
+             "description": "Never use em dashes"},
+        ],
+    )
+    selected = src.select()
+    assert len(selected) == 1
+    assert selected[0].description == "Never use em dashes"

@@ -15,9 +15,12 @@ Usage::
     llm.invoke("Write a short greeting")
 
 Because LangChain callbacks mutate internal prompt buffers in-place, the
-injection is done best-effort on the first prompt only. For stricter
-control, prefer the :class:`gradata.middleware.OpenAIMiddleware` wrapper
-over the underlying client.
+injection covers every prompt / message batch entry in a single callback
+invocation: ``on_llm_start`` prepends the block to every prompt in the
+list, and ``on_chat_model_start`` injects a system message into every
+batch. For stricter control (e.g. structured responses), prefer the
+:class:`gradata.middleware.OpenAIMiddleware` wrapper over the underlying
+client.
 """
 
 from __future__ import annotations
