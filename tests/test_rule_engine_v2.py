@@ -24,8 +24,12 @@ from gradata.rules.rule_engine import (
     AppliedRule,
     _difficulty_from_lesson,
     _make_rule_id,
+    _ordering_entropy,
+    _rule_set_hash,
     apply_rules,
     capture_example_from_correction,
+    choose_entropy_ordering,
+    clear_ordering_cache,
     compute_rule_difficulty,
     compute_scope_weight,
     demote_stale_rules,
@@ -572,3 +576,115 @@ class TestRuleTTL:
 
     def test_default_ttl_constant(self):
         assert DEFAULT_TTL_SESSIONS == 50
+
+
+# ===========================================================================
+# Entropy-based rule ordering — Lu et al. 2022 (arXiv:2104.08786)
+# ===========================================================================
+
+
+class TestEntropyOrdering:
+    """choose_entropy_ordering() picks diverse permutations; format uses it."""
+
+    def setup_method(self) -> None:
+        clear_ordering_cache()
+
+    def test_singleton_passthrough(self):
+        lesson = _make_lesson(category="A")
+        rule = _make_applied(lesson)
+        out = choose_entropy_ordering([rule], seed=0)
+        assert out == [rule]
+
+    def test_empty_passthrough(self):
+        assert choose_entropy_ordering([], seed=0) == []
+
+    def test_prefers_mixed_over_runs(self):
+        """A permutation that interleaves categories scores higher than a run."""
+        run = [_make_applied(_make_lesson(category="A", description=f"a{i}")) for i in range(3)]
+        run += [_make_applied(_make_lesson(category="B", description=f"b{i}")) for i in range(3)]
+        mixed = [run[0], run[3], run[1], run[4], run[2], run[5]]
+        assert _ordering_entropy(mixed) > _ordering_entropy(run)
+
+    def test_returns_new_list(self):
+        rules = [_make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C", "D")]
+        out = choose_entropy_ordering(rules, samples=4, seed=1)
+        # Same set of rules, not necessarily same order; and input is not mutated.
+        assert set(id(r) for r in out) == set(id(r) for r in rules)
+        assert len(out) == len(rules)
+
+    def test_deterministic_with_seed(self):
+        rules = [_make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C", "D", "E")]
+        a = choose_entropy_ordering(rules, samples=8, seed=42)
+        clear_ordering_cache()
+        b = choose_entropy_ordering(rules, samples=8, seed=42)
+        assert [r.rule_id for r in a] == [r.rule_id for r in b]
+
+    def test_cache_hit_returns_same_order(self):
+        rules = [_make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C", "D")]
+        key = ("email", _rule_set_hash(rules))
+        a = choose_entropy_ordering(rules, samples=8, seed=1, cache_key=key)
+        # Second call with a different seed should still return the cached order.
+        b = choose_entropy_ordering(rules, samples=8, seed=999, cache_key=key)
+        assert [r.rule_id for r in a] == [r.rule_id for r in b]
+
+    def test_cache_miss_on_different_rule_set(self):
+        rules_a = [_make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C")]
+        rules_b = [_make_applied(_make_lesson(category=c, description=c)) for c in ("X", "Y", "Z")]
+        key_a = ("code", _rule_set_hash(rules_a))
+        key_b = ("code", _rule_set_hash(rules_b))
+        choose_entropy_ordering(rules_a, samples=4, seed=1, cache_key=key_a)
+        out_b = choose_entropy_ordering(rules_b, samples=4, seed=2, cache_key=key_b)
+        # Different rule set, different cache entry, no leakage.
+        assert [r.rule_id for r in out_b] == [r.rule_id for r in out_b]
+        assert key_a != key_b
+
+    def test_zero_samples_returns_input_order(self):
+        rules = [_make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C")]
+        out = choose_entropy_ordering(rules, samples=0, seed=1)
+        assert [r.rule_id for r in out] == [r.rule_id for r in rules]
+
+    def test_format_uses_entropy_ordering(self):
+        """format_rules_for_prompt with entropy_search=True emits a block."""
+        rules = [
+            _make_applied(_make_lesson(category="TONE", description="t1")),
+            _make_applied(_make_lesson(category="ACCURACY", description="a1")),
+            _make_applied(_make_lesson(category="TONE", description="t2")),
+            _make_applied(_make_lesson(category="ACCURACY", description="a2")),
+        ]
+        out = format_rules_for_prompt(
+            rules,
+            merge=False,
+            shuffle_seed=7,
+            entropy_search=True,
+            task_type="email",
+        )
+        assert "<brain-rules>" in out and "</brain-rules>" in out
+        # Every rule's description makes it into the block
+        for r in rules:
+            assert r.lesson.description in out
+
+    def test_format_bypass_keeps_input_order(self):
+        """entropy_search=False preserves caller-supplied order exactly."""
+        rules = [
+            _make_applied(_make_lesson(category="ALPHA", description="alpha-desc-unique-0")),
+            _make_applied(_make_lesson(category="BETA", description="beta-desc-unique-1")),
+            _make_applied(_make_lesson(category="GAMMA", description="gamma-desc-unique-2")),
+        ]
+        out = format_rules_for_prompt(
+            rules,
+            merge=False,
+            entropy_search=False,
+        )
+        # Descriptions appear in the same order as input
+        idx = [out.index(r.lesson.description) for r in rules]
+        assert idx == sorted(idx)
+
+    def test_rule_set_hash_stable(self):
+        rules = [_make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C")]
+        assert _rule_set_hash(rules) == _rule_set_hash(rules)
+
+    def test_rule_set_hash_order_invariant(self):
+        a = [_make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C")]
+        b = list(reversed(a))
+        # Same set in different order -> same hash
+        assert _rule_set_hash(a) == _rule_set_hash(b)
