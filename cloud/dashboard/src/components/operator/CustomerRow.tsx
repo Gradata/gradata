@@ -8,8 +8,16 @@ const HEALTH_STYLE: Record<AdminCustomer['health'], string> = {
   churning:  'bg-[rgba(239,68,68,0.12)] text-[var(--color-destructive)]',
 }
 
+function isPlanTier(plan: string): plan is PlanTier {
+  return plan === 'free' || plan === 'cloud' || plan === 'team' || plan === 'enterprise'
+}
+
 export function CustomerRow({ customer }: { customer: AdminCustomer }) {
-  const tier = (customer.plan === 'pro' ? 'cloud' : customer.plan) as PlanTier
+  // `customer.plan` is loosely typed (backend may send legacy values like
+  // `pro` or unexpected strings). Narrow explicitly so we never render an
+  // invalid badge and fall back to the free tier.
+  const normalizedPlan = customer.plan === 'pro' ? 'cloud' : customer.plan
+  const tier: PlanTier = isPlanTier(normalizedPlan) ? normalizedPlan : 'free'
   return (
     <li
       data-testid="operator-customer"

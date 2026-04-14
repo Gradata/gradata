@@ -69,7 +69,8 @@ describe('ClearDemoButton', () => {
     postMock.mockResolvedValue({
       data: { deleted: 3, by_table: { lessons: 3, brains: 1 } },
     })
-    render(<ClearDemoButton brainId="brain-1" />)
+    const onCleared = vi.fn()
+    render(<ClearDemoButton brainId="brain-1" onCleared={onCleared} />)
 
     fireEvent.click(screen.getByRole('button', { name: /remove demo data/i }))
     const buttons = screen.getAllByRole('button', { name: /remove demo data/i })
@@ -81,6 +82,10 @@ describe('ClearDemoButton', () => {
       },
       { timeout: 2000 },
     )
+    // Parent refetch must be skipped when the brain row itself was removed —
+    // otherwise the parent would 404 on the now-deleted brain id and cancel
+    // the pending /dashboard redirect via an unmount.
+    expect(onCleared).not.toHaveBeenCalled()
   })
 
   it('shows an error banner when the API fails', async () => {

@@ -45,8 +45,19 @@ export default function TeamMembersPage() {
   const [inviting, setInviting] = useState(false)
   const [inviteStatus, setInviteStatus] = useState<string | null>(null)
   const [inviteError, setInviteError] = useState<string | null>(null)
-  const [busyUserId, setBusyUserId] = useState<string | null>(null)
+  // Track busy state per-member so concurrent mutations on different rows
+  // don't stomp on each other's loading flags or re-enable controls early.
+  const [busyUserIds, setBusyUserIds] = useState<Set<string>>(new Set())
   const [rowError, setRowError] = useState<string | null>(null)
+
+  const setRowBusy = (userId: string, busy: boolean) => {
+    setBusyUserIds((prev) => {
+      const next = new Set(prev)
+      if (busy) next.add(userId)
+      else next.delete(userId)
+      return next
+    })
+  }
 
   if (profileLoading || membersLoading) return <LoadingSpinner className="py-20" />
 
@@ -71,8 +82,13 @@ export default function TeamMembersPage() {
   const roster = members ?? []
 
   const handleInvite = async () => {
+    const email = inviteEmail.trim()
     if (!planAllowsInvites) {
       setInviteError('Invites require the Team plan. Upgrade to enable this.')
+      return
+    }
+    if (!email) {
+      setInviteError('Enter a valid email address.')
       return
     }
     setInviting(true)
@@ -81,7 +97,7 @@ export default function TeamMembersPage() {
     try {
       const res = await api.post<InviteResponse>(
         `/workspaces/${workspaceId}/invites`,
-        { email: inviteEmail, role: inviteRole },
+        { email, role: inviteRole },
       )
       setInviteStatus(`Invite sent to ${res.data.email}`)
       setInviteEmail('')
@@ -95,7 +111,7 @@ export default function TeamMembersPage() {
 
   const handleRemove = async (m: TeamMember) => {
     if (!confirm(`Remove ${m.display_name || m.email || m.user_id} from the workspace?`)) return
-    setBusyUserId(m.user_id)
+    setRowBusy(m.user_id, true)
     setRowError(null)
     try {
       await api.delete(`/workspaces/${workspaceId}/members/${m.user_id}`)
@@ -104,12 +120,12 @@ export default function TeamMembersPage() {
     } catch (err) {
       setRowError(readApiError(err, 'Could not remove member.'))
     } finally {
-      setBusyUserId(null)
+      setRowBusy(m.user_id, false)
     }
   }
 
   const handleRoleChange = async (m: TeamMember, nextRole: InviteRole) => {
-    setBusyUserId(m.user_id)
+    setRowBusy(m.user_id, true)
     setRowError(null)
     try {
       await api.patch(`/workspaces/${workspaceId}/members/${m.user_id}`, { role: nextRole })
@@ -118,7 +134,7 @@ export default function TeamMembersPage() {
     } catch (err) {
       setRowError(readApiError(err, 'Could not update role.'))
     } finally {
-      setBusyUserId(null)
+      setRowBusy(m.user_id, false)
     }
   }
 
@@ -152,7 +168,7 @@ export default function TeamMembersPage() {
             <ul className="divide-y divide-[var(--color-border)]">
               {roster.map((m) => {
                 const role: MemberRole = normalizeRole(m.role)
-                const busy = busyUserId === m.user_id
+                const busy = busyUserIds.has(m.user_id)
                 return (
                   <li
                     key={m.user_id}
@@ -243,7 +259,7 @@ export default function TeamMembersPage() {
             </div>
             <Button
               onClick={handleInvite}
-              disabled={inviting || !inviteEmail}
+              disabled={inviting || !inviteEmail.trim()}
               className="w-full"
             >
               {inviting ? 'Sending…' : 'Send invite'}
