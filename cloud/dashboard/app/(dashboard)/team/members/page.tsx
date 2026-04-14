@@ -99,7 +99,8 @@ export default function TeamMembersPage() {
     setRowError(null)
     try {
       await api.delete(`/workspaces/${workspaceId}/members/${m.user_id}`)
-      refetch()
+      await refetch()
+      setRowError(null)
     } catch (err) {
       setRowError(readApiError(err, 'Could not remove member.'))
     } finally {
@@ -112,7 +113,8 @@ export default function TeamMembersPage() {
     setRowError(null)
     try {
       await api.patch(`/workspaces/${workspaceId}/members/${m.user_id}`, { role: nextRole })
-      refetch()
+      await refetch()
+      setRowError(null)
     } catch (err) {
       setRowError(readApiError(err, 'Could not update role.'))
     } finally {

@@ -31,7 +31,7 @@ export function formatSyncAgo(iso: string | null, now: number = Date.now()): str
 
 /** Normalize a role string (defensive — backend may send any string). */
 export function normalizeRole(role: string | undefined | null): 'owner' | 'admin' | 'member' {
-  const r = (role || '').toLowerCase()
+  const r = (role || '').trim().toLowerCase()
   if (r === 'owner' || r === 'admin' || r === 'member') return r
   return 'member'
 }
@@ -42,6 +42,6 @@ export function pickWorkspaceId(
 ): string | null {
   if (!workspaces || workspaces.length === 0) return null
   // Prefer the workspace where the user is an owner, else first.
-  const owned = workspaces.find((w) => (w.role || '').toLowerCase() === 'owner')
+  const owned = workspaces.find((w) => (w.role || '').trim().toLowerCase() === 'owner')
   return (owned ?? workspaces[0]).id
 }

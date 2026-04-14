@@ -65,6 +65,24 @@ describe('ClearDemoButton', () => {
     })
   })
 
+  it('redirects to /dashboard when brain row was deleted', async () => {
+    postMock.mockResolvedValue({
+      data: { deleted: 3, by_table: { lessons: 3, brains: 1 } },
+    })
+    render(<ClearDemoButton brainId="brain-1" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /remove demo data/i }))
+    const buttons = screen.getAllByRole('button', { name: /remove demo data/i })
+    fireEvent.click(buttons[buttons.length - 1])
+
+    await waitFor(
+      () => {
+        expect(pushMock).toHaveBeenCalledWith('/dashboard')
+      },
+      { timeout: 2000 },
+    )
+  })
+
   it('shows an error banner when the API fails', async () => {
     postMock.mockRejectedValue(new Error('Server exploded'))
     render(<ClearDemoButton brainId="brain-1" />)

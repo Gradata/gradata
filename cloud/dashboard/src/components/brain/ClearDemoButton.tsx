@@ -38,11 +38,14 @@ export function ClearDemoButton({ brainId, onCleared }: Props) {
     try {
       const res = await api.post<ClearDemoResponse>(`/brains/${brainId}/clear-demo`)
       setResult(res.data)
-      onCleared?.(res.data)
       // If the brain row itself was deleted (seeded demo brain), redirect to
       // the brains list instead of reloading this page — reloading would land
-      // the user on the "Brain not found" state.
+      // the user on the "Brain not found" state. Also skip the onCleared
+      // callback in that case: the parent's refetch would 404 on a deleted id.
       const brainDeleted = (res.data.by_table?.brains ?? 0) > 0
+      if (!brainDeleted) {
+        onCleared?.(res.data)
+      }
       if (timerRef.current) clearTimeout(timerRef.current)
       timerRef.current = setTimeout(() => {
         setOpen(false)

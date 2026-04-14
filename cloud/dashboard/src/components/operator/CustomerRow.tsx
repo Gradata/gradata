@@ -32,7 +32,7 @@ export function CustomerRow({ customer }: { customer: AdminCustomer }) {
         </div>
       </div>
       <div className="flex-1 sm:w-24 sm:flex-none sm:text-right">
-        <div className="font-mono text-[13px] tabular-nums">${customer.mrr_usd}</div>
+        <div className="font-mono text-[13px] tabular-nums">${Number(customer.mrr_usd).toLocaleString()}</div>
         <div className="font-mono text-[10px] text-[var(--color-body)]">MRR</div>
       </div>
       <div className="flex-1 sm:w-20 sm:flex-none sm:text-right">
