@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 
 from app.auth import get_current_user_id
 from app.db import get_db
@@ -15,31 +15,31 @@ _log = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/users/me", response_model=UserProfile)
-async def get_profile(
-    request: Request,
-    user_id: str = Depends(get_current_user_id),
-) -> UserProfile:
-    """Return the authenticated user's profile and workspace memberships."""
-    db = get_db()
-
-    # Fetch workspace memberships
+async def _hydrate_workspaces(db, user_id: str) -> list[dict]:
+    """Return the user's workspace rows with their role merged in."""
     memberships = await db.select(
         "workspace_members",
         columns="workspace_id,role",
         filters={"user_id": user_id},
     )
+    role_by_ws = {m["workspace_id"]: m.get("role") for m in memberships}
 
-    workspace_ids = [m["workspace_id"] for m in memberships]
     workspaces: list[dict] = []
-    for ws_id in workspace_ids:
+    for ws_id, role in role_by_ws.items():
         rows = await db.select("workspaces", filters={"id": ws_id})
         if rows:
-            ws = rows[0]
-            role = next((m["role"] for m in memberships if m["workspace_id"] == ws_id), None)
-            workspaces.append({**ws, "role": role})
+            workspaces.append({**rows[0], "role": role})
+    return workspaces
 
-    # Fetch user record from brains table (user_id is our identity anchor)
+
+@router.get("/users/me", response_model=UserProfile)
+async def get_profile(user_id: str = Depends(get_current_user_id)) -> UserProfile:
+    """Return the authenticated user's profile and workspace memberships."""
+    db = get_db()
+
+    workspaces = await _hydrate_workspaces(db, user_id)
+
+    # user_id is the identity anchor — pull created_at from any owned brain.
     brain_rows = await db.select(
         "brains",
         columns="user_id,created_at",
@@ -57,7 +57,6 @@ async def get_profile(
 @router.patch("/users/me", response_model=UserProfile)
 async def update_profile(
     body: UpdateProfileRequest,
-    request: Request,
     user_id: str = Depends(get_current_user_id),
 ) -> UserProfile:
     """Update the authenticated user's display name."""
@@ -71,17 +70,7 @@ async def update_profile(
 
     _log.info("Updated display_name for user=%s", user_id)
 
-    memberships = await db.select(
-        "workspace_members",
-        columns="workspace_id,role",
-        filters={"user_id": user_id},
-    )
-    workspaces: list[dict] = []
-    for m in memberships:
-        rows = await db.select("workspaces", filters={"id": m["workspace_id"]})
-        if rows:
-            workspaces.append({**rows[0], "role": m["role"]})
-
+    workspaces = await _hydrate_workspaces(db, user_id)
     return UserProfile(
         user_id=user_id,
         display_name=body.display_name,
@@ -91,7 +80,6 @@ async def update_profile(
 
 @router.get("/users/me/notifications", response_model=NotificationPrefs)
 async def get_notifications(
-    request: Request,
     user_id: str = Depends(get_current_user_id),
 ) -> NotificationPrefs:
     """Return the authenticated user's notification preferences.
@@ -113,7 +101,6 @@ async def get_notifications(
 @router.put("/users/me/notifications", response_model=NotificationPrefs)
 async def update_notifications(
     body: NotificationPrefs,
-    request: Request,
     user_id: str = Depends(get_current_user_id),
 ) -> NotificationPrefs:
     """Replace the authenticated user's notification preferences."""

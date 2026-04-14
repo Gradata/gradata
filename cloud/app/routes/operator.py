@@ -220,18 +220,13 @@ async def list_customers(
             )
         )
 
-    # Sort
-    reverse = order == "desc"
-    if sort == "mrr":
-        rows.sort(key=lambda r: r.mrr_usd, reverse=reverse)
-    elif sort == "active_users":
-        rows.sort(key=lambda r: r.active_users, reverse=reverse)
-    elif sort == "last_active":
-        # None sorts to the end regardless of order direction.
-        rows.sort(
-            key=lambda r: (r.last_active is None, r.last_active or ""),
-            reverse=reverse,
-        )
+    # None sorts to the end regardless of order direction.
+    sort_keys = {
+        "mrr": lambda r: r.mrr_usd,
+        "active_users": lambda r: r.active_users,
+        "last_active": lambda r: (r.last_active is None, r.last_active or ""),
+    }
+    rows.sort(key=sort_keys[sort], reverse=(order == "desc"))
 
     return rows[offset : offset + limit]
 
