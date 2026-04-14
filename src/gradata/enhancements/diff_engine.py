@@ -1,7 +1,9 @@
 """
 Diff Engine — compute structured diffs between draft and final text.
 ====================================================================
-SDK LAYER: Pure stdlib logic. No file I/O, no external dependencies.
+SDK LAYER: Pure stdlib logic by default. Optional sentence-transformer
+embedder can be injected via ``compute_diff(..., embedder=...)`` or by
+installing the ``embeddings`` extra (``pip install gradata[embeddings]``).
 
 Usage::
 
@@ -10,13 +12,23 @@ Usage::
     result = compute_diff(draft, final)
     print(result.severity)          # "minor"
     print(result.summary_stats)     # {"lines_added": 2, ...}
+
+    # Opt-in semantic blend (DPO-style preference signal; Rafailov et al.
+    # 2023 treat before/after pairs as preference signal, so a semantic
+    # delta on the pair is a cheap proxy for preference strength).
+    result = compute_diff(draft, final, use_semantic=True)
+    print(result.blended_distance)  # 0.3·lev + 0.7·semantic
 """
 
 from __future__ import annotations
 
 import difflib
+import logging
 import zlib
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+
+_log = logging.getLogger("gradata.diff_engine")
 
 # ---------------------------------------------------------------------------
 # Data Classes
@@ -76,6 +88,8 @@ class DiffResult:
     severity: str
     summary_stats: dict[str, int]
     semantic_similarity: float | None = None
+    semantic_distance: float | None = None
+    blended_distance: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -204,6 +218,158 @@ def _analyze_line_opcodes(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Semantic distance (opt-in)
+# ---------------------------------------------------------------------------
+#
+# Levenshtein (and its compression cousin NCD) measure surface edits. Two
+# corrections with *identical* character-level distance can have opposite
+# semantic direction — e.g. "helpful" → "helpfully" (morphological) vs
+# "helpful" → "unhelpful" (polarity flip). The preference-learning lit
+# (Rafailov et al. 2023, DPO; Ethayarajh et al. 2024, KTO) treats
+# before/after pairs as preference signal, so semantic distance on the pair
+# is a principled cheap proxy for preference strength.
+#
+# We *blend* rather than replace: Levenshtein captures small stylistic surface
+# edits (Oliver's signature habits), semantic distance captures meaning
+# shifts (actual correction). Default weights: 0.3·lev + 0.7·semantic, chosen
+# to put majority weight on meaning while still surfacing high-volume surface
+# edits that Oliver does care about. Weights are configurable per-call.
+#
+# Performance: a single `sentence-transformers` call (all-MiniLM-L6-v2,
+# 22M params, 384-dim) is ~5-15 ms on CPU for a correction pair. Callers
+# that run correct() hot should pass a cached embedder or opt out with
+# `use_semantic=False`.
+
+Embedder = Callable[[Sequence[str]], Sequence[Sequence[float]]]
+
+_DEFAULT_EMBEDDER_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+_default_embedder_cache: Embedder | None = None
+_default_embedder_unavailable = False
+
+# Blend weights — justified in the module docstring above. Must sum to 1.0.
+DEFAULT_SEMANTIC_WEIGHT = 0.7
+DEFAULT_SURFACE_WEIGHT = 0.3
+
+
+def _load_default_embedder() -> Embedder | None:
+    """Lazy-load sentence-transformers. Returns None if unavailable.
+
+    Caches the loaded model on first call so subsequent corrections reuse it.
+    Graceful failure: logs debug and returns None if the dependency is not
+    installed — callers must handle None by falling back to surface distance.
+    """
+    global _default_embedder_cache, _default_embedder_unavailable
+    if _default_embedder_cache is not None:
+        return _default_embedder_cache
+    if _default_embedder_unavailable:
+        return None
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError:
+        _default_embedder_unavailable = True
+        _log.debug(
+            "sentence-transformers not installed; semantic distance disabled. "
+            "Install with `pip install gradata[embeddings]` to enable.",
+        )
+        return None
+    try:
+        model = SentenceTransformer(_DEFAULT_EMBEDDER_MODEL)
+    except Exception as exc:  # pragma: no cover - env/network failure
+        _default_embedder_unavailable = True
+        _log.debug("Default embedder load failed (%s); semantic distance disabled.",
+                   exc)
+        return None
+
+    def _embed(texts: Sequence[str]) -> Sequence[Sequence[float]]:
+        # sentence-transformers returns numpy arrays; convert to plain lists
+        # so the math below works on pure Python.
+        vecs = model.encode(list(texts))
+        return [list(v) for v in vecs]
+
+    _default_embedder_cache = _embed
+    return _embed
+
+
+def _cosine_distance(a: Sequence[float], b: Sequence[float]) -> float:
+    """Cosine distance in [0.0, 2.0]. 0=identical, 1=orthogonal, 2=opposite.
+
+    We clamp to [0.0, 1.0] downstream for blending so polarity flips saturate
+    at the same magnitude as "completely unrelated" — the blended distance is
+    a severity proxy, not a similarity score.
+    """
+    import math
+
+    dot = sum(x * y for x, y in zip(a, b, strict=False))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(x * x for x in b))
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    similarity = dot / (norm_a * norm_b)
+    return 1.0 - similarity
+
+
+def compute_semantic_distance(
+    before: str,
+    after: str,
+    embedder: Embedder | None = None,
+) -> float | None:
+    """Compute cosine distance between sentence-embeddings of ``(before, after)``.
+
+    Args:
+        before: The original text (draft).
+        after: The corrected text (final).
+        embedder: Callable mapping ``list[str] -> list[list[float]]``. If
+            ``None``, a shared sentence-transformers model is lazy-loaded
+            (requires the ``embeddings`` optional dependency).
+
+    Returns:
+        Cosine distance clamped to ``[0.0, 1.0]`` where 0.0 = semantically
+        identical, 1.0 = orthogonal or opposite. ``None`` when no embedder
+        is available (caller falls back to surface distance).
+    """
+    if not before and not after:
+        return 0.0
+    emb = embedder if embedder is not None else _load_default_embedder()
+    if emb is None:
+        return None
+    try:
+        vecs = emb([before or "", after or ""])
+    except Exception as exc:  # pragma: no cover - runtime embedder failure
+        _log.debug("Embedder call failed (%s); semantic distance unavailable.", exc)
+        return None
+    if len(vecs) < 2:
+        return None
+    cos_dist = _cosine_distance(vecs[0], vecs[1])
+    # Clamp to [0, 1] — cosine distance can range [0, 2] but we use it as a
+    # severity proxy blended with [0, 1] Levenshtein.
+    return round(max(0.0, min(1.0, cos_dist)), 6)
+
+
+def combine_distances(
+    lev_normalized: float,
+    semantic: float,
+    *,
+    surface_weight: float = DEFAULT_SURFACE_WEIGHT,
+    semantic_weight: float = DEFAULT_SEMANTIC_WEIGHT,
+) -> float:
+    """Linear blend of normalised surface and semantic distances.
+
+    Both inputs must lie in ``[0.0, 1.0]``. The weighted sum is clipped to
+    ``[0.0, 1.0]`` for downstream severity classification.
+
+    The default 0.3 / 0.7 split is justified in the module docstring and
+    mirrors the preference-learning reasoning (meaning shifts > surface
+    style under DPO-style preference signal — Rafailov et al. 2023).
+    """
+    if abs((surface_weight + semantic_weight) - 1.0) > 1e-6:
+        raise ValueError(
+            f"Weights must sum to 1.0 (got {surface_weight + semantic_weight}).",
+        )
+    blended = surface_weight * lev_normalized + semantic_weight * semantic
+    return round(max(0.0, min(1.0, blended)), 6)
+
+
 def _compression_distance(a: str, b: str) -> float:
     """Compute normalized compression distance (NCD) using zlib (LZ77).
 
@@ -239,20 +405,48 @@ def _compression_distance(a: str, b: str) -> float:
     return round(max(0.0, min(1.0, ncd)), 6)
 
 
-def compute_diff(draft: str, final: str) -> DiffResult:
+def compute_diff(
+    draft: str,
+    final: str,
+    *,
+    use_semantic: bool = False,
+    embedder: Embedder | None = None,
+    surface_weight: float = DEFAULT_SURFACE_WEIGHT,
+    semantic_weight: float = DEFAULT_SEMANTIC_WEIGHT,
+) -> DiffResult:
     """Compute a structured diff between a draft and a final version of text.
 
     Uses ``difflib.SequenceMatcher`` for the normalised edit distance and
-    opcode-based section extraction.  All logic is pure Python stdlib — no
-    external dependencies.
+    opcode-based section extraction.  Surface-level logic is pure Python
+    stdlib.
+
+    When ``use_semantic=True`` (or ``embedder`` is supplied), also computes a
+    sentence-embedding cosine distance and a blended severity score:
+
+        blended = surface_weight · lev_normalized + semantic_weight · semantic
+
+    Motivation: Levenshtein conflates morphological changes ("helpful" →
+    "helpfully") with polarity flips ("helpful" → "unhelpful"); the former
+    should be low-severity, the latter high-severity. The semantic delta
+    separates them. See module docstring for the preference-learning
+    justification (Rafailov et al. 2023, DPO).
+
+    When ``use_semantic=True`` but the embedder is unavailable (optional
+    dependency missing, load error), ``compute_diff`` gracefully falls back
+    to surface-only severity and leaves ``semantic_distance=None``.
 
     Args:
         draft: The original text (e.g. Claude's first output).
         final: The edited or accepted text (e.g. after human review).
+        use_semantic: If True, compute embedding cosine distance and blend.
+        embedder: Optional override callable ``Sequence[str] -> Sequence[Sequence[float]]``.
+        surface_weight: Blend weight on Levenshtein (default 0.3).
+        semantic_weight: Blend weight on semantic distance (default 0.7).
 
     Returns:
         A :class:`DiffResult` with ``edit_distance``, ``changed_sections``,
-        ``severity``, and ``summary_stats`` populated.
+        ``severity``, ``summary_stats``, and optionally ``semantic_distance``
+        / ``blended_distance`` populated.
 
     Example::
 
@@ -280,13 +474,28 @@ def compute_diff(draft: str, final: str) -> DiffResult:
         compression_dist = edit_distance  # NCD unreliable on short texts
 
     changed_sections, summary_stats = _analyze_line_opcodes(draft_lines, final_lines)
-    # Severity: use compression distance for long texts, edit_distance for short.
-    # Blended approach avoids NCD's short-text weakness while capturing
-    # block operations on real documents.
-    if len(draft) + len(final) >= MIN_COMPRESSION_LENGTH:
-        severity = _classify_severity(compression_dist)
+
+    # Optional semantic distance + blended severity (b009dc0).
+    semantic_dist: float | None = None
+    blended: float | None = None
+    if use_semantic or embedder is not None:
+        semantic_dist = compute_semantic_distance(draft, final, embedder=embedder)
+
+    # Severity: prefer blended when semantic is available, else surface logic.
+    # Surface logic: compression distance for long texts, edit_distance for short.
+    surface_for_severity = (
+        compression_dist
+        if len(draft) + len(final) >= MIN_COMPRESSION_LENGTH
+        else edit_distance
+    )
+    if semantic_dist is not None:
+        blended = combine_distances(
+            surface_for_severity, semantic_dist,
+            surface_weight=surface_weight, semantic_weight=semantic_weight,
+        )
+        severity = _classify_severity(blended)
     else:
-        severity = _classify_severity(edit_distance)
+        severity = _classify_severity(surface_for_severity)
 
     return DiffResult(
         edit_distance=edit_distance,
@@ -294,4 +503,6 @@ def compute_diff(draft: str, final: str) -> DiffResult:
         changed_sections=changed_sections,
         severity=severity,
         summary_stats=summary_stats,
+        semantic_distance=semantic_dist,
+        blended_distance=blended,
     )
