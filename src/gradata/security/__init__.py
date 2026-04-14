@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+from gradata.security.adversarial_blocklist import (
+    ADVERSARIAL_PHRASES,
+    contains_adversarial_phrases,
+    scan_correction,
+    scan_for_adversarial_phrases,
+)
 from gradata.security.brain_salt import (
     generate_brain_salt,
     load_or_create_salt,
@@ -28,6 +34,7 @@ from gradata.security.score_obfuscation import (
 )
 
 __all__ = [
+    "ADVERSARIAL_PHRASES",
     "SOURCE_EXTERNAL_PASTE",
     "SOURCE_UNKNOWN",
     "SOURCE_USER_EDIT",
@@ -36,11 +43,14 @@ __all__ = [
     "classify_source_context",
     "compute_correction_hash",
     "constant_time_pad",
+    "contains_adversarial_phrases",
     "create_provenance_record",
     "generate_brain_salt",
     "load_or_create_salt",
     "obfuscate_instruction",
     "salt_threshold",
+    "scan_correction",
+    "scan_for_adversarial_phrases",
     "sign_manifest",
     "truncate_score",
     "verify_manifest",

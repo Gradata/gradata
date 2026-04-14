@@ -192,8 +192,23 @@ def brain_correct(
     source_kind = _prov_meta["source_kind"]
     requires_review = bool(_prov_meta["requires_review"])
 
-    # If the source cannot be vouched for, escalate to approval_required so
-    # downstream graduation treats it as untrusted input.
+    # Adversarial-phrase blocklist (light-touch prompt-injection defence; A1).
+    # We flag-for-review rather than reject — a user may legitimately write
+    # about these concepts (red-team docs, teaching, etc.). Refs: Greshake
+    # et al. 2023 (https://arxiv.org/abs/2302.12173), Wallace et al. 2019
+    # (https://arxiv.org/abs/1908.07125).
+    adversarial_hits: list[str] = []
+    try:
+        from gradata.security.adversarial_blocklist import scan_correction
+        adversarial_hits = scan_correction(draft, final)
+    except Exception as _adv_err:  # pragma: no cover - defensive
+        _log.debug("Adversarial-phrase scan failed: %s", _adv_err)
+    if adversarial_hits and not requires_review:
+        requires_review = True
+
+    # If the source cannot be vouched for (either unknown provenance or
+    # blocklisted phrase hit), escalate to approval_required so downstream
+    # graduation treats it as untrusted input.
     if requires_review and not approval_required:
         approval_required = True
 
@@ -210,6 +225,7 @@ def brain_correct(
         "provenance_hash": provenance_hash,
         "source_kind": source_kind,
         "requires_review": requires_review,
+        "adversarial_hits": adversarial_hits,
     }
     if applies_to:
         data["applies_to"] = applies_to
@@ -225,6 +241,8 @@ def brain_correct(
         tags.append("requires_review:true")
     if source_kind:
         tags.append(f"source_kind:{source_kind}")
+    if adversarial_hits:
+        tags.append("adversarial_phrase:true")
 
     event = brain.emit("CORRECTION", "brain.correct", data, tags, session)
     event["diff"] = diff
@@ -235,6 +253,7 @@ def brain_correct(
     event["provenance_hash"] = provenance_hash
     event["source_kind"] = source_kind
     event["requires_review"] = requires_review
+    event["adversarial_hits"] = adversarial_hits
 
     # Auto-extract patterns
     try:
