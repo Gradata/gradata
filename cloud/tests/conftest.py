@@ -49,6 +49,10 @@ class MockSupabaseClient:
     async def update(self, table: str, data: dict, filters: dict | None = None) -> list[dict]:
         return [data]
 
+    async def delete(self, table: str, filters: dict | None = None) -> list[dict]:
+        """Mock delete: returns pre-seeded delete response rows (treat as 'deleted rows')."""
+        return list(self._responses[table].get("delete", []))
+
 
 @pytest.fixture(autouse=True)
 def mock_jwks(monkeypatch):

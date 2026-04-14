@@ -25,6 +25,17 @@ class Settings(BaseSettings):
     sentry_traces_sample_rate: float = 0.1
     sentry_release: str = ""  # Falls back to RAILWAY_GIT_COMMIT_SHA, then "dev"
 
+    # Stripe (all optional — empty values mean "not configured")
+    # Env vars: GRADATA_STRIPE_SECRET_KEY, GRADATA_STRIPE_WEBHOOK_SECRET,
+    # GRADATA_STRIPE_PRICE_ID_CLOUD, GRADATA_STRIPE_PRICE_ID_TEAM
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_id_cloud: str = ""
+    stripe_price_id_team: str = ""
+    stripe_success_url: str = "https://app.gradata.ai/billing?success=1"
+    stripe_cancel_url: str = "https://app.gradata.ai/billing?cancel=1"
+    stripe_portal_return_url: str = "https://app.gradata.ai/billing"
+
     model_config = {"env_prefix": "GRADATA_", "env_file": ".env", "extra": "ignore"}
 
 
