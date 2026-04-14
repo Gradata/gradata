@@ -3,8 +3,10 @@
 import { useMemo, useState } from 'react'
 import { useApi } from '@/hooks/useApi'
 import type { Brain, BrainAnalytics, Correction, Lesson, PaginatedResponse } from '@/types/api'
+import Link from 'next/link'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { Button } from '@/components/ui/button'
 import { computeKpis, computeGraduationCounts } from '@/lib/analytics-client'
 import { KpiStrip } from '@/components/brain/KpiStrip'
 import { GraduationProgressBar } from '@/components/brain/GraduationProgressBar'
@@ -56,7 +58,12 @@ export default function DashboardPage() {
       <div className="py-12">
         <EmptyState
           title="AI that learns the corrections you keep making"
-          description='Install the Gradata SDK and run your first session. Your brain stays local — the dashboard is a lens over it.'
+          description="Install the Gradata SDK and run your first session. Your brain stays local — the dashboard is a lens over it."
+          action={
+            <Link href="/setup">
+              <Button>Start setup →</Button>
+            </Link>
+          }
         />
         <pre className="mx-auto mt-6 w-fit rounded-[0.5rem] border border-[var(--color-border)] bg-[rgba(21,29,48,0.6)] px-5 py-3 font-mono text-[13px] text-[var(--color-accent-blue)]">
           pip install gradata

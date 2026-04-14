@@ -242,15 +242,16 @@ async def get_subscription(
     ws = ws_rows[0]
 
     brains = await db.select("brains", columns="id", filters={"user_id": user_id})
-    brain_ids = [b["id"] for b in brains]
+    brain_ids = {b["id"] for b in brains}
 
+    # Single fetch + in-process count — avoids 2*N DB calls per user brains.
     lesson_count = 0
     event_count = 0
-    for bid in brain_ids:
-        ls = await db.select("lessons", columns="id", filters={"brain_id": bid})
-        ev = await db.select("events", columns="id", filters={"brain_id": bid})
-        lesson_count += len(ls)
-        event_count += len(ev)
+    if brain_ids:
+        lessons = await db.select("lessons", columns="brain_id")
+        events = await db.select("events", columns="brain_id")
+        lesson_count = sum(1 for l in lessons if l.get("brain_id") in brain_ids)
+        event_count = sum(1 for e in events if e.get("brain_id") in brain_ids)
 
     period_end = ws.get("subscription_period_end")
     if isinstance(period_end, int):
