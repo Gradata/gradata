@@ -18,15 +18,13 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
-import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-# Add SDK to path for graduation simulation
-_sdk_root = Path(__file__).resolve().parent.parent.parent / "src"
-if str(_sdk_root) not in sys.path:
-    sys.path.insert(0, str(_sdk_root))
+from _common import ensure_sdk_on_path
+
+ensure_sdk_on_path()
 
 
 # ---------------------------------------------------------------------------
@@ -339,18 +337,8 @@ def _simulate_graduation(events: list[dict]) -> list[dict]:
     except ImportError:
         return []  # SDK not available, skip simulation
 
-    # Group corrections by session
+    # Group corrections by session.
     corrections_by_session: dict[int, list[dict]] = defaultdict(list)
-    for ev in events:
-        if ev.get("type") == "CORRECTION":
-            sess = ev.get("session")
-            if sess is not None:
-                try:
-                    corrections_by_session[int(sess)] += 1  # type: ignore[assignment]
-                except (ValueError, TypeError):
-                    pass
-    # Fix: actually append the event dict, not increment
-    corrections_by_session = defaultdict(list)
     for ev in events:
         if ev.get("type") == "CORRECTION":
             sess = ev.get("session")
