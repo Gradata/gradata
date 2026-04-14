@@ -60,7 +60,7 @@ def run_generated_hooks(*, env_var: str, default_dir: str, per_hook_timeout: int
 
     dispatcher = root / _DISPATCHER_FILENAME
     manifest = root / _MANIFEST_FILENAME
-    manifest_slugs: set[str] = set()
+    dispatcher_ran = False
 
     # Capture node stdout/stderr as bytes so we can decode UTF-8 explicitly —
     # Windows consoles default to cp1252 and will choke on the block-emoji
@@ -75,7 +75,7 @@ def run_generated_hooks(*, env_var: str, default_dir: str, per_hook_timeout: int
 
     # Fast path: bundled dispatcher.
     if dispatcher.exists() and manifest.exists():
-        manifest_slugs = _read_manifest_slugs(manifest)
+        dispatcher_ran = True
         try:
             proc = subprocess.run(
                 ["node", str(dispatcher)],
@@ -97,7 +97,10 @@ def run_generated_hooks(*, env_var: str, default_dir: str, per_hook_timeout: int
             return 2
 
     # Fallback / compat path: iterate any legacy per-file hooks not represented
-    # in the manifest. Skips internal files (dispatcher + manifest).
+    # in the manifest. Skips internal files (dispatcher + manifest). Only read
+    # the manifest slugs here — when the dispatcher blocked we already returned,
+    # and when no dispatcher is installed there's nothing to skip.
+    manifest_slugs = _read_manifest_slugs(manifest) if dispatcher_ran else set()
     for hook_path in sorted(root.glob("*.js")):
         if hook_path.name == _DISPATCHER_FILENAME:
             continue
