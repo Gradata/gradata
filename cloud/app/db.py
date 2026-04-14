@@ -5,11 +5,28 @@ import logging
 from typing import Any
 
 import httpx
+from fastapi import HTTPException
 
 from app.config import get_settings
 
 _log = logging.getLogger(__name__)
 _client: Any = None  # Replaced by mock in tests
+
+
+def _raise_db_error(op: str, table: str, resp: httpx.Response) -> None:
+    """Log full Supabase error detail, raise a generic HTTP 500 to the caller.
+
+    Prevents internal PostgREST error messages, constraint names, and row
+    counts from leaking to user-facing responses.
+    """
+    try:
+        detail = resp.json()
+    except ValueError:
+        detail = resp.text
+    _log.error("Supabase %s %s failed (%d): %s", op, table, resp.status_code, detail)
+    # PostgREST auth errors (401) should pass through; they indicate bad token.
+    status = 401 if resp.status_code == 401 else 500
+    raise HTTPException(status_code=status, detail="Database error")
 
 
 class SupabaseClient:
@@ -38,20 +55,23 @@ class SupabaseClient:
             for key, val in filters.items():
                 params[key] = f"eq.{val}"
         resp = await self._http.get(f"/{table}", params=params)
-        resp.raise_for_status()
+        if resp.is_error:
+            _raise_db_error("select", table, resp)
         return resp.json()
 
     async def insert(self, table: str, data: dict | list[dict]) -> list[dict]:
         """INSERT rows into a table."""
         resp = await self._http.post(f"/{table}", json=data)
-        resp.raise_for_status()
+        if resp.is_error:
+            _raise_db_error("insert", table, resp)
         return resp.json()
 
     async def upsert(self, table: str, data: dict | list[dict]) -> list[dict]:
         """UPSERT rows (INSERT ... ON CONFLICT DO UPDATE)."""
         headers = {**self._headers, "Prefer": "return=representation,resolution=merge-duplicates"}
         resp = await self._http.post(f"/{table}", json=data, headers=headers)
-        resp.raise_for_status()
+        if resp.is_error:
+            _raise_db_error("upsert", table, resp)
         return resp.json()
 
     async def update(
@@ -63,7 +83,8 @@ class SupabaseClient:
             for key, val in filters.items():
                 params[key] = f"eq.{val}"
         resp = await self._http.patch(f"/{table}", params=params, json=data)
-        resp.raise_for_status()
+        if resp.is_error:
+            _raise_db_error("update", table, resp)
         return resp.json()
 
     async def delete(
@@ -75,7 +96,8 @@ class SupabaseClient:
             for key, val in filters.items():
                 params[key] = f"eq.{val}"
         resp = await self._http.delete(f"/{table}", params=params)
-        resp.raise_for_status()
+        if resp.is_error:
+            _raise_db_error("delete", table, resp)
         try:
             return resp.json()
         except ValueError:
