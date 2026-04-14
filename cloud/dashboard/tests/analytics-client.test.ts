@@ -5,6 +5,7 @@ import {
   buildDecayCurve,
   computeTimeSaved,
   computeWoWDelta,
+  computeRuleStreak,
 } from '@/lib/analytics-client'
 import type { BrainAnalytics, Correction, Lesson } from '@/types/api'
 
@@ -195,5 +196,40 @@ describe('computeWoWDelta', () => {
 
   it('rounds to whole percent', () => {
     expect(computeWoWDelta(10, 6, { floor: 5 })).toBe(67)
+  })
+})
+
+describe('computeRuleStreak', () => {
+  const now = () => new Date().toISOString()
+  const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
+
+  it('returns null when no timestamps present', () => {
+    const l = mkLesson('a', 'RULE', 0.9, 0)
+    expect(computeRuleStreak(l)).toBeNull()
+  })
+
+  it('uses last_recurrence_at when present', () => {
+    const l = mkLesson('a', 'RULE', 0.9, 0)
+    ;(l as any).last_recurrence_at = daysAgo(14)
+    expect(computeRuleStreak(l)).toBe(14)
+  })
+
+  it('falls back to graduated_at when no recurrences', () => {
+    const l = mkLesson('a', 'RULE', 0.9, 0)
+    ;(l as any).graduated_at = daysAgo(21)
+    expect(computeRuleStreak(l)).toBe(21)
+  })
+
+  it('prefers max of last_recurrence_at and graduated_at', () => {
+    const l = mkLesson('a', 'RULE', 0.9, 0)
+    ;(l as any).last_recurrence_at = daysAgo(2)
+    ;(l as any).graduated_at = daysAgo(30)
+    expect(computeRuleStreak(l)).toBe(2)
+  })
+
+  it('returns 0 for same day', () => {
+    const l = mkLesson('a', 'RULE', 0.9, 0)
+    ;(l as any).graduated_at = now()
+    expect(computeRuleStreak(l)).toBe(0)
   })
 })

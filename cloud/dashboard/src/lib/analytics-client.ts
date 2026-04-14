@@ -213,3 +213,19 @@ export function computeWoWDelta(
   if (priorPeriod === 0) return null
   return Math.round(((thisPeriod - priorPeriod) / priorPeriod) * 100)
 }
+
+/**
+ * Days since the rule last triggered a correction or recurrence.
+ *
+ * Max of `last_recurrence_at` and `graduated_at`. Returns null when neither
+ * is present. Zero when the more recent of the two is today.
+ */
+export function computeRuleStreak(lesson: Lesson): number | null {
+  const rec = (lesson as unknown as { last_recurrence_at?: string }).last_recurrence_at
+  const grad = (lesson as unknown as { graduated_at?: string }).graduated_at
+  const candidates = [rec, grad].filter((v): v is string => typeof v === 'string' && v.length > 0)
+  if (candidates.length === 0) return null
+  const mostRecentMs = Math.max(...candidates.map((iso) => new Date(iso).getTime()))
+  const diffMs = Date.now() - mostRecentMs
+  return Math.max(0, Math.floor(diffMs / 86_400_000))
+}
