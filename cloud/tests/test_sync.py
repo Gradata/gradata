@@ -89,6 +89,93 @@ def test_sync_unauthenticated(client):
     assert resp.status_code in (401, 403)
 
 
+def test_sync_rule_patched_event_populates_rule_patches(client, mock_supabase, auth_headers):
+    """RULE_PATCHED events in the events array write a matching rule_patches row."""
+    mock_supabase.add_response(
+        "brains", "select",
+        [{"id": "brain-1", "workspace_id": "ws-1", "user_id": "user-1", "api_key": "gd_TVAL"}],
+    )
+    # Seed a lesson the event can resolve against
+    mock_supabase.add_response(
+        "lessons", "select",
+        [{
+            "id": "lesson-xyz",
+            "brain_id": "brain-1",
+            "category": "TONE",
+            "description": "Keep tone casual and direct",
+        }],
+    )
+    resp = client.post(
+        "/api/v1/sync",
+        json={
+            "brain_name": "default",
+            "corrections": [],
+            "lessons": [],
+            "events": [
+                {
+                    "type": "RULE_PATCHED",
+                    "source": "brain.patch_rule",
+                    "data": {
+                        "category": "TONE",
+                        "old_description": "Use casual tone in emails",
+                        "new_description": "Keep tone casual and direct",
+                        "reason": "self-healing: recurrence fix",
+                    },
+                    "tags": ["category:TONE", "self_healing"],
+                    "session": 7,
+                }
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["events_synced"] == 1
+
+    # The rule_patches insert should be present in mock._inserts
+    rule_patch_inserts = [row for row in mock_supabase._inserts if "old_description" in row and "new_description" in row]
+    assert len(rule_patch_inserts) == 1, f"expected 1 rule_patches row, got {len(rule_patch_inserts)}"
+    patch = rule_patch_inserts[0]
+    assert patch["lesson_id"] == "lesson-xyz"
+    assert patch["old_description"] == "Use casual tone in emails"
+    assert patch["new_description"] == "Keep tone casual and direct"
+    assert "self-healing" in patch["reason"]
+
+
+def test_sync_rule_patched_event_without_matching_lesson_is_skipped(client, mock_supabase, auth_headers):
+    """A RULE_PATCHED event for a category with no lesson is dropped, not raised."""
+    mock_supabase.add_response(
+        "brains", "select",
+        [{"id": "brain-1", "workspace_id": "ws-1", "user_id": "user-1", "api_key": "gd_TVAL"}],
+    )
+    # No lesson seeded for the category → the patch should be skipped
+    resp = client.post(
+        "/api/v1/sync",
+        json={
+            "brain_name": "default",
+            "corrections": [],
+            "lessons": [],
+            "events": [
+                {
+                    "type": "RULE_PATCHED",
+                    "source": "brain.patch_rule",
+                    "data": {
+                        "category": "GHOST_CATEGORY",
+                        "old_description": "old",
+                        "new_description": "new",
+                    },
+                    "tags": [],
+                    "session": None,
+                }
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    # Event row is inserted; no rule_patches row should be inserted
+    rule_patch_inserts = [row for row in mock_supabase._inserts if "old_description" in row and "new_description" in row]
+    assert rule_patch_inserts == []
+
+
 def test_sync_invalid_payload(client, mock_supabase, auth_headers):
     """Invalid payload returns 422."""
     mock_supabase.add_response(
