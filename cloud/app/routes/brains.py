@@ -119,10 +119,16 @@ async def create_brain(
         if not ws_rows:
             raise HTTPException(status_code=500, detail="Failed to create workspace")
         workspace_id = ws_rows[0]["id"]
-        await db.insert(
+        member_rows = await db.insert(
             "workspace_members",
             {"workspace_id": workspace_id, "user_id": user_id, "role": "owner"},
         )
+        if not member_rows:
+            _log.warning(
+                "Failed to create workspace membership for user=%s workspace=%s",
+                user_id,
+                workspace_id,
+            )
 
     # Generate a cloud-scope API key so the SDK can authenticate right away.
     # Delegate to the canonical helper so prefix + entropy stays consistent.

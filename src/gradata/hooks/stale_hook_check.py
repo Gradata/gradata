@@ -15,12 +15,10 @@ import re
 import sys
 from pathlib import Path
 
+from gradata._lessons import iter_rule_lessons
 from gradata.enhancements.rule_to_hook import _slug, _source_hash
 
 _HASH_LINE_RE = re.compile(r"^\s*\*\s*Source hash:\s*([0-9a-f]{12})", re.MULTILINE)
-_LESSON_RE = re.compile(
-    r"^\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+\w+:\s+(.+)$"
-)
 
 
 def _read_hash_from_hook(path: Path) -> str | None:
@@ -50,16 +48,10 @@ def _parse_lessons(brain_root: Path) -> tuple[dict[str, str], list[str]]:
         content = lessons_file.read_text(encoding="utf-8")
     except Exception:
         return by_slug, hooked
-    for line in content.splitlines():
-        m = _LESSON_RE.match(line.strip())
-        if not m:
-            continue
-        desc = m.group(1).strip()
-        is_hooked = desc.startswith("[hooked] ")
-        clean = desc[len("[hooked] "):] if is_hooked else desc
-        by_slug[_slug(clean)] = clean
-        if is_hooked:
-            hooked.append(clean)
+    for lesson in iter_rule_lessons(content.splitlines()):
+        by_slug[_slug(lesson.description)] = lesson.description
+        if lesson.hooked:
+            hooked.append(lesson.description)
     return by_slug, hooked
 
 

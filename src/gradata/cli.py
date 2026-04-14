@@ -533,8 +533,7 @@ def _generated_hook_dirs() -> list[Path]:
 
 def cmd_rule_list(args):
     """List RULE-tier lessons and their hook status."""
-    import re as _re
-
+    from gradata._lessons import iter_rule_lessons
     from gradata.enhancements.rule_to_hook import _slug
     from gradata.hooks import _manifest as _mf
 
@@ -543,18 +542,10 @@ def cmd_rule_list(args):
 
     rules: list[tuple[str, str, bool]] = []  # (category, description, hooked_marker)
     if lessons_file.exists():
-        lesson_re = _re.compile(
-            r"^\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+(\w+):\s+(.+)$"
-        )
-        for line in lessons_file.read_text(encoding="utf-8").splitlines():
-            m = lesson_re.match(line.strip())
-            if not m:
-                continue
-            category = m.group(1)
-            desc = m.group(2).strip()
-            hooked_marker = desc.startswith("[hooked] ")
-            clean_desc = desc[len("[hooked] "):] if hooked_marker else desc
-            rules.append((category, clean_desc, hooked_marker))
+        for lesson in iter_rule_lessons(
+            lessons_file.read_text(encoding="utf-8").splitlines()
+        ):
+            rules.append((lesson.category, lesson.description, lesson.hooked))
 
     # Discover installed hook files (pre + post) AND bundled manifest entries.
     # A rule is counted as "installed" if it appears in either.
@@ -622,8 +613,7 @@ def cmd_rule_list(args):
 
 def cmd_rule_remove(args):
     """Remove a graduated hook: delete the .js file and unmark (or purge) its lesson."""
-    import re as _re
-
+    from gradata._lessons import parse_rule_lesson
     from gradata.enhancements.rule_to_hook import _slug
     from gradata.hooks import _manifest as _mf
 
@@ -657,25 +647,18 @@ def cmd_rule_remove(args):
     if lessons_file.exists():
         lines = lessons_file.read_text(encoding="utf-8").splitlines()
         out_lines = []
-        lesson_re = _re.compile(
-            r"^(\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+\w+):\s+(.+)$"
-        )
         for line in lines:
-            m = lesson_re.match(line.strip())
-            if not m:
+            parsed = parse_rule_lesson(line)
+            if parsed is None:
                 out_lines.append(line)
                 continue
-            prefix = m.group(1)
-            desc = m.group(2).strip()
-            was_hooked = desc.startswith("[hooked] ")
-            clean_desc = desc[len("[hooked] "):] if was_hooked else desc
-            if _slug(clean_desc) == slug:
+            if _slug(parsed.description) == slug:
                 if args.purge:
                     touched_lesson = True
                     continue  # drop the line entirely
-                if was_hooked:
+                if parsed.hooked:
                     touched_lesson = True
-                    out_lines.append(f"{prefix}: {clean_desc}")
+                    out_lines.append(f"{parsed.prefix}: {parsed.description}")
                 else:
                     # Already unmarked — no change needed
                     out_lines.append(line)
