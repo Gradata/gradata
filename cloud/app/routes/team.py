@@ -7,6 +7,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from app.auth import get_current_user_id
 from app.db import get_db
@@ -234,4 +235,154 @@ async def update_member_role(
         role=new_role,
         joined_at=target.get("joined_at"),
         last_sync_at=None,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Team aggregate stats — powers /team overview + leaderboard
+# ---------------------------------------------------------------------------
+
+
+class TeamMemberStat(BaseModel):
+    user_id: str
+    display_name: str | None = None
+    email: str | None = None
+    role: str
+    last_sync_at: str | None = None
+    corrections_week: int = 0
+    correction_delta_pct: float = 0.0
+    rules_graduated_30d: int = 0
+    active: bool = False
+
+
+class TeamStatsResponse(BaseModel):
+    corrections_week: int = 0
+    rules_graduated_30d: int = 0
+    avg_delta_pct: float = 0.0
+    active_brains: int = 0
+    total_members: int = 0
+    members: list[TeamMemberStat] = []
+
+
+def _parse_iso(ts: object) -> datetime | None:
+    if not ts:
+        return None
+    try:
+        s = str(ts).replace("Z", "+00:00")
+        dt = datetime.fromisoformat(s)
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+@router.get("/workspaces/{workspace_id}/team-stats", response_model=TeamStatsResponse)
+async def get_team_stats(
+    workspace_id: str,
+    user_id: str = Depends(get_current_user_id),
+) -> TeamStatsResponse:
+    """Aggregate team activity for the leaderboard. Caller must belong to the workspace."""
+    await _require_member(workspace_id, user_id)
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    week_ago = now - timedelta(days=7)
+    two_weeks_ago = now - timedelta(days=14)
+    month_ago = now - timedelta(days=30)
+    active_cutoff = now - timedelta(days=14)
+
+    members = await db.select("workspace_members", filters={"workspace_id": workspace_id})
+    brains = await db.select("brains", filters={"workspace_id": workspace_id})
+
+    # Group brains by member.
+    brains_by_user: dict[str, list[dict]] = {}
+    brain_to_user: dict[str, str] = {}
+    for b in brains:
+        uid = b.get("user_id")
+        if uid:
+            brains_by_user.setdefault(uid, []).append(b)
+            brain_to_user[b["id"]] = uid
+
+    # Single fetch for all corrections + lessons across the workspace.
+    workspace_brain_ids = set(brain_to_user.keys())
+    all_corrections = await db.select("corrections", columns="brain_id,created_at")
+    all_lessons = await db.select("lessons", columns="brain_id,state,created_at")
+
+    corr_this: dict[str, int] = {}
+    corr_prior: dict[str, int] = {}
+    rules_30d: dict[str, int] = {}
+    for c in all_corrections:
+        bid = c.get("brain_id")
+        if bid not in workspace_brain_ids:
+            continue
+        uid = brain_to_user[bid]
+        ts = _parse_iso(c.get("created_at"))
+        if ts is None:
+            continue
+        if ts >= week_ago:
+            corr_this[uid] = corr_this.get(uid, 0) + 1
+        elif two_weeks_ago <= ts < week_ago:
+            corr_prior[uid] = corr_prior.get(uid, 0) + 1
+
+    for l in all_lessons:
+        bid = l.get("brain_id")
+        if bid not in workspace_brain_ids:
+            continue
+        uid = brain_to_user[bid]
+        if (l.get("state") or "") != "RULE":
+            continue
+        ts = _parse_iso(l.get("created_at"))
+        if ts and ts >= month_ago:
+            rules_30d[uid] = rules_30d.get(uid, 0) + 1
+
+    rows: list[TeamMemberStat] = []
+    active_count = 0
+    total_corr_week = 0
+    total_rules_30d = 0
+    delta_sum = 0.0
+    delta_n = 0
+
+    for m in members:
+        uid = m.get("user_id")
+        if not uid:
+            continue
+        member_brains = brains_by_user.get(uid, [])
+        last_sync: datetime | None = None
+        for b in member_brains:
+            ts = _parse_iso(b.get("last_sync_at"))
+            if ts and (last_sync is None or ts > last_sync):
+                last_sync = ts
+        is_active = last_sync is not None and last_sync >= active_cutoff
+        if is_active:
+            active_count += 1
+
+        this_week = corr_this.get(uid, 0)
+        prior_week = corr_prior.get(uid, 0)
+        delta = ((this_week - prior_week) / prior_week * 100.0) if prior_week else 0.0
+        if prior_week or this_week:
+            delta_sum += delta
+            delta_n += 1
+
+        total_corr_week += this_week
+        total_rules_30d += rules_30d.get(uid, 0)
+
+        rows.append(
+            TeamMemberStat(
+                user_id=uid,
+                display_name=m.get("display_name"),
+                email=m.get("email"),
+                role=m.get("role", "member"),
+                last_sync_at=last_sync.isoformat() if last_sync else None,
+                corrections_week=this_week,
+                correction_delta_pct=round(delta, 1),
+                rules_graduated_30d=rules_30d.get(uid, 0),
+                active=is_active,
+            )
+        )
+
+    return TeamStatsResponse(
+        corrections_week=total_corr_week,
+        rules_graduated_30d=total_rules_30d,
+        avg_delta_pct=round(delta_sum / delta_n, 1) if delta_n else 0.0,
+        active_brains=active_count,
+        total_members=len(rows),
+        members=rows,
     )

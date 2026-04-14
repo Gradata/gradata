@@ -6,6 +6,8 @@ import { useApi } from '@/hooks/useApi'
 import type { Brain, Correction, PaginatedResponse } from '@/types/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 
 const SEVERITY_STYLE: Record<Correction['severity'], string> = {
   trivial:  'bg-white/[0.04] text-[var(--color-body)]',
@@ -31,7 +33,13 @@ export default function CorrectionsPage() {
   const filtered = filter === 'all' ? corrections : corrections.filter((c) => c.severity === filter)
 
   if (loadingBrains || loading) return <LoadingSpinner className="py-20" />
-  if (!primaryId) return <EmptyState title="No brain yet" description="Install the SDK to start logging corrections." />
+  if (!primaryId) return (
+    <EmptyState
+      title="No brain yet"
+      description="Install the SDK and log your first correction to see it here."
+      action={<Link href="/setup"><Button>Get started →</Button></Link>}
+    />
+  )
 
   const severities: Array<'all' | Correction['severity']> = ['all', 'trivial', 'minor', 'moderate', 'major', 'rewrite']
 
