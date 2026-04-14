@@ -38,15 +38,19 @@ In Cloudflare → Pages → `gradata-dashboard` → Settings → Environment var
 ```
 VITE_SENTRY_DSN=https://...@o0.ingest.sentry.io/<project-id>
 VITE_SENTRY_ENVIRONMENT=production           # optional, defaults to MODE
-VITE_SENTRY_RELEASE=gradata-dashboard@<ver>  # optional
-
-# For source-map upload (makes prod stack traces readable)
-SENTRY_AUTH_TOKEN=<token-from-step-1>
-SENTRY_ORG=gradata
-SENTRY_PROJECT=gradata-dashboard
+VITE_SENTRY_RELEASE=gradata-dashboard@<ver>  # optional; GH Actions overrides per build
 ```
 
 **Important:** Vite reads `VITE_*` vars **at build time**. After setting them, trigger a rebuild (retry deploy, or push a commit). Reading env changes requires a new build.
+
+### Source maps (for readable stack traces)
+
+Source-map upload happens **automatically on every push to `main`** that touches `cloud/dashboard/**`, via `.github/workflows/dashboard-source-maps.yml`. No manual `sentry-cli` runs, no Cloudflare-side env vars for the Sentry auth token — the workflow holds them as GitHub Actions secrets.
+
+See [`cloud/dashboard/SOURCE-MAPS.md`](./dashboard/SOURCE-MAPS.md) for:
+- The five GitHub Actions secrets to configure (`SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`)
+- How to verify source maps uploaded after a deploy
+- How to skip the workflow (`[skip ci]` in commit message)
 
 Open the dashboard in a browser and check console for:
 

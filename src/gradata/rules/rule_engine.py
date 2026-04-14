@@ -867,9 +867,7 @@ def format_rules_for_prompt(
         example_draft = getattr(lesson, "example_draft", None)
         example_corrected = getattr(lesson, "example_corrected", None)
         if needs_reinforcement and example_draft is not None and example_corrected is not None:
-            lines.append(
-                f'   e.g. "{example_draft[:80]}" -> "{example_corrected[:80]}"'
-            )
+            lines.append(f'   e.g. "{example_draft[:80]}" -> "{example_corrected[:80]}"')
 
     lines.append("</brain-rules>")
     return "\n".join(lines)

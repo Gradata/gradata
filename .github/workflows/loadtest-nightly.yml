@@ -1,0 +1,87 @@
+name: loadtest-nightly
+
+# Nightly SLO canary against production. Runs baseline + spike only —
+# authed-read and sync-write require coordinated test workspaces and
+# would be too noisy to run unattended.
+
+on:
+  schedule:
+    # 03:00 UTC = quiet window for the US/EU timezones
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Base URL to test against'
+        required: false
+        default: 'https://gradata-production.up.railway.app'
+
+concurrency:
+  group: loadtest-nightly
+  cancel-in-progress: false
+
+jobs:
+  baseline:
+    name: baseline (smoke)
+    runs-on: ubuntu-latest
+    # Skip if the triggering commit message contains [skip ci]
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run baseline.js
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: cloud/loadtest/k6/baseline.js
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url || 'https://gradata-production.up.railway.app' }}
+
+      - name: Comment on commit if thresholds breached
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = context.sha;
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: sha,
+              body: `:rotating_light: **Nightly loadtest: baseline SLO breach**\n\n` +
+                    `p95 > 500ms or error_rate > 1% on \`/health\`.\n\n` +
+                    `See run: ${runUrl}\n\n` +
+                    `Rollback playbook: \`cloud/loadtest/README.md\``,
+            });
+
+  spike:
+    name: spike (rate limit check)
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    # Run spike regardless of baseline outcome — they test different things.
+    needs: []
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run spike.js
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: cloud/loadtest/k6/spike.js
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url || 'https://gradata-production.up.railway.app' }}
+
+      - name: Comment on commit if thresholds breached
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = context.sha;
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: sha,
+              body: `:rotating_light: **Nightly loadtest: spike SLO breach**\n\n` +
+                    `5xx detected under spike load — SlowAPI should return 429, not 500.\n\n` +
+                    `Check Sentry (\`gradata-cloud\` project) for stack traces.\n\n` +
+                    `See run: ${runUrl}\n\n` +
+                    `Rollback playbook: \`cloud/loadtest/README.md\``,
+            });

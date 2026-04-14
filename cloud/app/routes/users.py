@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Request
 
 from app.auth import get_current_user_id
 from app.db import get_db
-from app.models import UpdateProfileRequest, UserProfile
+from app.models import NotificationPrefs, UpdateProfileRequest, UserProfile
 
 _log = logging.getLogger(__name__)
 
@@ -87,3 +87,41 @@ async def update_profile(
         display_name=body.display_name,
         workspaces=workspaces,
     )
+
+
+@router.get("/users/me/notifications", response_model=NotificationPrefs)
+async def get_notifications(
+    request: Request,
+    user_id: str = Depends(get_current_user_id),
+) -> NotificationPrefs:
+    """Return the authenticated user's notification preferences.
+
+    Stored as a single JSON column on workspace_members for now (one workspace
+    per user during launch). Falls back to defaults if no row.
+    """
+    db = get_db()
+    rows = await db.select(
+        "workspace_members",
+        columns="notification_prefs",
+        filters={"user_id": user_id},
+    )
+    if not rows or not rows[0].get("notification_prefs"):
+        return NotificationPrefs()
+    return NotificationPrefs(**rows[0]["notification_prefs"])
+
+
+@router.put("/users/me/notifications", response_model=NotificationPrefs)
+async def update_notifications(
+    body: NotificationPrefs,
+    request: Request,
+    user_id: str = Depends(get_current_user_id),
+) -> NotificationPrefs:
+    """Replace the authenticated user's notification preferences."""
+    db = get_db()
+    await db.update(
+        "workspace_members",
+        data={"notification_prefs": body.model_dump()},
+        filters={"user_id": user_id},
+    )
+    _log.info("Updated notification_prefs for user=%s cadence=%s", user_id, body.digest_cadence)
+    return body
