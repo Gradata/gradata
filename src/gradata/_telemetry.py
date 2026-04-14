@@ -313,9 +313,20 @@ def _config_lock(timeout: float = 2.0) -> Iterator[None]:
         else:
             import fcntl  # type: ignore[import-not-found]
 
-            with contextlib.suppress(OSError):
-                fcntl.flock(fp.fileno(), fcntl.LOCK_EX)
-                acquired = True
+            # Non-blocking retry loop so the POSIX branch honors ``timeout``
+            # just like the Windows branch. Blocking ``flock(LOCK_EX)`` would
+            # hang indefinitely if another process holds the lock, violating
+            # the documented best-effort contract.
+            deadline = time.monotonic() + timeout
+            while True:
+                try:
+                    fcntl.flock(fp.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    acquired = True
+                    break
+                except OSError:
+                    if time.monotonic() >= deadline:
+                        break
+                    time.sleep(0.05)
         yield
     finally:
         if acquired:
