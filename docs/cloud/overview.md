@@ -74,11 +74,11 @@ See [API Reference](api.md) for full endpoint documentation.
 ## Sync
 
 ```python
-from gradata import Brain
-from gradata.cloud.sync import sync_brain
+from gradata.cloud import CloudClient
 
-brain = Brain("./my-brain")
-sync_brain(brain, api_key="your-key")
+client = CloudClient("./my-brain", api_key="your-key")
+client.connect()
+client.sync()
 ```
 
 Sync is incremental: only events since the last cursor are sent. Large brains with hundreds of sessions sync in seconds.
