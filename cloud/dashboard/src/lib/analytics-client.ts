@@ -196,3 +196,20 @@ export function computeTimeSaved(lessons: Lesson[]): number {
   }
   return fires * MINUTES_PER_CORRECTION
 }
+
+/**
+ * Week-over-week percent change with sample-size floor.
+ *
+ * Returns null when either period is below the floor, or when prior is 0.
+ * Caller renders null as `—`. Result is rounded to a whole percent.
+ */
+export function computeWoWDelta(
+  thisPeriod: number,
+  priorPeriod: number,
+  opts: { floor?: number } = {},
+): number | null {
+  const floor = opts.floor ?? 5
+  if (thisPeriod < floor || priorPeriod < floor) return null
+  if (priorPeriod === 0) return null
+  return Math.round(((thisPeriod - priorPeriod) / priorPeriod) * 100)
+}

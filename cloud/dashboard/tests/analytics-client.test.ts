@@ -4,6 +4,7 @@ import {
   computeGraduationCounts,
   buildDecayCurve,
   computeTimeSaved,
+  computeWoWDelta,
 } from '@/lib/analytics-client'
 import type { BrainAnalytics, Correction, Lesson } from '@/types/api'
 
@@ -168,5 +169,31 @@ describe('computeTimeSaved', () => {
     const lessons = [mkLesson('a', 'RULE', 0.9, 7)]
     ;(lessons[0] as any).recurrence_blocked = true
     expect(computeTimeSaved(lessons)).toBe(21)
+  })
+})
+
+describe('computeWoWDelta', () => {
+  it('returns null when either week below sample-size floor', () => {
+    expect(computeWoWDelta(3, 10, { floor: 5 })).toBeNull()
+    expect(computeWoWDelta(10, 4, { floor: 5 })).toBeNull()
+    expect(computeWoWDelta(2, 2, { floor: 5 })).toBeNull()
+  })
+
+  it('returns percent change when both weeks meet floor', () => {
+    expect(computeWoWDelta(12, 10, { floor: 5 })).toBe(20)
+    expect(computeWoWDelta(8, 10, { floor: 5 })).toBe(-20)
+  })
+
+  it('handles zero prior with this-week positive as null (undefined ratio)', () => {
+    expect(computeWoWDelta(10, 0, { floor: 5 })).toBeNull()
+  })
+
+  it('uses default floor of 5 when no options passed', () => {
+    expect(computeWoWDelta(4, 4)).toBeNull()
+    expect(computeWoWDelta(6, 5)).toBe(20)
+  })
+
+  it('rounds to whole percent', () => {
+    expect(computeWoWDelta(10, 6, { floor: 5 })).toBe(67)
   })
 })
