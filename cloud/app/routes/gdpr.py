@@ -52,6 +52,25 @@ def _iso(dt: datetime) -> str:
     return dt.isoformat()
 
 
+async def _require_active_user(user_id: str) -> None:
+    """Raise 404 if the caller's account has been soft-deleted.
+
+    ``get_current_user_id`` only verifies the JWT signature; once a user hits
+    POST /me/delete their ``users.deleted_at`` is set but their JWT is still
+    valid for its TTL. Every GDPR read handler must re-check the account is
+    active before returning data or the user can keep exfiltrating after
+    erasure. Raises 404 rather than 403 to avoid leaking account existence.
+    """
+    db = get_db()
+    rows = await db.select(
+        "users",
+        columns="id,deleted_at",
+        filters={"id": user_id},
+    )
+    if rows and rows[0].get("deleted_at"):
+        raise HTTPException(status_code=404, detail="Account not found")
+
+
 async def _collect_user_brains(user_id: str, *, include_deleted: bool = False) -> list[dict]:
     """Return brains owned by ``user_id``. Filters soft-deleted by default."""
     db = get_db()
@@ -90,6 +109,7 @@ async def data_summary(
     user_id: str = Depends(get_current_user_id),
 ) -> DataSummaryResponse:
     """Return counts + oldest/newest timestamps for the account settings UI."""
+    await _require_active_user(user_id)
     db = get_db()
 
     workspaces = await _collect_user_workspaces(user_id)
@@ -173,20 +193,9 @@ async def export_me(
     are returned inline; larger ones would be served via a signed URL
     (not yet required in production).
     """
+    await _require_active_user(user_id)
     await _enforce_export_rate_limit(user_id)
     db = get_db()
-
-    # Record the export request BEFORE generating the payload to shrink the
-    # TOCTOU window between _enforce_export_rate_limit and the ledger insert.
-    # A concurrent request arriving between the check and this insert will
-    # either see this row (and 429) or race by milliseconds; either way the
-    # 24h window bounds abuse. For true atomicity we'd need either a DB
-    # uniqueness constraint on (user_id, date_bucket) or a row-level lock,
-    # neither of which the current PostgREST wrapper exposes.
-    await db.insert(
-        "gdpr_export_requests",
-        {"user_id": user_id, "created_at": _iso(_utcnow())},
-    )
 
     workspaces = await _collect_user_workspaces(user_id, include_deleted=True)
     brains = await _collect_user_brains(user_id, include_deleted=True)
@@ -216,7 +225,6 @@ async def export_me(
 
     serialized = json.dumps(payload, default=str)
     size_bytes = len(serialized.encode("utf-8"))
-    _log.info("GDPR export generated for user=%s size=%d", user_id, size_bytes)
 
     response = DataExportResponse(
         user_id=user_id,
@@ -224,11 +232,11 @@ async def export_me(
         size_bytes=size_bytes,
         format="json",
     )
-    if size_bytes <= INLINE_EXPORT_MAX_BYTES:
-        response.data = payload
-    else:
+    if size_bytes > INLINE_EXPORT_MAX_BYTES:
         # TODO: write to Supabase Storage and return a signed URL.
         # For now, surface a clear error so ops gets paged if it happens.
+        # NOTE: no ledger row is inserted on this failure path — the user gets
+        # to retry without burning their 24h quota on an undelivered payload.
         raise HTTPException(
             status_code=507,
             detail=(
@@ -236,6 +244,20 @@ async def export_me(
                 "is not yet implemented. Contact privacy@gradata.ai."
             ),
         )
+    response.data = payload
+
+    # Record the successful export AFTER the payload is assembled and the size
+    # check passes. This way a 507 (or any earlier exception) does not burn the
+    # user's 24h quota on an export they never actually received. TOCTOU note:
+    # two concurrent requests could both pass _enforce_export_rate_limit and
+    # then both insert — acceptable given the export is idempotent and the
+    # window bounds abuse. For true atomicity we'd need a DB-side uniqueness
+    # constraint on (user_id, date_bucket), tracked as a follow-up.
+    await db.insert(
+        "gdpr_export_requests",
+        {"user_id": user_id, "created_at": _iso(_utcnow())},
+    )
+    _log.info("GDPR export generated size=%d", size_bytes)
     return response
 
 
@@ -251,7 +273,10 @@ async def _send_deletion_confirmation(user_id: str, email: str | None) -> None:
     can verify the request landed while we build the email pipeline.
     Tracked follow-up: wire to the admin/ESP client once provider is chosen.
     """
-    _log.info("GDPR deletion confirmation queued user=%s email=%s", user_id, email)
+    # Do not log raw user_id or email — this is a GDPR-sensitive path and
+    # logs are long-lived / shipped to observability. has_email is enough
+    # for ops to confirm the send path vs a silent no-op.
+    _log.info("GDPR deletion confirmation queued has_email=%s", bool(email))
 
 
 @router.post("/me/delete", response_model=DeleteAccountResponse, status_code=202)
@@ -287,45 +312,85 @@ async def delete_me(
             purge_after=existing.get("purge_after") or purge_iso,
         )
 
-    # Tombstone the user row. Upsert so we don't 500 if the row is absent.
-    await db.upsert(
-        "users",
-        {
-            "id": user_id,
-            "deleted_at": now_iso,
-            "purge_after": purge_iso,
-        },
-    )
-
-    # Cascade to workspaces they own.
-    # NOTE: per-row UPDATE (N+1) is intentional — db.select has no IN/transaction
-    # support yet. Tracked follow-up: switch to a single PATCH with PostgREST
-    # `id=in.(...)` filter once SupabaseClient grows that helper.
+    # Cascade ORDER matters — the db wrapper has no transactions yet, so we
+    # tombstone subordinate resources (workspaces, brains) FIRST and the
+    # ``users`` row LAST. A mid-cascade failure this way leaves the account
+    # still active (recoverable on retry) rather than tombstoned-with-live-
+    # resources (orphaned and invisible to the user). Tracked follow-up:
+    # switch to a single transaction or PostgREST ``id=in.(...)`` bulk PATCH
+    # once SupabaseClient supports either (see db wrapper TODO).
     owned_workspaces = await _collect_user_workspaces(user_id, include_deleted=False)
-    for ws in owned_workspaces:
-        await db.update(
-            "workspaces",
-            data={"deleted_at": now_iso},
-            filters={"id": ws["id"]},
-        )
-
-    # Cascade to brains they own.
     owned_brains = await _collect_user_brains(user_id, include_deleted=False)
-    for b in owned_brains:
-        await db.update(
-            "brains",
-            data={"deleted_at": now_iso},
-            filters={"id": b["id"]},
+
+    updated_workspaces: list[str] = []
+    updated_brains: list[str] = []
+    try:
+        for ws in owned_workspaces:
+            await db.update(
+                "workspaces",
+                data={"deleted_at": now_iso},
+                filters={"id": ws["id"]},
+            )
+            updated_workspaces.append(ws["id"])
+        for b in owned_brains:
+            await db.update(
+                "brains",
+                data={"deleted_at": now_iso},
+                filters={"id": b["id"]},
+            )
+            updated_brains.append(b["id"])
+
+        # Subordinates tombstoned — now mark the user deleted. Upsert so we
+        # don't 500 if the shadow users row is absent.
+        await db.upsert(
+            "users",
+            {
+                "id": user_id,
+                "deleted_at": now_iso,
+                "purge_after": purge_iso,
+            },
         )
+    except Exception as exc:
+        # Best-effort rollback: revert the partial subordinate tombstones so
+        # the account stays in a consistent "still active" state. Any rollback
+        # failure is swallowed and logged — the user sees a 500 and retries.
+        _log.error(
+            "GDPR soft-delete cascade failed mid-flight partial_workspaces=%d partial_brains=%d",
+            len(updated_workspaces),
+            len(updated_brains),
+            exc_info=True,
+        )
+        for ws_id in updated_workspaces:
+            try:
+                await db.update(
+                    "workspaces",
+                    data={"deleted_at": None},
+                    filters={"id": ws_id},
+                )
+            except Exception:  # pragma: no cover - defensive best-effort
+                _log.warning("Rollback failed for workspace tombstone")
+        for b_id in updated_brains:
+            try:
+                await db.update(
+                    "brains",
+                    data={"deleted_at": None},
+                    filters={"id": b_id},
+                )
+            except Exception:  # pragma: no cover - defensive best-effort
+                _log.warning("Rollback failed for brain tombstone")
+        raise HTTPException(
+            status_code=500,
+            detail="Account deletion failed mid-cascade. Please retry.",
+        ) from exc
 
     # Resolve email from the shadow users table if present (best-effort).
     # Reuses the pre-cascade fetch above to avoid a second round-trip.
     email: str | None = existing_rows[0].get("email") if existing_rows else None
     await _send_deletion_confirmation(user_id, email)
 
+    # No raw user_id / email in logs — this is a compliance-sensitive flow.
     _log.info(
-        "GDPR soft-delete user=%s workspaces=%d brains=%d purge_after=%s",
-        user_id,
+        "GDPR soft-delete workspaces=%d brains=%d purge_after=%s",
         len(owned_workspaces),
         len(owned_brains),
         purge_iso,

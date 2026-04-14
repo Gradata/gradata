@@ -351,6 +351,187 @@ def test_delete_is_idempotent_when_already_soft_deleted(gdpr_client, mock_supaba
 
 
 # ---------------------------------------------------------------------------
+# Soft-deleted accounts cannot keep reading via still-valid JWTs.
+# ---------------------------------------------------------------------------
+
+
+def test_data_summary_blocks_soft_deleted_user(gdpr_client):
+    """A user whose users.deleted_at is set can't read data-summary via JWT TTL."""
+    client = gdpr_client(
+        workspaces=[],
+        brains=[],
+        users=[{"id": CALLER_UID, "deleted_at": "2026-04-01T00:00:00+00:00"}],
+    )
+    resp = client.get("/api/v1/me/data-summary")
+    assert resp.status_code == 404
+
+
+def test_export_blocks_soft_deleted_user(gdpr_client):
+    """Soft-deleted user hitting /me/export gets 404 — no exfil after erasure."""
+    client = gdpr_client(
+        workspaces=[],
+        brains=[],
+        gdpr_export_requests=[],
+        users=[{"id": CALLER_UID, "deleted_at": "2026-04-01T00:00:00+00:00"}],
+    )
+    resp = client.get("/api/v1/me/export")
+    assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Export quota is only burned on SUCCESSFUL delivery.
+# ---------------------------------------------------------------------------
+
+
+def test_export_ledger_row_written_only_after_successful_payload(gdpr_client, mock_supabase):
+    """Happy-path export inserts exactly one ledger row (the successful one)."""
+    client = gdpr_client(
+        workspaces=[],
+        brains=[],
+        corrections=[],
+        lessons=[],
+        events=[],
+        meta_rules=[],
+        gdpr_export_requests=[],
+    )
+    resp = client.get("/api/v1/me/export")
+    assert resp.status_code == 200
+    ledger_rows = [r for r in mock_supabase._inserts if r.get("user_id") == CALLER_UID]
+    assert len(ledger_rows) == 1, "expected exactly one ledger insert on success"
+
+
+def test_export_does_not_burn_quota_when_payload_exceeds_cap(
+    gdpr_client, mock_supabase, monkeypatch
+):
+    """A 507 oversized-export failure must NOT consume the 24h quota."""
+    # Force the size check to trip by lowering the cap to 0 bytes.
+    import app.routes.gdpr as gdpr_mod
+
+    monkeypatch.setattr(gdpr_mod, "INLINE_EXPORT_MAX_BYTES", 0)
+    client = gdpr_client(
+        workspaces=[],
+        brains=[],
+        corrections=[],
+        lessons=[],
+        events=[],
+        meta_rules=[],
+        gdpr_export_requests=[],
+    )
+    resp = client.get("/api/v1/me/export")
+    assert resp.status_code == 507
+    ledger_rows = [r for r in mock_supabase._inserts if r.get("user_id") == CALLER_UID]
+    assert ledger_rows == [], "failed exports must not burn the rate-limit quota"
+
+
+# ---------------------------------------------------------------------------
+# Soft-delete cascade: reorder + best-effort rollback.
+# ---------------------------------------------------------------------------
+
+
+def test_delete_tombstones_subordinates_before_user(app_with_user, mock_supabase):
+    """Cascade must tombstone workspaces/brains BEFORE marking the user deleted.
+
+    Order matters: if we tombstone the user first and then a subordinate
+    update fails, the account looks deleted but owns live resources. Going
+    subordinates-first means a mid-cascade failure leaves the account
+    recoverable.
+    """
+    order: list[str] = []
+
+    async def tracking_update(table, data=None, filters=None):
+        order.append(f"update:{table}")
+        return [data]
+
+    async def tracking_upsert(table, data):
+        order.append(f"upsert:{table}")
+        mock_supabase._inserts.append(data)
+        return [data]
+
+    mock_supabase.update = tracking_update  # type: ignore[assignment]
+    mock_supabase.upsert = tracking_upsert  # type: ignore[assignment]
+
+    mock_supabase.add_response(
+        "workspaces",
+        "select",
+        [{"id": WORKSPACE_ID, "owner_id": CALLER_UID, "created_at": "2026-01-01T00:00:00+00:00"}],
+    )
+    mock_supabase.add_response(
+        "brains",
+        "select",
+        [{"id": BRAIN_ID, "user_id": CALLER_UID, "created_at": "2026-01-02T00:00:00+00:00"}],
+    )
+    mock_supabase.add_response("users", "select", [])
+
+    app = app_with_user(CALLER_UID)
+    client = TestClient(app)
+    resp = client.post("/api/v1/me/delete")
+    assert resp.status_code == 202
+
+    assert "upsert:users" in order, "expected the user tombstone to fire"
+    assert "update:workspaces" in order, "expected workspace tombstone"
+    assert "update:brains" in order, "expected brain tombstone"
+    assert order.index("update:workspaces") < order.index("upsert:users"), (
+        "workspaces must tombstone before the user"
+    )
+    assert order.index("update:brains") < order.index("upsert:users"), (
+        "brains must tombstone before the user"
+    )
+
+
+def test_delete_rolls_back_partial_cascade_on_mid_flight_failure(
+    app_with_user, mock_supabase
+):
+    """If brain tombstoning fails mid-cascade, roll back the workspace
+    tombstones and refuse to mark the user deleted. User sees 500 and retries."""
+    rollback_calls: list[dict] = []
+    user_upserts: list[dict] = []
+
+    workspaces = [
+        {"id": WORKSPACE_ID, "owner_id": CALLER_UID, "created_at": "2026-01-01T00:00:00+00:00"},
+    ]
+    brains = [
+        {"id": BRAIN_ID, "user_id": CALLER_UID, "created_at": "2026-01-02T00:00:00+00:00"},
+    ]
+    mock_supabase.add_response("workspaces", "select", workspaces)
+    mock_supabase.add_response("brains", "select", brains)
+    mock_supabase.add_response("users", "select", [])
+
+    original_update = mock_supabase.update
+
+    async def failing_update(table, data=None, filters=None):
+        # Let workspace tombstones succeed, fail on the first brain tombstone,
+        # then let rollback updates (data={"deleted_at": None}) pass so we can
+        # observe them.
+        if table == "brains" and (data or {}).get("deleted_at") is not None:
+            raise RuntimeError("simulated DB blip on brains update")
+        if (data or {}).get("deleted_at") is None:
+            rollback_calls.append({"table": table, "filters": filters})
+        return await original_update(table, data=data, filters=filters)
+
+    async def tracking_upsert(table, data):
+        user_upserts.append(data)
+        mock_supabase._inserts.append(data)
+        return [data]
+
+    mock_supabase.update = failing_update  # type: ignore[assignment]
+    mock_supabase.upsert = tracking_upsert  # type: ignore[assignment]
+
+    app = app_with_user(CALLER_UID)
+    client = TestClient(app)
+    resp = client.post("/api/v1/me/delete")
+
+    assert resp.status_code == 500
+    # User row must NOT be tombstoned on failure — that's the whole point of
+    # ordering subordinates-first with a rollback.
+    assert user_upserts == [], "user must not be tombstoned when cascade fails"
+    # The already-updated workspace tombstone must have been rolled back.
+    assert any(
+        c["table"] == "workspaces" and c["filters"] == {"id": WORKSPACE_ID}
+        for c in rollback_calls
+    ), "expected workspace rollback after mid-cascade failure"
+
+
+# ---------------------------------------------------------------------------
 # Backwards-compat: existing /workspaces/{id}/members must still work
 # after soft-delete filter was added in auth.py / users.py.
 # ---------------------------------------------------------------------------
