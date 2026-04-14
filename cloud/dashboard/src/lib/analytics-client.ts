@@ -8,22 +8,30 @@
 import type { BrainAnalytics, Correction, Lesson } from '@/types/api'
 
 export interface KpiMetrics {
-  /** Correction rate change vs prior period, negative = improving (learning) */
   correctionRateDeltaPct: number
   correctionsThisWeek: number
   correctionsPriorWeek: number
+  /** WoW delta percent, null when below sample-size floor */
+  correctionRateWoWDelta: number | null
 
-  /** Mean sessions to graduation. Placeholder math until backend ships per-lesson timelines */
   sessionsToGraduation: number
-  sessionsToGraduationLow: number  // 95% CI lower
-  sessionsToGraduationHigh: number // 95% CI upper
+  sessionsToGraduationLow: number
+  sessionsToGraduationHigh: number
 
-  /** Absolute misfire count. Trust signal — ideally 0. */
   misfireCount: number
+  misfireCountPriorWeek: number
+  /** WoW delta percent, null when below sample-size floor */
+  misfireWoWDelta: number | null
   totalFires: number
 
-  /** Brain footprint approximated from correction + lesson counts (KB) */
   footprintKb: number
+
+  /** Estimated minutes saved this period (current window); always shown with "Est." prefix */
+  timeSavedMinutes: number
+  /** Prior-period time saved; null when not computable (requires per-fire timestamps) */
+  timeSavedMinutesPriorWeek: number | null
+  /** WoW delta percent for time saved; null when prior is null or below floor */
+  timeSavedWoWDelta: number | null
 }
 
 export interface GraduationCounts {
@@ -78,16 +86,38 @@ export function computeKpis(
   // Brain footprint: ~11 KB per correction per S103 ANALYSIS
   const footprintKb = Math.round(corrections.length * 11)
 
+  const timeSavedMinutes = computeTimeSaved(lessons)
+
+  // Prior-week Time Saved requires per-fire timestamps. Until backend ships
+  // them, return null to avoid a misleading 0.
+  const timeSavedMinutesPriorWeek: number | null = null
+  const timeSavedWoWDelta: number | null =
+    timeSavedMinutesPriorWeek === null
+      ? null
+      : computeWoWDelta(timeSavedMinutes, timeSavedMinutesPriorWeek)
+
+  const correctionRateWoWDelta = computeWoWDelta(correctionsThisWeek, correctionsPriorWeek)
+
+  // Misfire prior-week is 0 until backend exposes misfire timeline
+  const misfireCountPriorWeek = 0
+  const misfireWoWDelta = computeWoWDelta(misfireCount, misfireCountPriorWeek)
+
   return {
     correctionRateDeltaPct,
     correctionsThisWeek,
     correctionsPriorWeek,
+    correctionRateWoWDelta,
     sessionsToGraduation,
     sessionsToGraduationLow,
     sessionsToGraduationHigh,
     misfireCount,
+    misfireCountPriorWeek,
+    misfireWoWDelta,
     totalFires,
     footprintKb,
+    timeSavedMinutes,
+    timeSavedMinutesPriorWeek,
+    timeSavedWoWDelta,
   }
 }
 

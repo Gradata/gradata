@@ -233,3 +233,32 @@ describe('computeRuleStreak', () => {
     expect(computeRuleStreak(l)).toBe(0)
   })
 })
+
+describe('computeKpis (extended)', () => {
+  it('includes timeSavedMinutes computed from lessons', () => {
+    const lessons = [
+      (() => {
+        const l = mkLesson('a', 'RULE', 0.9, 4)
+        ;(l as any).recurrence_blocked = true
+        return l
+      })(),
+    ]
+    const k = computeKpis(emptyAnalytics, [], lessons)
+    expect(k.timeSavedMinutes).toBe(12)
+  })
+
+  it('includes correctionRateWoWDelta as null when below floor', () => {
+    const k = computeKpis(emptyAnalytics, [], [])
+    expect(k.correctionRateWoWDelta).toBeNull()
+  })
+
+  it('includes misfireCountPriorWeek when computable', () => {
+    const k = computeKpis(emptyAnalytics, [], [])
+    expect(k.misfireCountPriorWeek).toBe(0)
+  })
+
+  it('returns timeSavedMinutesPriorWeek = null when recurrence_blocked-era data absent', () => {
+    const k = computeKpis(emptyAnalytics, [], [])
+    expect(k.timeSavedMinutesPriorWeek).toBeNull()
+  })
+})
