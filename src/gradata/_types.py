@@ -174,10 +174,9 @@ class Lesson:
     climb_count: int = 0  # Total times this rule climbed (max 3)
     last_climb_session: int = 0  # Session when last climb occurred
     tree_level: int = 0  # Current depth: 0=leaf, 1=branch, 2=trunk
-    _contradiction_streak: int = 0  # Consecutive contradiction count (triggers self-correction)
-
-    # ── Internal streak tracking (not persisted to disk schema) ────────
-    _contradiction_streak: int = 0  # Consecutive contradictions for penalty acceleration
+    # Consecutive CONTRADICTING corrections; accelerates confidence decay,
+    # resets on reinforcement or non-contradicting updates. Not persisted.
+    _contradiction_streak: int = 0
 
     def __post_init__(self) -> None:
         self.confidence = round(max(0.0, min(1.0, self.confidence)), 2)

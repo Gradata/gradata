@@ -100,11 +100,14 @@ def main() -> int:
     orphan_hooked_texts = [t for t in hooked_texts if _slug(t) not in all_hook_slugs]
 
     stale: list[tuple[str, Path, str, str, str]] = []  # (slug, path, hook_hash, current_hash, fix_text)
+    seen_slugs: set[str] = set()
     orphan_idx = 0
     for d in _hook_dirs():
         if not d.exists():
             continue
         for hook_path in sorted(d.glob("*.js")):
+            if hook_path.name == "_dispatcher.js":
+                continue
             slug = hook_path.stem
             hook_hash = _read_hash_from_hook(hook_path)
             if not hook_hash:
@@ -120,8 +123,32 @@ def main() -> int:
                     # No candidate pairing available; treat as orphan, skip.
                     continue
             current_hash = _source_hash(current_text)
+            seen_slugs.add(slug)
             if current_hash != hook_hash:
                 stale.append((slug, hook_path, hook_hash, current_hash, current_text))
+
+    # Also check manifest-only entries (legacy .js may have been deleted after
+    # a migrate --delete-legacy, leaving only the bundled manifest).
+    try:
+        from gradata.hooks import _manifest as _mf
+        dirs = _hook_dirs()
+        for kind, d in (("pre", dirs[0]), ("post", dirs[1])):
+            for entry in _mf.read_manifest(kind):
+                slug = entry.get("slug")
+                if not slug or slug in seen_slugs:
+                    continue
+                recorded = entry.get("source_hash")
+                if not recorded:
+                    continue
+                current_text = lessons_by_slug.get(slug)
+                if current_text is None:
+                    continue
+                current_hash = _source_hash(current_text)
+                if current_hash != recorded:
+                    pseudo_path = d / f"{slug} (bundled)"
+                    stale.append((slug, pseudo_path, recorded, current_hash, current_text))
+    except Exception:
+        pass
 
     if stale:
         print("Gradata: stale rule-to-hook warnings")
