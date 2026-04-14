@@ -337,6 +337,13 @@ class TestWebhook:
 
 class TestWebhookHardening:
     def _post_with(self, client, fake_stripe, event: dict):
+        """Post a raw event dict without the id/created defaults.
+
+        Unlike TestWebhook._post_event (which calls setdefault for `id` and
+        `created`), hardening tests need to control those fields exactly —
+        e.g., stale-event tests supply their own `created`, and the
+        missing-`created` test deliberately omits it. Don't add defaults here.
+        """
         fake_stripe.Webhook.construct_event = MagicMock(return_value=event)
         return client.post(
             "/api/v1/billing/webhook",
@@ -377,10 +384,12 @@ class TestWebhookHardening:
         """Once an event.id is in processed_webhooks, re-delivery is a no-op."""
         import time as _time
 
-        # Seed the idempotency table with this event_id.
+        # Seed the idempotency table with a COMPLETED row for this event_id.
+        # Only status='processed' short-circuits; a bare row (or one stuck in
+        # 'processing') would be treated as a stale/poisoned claim instead.
         mock_supabase.add_response(
             "processed_webhooks", "select",
-            [{"event_id": "evt_duplicate_1"}],
+            [{"event_id": "evt_duplicate_1", "status": "processed"}],
         )
 
         # Capture update calls so we can assert the handler did NOT run.
@@ -497,3 +506,107 @@ class TestWebhookHardening:
         workspace_writes = [u for u in handler_updates if u["table"] == "workspaces"]
         assert not workspace_writes, \
             "Claim-race loser must skip the handler to prevent double-apply"
+
+    def test_stale_processing_claim_is_reclaimed_not_dropped(
+        self, client, mock_supabase, configured_prices, fake_stripe
+    ):
+        """A 'processing' row older than the stale window must be reclaimed.
+
+        Regression: without reclaim, a worker that dies mid-handler leaves a
+        permanent poison-pill row that blocks every subsequent Stripe retry
+        for the same event_id.
+        """
+        import time as _time
+        from datetime import datetime, timedelta, timezone
+
+        # Stale claim: status='processing', claimed_at 20 min ago (> 10 min window).
+        stale_ts = (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat()
+        mock_supabase.add_response(
+            "processed_webhooks", "select",
+            [{"event_id": "evt_stale_1", "status": "processing", "claimed_at": stale_ts}],
+        )
+
+        async def _raise_pk_conflict(table, data):
+            if table == "processed_webhooks":
+                raise RuntimeError("duplicate key value violates unique constraint")
+            return [data]
+
+        update_calls: list[dict] = []
+
+        async def _capture_update(table, data, filters=None):
+            update_calls.append({"table": table, "data": data, "filters": filters})
+            return [data]
+
+        mock_supabase.insert = _raise_pk_conflict  # type: ignore[method-assign]
+        mock_supabase.update = _capture_update  # type: ignore[method-assign]
+
+        event = {
+            "id": "evt_stale_1",
+            "type": "customer.subscription.updated",
+            "created": int(_time.time()),
+            "data": {"object": {"customer": "cus_x", "status": "active"}},
+        }
+        resp = self._post_with(client, fake_stripe, event)
+
+        assert resp.status_code == 200
+        # A reclaim UPDATE on processed_webhooks must have happened.
+        reclaims = [
+            u for u in update_calls
+            if u["table"] == "processed_webhooks"
+            and u["data"].get("status") == "processing"
+        ]
+        assert len(reclaims) == 1, "Stale processing row must be reclaimed"
+        # The filter MUST include the prior claimed_at to prevent racing reclaims
+        # from both winning the update.
+        assert reclaims[0]["filters"].get("claimed_at") == stale_ts
+        # Handler should have run (workspace update present).
+        workspace_writes = [u for u in update_calls if u["table"] == "workspaces"]
+        assert workspace_writes, "Handler must run after successful reclaim"
+
+    def test_active_processing_claim_is_not_reclaimed(
+        self, client, mock_supabase, configured_prices, fake_stripe
+    ):
+        """A 'processing' row younger than the stale window stays claimed."""
+        import time as _time
+        from datetime import datetime, timedelta, timezone
+
+        # Recent claim: 30 seconds old — another worker is actively handling.
+        recent_ts = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
+        mock_supabase.add_response(
+            "processed_webhooks", "select",
+            [{"event_id": "evt_active_1", "status": "processing", "claimed_at": recent_ts}],
+        )
+
+        async def _raise_pk_conflict(table, data):
+            if table == "processed_webhooks":
+                raise RuntimeError("duplicate key value violates unique constraint")
+            return [data]
+
+        update_calls: list[dict] = []
+
+        async def _capture_update(table, data, filters=None):
+            update_calls.append({"table": table, "data": data, "filters": filters})
+            return [data]
+
+        mock_supabase.insert = _raise_pk_conflict  # type: ignore[method-assign]
+        mock_supabase.update = _capture_update  # type: ignore[method-assign]
+
+        event = {
+            "id": "evt_active_1",
+            "type": "customer.subscription.updated",
+            "created": int(_time.time()),
+            "data": {"object": {"customer": "cus_x", "status": "active"}},
+        }
+        resp = self._post_with(client, fake_stripe, event)
+
+        assert resp.status_code == 200
+        assert resp.json().get("duplicate") is True
+        # No reclaim, no handler run.
+        reclaims = [
+            u for u in update_calls
+            if u["table"] == "processed_webhooks"
+            and u["data"].get("status") == "processing"
+        ]
+        assert not reclaims, "Active claim must NOT be reclaimed"
+        workspace_writes = [u for u in update_calls if u["table"] == "workspaces"]
+        assert not workspace_writes, "Handler must NOT run while another worker holds the claim"

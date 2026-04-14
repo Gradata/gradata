@@ -161,12 +161,21 @@ def _event_created(event) -> int | None:
     return None
 
 
+# Stale 'processing' claims get reclaimed after this window. Chosen to be
+# larger than any expected handler runtime but well under Stripe's 3-day
+# retry window, so a worker crash doesn't permanently poison an event_id.
+WEBHOOK_CLAIM_STALE_SECONDS = 10 * 60
+
+
 async def _already_processed(event_id: str) -> bool:
     """Return True when we've already FINISHED handling this event.id.
 
-    Kept for observability/tests. The main race-proof guard is
-    `_claim_event` below — this is only a cheap short-circuit so duplicates
-    return early without even attempting an insert.
+    Only short-circuits on rows with status='processed'. A row with
+    status='processing' is NOT treated as a duplicate here — it might be a
+    stale claim from a worker that crashed mid-handler, and _claim_event
+    below will reclaim it if it's older than WEBHOOK_CLAIM_STALE_SECONDS.
+    This is the fix for the "poison pill" failure mode where a dead worker
+    would permanently block every retry for a given event_id.
     """
     db = get_db()
     try:
@@ -180,20 +189,27 @@ async def _already_processed(event_id: str) -> bool:
         # to "not processed" — better than 5xxing every webhook during rollout.
         _log.warning("processed_webhooks lookup failed (table missing?): %s", exc)
         return False
-    return bool(rows)
+    if not rows:
+        return False
+    return (rows[0].get("status") or "") == "processed"
 
 
 async def _claim_event(event_id: str, event_type: str) -> bool:
     """Atomically claim an event_id before running the handler.
 
     Returns True if this worker won the claim (we must run the handler),
-    False if another delivery already claimed it (skip — duplicate).
+    False if another delivery holds an active claim (skip — duplicate).
 
-    Implementation: INSERT with status='processing'. The PK on event_id
-    means only one writer can succeed. Any exception from the insert
-    (conflict, network, table missing) is treated as "did not claim" and
-    we skip processing — safer to drop a duplicate than to double-apply
-    a subscription update.
+    Flow:
+    1. Try INSERT with status='processing'. Wins on fresh event_ids.
+    2. On conflict: look at the existing row.
+       - status='processed' -> already done, skip.
+       - status='processing' and claimed_at younger than stale window ->
+         an active worker holds the claim, skip.
+       - status='processing' and claimed_at older than stale window ->
+         worker almost certainly crashed; reclaim by resetting claimed_at
+         (UPDATE with a claimed_at filter to keep it atomic vs racing
+         reclaim attempts).
     """
     db = get_db()
     try:
@@ -206,17 +222,82 @@ async def _claim_event(event_id: str, event_type: str) -> bool:
             },
         )
     except Exception as exc:
-        # Most common: PK conflict from a concurrent delivery. Also covers
-        # missing-table during rollout — in that case we can't safely claim,
-        # so we fall through to legacy behaviour (skip processing).
+        # PK conflict is expected for duplicate deliveries. Fall through to
+        # the staleness check. Also covers missing-table during rollout —
+        # the stale-check will also raise and return False, preserving the
+        # "skip when we can't safely claim" behaviour.
         _log.info(
-            "processed_webhooks claim failed for event=%s (likely duplicate): %s",
+            "processed_webhooks insert failed for event=%s, checking for stale claim: %s",
             event_id, exc,
         )
+    else:
+        return bool(rows)
+
+    # Conflict path: decide whether the existing row is poisoned.
+    try:
+        existing = await db.select(
+            "processed_webhooks",
+            columns="event_id,status,claimed_at",
+            filters={"event_id": event_id},
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        _log.warning("processed_webhooks stale-check failed for %s: %s", event_id, exc)
         return False
-    # PostgREST returns the inserted row(s); an empty list would indicate the
-    # row was suppressed by an upstream policy — treat that as "not claimed".
-    return bool(rows)
+
+    if not existing:
+        return False
+    row = existing[0]
+    if (row.get("status") or "") == "processed":
+        return False
+
+    claimed_at_raw = row.get("claimed_at")
+    if not _claim_is_stale(claimed_at_raw):
+        return False
+
+    # Stale 'processing' row — another worker almost certainly died. Reclaim.
+    # The filter on the prior claimed_at prevents two reclaim attempts from
+    # both winning: whichever UPDATE lands first changes the timestamp so
+    # the second one matches zero rows.
+    try:
+        updated = await db.update(
+            "processed_webhooks",
+            data={"status": "processing", "claimed_at": "now()"},
+            filters={"event_id": event_id, "claimed_at": claimed_at_raw},
+        )
+    except Exception as exc:
+        _log.warning("processed_webhooks reclaim failed for %s: %s", event_id, exc)
+        return False
+    if updated:
+        _log.warning(
+            "Reclaimed stale processed_webhooks row for event=%s (prior claim at %s)",
+            event_id, claimed_at_raw,
+        )
+        return True
+    return False
+
+
+def _claim_is_stale(claimed_at_raw) -> bool:
+    """Return True when a `processing` row's claimed_at is older than the
+    stale window. Best-effort parsing — unparseable values are NOT treated
+    as stale (safer to skip than to double-process)."""
+    if not claimed_at_raw:
+        return False
+    from datetime import datetime, timezone
+    try:
+        if isinstance(claimed_at_raw, str):
+            # Postgres timestamptz comes back as ISO8601; tolerate 'Z' suffix.
+            s = claimed_at_raw.replace("Z", "+00:00")
+            ts = datetime.fromisoformat(s)
+        elif isinstance(claimed_at_raw, datetime):
+            ts = claimed_at_raw
+        else:
+            return False
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        age = (datetime.now(timezone.utc) - ts).total_seconds()
+        return age > WEBHOOK_CLAIM_STALE_SECONDS
+    except (ValueError, TypeError):
+        return False
 
 
 async def _mark_processed(event_id: str, event_type: str) -> None:

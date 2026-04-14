@@ -42,13 +42,24 @@ def _auth_or_ip_key(request: Request) -> str:
 def limits_enabled() -> bool:
     """Resolve whether limits should be enforced.
 
-    Production: enabled unless `GRADATA_RATE_LIMIT_ENABLED=false`.
-    Test env:  disabled unless `GRADATA_RATE_LIMIT_ENABLED=true` (explicit opt-in).
+    Precedence (highest -> lowest):
+    1. `GRADATA_RATE_LIMIT_ENABLED` env var (explicit override — test opt-in).
+    2. `Settings.rate_limit_enabled` from `.env` / Settings() construction.
+    3. Environment-based default: disabled in `test`, enabled elsewhere.
+
+    The env-var override is retained so tests (and emergency ops) can flip
+    the kill switch without reconstructing Settings. Anything else flows
+    through the Pydantic Settings model, so values from `.env` files or
+    `Settings(rate_limit_enabled=False)` are actually honoured.
     """
     raw = os.environ.get("GRADATA_RATE_LIMIT_ENABLED")
     if raw is not None:
         return raw.strip().lower() in {"1", "true", "yes", "on"}
-    return get_settings().environment != "test"
+    settings = get_settings()
+    # Test env default: off unless explicitly enabled via env var above.
+    if settings.environment == "test":
+        return False
+    return bool(settings.rate_limit_enabled)
 
 
 # IP-keyed limiter (public + sensitive buckets).
