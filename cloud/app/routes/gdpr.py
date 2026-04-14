@@ -129,6 +129,9 @@ async def data_summary(
 async def _enforce_export_rate_limit(user_id: str) -> None:
     """Raise 429 if the user already exported within EXPORT_RATE_WINDOW."""
     db = get_db()
+    # TODO(db-layer): fetch only the most recent row (order_by created_at desc,
+    # limit=1) once SupabaseClient.select supports ordering/limits. Today the
+    # wrapper only accepts eq filters, so we scan all rows for this user.
     rows = await db.select(
         "gdpr_export_requests",
         columns="id,created_at",
