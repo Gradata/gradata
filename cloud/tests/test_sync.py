@@ -171,7 +171,8 @@ def test_sync_rule_patched_event_without_matching_lesson_is_skipped(client, mock
         headers=auth_headers,
     )
     assert resp.status_code == 200, resp.text
-    # Event row is inserted; no rule_patches row should be inserted
+    # The event row itself still gets inserted — only the rule_patches side is skipped
+    assert resp.json()["events_synced"] == 1
     rule_patch_inserts = [row for row in mock_supabase._inserts if "old_description" in row and "new_description" in row]
     assert rule_patch_inserts == []
 

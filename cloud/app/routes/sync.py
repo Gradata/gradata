@@ -129,6 +129,18 @@ async def sync_brain(
                     old_desc = data.get("old_description") or ""
                     new_desc = data.get("new_description") or ""
                     if not cat or not old_desc or not new_desc:
+                        missing = [
+                            name for name, val in (
+                                ("category", cat),
+                                ("old_description", old_desc),
+                                ("new_description", new_desc),
+                            ) if not val
+                        ]
+                        _log.warning(
+                            "rule-patches: skipping RULE_PATCHED event for brain=%s "
+                            "(missing %s; created_at=%s)",
+                            brain_id, ",".join(missing), ev.created_at or "?",
+                        )
                         continue
                     lesson_id = _resolve_lesson_id(cat, old_desc, new_desc)
                     if lesson_id is None:
