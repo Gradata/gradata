@@ -29,11 +29,17 @@ class MockSupabaseClient:
         self._responses[table][operation] = data
 
     async def select(
-        self, table: str, columns: str = "*", filters: dict | None = None
+        self,
+        table: str,
+        columns: str = "*",
+        filters: dict | None = None,
+        in_: dict | None = None,
     ) -> list[dict]:
         rows = self._responses[table].get("select", [])
         if filters:
             rows = [r for r in rows if all(r.get(k) == v for k, v in filters.items())]
+        if in_:
+            rows = [r for r in rows if all(r.get(k) in vals for k, vals in in_.items())]
         return rows
 
     async def insert(self, table: str, data: dict | list[dict]) -> list[dict]:

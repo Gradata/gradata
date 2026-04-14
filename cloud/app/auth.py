@@ -128,6 +128,22 @@ async def get_current_user_id(
     return await verify_jwt(credentials.credentials)
 
 
+async def get_current_user_id_flexible(
+    credentials: HTTPAuthorizationCredentials = Security(_bearer),
+) -> str:
+    """Extract user_id from either a SDK API key or a Supabase JWT.
+
+    Unlike :func:`get_current_brain`, this does NOT require that a brain
+    already exists — it only identifies the caller. Use for endpoints that
+    should work for brand-new users who haven't created a brain yet.
+    """
+    cred = credentials.credentials
+    if cred.startswith("gd_"):
+        brain = await verify_api_key(cred)
+        return brain["user_id"]
+    return await verify_jwt(cred)
+
+
 async def verify_brain_ownership(brain_id: str, user_id: str) -> dict:
     """Verify the authenticated user owns the brain. Returns brain or raises 403."""
     db = get_db()

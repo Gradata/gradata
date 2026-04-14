@@ -43,19 +43,15 @@ import math
 import random
 import re
 import sys
-import urllib.error
-import urllib.request
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from statistics import mean, pstdev
 from typing import Any
 
-# Wire the SDK into sys.path so `from gradata...` works when invoked
-# directly (same pattern as brain_benchmark.py).
-_SDK_ROOT = Path(__file__).resolve().parent.parent.parent / "src"
-if str(_SDK_ROOT) not in sys.path:
-    sys.path.insert(0, str(_SDK_ROOT))
+from _common import DEFAULT_OLLAMA_MODEL, DEFAULT_OLLAMA_URL, ensure_sdk_on_path, ollama_generate
+
+ensure_sdk_on_path()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("ab_test_constitutional")
@@ -64,8 +60,8 @@ log = logging.getLogger("ab_test_constitutional")
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_MODEL = "gemma4:e4b"
-OLLAMA_URL = "http://localhost:11434/api/generate"
+DEFAULT_MODEL = DEFAULT_OLLAMA_MODEL
+OLLAMA_URL = DEFAULT_OLLAMA_URL
 DEFAULT_BRAIN_DIR = r"C:/Users/olive/SpritesWork/brain"
 DEFAULT_OUTPUT = ".tmp/ab_test_results"
 
@@ -221,29 +217,15 @@ def _ollama_generate(
     temperature: float = 0.7,
 ) -> str:
     """Call Ollama /api/generate. Returns response text or an error marker."""
-    payload = json.dumps(
-        {
-            "model": model,
-            "prompt": prompt,
-            "system": system,
-            "stream": False,
-            "options": {
-                "temperature": temperature,
-                "num_predict": num_predict,
-            },
-        }
-    ).encode("utf-8")
-
-    req = urllib.request.Request(
-        OLLAMA_URL, data=payload, headers={"Content-Type": "application/json"}
+    return ollama_generate(
+        prompt,
+        system=system,
+        model=model,
+        url=OLLAMA_URL,
+        timeout=timeout,
+        num_predict=num_predict,
+        temperature=temperature,
     )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data.get("response", "").strip()
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
-        log.warning("Ollama call failed: %s", e)
-        return f"[Generation failed: {e}]"
 
 
 # ---------------------------------------------------------------------------

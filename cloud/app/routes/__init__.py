@@ -14,6 +14,8 @@ from app.routes.gdpr import router as gdpr_router
 from app.routes.lessons import router as lessons_router
 from app.routes.meta_rules import router as meta_rules_router
 from app.routes.operator import router as operator_router
+from app.routes.proof import router as proof_router
+from app.routes.public import router as public_router
 from app.routes.rule_patches import router as rule_patches_router
 from app.routes.sync import router as sync_router
 from app.routes.team import router as team_router
@@ -34,3 +36,5 @@ router.include_router(billing_router, tags=["billing"])
 router.include_router(team_router, tags=["team"])
 router.include_router(operator_router, tags=["operator"])
 router.include_router(gdpr_router, tags=["gdpr"])
+router.include_router(proof_router, tags=["proof"])
+router.include_router(public_router, tags=["public"])
