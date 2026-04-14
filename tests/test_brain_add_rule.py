@@ -12,7 +12,6 @@ Covers:
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
@@ -23,8 +22,11 @@ from gradata.enhancements.self_improvement import parse_lessons
 
 
 @pytest.fixture
-def brain(tmp_path: Path) -> Brain:
-    os.environ["BRAIN_DIR"] = str(tmp_path / "brain")
+def brain(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Brain:
+    # Scope BRAIN_DIR via monkeypatch so it's auto-reverted after each test
+    # and can't leak into unrelated tests (the raw os.environ.__setitem__
+    # approach persisted beyond the test that set it).
+    monkeypatch.setenv("BRAIN_DIR", str(tmp_path / "brain"))
     b = Brain.init(tmp_path / "brain", name="AddRuleTest", domain="Testing",
                    embedding="local", interactive=False)
     return b

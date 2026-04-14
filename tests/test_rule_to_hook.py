@@ -1,4 +1,5 @@
 """Tests for rule-to-hook graduation."""
+import shutil
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,14 @@ from gradata.enhancements.rule_to_hook import (
     EnforcementType,
     classify_rule,
     find_hook_candidates,
+)
+
+# Several tests below shell out to `node` to execute rendered hook templates.
+# Skip the whole module when node isn't available so CI / minimal dev envs
+# don't fail on an environment precondition we can't satisfy.
+pytestmark = pytest.mark.skipif(
+    shutil.which("node") is None,
+    reason="node not installed — rule-to-hook integration tests shell out to Node",
 )
 
 

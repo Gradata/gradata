@@ -13,12 +13,16 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import shlex
 import sys
 from pathlib import Path
 
 _HASH_LINE_RE = re.compile(r"^\s*\*\s*Source hash:\s*([0-9a-f]{12})", re.MULTILINE)
+# Kept for legacy pattern detection only. All RULE-tier lesson shapes go
+# through parse_lessons() below so legacy "[RULE] [hooked] CAT: desc" and
+# categories with "/" are recognised consistently.
 _LESSON_RE = re.compile(
-    r"^\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+\w+:\s+(.+)$"
+    r"^\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+(?:\[hooked\]\s+)?(?P<cat>[\w/\-]+):\s+(?P<desc>.+)$"
 )
 
 
@@ -41,13 +45,18 @@ def _read_hash_from_hook(path: Path) -> str | None:
 
 
 def _parse_lessons(brain_root: Path) -> tuple[dict[str, str], list[str]]:
-    """Parse lessons.md.
+    """Parse lessons.md via the canonical parser.
 
     Returns:
       (by_slug, hooked_texts) where:
         by_slug maps slug -> cleaned rule_text for ALL RULE-tier lessons.
         hooked_texts is the list of cleaned rule_texts for [hooked] lessons,
         in file order — used for fuzzy re-pairing when slugs have drifted.
+
+    Uses parse_lessons() so legacy "[RULE:conf] [hooked] CATEGORY: desc" rows
+    and categories containing slashes (e.g. "DRAFTING/FORMAT") are recognised
+    the same way the main pipeline does. Also scans the raw file once for
+    the line-level legacy "[hooked]" marker position that parse_lessons drops.
     """
     lessons_file = brain_root / "lessons.md"
     by_slug: dict[str, str] = {}
@@ -58,13 +67,55 @@ def _parse_lessons(brain_root: Path) -> tuple[dict[str, str], list[str]]:
         content = lessons_file.read_text(encoding="utf-8")
     except Exception:
         return by_slug, hooked
+
+    # Pre-compute which cleaned descriptions were marked with the legacy
+    # "[hooked]" token (between state-bracket and category) — parse_lessons
+    # doesn't preserve this, so we scan lines directly.
+    legacy_hooked_descs: set[str] = set()
     for line in content.splitlines():
         m = _LESSON_RE.match(line.strip())
         if not m:
             continue
-        desc = m.group(1).strip()
-        is_hooked = desc.startswith("[hooked] ")
-        clean = desc[len("[hooked] "):] if is_hooked else desc
+        desc = m.group("desc").strip()
+        # Detect if this row had the legacy token position.
+        if re.search(r"\[RULE:[\d.]+\]\s+\[hooked\]\s+", line):
+            clean = desc[len("[hooked] "):] if desc.startswith("[hooked] ") else desc
+            legacy_hooked_descs.add(clean)
+
+    try:
+        from gradata.enhancements.self_improvement import parse_lessons
+    except Exception:
+        parse_lessons = None  # type: ignore[assignment]
+
+    if parse_lessons is not None:
+        try:
+            lessons = parse_lessons(content)
+        except Exception:
+            lessons = []
+        for lesson in lessons:
+            state = getattr(lesson, "state", None)
+            state_value = getattr(state, "value", state)
+            if str(state_value).upper() != "RULE":
+                continue
+            desc = (getattr(lesson, "description", "") or "").strip()
+            modern_hooked = desc.startswith("[hooked] ")
+            clean = desc[len("[hooked] "):] if modern_hooked else desc
+            by_slug[_slug(clean)] = clean
+            if modern_hooked or clean in legacy_hooked_descs:
+                hooked.append(clean)
+        return by_slug, hooked
+
+    # Fallback: parser unavailable — use the regex directly (preserves
+    # legacy behaviour for minimal embeddings without the full SDK).
+    for line in content.splitlines():
+        m = _LESSON_RE.match(line.strip())
+        if not m:
+            continue
+        desc = m.group("desc").strip()
+        is_hooked = desc.startswith("[hooked] ") or re.search(
+            r"\[RULE:[\d.]+\]\s+\[hooked\]\s+", line
+        )
+        clean = desc[len("[hooked] "):] if desc.startswith("[hooked] ") else desc
         by_slug[_slug(clean)] = clean
         if is_hooked:
             hooked.append(clean)
@@ -141,7 +192,12 @@ def main() -> int:
             print(f"  - {slug}")
             print(f"      hook:    {path}")
             print(f"      hash:    {old_hash} (installed) -> {new_hash} (current)")
-            print(f"      fix:     gradata rule remove {slug} && gradata rule add \"{current_text}\"")
+            # shlex.quote the user-controlled text so the printed command is
+            # safe to copy/paste into a POSIX shell even if the rule text
+            # contains quotes, backticks, or other shell metacharacters.
+            safe_slug = shlex.quote(slug)
+            safe_text = shlex.quote(current_text)
+            print(f"      fix:     gradata rule remove {safe_slug} && gradata rule add {safe_text}")
             print()
 
     return 0

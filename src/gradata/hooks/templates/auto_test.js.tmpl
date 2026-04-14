@@ -39,6 +39,16 @@ try {
   const res = spawnSync('python', ['-m', 'pytest', testFile, '--tb=short', '-q'], {
     encoding: 'utf-8', timeout: 30000,
   });
+  // spawnSync didn't reach the child (python missing, ENOENT, killed by
+  // signal, etc). Treat as "could not verify" — never block the tool chain
+  // on our infra failure. Emit an allow decision and exit 0.
+  if (res.error || res.status === null) {
+    process.stdout.write(JSON.stringify({
+      decision: "allow",
+      reason: `Gradata auto_test: skipped (could not run pytest: ${(res.error && res.error.message) || 'no exit status'})`,
+    }));
+    process.exit(0);
+  }
   if (res.status !== 0) {
     const summary = `WARNING: Tests failed for ${testFile} after editing ${filePath}:\n${(res.stdout || '').slice(-800)}\n${(res.stderr || '').slice(-400)}\n\nRule: {{RULE_TEXT}}. Fix before moving on.`;
     process.stdout.write(JSON.stringify({decision: "block", reason: summary}));

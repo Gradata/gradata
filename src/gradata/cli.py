@@ -518,9 +518,13 @@ def cmd_rule_add(args):
     # on a missing db), so we don't need a second hand-rolled write path.
     from gradata import Brain as _Brain
 
-    _Brain(brain_root).add_rule(
+    add_result = _Brain(brain_root).add_rule(
         description=description, category=category, state="RULE", confidence=1.0,
     )
+    if not add_result.get("added"):
+        reason = add_result.get("reason", "unknown")
+        print(f"error: failed to add rule: {reason}", file=sys.stderr)
+        sys.exit(1)
 
     if result.installed:
         print(f"rule graduated to hook: installed at {result.hook_path}")
@@ -541,18 +545,24 @@ def cmd_rule_list(args):
     # Parse RULE-tier entries WITH [hooked] marker preserved
     rules: list[tuple[str, str, bool]] = []  # (category, description, hooked_marker_in_lessons)
     if lessons_file.exists():
+        # Accept both modern layout (marker inside description) and the legacy
+        # "[RULE:conf] [hooked] CATEGORY: desc" layout where the marker appears
+        # between the state bracket and the category.
         lesson_re = _re.compile(
-            r"^\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+(\w+):\s+(.+)$"
+            r"^\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+(?:\[hooked\]\s+)?(\w+):\s+(.+)$"
         )
         for line in lessons_file.read_text(encoding="utf-8").splitlines():
-            m = lesson_re.match(line.strip())
+            stripped = line.strip()
+            # Legacy marker position: remember it, then strip for regex.
+            legacy_marker = bool(_re.search(r"\[RULE:[\d.]+\]\s+\[hooked\]\s+", stripped))
+            m = lesson_re.match(stripped)
             if not m:
                 continue
             category = m.group(1)
             desc = m.group(2).strip()
-            hooked_marker = desc.startswith("[hooked] ")
-            clean_desc = desc[len("[hooked] "):] if hooked_marker else desc
-            rules.append((category, clean_desc, hooked_marker))
+            modern_marker = desc.startswith("[hooked] ")
+            clean_desc = desc[len("[hooked] "):] if modern_marker else desc
+            rules.append((category, clean_desc, modern_marker or legacy_marker))
 
     # Discover installed hook files (pre + post)
     pre_dir = Path(os.environ.get("GRADATA_HOOK_ROOT")
@@ -610,6 +620,10 @@ def cmd_rule_remove(args):
     import os
     import re as _re
 
+    # Reuse the canonical slug impl — single source of truth with cmd_rule_list
+    # and the graduation pipeline.
+    from gradata.enhancements.rule_to_hook import _slug
+
     slug = args.slug.strip()
     if not slug:
         print("error: slug required", file=sys.stderr)
@@ -617,10 +631,6 @@ def cmd_rule_remove(args):
 
     brain_root = _resolve_brain_root(args)
     lessons_file = brain_root / "lessons.md"
-
-    def _slug(text: str) -> str:
-        s = _re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-        return s[:60] or "rule"
 
     # 1. Delete hook file from whichever generated dir holds it
     pre_dir = Path(os.environ.get("GRADATA_HOOK_ROOT")
@@ -641,18 +651,26 @@ def cmd_rule_remove(args):
     if lessons_file.exists():
         lines = lessons_file.read_text(encoding="utf-8").splitlines()
         out_lines = []
+        # Accept optional legacy "[hooked]" token between the state bracket
+        # and the category (normalised out of the prefix so reformatted lines
+        # carry the marker only in the description).
         lesson_re = _re.compile(
-            r"^(\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+\w+):\s+(.+)$"
+            r"^(\[[\d-]+\]\s+\[RULE:[\d.]+\])\s+(?:\[hooked\]\s+)?(\w+):\s+(.+)$"
         )
         for line in lines:
-            m = lesson_re.match(line.strip())
+            stripped = line.strip()
+            m = lesson_re.match(stripped)
             if not m:
                 out_lines.append(line)
                 continue
-            prefix = m.group(1)
-            desc = m.group(2).strip()
-            was_hooked = desc.startswith("[hooked] ")
-            clean_desc = desc[len("[hooked] "):] if was_hooked else desc
+            state_prefix = m.group(1)
+            category = m.group(2)
+            prefix = f"{state_prefix} {category}"
+            desc = m.group(3).strip()
+            legacy_marker = bool(_re.search(r"\[RULE:[\d.]+\]\s+\[hooked\]\s+", stripped))
+            modern_marker = desc.startswith("[hooked] ")
+            was_hooked = legacy_marker or modern_marker
+            clean_desc = desc[len("[hooked] "):] if modern_marker else desc
             if _slug(clean_desc) == slug:
                 if args.purge:
                     touched_lesson = True

@@ -94,11 +94,14 @@ def _format_aider(rules: list[tuple[str, str]]) -> str:
     """
     if not rules:
         return "# No graduated rules yet\n"
+    import json as _json
+
     yaml_lines = ["# Graduated rules from Gradata", "message:"]
     for _, desc in rules:
-        # Escape double quotes for YAML safety
-        safe = desc.replace('"', '\\"')
-        yaml_lines.append(f'  - "{safe}"')
+        # YAML 1.2 double-quoted scalars accept the same escape grammar as
+        # JSON strings, so `json.dumps` gives us a valid scalar for any
+        # description (handles quotes, backslashes, control chars, unicode).
+        yaml_lines.append(f"  - {_json.dumps(desc, ensure_ascii=False)}")
     return "\n".join(yaml_lines) + "\n"
 
 

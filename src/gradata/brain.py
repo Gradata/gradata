@@ -419,7 +419,11 @@ class Brain(BrainInspectionMixin):
         Returns:
             The emitted CORRECTION event dict.
         """
-        data: dict = {"detail": text, "category": category, **extras}
+        # Apply extras first, then explicit fields so callers can't override
+        # the primary signals (detail/category/draft_text) via **extras.
+        data: dict = dict(extras)
+        data["detail"] = text
+        data["category"] = category
         if assistant_draft is not None:
             data["draft_text"] = assistant_draft
         return self.emit("CORRECTION", "user", data, [f"category:{category}"])
@@ -515,12 +519,17 @@ class Brain(BrainInspectionMixin):
         """
         from datetime import date
 
-        from gradata._db import write_lessons_safe
+        from gradata._db import lessons_lock
         from gradata._types import Lesson, LessonState
         from gradata.enhancements.self_improvement import format_lessons, parse_lessons
 
         description = (description or "").strip()
-        category = (category or "").strip()
+        # Canonicalize category casing so callers passing "drafting" and
+        # "DRAFTING" don't create duplicate logical buckets (parse_lessons
+        # preserves whatever casing is on disk, so we pick one form — upper —
+        # at the add_rule boundary). Must match the form used by duplicate
+        # comparisons, persistence, and the emit() tag below.
+        category = (category or "").strip().upper()
 
         if not description:
             return {"added": False, "reason": "empty_description"}
@@ -546,24 +555,14 @@ class Brain(BrainInspectionMixin):
         if lessons_path is None:  # pragma: no cover — create=True always returns
             return {"added": False, "reason": "no_lessons_file"}
 
-        # Parse existing lessons (round-trip via canonical pipeline)
-        existing = parse_lessons(lessons_path.read_text(encoding="utf-8"))
-
-        # Duplicate check: same category + normalized description
+        # Duplicate check: same canonical category + normalized description
         def _norm(s: str) -> str:
             return " ".join(s.split()).lower()
 
         desc_norm = _norm(description)
-        for l in existing:
-            if l.category == category and _norm(l.description) == desc_norm:
-                return {
-                    "added": False,
-                    "reason": "duplicate",
-                    "category": category,
-                    "description": description,
-                }
 
-        # Build a new Lesson through the canonical type, applying optional data
+        # Build the new Lesson (cheap, no I/O) before locking so we hold the
+        # critical section as briefly as possible.
         lesson = Lesson(
             date=date.today().isoformat(),
             state=lesson_state,
@@ -580,8 +579,27 @@ class Brain(BrainInspectionMixin):
                 if k in field_names and k not in protected:
                     setattr(lesson, k, v)
 
-        existing.append(lesson)
-        write_lessons_safe(lessons_path, format_lessons(existing))
+        # TOCTOU protection: hold the same lock write_lessons_safe uses for
+        # the entire read → duplicate-check → append → write sequence so
+        # concurrent add_rule calls can't both observe "no duplicate" and
+        # then each append the same lesson.
+        with lessons_lock(lessons_path):
+            existing = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+            for l in existing:
+                # l.category may have arbitrary casing (parse_lessons preserves
+                # on-disk form); compare case-insensitively against the canonical
+                # upper-cased `category` we're inserting.
+                if (l.category or "").strip().upper() == category and _norm(l.description) == desc_norm:
+                    return {
+                        "added": False,
+                        "reason": "duplicate",
+                        "category": category,
+                        "description": description,
+                    }
+            existing.append(lesson)
+            # Write inside the lock — reuse the same serializer but call the
+            # raw writer directly since we already hold the lock.
+            lessons_path.write_text(format_lessons(existing), encoding="utf-8")
 
         # Best-effort event log — never fail the add if event emission fails
         try:

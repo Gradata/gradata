@@ -70,7 +70,9 @@ DETERMINISTIC_PATTERNS: list[tuple[re.Pattern[str], DeterminismCheck, str, str |
     # Secret scan
     (re.compile(r"never (commit|push) secret"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
     (re.compile(r"no (hardcod|hardcode).+secret"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
-    (re.compile(r"never commit secret|no secret|never push secret"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
+    # Tighter variant: require an anchoring preposition + target noun so generic
+    # phrases like "there's no secret sauce" don't collide with the secret rule.
+    (re.compile(r"\bno secrets?\b.*\b(in|to|into)\b.*\b(code|commit|commits|repo|source)\b"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
     (re.compile(r"no hardcoded api key|never hardcode api key|no api key in code"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
     # Auto test — PostToolUse, runs pytest against test_<basename>.py after edits.
     # template_arg is a sentinel ("auto_test") because render_hook gates on
