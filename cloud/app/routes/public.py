@@ -37,13 +37,26 @@ _CACHE: dict[str, PublicStats | float] = {"value": None, "expires_at": 0.0}  # t
 _CACHE_TTL_SECONDS = 60.0
 
 
+def _parse_ts(ts: object) -> datetime | None:
+    if not ts:
+        return None
+    try:
+        s = str(ts).replace("Z", "+00:00")
+        dt = datetime.fromisoformat(s)
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
 async def _compute_stats() -> PublicStats:
     db = get_db()
 
-    brains = await db.select("brains", columns="id")
+    brains = await db.select("brains", columns="id,last_sync_at")
     corrections = await db.select("corrections", columns="created_at")
     lessons = await db.select("lessons", columns="state,created_at")
     meta_rules = await db.select("meta_rules", columns="id")
+    # heartbeats are lightweight — fetch only recent ones
+    heartbeats = await db.select("heartbeats", columns="created_at")
 
     graduated_states = {"PATTERN", "RULE"}
     lessons_graduated = sum(1 for l in lessons if (l.get("state") or "") in graduated_states)
@@ -52,26 +65,30 @@ async def _compute_stats() -> PublicStats:
     graduated_7d = 0
     last_activity: datetime | None = None
 
-    def _parse(ts: object) -> datetime | None:
-        if not ts:
-            return None
-        try:
-            s = str(ts).replace("Z", "+00:00")
-            dt = datetime.fromisoformat(s)
-            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-        except ValueError:
-            return None
+    def _bump(ts_val: object) -> None:
+        nonlocal last_activity
+        ts = _parse_ts(ts_val)
+        if ts and (last_activity is None or ts > last_activity):
+            last_activity = ts
 
     for l in lessons:
-        ts = _parse(l.get("created_at"))
+        ts = _parse_ts(l.get("created_at"))
         if ts and (now - ts).days <= 7 and (l.get("state") or "") in graduated_states:
             graduated_7d += 1
-        if ts and (last_activity is None or ts > last_activity):
-            last_activity = ts
+        _bump(l.get("created_at"))
     for c in corrections:
-        ts = _parse(c.get("created_at"))
-        if ts and (last_activity is None or ts > last_activity):
-            last_activity = ts
+        _bump(c.get("created_at"))
+    for b in brains:
+        _bump(b.get("last_sync_at"))
+    for h in heartbeats:
+        _bump(h.get("created_at"))
+
+    # Record this cache-refresh as a heartbeat so the field always moves
+    # forward. Only fires when the cache actually misses (i.e. ~once per TTL).
+    try:
+        await db.insert("heartbeats", {"source": "public_stats_refresh"})
+    except Exception as exc:  # pragma: no cover - defensive
+        _log.warning("heartbeat insert failed: %s", exc)
 
     return PublicStats(
         brains_total=len(brains),
@@ -98,3 +115,18 @@ async def get_public_stats(request: Request) -> PublicStats:
     _CACHE["value"] = stats
     _CACHE["expires_at"] = now + _CACHE_TTL_SECONDS
     return stats
+
+
+@router.post("/public/heartbeat")
+@limiter.limit("20/minute")
+async def post_heartbeat(request: Request, source: str = "unknown") -> dict[str, str]:
+    """Record a client-side heartbeat ping. No auth. Idempotent, cheap."""
+    # Whitelist sources to prevent arbitrary labels bloating the table.
+    allowed = {"dashboard", "marketing", "sdk", "unknown"}
+    safe_source = source if source in allowed else "unknown"
+    db = get_db()
+    try:
+        await db.insert("heartbeats", {"source": safe_source})
+    except Exception as exc:  # pragma: no cover - defensive
+        _log.warning("heartbeat insert failed: %s", exc)
+    return {"status": "ok"}
