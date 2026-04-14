@@ -185,7 +185,7 @@ function LegalFooter() {
 }
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? 'https://gradata-production.up.railway.app/api/v1'
+  process.env.NEXT_PUBLIC_API_URL ?? 'https://api.gradata.ai/api/v1'
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)

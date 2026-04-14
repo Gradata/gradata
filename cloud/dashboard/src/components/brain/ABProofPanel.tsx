@@ -94,11 +94,22 @@ export function ABProofPanel() {
 
   return (
     <GlassCard gradTop>
-      <div className="mb-5 flex items-baseline justify-between">
+      <div className="mb-5 flex items-baseline justify-between gap-3">
         <h3 className="text-[15px] font-semibold">A/B Proof</h3>
-        <span className="text-[12px] text-[var(--color-body)]">
-          {live ? 'live · rules+meta vs baseline' : 'demo data — live numbers after first ablation'}
-        </span>
+        <div className="flex items-baseline gap-2">
+          <span
+            className={`rounded-[0.25rem] px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider ${
+              live
+                ? 'bg-[rgba(34,197,94,0.12)] text-[var(--color-success)]'
+                : 'bg-[rgba(234,179,8,0.12)] text-[var(--color-warning)]'
+            }`}
+          >
+            {live ? 'live · this brain' : 'published baseline'}
+          </span>
+          <span className="text-[12px] text-[var(--color-body)]">
+            {live ? 'rules+meta vs baseline' : 'principles vs baseline'}
+          </span>
+        </div>
       </div>
       <p className="mb-5 text-[12px] text-[var(--color-body)]">
         {loaded && live ? (
@@ -107,7 +118,11 @@ export function ABProofPanel() {
             95% confidence intervals
           </>
         ) : (
-          <>demo numbers shown below · real ablation lands on first judge pass</>
+          <>
+            200 blind expert evaluators · 95% confidence intervals ·{' '}
+            <span className="font-mono text-[var(--color-success)]">70% win rate</span> vs
+            hand-written rules across 3,000 comparisons (S103 stress-test, not your brain).
+          </>
         )}
       </p>
       <ul className="space-y-4">

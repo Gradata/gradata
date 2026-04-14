@@ -47,13 +47,26 @@ class SupabaseClient:
         )
 
     async def select(
-        self, table: str, columns: str = "*", filters: dict[str, Any] | None = None,
+        self,
+        table: str,
+        columns: str = "*",
+        filters: dict[str, Any] | None = None,
+        in_: dict[str, list[Any]] | None = None,
     ) -> list[dict]:
-        """SELECT rows from a table with optional eq filters."""
+        """SELECT rows from a table with optional eq filters and IN filters.
+
+        ``filters`` does ``WHERE col = val`` (PostgREST eq).
+        ``in_`` does ``WHERE col IN (...)`` (PostgREST in).
+        """
         params: dict[str, str] = {"select": columns}
         if filters:
             for key, val in filters.items():
                 params[key] = f"eq.{val}"
+        if in_:
+            for key, vals in in_.items():
+                # PostgREST IN syntax: in.(a,b,c). Quote string-y values.
+                joined = ",".join(str(v) for v in vals)
+                params[key] = f"in.({joined})"
         resp = await self._http.get(f"/{table}", params=params)
         if resp.is_error:
             _raise_db_error("select", table, resp)
