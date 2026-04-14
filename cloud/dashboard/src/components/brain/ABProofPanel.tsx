@@ -74,13 +74,16 @@ export function ABProofPanel() {
     }
   }, [])
 
-  // Pick rows: real dimensions if available, otherwise demo fixtures
+  // Pick rows: real dimensions if available, otherwise demo fixtures.
+  // Prefer with_full_mean (rules + meta-rules) to match the panel copy
+  // "rules+meta vs baseline"; fall back to best_mean if the export didn't
+  // carry full-stack numbers, and finally to 0 if neither is set.
   const live = data?.available && (data?.dimensions?.length ?? 0) > 0
   const rows: ABDimension[] = live
     ? (data!.dimensions ?? []).map((d) => ({
         dimension: DIM_LABELS[d.dimension] ?? d.dimension,
         baseline: d.baseline_mean,
-        withPrinciples: d.best_mean,
+        withPrinciples: d.with_full_mean ?? d.best_mean ?? 0,
         ciLow: d.ci_low,
         ciHigh: d.ci_high,
       }))

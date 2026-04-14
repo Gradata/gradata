@@ -65,5 +65,15 @@ async def get_proof() -> dict:
     except (OSError, ValueError) as exc:
         _log.warning("proof_results.json unreadable: %s", exc)
         return {"available": False, "source": None, "reason": "results file unreadable"}
+    if not isinstance(payload, dict):
+        _log.warning(
+            "proof_results.json has unexpected top-level type %s — treating as unavailable",
+            type(payload).__name__,
+        )
+        return {
+            "available": False,
+            "source": None,
+            "reason": "results file has unexpected JSON shape (expected object)",
+        }
     payload.setdefault("available", True)
     return payload

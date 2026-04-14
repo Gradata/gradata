@@ -70,6 +70,17 @@ def test_proof_returns_unavailable_on_corrupt_file(client, monkeypatch, tmp_path
     assert resp.json()["available"] is False
 
 
+def test_proof_returns_unavailable_on_wrong_json_shape(client, monkeypatch, tmp_path):
+    """Valid JSON but wrong top-level shape (list, string, number) → graceful unavailable."""
+    f = tmp_path / "wrong_shape.json"
+    f.write_text("[]", encoding="utf-8")  # valid JSON, wrong shape (expected dict)
+    from app.routes import proof as proof_module
+    monkeypatch.setattr(proof_module, "_PROOF_PATH", f)
+    resp = client.get("/api/v1/public/proof")
+    assert resp.status_code == 200
+    assert resp.json()["available"] is False
+
+
 def test_proof_is_public_unauthenticated(client, monkeypatch, tmp_path):
     """No auth header required — this is a marketing surface."""
     from app.routes import proof as proof_module
