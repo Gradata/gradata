@@ -292,23 +292,27 @@ async def list_alerts(_: str = Depends(require_operator)) -> list[AdminAlert]:
             )
 
     # usage-spike: >3x weekly corrections vs. prior week per workspace.
+    # Single DB fetch + in-process grouping — avoids an N+1 loop over brains.
     week_ago = now - timedelta(days=7)
     two_weeks_ago = now - timedelta(days=14)
-    for ws_id, ws_brains in brains_by_ws.items():
-        this_week = 0
-        prior_week = 0
-        for b in ws_brains:
-            corrections = await db.select(
-                "corrections", columns="created_at", filters={"brain_id": b["id"]}
-            )
-            for c in corrections:
-                ts = _parse_ts(c.get("created_at"))
-                if ts is None:
-                    continue
-                if ts >= week_ago:
-                    this_week += 1
-                elif two_weeks_ago <= ts < week_ago:
-                    prior_week += 1
+    brain_to_ws = {b["id"]: ws for ws, brains in brains_by_ws.items() for b in brains}
+    all_corrections = await db.select("corrections", columns="brain_id,created_at")
+    weekly_counts: dict[str, dict[str, int]] = {}
+    for c in all_corrections:
+        ws_id = brain_to_ws.get(c.get("brain_id"))
+        if not ws_id:
+            continue
+        ts = _parse_ts(c.get("created_at"))
+        if ts is None:
+            continue
+        bucket = weekly_counts.setdefault(ws_id, {"this": 0, "prior": 0})
+        if ts >= week_ago:
+            bucket["this"] += 1
+        elif two_weeks_ago <= ts < week_ago:
+            bucket["prior"] += 1
+    for ws_id, counts in weekly_counts.items():
+        this_week = counts["this"]
+        prior_week = counts["prior"]
         if prior_week > 0 and this_week > prior_week * 3:
             company = next(
                 (w.get("name") or ws_id for w in workspaces if w["id"] == ws_id), ws_id
