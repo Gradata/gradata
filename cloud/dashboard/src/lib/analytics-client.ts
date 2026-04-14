@@ -165,3 +165,34 @@ export function buildDecayCurve(
     }
   })
 }
+
+const MINUTES_PER_CORRECTION = 3
+
+/**
+ * Estimated minutes saved by the brain this period.
+ *
+ * Honest formula: only count fires on rules with `recurrence_blocked = true`
+ * (rule has a history of preventing re-corrections).
+ *
+ * Fallback (until backend ships `recurrence_blocked`): count fires on rules
+ * where fire_count > 1 AND correction_count > 0. This excludes first-fire-ever
+ * and rules that never caught a real correction.
+ *
+ * Returns integer minutes. Always labelled "Est." in the UI.
+ */
+export function computeTimeSaved(lessons: Lesson[]): number {
+  let fires = 0
+  for (const l of lessons) {
+    const hasRecurrenceFlag = typeof (l as unknown as { recurrence_blocked?: boolean }).recurrence_blocked === 'boolean'
+    if (hasRecurrenceFlag) {
+      if ((l as unknown as { recurrence_blocked: boolean }).recurrence_blocked) {
+        fires += l.fire_count ?? 0
+      }
+    } else {
+      const fc = l.fire_count ?? 0
+      const cc = (l as unknown as { correction_count?: number }).correction_count ?? 0
+      if (fc > 1 && cc > 0) fires += fc
+    }
+  }
+  return fires * MINUTES_PER_CORRECTION
+}

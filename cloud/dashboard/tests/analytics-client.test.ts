@@ -3,6 +3,7 @@ import {
   computeKpis,
   computeGraduationCounts,
   buildDecayCurve,
+  computeTimeSaved,
 } from '@/lib/analytics-client'
 import type { BrainAnalytics, Correction, Lesson } from '@/types/api'
 
@@ -131,5 +132,41 @@ describe('buildDecayCurve', () => {
     expect(curve[0]).toHaveProperty('ciLow')
     expect(curve[0]).toHaveProperty('ciHigh')
     expect(curve[0]).toHaveProperty('day')
+  })
+})
+
+describe('computeTimeSaved', () => {
+  it('returns 0 minutes for no lessons', () => {
+    expect(computeTimeSaved([])).toBe(0)
+  })
+
+  it('counts only fires on rules with recurrence_blocked=true (honest formula)', () => {
+    const lessons = [
+      mkLesson('a', 'RULE', 0.9, 4),
+      mkLesson('b', 'RULE', 0.9, 2),
+    ]
+    ;(lessons[0] as any).recurrence_blocked = true
+    ;(lessons[1] as any).recurrence_blocked = false
+    // honest: 3 min × 4 fires on rule a = 12
+    expect(computeTimeSaved(lessons)).toBe(12)
+  })
+
+  it('falls back to fire_count > 1 AND correction_count > 0 when recurrence_blocked missing', () => {
+    const lessons = [
+      mkLesson('a', 'RULE', 0.9, 5),
+      mkLesson('b', 'RULE', 0.9, 1),
+      mkLesson('c', 'RULE', 0.9, 3),
+    ]
+    ;(lessons[0] as any).correction_count = 2 // counts: 5 fires
+    ;(lessons[1] as any).correction_count = 1 // excluded: fire_count not > 1
+    ;(lessons[2] as any).correction_count = 0 // excluded: correction_count 0
+    // 3 min × 5 fires = 15
+    expect(computeTimeSaved(lessons)).toBe(15)
+  })
+
+  it('returns whole minutes, floored/rounded to nearest whole minute', () => {
+    const lessons = [mkLesson('a', 'RULE', 0.9, 7)]
+    ;(lessons[0] as any).recurrence_blocked = true
+    expect(computeTimeSaved(lessons)).toBe(21)
   })
 })
