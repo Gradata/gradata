@@ -191,13 +191,21 @@ class TestUpdateConfidence:
 
     def test_rule_lessons_demoted_on_contradiction(self):
         """RULE-state lessons CAN be demoted if contradicted (not immortal)."""
-        from gradata.enhancements.self_improvement import LessonState
+        from gradata.enhancements.self_improvement import (
+            LessonState,
+            MAX_PER_STEP_PENALTY,
+        )
         lesson = self._lesson("DRAFTING", 0.95, LessonState.RULE)
         original_conf = lesson.confidence
         result = self.update([lesson], [{"category": "DRAFTING"}])
-        # FSRS penalty applies even to RULES — penalty is confidence-dependent
-        expected_penalty = self.fsrs_penalty(0.95)
+        # FSRS penalty applies even to RULES. Post-fix #1.3, the combined
+        # penalty is capped at MAX_PER_STEP_PENALTY so a single correction
+        # cannot subtract more than 0.20 in one tick.
+        expected_penalty = min(self.fsrs_penalty(0.95), MAX_PER_STEP_PENALTY)
         assert result[0].confidence == round(original_conf - expected_penalty, 2)
+        # Penalty must never exceed the compound cap
+        drop = original_conf - result[0].confidence
+        assert drop <= MAX_PER_STEP_PENALTY + 1e-9
 
     def test_untestable_after_20_sessions_no_fires(self):
         """Lesson flagged UNTESTABLE after 20 sessions_since_fire with fire_count==0."""

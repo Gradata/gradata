@@ -125,6 +125,25 @@ MACHINE_SEVERITY_WEIGHTS: dict[str, float] = {
 # Graduation gate thresholds
 _GRADUATION_DEDUP_THRESHOLD = 0.85  # Near-duplicate rule detection
 
+# Per-step compound-penalty ceiling.
+# gap-analysis/01-internal-audit.md #1.3: without a cap, a single rewrite
+# contradiction on a RULE at 0.90 can compound to ~0.63 in one tick
+# (base 0.17 * FSRS ~1.22 * severity 1.30 * ACCELERATION 1.50 *
+# streak 1.00 * sev_boost 1.80 * rule_override 1.20). Combined with the
+# Bayesian blend that follows, the update oscillates under alternating
+# corrections. 0.20 is one graduation tier's worth of confidence
+# (INSTINCT->PATTERN band) — the maximum a single correction should
+# ever move the rule in one step. Matches MAX_PER_SESSION_DELTA so that
+# one correction cannot chain two tier demotions in a single session.
+MAX_PER_STEP_PENALTY = 0.20
+
+# Per-session net confidence-delta ceiling. Caps the Sybil attack where
+# a burst of same-session corrections (10 x +0.12/rewrite) pushes a
+# fresh lesson 0 -> 0.90 in a single tick. 0.30 permits exactly one
+# tier transition (INSTINCT->PATTERN 0.20, or PATTERN->RULE 0.30) but
+# not two. See gap-analysis/01-internal-audit.md Gap 4 red-team note.
+MAX_PER_SESSION_DELTA = 0.30
+
 # Auto-detection threshold: if a session has more than this many corrections,
 # it's likely machine-driven. Set high enough that intensive human sessions
 # (code review, wrap-up, big lesson sweep) don't false-positive.
@@ -730,8 +749,14 @@ def update_confidence(
                         bonus = base_bonus * weight
                     else:
                         bonus = base_bonus
+                    _pre_bonus_conf = lesson.confidence
                     lesson.confidence = round(max(0.0, min(1.0, lesson.confidence + bonus)), 2)
-                    lesson.confidence = max(0.0, min(1.0, _bayesian_confidence(lesson)))
+                    # Monotonicity: on a reinforcement event, the Bayesian
+                    # blend cannot pull confidence DOWN. Mirrors the symmetric
+                    # penalty-path guard. See gap-analysis/01-internal-audit.md
+                    # #1.3.
+                    _bayes = max(0.0, min(1.0, _bayesian_confidence(lesson)))
+                    lesson.confidence = max(_bayes, _pre_bonus_conf)
                     lesson.fire_count += 1
                 else:
                     # CONTRADICTING or UNKNOWN: FSRS penalty
@@ -772,8 +797,22 @@ def update_confidence(
                         and direction != "CONTRADICTING"
                     ):
                         penalty *= PREFERENCE_DECAY_DAMPER
+                    # Cap compound penalty. Without this, a single rewrite
+                    # contradiction on a RULE can subtract ~0.63 in one step;
+                    # see gap-analysis/01-internal-audit.md #1.3 and the
+                    # MAX_PER_STEP_PENALTY comment at module top.
+                    penalty = min(penalty, MAX_PER_STEP_PENALTY)
+                    _pre_penalty_conf = lesson.confidence
                     lesson.confidence = round(max(0.0, min(1.0, lesson.confidence - penalty)), 2)
-                    lesson.confidence = max(0.0, min(1.0, _bayesian_confidence(lesson)))
+                    # Single principled update rule: FSRS-then-blend. We take
+                    # the Bayesian posterior as a second opinion but enforce
+                    # monotonicity on penalty events — the blend cannot pull
+                    # confidence UP after a correction. Without this guard
+                    # the two update paths (FSRS and Bayesian) overwrite
+                    # each other and oscillate under alternating corrections
+                    # (audit finding gap-analysis/01-internal-audit.md #1.3).
+                    _bayes = max(0.0, min(1.0, _bayesian_confidence(lesson)))
+                    lesson.confidence = min(_bayes, _pre_penalty_conf)
             else:
                 # Survived: category was testable, corrections exist elsewhere
                 # Cooling period: skip survival bonus if recently contradicted

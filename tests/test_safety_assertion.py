@@ -14,6 +14,7 @@ import logging
 
 from gradata._types import Lesson, LessonState
 from gradata.enhancements.self_improvement import (
+    MAX_PER_STEP_PENALTY,
     MIN_APPLICATIONS_FOR_PATTERN,
     MIN_APPLICATIONS_FOR_RULE,
     PATTERN_THRESHOLD,
@@ -230,3 +231,75 @@ class TestSurvivalBonusRequiresInjectionEvidence:
         # Without injection evidence, fire_count gate must still block promotion
         assert lesson.fire_count == 0
         assert lesson.state == LessonState.INSTINCT
+
+
+class TestPenaltyCap:
+    """Fix for gap-analysis/01-internal-audit.md #1.3.
+
+    Compound FSRS penalty must not exceed MAX_PER_STEP_PENALTY in one tick,
+    even when ACCELERATION * streak_mult * severity_boost * rule_override
+    combine with a rewrite severity weight.
+    """
+
+    def test_rewrite_contradiction_capped_on_rule(self) -> None:
+        """Full-stacked penalty on a RULE must not exceed the cap."""
+        lesson = _make_lesson(
+            state=LessonState.RULE,
+            confidence=0.90,
+            fire_count=8,
+            category="DRAFTING",
+            description="tighten prose",
+        )
+        pre = lesson.confidence
+        update_confidence(
+            [lesson],
+            [
+                {
+                    "category": "DRAFTING",
+                    "description": "loosen prose more",
+                    "direction": "CONTRADICTING",
+                    "severity_label": "rewrite",
+                }
+            ],
+            severity_data={"DRAFTING": "rewrite"},
+        )
+        drop = pre - lesson.confidence
+        assert drop > 0, "Penalty must still apply"
+        assert drop <= MAX_PER_STEP_PENALTY + 1e-9, (
+            f"Penalty {drop} exceeded cap {MAX_PER_STEP_PENALTY}"
+        )
+
+    def test_monotone_under_alternating_corrections(self) -> None:
+        """Alternating contradict/reinforce must not oscillate wildly.
+
+        Each contradict tick must decrease confidence; each reinforce tick
+        must not decrease it. The Bayesian blend cannot pull the update in
+        the opposite direction of the current event.
+        """
+        lesson = _make_lesson(
+            state=LessonState.PATTERN,
+            confidence=0.70,
+            fire_count=5,
+            category="DRAFTING",
+            description="tighten prose",
+        )
+        # 5 contradict events then 5 reinforce events
+        prev = lesson.confidence
+        for _ in range(5):
+            update_confidence(
+                [lesson],
+                [{"category": "DRAFTING", "direction": "CONTRADICTING"}],
+            )
+            assert lesson.confidence <= prev + 1e-9, (
+                "Contradict event must not increase confidence"
+            )
+            prev = lesson.confidence
+        for _ in range(5):
+            update_confidence(
+                [lesson],
+                [{"category": "DRAFTING", "direction": "REINFORCING"}],
+            )
+            assert lesson.confidence >= prev - 1e-9, (
+                "Reinforce event must not decrease confidence"
+            )
+            prev = lesson.confidence
