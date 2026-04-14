@@ -174,6 +174,7 @@ class Lesson:
     climb_count: int = 0  # Total times this rule climbed (max 3)
     last_climb_session: int = 0  # Session when last climb occurred
     tree_level: int = 0  # Current depth: 0=leaf, 1=branch, 2=trunk
+    _contradiction_streak: int = 0  # Consecutive contradiction count (triggers self-correction)
 
     # ── Contradiction streak tracking (runtime-only, not persisted) ──
     # Increments on consecutive CONTRADICTING corrections for accelerated

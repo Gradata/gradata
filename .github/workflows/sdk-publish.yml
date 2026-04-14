@@ -1,0 +1,175 @@
+name: SDK Publish
+
+# Trigger on SDK version tags: sdk-v0.5.0, sdk-v0.5.1rc1, etc.
+# Release candidates (rc/a/b/dev suffix) publish to TestPyPI;
+# final versions publish to PyPI.
+on:
+  push:
+    tags:
+      - "sdk-v*"
+
+concurrency:
+  group: sdk-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
+      already_published: ${{ steps.check.outputs.already_published }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Derive version from tag
+        id: meta
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#sdk-v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          if [[ "${VERSION}" =~ (rc|a|b|dev|alpha|beta) ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Tag:     ${TAG}"
+          echo "Version: ${VERSION}"
+
+      - name: Verify tag matches pyproject.toml version
+        run: |
+          PYPROJECT_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          TAG_VERSION="${{ steps.meta.outputs.version }}"
+          if [ "${PYPROJECT_VERSION}" != "${TAG_VERSION}" ]; then
+            echo "::error::Tag version (${TAG_VERSION}) does not match pyproject.toml version (${PYPROJECT_VERSION})."
+            echo "::error::Bump pyproject.toml to ${TAG_VERSION} or retag."
+            exit 1
+          fi
+          echo "Version match confirmed: ${PYPROJECT_VERSION}"
+
+      - name: Check if version already exists on PyPI
+        id: check
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          IS_PRE="${{ steps.meta.outputs.is_prerelease }}"
+          if [ "${IS_PRE}" = "true" ]; then
+            INDEX_URL="https://test.pypi.org/pypi/gradata/json"
+            INDEX_NAME="TestPyPI"
+          else
+            INDEX_URL="https://pypi.org/pypi/gradata/json"
+            INDEX_NAME="PyPI"
+          fi
+          echo "Querying ${INDEX_NAME} at ${INDEX_URL}"
+          HTTP_STATUS=$(curl -s -o /tmp/pypi.json -w "%{http_code}" "${INDEX_URL}" || echo "000")
+          if [ "${HTTP_STATUS}" = "404" ]; then
+            echo "Project not yet on ${INDEX_NAME} — first publish."
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${HTTP_STATUS}" != "200" ]; then
+            echo "::warning::Unexpected HTTP ${HTTP_STATUS} from ${INDEX_NAME}. Proceeding."
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if python -c "import json,sys; d=json.load(open('/tmp/pypi.json')); sys.exit(0 if '${VERSION}' in d.get('releases',{}) else 1)"; then
+            echo "::warning::gradata==${VERSION} is already published to ${INDEX_NAME}. Skipping publish step."
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "gradata==${VERSION} not yet on ${INDEX_NAME}. Will publish."
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dev dependencies
+        if: steps.check.outputs.already_published != 'true'
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Run tests (gate before publish)
+        if: steps.check.outputs.already_published != 'true'
+        run: python -m pytest tests/ -v --tb=short --ignore=tests/test_spec_compliance.py
+
+      - name: Build wheel and sdist
+        if: steps.check.outputs.already_published != 'true'
+        run: |
+          rm -rf dist/
+          uv build
+          ls -la dist/
+
+      - name: Upload distributions
+        if: steps.check.outputs.already_published != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-testpypi:
+    name: Publish to TestPyPI (pre-release)
+    needs: build
+    if: needs.build.outputs.is_prerelease == 'true' && needs.build.outputs.already_published != 'true'
+    runs-on: ubuntu-latest
+
+    # Trusted Publisher — configure at test.pypi.org/manage/account/publishing/
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build
+    if: needs.build.outputs.is_prerelease == 'false' && needs.build.outputs.already_published != 'true'
+    runs-on: ubuntu-latest
+
+    # Trusted Publisher — configure at pypi.org/manage/account/publishing/
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+
+  skipped:
+    name: Publish skipped (version already on index)
+    needs: build
+    if: needs.build.outputs.already_published == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report
+        run: |
+          echo "::warning::gradata==${{ needs.build.outputs.version }} already exists on the target index."
+          echo "::warning::Bump pyproject.toml and retag if you intended to publish a new version."
