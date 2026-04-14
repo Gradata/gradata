@@ -1,5 +1,6 @@
 import { PlanBadge, type PlanTier } from '@/components/brain/PlanBadge'
 import type { AdminCustomer } from '@/types/api'
+import { formatRelativeAgo } from '@/lib/format'
 
 const HEALTH_STYLE: Record<AdminCustomer['health'], string> = {
   healthy:   'bg-[rgba(34,197,94,0.12)] text-[var(--color-success)]',
@@ -27,7 +28,7 @@ export function CustomerRow({ customer }: { customer: AdminCustomer }) {
           </span>
         </div>
         <div className="font-mono text-[10px] text-[var(--color-body)]">
-          {customer.last_active ? `last active ${formatAgo(customer.last_active)}` : 'never active'}
+          {customer.last_active ? `last active ${formatRelativeAgo(customer.last_active)}` : 'never active'}
         </div>
       </div>
       <div className="flex-1 sm:w-24 sm:flex-none sm:text-right">
@@ -46,19 +47,10 @@ export function CustomerRow({ customer }: { customer: AdminCustomer }) {
   )
 }
 
-function formatAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime()
-  if (Number.isNaN(diffMs)) return '—'
-  const h = Math.floor(diffMs / 3600_000)
-  if (h < 1) return 'just now'
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
-}
-
 /**
  * True when a useApi error looks like a 403 from the operator allowlist.
  *
- * We prefer the structured HTTP status code from `useApi.errorStatus` — the
+ * Prefers the structured HTTP status code from `useApi.errorStatus`. The
  * string-message fallback only matches the exact backend detail phrase set by
  * `require_operator` ("Operator access …"), so a 401 session error or an
  * unrelated 500 no longer misrenders as the friendly no-access state.

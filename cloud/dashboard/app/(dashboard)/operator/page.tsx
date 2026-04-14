@@ -11,6 +11,7 @@ import type {
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { ErrorState } from '@/components/shared/ErrorState'
 import { CustomerRow, isForbidden } from '@/components/operator/CustomerRow'
+import { formatRelativeAgo } from '@/lib/format'
 
 /**
  * Operator panel — god-mode. Backend enforces the @gradata.ai / @sprites.ai
@@ -142,7 +143,7 @@ export default function OperatorPage() {
                     <span className="ml-2 text-[13px] text-[var(--color-body)]">· {a.detail}</span>
                   </div>
                   <span className="font-mono text-[10px] text-[var(--color-body)] shrink-0">
-                    {formatAgo(a.created_at)}
+                    {formatRelativeAgo(a.created_at)}
                   </span>
                 </div>
               </li>
@@ -190,14 +191,5 @@ function Kpi({ label, value, sub, tone }: {
       </div>
     </GlassCard>
   )
-}
-
-function formatAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime()
-  if (Number.isNaN(diffMs)) return '—'
-  const h = Math.floor(diffMs / 3600_000)
-  if (h < 1) return 'just now'
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
 }
 

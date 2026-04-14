@@ -2,27 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import axios from 'axios'
 import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import api from '@/lib/api'
+import { readApiError } from '@/lib/errors'
 import type { ClearDemoResponse } from '@/types/api'
 
 interface Props {
   brainId: string
   /** Called after a successful clear so the parent can refetch. */
   onCleared?: (result: ClearDemoResponse) => void
-}
-
-function readApiError(err: unknown, fallback: string): string {
-  if (axios.isAxiosError(err)) {
-    const detail = (err.response?.data as { detail?: string } | undefined)?.detail
-    return detail || err.message || fallback
-  }
-  if (err instanceof Error) return err.message
-  return fallback
 }
 
 export function ClearDemoButton({ brainId, onCleared }: Props) {

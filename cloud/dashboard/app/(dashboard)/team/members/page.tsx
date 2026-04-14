@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import axios from 'axios'
 import { GlassCard } from '@/components/layout/GlassCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,21 +14,13 @@ import type { InviteResponse, InviteRole, MemberRole, TeamMember, UserProfile } 
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { ErrorState } from '@/components/shared/ErrorState'
 import api from '@/lib/api'
+import { readApiError } from '@/lib/errors'
 import { formatSyncAgo, normalizeRole, pickWorkspaceId } from '@/lib/team'
 
 const ROLE_BADGE: Record<MemberRole, string> = {
   owner:  'bg-[rgba(124,58,237,0.12)] text-[var(--color-accent-violet)]',
   admin:  'bg-[rgba(58,130,255,0.12)] text-[var(--color-accent-blue)]',
   member: 'bg-white/[0.06] text-[var(--color-body)]',
-}
-
-function readApiError(err: unknown, fallback: string): string {
-  if (axios.isAxiosError(err)) {
-    const detail = (err.response?.data as { detail?: string } | undefined)?.detail
-    return detail || err.message || fallback
-  }
-  if (err instanceof Error) return err.message
-  return fallback
 }
 
 export default function TeamMembersPage() {

@@ -1,13 +1,7 @@
-// Pure helpers for the Team Overview / Members pages.
-// Kept framework-free so they stay easy to unit-test.
-
 import type { TeamMember } from '@/types/api'
+import { formatRelativeAgo } from '@/lib/format'
 
-/**
- * Activity threshold (ms): members whose latest brain sync is within
- * this window are counted as "active". 14 days mirrors the operator
- * healthy-cutoff so the two surfaces stay consistent.
- */
+// 14 days mirrors the operator healthy-cutoff so the two surfaces stay consistent.
 const ACTIVE_THRESHOLD_MS = 14 * 24 * 60 * 60 * 1000
 
 export function isMemberActive(member: TeamMember, now: number = Date.now()): boolean {
@@ -30,22 +24,9 @@ export function computeTeamAggregate(members: TeamMember[], now: number = Date.n
   }
 }
 
-/**
- * Format an ISO timestamp as a coarse "X ago" string.
- * Returns "never synced" when the timestamp is null/invalid.
- */
+/** Returns "never synced" when the timestamp is null/invalid. */
 export function formatSyncAgo(iso: string | null, now: number = Date.now()): string {
-  if (!iso) return 'never synced'
-  const t = new Date(iso).getTime()
-  if (Number.isNaN(t)) return 'never synced'
-  const diffMs = now - t
-  if (diffMs < 0) return 'just now'
-  const mins = Math.floor(diffMs / 60_000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
+  return formatRelativeAgo(iso, 'never synced', now)
 }
 
 /** Normalize a role string (defensive — backend may send any string). */
