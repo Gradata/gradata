@@ -63,12 +63,12 @@ export default function DashboardPage() {
           description="Install the Gradata SDK and run your first session. Your brain stays local — the dashboard is a lens over it."
           action={
             <div className="flex flex-wrap items-center justify-center gap-3">
-              <Link href="/setup">
-                <Button>Start setup →</Button>
-              </Link>
-              <Button variant="outline" onClick={() => setDemoMode(true)}>
-                Preview with sample data
+              <Button onClick={() => setDemoMode(true)}>
+                Preview with sample data →
               </Button>
+              <Link href="/setup">
+                <Button variant="outline">Install the SDK</Button>
+              </Link>
             </div>
           }
         />

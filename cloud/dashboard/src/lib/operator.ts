@@ -13,8 +13,10 @@ const OPERATOR_DOMAINS = ['gradata.ai', 'sprites.ai']
 
 export function isOperatorEmail(email: string | null | undefined): boolean {
   if (!email) return false
-  const at = email.lastIndexOf('@')
-  if (at < 0) return false
-  const domain = email.slice(at + 1).toLowerCase().trim()
+  const trimmed = email.trim()
+  // Reject multi-@ inputs (e.g. "user@evil.com@gradata.ai") to match backend semantics.
+  const parts = trimmed.split('@')
+  if (parts.length !== 2) return false
+  const domain = parts[1].toLowerCase()
   return OPERATOR_DOMAINS.includes(domain)
 }

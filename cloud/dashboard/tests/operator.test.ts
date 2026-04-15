@@ -21,6 +21,11 @@ describe('isOperatorEmail', () => {
     expect(isOperatorEmail('user@gradata.ai.evil.com')).toBe(false)
   })
 
+  it('rejects multi-@ inputs even if the last segment matches (security)', () => {
+    expect(isOperatorEmail('user@evil.com@gradata.ai')).toBe(false)
+    expect(isOperatorEmail('a@b@gradata.ai')).toBe(false)
+  })
+
   it('returns false for null, undefined, empty', () => {
     expect(isOperatorEmail(null)).toBe(false)
     expect(isOperatorEmail(undefined)).toBe(false)

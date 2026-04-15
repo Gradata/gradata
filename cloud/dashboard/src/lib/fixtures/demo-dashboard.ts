@@ -11,8 +11,9 @@ import type {
   Lesson,
 } from '@/types/api'
 
-const now = Date.now()
-const daysAgo = (n: number) => new Date(now - n * 86_400_000).toISOString()
+// Compute timestamps lazily on render so demo data stays anchored to "now"
+// even if the app stays open for hours/days.
+const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
 
 export const demoBrain = {
   id: 'demo',
@@ -36,7 +37,8 @@ export const demoAnalytics: BrainAnalytics = {
   },
 }
 
-export const demoCorrections: Correction[] = Array.from({ length: 142 }, (_, i) => ({
+// Computed at first render — still stable within a session, but always fresh on reload.
+export const demoCorrections: Correction[] = /* @__PURE__ */ Array.from({ length: 142 }, (_, i) => ({
   id: `demo-c-${i}`,
   brain_id: 'demo',
   severity: (['trivial', 'minor', 'moderate', 'major', 'rewrite'] as const)[i % 5],
