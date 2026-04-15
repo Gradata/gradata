@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 # IMPORTANT: Use module reference (not value import) so set_brain_dir() updates propagate.
 # `from X import Y` copies the value at import time — subsequent set_brain_dir() won't update it.
 import gradata._paths as _p
+from gradata._platform import detect_platform_source
 
 if TYPE_CHECKING:
     from gradata._paths import BrainContext
@@ -74,13 +75,9 @@ def emit(event_type: str, source: str, data: dict | None = None, tags: list | No
 
     # Enrich data dict with auto-detected platform source (env-var based).
     # Keeps public API signatures untouched — callers get this for free.
+    # Always copy so we never mutate the caller's dict in place.
     data = dict(data) if data else {}
-    if "platform_source" not in data:
-        try:
-            from gradata._platform import detect_platform_source
-            data["platform_source"] = detect_platform_source()
-        except Exception:
-            data["platform_source"] = "raw-python"
+    data.setdefault("platform_source", detect_platform_source())
 
     enriched_tags = tags or []
     try:
