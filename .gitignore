@@ -148,6 +148,7 @@ templates/
 research/
 !docs/research/
 scripts/
+!cloud/scripts/
 docs/cloud/
 docs/study-protocol.md
 
