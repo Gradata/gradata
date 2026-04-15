@@ -30,7 +30,13 @@ embeddings = ["sentence-transformers>=2.0.0"]  # Local embeddings
 gemini = ["google-genai>=1.0.0"]  # Gemini embeddings (free tier)
 encrypted = ["cryptography>=41.0"]  # Encryption at rest for system.db
 cloud = []  # Cloud client uses stdlib only (urllib). Enhancements included in base package.
-all = ["sentence-transformers>=2.0.0", "google-genai>=1.0.0", "cryptography>=41.0"]
+adapters-mem0 = ["mem0ai>=1.0.11"]  # Mem0 external memory adapter (opt-in)
+all = [
+    "sentence-transformers>=2.0.0",
+    "google-genai>=1.0.0",
+    "cryptography>=41.0",
+    "mem0ai>=1.0.11",
+]
 dev = [
     "pytest>=8.0",
     "hypothesis>=6.0",
