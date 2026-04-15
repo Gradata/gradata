@@ -6,8 +6,6 @@ import { useApi } from '@/hooks/useApi'
 import type { Brain, Lesson, PaginatedResponse } from '@/types/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
 
 const STATE_STYLE: Record<Lesson['state'], string> = {
   INSTINCT: 'bg-[rgba(58,130,255,0.12)] text-[var(--color-accent-blue)]',
@@ -35,8 +33,7 @@ export default function RulesPage() {
   if (!primaryId) return (
     <EmptyState
       title="No brain yet"
-      description="Install the SDK and graduate your first rule to see it here."
-      action={<Link href="/setup"><Button>Get started →</Button></Link>}
+      description="Install the SDK and graduate your first rule to see it here. See Setup in the left nav for install instructions."
     />
   )
 
