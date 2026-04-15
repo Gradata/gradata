@@ -16,6 +16,7 @@ from pathlib import Path
 
 from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
+from gradata.rules.rule_ranker import rank_rules
 
 try:
     from gradata.enhancements.self_improvement import parse_lessons
@@ -69,18 +70,19 @@ def _infer_agent_type(data: dict) -> str:
     return "general"
 
 
-def _relevance_score(lesson, agent_type: str) -> float:
-    score = lesson.confidence
-    if lesson.state.name == "RULE":
-        score += 0.2
-    cat_lower = lesson.category.lower()
-    if agent_type.lower() in cat_lower:
-        score += 0.3
-    keywords = SCOPE_KEYWORDS.get(agent_type.lower(), [])
-    desc_lower = lesson.description.lower()
-    if any(kw in desc_lower for kw in keywords):
-        score += 0.1
-    return score
+def _lesson_to_rule_dict(lesson) -> dict:
+    """Adapter: Lesson -> rank_rules dict (carries alpha/beta for Thompson)."""
+    return {
+        "id": getattr(lesson, "description", ""),
+        "description": getattr(lesson, "description", ""),
+        "category": getattr(lesson, "category", ""),
+        "confidence": float(getattr(lesson, "confidence", 0.5)),
+        "fire_count": int(getattr(lesson, "fire_count", 0)),
+        "last_session": 0,
+        "alpha": float(getattr(lesson, "alpha", 1.0)),
+        "beta_param": float(getattr(lesson, "beta_param", 1.0)),
+        "_lesson": lesson,
+    }
 
 
 def main(data: dict) -> dict | None:
@@ -115,8 +117,27 @@ def main(data: dict) -> dict | None:
                 pass  # Fall back to unfiltered on any import/runtime error
 
         agent_type = _infer_agent_type(data)
-        scored = sorted(filtered, key=lambda r: _relevance_score(r, agent_type), reverse=True)
-        top = scored[:MAX_RULES]
+        keywords = list(SCOPE_KEYWORDS.get(agent_type.lower(), []))
+        # Scope inference feeds the unified ranker as task_type + context_keywords.
+        # BM25 picks up on category/description/tags overlap against these terms.
+        rule_dicts = [_lesson_to_rule_dict(lesson) for lesson in filtered]
+
+        session_seed = data.get("session_number") or data.get("session_id")
+        if isinstance(session_seed, str):
+            try:
+                session_seed = int(session_seed)
+            except ValueError:
+                session_seed = abs(hash(session_seed)) % (2**31)
+
+        ranked = rank_rules(
+            rule_dicts,
+            current_session=int(data.get("session_number") or 0),
+            task_type=agent_type,
+            context_keywords=keywords or None,
+            max_rules=MAX_RULES,
+            session_seed=session_seed if isinstance(session_seed, int) else None,
+        )
+        top = [rd.get("_lesson") for rd in ranked if rd.get("_lesson") is not None]
 
         lines = []
         for r in top:
