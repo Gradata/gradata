@@ -19,6 +19,12 @@ Not generally more intelligent. Calibrated to you.
 pip install gradata
 ```
 
+Or, one-command setup including IDE hooks (Node 18+ required):
+
+```bash
+npx gradata-install install --ide=claude-code
+```
+
 Works with any LLM. Python 3.11+. Zero required dependencies.
 
 ## Intellectual lineage
