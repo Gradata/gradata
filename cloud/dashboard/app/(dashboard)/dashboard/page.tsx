@@ -13,11 +13,7 @@ import { GraduationProgressBar } from '@/components/brain/GraduationProgressBar'
 import { CorrectionDecayCurve } from '@/components/brain/CorrectionDecayCurve'
 import { ActiveRulesPanel } from '@/components/brain/ActiveRulesPanel'
 import { CategoriesChart } from '@/components/brain/CategoriesChart'
-import { MetaRulesGrid } from '@/components/brain/MetaRulesGrid'
 import { ActivityFeed } from '@/components/brain/ActivityFeed'
-import { PrivacyPosturePanel } from '@/components/brain/PrivacyPosturePanel'
-import { ABProofPanel } from '@/components/brain/ABProofPanel'
-import { MethodologyLink } from '@/components/brain/MethodologyLink'
 
 export default function DashboardPage() {
   const [range, setRange] = useState<'7d' | '30d' | '90d'>('30d')
@@ -107,9 +103,9 @@ export default function DashboardPage() {
       {kpis && <KpiStrip metrics={kpis} />}
 
       {/* Hero: correction decay curve */}
-      <CorrectionDecayCurve corrections={corrections} range={range} />
+      <CorrectionDecayCurve corrections={corrections} lessons={lessons} range={range} />
 
-      {/* Graduation pipeline (3-tier, sim-validated as the moat) */}
+      {/* Graduation pipeline (3-tier, sim-validated as the moat) — thin strip */}
       <div className="mb-4">
         <GraduationProgressBar counts={gradCounts} />
       </div>
@@ -120,20 +116,9 @@ export default function DashboardPage() {
         {analytics && <CategoriesChart analytics={analytics} />}
       </div>
 
-      {/* Meta rules + Activity */}
-      <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <MetaRulesGrid />
+      {/* Activity */}
+      <div className="mb-4">
         <ActivityFeed />
-      </div>
-
-      {/* Trust surface: privacy + A/B proof */}
-      <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <PrivacyPosturePanel footprintKb={kpis?.footprintKb ?? 0} />
-        <ABProofPanel />
-      </div>
-
-      <div className="text-center">
-        <MethodologyLink />
       </div>
     </>
   )
