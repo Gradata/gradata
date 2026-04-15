@@ -4,10 +4,18 @@
  * Rule: {{RULE_TEXT}}
  * Source hash: {{SOURCE_HASH}}
  * Template: destructive_block
+ *
+ * PreToolUse hook, matcher: Bash. Blocks destructive commands with a
+ * curated baseline pattern set PLUS the rule-specific pattern the brain
+ * graduated this hook for. Override per-invocation via:
+ *
+ *   GRADATA_BYPASS=1            (bypass all gradata hooks)
+ *   GRADATA_ALLOW_DESTRUCTIVE=1 (allow a single destructive command)
  */
 const fs = require('fs');
 
 if (process.env.GRADATA_BYPASS === '1') process.exit(0);
+if (process.env.GRADATA_ALLOW_DESTRUCTIVE === '1') process.exit(0);
 
 let input;
 try {
@@ -18,14 +26,48 @@ try {
 try {
   const toolInput = input.tool_input || {};
   const content = toolInput.command || toolInput.content || toolInput.new_string || '';
-  const pattern = {{PATTERN_LITERAL}};
-  if (pattern.test(content)) {
-    const msg = `⛔ BLOCKED by graduated rule: {{RULE_TEXT}}\n\nDestructive command refused. Set GRADATA_BYPASS=1 to override.`;
-    process.stdout.write(JSON.stringify({decision: "block", reason: msg}));
-    process.exit(2);
+
+  // Curated baseline: the obvious session-killers. Always on.
+  // These are all advisory-safe in that they refuse to RUN, not to type.
+  const BASELINE = [
+    /\brm\s+(-[a-zA-Z]*[rRfF][a-zA-Z]*\s+)+(\/|~|\$HOME|\*)\s*(?:$|;|&|\|)/,
+    /\brm\s+-[rRfF]+\s+\/\s*$/,
+    /\brm\s+-[rRfF]+\s+~\s*$/,
+    /\bDROP\s+TABLE\b/i,
+    /\bDROP\s+DATABASE\b/i,
+    /\bTRUNCATE\s+TABLE\b/i,
+    /\bgit\s+push\s+(--force|-f)\b[^|&;]*\b(main|master|prod|production)\b/,
+    /\bgit\s+push\s+.*\+(main|master|prod|production)\b/,
+    /\bgit\s+reset\s+--hard\s+origin\/(main|master|prod|production)\b/,
+    /\bgit\s+clean\s+-[a-zA-Z]*f[a-zA-Z]*d/,
+    /\bmkfs\.[a-z0-9]+\b/,
+    /\bdd\s+if=.*of=\/dev\/[sh]d[a-z]/,
+    /:\(\)\s*\{[^}]*\};:/,              // classic fork bomb
+    /\bchmod\s+-R\s+0*777\s+\//,
+    /\bchown\s+-R\s+[^ ]+\s+\/(?:\s|$)/,
+  ];
+
+  // Rule-specific pattern from graduation. May be the sentinel
+  // literal when installed standalone (no rule-specific pattern).
+  const rulePattern = {{PATTERN_LITERAL}};
+
+  const patterns = BASELINE.slice();
+  if (rulePattern && rulePattern instanceof RegExp) patterns.push(rulePattern);
+
+  for (const p of patterns) {
+    if (p.test(content)) {
+      const msg = (
+        `\u26d4 BLOCKED: destructive command. Confirm with user before running.\n` +
+        `Rule: {{RULE_TEXT}}\n` +
+        `Matched pattern: ${p}\n` +
+        `Override once: GRADATA_ALLOW_DESTRUCTIVE=1 <command>`
+      );
+      process.stdout.write(JSON.stringify({decision: "block", reason: msg}));
+      process.exit(2);
+    }
   }
 } catch (e) {
-  // Never block on hook error
+  // Never block on hook error — fail open.
   process.exit(0);
 }
 process.exit(0);

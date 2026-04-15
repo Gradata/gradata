@@ -19,6 +19,26 @@ from gradata.hooks._profiles import Profile
 # Hook registry: (module, event, matcher, profile, timeout, description)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Template registry: JS hook templates auto-installable via rule graduation
+# (rendered by src/gradata/enhancements/rule_to_hook.py). Listed here so
+# `gradata hooks list-templates` and docs have a single source of truth.
+#   (template_name, event, matcher, description)
+# ---------------------------------------------------------------------------
+
+TEMPLATE_REGISTRY: list[tuple[str, str, str | None, str]] = [
+    ("regex_replace",     "PreToolUse",  "Write|Edit|MultiEdit", "Block content matching a graduated regex (e.g. em-dash)"),
+    ("fstring_block",     "PreToolUse",  "Bash",                 "Block `python -c` with f-strings"),
+    ("root_file_save",    "PreToolUse",  "Write",                "Block new files at repo root"),
+    ("destructive_block", "PreToolUse",  "Bash",                 "Block rm -rf /, DROP TABLE, force-push main, etc."),
+    ("secret_scan",       "PreToolUse",  "Write|Edit|MultiEdit", "Block writes containing API keys/tokens"),
+    ("file_size_check",   "PreToolUse",  "Write|Edit|MultiEdit", "Block writes exceeding a graduated line limit"),
+    ("auto_test",         "PostToolUse", "Edit|Write",           "Run pytest against test_<basename>.py after edits"),
+    ("auto_format",       "PostToolUse", "Edit|Write",           "Run ruff/prettier on the edited file (fail-open)"),
+    ("notify_waiting",    "Stop",        None,                   "Native OS notification when Claude finishes a turn"),
+]
+
+
 HOOK_REGISTRY: list[tuple[str, str, str | None, Profile, int, str]] = [
     ("auto_correct",         "PostToolUse",      "Edit|Write",           Profile.MINIMAL,  5000,  "Gradata: capture corrections from edits"),
     ("inject_brain_rules",   "SessionStart",     None,                   Profile.MINIMAL,  10000, "Gradata: inject graduated rules at session start"),

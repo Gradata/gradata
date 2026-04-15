@@ -95,6 +95,13 @@ DETERMINISTIC_PATTERNS: list[tuple[re.Pattern[str], DeterminismCheck, str, str |
     (re.compile(r"never save.+root|no files? (in|at) root|don.t save.+root"), DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
     (re.compile(r"(keep|put) (files|scripts) in (subfolder|subdir)"), DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
     (re.compile(r"never commit.+to root|no commits to root"), DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
+    # Auto-format — PostToolUse, runs ruff/prettier after edits. Sentinel arg.
+    (re.compile(r"always (auto-?)?format after edit"), DeterminismCheck.TEST_TRIGGER, "auto_format", "auto_format"),
+    (re.compile(r"auto-?format .*(python|js|ts|markdown)"), DeterminismCheck.TEST_TRIGGER, "auto_format", "auto_format"),
+    (re.compile(r"run (ruff|prettier) (format )?after"), DeterminismCheck.TEST_TRIGGER, "auto_format", "auto_format"),
+    # Notify when waiting — Stop hook, native OS notification. Sentinel arg.
+    (re.compile(r"notify (me )?when (claude )?(finishes|done|waiting)"), DeterminismCheck.TEST_TRIGGER, "notify_waiting", "notify_waiting"),
+    (re.compile(r"(os|native|desktop) notification.*(done|finish|wait)"), DeterminismCheck.TEST_TRIGGER, "notify_waiting", "notify_waiting"),
 ]
 
 
@@ -170,16 +177,24 @@ _IMPLEMENTED_TEMPLATES = {
     "secret_scan",
     "file_size_check",
     "auto_test",
+    "auto_format",
+    "notify_waiting",
 }
 
 # Templates that fire on PostToolUse (after an edit/write) rather than PreToolUse.
 # install_hook routes these to GRADATA_HOOK_ROOT_POST instead of GRADATA_HOOK_ROOT.
-_POST_TOOL_TEMPLATES = {"auto_test"}
+_POST_TOOL_TEMPLATES = {"auto_test", "auto_format"}
 
-# Templates whose self-test we skip during graduation. auto_test would need a
-# real test file on disk to exit 2; synthesizing that during graduation is more
-# noise than signal, so we trust the template and skip.
-_TEMPLATES_SKIP_SELFTEST = {"auto_test"}
+# Templates that fire on Stop (turn end) rather than any Tool event. Installed
+# into the post-tool dir because that directory is already scanned at session
+# close by the generated_runner. They are advisory-only (never block).
+_STOP_TEMPLATES = {"notify_waiting"}
+
+# Templates whose self-test we skip during graduation. These hooks are
+# advisory-only (exit 0 on everything) or require external state (pytest
+# file on disk, running notifier daemon). Synthesizing that during
+# graduation is more noise than signal, so we trust the template and skip.
+_TEMPLATES_SKIP_SELFTEST = {"auto_test", "auto_format", "notify_waiting"}
 
 # Templates that receive the violating text as a Bash command rather than Write content.
 _BASH_TEMPLATES = {"destructive_block", "fstring_block"}
@@ -315,7 +330,7 @@ def install_hook(slug: str, hook_source: str, *, template: str) -> Path:
 
     Creates the directory if needed. Chmods to 0o755 on platforms that support it.
     """
-    if template in _POST_TOOL_TEMPLATES:
+    if template in _POST_TOOL_TEMPLATES or template in _STOP_TEMPLATES:
         override = os.environ.get("GRADATA_HOOK_ROOT_POST")
         root = Path(override) if override else Path(".claude/hooks/post-tool/generated")
     else:
