@@ -394,24 +394,15 @@ async def stripe_webhook(request: Request) -> JSONResponse:
 async def _handle_event(event: dict) -> None:
     """Dispatch Stripe event to the appropriate handler.
 
-    Idempotent — the processed_webhooks table keys on event.id, so Stripe
-    retries (which can happen on transient 5xx) won't double-apply.
+    Idempotency is handled by the outer ``_claim_event`` / ``_mark_processed``
+    wrappers in the webhook route — this function trusts that its caller has
+    already won an atomic claim on ``event_id`` and is responsible for flipping
+    the status to ``processed`` afterwards. Do NOT insert into
+    ``processed_webhooks`` here; doing so would double-insert on every call.
     """
     etype = event.get("type", "")
-    event_id = event.get("id", "")
     data = event.get("data", {}).get("object", {})
     db = get_db()
-
-    if event_id:
-        try:
-            await db.insert(
-                "processed_webhooks",
-                {"event_id": event_id, "event_type": etype},
-            )
-        except Exception as exc:
-            # Unique-constraint violation on event_id -> already processed.
-            _log.info("Skipping duplicate Stripe webhook event_id=%s (%s)", event_id, exc)
-            return
 
     if etype == "checkout.session.completed":
         customer_id = data.get("customer")

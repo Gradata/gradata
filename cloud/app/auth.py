@@ -122,10 +122,15 @@ async def get_current_brain(
     cred = credentials.credentials
     if cred.startswith("gd_"):
         brain = await verify_api_key(cred)
+        # Tag Sentry immediately after auth succeeds so any later failures
+        # (ownership mismatches, missing records) still carry identity context.
         _tag_brain(brain)
         return brain
 
     user_id = await verify_jwt(cred)
+    # Tag Sentry as soon as we know who's calling — before the brain lookup,
+    # so "No brain found" 404s are still attributed to a user in Sentry.
+    tag_user(user_id)
     db = get_db()
     rows = await db.select("brains", filters={"user_id": user_id})
     if not rows:
@@ -179,12 +184,15 @@ async def get_brain_for_request(
     cred = credentials.credentials
     if cred.startswith("gd_"):
         brain = await verify_api_key(cred)
+        # Tag immediately so 403 "Not your brain" rejections are attributed.
+        _tag_brain(brain)
         if brain.get("id") != brain_id:
             raise HTTPException(status_code=403, detail="Not your brain")
-        _tag_brain(brain)
         return brain
 
     user_id = await verify_jwt(cred)
+    # Tag the user before ownership check so 403/404s carry Sentry context.
+    tag_user(user_id)
     brain = await verify_brain_ownership(brain_id, user_id)
     _tag_brain(brain, user_id=user_id)
     return brain
@@ -220,6 +228,8 @@ async def require_operator(
     """
     claims = await verify_jwt_claims(credentials.credentials)
     user_id = claims["sub"]
+    # Tag immediately so operator-denied 403s carry identity context in Sentry.
+    tag_user(user_id)
 
     email = await _resolve_user_email(user_id, claims)
     if not email:
@@ -229,5 +239,4 @@ async def require_operator(
     if domain not in OPERATOR_DOMAINS:
         raise HTTPException(status_code=403, detail="Operator access denied")
 
-    tag_user(user_id)
     return user_id
