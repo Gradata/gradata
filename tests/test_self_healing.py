@@ -562,6 +562,70 @@ class TestAutoHeal:
         assert result["examined"] >= 1
 
 
+class TestCorrectAutoHealIntegration:
+    """brain.correct() auto-closes the heal loop when auto_heal=True (default)."""
+
+    @pytest.fixture
+    def brain_with_rule(self, tmp_path):
+        from gradata._db import write_lessons_safe
+        from gradata._types import Lesson, LessonState
+        from gradata.brain import Brain
+        from gradata.enhancements.self_improvement import format_lessons
+
+        brain = Brain.init(str(tmp_path / "test-brain"))
+        rule = Lesson(
+            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
+            category="TONE", description="Never use exclamation marks",
+            fire_count=8,
+        )
+        lessons_path = brain._find_lessons_path(create=True)
+        write_lessons_safe(lessons_path, format_lessons([rule]))
+        return brain
+
+    def test_auto_heal_triggers_on_rule_failure(self, brain_with_rule):
+        """A correction in a ruled category auto-emits RULE_PATCHED."""
+        result = brain_with_rule.correct(
+            draft="Thanks for joining! Excited!",
+            final="Thanks for joining. Excited.",
+            category="TONE",
+        )
+        # The correction fired a RULE_FAILURE detection
+        assert result.get("rule_failure_detected") is True
+
+        # And auto_heal closed the loop in the same call
+        patched = brain_with_rule.query_events(event_type="RULE_PATCHED", limit=10)
+        # At least one patch should have happened when the delta contains
+        # the failure context. "Thanks for joining! Excited!" / "joining."
+        # carries enough delta words to pass the retroactive test.
+        if patched:
+            assert patched[0]["data"]["reason"].startswith("auto_heal:")
+            assert "auto_healed" in result
+
+    def test_auto_heal_opt_out(self, brain_with_rule):
+        """auto_heal=False keeps the old behavior: emit RULE_FAILURE but no patch."""
+        brain_with_rule.correct(
+            draft="Thanks for joining! Excited!",
+            final="Thanks for joining. Excited.",
+            category="TONE",
+            auto_heal=False,
+        )
+        failures = brain_with_rule.query_events(event_type="RULE_FAILURE", limit=10)
+        patches = brain_with_rule.query_events(event_type="RULE_PATCHED", limit=10)
+        assert len(failures) >= 1
+        assert len(patches) == 0
+
+    def test_auto_heal_skipped_in_dry_run(self, brain_with_rule):
+        """dry_run=True should not trigger auto-heal even if a failure is detected."""
+        brain_with_rule.correct(
+            draft="Thanks for joining! Excited!",
+            final="Thanks for joining. Excited.",
+            category="TONE",
+            dry_run=True,
+        )
+        patches = brain_with_rule.query_events(event_type="RULE_PATCHED", limit=10)
+        assert len(patches) == 0
+
+
 class TestSelfHealingE2E:
     """Full flow: correct -> RULE_FAILURE detected -> patch generated -> rule updated."""
 

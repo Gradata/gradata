@@ -374,6 +374,7 @@ class Brain(BrainInspectionMixin):
         min_severity: str = "as-is",
         scope: str | None = None,
         applies_to: str | None = None,
+        auto_heal: bool = True,
     ) -> dict:
         """Record a correction: user edited draft into final version.
 
@@ -401,6 +402,7 @@ class Brain(BrainInspectionMixin):
             min_severity=min_severity,
             scope=scope,
             applies_to=applies_to,
+            auto_heal=auto_heal,
         )
 
         # Activation telemetry — fires once per machine, only if opted in.

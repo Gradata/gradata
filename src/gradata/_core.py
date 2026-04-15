@@ -82,7 +82,7 @@ def brain_correct(
     session: int | None = None, agent_type: str | None = None,
     approval_required: bool = False, dry_run: bool = False,
     min_severity: str = "as-is", scope: str | None = None,
-    applies_to: str | None = None,
+    applies_to: str | None = None, auto_heal: bool = True,
 ) -> dict:
     """Record a correction: user edited draft into final version."""
     # Input validation
@@ -426,6 +426,28 @@ def brain_correct(
                 session,
             )
             event["rule_failure_detected"] = True
+
+            # Close the loop: auto-patch when the retroactive test passes.
+            # Skipped in dry_run / approval_required / renter modes and
+            # when the caller explicitly disables auto_heal.
+            if (
+                auto_heal
+                and not dry_run
+                and not approval_required
+                and not getattr(brain, "_renter_mode", False)
+            ):
+                try:
+                    from gradata.enhancements.self_healing import auto_heal_failures
+
+                    heal_summary = auto_heal_failures(
+                        brain,
+                        failure_events=[{"data": failure}],
+                        max_patches=1,
+                    )
+                    if heal_summary["patched"]:
+                        event["auto_healed"] = heal_summary
+                except Exception as heal_exc:
+                    _log.debug("Auto-heal failed: %s", heal_exc)
     except Exception as e:
         _log.debug("Self-healing detection failed: %s", e)
 
