@@ -238,11 +238,13 @@ class TestCliRuleAdd:
         assert len(js_files) == 1, f"found: {[f.name for f in hook_root.iterdir()]}"
         assert (hook_root / "_dispatcher.js").exists()
         assert (hook_root / "_manifest.json").exists()
-        # Lessons file should contain the [hooked] marker
+        # Lessons file should record hook state in structured metadata
+        # (how_enforced="hooked"), not as a brittle description prefix.
         lessons = brain_dir / "lessons.md"
         assert lessons.exists()
         content = lessons.read_text(encoding="utf-8")
-        assert "[hooked]" in content
+        assert '"how_enforced": "hooked"' in content
+        assert "[hooked]" not in content  # legacy prefix should NOT appear
         assert "never use em dashes" in content
 
     def test_rule_add_falls_back_to_soft_for_advisory(self, tmp_path, monkeypatch):
@@ -312,10 +314,17 @@ class TestGraduateIntegration:
             f"expected 1 hook file, found: {[f.name for f in tmp_path.iterdir()]}"
         )
 
-        # Assertion 3: lesson description now carries [hooked] marker so
-        # rule_enforcement dedup skips it.
-        assert lesson.description.lstrip().startswith("[hooked]"), (
-            f"lesson should be marked hooked, got: {lesson.description!r}"
+        # Assertion 3: lesson carries structured "hooked" metadata so the
+        # soft-reminder rule_enforcement hook dedup skips it. The legacy
+        # "[hooked] " description prefix should NOT be used anymore.
+        from gradata.enhancements.self_improvement import is_hook_enforced
+
+        assert is_hook_enforced(lesson), (
+            f"lesson should be marked hooked via metadata, got metadata="
+            f"{getattr(lesson, 'metadata', None)} desc={lesson.description!r}"
+        )
+        assert not lesson.description.lstrip().startswith("[hooked]"), (
+            "description should NOT carry the legacy [hooked] prefix"
         )
 
     def test_graduate_non_deterministic_rule_not_hooked(self, tmp_path, monkeypatch):
@@ -340,8 +349,12 @@ class TestGraduateIntegration:
         assert len(js_files) == 0, (
             f"advisory rule should not install a hook, got: {[f.name for f in js_files]}"
         )
-        # Description should NOT be marked [hooked]
+        # Description should NOT be marked [hooked] (legacy) and metadata
+        # must not report "hooked" enforcement.
+        from gradata.enhancements.self_improvement import is_hook_enforced
+
         assert not lesson.description.lstrip().startswith("[hooked]")
+        assert not is_hook_enforced(lesson)
 
 
 class TestBypassEnv:

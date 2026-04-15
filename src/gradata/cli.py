@@ -482,6 +482,7 @@ def _resolve_brain_root(args):
 
 def cmd_rule_add(args):
     """Fast-track a user-declared rule. Writes at RULE tier conf=1.0, tries to install a hook."""
+    import json as _json
     from datetime import date
 
     from gradata.enhancements import rule_to_hook
@@ -504,7 +505,8 @@ def cmd_rule_add(args):
 
     result = rule_to_hook.try_generate(candidate, brain=brain, source="user_declared")
 
-    # Persist to lessons.md — prefix description with [hooked] if hook installed
+    # Persist to lessons.md — record install state in structured metadata
+    # (how_enforced="hooked"), not as a description prefix. See PR #26 review.
     brain_root = _resolve_brain_root(args)
     lessons = brain_root / "lessons.md"
     lessons.parent.mkdir(parents=True, exist_ok=True)
@@ -512,8 +514,20 @@ def cmd_rule_add(args):
         category = candidate.determinism.value.upper()
     else:
         category = "USER"
-    description = f"[hooked] {text}" if result.installed else text
-    line = f"[{date.today().isoformat()}] [RULE:1.00] {category}: {description}\n"
+    line = f"[{date.today().isoformat()}] [RULE:1.00] {category}: {text}\n"
+    if result.installed:
+        meta = {
+            "what": "",
+            "why": "",
+            "who": "",
+            "when_created": "",
+            "when_validated": "",
+            "where_scope": "",
+            "how_enforced": "hooked",
+            "utility_score": 0.5,
+            "safety_score": 0.5,
+        }
+        line += f"  Metadata: {_json.dumps(meta)}\n"
     with lessons.open("a", encoding="utf-8") as f:
         f.write(line)
 

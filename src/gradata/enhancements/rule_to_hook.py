@@ -217,20 +217,15 @@ def render_hook(candidate: HookCandidate) -> str | None:
         .replace("\n", " ")
     )
 
-    # file_size_check: template_arg holds the line limit as a string
+    # file_size_check uses {{LINE_LIMIT}}; all other templates use {{PATTERN_LITERAL}}.
     if candidate.hook_template == "file_size_check":
-        limit = candidate.template_arg or "500"
-        return (
-            tmpl
-            .replace("{{LINE_LIMIT}}", limit)
-            .replace("{{RULE_TEXT}}", safe_text)
-            .replace("{{SOURCE_HASH}}", _source_hash(candidate.rule_description))
-        )
+        tmpl = tmpl.replace("{{LINE_LIMIT}}", candidate.template_arg or "500")
+    else:
+        pattern_literal = f"new RegExp({json.dumps(candidate.template_arg)})"
+        tmpl = tmpl.replace("{{PATTERN_LITERAL}}", pattern_literal)
 
-    pattern_literal = f"new RegExp({json.dumps(candidate.template_arg)})"
     return (
         tmpl
-        .replace("{{PATTERN_LITERAL}}", pattern_literal)
         .replace("{{RULE_TEXT}}", safe_text)
         .replace("{{SOURCE_HASH}}", _source_hash(candidate.rule_description))
     )
@@ -422,6 +417,7 @@ def _log_outcome(brain, source: str, candidate: HookCandidate, result: Generatio
             })
     except Exception:
         pass  # never fail graduation on a logging error
+
 
 
 def try_generate(

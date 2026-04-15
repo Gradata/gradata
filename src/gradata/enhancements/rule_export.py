@@ -35,9 +35,10 @@ def _parse_rules(
     lessons_file = lessons_path if lessons_path is not None else brain_root / "lessons.md"
     if not lessons_file.exists():
         return []
-    # The [hooked] marker can appear between the state bracket and the
-    # category. The canonical parser doesn't know about this marker, so we
-    # strip it before parsing (it's internal metadata, not part of the rule).
+    # Legacy lessons.md files may carry a "[hooked]" marker between the
+    # state bracket and the category. The canonical parser doesn't know about
+    # it, so strip it before parsing (it's internal state, not rule text).
+    # New code records the same state in ``lesson.metadata.how_enforced``.
     raw = lessons_file.read_text(encoding="utf-8")
     raw = _re.sub(r"(\[\w+:[\d.]+\])\s+\[hooked\]\s+", r"\1 ", raw)
     lessons = parse_lessons(raw)
