@@ -45,3 +45,29 @@ class TestSessionHistory:
         payload = {}
         sh.on_session_ended(payload)
         assert "rule_effectiveness" in payload
+
+    def test_apply_brain_rules_emits_rules_injected(self, tmp_path):
+        """Regression: brain.apply_brain_rules() must fire rules.injected on the
+        in-memory bus. Without this emit, SessionHistory's effectiveness tracking
+        stays dormant — all three of its handlers subscribe, but rules.injected
+        is the one with no emitter elsewhere in the codebase."""
+        from gradata.brain import Brain
+
+        brain = Brain.init(str(tmp_path), domain="Test")
+        # Generate at least one graduated rule.
+        for i in range(6):
+            brain.correct(
+                draft=f"Dear Sir or Madam, about item {i}",
+                final=f"Hey, about item {i}",
+                category="TONE",
+            )
+        brain.end_session()
+
+        sh = SessionHistory()
+        sh.subscribe_to_bus(brain.bus)
+
+        rules_text = brain.apply_brain_rules("write an email")
+        assert rules_text, "expected graduated rule text"
+        assert len(sh.injected_this_session) >= 1, (
+            "rules.injected did not fire — SessionHistory is dormant"
+        )

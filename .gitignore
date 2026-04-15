@@ -199,3 +199,18 @@ docs/launch-post.md
 docs/public-launch-narrative.md
 docs/RELEASE-*-DRAFT.md
 
+# Orphaned dirs from S105 splits — cloud/ moved to private
+# Gradata/gradata-cloud in #76, sdk/ superseded by the flattened repo
+# layout in #65. Left on disk as untracked copies that keep showing
+# up in `git status` and sometimes get accidentally re-added.
+/cloud/
+/sdk/
+
+# Railway config for the cloud API now lives in the private
+# gradata-cloud repo at cloud/railway.toml — the root-level copy
+# here is a stale leftover from before the split.
+/railway.toml
+
+# Sales exports — should live in brain/leads, never in the SDK repo.
+apollo-leads-*.csv
+

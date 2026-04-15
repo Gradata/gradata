@@ -886,6 +886,18 @@ class Brain(BrainInspectionMixin):
 
         result = format_rules_for_prompt(applied)
         self._rule_cache.put(cache_key, result)
+
+        # Fires the in-memory bus so SessionHistory (integrations/session_history.py)
+        # can track per-session rule effectiveness — it subscribes to rules.injected
+        # but the emitter was never wired, leaving compute_effectiveness() dormant.
+        # Cache hits above skip this intentionally: SessionHistory uses a set so
+        # replays are idempotent within a session, and the cache is per-scope
+        # so repeated injects in the same scope yield the same rule set.
+        if applied:
+            self.bus.emit("rules.injected", {
+                "rules": [{"id": a.rule_id} for a in applied],
+                "task": task,
+            })
         return result
 
     def scoped_rules(
