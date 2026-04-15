@@ -280,6 +280,110 @@ def test_with_real_data():
         print(f"Verified: loaded {len(loaded)} meta-rules back from DB")
 
 
+# ---------------------------------------------------------------------------
+# Differential-privacy export scaffold tests
+# ---------------------------------------------------------------------------
+
+import random as _random
+
+from gradata.enhancements.meta_rules_storage import (
+    DPConfig,
+    apply_dp_to_export_row,
+)
+
+
+def test_dp_config_defaults_are_off():
+    """DP must ship off-by-default; the dataclass is the source of truth."""
+    cfg = DPConfig()
+    assert cfg.enabled is False
+    assert cfg.epsilon == 1.0
+    assert cfg.mechanism == "laplace"
+    assert cfg.clip_norm == 1.0
+    print("[PASS] DPConfig defaults")
+
+
+def test_apply_dp_noop_when_disabled():
+    """With enabled=False the row must pass through untouched."""
+    row = {
+        "id": "m1",
+        "confidence": 0.87,
+        "fire_count": 12,
+        "principle": "raw operator fingerprint",
+        "source_lesson_ids": ["l1", "l2", "l3"],
+    }
+    original = dict(row)
+    result = apply_dp_to_export_row(row, DPConfig(enabled=False))
+    assert result == original
+    print("[PASS] DP off = identity")
+
+
+def test_apply_dp_enabled_suppresses_text_and_perturbs_numbers():
+    """With enabled=True text must be suppressed and numbers noised/clipped."""
+    rng = _random.Random(42)  # seeded for reproducibility
+    row = {
+        "id": "m1",
+        "confidence": 0.87,
+        "fire_count": 12,
+        "principle": "raw operator fingerprint",
+        "description": "also sensitive",
+        "representative_text": "verbatim correction",
+        "examples": ["ex1", "ex2"],
+        "source_lesson_ids": ["l1", "l2", "l3", "l4", "l5"],
+    }
+    cfg = DPConfig(enabled=True, epsilon=1.0, clip_norm=1.0)
+    result = apply_dp_to_export_row(row, cfg, rng=rng)
+
+    # Text fields: suppressed.
+    assert result["principle"] == "[DP-SUPPRESSED]"
+    assert result["description"] == "[DP-SUPPRESSED]"
+    assert result["representative_text"] == "[DP-SUPPRESSED]"
+    assert result["examples"] == []
+
+    # Source IDs: dropped; cardinality exposed as noised integer.
+    assert result["source_lesson_ids"] == []
+    assert isinstance(result["source_lesson_count"], int)
+    assert result["source_lesson_count"] >= 0
+
+    # Confidence: clamped to [0, 1] after noise.
+    assert 0.0 <= result["confidence"] <= 1.0
+
+    # fire_count: non-negative integer.
+    assert isinstance(result["fire_count"], int)
+    assert result["fire_count"] >= 0
+    print("[PASS] DP on = suppressed + noised")
+
+
+def test_apply_dp_noise_actually_perturbs_confidence():
+    """Flipping the flag must produce *different* outputs across draws.
+
+    Guards against a regression where someone stubs out the Laplace draw
+    but leaves the plumbing intact.
+    """
+    cfg = DPConfig(enabled=True, epsilon=0.5, clip_norm=1.0)
+    outputs = set()
+    for seed in range(20):
+        rng = _random.Random(seed)
+        row = {"id": "m", "confidence": 0.5, "fire_count": 10,
+               "principle": "x", "source_lesson_ids": ["a", "b"]}
+        out = apply_dp_to_export_row(row, cfg, rng=rng)
+        outputs.add(round(out["confidence"], 6))
+    # With ε=0.5 and 20 independent seeds, we expect many distinct values.
+    assert len(outputs) > 5, f"Expected noise variation, got {len(outputs)} distinct outputs"
+    print(f"[PASS] DP noise variation: {len(outputs)} distinct outputs across 20 seeds")
+
+
+def test_apply_dp_rejects_bad_config():
+    """ε must be > 0 and mechanism must be supported."""
+    row = {"id": "m", "confidence": 0.5}
+    with pytest.raises(ValueError):
+        apply_dp_to_export_row(row, DPConfig(enabled=True, epsilon=0.0))
+    with pytest.raises(ValueError):
+        apply_dp_to_export_row(row, DPConfig(enabled=True, mechanism="gaussian"))
+    with pytest.raises(ValueError):
+        apply_dp_to_export_row(row, DPConfig(enabled=True, clip_norm=-1.0))
+    print("[PASS] DP rejects bad config")
+
+
 if __name__ == "__main__":
     print("Running meta_rules unit tests...\n")
     test_parse_lessons()
@@ -289,6 +393,11 @@ if __name__ == "__main__":
     test_format_meta_rules()
     test_sqlite_roundtrip()
     test_refresh_meta_rules()
+    test_dp_config_defaults_are_off()
+    test_apply_dp_noop_when_disabled()
+    test_apply_dp_enabled_suppresses_text_and_perturbs_numbers()
+    test_apply_dp_noise_actually_perturbs_confidence()
+    test_apply_dp_rejects_bad_config()
 
     print("\n" + "="*60)
     print("Running against REAL lesson data...\n")
