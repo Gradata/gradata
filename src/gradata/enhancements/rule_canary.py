@@ -17,11 +17,16 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from datetime import UTC
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 
 _log = logging.getLogger(__name__)
+
+
+def _now_iso() -> str:
+    """ISO-8601 UTC timestamp for audit columns."""
+    return datetime.now(UTC).isoformat()
 
 # Default canary period: 3 sessions
 CANARY_SESSIONS = 3
@@ -96,15 +101,12 @@ def promote_to_canary(rule_category: str, session: int, db_path: Path | None = N
         db_path = _get_db_path()
 
     try:
-        from datetime import datetime
-        now = datetime.now(UTC).isoformat()
-
         with sqlite3.connect(str(db_path)) as conn:
             _ensure_table(conn)
             conn.execute(
                 "INSERT OR REPLACE INTO rule_canary (category, status, start_session, correction_count, updated_at) "
                 "VALUES (?, ?, ?, 0, ?)",
-                (rule_category, CanaryStatus.CANARY.value, session, now),
+                (rule_category, CanaryStatus.CANARY.value, session, _now_iso()),
             )
             conn.commit()
     except Exception as e:
@@ -201,14 +203,11 @@ def rollback_rule(rule_category: str, reason: str, db_path: Path | None = None) 
         db_path = _get_db_path()
 
     try:
-        from datetime import datetime
-        now = datetime.now(UTC).isoformat()
-
         with sqlite3.connect(str(db_path)) as conn:
             _ensure_table(conn)
             conn.execute(
                 "UPDATE rule_canary SET status = ?, updated_at = ? WHERE category = ?",
-                (CanaryStatus.ROLLED_BACK.value, now, rule_category),
+                (CanaryStatus.ROLLED_BACK.value, _now_iso(), rule_category),
             )
             conn.commit()
 
@@ -238,14 +237,11 @@ def promote_to_active(rule_category: str, db_path: Path | None = None) -> None:
         db_path = _get_db_path()
 
     try:
-        from datetime import datetime
-        now = datetime.now(UTC).isoformat()
-
         with sqlite3.connect(str(db_path)) as conn:
             _ensure_table(conn)
             conn.execute(
                 "UPDATE rule_canary SET status = ?, updated_at = ? WHERE category = ?",
-                (CanaryStatus.ACTIVE.value, now, rule_category),
+                (CanaryStatus.ACTIVE.value, _now_iso(), rule_category),
             )
             conn.commit()
 
