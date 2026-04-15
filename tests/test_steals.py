@@ -357,110 +357,6 @@ class TestCorrectionContext:
 
 
 # =========================================================================
-# STEAL 5: Rule Conflict Detection
-# =========================================================================
-
-
-class TestRuleConflicts:
-    """Test rule relationship classification."""
-
-    def _make_lesson(self, desc: str, *, category: str = "DRAFTING",
-                     state: LessonState = LessonState.RULE,
-                     confidence: float = 0.90) -> Lesson:
-        return Lesson(
-            date="2026-03-01",
-            state=state,
-            confidence=confidence,
-            category=category,
-            description=desc,
-        )
-
-    def test_updates_detection(self):
-        from gradata.enhancements.rule_evolution import detect_rule_conflict, RuleRelation
-
-        new = self._make_lesson("Always avoid using formal tone in emails")
-        existing = [
-            self._make_lesson("Always use formal tone in emails"),
-        ]
-
-        relation, target = detect_rule_conflict(new, existing)
-        assert relation == RuleRelation.UPDATES
-        assert target is not None
-
-    def test_extends_detection(self):
-        from gradata.enhancements.rule_evolution import detect_rule_conflict, RuleRelation
-
-        new = self._make_lesson("Use colons instead of em dashes in email subject lines")
-        existing = [
-            self._make_lesson("Use colons instead of em dashes in email body text"),
-        ]
-
-        relation, target = detect_rule_conflict(new, existing)
-        assert relation == RuleRelation.EXTENDS
-        assert target is not None
-
-    def test_derives_detection(self):
-        from gradata.enhancements.rule_evolution import detect_rule_conflict, RuleRelation
-
-        new = self._make_lesson("Use colons instead of em dashes in email paragraphs")
-        existing = [
-            self._make_lesson("Use colons instead of em dashes in email subject lines"),
-            self._make_lesson("Use colons instead of em dashes in email bullet points"),
-            self._make_lesson("Use colons instead of em dashes in email headers"),
-        ]
-
-        relation, target = detect_rule_conflict(new, existing)
-        # All same category with high keyword overlap -> DERIVES or EXTENDS
-        assert relation in (RuleRelation.DERIVES, RuleRelation.EXTENDS)
-
-    def test_independent_detection(self):
-        from gradata.enhancements.rule_evolution import detect_rule_conflict, RuleRelation
-
-        new = self._make_lesson("Always verify prospect company size before outreach")
-        existing = [
-            self._make_lesson("Use colons not em dashes in emails"),
-        ]
-
-        relation, target = detect_rule_conflict(new, existing)
-        assert relation == RuleRelation.INDEPENDENT
-        assert target is None
-
-    def test_empty_existing_rules(self):
-        from gradata.enhancements.rule_evolution import detect_rule_conflict, RuleRelation
-
-        new = self._make_lesson("Some new rule")
-        relation, target = detect_rule_conflict(new, [])
-        assert relation == RuleRelation.INDEPENDENT
-
-    def test_classify_all_relations(self):
-        from gradata.enhancements.rule_evolution import classify_all_relations, RuleRelation
-
-        new = self._make_lesson("Use short email subject lines for cold outreach")
-        existing = [
-            self._make_lesson("Keep email subject lines under fifty characters"),
-            self._make_lesson("Always verify prospect identity before drafting"),
-            self._make_lesson("Use formal tone in cold outreach emails"),
-        ]
-
-        results = classify_all_relations(new, existing)
-        assert isinstance(results, list)
-        # Should have at least one result (the subject line rule is similar)
-        # Results are sorted by similarity descending
-
-
-class TestRuleRelationEnum:
-    """Test RuleRelation enum values."""
-
-    def test_all_values(self):
-        from gradata.enhancements.rule_evolution import RuleRelation
-
-        assert RuleRelation.UPDATES.value == "updates"
-        assert RuleRelation.EXTENDS.value == "extends"
-        assert RuleRelation.DERIVES.value == "derives"
-        assert RuleRelation.INDEPENDENT.value == "independent"
-
-
-# =========================================================================
 # STEAL 6: Learning Graph
 # =========================================================================
 
@@ -615,7 +511,6 @@ class TestIntegration:
     def test_all_imports(self):
         from gradata.mcp_tools import correct, recall, manifest
         from gradata.correction_detector import detect_correction, extract_correction_context
-        from gradata.enhancements.rule_evolution import detect_rule_conflict, RuleRelation
         from gradata.graph import build_learning_graph, GraphNode, GraphEdge, to_json
 
     def test_correction_to_graph_flow(self):
@@ -648,27 +543,3 @@ class TestIntegration:
         assert len(nodes) == 1
         assert nodes[0].category == "FORMATTING"
 
-    def test_conflict_detection_to_graph_flow(self):
-        """Simulate: new correction -> check conflicts -> build graph with edges."""
-        from gradata.enhancements.rule_evolution import classify_all_relations, RuleRelation
-        from gradata.graph import build_learning_graph, GraphEdge
-
-        existing = [
-            Lesson(date="2026-03-01", state=LessonState.RULE, confidence=0.95,
-                   category="DRAFTING", description="Always keep emails concise and short"),
-            Lesson(date="2026-03-01", state=LessonState.RULE, confidence=0.90,
-                   category="DRAFTING", description="Use direct subject lines in cold emails"),
-        ]
-
-        new_lesson = Lesson(
-            date="2026-03-27", state=LessonState.INSTINCT, confidence=0.30,
-            category="DRAFTING", description="Keep cold emails under three sentences",
-        )
-
-        # Check relations
-        relations = classify_all_relations(new_lesson, existing)
-
-        # Build graph
-        all_lessons = existing + [new_lesson]
-        nodes, edges = build_learning_graph(all_lessons)
-        assert len(nodes) == 3

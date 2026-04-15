@@ -122,7 +122,6 @@ def _sdk_capabilities() -> dict:
         ("auto_correct_hook", "gradata.hooks.auto_correct", "gradata"),
         ("reporting", "gradata.enhancements.reporting", "fest.build-inspired+gradata"),
         ("quality_monitoring", "gradata.enhancements.quality_monitoring", "jarvis-inspired+gradata"),
-        ("rule_evolution", "gradata.enhancements.rule_evolution", "jarvis-inspired+gradata"),
     ]
 
     all_modules = _paul_modules + _ruflo_modules + _deerflow_modules + _ecc_modules + _everos_modules + _core_modules

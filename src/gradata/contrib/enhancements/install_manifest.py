@@ -271,8 +271,7 @@ DEFAULT_MODULES: list[Module] = [
         kind="enhancement",
         components=[
             "enhancements.rule_integrity", "enhancements.contradiction_detector",
-            "enhancements.rule_verifier", "enhancements.rule_conflicts",
-            "enhancements.rule_canary",
+            "enhancements.rule_conflicts", "enhancements.rule_canary",
         ],
         dependencies=["learning-pipeline"],
         cost=ModuleCost.MEDIUM,

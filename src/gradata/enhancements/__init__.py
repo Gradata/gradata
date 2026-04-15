@@ -20,7 +20,6 @@ AVAILABLE modules (open source, shipped in SDK):
   success_conditions   -- 6-condition validation
   meta_rules           -- Emergent meta-rule discovery (compound procedural memory)
   rule_integrity       -- HMAC signing for tamper detection
-  rule_verifier        -- Output verification against rules
   rule_canary          -- Rule regression detection
   rule_conflicts       -- Contradiction detection
   contradiction_detector -- Semantic contradiction detection before graduation
