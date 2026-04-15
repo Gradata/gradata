@@ -22,7 +22,6 @@ export function KpiStrip({ metrics }: { metrics: KpiMetrics }) {
     label: string
     value: string
     subline?: string
-    delta?: string
     tone?: 'pos' | 'neg' | 'neu'
     tooltip?: string
   }> = [
@@ -30,7 +29,6 @@ export function KpiStrip({ metrics }: { metrics: KpiMetrics }) {
       label: 'Correction Rate',
       value: metrics.correctionRateWoWDelta === null ? '—' : formatDelta(metrics.correctionRateWoWDelta),
       subline: `${metrics.correctionsThisWeek} this week · ${metrics.correctionsPriorWeek} prior`,
-      delta: formatDelta(metrics.correctionRateWoWDelta),
       tone:
         metrics.correctionRateWoWDelta === null ? 'neu'
           : metrics.correctionRateWoWDelta < 0 ? 'pos'
@@ -78,10 +76,15 @@ export function KpiStrip({ metrics }: { metrics: KpiMetrics }) {
   return (
     <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
       {items.map((item) => (
-        <GlassCard key={item.label} className="p-5" title={item.tooltip}>
-          <span className="mb-2 block text-[12px] font-medium text-[var(--color-body)]">
+        <GlassCard
+          key={item.label}
+          className="p-5"
+          title={item.tooltip}
+          data-testid={`kpi-${item.label.toLowerCase().replace(/[^a-z]/g, '-')}`}
+        >
+          <div className="mb-2 text-[12px] font-medium text-[var(--color-body)]">
             {item.label}
-          </span>
+          </div>
           <div className="font-[var(--font-heading)] text-[26px] sm:text-[28px] font-bold tabular-nums text-gradient-brand break-words">
             {item.value}
           </div>

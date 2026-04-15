@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { KpiStrip } from '@/components/brain/KpiStrip'
 import type { KpiMetrics } from '@/lib/analytics-client'
 
@@ -76,22 +76,20 @@ describe('KpiStrip with Time Saved', () => {
 
   it('renders time saved as approximate hours when >= 60 min', () => {
     render(<KpiStrip metrics={fullMetrics} />)
-    // 93 min = ~1.6h; component should render like "~1.6h" or "~1h 33m"
-    expect(screen.getByText(/~1\.[56]h|~1h 3[0-9]m/)).toBeInTheDocument()
+    // 93 min deterministically formats to "~1.6h" (93/60 = 1.55, toFixed(1) = 1.6)
+    expect(screen.getByText('~1.6h')).toBeInTheDocument()
   })
 
   it('renders em dash for null WoW deltas', () => {
     render(<KpiStrip metrics={{ ...fullMetrics, correctionRateWoWDelta: null }} />)
-    const card = screen.getByText(/Correction Rate/i).closest('div')!
-    expect(card.textContent).toMatch(/—/)
+    const card = screen.getByTestId(/kpi-correction-rate/)
+    expect(within(card).getByText('—')).toBeInTheDocument()
   })
 
   it('includes the honest "Est." tooltip copy on the Time Saved card', () => {
     render(<KpiStrip metrics={fullMetrics} />)
-    const timeSavedCard = screen.getByText(/Est\. Time Saved/i).closest('div')!
-    const tip = timeSavedCard.querySelector('[title]')?.getAttribute('title')
-      ?? timeSavedCard.getAttribute('title')
-      ?? ''
+    const card = screen.getByTestId(/kpi-est--time-saved/)
+    const tip = card.getAttribute('title') ?? ''
     expect(tip).toMatch(/Estimated|3 minutes|fires/)
   })
 })
