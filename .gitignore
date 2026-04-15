@@ -156,8 +156,9 @@ templates/
 # examples/ — included for open source hygiene
 research/
 !docs/research/
-scripts/
+scripts/*
 !cloud/scripts/
+!scripts/migrate_legacy_scopes.py
 docs/cloud/
 docs/study-protocol.md
 
