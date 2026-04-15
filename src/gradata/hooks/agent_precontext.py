@@ -137,7 +137,11 @@ def main(data: dict) -> dict | None:
             max_rules=MAX_RULES,
             session_seed=session_seed if isinstance(session_seed, int) else None,
         )
-        top = [rd.get("_lesson") for rd in ranked if rd.get("_lesson") is not None]
+        top: list = []
+        for rd in ranked:
+            lesson = rd.get("_lesson")
+            if lesson is not None:
+                top.append(lesson)
 
         lines = []
         for r in top:

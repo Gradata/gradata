@@ -195,7 +195,11 @@ def main(data: dict) -> dict | None:
         wiki_boost=wiki_boost or None,
         session_seed=session_seed if isinstance(session_seed, int) else None,
     )
-    scored = [rd.get("_lesson") for rd in ranked if rd.get("_lesson") is not None]
+    scored: list = []
+    for rd in ranked:
+        lesson = rd.get("_lesson")
+        if lesson is not None:
+            scored.append(lesson)
     _log.debug(
         "Unified injection: %d ranked (wiki_boost=%d)",
         len(scored), len(wiki_boost),
