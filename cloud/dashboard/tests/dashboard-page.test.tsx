@@ -48,7 +48,7 @@ describe('/dashboard page composition', () => {
 
   it('renders KpiStrip and ActiveRulesPanel (core outcome panels)', () => {
     render(<DashboardPage />)
-    expect(screen.getByText(/Est\. Time Saved/i)).toBeInTheDocument()
-    expect(screen.getByText(/Active Rules/i)).toBeInTheDocument()
+    expect(screen.getByText('Time Saved')).toBeInTheDocument()
+    expect(screen.getByText('Your Rules')).toBeInTheDocument()
   })
 })

@@ -99,22 +99,22 @@ describe('ActivityFeed outcome reframes', () => {
     expect(screen.getByText(/Attach case studies/i)).toBeInTheDocument()
   })
 
-  it('renders "Rule refined" label for rule.patched kind', () => {
+  it('renders "Rule updated" label for rule.patched kind', () => {
     render(
       <ActivityFeed
         events={[{ id: '2', kind: 'rule.patched', description: 'No em dashes', at: at(24) }] as any}
       />,
     )
-    expect(screen.getByText(/Rule refined/i)).toBeInTheDocument()
+    expect(screen.getByText(/Rule updated/i)).toBeInTheDocument()
   })
 
-  it('renders "Slipped" label for rule.recurrence kind', () => {
+  it('renders "Slipped back" label for rule.recurrence kind', () => {
     render(
       <ActivityFeed
         events={[{ id: '3', kind: 'rule.recurrence', description: 'Colons over dashes', at: at(48) }] as any}
       />,
     )
-    expect(screen.getByText(/Slipped/i)).toBeInTheDocument()
+    expect(screen.getByText(/Slipped back/i)).toBeInTheDocument()
   })
 
   it('does NOT render meta_rule.emerged events', () => {
@@ -129,6 +129,6 @@ describe('ActivityFeed outcome reframes', () => {
 
   it('renders empty-state copy when no rendered events exist', () => {
     render(<ActivityFeed events={[{ id: '5', kind: 'meta_rule.emerged', description: 'x', at: at(1) }] as any} />)
-    expect(screen.getByText(/brain is quiet/i)).toBeInTheDocument()
+    expect(screen.getByText(/AI has been quiet/i)).toBeInTheDocument()
   })
 })

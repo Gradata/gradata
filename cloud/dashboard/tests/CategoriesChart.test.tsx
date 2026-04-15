@@ -27,7 +27,7 @@ const DIMENSIONS = [
 describe('CategoriesChart', () => {
   it('renders all 6 dimensions when classifier is healthy (>= 70% categorized)', () => {
     // Seed enough categorized data to pass the classifier-health gate so the
-    // chart (not the recalibrating empty state) is rendered.
+    // chart (not the still figuring out empty state) is rendered.
     render(<CategoriesChart analytics={mkAnalytics({ TONE: 1 })} />)
     DIMENSIONS.forEach((d) => {
       expect(screen.getByText(d)).toBeInTheDocument()
@@ -79,7 +79,7 @@ describe('CategoriesChart classifier health', () => {
         analytics={mkAnalytics({ OTHER: 3, TONE: 1 })}
       />,
     )
-    expect(screen.getByText(/recalibrating/i)).toBeInTheDocument()
+    expect(screen.getByText(/still figuring out/i)).toBeInTheDocument()
   })
 
   it('renders the chart when >= 70% corrections have a real category', () => {
@@ -89,11 +89,11 @@ describe('CategoriesChart classifier health', () => {
         analytics={mkAnalytics({ TONE: 3, ACCURACY: 1, OTHER: 1 })}
       />,
     )
-    expect(screen.queryByText(/recalibrating/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/still figuring out/i)).not.toBeInTheDocument()
   })
 
   it('renders empty state when no corrections at all', () => {
     render(<CategoriesChart analytics={mkAnalytics({})} />)
-    expect(screen.getByText(/recalibrating|no corrections/i)).toBeInTheDocument()
+    expect(screen.getByText(/still figuring out|no corrections/i)).toBeInTheDocument()
   })
 })

@@ -105,7 +105,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-[22px]">Overview</h1>
           <p className="mt-1 text-[13px] text-[var(--color-body)]">
-            Your brain&apos;s learning progress
+            What your AI learned from you
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">

@@ -2,7 +2,7 @@ import { GlassCard } from '@/components/layout/GlassCard'
 import type { KpiMetrics } from '@/lib/analytics-client'
 
 const TIME_SAVED_TOOLTIP =
-  'Estimated time saved = 3 minutes × rule fires on rules that have already caught a real correction. Excludes first-fire-ever. This is an estimate; the goal is a directional signal, not a precise audit.'
+  'About 3 minutes per correction your AI caught on its own. Counts only rules that previously failed — so the number only goes up when your AI is actually preventing repeat mistakes.'
 
 function formatMinutes(n: number): string {
   if (n < 60) return `${n}m`
@@ -26,40 +26,40 @@ export function KpiStrip({ metrics }: { metrics: KpiMetrics }) {
     tooltip?: string
   }> = [
     {
-      label: 'Correction Rate',
+      label: 'Mistakes Caught',
       value: metrics.correctionRateWoWDelta === null ? '—' : formatDelta(metrics.correctionRateWoWDelta),
-      subline: `${metrics.correctionsThisWeek} this week · ${metrics.correctionsPriorWeek} prior`,
+      subline: `${metrics.correctionsThisWeek} this week · ${metrics.correctionsPriorWeek} last week`,
       tone:
         metrics.correctionRateWoWDelta === null ? 'neu'
           : metrics.correctionRateWoWDelta < 0 ? 'pos'
             : metrics.correctionRateWoWDelta > 0 ? 'neg' : 'neu',
     },
     {
-      label: 'Est. Time Saved',
+      label: 'Time Saved',
       value: metrics.timeSavedMinutes === 0 ? '—' : formatMinutes(metrics.timeSavedMinutes),
       subline:
         metrics.timeSavedWoWDelta === null
-          ? 'vs prior: —'
-          : `vs prior: ${formatDelta(metrics.timeSavedWoWDelta)}`,
+          ? 'about 3 min per catch'
+          : `${formatDelta(metrics.timeSavedWoWDelta)} vs last week`,
       tone: metrics.timeSavedMinutes > 0 ? 'pos' : 'neu',
       tooltip: TIME_SAVED_TOOLTIP,
     },
     {
-      label: 'Sessions to Graduation',
+      label: 'Sessions to Graduate',
       value: metrics.sessionsToGraduation === 0 ? '—' : metrics.sessionsToGraduation.toFixed(1),
       subline:
         metrics.sessionsToGraduation > 0
-          ? `95% CI [${metrics.sessionsToGraduationLow}, ${metrics.sessionsToGraduationHigh}]`
-          : 'awaiting first graduation',
+          ? `typically ${Math.round(metrics.sessionsToGraduationLow)}–${Math.round(metrics.sessionsToGraduationHigh)} sessions`
+          : 'no rules graduated yet',
       tone: 'neu',
     },
     {
-      label: 'Misfires',
+      label: 'False Alarms',
       value: metrics.misfireCount.toString(),
       subline:
         metrics.misfireWoWDelta === null
-          ? `across ${metrics.totalFires} rule fires`
-          : `was ${metrics.misfireCountPriorWeek} last week · ${formatDelta(metrics.misfireWoWDelta)}`,
+          ? `across ${metrics.totalFires} times your AI helped`
+          : `was ${metrics.misfireCountPriorWeek} last week`,
       tone: metrics.misfireCount === 0 ? 'pos' : 'neg',
     },
     {

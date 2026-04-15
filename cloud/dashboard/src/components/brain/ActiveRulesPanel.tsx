@@ -33,10 +33,21 @@ function glyph(status: RuleStatus): React.ReactNode {
 }
 
 function suffix(s: { status: RuleStatus; streakDays: number | null; recurredDays: number | null }): string {
-  if (s.status === 'unknown') return '—'
-  if (s.status === 'recurred' && s.recurredDays !== null) return `recurred ${s.recurredDays}d ago`
-  if (s.streakDays !== null) return `${s.streakDays}d clean`
-  return '—'
+  if (s.status === 'unknown') return 'just learned'
+  if (s.status === 'recurred' && s.recurredDays !== null) {
+    return s.recurredDays === 0 ? 'slipped today' : `slipped ${s.recurredDays}d ago`
+  }
+  if (s.streakDays !== null) {
+    if (s.streakDays === 0) return 'graduated today'
+    return `${s.streakDays} days holding`
+  }
+  return 'just learned'
+}
+
+const STATE_LABEL: Record<string, string> = {
+  RULE: 'Graduated',
+  PATTERN: 'Learning',
+  INSTINCT: 'Watching',
 }
 
 export function ActiveRulesPanel({ lessons }: { lessons: Lesson[] }) {
@@ -48,26 +59,26 @@ export function ActiveRulesPanel({ lessons }: { lessons: Lesson[] }) {
   return (
     <GlassCard gradTop>
       <div className="mb-5 flex items-baseline justify-between">
-        <h3 className="text-[15px] font-semibold">Active Rules</h3>
-        <span className="text-[12px] text-[var(--color-body)]">top 8</span>
+        <h3 className="text-[15px] font-semibold">Your Rules</h3>
+        <span className="text-[12px] text-[var(--color-body)]">what your AI learned</span>
       </div>
       <ul className="space-y-3">
         {rules.length === 0 && (
           <li className="text-[13px] text-[var(--color-body)]">
-            No graduated rules yet. Keep correcting and patterns will emerge.
+            Nothing graduated yet. Keep correcting — rules emerge after your AI sees a pattern 3+ times.
           </li>
         )}
         {rules.map((rule) => {
           const s = statusFor(rule)
+          const stateLabel = STATE_LABEL[rule.state] ?? rule.state
           return (
             <li key={rule.id} data-rule-row className="flex items-start gap-3">
               {glyph(s.status)}
               <div className="flex-1 min-w-0">
                 <div className="text-[13px]">{rule.description}</div>
-                <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[10px] text-[var(--color-body)]">
-                  <span>{rule.category}</span>
-                  <span className="uppercase">{rule.state}</span>
-                  <span>{(rule.confidence ?? 0).toFixed(2)}</span>
+                <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-[var(--color-body)]">
+                  <span>{stateLabel}</span>
+                  <span>·</span>
                   <span>{suffix(s)}</span>
                 </div>
               </div>
@@ -80,7 +91,7 @@ export function ActiveRulesPanel({ lessons }: { lessons: Lesson[] }) {
           href="/rules"
           className="text-[12px] text-[var(--color-accent-blue)] hover:underline"
         >
-          See all rules →
+          See all your rules →
         </Link>
       </div>
     </GlassCard>
