@@ -1,11 +1,17 @@
-# Gradata — AI that learns your judgment
+# Gradata
+
+## AI that learns your judgment, not just your preferences.
 
 [![Tests](https://github.com/Gradata/gradata/actions/workflows/test.yml/badge.svg)](https://github.com/Gradata/gradata/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/gradata)](https://pypi.org/project/gradata/)
 [![Python](https://img.shields.io/pypi/pyversions/gradata)](https://pypi.org/project/gradata/)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
-Every correction you make teaches your AI something. Gradata captures those corrections, extracts the behavioral instruction behind them, and graduates it into a rule. Over time, your AI stops needing corrections. It converges on your judgment.
+Install the SDK, use Claude or GPT like you already do, and correct it when it's wrong. Gradata turns your repeat corrections into durable rules the AI carries forward — automatically. Unlike prompt engineering, which asks you to guess what the model needs, Gradata learns from what you actually fix.
+
+- **Local-first.** Your brain stays on your machine. AGPL-3.0 — fork it, host it, change it.
+- **Proven.** Simulation-validated learning loop (MiroFish panel methodology + published research on behavioral learning).
+- **Measurable.** *Est. Time Saved*, *Mistakes Caught*, *Sessions to Graduate* — honest metrics, not vanity.
 
 Not generally more intelligent. Calibrated to you.
 
@@ -14,6 +20,10 @@ pip install gradata
 ```
 
 Works with any LLM. Python 3.11+. Zero required dependencies.
+
+## Intellectual lineage
+
+Gradata synthesizes research from Constitutional AI (Anthropic, 2022), Duolingo's half-life regression (Settles & Meeder, ACL 2016), the Copilot RCT efficacy study (Peng et al., 2023), SuperMemo's two-component memory model (Wozniak, 1995), MT-Bench LLM-as-judge (Zheng et al., NeurIPS 2023), and the 15 agentic patterns (orchestrator, reflection, memory, rule_engine, and the rest). It stands alongside Mem0, Letta, and EverMind as an open memory system — with one difference: Gradata learns from your corrections, not just recalls facts. What's new is the graduation pipeline that turns repeated mistakes into durable rules, validated by multi-agent simulation. See [CREDITS.md](./CREDITS.md) for the full list.
 
 ## Quick Start
 
