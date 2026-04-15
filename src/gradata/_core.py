@@ -173,6 +173,45 @@ def brain_correct(
     if applies_to:
         scope_data["applies_to"] = applies_to
 
+    # Provenance hash + source classification (defence against A1 prompt injection
+    # per Greshake et al. 2023 https://arxiv.org/abs/2302.12173). Any correction
+    # that did not originate as a direct user edit of an AI output is flagged
+    # `requires_review=True` and forced through the existing approval gate so it
+    # cannot graduate to a RULE without an explicit promote action.
+    try:
+        from gradata.security.correction_hash import build_provenance
+        _prov_meta = build_provenance(draft, final, context)
+    except Exception as _prov_err:  # pragma: no cover - defensive
+        _log.debug("Provenance hash computation failed: %s", _prov_err)
+        _prov_meta = {
+            "provenance_hash": "",
+            "source_kind": "unknown",
+            "requires_review": True,
+        }
+    provenance_hash = _prov_meta["provenance_hash"]
+    source_kind = _prov_meta["source_kind"]
+    requires_review = bool(_prov_meta["requires_review"])
+
+    # Adversarial-phrase blocklist (light-touch prompt-injection defence; A1).
+    # We flag-for-review rather than reject — a user may legitimately write
+    # about these concepts (red-team docs, teaching, etc.). Refs: Greshake
+    # et al. 2023 (https://arxiv.org/abs/2302.12173), Wallace et al. 2019
+    # (https://arxiv.org/abs/1908.07125).
+    adversarial_hits: list[str] = []
+    try:
+        from gradata.security.adversarial_blocklist import scan_correction
+        adversarial_hits = scan_correction(draft, final)
+    except Exception as _adv_err:  # pragma: no cover - defensive
+        _log.debug("Adversarial-phrase scan failed: %s", _adv_err)
+    if adversarial_hits and not requires_review:
+        requires_review = True
+
+    # If the source cannot be vouched for (either unknown provenance or
+    # blocklisted phrase hit), escalate to approval_required so downstream
+    # graduation treats it as untrusted input.
+    if requires_review and not approval_required:
+        approval_required = True
+
     data = {
         "draft_text": draft_redacted[:2000], "final_text": final_redacted[:2000],
         "edit_distance": diff.edit_distance, "severity": diff.severity,
@@ -183,6 +222,10 @@ def brain_correct(
         "lines_added": diff.summary_stats.get("lines_added", 0),
         "lines_removed": diff.summary_stats.get("lines_removed", 0),
         "correction_scope": correction_scope,
+        "provenance_hash": provenance_hash,
+        "source_kind": source_kind,
+        "requires_review": requires_review,
+        "adversarial_hits": adversarial_hits,
     }
     if applies_to:
         data["applies_to"] = applies_to
@@ -194,6 +237,12 @@ def brain_correct(
         tags.append("major_edit:true")
     if applies_to:
         tags.append(f"applies_to:{applies_to}")
+    if requires_review:
+        tags.append("requires_review:true")
+    if source_kind:
+        tags.append(f"source_kind:{source_kind}")
+    if adversarial_hits:
+        tags.append("adversarial_phrase:true")
 
     event = brain.emit("CORRECTION", "brain.correct", data, tags, session)
     event["diff"] = diff
@@ -201,6 +250,10 @@ def brain_correct(
     event["correction_scope"] = correction_scope
     if applies_to:
         event["applies_to"] = applies_to
+    event["provenance_hash"] = provenance_hash
+    event["source_kind"] = source_kind
+    event["requires_review"] = requires_review
+    event["adversarial_hits"] = adversarial_hits
 
     # Auto-extract patterns
     try:
