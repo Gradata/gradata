@@ -26,9 +26,13 @@ import re
 import time
 from pathlib import Path
 
-from gradata._types import Lesson
+from typing import TYPE_CHECKING
+
 from gradata.hooks._base import extract_message, resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
+
+if TYPE_CHECKING:
+    from gradata._types import Lesson
 
 try:
     from gradata.enhancements.self_improvement import parse_lessons

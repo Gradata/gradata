@@ -64,7 +64,7 @@ def _rule_matches_domain(rule: GraduatedRule, domain_norm: str) -> bool:
     if str(scope.get("domain", "")).strip().lower() == domain_norm:
         return True
     applies = str(scope.get("applies_to", "")).strip().lower()
-    return applies == domain_norm or (applies and applies.startswith(f"{domain_norm}:"))
+    return applies == domain_norm or bool(applies and applies.startswith(f"{domain_norm}:"))
 
 
 class RuleContext:
