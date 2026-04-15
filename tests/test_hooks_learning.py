@@ -258,6 +258,90 @@ def test_corrupt_meta_rules_db_degrades_to_rules_only(tmp_path):
     assert "<brain-meta-rules>" not in text
 
 
+def test_load_meta_rules_legacy_schema_without_source_column(tmp_path):
+    """Brains upgraded from an older schema may be missing the `source`
+    column. Read-only callers must still get rows back with source
+    synthesized as 'deterministic' rather than raising 'no such column'."""
+    import sqlite3
+
+    from gradata.enhancements.meta_rules_storage import load_meta_rules
+
+    db_path = tmp_path / "system.db"
+    conn = sqlite3.connect(str(db_path))
+    try:
+        # Legacy schema: every column EXCEPT `source`.
+        conn.execute(
+            """CREATE TABLE meta_rules (
+                id TEXT PRIMARY KEY,
+                principle TEXT,
+                source_categories TEXT,
+                source_lesson_ids TEXT,
+                confidence REAL,
+                created_session INTEGER,
+                last_validated_session INTEGER,
+                scope TEXT,
+                examples TEXT,
+                context_weights TEXT,
+                applies_when TEXT,
+                never_when TEXT,
+                transfer_scope TEXT
+            )"""
+        )
+        conn.execute(
+            """INSERT INTO meta_rules VALUES
+               ('m1', 'Always verify', '["PROCESS"]', '["l1"]', 0.85,
+                1, 1, '{}', '[]', '{"default": 1.0}', '[]', '[]', 'personal')"""
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    metas = load_meta_rules(db_path)
+    assert len(metas) == 1
+    assert metas[0].id == "m1"
+    assert metas[0].source == "deterministic"
+
+
+def test_inject_respects_applies_when_never_when(tmp_path):
+    """applies_when / never_when must gate meta-rule injection at
+    SessionStart. A rule with never_when=session_type=code must be
+    excluded when the hook payload says session_type=code."""
+    from gradata.enhancements.meta_rules import MetaRule
+    from gradata.enhancements.meta_rules_storage import save_meta_rules
+
+    (tmp_path / "lessons.md").write_text(
+        "[2026-04-01] [RULE:0.92] PROCESS: Always plan before implementing\n",
+        encoding="utf-8",
+    )
+    db_path = tmp_path / "system.db"
+    gated = MetaRule(
+        id="m_gated",
+        principle="Never chat in code sessions",
+        source_categories=["PROCESS"],
+        source_lesson_ids=["l1", "l2", "l3"],
+        confidence=0.90,
+        created_session=1,
+        last_validated_session=1,
+        never_when=["session_type=code"],
+        source="llm_synth",
+    )
+    save_meta_rules(db_path, [gated])
+
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+        # Blocking payload — never_when matches, meta-rule must be skipped.
+        blocked = inject_main({"session_type": "code"})
+        # Permissive payload — never_when does not match, meta-rule injected.
+        allowed = inject_main({"session_type": "prose"})
+
+    assert blocked is not None
+    assert "<brain-rules>" in blocked["result"]
+    assert "<brain-meta-rules>" not in blocked["result"]
+
+    assert allowed is not None
+    assert "<brain-meta-rules>" in allowed["result"]
+    assert "Never chat in code sessions" in allowed["result"]
+
+
 def test_session_close_emits_event(tmp_path):
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
         with patch("gradata.hooks.session_close._emit_session_end") as mock_emit:

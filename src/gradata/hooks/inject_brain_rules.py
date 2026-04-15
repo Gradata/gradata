@@ -165,13 +165,28 @@ def main(data: dict) -> dict | None:
                 if getattr(m, "source", "deterministic") in INJECTABLE_META_SOURCES
             ]
             if injectable:
+                # Build a sanitized condition_context from the hook payload so
+                # applies_when / never_when are honored during SessionStart.
+                # We only forward small, string-shaped fields the rule engine
+                # uses for gating — no file contents, transcripts, or secrets.
+                condition_context = {
+                    k: data[k]
+                    for k in ("session_type", "task_type", "source", "cwd")
+                    if isinstance(data.get(k), (str, int, float, bool))
+                }
+                if context and "context" not in condition_context:
+                    condition_context["context"] = context
+
                 # Pass the full injectable set with `limit=MAX_META_RULES` so
                 # the cap is applied AFTER context-aware ranking inside the
                 # formatter. Pre-slicing by raw confidence would let a
                 # lower-confidence rule with a strong context weight get
                 # silently excluded.
                 formatted = format_meta_rules_for_prompt(
-                    injectable, context=context, limit=MAX_META_RULES,
+                    injectable,
+                    context=context,
+                    condition_context=condition_context,
+                    limit=MAX_META_RULES,
                 )
                 if formatted:
                     meta_block = (

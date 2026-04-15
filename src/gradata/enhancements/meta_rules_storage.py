@@ -157,11 +157,18 @@ def load_meta_rules(db_path: str | Path) -> list[MetaRule]:
         if not cursor.fetchone():
             return []
 
+        # Legacy brains may predate the `source` column. Probe the schema and
+        # synthesize `'deterministic'` in the SELECT when the column is absent
+        # so read-only callers (e.g. inject_brain_rules) don't have to trigger
+        # a write migration. Keeps the query shape stable for row unpacking.
+        existing_cols = {r[1] for r in conn.execute("PRAGMA table_info(meta_rules)")}
+        source_expr = "source" if "source" in existing_cols else "'deterministic' AS source"
+
         rows = conn.execute(
-            """SELECT id, principle, source_categories, source_lesson_ids,
+            f"""SELECT id, principle, source_categories, source_lesson_ids,
                       confidence, created_session, last_validated_session,
                       scope, examples, context_weights, applies_when, never_when,
-                      transfer_scope, source
+                      transfer_scope, {source_expr}
                FROM meta_rules
                ORDER BY confidence DESC"""
         ).fetchall()
