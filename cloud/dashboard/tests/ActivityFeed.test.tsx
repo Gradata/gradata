@@ -77,3 +77,58 @@ describe('ActivityFeed', () => {
     expect(() => render(<ActivityFeed />)).not.toThrow()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Outcome-first prop-driven mode
+// ---------------------------------------------------------------------------
+
+const at = (hoursAgo: number) => new Date(Date.now() - hoursAgo * 3_600_000).toISOString()
+
+describe('ActivityFeed outcome reframes', () => {
+  beforeEach(() => {
+    useApiMock.mockImplementation(() => noData)
+  })
+
+  it('renders "Rule graduated" label for rule.graduated kind', () => {
+    render(
+      <ActivityFeed
+        events={[{ id: '1', kind: 'rule.graduated', description: 'Attach case studies as PDF', at: at(2) }] as any}
+      />,
+    )
+    expect(screen.getByText(/Rule graduated/i)).toBeInTheDocument()
+    expect(screen.getByText(/Attach case studies/i)).toBeInTheDocument()
+  })
+
+  it('renders "Rule refined" label for rule.patched kind', () => {
+    render(
+      <ActivityFeed
+        events={[{ id: '2', kind: 'rule.patched', description: 'No em dashes', at: at(24) }] as any}
+      />,
+    )
+    expect(screen.getByText(/Rule refined/i)).toBeInTheDocument()
+  })
+
+  it('renders "Slipped" label for rule.recurrence kind', () => {
+    render(
+      <ActivityFeed
+        events={[{ id: '3', kind: 'rule.recurrence', description: 'Colons over dashes', at: at(48) }] as any}
+      />,
+    )
+    expect(screen.getByText(/Slipped/i)).toBeInTheDocument()
+  })
+
+  it('does NOT render meta_rule.emerged events', () => {
+    render(
+      <ActivityFeed
+        events={[{ id: '4', kind: 'meta_rule.emerged', description: 'Verify before acting', at: at(72) }] as any}
+      />,
+    )
+    expect(screen.queryByText(/Meta-rule/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Verify before acting/i)).not.toBeInTheDocument()
+  })
+
+  it('renders empty-state copy when no rendered events exist', () => {
+    render(<ActivityFeed events={[{ id: '5', kind: 'meta_rule.emerged', description: 'x', at: at(1) }] as any} />)
+    expect(screen.getByText(/brain is quiet/i)).toBeInTheDocument()
+  })
+})
