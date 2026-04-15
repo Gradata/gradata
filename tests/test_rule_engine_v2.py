@@ -16,22 +16,27 @@ from __future__ import annotations
 
 import pytest
 
-from gradata._types import Lesson, LessonState
 from gradata._scope import RuleScope
+from gradata._types import Lesson, LessonState
+from gradata.events_bus import EventBus
 from gradata.rules.rule_engine import (
+    DEFAULT_TTL_SESSIONS,
     AppliedRule,
-    apply_rules,
-    capture_example_from_correction,
-    compute_rule_difficulty,
-    compute_scope_weight,
-    detect_task_type,
-    filter_by_scope,
-    format_rules_for_prompt,
-    merge_related_rules,
     _difficulty_from_lesson,
     _make_rule_id,
+    _ordering_entropy,
+    _rule_set_hash,
+    apply_rules,
+    capture_example_from_correction,
+    choose_entropy_ordering,
+    clear_ordering_cache,
+    compute_rule_difficulty,
+    compute_scope_weight,
+    demote_stale_rules,
+    detect_task_type,
+    format_rules_for_prompt,
+    merge_related_rules,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -48,6 +53,7 @@ def _make_lesson(
     scope_json: str = "",
     example_draft: str | None = None,
     example_corrected: str | None = None,
+    sessions_since_fire: int = 0,
 ) -> Lesson:
     return Lesson(
         date="2026-03-26",
@@ -60,6 +66,7 @@ def _make_lesson(
         scope_json=scope_json,
         example_draft=example_draft,
         example_corrected=example_corrected,
+        sessions_since_fire=sessions_since_fire,
     )
 
 
@@ -451,3 +458,233 @@ class TestApplyRulesIntegration:
         lessons = [_make_lesson(description=f"Rule {i}", category=f"CAT{i}") for i in range(20)]
         result = apply_rules(lessons, scope=RuleScope(), max_rules=5)
         assert len(result) <= 5
+
+
+# ===========================================================================
+# Rule TTL — zombie-rule mitigation (red-team finding A7)
+# ===========================================================================
+
+
+class TestRuleTTL:
+    """demote_stale_rules() and apply_rules TTL integration.
+
+    Rules idle for >= ttl_sessions are demoted from RULE -> PATTERN with
+    stale=True. No deletion — preserves history for user review.
+    """
+
+    def test_fresh_rule_not_demoted(self):
+        lesson = _make_lesson(state=LessonState.RULE, sessions_since_fire=0)
+        demoted = demote_stale_rules([lesson], ttl_sessions=50)
+        assert demoted == []
+        assert lesson.state is LessonState.RULE
+        assert lesson.stale is False
+
+    def test_below_ttl_not_demoted(self):
+        lesson = _make_lesson(state=LessonState.RULE, sessions_since_fire=49)
+        demoted = demote_stale_rules([lesson], ttl_sessions=50)
+        assert demoted == []
+        assert lesson.state is LessonState.RULE
+        assert lesson.stale is False
+
+    def test_at_ttl_demoted(self):
+        lesson = _make_lesson(state=LessonState.RULE, sessions_since_fire=50)
+        demoted = demote_stale_rules([lesson], ttl_sessions=50)
+        assert demoted == [lesson]
+        assert lesson.state is LessonState.PATTERN
+        assert lesson.stale is True
+
+    def test_above_ttl_demoted(self):
+        lesson = _make_lesson(state=LessonState.RULE, sessions_since_fire=999)
+        demoted = demote_stale_rules([lesson], ttl_sessions=50)
+        assert demoted == [lesson]
+        assert lesson.state is LessonState.PATTERN
+        assert lesson.stale is True
+
+    def test_pattern_lesson_untouched(self):
+        """PATTERN-tier lessons are not demoted further by TTL (no deletion)."""
+        lesson = _make_lesson(state=LessonState.PATTERN, sessions_since_fire=500)
+        demoted = demote_stale_rules([lesson], ttl_sessions=50)
+        assert demoted == []
+        assert lesson.state is LessonState.PATTERN
+        # stale flag only set on demotion, not on already-below-RULE lessons
+        assert lesson.stale is False
+
+    def test_ttl_zero_disables(self):
+        lesson = _make_lesson(state=LessonState.RULE, sessions_since_fire=10_000)
+        demoted = demote_stale_rules([lesson], ttl_sessions=0)
+        assert demoted == []
+        assert lesson.state is LessonState.RULE
+
+    def test_configurable_ttl(self):
+        lesson = _make_lesson(state=LessonState.RULE, sessions_since_fire=20)
+        # Default would keep it; tight TTL of 10 should demote.
+        demoted = demote_stale_rules([lesson], ttl_sessions=10)
+        assert lesson.state is LessonState.PATTERN
+        assert lesson.stale is True
+        assert len(demoted) == 1
+
+    def test_event_bus_emits_demotion(self):
+        lesson = _make_lesson(
+            category="DRAFTING",
+            description="Ancient lesson",
+            state=LessonState.RULE,
+            sessions_since_fire=100,
+        )
+        bus = EventBus()
+        captured: list[dict] = []
+        bus.on("rule_demoted_ttl", lambda payload: captured.append(payload))
+        demote_stale_rules([lesson], ttl_sessions=50, bus=bus)
+        assert len(captured) == 1
+        payload = captured[0]
+        assert payload["category"] == "DRAFTING"
+        assert payload["sessions_since_fire"] == 100
+        assert payload["ttl_sessions"] == 50
+        assert "rule_id" in payload
+
+    def test_apply_rules_integrates_ttl(self):
+        """Stale RULE -> PATTERN demotion happens inside apply_rules."""
+        fresh = _make_lesson(
+            category="FRESH",
+            description="Fresh rule",
+            state=LessonState.RULE,
+            sessions_since_fire=0,
+        )
+        stale = _make_lesson(
+            category="STALE",
+            description="Stale rule",
+            state=LessonState.RULE,
+            sessions_since_fire=200,
+        )
+        result = apply_rules([fresh, stale], scope=RuleScope(), ttl_sessions=50)
+        # Both still surface (PATTERN is eligible), but stale one was demoted
+        assert stale.state is LessonState.PATTERN
+        assert stale.stale is True
+        assert fresh.state is LessonState.RULE
+        # The fresh RULE-tier rule should rank above the demoted stale PATTERN
+        categories = [r.lesson.category for r in result]
+        assert categories.index("FRESH") < categories.index("STALE")
+
+    def test_apply_rules_ttl_disabled_with_zero(self):
+        stale = _make_lesson(
+            category="STALE",
+            state=LessonState.RULE,
+            sessions_since_fire=10_000,
+        )
+        apply_rules([stale], scope=RuleScope(), ttl_sessions=0)
+        assert stale.state is LessonState.RULE
+        assert stale.stale is False
+
+    def test_default_ttl_constant(self):
+        assert DEFAULT_TTL_SESSIONS == 50
+
+
+# ===========================================================================
+# Entropy-based rule ordering — Lu et al. 2022 (arXiv:2104.08786)
+# ===========================================================================
+
+
+class TestEntropyOrdering:
+    """choose_entropy_ordering() picks diverse permutations; format uses it."""
+
+    def setup_method(self) -> None:
+        clear_ordering_cache()
+
+    def test_singleton_passthrough(self):
+        lesson = _make_lesson(category="A")
+        rule = _make_applied(lesson)
+        out = choose_entropy_ordering([rule], seed=0)
+        assert out == [rule]
+
+    def test_empty_passthrough(self):
+        assert choose_entropy_ordering([], seed=0) == []
+
+    def test_prefers_mixed_over_runs(self):
+        """A permutation that interleaves categories scores higher than a run."""
+        run = [_make_applied(_make_lesson(category="A", description=f"a{i}")) for i in range(3)]
+        run += [_make_applied(_make_lesson(category="B", description=f"b{i}")) for i in range(3)]
+        mixed = [run[0], run[3], run[1], run[4], run[2], run[5]]
+        assert _ordering_entropy(mixed) > _ordering_entropy(run)
+
+    def test_returns_new_list(self):
+        rules = [_make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C", "D")]
+        out = choose_entropy_ordering(rules, samples=4, seed=1)
+        # Same set of rules, not necessarily same order; and input is not mutated.
+        assert set(id(r) for r in out) == set(id(r) for r in rules)
+        assert len(out) == len(rules)
+
+    def test_deterministic_with_seed(self):
+        rules = [_make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C", "D", "E")]
+        a = choose_entropy_ordering(rules, samples=8, seed=42)
+        clear_ordering_cache()
+        b = choose_entropy_ordering(rules, samples=8, seed=42)
+        assert [r.rule_id for r in a] == [r.rule_id for r in b]
+
+    def test_cache_hit_returns_same_order(self):
+        rules = [_make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C", "D")]
+        key = ("email", _rule_set_hash(rules))
+        a = choose_entropy_ordering(rules, samples=8, seed=1, cache_key=key)
+        # Second call with a different seed should still return the cached order.
+        b = choose_entropy_ordering(rules, samples=8, seed=999, cache_key=key)
+        assert [r.rule_id for r in a] == [r.rule_id for r in b]
+
+    def test_cache_miss_on_different_rule_set(self):
+        rules_a = [_make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C")]
+        rules_b = [_make_applied(_make_lesson(category=c, description=c)) for c in ("X", "Y", "Z")]
+        key_a = ("code", _rule_set_hash(rules_a))
+        key_b = ("code", _rule_set_hash(rules_b))
+        choose_entropy_ordering(rules_a, samples=4, seed=1, cache_key=key_a)
+        out_b = choose_entropy_ordering(rules_b, samples=4, seed=2, cache_key=key_b)
+        # Different rule set, different cache entry, no leakage.
+        assert [r.rule_id for r in out_b] == [r.rule_id for r in out_b]
+        assert key_a != key_b
+
+    def test_zero_samples_returns_input_order(self):
+        rules = [_make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C")]
+        out = choose_entropy_ordering(rules, samples=0, seed=1)
+        assert [r.rule_id for r in out] == [r.rule_id for r in rules]
+
+    def test_format_uses_entropy_ordering(self):
+        """format_rules_for_prompt with entropy_search=True emits a block."""
+        rules = [
+            _make_applied(_make_lesson(category="TONE", description="t1")),
+            _make_applied(_make_lesson(category="ACCURACY", description="a1")),
+            _make_applied(_make_lesson(category="TONE", description="t2")),
+            _make_applied(_make_lesson(category="ACCURACY", description="a2")),
+        ]
+        out = format_rules_for_prompt(
+            rules,
+            merge=False,
+            shuffle_seed=7,
+            entropy_search=True,
+            task_type="email",
+        )
+        assert "<brain-rules>" in out and "</brain-rules>" in out
+        # Every rule's description makes it into the block
+        for r in rules:
+            assert r.lesson.description in out
+
+    def test_format_bypass_keeps_input_order(self):
+        """entropy_search=False preserves caller-supplied order exactly."""
+        rules = [
+            _make_applied(_make_lesson(category="ALPHA", description="alpha-desc-unique-0")),
+            _make_applied(_make_lesson(category="BETA", description="beta-desc-unique-1")),
+            _make_applied(_make_lesson(category="GAMMA", description="gamma-desc-unique-2")),
+        ]
+        out = format_rules_for_prompt(
+            rules,
+            merge=False,
+            entropy_search=False,
+        )
+        # Descriptions appear in the same order as input
+        idx = [out.index(r.lesson.description) for r in rules]
+        assert idx == sorted(idx)
+
+    def test_rule_set_hash_stable(self):
+        rules = [_make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C")]
+        assert _rule_set_hash(rules) == _rule_set_hash(rules)
+
+    def test_rule_set_hash_order_invariant(self):
+        a = [_make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C")]
+        b = list(reversed(a))
+        # Same set in different order -> same hash
+        assert _rule_set_hash(a) == _rule_set_hash(b)
