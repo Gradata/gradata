@@ -4,23 +4,19 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, Query, Request
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import APIRouter, Depends, Query
 
 from app.auth import get_brain_for_request
 from app.db import get_db
 
 _log = logging.getLogger(__name__)
-_bearer = HTTPBearer()
 
 router = APIRouter()
 
 
 @router.get("/brains/{brain_id}/lessons")
 async def list_lessons(
-    brain_id: str,
-    request: Request,
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+    brain: dict = Depends(get_brain_for_request),
     state: str | None = Query(None, description="Filter by lesson state (RULE, PATTERN, etc.)"),
     category: str | None = Query(None, description="Filter by category"),
     min_confidence: float | None = Query(None, ge=0.0, le=1.0),
@@ -29,7 +25,6 @@ async def list_lessons(
     sort: str | None = Query(None, description="Sort field: confidence"),
 ) -> list[dict]:
     """List lessons for a brain with optional filtering and pagination."""
-    brain = await get_brain_for_request(brain_id, credentials)
     db = get_db()
 
     filters: dict = {"brain_id": brain["id"]}
@@ -44,7 +39,7 @@ async def list_lessons(
         filters=filters,
     )
 
-    # Apply post-fetch filters that PostgREST simple eq can't handle
+    # PostgREST eq can't express min_confidence; filter in-process.
     if min_confidence is not None:
         rows = [r for r in rows if (r.get("confidence") or 0.0) >= min_confidence]
 
