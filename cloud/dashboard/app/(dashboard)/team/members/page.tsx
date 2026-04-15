@@ -9,6 +9,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { PlanGate, PLANS, type PlanTier } from '@/components/brain/PlanBadge'
+import { isOperatorEmail } from '@/lib/operator'
 import { useApi } from '@/hooks/useApi'
 import type { InviteResponse, InviteRole, MemberRole, TeamMember, UserProfile } from '@/types/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -165,7 +166,7 @@ export default function TeamMembersPage() {
         </Button>
       </header>
 
-      <PlanGate current={currentPlan} requires="team" featureName="Team member management">
+      <PlanGate current={currentPlan} requires="team" featureName="Team member management" bypass={isOperatorEmail(profile?.email)}>
         <GlassCard gradTop>
           {roster.length === 0 ? (
             <p className="py-6 text-center text-[13px] text-[var(--color-body)]">

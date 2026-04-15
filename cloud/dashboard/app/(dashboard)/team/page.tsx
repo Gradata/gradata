@@ -3,36 +3,51 @@
 import Link from 'next/link'
 import { GlassCard } from '@/components/layout/GlassCard'
 import { PlanGate, type PlanTier } from '@/components/brain/PlanBadge'
+import { isOperatorEmail } from '@/lib/operator'
 import { useApi } from '@/hooks/useApi'
-import type { TeamMember, UserProfile } from '@/types/api'
+import type { UserProfile } from '@/types/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { ErrorState } from '@/components/shared/ErrorState'
-import { TeamLeaderboard } from '@/components/team/TeamLeaderboard'
-import {
-  computeTeamAggregate,
-  isMemberActive,
-  normalizeRole,
-  pickWorkspaceId,
-} from '@/lib/team'
+import { pickWorkspaceId } from '@/lib/team'
+
+interface TeamMemberStat {
+  user_id: string
+  display_name: string | null
+  email: string | null
+  role: string
+  last_sync_at: string | null
+  corrections_week: number
+  correction_delta_pct: number
+  rules_graduated_30d: number
+  active: boolean
+}
+
+interface TeamStats {
+  corrections_week: number
+  rules_graduated_30d: number
+  avg_delta_pct: number
+  active_brains: number
+  total_members: number
+  members: TeamMemberStat[]
+}
 
 export default function TeamOverviewPage() {
   const {
     data: profile,
-    loading: profileLoading,
+    loading: loadingProfile,
     error: profileError,
     refetch: refetchProfile,
   } = useApi<UserProfile>('/users/me')
   const workspaceId = pickWorkspaceId(profile?.workspaces)
 
   const {
-    data: members,
-    loading: membersLoading,
-    error: membersError,
-    refetch,
-  } = useApi<TeamMember[]>(workspaceId ? `/workspaces/${workspaceId}/members` : null)
+    data: stats,
+    loading: loadingStats,
+    error: statsError,
+    refetch: refetchStats,
+  } = useApi<TeamStats>(workspaceId ? `/workspaces/${workspaceId}/team-stats` : null)
 
-  if (profileLoading || membersLoading) return <LoadingSpinner className="py-20" />
-
+  if (loadingProfile) return <LoadingSpinner className="py-20" />
   if (profileError) return <ErrorState message={profileError} onRetry={refetchProfile} />
 
   const currentPlan = (profile?.plan?.toLowerCase() ?? 'free') as PlanTier
@@ -40,21 +55,15 @@ export default function TeamOverviewPage() {
   if (!workspaceId) {
     return <TeamEmptyState message="No workspace found for your account yet." />
   }
-  if (membersError) return <ErrorState message={membersError} onRetry={refetch} />
 
-  const roster = members ?? []
-  const agg = computeTeamAggregate(roster)
-
-  // Leaderboard: rank active members by most recent sync (no per-member delta
-  // in the real API yet — sort by freshest activity as a proxy for engagement).
-  // Reuse the shared activity helper so KPIs and leaderboard stay consistent.
-  const leaderboard = [...roster]
-    .filter((m) => isMemberActive(m))
-    .sort((a, b) => {
-      const aT = a.last_sync_at ? new Date(a.last_sync_at).getTime() : 0
-      const bT = b.last_sync_at ? new Date(b.last_sync_at).getTime() : 0
-      return bT - aT
-    })
+  const agg = stats ?? {
+    corrections_week: 0, rules_graduated_30d: 0, avg_delta_pct: 0,
+    active_brains: 0, total_members: 0, members: [],
+  }
+  // Leaderboard: rank by most negative delta (whose AI learned fastest).
+  const leaderboard = [...agg.members]
+    .filter((m) => m.active)
+    .sort((a, b) => a.correction_delta_pct - b.correction_delta_pct)
 
   return (
     <>
@@ -73,24 +82,51 @@ export default function TeamOverviewPage() {
         </Link>
       </header>
 
-      <PlanGate current={currentPlan} requires="team" featureName="Team analytics">
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Kpi label="Team members" value={agg.totalMembers.toString()} sub="on the roster" tone="neu" />
-          <Kpi label="Active brains" value={agg.activeBrains.toString()}
-               sub={`${agg.activeBrains}/${agg.totalMembers} synced recently`}
-               tone={agg.activeBrains > 0 ? 'pos' : 'neu'} />
-          <Kpi label="Owners + admins"
-               value={roster.filter((m) => {
-                 const r = normalizeRole(m.role)
-                 return r === 'owner' || r === 'admin'
-               }).length.toString()}
-               sub="can manage team" tone="neu" />
-          <Kpi label="Members"
-               value={roster.filter((m) => normalizeRole(m.role) === 'member').length.toString()}
-               sub="read-own-brain" tone="neu" />
-        </div>
+      <PlanGate
+        current={currentPlan}
+        requires="team"
+        featureName="Team analytics"
+        bypass={isOperatorEmail(profile?.email)}
+      >
+        {loadingStats ? (
+          <LoadingSpinner className="py-12" />
+        ) : statsError ? (
+          <ErrorState message={statsError} onRetry={refetchStats} />
+        ) : (
+          <>
+            <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Kpi label="Team Corrections"   value={agg.corrections_week.toString()} sub="this week" tone="neu" />
+              <Kpi label="Avg Δ vs last week" value={`${agg.avg_delta_pct > 0 ? '+' : ''}${agg.avg_delta_pct.toFixed(0)}%`}
+                   sub={agg.avg_delta_pct < 0 ? 'learning' : agg.avg_delta_pct > 0 ? 'regressing' : 'flat'}
+                   tone={agg.avg_delta_pct < 0 ? 'pos' : agg.avg_delta_pct > 0 ? 'neg' : 'neu'} />
+              <Kpi label="Rules Graduated"    value={agg.rules_graduated_30d.toString()} sub="team · last 30 days" tone="neu" />
+              <Kpi label="Active Brains"      value={`${agg.active_brains}/${agg.total_members}`} sub="synced in last 14d" tone="neu" />
+            </div>
 
-        <TeamLeaderboard members={leaderboard} />
+            <GlassCard gradTop>
+              <div className="mb-5 flex items-baseline justify-between">
+                <h3 className="text-[15px] font-semibold">Leaderboard</h3>
+                <span className="text-[12px] text-[var(--color-body)]">
+                  whose AI learned fastest
+                </span>
+              </div>
+              {leaderboard.length === 0 ? (
+                <p className="py-6 text-center text-[13px] text-[var(--color-body)]">
+                  No active members yet. Once your team starts logging corrections, the leaderboard appears here.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {leaderboard.map((m, i) => (
+                    <LeaderRow key={m.user_id} member={m} rank={i + 1} />
+                  ))}
+                </ul>
+              )}
+              <p className="mt-6 text-[11px] text-[var(--color-body)]">
+                Ranked by week-over-week correction-rate decrease. Not for shaming — for pattern sharing.
+              </p>
+            </GlassCard>
+          </>
+        )}
       </PlanGate>
     </>
   )
@@ -127,3 +163,39 @@ function Kpi({ label, value, sub, tone }: {
   )
 }
 
+function LeaderRow({ member, rank }: { member: TeamMemberStat; rank: number }) {
+  const deltaTone =
+    member.correction_delta_pct < 0 ? 'text-[var(--color-success)]'
+      : member.correction_delta_pct > 0 ? 'text-[var(--color-destructive)]'
+        : 'text-[var(--color-body)]'
+  return (
+    <li
+      data-testid="leader-row"
+      className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-[0.5rem] border border-[var(--color-border)] bg-white/[0.02] p-3 sm:flex-nowrap"
+    >
+      <span className="w-6 font-mono text-[12px] text-[var(--color-body)]">#{rank}</span>
+      <div className="min-w-0 flex-1 basis-[calc(100%-3rem)] sm:basis-auto">
+        <div className="text-[13px] font-medium truncate">
+          {member.display_name || member.email || member.user_id.slice(0, 8)}
+        </div>
+        {member.email && member.display_name && (
+          <div className="font-mono text-[10px] text-[var(--color-body)] truncate">{member.email}</div>
+        )}
+      </div>
+      <div className="flex-1 sm:w-28 sm:flex-none sm:text-right">
+        <div className={`font-mono text-[13px] tabular-nums ${deltaTone}`}>
+          {member.correction_delta_pct > 0 ? '+' : ''}{member.correction_delta_pct.toFixed(0)}%
+        </div>
+        <div className="font-mono text-[10px] text-[var(--color-body)]">corrections Δ</div>
+      </div>
+      <div className="flex-1 sm:w-20 sm:flex-none sm:text-right">
+        <div className="font-mono text-[13px] tabular-nums">{member.rules_graduated_30d}</div>
+        <div className="font-mono text-[10px] text-[var(--color-body)]">rules 30d</div>
+      </div>
+      <div className="flex-1 sm:w-24 sm:flex-none sm:text-right">
+        <div className="font-mono text-[13px] tabular-nums">{member.corrections_week}</div>
+        <div className="font-mono text-[10px] text-[var(--color-body)]">this week</div>
+      </div>
+    </li>
+  )
+}

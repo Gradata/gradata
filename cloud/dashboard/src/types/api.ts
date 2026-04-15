@@ -18,6 +18,10 @@ export interface Lesson {
   confidence: number
   fire_count: number
   created_at: string
+  recurrence_blocked?: boolean
+  last_recurrence_at?: string | null
+  graduated_at?: string | null
+  correction_count?: number
 }
 
 export interface Correction {
