@@ -42,13 +42,13 @@ type RenderableOutcomeKind = Exclude<OutcomeActivityKind, 'meta_rule.emerged'>
 
 const LABELS: Record<RenderableOutcomeKind, { icon: string; label: string }> = {
   'rule.graduated': { icon: '✅', label: 'Rule graduated' },
-  'rule.patched': { icon: '🔧', label: 'Rule refined' },
-  'rule.recurrence': { icon: '⚠️', label: 'Slipped' },
-  'rule.mastered': { icon: '👥', label: 'Standard codified — your team now inherits this' },
-  'category.spike': { icon: '📈', label: 'More corrections this week' },
+  'rule.patched': { icon: '🔧', label: 'Rule updated' },
+  'rule.recurrence': { icon: '⚠️', label: 'Slipped back' },
+  'rule.mastered': { icon: '👥', label: 'Your team now gets this automatically' },
+  'category.spike': { icon: '📈', label: 'More fixes this week' },
 }
 
-const EMPTY_COPY = 'Nothing to report this week. Your brain is quiet — that is a good sign.'
+const EMPTY_COPY = 'Nothing to report this week. Your AI has been quiet — that is a good sign.'
 
 export function renderableEvents<T extends { kind: OutcomeActivityKind }>(events: T[]): T[] {
   return events.filter((e) => e.kind !== 'meta_rule.emerged')

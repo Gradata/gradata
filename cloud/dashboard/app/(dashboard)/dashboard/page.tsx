@@ -8,6 +8,12 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Button } from '@/components/ui/button'
 import { computeKpis, computeGraduationCounts } from '@/lib/analytics-client'
+import {
+  demoAnalytics,
+  demoCorrections,
+  demoLessons,
+  demoActivityEvents,
+} from '@/lib/fixtures/demo-dashboard'
 import { KpiStrip } from '@/components/brain/KpiStrip'
 import { GraduationProgressBar } from '@/components/brain/GraduationProgressBar'
 import { CorrectionDecayCurve } from '@/components/brain/CorrectionDecayCurve'
@@ -17,6 +23,7 @@ import { ActivityFeed } from '@/components/brain/ActivityFeed'
 
 export default function DashboardPage() {
   const [range, setRange] = useState<'7d' | '30d' | '90d'>('30d')
+  const [demoMode, setDemoMode] = useState(false)
 
   const { data: brains, loading: loadingBrains } = useApi<Brain[]>('/brains')
   const primaryBrainId = brains?.[0]?.id ?? null
@@ -32,33 +39,42 @@ export default function DashboardPage() {
   )
 
   const corrections = useMemo<Correction[]>(() => {
+    if (demoMode) return demoCorrections
     if (!correctionsResp) return []
     return Array.isArray(correctionsResp) ? correctionsResp : correctionsResp.data
-  }, [correctionsResp])
+  }, [correctionsResp, demoMode])
 
   const lessons = useMemo<Lesson[]>(() => {
+    if (demoMode) return demoLessons
     if (!lessonsResp) return []
     return Array.isArray(lessonsResp) ? lessonsResp : lessonsResp.data
-  }, [lessonsResp])
+  }, [lessonsResp, demoMode])
+
+  const effectiveAnalytics = demoMode ? demoAnalytics : analytics
 
   const kpis = useMemo(
-    () => (analytics ? computeKpis(analytics, corrections, lessons) : null),
-    [analytics, corrections, lessons],
+    () => (effectiveAnalytics ? computeKpis(effectiveAnalytics, corrections, lessons) : null),
+    [effectiveAnalytics, corrections, lessons],
   )
   const gradCounts = useMemo(() => computeGraduationCounts(lessons), [lessons])
 
-  if (loadingBrains) return <LoadingSpinner className="py-20" />
+  if (loadingBrains && !demoMode) return <LoadingSpinner className="py-20" />
 
-  if (!primaryBrainId) {
+  if (!primaryBrainId && !demoMode) {
     return (
       <div className="py-12">
         <EmptyState
           title="AI that learns the corrections you keep making"
           description="Install the Gradata SDK and run your first session. Your brain stays local — the dashboard is a lens over it."
           action={
-            <Link href="/setup">
-              <Button>Start setup →</Button>
-            </Link>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Button onClick={() => setDemoMode(true)}>
+                Preview with sample data →
+              </Button>
+              <Link href="/setup">
+                <Button variant="outline">Install the SDK</Button>
+              </Link>
+            </div>
           }
         />
         <pre className="mx-auto mt-6 w-fit rounded-[0.5rem] border border-[var(--color-border)] bg-[rgba(21,29,48,0.6)] px-5 py-3 font-mono text-[13px] text-[var(--color-accent-blue)]">
@@ -73,12 +89,28 @@ export default function DashboardPage() {
 
   return (
     <>
+      {/* Demo banner */}
+      {demoMode && (
+        <div className="mb-6 flex items-center justify-between gap-3 rounded-[0.5rem] border border-[rgba(234,179,8,0.3)] bg-[rgba(234,179,8,0.08)] px-4 py-2.5">
+          <span className="text-[12px] text-[var(--color-warning)]">
+            <strong>Demo mode</strong> — showing sample data. Install the SDK to see your own brain.
+          </span>
+          <button
+            type="button"
+            onClick={() => setDemoMode(false)}
+            className="text-[12px] text-[var(--color-body)] hover:text-[var(--color-text)]"
+          >
+            Exit demo
+          </button>
+        </div>
+      )}
+
       {/* Page header + time range pills */}
       <header className="mb-7 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-[22px]">Overview</h1>
           <p className="mt-1 text-[13px] text-[var(--color-body)]">
-            Your brain&apos;s learning progress
+            What your AI learned from you
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -113,12 +145,12 @@ export default function DashboardPage() {
       {/* Rules + Categories */}
       <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ActiveRulesPanel lessons={lessons} />
-        {analytics && <CategoriesChart analytics={analytics} />}
+        {effectiveAnalytics && <CategoriesChart analytics={effectiveAnalytics} />}
       </div>
 
       {/* Activity */}
       <div className="mb-4">
-        <ActivityFeed />
+        <ActivityFeed events={demoMode ? demoActivityEvents : undefined} />
       </div>
     </>
   )

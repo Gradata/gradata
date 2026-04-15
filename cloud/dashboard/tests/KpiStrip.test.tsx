@@ -22,26 +22,25 @@ const baseMetrics: KpiMetrics = {
 }
 
 describe('KpiStrip', () => {
-  it('renders all KPI card labels including Est. Time Saved', () => {
+  it('renders all KPI card labels (marketified)', () => {
     render(<KpiStrip metrics={baseMetrics} />)
-    expect(screen.getByText('Correction Rate')).toBeInTheDocument()
-    expect(screen.getByText(/Est\. Time Saved/i)).toBeInTheDocument()
-    expect(screen.getByText('Sessions to Graduation')).toBeInTheDocument()
-    expect(screen.getByText('Misfires')).toBeInTheDocument()
+    expect(screen.getByText('Mistakes Caught')).toBeInTheDocument()
+    expect(screen.getByText('Time Saved')).toBeInTheDocument()
+    expect(screen.getByText('Sessions to Graduate')).toBeInTheDocument()
+    expect(screen.getByText('False Alarms')).toBeInTheDocument()
     expect(screen.getByText('Brain Footprint')).toBeInTheDocument()
   })
 
   it('shows "—" placeholder for null/zero values', () => {
     render(<KpiStrip metrics={baseMetrics} />)
     const dashes = screen.getAllByText('—')
-    // correction rate (null WoW) + sessions-to-graduation (0) + time saved (0) all render "—"
     expect(dashes.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('renders destructive tone for misfires > 0', () => {
+  it('renders destructive tone for False Alarms > 0', () => {
     const m: KpiMetrics = { ...baseMetrics, misfireCount: 2, totalFires: 10 }
     render(<KpiStrip metrics={m} />)
-    const change = screen.getByText(/across 10 rule fires/)
+    const change = screen.getByText(/10 times your AI helped/)
     expect(change.className).toContain('text-[var(--color-destructive)]')
   })
 })
@@ -65,31 +64,30 @@ const fullMetrics: KpiMetrics = {
 }
 
 describe('KpiStrip with Time Saved', () => {
-  it('renders five cards including Est. Time Saved', () => {
+  it('renders five cards with human labels', () => {
     render(<KpiStrip metrics={fullMetrics} />)
-    expect(screen.getByText(/Correction Rate/i)).toBeInTheDocument()
-    expect(screen.getByText(/Est\. Time Saved/i)).toBeInTheDocument()
-    expect(screen.getByText(/Sessions to Graduation/i)).toBeInTheDocument()
-    expect(screen.getByText(/Misfires/i)).toBeInTheDocument()
-    expect(screen.getByText(/Brain Footprint/i)).toBeInTheDocument()
+    expect(screen.getByText('Mistakes Caught')).toBeInTheDocument()
+    expect(screen.getByText('Time Saved')).toBeInTheDocument()
+    expect(screen.getByText('Sessions to Graduate')).toBeInTheDocument()
+    expect(screen.getByText('False Alarms')).toBeInTheDocument()
+    expect(screen.getByText('Brain Footprint')).toBeInTheDocument()
   })
 
   it('renders time saved as approximate hours when >= 60 min', () => {
     render(<KpiStrip metrics={fullMetrics} />)
-    // 93 min deterministically formats to "~1.6h" (93/60 = 1.55, toFixed(1) = 1.6)
     expect(screen.getByText('~1.6h')).toBeInTheDocument()
   })
 
   it('renders em dash for null WoW deltas', () => {
     render(<KpiStrip metrics={{ ...fullMetrics, correctionRateWoWDelta: null }} />)
-    const card = screen.getByTestId(/kpi-correction-rate/)
+    const card = screen.getByTestId(/kpi-mistakes-caught/)
     expect(within(card).getByText('—')).toBeInTheDocument()
   })
 
-  it('includes the honest "Est." tooltip copy on the Time Saved card', () => {
+  it('includes plain-language tooltip copy on the Time Saved card', () => {
     render(<KpiStrip metrics={fullMetrics} />)
-    const card = screen.getByTestId(/kpi-est--time-saved/)
+    const card = screen.getByTestId(/kpi-time-saved/)
     const tip = card.getAttribute('title') ?? ''
-    expect(tip).toMatch(/Estimated|3 minutes|fires/)
+    expect(tip).toMatch(/3 minutes|correction|AI caught/)
   })
 })

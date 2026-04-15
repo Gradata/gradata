@@ -63,46 +63,46 @@ describe('ActiveRulesPanel', () => {
     expect(screen.queryByText('instinct-hidden')).not.toBeInTheDocument()
   })
 
-  it('shows empty-state copy when no graduated rules', () => {
+  it('shows empty-state copy when nothing has graduated', () => {
     render(<ActiveRulesPanel lessons={[mk('i1', 'INSTINCT', 0.3)]} />)
     expect(
-      screen.getByText(/No graduated rules yet/i),
+      screen.getByText(/Nothing graduated yet/i),
     ).toBeInTheDocument()
   })
 })
 
 describe('ActiveRulesPanel status glyphs', () => {
-  it('renders filled dot + Xd clean for rules clean >= 7 days', () => {
+  it('renders filled dot + "N days holding" for rules clean >= 7 days', () => {
     const rules = [mkRule('a', { graduated_at: daysAgo(21) })]
     render(<ActiveRulesPanel lessons={rules} />)
-    expect(screen.getByText(/21d clean/i)).toBeInTheDocument()
+    expect(screen.getByText(/21 days holding/i)).toBeInTheDocument()
     expect(document.querySelector('[data-glyph="clean-durable"]')).toBeInTheDocument()
   })
 
   it('renders open dot for clean < 7 days', () => {
     const rules = [mkRule('a', { graduated_at: daysAgo(3) })]
     render(<ActiveRulesPanel lessons={rules} />)
-    expect(screen.getByText(/3d clean/i)).toBeInTheDocument()
+    expect(screen.getByText(/3 days holding/i)).toBeInTheDocument()
     expect(document.querySelector('[data-glyph="clean-new"]')).toBeInTheDocument()
   })
 
-  it('renders half dot + recurred Nd ago for recurrence < 7 days', () => {
+  it('renders half dot + "slipped Nd ago" for recurrence < 7 days', () => {
     const rules = [mkRule('a', { graduated_at: daysAgo(30), last_recurrence_at: daysAgo(2) })]
     render(<ActiveRulesPanel lessons={rules} />)
-    expect(screen.getByText(/recurred 2d ago/i)).toBeInTheDocument()
+    expect(screen.getByText(/slipped 2d ago/i)).toBeInTheDocument()
     expect(document.querySelector('[data-glyph="recurred"]')).toBeInTheDocument()
   })
 
-  it('renders em dash suffix when streak is null', () => {
-    const rules = [mkRule('a')] // no graduated_at, no last_recurrence_at
+  it('renders "just learned" when streak data is absent', () => {
+    const rules = [mkRule('a')]
     render(<ActiveRulesPanel lessons={rules} />)
     const row = screen.getByText('a').closest('li')!
-    expect(row.textContent).toMatch(/—/)
+    expect(row.textContent).toMatch(/just learned/i)
   })
 
-  it('renders a "See all rules" link to /rules', () => {
+  it('renders a "See all your rules" link to /rules', () => {
     render(<ActiveRulesPanel lessons={[]} />)
-    const link = screen.getByRole('link', { name: /see all rules/i })
+    const link = screen.getByRole('link', { name: /see all your rules/i })
     expect(link).toHaveAttribute('href', '/rules')
   })
 
