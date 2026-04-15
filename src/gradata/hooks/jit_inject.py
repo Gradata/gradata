@@ -25,7 +25,6 @@ import os
 import re
 import time
 from pathlib import Path
-
 from typing import TYPE_CHECKING
 
 from gradata.hooks._base import extract_message, resolve_brain_dir, run_hook
