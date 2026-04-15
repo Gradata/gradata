@@ -27,6 +27,18 @@ npx gradata-install install --ide=claude-code
 
 Works with any LLM. Python 3.11+. Zero required dependencies.
 
+## Repo layout
+
+- `src/gradata/` — the Python SDK (the heart: correction → rules → graduation pipeline)
+- `cloud/` — FastAPI backend + dashboard (optional hosted tier)
+- `tests/` — SDK tests (pytest)
+- `docs/` — mkdocs site sources (published to gradata.ai/docs)
+- `marketing/` — gradata.ai marketing site (Next.js)
+- `examples/` — SDK usage examples
+- `gradata-install/` — npm wrapper for one-command IDE setup
+- `.claude-plugin/` + `hooks/` — Claude Code plugin manifest (install with `/plugin install gradata`)
+- `brain/` — research scripts (benchmarks, simulations)
+
 ## Intellectual lineage
 
 Gradata synthesizes research from Constitutional AI (Anthropic, 2022), Duolingo's half-life regression (Settles & Meeder, ACL 2016), the Copilot RCT efficacy study (Peng et al., 2023), SuperMemo's two-component memory model (Wozniak, 1995), MT-Bench LLM-as-judge (Zheng et al., NeurIPS 2023), and the 15 agentic patterns (orchestrator, reflection, memory, rule_engine, and the rest). It stands alongside Mem0, Letta, and EverMind as an open memory system — with one difference: Gradata learns from your corrections, not just recalls facts. What's new is the graduation pipeline that turns repeated mistakes into durable rules, validated by multi-agent simulation. See [CREDITS.md](./CREDITS.md) for the full list.
