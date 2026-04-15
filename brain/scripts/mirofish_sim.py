@@ -3,6 +3,10 @@
 Generates multi-round debates between AI personas about architecture questions.
 Uses Ollama (Gemma4:e4b) for local generation.
 
+Methodology credit: the multi-agent expert-panel debate pattern follows the
+MiroFish approach to synthetic persona deliberation. This module adapts that
+methodology for Gradata's internal validation experiments.
+
 Usage:
     python mirofish_sim.py --config config.json --output dir/
 """
