@@ -12,11 +12,11 @@ from gradata import _telemetry
 @pytest.fixture(autouse=True)
 def _isolate_config(tmp_path, monkeypatch):
     """Point the telemetry config at a tmp path so tests don't touch the
-    real ~/.gradata/config.toml."""
+    real user config. Uses the shared ``GRADATA_CONFIG_DIR`` override
+    exposed by :mod:`gradata._config_paths` instead of patching module
+    constants directly."""
     cfg_dir = tmp_path / ".gradata"
-    cfg_path = cfg_dir / "config.toml"
-    monkeypatch.setattr(_telemetry, "CONFIG_DIR", cfg_dir)
-    monkeypatch.setattr(_telemetry, "CONFIG_PATH", cfg_path)
+    monkeypatch.setenv("GRADATA_CONFIG_DIR", str(cfg_dir))
     # Clear kill-switch env
     monkeypatch.delenv(_telemetry.ENV_KILL_SWITCH, raising=False)
     monkeypatch.delenv(_telemetry.ENV_ENDPOINT, raising=False)

@@ -25,7 +25,9 @@ Emails. Stack traces. Environment variables. Anything identifiable.
 
 Opt-in semantics
 ----------------
-1. ``~/.gradata/config.toml`` holds ``[telemetry] enabled = true|false``.
+1. The user-level Gradata config file (default ``~/.gradata/config.toml``,
+   overridable via ``GRADATA_CONFIG_DIR``) holds
+   ``[telemetry] enabled = true|false``.
 2. Default is OFF (missing file or missing key → off).
 3. ``GRADATA_TELEMETRY=0`` env var overrides to off, always. (Kill switch
    for users who already opted in but need to silence one session.)
@@ -56,14 +58,29 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, Literal
 
+from gradata._config_paths import get_config_dir
+
 logger = logging.getLogger("gradata.telemetry")
 
 # ── Constants ─────────────────────────────────────────────────────────
 DEFAULT_ENDPOINT: Final[str] = "https://api.gradata.ai/telemetry/event"
 ENV_ENDPOINT: Final[str] = "GRADATA_TELEMETRY_ENDPOINT"
 ENV_KILL_SWITCH: Final[str] = "GRADATA_TELEMETRY"
-CONFIG_DIR: Final[Path] = Path.home() / ".gradata"
-CONFIG_PATH: Final[Path] = CONFIG_DIR / "config.toml"
+_CONFIG_FILENAME: Final[str] = "config.toml"
+
+
+def _config_dir() -> Path:
+    """Shared resolver for the user-level Gradata config directory.
+
+    Delegates to :mod:`gradata._config_paths` so all SDK modules agree on
+    where ``config.toml`` lives and no one hardcodes ``Path.home()``.
+    """
+    return get_config_dir()
+
+
+def _config_path() -> Path:
+    """Shared resolver for the telemetry config file."""
+    return _config_dir() / _CONFIG_FILENAME
 
 # The exhaustive set of activation events. Adding a new one here is the
 # only place you need to touch — the prompt copy and the docs reference
@@ -87,10 +104,11 @@ ActivationEvent = Literal[
 def _read_config() -> dict[str, str]:
     """Read ``config.toml`` into a flat dict of top-level and ``[telemetry]``
     keys. Zero-dep — we don't want to pull tomllib just for this."""
-    if not CONFIG_PATH.exists():
+    cfg_path = _config_path()
+    if not cfg_path.exists():
         return {}
     try:
-        text = CONFIG_PATH.read_text(encoding="utf-8")
+        text = cfg_path.read_text(encoding="utf-8")
     except OSError:
         return {}
     out: dict[str, str] = {}
@@ -118,8 +136,10 @@ def _write_config_key(key: str, value: str) -> None:
     section, _, bare = key.partition(".")
     if not bare:
         section, bare = "", section
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    existing = CONFIG_PATH.read_text(encoding="utf-8") if CONFIG_PATH.exists() else ""
+    cfg_dir = _config_dir()
+    cfg_path = _config_path()
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    existing = cfg_path.read_text(encoding="utf-8") if cfg_path.exists() else ""
 
     # Simple rewriter: find section, find key, replace; otherwise append.
     lines = existing.splitlines()
@@ -158,7 +178,7 @@ def _write_config_key(key: str, value: str) -> None:
             out_lines.append(f"[{section}]")
         out_lines.append(f'{bare} = "{value}"')
 
-    CONFIG_PATH.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+    cfg_path.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
 
 
 # ── Opt-in check ──────────────────────────────────────────────────────
@@ -189,7 +209,7 @@ def config_path() -> Path:
     Exposed so callers (e.g. the CLI) can render a portable path string
     instead of hard-coding ``~/.gradata/config.toml``.
     """
-    return CONFIG_PATH
+    return _config_path()
 
 
 # ── Anonymous user ID ─────────────────────────────────────────────────
@@ -287,8 +307,9 @@ def _config_lock(timeout: float = 2.0) -> Iterator[None]:
     worst-case race only causes a duplicate one-shot event, which the
     backend already tolerates.
     """
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    lock_path = CONFIG_DIR / ".config.lock"
+    cfg_dir = _config_dir()
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = cfg_dir / ".config.lock"
     try:
         fp = open(lock_path, "a+b")  # noqa: SIM115 — closed in finally below
     except OSError:

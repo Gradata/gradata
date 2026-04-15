@@ -120,11 +120,36 @@ class TestReplay:
         assert resp.status_code == 202
         assert mock_supabase._inserts == []
 
-    def test_drops_exactly_one_hour_old(self, client, mock_supabase):
-        old = (datetime.now(timezone.utc) - timedelta(hours=1, seconds=5)).isoformat()
+    @pytest.mark.parametrize(
+        "delta",
+        [
+            # A hair past the 1-hour boundary — asserts the rejection
+            # threshold fires as soon as ``now - ts > _MAX_AGE``.
+            timedelta(hours=1, seconds=1),
+            # Comfortably past the boundary — guards against drift/jitter
+            # in clocks or scheduler wake-ups.
+            timedelta(hours=1, seconds=5),
+        ],
+        ids=["just_over_one_hour", "well_past_one_hour"],
+    )
+    def test_drops_events_past_one_hour(self, client, mock_supabase, delta):
+        old = (datetime.now(timezone.utc) - delta).isoformat()
         resp = client.post("/telemetry/event", json=_valid_body(ts=old))
         assert resp.status_code == 202
         assert mock_supabase._inserts == []
+
+    def test_accepts_exactly_one_hour_old(self, client, mock_supabase):
+        # Contract: events are dropped only when ``now - ts > 1h`` (strictly).
+        # A timestamp that is exactly 1 hour old must still be accepted; this
+        # pins the boundary so a future refactor can't silently tighten it.
+        old_ts = datetime.now(timezone.utc) - timedelta(hours=1)
+        # Pad the allowed margin slightly so test-runner latency between
+        # building ``old_ts`` and the server recomputing ``now`` doesn't push
+        # us past the strict boundary.
+        old = (old_ts + timedelta(milliseconds=500)).isoformat()
+        resp = client.post("/telemetry/event", json=_valid_body(ts=old))
+        assert resp.status_code == 202
+        assert len(mock_supabase._inserts) == 1
 
     def test_accepts_recent_events(self, client, mock_supabase):
         recent = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
