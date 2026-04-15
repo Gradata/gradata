@@ -285,6 +285,61 @@ Register a custom task type in the scope classifier.
 
 ---
 
+## Inspection & Transparency
+
+Every graduated rule can be traced back to the corrections that created it. These methods power `gradata review`, dashboards, audits, and third-party tooling.
+
+### `brain.rules(*, include_all=False, category=None)` → list[dict]
+
+List graduated rules. By default returns PATTERN and RULE state only.
+
+```python
+brain.rules()                              # graduated only
+brain.rules(include_all=True)              # include INSTINCT
+brain.rules(category="tone")               # filter by category
+```
+
+Each dict contains `id`, `description`, `category`, `state`, `confidence`, `applications`, and timestamps. Rule IDs are stable hashes derived from the lesson content, so they survive re-loads.
+
+### `brain.explain(rule_id)` → dict
+
+Trace a rule to the corrections that created it.
+
+```python
+brain.explain("rule_abc123")
+# → {"rule_id": ..., "description": ..., "source_corrections": [...], "sessions": [...]}
+```
+
+### `brain.trace(rule_id)` → dict
+
+Full provenance chain: rule → lesson → corrections → events. Heavier than `explain()`; use for audits.
+
+### `brain.export_data(*, output_format="json")` → str
+
+Export rules as JSON or YAML. For quick inspection, dashboards, or `git diff` of AI preferences.
+
+```python
+brain.export_data()                        # JSON string
+brain.export_data(output_format="yaml")    # YAML string
+```
+
+### `brain.pending_promotions()` → list[dict]
+
+List rules that have graduated this session and may warrant human review. Silent during normal work — intended to be called at session end.
+
+### `brain.approve_promotion(rule_id)` → dict
+
+Endorse a graduated rule. Persists a `reviewed` flag to the lessons file and emits `PROMOTION_APPROVED`. Returns `{"approved": True}` or `{"error": "..."}`.
+
+### `brain.reject_promotion(rule_id)` → dict
+
+Demote a graduated rule back to INSTINCT with confidence 0.40. Emits `PROMOTION_REJECTED`. Returns `{"rejected": True, "demoted_from": old_state}` or `{"error": "..."}`.
+
+!!! note
+    `review_pending()` / `approve_lesson()` / `reject_lesson()` operate on the _pre_-graduation approval queue (integer IDs, gated by `approval_required=True`). `pending_promotions()` / `approve_promotion()` / `reject_promotion()` operate on _already_-graduated rules (stable string IDs) as a post-hoc veto.
+
+---
+
 ## Export and share
 
 ### `brain.export(output_path=None, mode="full")` → Path
@@ -308,6 +363,22 @@ Install a brain package from another user, applying their graduated rules to thi
 ### `brain.export_rules(min_state="PATTERN", skill_name="")` → str
 
 Export rules as markdown for cross-platform agent hosts (see [Rule-to-Hook](rule-to-hook.md)).
+
+### `brain.export_rules_json(min_state="PATTERN")` → list[dict]
+
+Export graduated rules as a flat, sorted JSON-ready array. Useful for dashboards and external tooling.
+
+### `brain.export_skill(output_dir=None, min_state="PATTERN", skill_name="")` → Path
+
+Export graduated rules as a full [skill directory](https://github.com/openspace-ai/skills) (SKILL.md + metadata). Returns the path to the created directory.
+
+### `brain.export_skills(output_dir=None, min_state="PATTERN")` → list[str]
+
+Export graduated rules as one SKILL.md per category. Returns the list of files written.
+
+### `brain.export_tree(format="json", path="./export")` → Path
+
+Export the brain's rule tree in `"json"` or `"obsidian"` format.
 
 ### `brain.backfill_from_git(repo_path=".", lookback_days=90)`
 
