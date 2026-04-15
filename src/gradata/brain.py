@@ -546,10 +546,8 @@ class Brain(BrainInspectionMixin):
         # so subsequent apply_brain_rules() calls see the patched text
         # instead of a stale pre-patch prompt.
         if result.get("patched"):
-            try:
+            with contextlib.suppress(Exception):  # pragma: no cover -- defensive
                 self._rule_cache.invalidate()
-            except Exception:  # pragma: no cover -- defensive
-                pass
         return result
 
     def add_rule(
