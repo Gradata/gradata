@@ -19,7 +19,12 @@ export default function PrivacyPage() {
   }, [analytics])
 
   if (loadingBrains) return <LoadingSpinner className="py-20" />
-  if (!primaryId) return <EmptyState title="No brain yet" description="Install the SDK first." />
+  if (!primaryId) return (
+    <EmptyState
+      title="No brain yet"
+      description="Install the SDK first — privacy controls appear per brain. See Setup in the left nav for install instructions."
+    />
+  )
 
   return (
     <>

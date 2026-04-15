@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AuthLegalLinks } from '@/components/layout/AuthLegalLinks'
 import { useAuth } from '@/hooks/useAuth'
+import { friendlyAuthError } from '@/lib/auth-errors'
 
 export default function ForgotPasswordPage() {
   const { sendPasswordReset } = useAuth()
@@ -21,7 +22,7 @@ export default function ForgotPasswordPage() {
     setError(null)
     setSubmitting(true)
     const result = await sendPasswordReset(email)
-    if (result.error) setError(result.error.message)
+    if (result.error) setError(friendlyAuthError(result.error.message))
     else setSent(true)
     setSubmitting(false)
   }

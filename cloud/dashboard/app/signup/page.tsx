@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AuthLegalLinks } from '@/components/layout/AuthLegalLinks'
 import { useAuth } from '@/hooks/useAuth'
+import { friendlyAuthError } from '@/lib/auth-errors'
 
 export default function SignupPage() {
   const { signUp, session, loading } = useAuth()
@@ -33,7 +34,7 @@ export default function SignupPage() {
 
     setSubmitting(true)
     const result = await signUp(email, pw)
-    if (result.error) setError(result.error.message)
+    if (result.error) setError(friendlyAuthError(result.error.message))
     else setSuccess(true)
     setSubmitting(false)
   }
