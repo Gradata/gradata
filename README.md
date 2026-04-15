@@ -5,7 +5,7 @@
 [![Tests](https://github.com/Gradata/gradata/actions/workflows/test.yml/badge.svg)](https://github.com/Gradata/gradata/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/gradata)](https://pypi.org/project/gradata/)
 [![Python](https://img.shields.io/pypi/pyversions/gradata)](https://pypi.org/project/gradata/)
-[![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 You fix a tone. You rewrite a regex. You re-explain how your team formats PRs. Then the AI forgets, and you do it all again next session.
 
@@ -21,7 +21,7 @@ One-command setup for Claude Code, Cursor, Windsurf, or any MCP-compatible IDE:
 npx gradata-install install --ide=claude-code
 ```
 
-Works with any LLM. Python 3.11+. Zero required dependencies. Local-first. AGPL-3.0.
+Works with any LLM. Python 3.11+. Zero required dependencies. Local-first. Apache-2.0.
 
 ---
 
@@ -307,4 +307,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-AGPL-3.0. Commercial license available — contact hello@gradata.com.
+**SDK:** Apache-2.0. Use it anywhere — commercial, proprietary, SaaS, internal tooling. No copyleft, no linking obligations.
+
+**Cloud** (`gradata-cloud` repo): BSL-1.1, auto-converts to Apache-2.0 on 2029-04-15. You can read the code, fork it, and self-host for internal use. You cannot run it as a competing commercial SaaS. After the Change Date, all restrictions lift.
