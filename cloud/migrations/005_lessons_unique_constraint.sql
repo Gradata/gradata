@@ -12,6 +12,8 @@
 -- This is conservative — no lesson metadata is lost for brains that never
 -- synced the same description twice.
 
+BEGIN;
+
 WITH ranked AS (
     SELECT
         id,
@@ -27,3 +29,5 @@ WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
 ALTER TABLE lessons
 ADD CONSTRAINT lessons_brain_id_description_key
 UNIQUE (brain_id, description);
+
+COMMIT;

@@ -221,14 +221,18 @@ async def list_customers(
             )
         )
 
-    # Sort Nones consistently: actual dates rank before None in both asc and desc
-    # (True > False, so `is not None` ensures real dates always sort before None).
-    sort_keys = {
-        "mrr": lambda r: r.mrr_usd,
-        "active_users": lambda r: r.active_users,
-        "last_active": lambda r: (r.last_active is not None, r.last_active or ""),
-    }
-    rows.sort(key=sort_keys[sort], reverse=(order == "desc"))
+    # Keep None last_active rows at the end for both asc and desc order.
+    # `reverse=True` flips tuple ordering, so a single composite key can't
+    # hold Nones last in both directions — do it as a stable two-pass sort.
+    if sort == "last_active":
+        rows.sort(key=lambda r: r.last_active or "", reverse=(order == "desc"))
+        rows.sort(key=lambda r: r.last_active is None)  # stable: Nones to the end
+    else:
+        sort_keys = {
+            "mrr": lambda r: r.mrr_usd,
+            "active_users": lambda r: r.active_users,
+        }
+        rows.sort(key=sort_keys[sort], reverse=(order == "desc"))
 
     return rows[offset : offset + limit]
 
