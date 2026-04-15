@@ -36,7 +36,17 @@ TIER_UNIVERSAL = 3  # Universal principle: emerges from 3+ super-meta-rules
 
 @dataclass
 class MetaRule:
-    """Emergent principle from 3+ related corrections."""
+    """Emergent principle from 3+ related corrections.
+
+    The ``source`` field tracks how the principle text was generated:
+      - ``"deterministic"`` (default): produced by token-frequency / cluster
+        heuristics. Empirically (2026-04-14 ablation) these regress
+        correctness when injected into prompts. Excluded from injection.
+      - ``"llm_synth"``: produced by cloud-side LLM synthesis from the
+        source rules. Eligible for injection.
+      - ``"human_curated"``: hand-written or human-edited principle. Always
+        eligible for injection.
+    """
 
     id: str
     principle: str
@@ -51,6 +61,13 @@ class MetaRule:
     applies_when: list[str] = field(default_factory=list)
     never_when: list[str] = field(default_factory=list)
     transfer_scope: RuleTransferScope = RuleTransferScope.PERSONAL
+    source: str = "deterministic"  # provenance of the principle text — see class docstring
+
+
+# Sources whose principle text is trusted enough to inject into LLM prompts.
+# Deterministic auto-generated principles regress correctness empirically
+# (2026-04-14 ablation, 432 trials, judged blind).
+INJECTABLE_META_SOURCES = frozenset({"llm_synth", "human_curated"})
 
 
 @dataclass
@@ -305,6 +322,7 @@ def format_meta_rules_for_prompt(
     context: str = "",
     condition_context: dict | None = None,
     scope_filter: RuleTransferScope | None = None,
+    limit: int | None = None,
 ) -> str:
     """Format meta-rules for injection into LLM context.
 
@@ -322,6 +340,10 @@ def format_meta_rules_for_prompt(
     When *scope_filter* is provided, only meta-rules with the matching
     ``transfer_scope`` are included.
 
+    When *limit* is provided, the cap is applied AFTER context-aware
+    ranking so a lower-confidence rule with a stronger context weight
+    can still be promoted into the final set.
+
     Args:
         metas: Meta-rules to format.
         context: Optional task-context label (e.g. ``"drafting"``,
@@ -332,6 +354,9 @@ def format_meta_rules_for_prompt(
             :func:`evaluate_conditions` are included.
         scope_filter: When set, only include meta-rules with this
             transfer scope.
+        limit: Optional maximum number of meta-rules to include.
+            Applied AFTER context-aware ranking so context weight can
+            influence which rules make the cut. ``None`` means no cap.
 
     Returns:
         Formatted string block, or ``""`` if *metas* is empty.
@@ -349,9 +374,15 @@ def format_meta_rules_for_prompt(
     if not metas:
         return ""
 
-    # Re-rank by context weight when a context is provided
+    # Re-rank by context weight when a context is provided. Pass `limit`
+    # through as `max_rules` so ranking + capping happens atomically;
+    # otherwise apply the cap after the fact (no ranking case).
     if context:
-        metas = rank_meta_rules_by_context(metas, context)
+        metas = rank_meta_rules_by_context(
+            metas, context, max_rules=limit if limit is not None else len(metas),
+        )
+    elif limit is not None:
+        metas = metas[:limit]
 
     lines = ["## Brain Meta-Rules (compound principles)"]
     for i, meta in enumerate(metas, start=1):
