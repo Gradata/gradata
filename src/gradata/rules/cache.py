@@ -6,7 +6,11 @@ import hashlib
 
 
 class RuleCache:
-    """Caches formatted-rule strings by scope key. Invalidated on brain.correct()."""
+    """Caches formatted rule strings by scope key. Invalidated on brain.correct().
+
+    Stores the output of ``format_rules_for_prompt`` (a ``str``) keyed by
+    scope so re-applying the same scope is a dict lookup, not a re-rank.
+    """
 
     def __init__(self) -> None:
         self._cache: dict[str, str] = {}

@@ -174,6 +174,8 @@ class Lesson:
     climb_count: int = 0  # Total times this rule climbed (max 3)
     last_climb_session: int = 0  # Session when last climb occurred
     tree_level: int = 0  # Current depth: 0=leaf, 1=branch, 2=trunk
+    # Transient runtime state (not persisted to lessons.md) — self_improvement
+    # / rule_evolution decay confidence once this crosses a threshold.
     _contradiction_streak: int = 0  # Consecutive contradictions; triggers self-correction / penalty acceleration
 
     def __post_init__(self) -> None:

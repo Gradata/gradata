@@ -39,6 +39,7 @@ HOOK_REGISTRY: list[tuple[str, str, str | None, Profile, int, str]] = [
     ("brain_maintain",       "Stop",             None,                   Profile.STRICT,   20000, "Gradata: FTS rebuild + brain maintenance"),
     ("session_persist",      "Stop",             None,                   Profile.STRICT,   10000, "Gradata: crash-safe session handoff"),
     ("implicit_feedback",    "UserPromptSubmit", None,                   Profile.STRICT,   5000,  "Gradata: detect pushback as implicit corrections"),
+    ("stale_hook_check",     "SessionStart",     None,                   Profile.STANDARD, 5000,  "Gradata: warn on stale generated hooks at session start"),
 ]
 
 SETTINGS_PATH = Path.home() / ".claude" / "settings.json"

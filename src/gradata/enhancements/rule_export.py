@@ -4,6 +4,9 @@ Supported targets:
 - cursor    -> .cursorrules (freeform markdown rule-per-line)
 - agents    -> AGENTS.md (markdown with headings + bullet rules)
 - aider     -> .aider.conf.yml (YAML with custom system prompt rules)
+- codex     -> .codex/AGENTS.md (Codex CLI rules, same AGENTS schema)
+- cline     -> .clinerules (Cline rules file — single markdown)
+- continue  -> .continue/rules/gradata-rules.md (Continue.dev rules)
 
 Usage (library):
     from gradata.enhancements.rule_export import export_rules
@@ -65,15 +68,19 @@ def _format_cursor(rules: list[tuple[str, str]]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _format_agents(rules: list[tuple[str, str]]) -> str:
+def _format_grouped_markdown(title: str, rules: list[tuple[str, str]]) -> str:
+    """Render rules as a markdown doc with a title, intro, and ``## CATEGORY``
+    sections of bullet points. Shared body for AGENTS.md / Codex / Cline /
+    Continue.dev exports — they all consume the same schema (markdown
+    appended to a system prompt), only the H1 title and output path differ.
+    """
     if not rules:
-        return "# AGENTS.md\n\nNo graduated rules yet.\n"
-    # Group by category for readability
+        return f"# {title}\n\nNo graduated rules yet.\n"
     by_cat: dict[str, list[str]] = {}
     for cat, desc in rules:
         by_cat.setdefault(cat, []).append(desc)
     lines = [
-        "# AGENTS.md",
+        f"# {title}",
         "",
         "Graduated rules learned from corrections. Follow these in every response.",
         "",
@@ -98,20 +105,52 @@ def _format_aider(rules: list[tuple[str, str]]) -> str:
     double-quoted scalar (YAML's double-quoted form is a superset of JSON
     strings for these escapes).
     """
-    import json as _json
-
     if not rules:
         return "# No graduated rules yet\n"
+    import json as _json
+
     yaml_lines = ["# Graduated rules from Gradata", "message:"]
     for _, desc in rules:
-        yaml_lines.append(f"  - {_json.dumps(desc)}")
+        # YAML 1.2 double-quoted scalars accept the same escape grammar as
+        # JSON strings, so `json.dumps` gives us a valid scalar for any
+        # description (handles quotes, backslashes, control chars, unicode).
+        yaml_lines.append(f"  - {_json.dumps(desc, ensure_ascii=False)}")
     return "\n".join(yaml_lines) + "\n"
+
+
+# Grouped-markdown targets share _format_grouped_markdown; each picks its
+# own H1 title. Codex scopes to .codex/AGENTS.md to avoid collisions with
+# a top-level AGENTS.md when multiple agent tools share a repo.
+_GROUPED_MARKDOWN_TITLES = {
+    "agents": "AGENTS.md",
+    "codex": "Codex AGENTS.md",
+    "cline": "Cline Rules",
+    "continue": "Continue.dev Rules",
+}
+
+
+def _make_grouped_formatter(title: str):
+    def _fmt(rules: list[tuple[str, str]]) -> str:
+        return _format_grouped_markdown(title, rules)
+    return _fmt
 
 
 _FORMATTERS = {
     "cursor": _format_cursor,
-    "agents": _format_agents,
     "aider": _format_aider,
+    **{k: _make_grouped_formatter(v) for k, v in _GROUPED_MARKDOWN_TITLES.items()},
+}
+
+
+# Default relative output paths per target — used by the CLI when --output
+# is not supplied, and documented for users who want the conventional path.
+DEFAULT_PATHS: dict[str, str] = {
+    "cursor": ".cursorrules",
+    "agents": "AGENTS.md",
+    "aider": ".aider.conf.yml",
+    "codex": ".codex/AGENTS.md",
+    "cline": ".clinerules",
+    "continue": ".continue/rules/gradata-rules.md",
 }
 
 

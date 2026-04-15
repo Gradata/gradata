@@ -862,6 +862,7 @@ def graduate(
     renter: bool = False,
     machine_mode: bool = False,
     salt: str = "",
+    brain=None,
 ) -> tuple[list[Lesson], list[Lesson]]:
     """Apply state transitions and split into active vs graduated.
 
@@ -1069,7 +1070,11 @@ def graduate(
                     candidate = rule_to_hook.classify_rule(
                         desc, confidence=float(lesson.confidence)
                     )
-                    gen_result = rule_to_hook.try_generate(candidate)
+                    gen_result = rule_to_hook.try_generate(
+                        candidate,
+                        brain=brain,
+                        source="graduate",
+                    )
                     if gen_result.installed:
                         if lesson.metadata is None:
                             lesson.metadata = RuleMetadata()

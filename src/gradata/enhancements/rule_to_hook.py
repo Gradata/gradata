@@ -70,7 +70,9 @@ DETERMINISTIC_PATTERNS: list[tuple[re.Pattern[str], DeterminismCheck, str, str |
     # Secret scan
     (re.compile(r"never (commit|push) secret"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
     (re.compile(r"no (hardcod|hardcode).+secret"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
-    (re.compile(r"never commit secret|no secret|never push secret"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
+    # Tighter variant: require an anchoring preposition + target noun so generic
+    # phrases like "there's no secret sauce" don't collide with the secret rule.
+    (re.compile(r"\bno secrets?\b.*\b(in|to|into)\b.*\b(code|commit|commits|repo|source)\b"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
     (re.compile(r"no hardcoded api key|never hardcode api key|no api key in code"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
     # Auto test — PostToolUse, runs pytest against test_<basename>.py after edits.
     # template_arg is a sentinel ("auto_test") because render_hook gates on
@@ -217,15 +219,20 @@ def render_hook(candidate: HookCandidate) -> str | None:
         .replace("\n", " ")
     )
 
-    # file_size_check uses {{LINE_LIMIT}}; all other templates use {{PATTERN_LITERAL}}.
+    # file_size_check: template_arg holds the line limit as a string
     if candidate.hook_template == "file_size_check":
-        tmpl = tmpl.replace("{{LINE_LIMIT}}", candidate.template_arg or "500")
-    else:
-        pattern_literal = f"new RegExp({json.dumps(candidate.template_arg)})"
-        tmpl = tmpl.replace("{{PATTERN_LITERAL}}", pattern_literal)
+        limit = candidate.template_arg or "500"
+        return (
+            tmpl
+            .replace("{{LINE_LIMIT}}", limit)
+            .replace("{{RULE_TEXT}}", safe_text)
+            .replace("{{SOURCE_HASH}}", _source_hash(candidate.rule_description))
+        )
 
+    pattern_literal = f"new RegExp({json.dumps(candidate.template_arg)})"
     return (
         tmpl
+        .replace("{{PATTERN_LITERAL}}", pattern_literal)
         .replace("{{RULE_TEXT}}", safe_text)
         .replace("{{SOURCE_HASH}}", _source_hash(candidate.rule_description))
     )
@@ -291,6 +298,14 @@ def _slug(text: str) -> str:
     return s[:60] or "rule"
 
 
+def _hook_root() -> Path:
+    """Where generated hooks get installed. Overridable via env for tests."""
+    override = os.environ.get("GRADATA_HOOK_ROOT")
+    if override:
+        return Path(override)
+    return Path(".claude/hooks/pre-tool/generated")
+
+
 def install_hook(slug: str, hook_source: str, *, template: str) -> Path:
     """Write rendered hook source. Routes to post-tool dir for PostToolUse templates.
 
@@ -301,10 +316,10 @@ def install_hook(slug: str, hook_source: str, *, template: str) -> Path:
     Creates the directory if needed. Chmods to 0o755 on platforms that support it.
     """
     if template in _POST_TOOL_TEMPLATES:
-        env_var, default = "GRADATA_HOOK_ROOT_POST", ".claude/hooks/post-tool/generated"
+        override = os.environ.get("GRADATA_HOOK_ROOT_POST")
+        root = Path(override) if override else Path(".claude/hooks/post-tool/generated")
     else:
-        env_var, default = "GRADATA_HOOK_ROOT", ".claude/hooks/pre-tool/generated"
-    root = Path(os.environ.get(env_var) or default)
+        root = _hook_root()
     root.mkdir(parents=True, exist_ok=True)
     path = root / f"{slug}.js"
     # Preserve LF line endings regardless of platform
@@ -353,10 +368,37 @@ def _synthesize_positive(candidate: HookCandidate) -> str:
     return f"x{p}y"
 
 
+def _log_outcome(brain, source: str, candidate: HookCandidate, result: GenerationResult) -> None:
+    """Emit a RULE_TO_HOOK_INSTALLED/_FAILED event when a brain is provided.
+
+    Never raises — logging failures must not break graduation.
+    """
+    if brain is None:
+        return
+    try:
+        if result.installed:
+            brain.emit("RULE_TO_HOOK_INSTALLED", source, {
+                "slug": result.hook_path.stem if result.hook_path else "",
+                "rule_text": candidate.rule_description,
+                "template": candidate.hook_template,
+                "hook_path": str(result.hook_path) if result.hook_path else None,
+            })
+        else:
+            brain.emit("RULE_TO_HOOK_FAILED", source, {
+                "rule_text": candidate.rule_description,
+                "template": candidate.hook_template,
+                "reason": result.reason,
+            })
+    except Exception:
+        pass  # never fail graduation on a logging error
+
+
 def try_generate(
     candidate: HookCandidate,
     *,
     positive_example: str | None = None,
+    brain=None,
+    source: str = "graduate",
 ) -> GenerationResult:
     """Attempt to graduate a HookCandidate into an installed PreToolUse hook.
 
@@ -366,9 +408,24 @@ def try_generate(
         candidate: A HookCandidate from classify_rule.
         positive_example: Optional captured violating text to self-test against.
             If None, a minimal example is synthesized from template_arg.
+        brain: Optional Brain instance for event logging. When provided,
+            emits RULE_TO_HOOK_INSTALLED or RULE_TO_HOOK_FAILED.
+        source: Event source label ("graduate" for pipeline, "user_declared" for CLI).
 
     Returns a GenerationResult describing the outcome.
     """
+    result = _compute_generation(candidate, positive_example=positive_example)
+    _log_outcome(brain, source, candidate, result)
+    return result
+
+
+def _compute_generation(
+    candidate: HookCandidate,
+    *,
+    positive_example: str | None = None,
+) -> GenerationResult:
+    """Pure generation logic (no side-effect logging).  Split from try_generate
+    so outcome events are emitted in one place."""
     if candidate.enforcement != EnforcementType.HOOK:
         return GenerationResult(
             installed=False,
