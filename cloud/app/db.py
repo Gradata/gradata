@@ -143,6 +143,11 @@ class SupabaseClient:
         params: dict[str, str] = {}
         for key, val in filters.items():
             params[key] = f"eq.{val}"
+        # Final safety net: if every filter value was stripped away somehow,
+        # refuse rather than issue a full-table DELETE.
+        if not params:
+            _log.error("Refusing unfiltered delete on %s (all filters empty)", table)
+            raise HTTPException(status_code=500, detail="Database error")
         resp = await self._http.delete(f"/{table}", params=params)
         if resp.is_error:
             _raise_db_error("delete", table, resp)
