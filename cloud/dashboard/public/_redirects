@@ -1,9 +1,0 @@
-# Cloudflare Pages redirects
-# Format: <source> <destination> <status>
-# 200 = rewrite (URL stays), 301/302 = redirect (URL changes)
-
-# Legacy /brains/* compatibility — collapse to /brain?id=:splat
-/brains/*  /brain?id=:splat  301
-
-# Subdomain root compat — strip /app prefix if any old links exist
-/app/*  /:splat  301
