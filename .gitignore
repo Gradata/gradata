@@ -186,3 +186,10 @@ design-system/
 .gstack/
 .gitnexus
 .superpowers/
+
+# Pre-launch marketing drafts (private — live in vault instead)
+docs/content/
+docs/launch-post.md
+docs/public-launch-narrative.md
+docs/RELEASE-*-DRAFT.md
+
