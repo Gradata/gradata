@@ -563,7 +563,7 @@ class TestAutoHeal:
 
 
 class TestCorrectAutoHealIntegration:
-    """brain.correct() auto-closes the heal loop when auto_heal=True (default)."""
+    """brain.correct() closes the heal loop only when auto_heal=True is opted in."""
 
     @pytest.fixture
     def brain_with_rule(self, tmp_path):
@@ -583,11 +583,12 @@ class TestCorrectAutoHealIntegration:
         return brain
 
     def test_auto_heal_triggers_on_rule_failure(self, brain_with_rule):
-        """A correction in a ruled category auto-emits RULE_PATCHED."""
+        """A correction in a ruled category auto-emits RULE_PATCHED when opted in."""
         result = brain_with_rule.correct(
             draft="Thanks for joining! Excited!",
             final="Thanks for joining. Excited.",
             category="TONE",
+            auto_heal=True,
         )
         # The correction fired a RULE_FAILURE detection
         assert result.get("rule_failure_detected") is True
@@ -614,6 +615,46 @@ class TestCorrectAutoHealIntegration:
         assert len(failures) >= 1
         assert len(patches) == 0
 
+    def test_default_off_no_patch(self, brain_with_rule):
+        """Council verdict: auto_heal defaults to False. correct() with no
+        ``auto_heal=`` kwarg must detect RULE_FAILURE but never call the
+        orchestrator and never emit RULE_PATCHED.
+        """
+        result = brain_with_rule.correct(
+            draft="Thanks for joining! Excited!",
+            final="Thanks for joining. Excited.",
+            category="TONE",
+        )
+        # Failure still detected (that path is independent of auto_heal)
+        assert result.get("rule_failure_detected") is True
+        # But no patch event, and no auto_healed key on the correction event
+        patches = brain_with_rule.query_events(event_type="RULE_PATCHED", limit=10)
+        assert len(patches) == 0
+        assert "auto_healed" not in result
+
+    def test_patch_receipt_shape(self, brain_with_rule):
+        """When auto_heal=True successfully patches, the returned summary
+        exposes PatchReceipt fields (rule_id, old/new_confidence, patch_diff,
+        revert_command) so downstream tooling can show the edit.
+        """
+        failures = [{
+            "data": {
+                "failed_rule_category": "TONE",
+                "failed_rule_description": "Never use exclamation marks",
+                "failed_rule_confidence": 0.92,
+                "correction_description": "Removed exclamation marks from casual Slack message",
+            }
+        }]
+        summary = brain_with_rule.auto_heal(failure_events=failures)
+        assert summary["patched"] == 1
+        receipt = summary["patches"][0]
+        for key in ("rule_id", "old_confidence", "new_confidence", "patch_diff", "revert_command"):
+            assert key in receipt, f"PatchReceipt missing {key!r}"
+        assert receipt["rule_id"].startswith("TONE:")
+        assert receipt["revert_command"] == f"gradata rule revert {receipt['rule_id']}"
+        assert receipt["patch_diff"].startswith("- ")
+        assert "\n+ " in receipt["patch_diff"]
+
     def test_auto_heal_skipped_in_dry_run(self, brain_with_rule):
         """dry_run=True should not trigger auto-heal even if a failure is detected."""
         brain_with_rule.correct(
@@ -621,6 +662,7 @@ class TestCorrectAutoHealIntegration:
             final="Thanks for joining. Excited.",
             category="TONE",
             dry_run=True,
+            auto_heal=True,
         )
         patches = brain_with_rule.query_events(event_type="RULE_PATCHED", limit=10)
         assert len(patches) == 0
@@ -649,11 +691,12 @@ class TestSelfHealingE2E:
     def test_full_self_healing_flow(self, brain_with_rule):
         brain = brain_with_rule
 
-        # 1. Correction triggers RULE_FAILURE
+        # 1. Correction triggers RULE_FAILURE (opt into auto-heal for E2E)
         result = brain.correct(
             draft="Thanks for joining! Excited to work together!",
             final="Thanks for joining. Excited to work together.",
             category="TONE",
+            auto_heal=True,
         )
         assert result.get("rule_failure_detected") is True
 

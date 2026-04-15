@@ -374,7 +374,7 @@ class Brain(BrainInspectionMixin):
         min_severity: str = "as-is",
         scope: str | None = None,
         applies_to: str | None = None,
-        auto_heal: bool = True,
+        auto_heal: bool = False,
     ) -> dict:
         """Record a correction: user edited draft into final version.
 

@@ -578,14 +578,31 @@ def auto_heal_failures(
             continue
 
         if result.get("patched"):
-            patched.append(
-                {
-                    "category": candidate["category"],
-                    "old_description": candidate["original_description"],
-                    "new_description": candidate["proposed_description"],
-                    "delta_score": test.get("delta_score"),
-                }
+            # Stable, deterministic rule id derived from category + original
+            # description. Mirrors the convention used elsewhere in the
+            # graph layer so `gradata rule revert {id}` can round-trip.
+            rule_id = (
+                f"{candidate['category'].upper()}:"
+                f"{hash(candidate['original_description']) % 10000:04d}"
             )
+            preserved = result.get("confidence_preserved")
+            old_desc = candidate["original_description"]
+            new_desc = candidate["proposed_description"]
+            patch_diff = f"- {old_desc}\n+ {new_desc}"
+            receipt = {
+                "rule_id": rule_id,
+                "old_confidence": preserved,
+                "new_confidence": preserved,
+                "patch_diff": patch_diff,
+                "revert_command": f"gradata rule revert {rule_id}",
+                # Legacy fields retained for backwards compatibility with
+                # existing tests / tooling that read these keys.
+                "category": candidate["category"],
+                "old_description": old_desc,
+                "new_description": new_desc,
+                "delta_score": test.get("delta_score"),
+            }
+            patched.append(receipt)
         else:
             skipped.append(
                 {

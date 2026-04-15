@@ -82,7 +82,7 @@ def brain_correct(
     session: int | None = None, agent_type: str | None = None,
     approval_required: bool = False, dry_run: bool = False,
     min_severity: str = "as-is", scope: str | None = None,
-    applies_to: str | None = None, auto_heal: bool = True,
+    applies_to: str | None = None, auto_heal: bool = False,
 ) -> dict:
     """Record a correction: user edited draft into final version."""
     # Input validation
@@ -446,6 +446,26 @@ def brain_correct(
                     )
                     if heal_summary["patched"]:
                         event["auto_healed"] = heal_summary
+                        # Make auto-heal visible: one stderr line per patch so
+                        # silent rule edits can't sneak through. Guarded so a
+                        # printing bug can never break the learning loop.
+                        try:
+                            import sys as _sys
+                            for _patch in heal_summary.get("patches", []) or []:
+                                _rid = _patch.get("rule_id", "?")
+                                _old = _patch.get("old_confidence")
+                                _new = _patch.get("new_confidence")
+                                _revert = _patch.get(
+                                    "revert_command", f"gradata rule revert {_rid}"
+                                )
+                                print(
+                                    f"[gradata] auto-healed R-{_rid}: "
+                                    f"confidence {_old} -> {_new}, "
+                                    f"revert with `{_revert}`",
+                                    file=_sys.stderr,
+                                )
+                        except Exception:  # pragma: no cover — defensive
+                            pass
                 except Exception as heal_exc:
                     _log.debug("Auto-heal failed: %s", heal_exc)
     except Exception as e:
