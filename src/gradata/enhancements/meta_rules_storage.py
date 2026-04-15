@@ -2,7 +2,8 @@
 Meta-Rule SQLite Persistence — load/save for meta_rules and super_meta_rules tables.
 =====================================================================================
 All database I/O for meta-rules lives here.  Core logic and discovery live in
-``meta_rules.py``; tier-2/3 super-meta-rule logic lives in ``super_meta_rules.py``.
+``meta_rules.py`` (including the :class:`SuperMetaRule` dataclass used for
+tier-2/3 rows).
 
 Also exposes a *differential-privacy scaffold* (:class:`DPConfig`,
 :func:`apply_dp_to_export_row`) used by the cloud export path when meta-rules

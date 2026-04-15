@@ -90,7 +90,6 @@ class TestArchitectureLayers:
             "truth_protocol",
             "eval_benchmark",
             "install_manifest",
-            "outcome_feedback",
         ],
     )
     def test_contrib_enhancements_importable(self, module):

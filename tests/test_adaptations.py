@@ -2259,7 +2259,6 @@ class TestManifestNewModules:
         expected = [
             "loop_detection", "middleware_chain", "git_backfill",
             "auto_correct_hook", "reporting", "quality_monitoring",
-            "rule_evolution",
         ]
         for name in expected:
             assert name in modules, f"Missing: {name}"
@@ -2431,119 +2430,6 @@ class TestAntiPatterns:
             if r.pattern_name == "happy_to_help":
                 assert r.replacement_hint != ""
 
-
-# ---------------------------------------------------------------------------
-# 25. Rule A/B Testing
-# ---------------------------------------------------------------------------
-
-from gradata.enhancements.rule_evolution import (
-    ExperimentManager,
-    ExperimentResult,
-    RuleExperiment,
-    wilson_score_interval,
-)
-
-
-class TestRuleABTesting:
-    def test_wilson_score_zero_trials(self):
-        lower, upper = wilson_score_interval(0, 0)
-        assert lower == 0.0
-        assert upper == 0.0
-
-    def test_wilson_score_all_success(self):
-        lower, upper = wilson_score_interval(100, 100)
-        assert lower > 0.9
-        assert upper == 1.0
-
-    def test_wilson_score_half(self):
-        lower, upper = wilson_score_interval(50, 100)
-        assert 0.3 < lower < 0.5
-        assert 0.5 < upper < 0.7
-
-    def test_experiment_basic(self):
-        exp = RuleExperiment(
-            experiment_id="test",
-            variant_a="Rule A",
-            variant_b="Rule B",
-        )
-        assert exp.total_trials == 0
-
-    def test_experiment_record(self):
-        exp = RuleExperiment(
-            experiment_id="test",
-            variant_a="A", variant_b="B",
-        )
-        exp.record("a", success=True)
-        exp.record("b", success=False)
-        assert exp.total_trials == 2
-
-    def test_experiment_invalid_variant(self):
-        exp = RuleExperiment(experiment_id="test", variant_a="A", variant_b="B")
-        with pytest.raises(ValueError, match="'a' or 'b'"):
-            exp.record("c", success=True)
-
-    def test_experiment_inconclusive_few_trials(self):
-        exp = RuleExperiment(
-            experiment_id="test", variant_a="A", variant_b="B",
-            min_trials=20,
-        )
-        for _ in range(5):
-            exp.record("a", success=True)
-            exp.record("b", success=False)
-        result = exp.evaluate()
-        assert not result.sufficient_data
-        assert result.winner is None
-
-    def test_experiment_conclusive(self):
-        exp = RuleExperiment(
-            experiment_id="test", variant_a="A", variant_b="B",
-            min_trials=20, min_margin=0.10,
-        )
-        # A wins 90%, B wins 50%
-        for _ in range(25):
-            exp.record("a", success=True)
-        for _ in range(5):
-            exp.record("a", success=False)
-        for _ in range(15):
-            exp.record("b", success=True)
-        for _ in range(15):
-            exp.record("b", success=False)
-        result = exp.evaluate()
-        assert result.sufficient_data
-        assert result.winner == "a"
-        assert result.confidence > 0
-
-    def test_experiment_serialization(self):
-        exp = RuleExperiment(experiment_id="test", variant_a="A", variant_b="B")
-        exp.record("a", success=True)
-        exp.record("b", success=False)
-        d = exp.to_dict()
-        restored = RuleExperiment.from_dict(d)
-        assert restored.total_trials == 2
-
-    def test_experiment_assign(self):
-        exp = RuleExperiment(experiment_id="test", variant_a="A", variant_b="B")
-        variants = {exp.assign() for _ in range(20)}
-        assert "a" in variants
-        assert "b" in variants
-
-    def test_manager_create(self):
-        mgr = ExperimentManager()
-        exp = mgr.create("test", "A", "B", category="TONE")
-        assert mgr.active_count == 1
-        assert mgr.get("test") is exp
-
-    def test_manager_evaluate_all(self):
-        mgr = ExperimentManager()
-        mgr.create("test", "A", "B")
-        results = mgr.evaluate_all()
-        assert len(results) == 1
-
-    def test_manager_stats(self):
-        mgr = ExperimentManager()
-        mgr.create("test", "A", "B")
-        stats = mgr.stats()
-        assert stats["active_experiments"] == 1
 
 
 # ===========================================================================
