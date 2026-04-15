@@ -122,12 +122,15 @@ docs/north-star-research.md
 # Internal dev tooling — not part of SDK
 CLAUDE.md
 FEATURES.md
-Dockerfile
-.dockerignore
 .claude/
-packages/
 docs/GTM-Execution-Plan.md
 docs/gradata-comparison-table.md
+
+# npm package build artifacts (sources tracked, outputs ignored)
+packages/npm/node_modules/
+packages/npm/dist/
+packages/*/node_modules/
+packages/*/dist/
 
 # Secrets
 .env
