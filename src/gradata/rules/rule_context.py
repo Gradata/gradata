@@ -48,11 +48,15 @@ class GraduatedRule:
 def _rule_matches_domain(rule: GraduatedRule, domain_norm: str) -> bool:
     """Return True if ``rule`` is in-scope for ``domain_norm`` (already lowercased).
 
-    Match rules (OR):
+    STRICT matching (council verdict 4/4). Match rules (OR):
       1. ``rule.scope["domain"]`` equals ``domain_norm`` (case-insensitive).
       2. ``rule.scope["applies_to"]`` equals ``domain_norm`` or starts with
          ``f"{domain_norm}:"``.
-      3. ``rule.category`` equals ``domain_norm`` (case-insensitive fallback).
+
+    ``rule.category`` is deliberately ignored. Categories are taxonomy
+    labels (STYLE, TONE, SECURITY), not domains. Legacy rules with no
+    ``scope.domain`` set must be migrated via
+    ``scripts/migrate_legacy_scopes.py``.
     """
     if not domain_norm:
         return True
@@ -60,9 +64,7 @@ def _rule_matches_domain(rule: GraduatedRule, domain_norm: str) -> bool:
     if str(scope.get("domain", "")).strip().lower() == domain_norm:
         return True
     applies = str(scope.get("applies_to", "")).strip().lower()
-    if applies == domain_norm or (applies and applies.startswith(f"{domain_norm}:")):
-        return True
-    return (rule.category or "").strip().lower() == domain_norm
+    return applies == domain_norm or (applies and applies.startswith(f"{domain_norm}:"))
 
 
 class RuleContext:
@@ -114,10 +116,10 @@ class RuleContext:
 
         Args:
             domain: Optional domain filter. When set, only rules whose
-                ``scope["domain"]`` matches (case-insensitive), whose
+                ``scope["domain"]`` matches (case-insensitive) or whose
                 ``scope["applies_to"]`` equals ``domain`` or starts with
-                ``f"{domain}:"``, or whose ``category`` matches ``domain``
-                are returned.
+                ``f"{domain}:"`` are returned. Category is NOT used as a
+                fallback (council verdict 4/4 STRICT).
         """
         candidates = list(self._rules.values())
 

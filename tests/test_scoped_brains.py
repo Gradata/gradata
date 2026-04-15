@@ -142,8 +142,13 @@ def test_lessons_filtered_by_applies_to_prefix(tmp_path):
     assert "Refactor" in code_scoped[0].description
 
 
-def test_lessons_filtered_by_category_fallback(tmp_path):
-    """Legacy lessons with no scope_json still surface via category match."""
+def test_legacy_category_only_lessons_excluded(tmp_path):
+    """Council verdict 4/4 STRICT: category-as-domain fallback removed.
+
+    Legacy lessons with no scope_json (category-only) MUST NOT surface
+    under a scoped view. Users migrate them via
+    ``scripts/migrate_legacy_scopes.py``.
+    """
     from gradata.brain import Brain
 
     brain = Brain.init(str(tmp_path))
@@ -152,6 +157,29 @@ def test_lessons_filtered_by_category_fallback(tmp_path):
         lessons_path,
         [
             {"category": "CODE", "description": "Run tests first", "scope_json": ""},
+            {"category": "EMAIL", "description": "Hyperlink Calendly", "scope_json": ""},
+        ],
+    )
+
+    code_scoped = brain.scope("code").lessons()
+    assert code_scoped == []
+
+
+def test_migrated_lesson_surfaces_after_scope_json_set(tmp_path):
+    """Once scope_json.domain is populated (e.g. by migrate_legacy_scopes),
+    the lesson surfaces under the scoped view."""
+    from gradata.brain import Brain
+
+    brain = Brain.init(str(tmp_path))
+    lessons_path = brain.dir / "lessons.md"
+    _write_lessons(
+        lessons_path,
+        [
+            {
+                "category": "CODE",
+                "description": "Run tests first",
+                "scope_json": json.dumps({"domain": "code"}),
+            },
             {"category": "EMAIL", "description": "Hyperlink Calendly", "scope_json": ""},
         ],
     )
@@ -327,16 +355,35 @@ def test_rule_context_domain_filter():
     assert {r.rule_id for r in sales_rules} == {"r2"}
 
 
-def test_rule_context_domain_category_fallback():
+def test_rule_context_category_only_excluded():
+    """STRICT: category-only rules (no scope.domain) do NOT match a domain query."""
     from gradata.rules.rule_context import GraduatedRule, RuleContext
 
     ctx = RuleContext()
     ctx.publish(
         GraduatedRule(
             rule_id="r1",
-            category="CODE",  # no scope but category matches
+            category="CODE",  # category matches but scope.domain is unset
             principle="unit-test coverage",
             confidence=0.9,
+        )
+    )
+    result = ctx.query(domain="code", limit=10)
+    assert result == []
+
+
+def test_rule_context_domain_explicit_scope_required():
+    """After migration, scope.domain='code' on the same rule makes it match."""
+    from gradata.rules.rule_context import GraduatedRule, RuleContext
+
+    ctx = RuleContext()
+    ctx.publish(
+        GraduatedRule(
+            rule_id="r1",
+            category="CODE",
+            principle="unit-test coverage",
+            confidence=0.9,
+            scope={"domain": "code"},
         )
     )
     result = ctx.query(domain="code", limit=10)

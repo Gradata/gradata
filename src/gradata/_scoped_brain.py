@@ -16,12 +16,14 @@ Domain match semantics (see ``lesson_matches_domain``):
     A lesson belongs to domain ``D`` if ANY of the following holds:
 
     1. ``scope_json.domain == D`` (exact match on the stored RuleScope).
-    2. ``scope_json.applies_to`` starts with ``f"{D}:"`` (e.g. ``"code:refactor"``
-       matches domain ``"code"``). Bare ``applies_to == D`` also matches.
-    3. ``lesson.category.lower() == D.lower()`` (category-as-domain fallback).
+    2. ``scope_json.applies_to == D`` or starts with ``f"{D}:"``
+       (e.g. ``"code:refactor"`` matches domain ``"code"``).
 
-    Matching is case-insensitive. This is a deliberately permissive OR so
-    legacy lessons (category-tagged only) still surface under a scoped view.
+    Matching is case-insensitive. The category-as-domain fallback was
+    removed per the 4/4 STRICT council verdict: ``category`` is a
+    taxonomy label (STYLE, TONE, SECURITY), not a domain. Legacy
+    lessons without a ``scope_json.domain`` must be migrated using
+    ``scripts/migrate_legacy_scopes.py``.
 """
 
 from __future__ import annotations
@@ -45,8 +47,9 @@ logger = logging.getLogger(__name__)
 def lesson_matches_domain(lesson: Lesson, domain: str) -> bool:
     """Return True if ``lesson`` is in-scope for ``domain``.
 
-    See :mod:`gradata._scoped_brain` module docstring for the three-way
-    match rules. Empty ``domain`` matches everything (wildcard).
+    Matching is STRICT (council verdict 4/4): only the stored
+    ``scope_json`` is consulted. ``lesson.category`` is deliberately
+    ignored. Empty ``domain`` matches everything (wildcard).
     """
     if not domain:
         return True
@@ -54,25 +57,20 @@ def lesson_matches_domain(lesson: Lesson, domain: str) -> bool:
     if not d_norm:
         return True
 
-    # Rule 3: category fallback (cheapest check first)
-    if (lesson.category or "").strip().lower() == d_norm:
+    if not lesson.scope_json:
+        return False
+    try:
+        scope_data = json.loads(lesson.scope_json)
+    except (json.JSONDecodeError, TypeError):
+        return False
+    if not isinstance(scope_data, dict):
+        return False
+
+    scope_domain = str(scope_data.get("domain", "") or "").strip().lower()
+    if scope_domain == d_norm:
         return True
-
-    # Rules 1 and 2: dig into scope_json
-    if lesson.scope_json:
-        try:
-            scope_data = json.loads(lesson.scope_json)
-        except (json.JSONDecodeError, TypeError):
-            scope_data = {}
-        if isinstance(scope_data, dict):
-            scope_domain = str(scope_data.get("domain", "") or "").strip().lower()
-            if scope_domain == d_norm:
-                return True
-            applies_to = str(scope_data.get("applies_to", "") or "").strip().lower()
-            if applies_to == d_norm or applies_to.startswith(f"{d_norm}:"):
-                return True
-
-    return False
+    applies_to = str(scope_data.get("applies_to", "") or "").strip().lower()
+    return applies_to == d_norm or applies_to.startswith(f"{d_norm}:")
 
 
 def filter_lessons_by_domain(lessons: list[Lesson], domain: str) -> list[Lesson]:
@@ -127,19 +125,15 @@ class ScopedBrain:
     def _rule_dict_matches(self, rule: dict) -> bool:
         """Domain-match a dict as returned by ``list_rules``.
 
-        The inspection layer already serialises lessons to dicts; we re-derive
-        the match by loading the underlying Lesson via its rule_id. To keep
-        this cheap and dependency-free, we inspect dict fields directly.
+        STRICT matching (council verdict 4/4): only ``scope_json.domain``
+        or ``scope_json.applies_to`` are consulted. ``category`` is
+        ignored. ``metadata.where_scope`` is preserved as a legitimate
+        alternate serialization of the stored scope domain.
         """
         d_norm = self._domain.lower()
 
-        # Category fallback
-        cat = str(rule.get("category", "")).lower()
-        if cat == d_norm:
-            return True
-
-        # Scope data lives under metadata.where_scope or a top-level scope key
-        # depending on the exporter. Probe both conservatively.
+        # metadata.where_scope is how the inspection layer serialises
+        # the stored scope_json.domain, so it counts as a domain match.
         meta = rule.get("metadata") or {}
         where = str(meta.get("where_scope", "")).lower() if isinstance(meta, dict) else ""
         if where == d_norm:
