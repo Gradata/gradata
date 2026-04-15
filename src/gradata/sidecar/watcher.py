@@ -148,6 +148,25 @@ def _normalise_edit_distance(old: str, new: str) -> float:
     return round(1.0 - ratio, 4)
 
 
+def _ast_severity_or_none(before: str, after: str, path: str) -> str | None:
+    """Optional AST shunt: engages only when the flag is set and the file
+    is a supported language. Returns ``None`` on any miss so the caller
+    falls back to the edit-distance classifier. Never raises.
+    """
+    try:
+        from gradata.enhancements.ast_severity import (
+            ast_severity_enabled,
+            classify_ast_severity,
+            language_supported,
+        )
+
+        if not (ast_severity_enabled() and language_supported(path=path)):
+            return None
+        return classify_ast_severity(before, after)
+    except Exception:
+        return None
+
+
 def _classify_severity(edit_distance: float) -> str:
     """Map edit distance to severity label (aligned with diff_engine 5-label scale).
 
@@ -330,28 +349,9 @@ class FileWatcher:
         edit_distance = _normalise_edit_distance(
             watched.original_content, current_content
         )
-        # Optional AST-aware severity shunt: when GRADATA_AST_SEVERITY is set
-        # and the file is Python, score the AST delta instead of the textual
-        # delta. Falls back to edit-distance severity on any miss (unsupported
-        # language, parse failure, flag off). Keeps this as the single opt-in
-        # shunt point for the SDK.
-        severity = _classify_severity(edit_distance)
-        try:
-            from gradata.enhancements.ast_severity import (
-                ast_severity_enabled,
-                classify_ast_severity,
-                language_supported,
-            )
-
-            if ast_severity_enabled() and language_supported(path=resolved):
-                ast_sev = classify_ast_severity(
-                    watched.original_content, current_content
-                )
-                if ast_sev is not None:
-                    severity = ast_sev
-        except Exception:
-            # Never let the optional shunt break correction capture.
-            pass
+        severity = _ast_severity_or_none(
+            watched.original_content, current_content, resolved
+        ) or _classify_severity(edit_distance)
         return FileChange(
             path=resolved,
             old_content=watched.original_content,

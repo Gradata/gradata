@@ -1,9 +1,8 @@
 """
 Tests for the AST-aware severity classifier.
 
-Verifies the optional AST path collapses formatting-only deltas to
-``"as-is"``, up-weights genuine semantic changes, and falls back cleanly
-when Python parsing fails.
+Covers flag gating, language gating, whitespace/comment/rename/signature/
+rewrite semantics, parse-failure fallback, and the watcher shunt.
 """
 
 from __future__ import annotations
@@ -16,6 +15,8 @@ from gradata.enhancements.ast_severity import (
     language_supported,
 )
 
+_VALID_LABELS = {"as-is", "minor", "moderate", "major", "discarded"}
+
 # ---------------------------------------------------------------------------
 # Flag + language gating
 # ---------------------------------------------------------------------------
@@ -26,32 +27,40 @@ def test_flag_defaults_off(monkeypatch):
     assert ast_severity_enabled() is False
 
 
-@pytest.mark.parametrize("val", ["1", "true", "True", "YES", "on"])
-def test_flag_truthy_values(monkeypatch, val):
+@pytest.mark.parametrize(
+    "val,expected",
+    [
+        ("1", True),
+        ("true", True),
+        ("True", True),
+        ("YES", True),
+        ("on", True),
+        ("", False),
+        ("0", False),
+        ("false", False),
+        ("no", False),
+        ("bogus", False),
+    ],
+)
+def test_flag_values(monkeypatch, val, expected):
     monkeypatch.setenv("GRADATA_AST_SEVERITY", val)
-    assert ast_severity_enabled() is True
+    assert ast_severity_enabled() is expected
 
 
-@pytest.mark.parametrize("val", ["", "0", "false", "no", "bogus"])
-def test_flag_falsy_values(monkeypatch, val):
-    monkeypatch.setenv("GRADATA_AST_SEVERITY", val)
-    assert ast_severity_enabled() is False
-
-
-def test_language_hint_python():
-    assert language_supported(language="python") is True
-    assert language_supported(language="PY") is True
-
-
-def test_language_hint_unsupported():
-    assert language_supported(language="typescript") is False
-    assert language_supported(language=None) is False
-
-
-def test_language_from_path():
-    assert language_supported(path="/tmp/foo.py") is True
-    assert language_supported(path="/tmp/foo.pyi") is True
-    assert language_supported(path="/tmp/foo.md") is False
+@pytest.mark.parametrize(
+    "kwargs,expected",
+    [
+        ({"language": "python"}, True),
+        ({"language": "PY"}, True),
+        ({"language": "typescript"}, False),
+        ({"language": None}, False),
+        ({"path": "/tmp/foo.py"}, True),
+        ({"path": "/tmp/foo.pyi"}, True),
+        ({"path": "/tmp/foo.md"}, False),
+    ],
+)
+def test_language_supported(kwargs, expected):
+    assert language_supported(**kwargs) is expected
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +86,11 @@ def test_comment_added_is_trivial():
     assert classify_ast_severity(before, after) == "as-is"
 
 
+def test_identical_sources_are_as_is():
+    src = "def f():\n    return 1\n"
+    assert classify_ast_severity(src, src) == "as-is"
+
+
 def test_local_rename_is_minor():
     """Renaming one local in a small function is a minor correction."""
     before = (
@@ -99,10 +113,7 @@ def test_local_rename_is_minor():
 
 def test_signature_change_is_major_or_moderate():
     """Adding a parameter and propagating it is semantically loaded."""
-    before = (
-        "def greet(name):\n"
-        "    return 'hello ' + name\n"
-    )
+    before = "def greet(name):\n    return 'hello ' + name\n"
     after = (
         "def greet(name, loud=False):\n"
         "    msg = 'hello ' + name\n"
@@ -138,29 +149,20 @@ def test_full_body_rewrite_is_major_or_rewrite():
 
 
 # ---------------------------------------------------------------------------
-# Parse-failure fallback
+# Parse-failure / unsupported fallback
 # ---------------------------------------------------------------------------
 
 
-def test_malformed_before_returns_none():
-    before = "def f(:\n    pass\n"  # invalid Python
-    after = "def f():\n    pass\n"
-    assert classify_ast_severity(before, after) is None
-
-
-def test_malformed_after_returns_none():
-    before = "def f():\n    pass\n"
-    after = "def f(:\n    pass\n"
-    assert classify_ast_severity(before, after) is None
-
-
-def test_unsupported_language_returns_none():
-    assert classify_ast_severity("int x = 1;", "int x = 2;", language="c") is None
-
-
-def test_identical_sources_are_as_is():
-    src = "def f():\n    return 1\n"
-    assert classify_ast_severity(src, src) == "as-is"
+@pytest.mark.parametrize(
+    "before,after,language",
+    [
+        ("def f(:\n    pass\n", "def f():\n    pass\n", "python"),  # malformed before
+        ("def f():\n    pass\n", "def f(:\n    pass\n", "python"),  # malformed after
+        ("int x = 1;", "int x = 2;", "c"),  # unsupported language
+    ],
+)
+def test_returns_none_for_parse_or_language_miss(before, after, language):
+    assert classify_ast_severity(before, after, language=language) is None
 
 
 # ---------------------------------------------------------------------------
@@ -173,14 +175,13 @@ def test_watcher_shunt_engages_on_python_when_flag_set(tmp_path, monkeypatch):
     from gradata.sidecar.watcher import FileWatcher
 
     monkeypatch.setenv("GRADATA_AST_SEVERITY", "1")
-    watch_dir = tmp_path
-    target = watch_dir / "mod.py"
+    target = tmp_path / "mod.py"
     # Dense one-liner, then same program reformatted. Edit distance would
     # flag this as a large change; AST diff is zero.
     before = "def f(x):return x+1\n"
     after = "def f(x):\n    return x + 1\n"
 
-    watcher = FileWatcher(watch_dir)
+    watcher = FileWatcher(tmp_path)
     watcher.track(str(target), before)
     target.write_text(after, encoding="utf-8")
 
@@ -189,54 +190,30 @@ def test_watcher_shunt_engages_on_python_when_flag_set(tmp_path, monkeypatch):
     assert change.severity == "as-is"
 
 
-def test_watcher_shunt_off_by_default(tmp_path, monkeypatch):
-    """Flag unset => watcher uses the original edit-distance classifier."""
+@pytest.mark.parametrize(
+    "filename,flag_on",
+    [
+        ("mod.py", False),   # flag off => edit-distance path (not forced as-is)
+        ("notes.md", True),  # flag on but non-python => shunt skipped
+    ],
+)
+def test_watcher_shunt_skipped(tmp_path, monkeypatch, filename, flag_on):
+    """Shunt must only engage when BOTH flag on AND language supported."""
     from gradata.sidecar.watcher import FileWatcher
 
-    monkeypatch.delenv("GRADATA_AST_SEVERITY", raising=False)
-    watch_dir = tmp_path
-    target = watch_dir / "mod.py"
-    before = "def f(x):return x+1\n"
-    after = "def f(x):\n    return x + 1\n"
+    if flag_on:
+        monkeypatch.setenv("GRADATA_AST_SEVERITY", "1")
+    else:
+        monkeypatch.delenv("GRADATA_AST_SEVERITY", raising=False)
 
-    watcher = FileWatcher(watch_dir)
+    target = tmp_path / filename
+    before = "def f(x):return x+1\n" if filename.endswith(".py") else "hello world\n"
+    after = "def f(x):\n    return x + 1\n" if filename.endswith(".py") else "hello brave new world\n"
+
+    watcher = FileWatcher(tmp_path)
     watcher.track(str(target), before)
     target.write_text(after, encoding="utf-8")
 
     change = watcher.check(str(target))
     assert change is not None
-    # Without the flag we get whatever edit-distance says — crucially NOT
-    # forced to "as-is". Just assert severity is a valid label.
-    assert change.severity in {
-        "as-is",
-        "minor",
-        "moderate",
-        "major",
-        "discarded",
-    }
-
-
-def test_watcher_shunt_ignores_non_python(tmp_path, monkeypatch):
-    """Flag on but file is .md => AST path skipped, edit-distance used."""
-    from gradata.sidecar.watcher import FileWatcher
-
-    monkeypatch.setenv("GRADATA_AST_SEVERITY", "1")
-    watch_dir = tmp_path
-    target = watch_dir / "notes.md"
-    before = "hello world\n"
-    after = "hello brave new world\n"
-
-    watcher = FileWatcher(watch_dir)
-    watcher.track(str(target), before)
-    target.write_text(after, encoding="utf-8")
-
-    change = watcher.check(str(target))
-    assert change is not None
-    # Severity still valid; AST shunt should not have engaged.
-    assert change.severity in {
-        "as-is",
-        "minor",
-        "moderate",
-        "major",
-        "discarded",
-    }
+    assert change.severity in _VALID_LABELS
