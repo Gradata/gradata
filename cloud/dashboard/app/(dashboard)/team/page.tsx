@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { GlassCard } from '@/components/layout/GlassCard'
 import { PlanGate, type PlanTier } from '@/components/brain/PlanBadge'
+import { isOperatorEmail } from '@/lib/operator'
 import { useApi } from '@/hooks/useApi'
 import type { UserProfile } from '@/types/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
@@ -64,7 +65,7 @@ export default function TeamOverviewPage() {
         </Link>
       </header>
 
-      <PlanGate current={currentPlan} requires="team" featureName="Team analytics">
+      <PlanGate current={currentPlan} requires="team" featureName="Team analytics" bypass={isOperatorEmail(profile?.email)}>
         {loadingStats ? (
           <LoadingSpinner className="py-12" />
         ) : (
