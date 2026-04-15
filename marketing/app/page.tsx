@@ -33,6 +33,14 @@ export default function HomePage() {
           </p>
         </div>
         <KpiProofRow />
+        <div className="mt-8">
+          <a
+            href={site.proofUrl}
+            className="inline-flex items-center rounded-md border border-[color:var(--color-border)] px-5 py-2.5 text-sm font-medium text-[color:var(--color-foreground)] transition-colors hover:bg-[color:var(--color-card)]"
+          >
+            Read the A/B proof: Sonnet +7.8%, Gemma4 +9.5% correctness
+          </a>
+        </div>
       </section>
 
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">

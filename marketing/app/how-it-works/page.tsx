@@ -99,6 +99,25 @@ next_draft = llm.generate(prompt, context=brain.context_for("reply"))`}
         ))}
       </section>
 
+      <section className="mt-8">
+        <GlassCard className="p-6">
+          <div className="font-heading text-lg font-semibold">See the ablation data</div>
+          <p className="mt-2 text-sm text-[color:var(--color-muted-foreground)]">
+            192 trials across Sonnet, DeepSeek, qwen14b, and Gemma4. Blind Haiku 4.5 judge.
+            Rules clean vs rules plus LLM meta-rules vs base. Min 2022 random-content control
+            regressed 3 to 10 percent on three of four models, so the lift tracks content, not format.
+          </p>
+          <div className="mt-4">
+            <a
+              href={site.proofUrl}
+              className="inline-flex items-center rounded-md border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-foreground)] transition-colors hover:bg-[color:var(--color-card)]"
+            >
+              Read the A/B proof: Sonnet +7.8% preference
+            </a>
+          </div>
+        </GlassCard>
+      </section>
+
       <section className="mt-14">
         <GlassCard className="p-6">
           <div className="font-heading text-lg font-semibold">Injection, not retraining</div>
