@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import pytest
+
 from gradata._types import Lesson, LessonState
 
 
@@ -119,10 +120,10 @@ class TestBrainCorrectRuleFailure:
     @pytest.fixture
     def brain_with_rule(self, tmp_path):
         """Create a brain with a graduated RULE in TONE category."""
-        from gradata.brain import Brain
-        from gradata._types import Lesson, LessonState
-        from gradata.enhancements.self_improvement import format_lessons
         from gradata._db import write_lessons_safe
+        from gradata._types import Lesson, LessonState
+        from gradata.brain import Brain
+        from gradata.enhancements.self_improvement import format_lessons
 
         brain = Brain.init(str(tmp_path / "test-brain"))
         rule = Lesson(
@@ -161,10 +162,10 @@ class TestPatchRule:
 
     @pytest.fixture
     def brain_with_rule(self, tmp_path):
-        from gradata.brain import Brain
-        from gradata._types import Lesson, LessonState
-        from gradata.enhancements.self_improvement import format_lessons
         from gradata._db import write_lessons_safe
+        from gradata._types import Lesson, LessonState
+        from gradata.brain import Brain
+        from gradata.enhancements.self_improvement import format_lessons
 
         brain = Brain.init(str(tmp_path / "test-brain"))
         rule = Lesson(
@@ -384,6 +385,7 @@ class TestNarrowRuleScope:
 
     def test_adds_domain_exclusion(self):
         import json
+
         from gradata.enhancements.self_healing import narrow_rule_scope
 
         rule = Lesson(
@@ -412,6 +414,7 @@ class TestNarrowRuleScope:
 
     def test_accumulates_exclusions(self):
         import json
+
         from gradata.enhancements.self_healing import narrow_rule_scope
 
         rule = Lesson(
@@ -429,15 +432,145 @@ class TestNarrowRuleScope:
         assert "internal_notes" in scope["excluded_domains"]
 
 
+class TestAutoHeal:
+    """brain.auto_heal + auto_heal_failures: the closed-loop orchestrator."""
+
+    @pytest.fixture
+    def brain_with_rule(self, tmp_path):
+        from gradata._db import write_lessons_safe
+        from gradata._types import Lesson, LessonState
+        from gradata.brain import Brain
+        from gradata.enhancements.self_improvement import format_lessons
+
+        brain = Brain.init(str(tmp_path / "test-brain"))
+        rule = Lesson(
+            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
+            category="TONE", description="Never use exclamation marks",
+            fire_count=8,
+        )
+        lessons_path = brain._find_lessons_path(create=True)
+        write_lessons_safe(lessons_path, format_lessons([rule]))
+        return brain
+
+    def test_empty_failures_returns_zero_summary(self, brain_with_rule):
+        result = brain_with_rule.auto_heal(failure_events=[])
+        assert result == {
+            "examined": 0,
+            "patched": 0,
+            "skipped": 0,
+            "patches": [],
+            "skipped_reasons": [],
+        }
+
+    def test_passing_candidate_auto_patches_and_emits_event(self, brain_with_rule):
+        failures = [{
+            "data": {
+                "failed_rule_category": "TONE",
+                "failed_rule_description": "Never use exclamation marks",
+                "failed_rule_confidence": 0.92,
+                "correction_description": "Removed exclamation marks from casual Slack message",
+            }
+        }]
+        result = brain_with_rule.auto_heal(failure_events=failures)
+        assert result["examined"] == 1
+        assert result["patched"] == 1
+        assert result["patches"][0]["category"] == "TONE"
+
+        # RULE_PATCHED event emitted by brain.patch_rule
+        events = brain_with_rule.query_events(event_type="RULE_PATCHED", limit=10)
+        assert len(events) >= 1
+        assert events[0]["data"]["reason"].startswith("auto_heal:")
+
+    def test_failing_retroactive_test_is_skipped(self, brain_with_rule):
+        # Correction word-identical to rule -> no delta -> retroactive_test rejects
+        failures = [{
+            "data": {
+                "failed_rule_category": "TONE",
+                "failed_rule_description": "Never use exclamation marks",
+                "failed_rule_confidence": 0.92,
+                "correction_description": "Never use exclamation marks",
+            }
+        }]
+        result = brain_with_rule.auto_heal(failure_events=failures)
+        assert result["patched"] == 0
+        assert result["skipped"] == 1
+        assert "retroactive_test_failed" in result["skipped_reasons"][0]["reason"]
+
+    def test_deduplicates_same_category_in_batch(self, brain_with_rule):
+        # Two failures for the same rule in one call -> only one patch
+        failures = [
+            {
+                "data": {
+                    "failed_rule_category": "TONE",
+                    "failed_rule_description": "Never use exclamation marks",
+                    "failed_rule_confidence": 0.92,
+                    "correction_description": "Removed exclamation marks from sales email",
+                }
+            },
+            {
+                "data": {
+                    "failed_rule_category": "TONE",
+                    "failed_rule_description": "Never use exclamation marks",
+                    "failed_rule_confidence": 0.92,
+                    "correction_description": "Removed exclamation marks from sales email",
+                }
+            },
+        ]
+        result = brain_with_rule.auto_heal(failure_events=failures)
+        assert result["patched"] == 1
+        assert any(s["reason"] == "duplicate_in_batch" for s in result["skipped_reasons"])
+
+    def test_respects_max_patches_cap(self, brain_with_rule):
+        from gradata._db import write_lessons_safe
+        from gradata._types import Lesson, LessonState
+        from gradata.enhancements.self_improvement import format_lessons
+
+        # Seed 3 rules in distinct categories
+        lessons = [
+            Lesson(date="2026-04-01", state=LessonState.RULE, confidence=0.92,
+                   category=f"CAT_{i}", description=f"Rule number {i}",
+                   fire_count=5)
+            for i in range(3)
+        ]
+        lessons_path = brain_with_rule._find_lessons_path(create=True)
+        write_lessons_safe(lessons_path, format_lessons(lessons))
+
+        failures = [
+            {
+                "data": {
+                    "failed_rule_category": f"CAT_{i}",
+                    "failed_rule_description": f"Rule number {i}",
+                    "failed_rule_confidence": 0.92,
+                    "correction_description": f"Rule number {i} failed in sales context",
+                }
+            }
+            for i in range(3)
+        ]
+        result = brain_with_rule.auto_heal(failure_events=failures, max_patches=1)
+        assert result["patched"] == 1
+        assert any(s["reason"] == "max_patches_reached" for s in result["skipped_reasons"])
+
+    def test_reads_events_from_brain_when_none_passed(self, brain_with_rule):
+        # Trigger a RULE_FAILURE via brain.correct, then auto_heal without args
+        brain_with_rule.correct(
+            draft="Thanks for joining! Excited!",
+            final="Thanks for joining. Excited.",
+            category="TONE",
+        )
+        result = brain_with_rule.auto_heal()
+        # Should have read the RULE_FAILURE from the event log
+        assert result["examined"] >= 1
+
+
 class TestSelfHealingE2E:
     """Full flow: correct -> RULE_FAILURE detected -> patch generated -> rule updated."""
 
     @pytest.fixture
     def brain_with_rule(self, tmp_path):
-        from gradata.brain import Brain
-        from gradata._types import Lesson, LessonState
-        from gradata.enhancements.self_improvement import format_lessons
         from gradata._db import write_lessons_safe
+        from gradata._types import Lesson, LessonState
+        from gradata.brain import Brain
+        from gradata.enhancements.self_improvement import format_lessons
 
         brain = Brain.init(str(tmp_path / "test-brain"))
         rule = Lesson(
