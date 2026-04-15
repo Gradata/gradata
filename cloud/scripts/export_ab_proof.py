@@ -121,12 +121,19 @@ def aggregate(judgments: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     judges: set[str] = set()
     task_ids: set[str] = set()
 
+    allowed_conditions = set(CONDITIONS)
+    trials = 0
     for rec in flat:
         model = rec.get("model") or rec.get("subject")
         condition = rec.get("condition") or rec.get("variant")
         dimension = rec.get("dimension")
         score = rec.get("score")
         if not (model and condition and dimension) or not isinstance(score, (int, float)):
+            continue
+        # Downstream aggregation only supports the baseline / rules / full
+        # arms; silently drop any unknown condition so trial counts, subject
+        # lists, and dimension zeroing stay consistent with the reported arms.
+        if condition not in allowed_conditions:
             continue
         score = float(score)
         by_cond_dim[(condition, dimension)].append(score)
@@ -136,6 +143,7 @@ def aggregate(judgments: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
             judges.add(rec["judge"])
         if rec.get("task_id"):
             task_ids.add(rec["task_id"])
+        trials += 1
 
     dimensions_seen = sorted({d for (_c, d) in by_cond_dim})
     dim_payload: list[dict[str, Any]] = []
@@ -146,8 +154,19 @@ def aggregate(judgments: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         baseline_mean = round(_mean(base), 3)
         with_rules_mean = round(_mean(rules), 3) if rules else baseline_mean
         with_full_mean = round(_mean(full), 3) if full else with_rules_mean
-        best_mean = max(with_rules_mean, with_full_mean)
-        ci_pool = rules or full or base
+        # Pick the arm with the highest mean and keep CI / n_with locked to
+        # that same arm so reported uncertainty matches the winning pool.
+        if rules and with_rules_mean >= with_full_mean and with_rules_mean >= baseline_mean:
+            ci_pool, n_with = rules, len(rules)
+            best_mean = with_rules_mean
+        elif full and with_full_mean >= baseline_mean:
+            ci_pool, n_with = full, len(full)
+            best_mean = with_full_mean
+        else:
+            # Baseline wins (or no treatment arms) — report baseline CI and
+            # zero treatment sample size so delta_pp is honestly 0.
+            ci_pool, n_with = base, 0
+            best_mean = baseline_mean
         ci_low, ci_high = _ci95(ci_pool)
         dim_payload.append({
             "dimension": dim,
@@ -159,7 +178,7 @@ def aggregate(judgments: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
             "ci_high": round(ci_high, 3),
             "delta_pp": round((best_mean - baseline_mean) * 100, 1),
             "n_base": len(base),
-            "n_with": len(rules) + len(full),
+            "n_with": n_with,
         })
 
     per_model: list[dict[str, Any]] = []
@@ -169,11 +188,19 @@ def aggregate(judgments: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
             base = by_model_cond_dim.get((model, "base", dim), [])
             rules = by_model_cond_dim.get((model, "rules", dim), [])
             full = by_model_cond_dim.get((model, "full", dim), [])
-            best_pool = rules or full
-            if not base and not best_pool:
+            if not base and not rules and not full:
                 continue
             baseline_mean = round(_mean(base), 3)
-            with_best_mean = round(_mean(best_pool), 3) if best_pool else baseline_mean
+            # Pick the treatment arm with the higher mean rather than
+            # preferring `rules` unconditionally — otherwise `with_best_mean`
+            # silently under-reports when `full` outperforms `rules`.
+            rules_mean = _mean(rules) if rules else None
+            full_mean = _mean(full) if full else None
+            candidates = [m for m in (rules_mean, full_mean) if m is not None]
+            if candidates:
+                with_best_mean = round(max(candidates), 3)
+            else:
+                with_best_mean = baseline_mean
             m_dims.append({
                 "dimension": dim,
                 "baseline_mean": baseline_mean,
@@ -189,7 +216,7 @@ def aggregate(judgments: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         "subjects": sorted(subjects),
         "conditions": [c for c in CONDITIONS if any(c == k[0] for k in by_cond_dim)],
         "judge": sorted(judges)[0] if judges else None,
-        "trials": len(flat),
+        "trials": trials,
         "tasks": len(task_ids),
         "dimensions": dim_payload,
         "per_model": per_model,
