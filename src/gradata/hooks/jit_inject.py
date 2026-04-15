@@ -26,6 +26,7 @@ import re
 import time
 from pathlib import Path
 
+from gradata._types import Lesson
 from gradata.hooks._base import extract_message, resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
 
@@ -96,13 +97,13 @@ def _float_env(name: str, default: float) -> float:
 
 
 def rank_rules_for_draft(
-    lessons: list,
+    lessons: list[Lesson],
     draft_text: str,
     *,
     k: int = DEFAULT_MAX_RULES,
     min_confidence: float = DEFAULT_MIN_CONFIDENCE,
     min_similarity: float = DEFAULT_MIN_SIMILARITY,
-) -> list[tuple[object, float]]:
+) -> list[tuple[Lesson, float]]:
     """Score each lesson against draft_text and return top-k above threshold.
 
     Returns a list of (lesson, similarity) tuples, highest first. A rule
@@ -117,7 +118,7 @@ def rank_rules_for_draft(
     if not draft_tokens:
         return []
 
-    scored: list[tuple[object, float]] = []
+    scored: list[tuple[Lesson, float]] = []
     for lesson in lessons:
         conf = getattr(lesson, "confidence", 0.0)
         if conf < min_confidence:
