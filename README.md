@@ -193,10 +193,7 @@ Memory systems remember what you said. Gradata learns how you think.
 - `brain.bus.on(event, handler)` — subscribe to any pipeline event
 - Events: `correction.created`, `lesson.graduated`, `meta_rule.created`, `session.ended`
 
-**Rule inspection + approval:**
-- `brain.rules()` / `brain.explain(rule_id)` / `brain.trace(rule_id)` — full provenance chain
-- `brain.pending_promotions()` — review what graduated this session
-- `brain.approve_promotion(id)` / `brain.reject_promotion(id)` — human veto power
+**Rule inspection + approval:** see [Inspection & Transparency API](#inspection--transparency-api) below.
 
 **Security:**
 - PII redaction before storage (credentials, emails, SSNs, credit cards)
@@ -209,6 +206,41 @@ Memory systems remember what you said. Gradata learns how you think.
 - MCP server for Claude Code, Cursor, Windsurf
 - Claude Code hooks: `gradata hooks install` — auto-captures corrections
 - Custom LLM providers: `GRADATA_LLM_PROVIDER=openai` or any OpenAI-compatible endpoint
+
+## Inspection & Transparency API
+
+Every graduated rule can be traced back to the corrections that created it. No opaque behavior. Git diff for AI preferences.
+
+```python
+from gradata import Brain
+
+brain = Brain("./my-brain")
+
+# List graduated rules (optionally filter by category or include all states)
+rules = brain.rules()
+rules = brain.rules(include_all=True, category="tone")
+
+# Trace a rule to the corrections that created it
+brain.explain("rule_abc123")
+# → {"rule_id": ..., "description": ..., "source_corrections": [...], "sessions": [...]}
+
+# Full provenance chain (rule → lesson → corrections → events)
+brain.trace("rule_abc123")
+
+# Export rules for review, diffing, or sharing
+brain.export_data(output_format="json")   # or "yaml"
+brain.export_rules(min_state="PATTERN")   # OpenSpace-compatible SKILL.md
+brain.export_rules_json(min_state="RULE") # flat sorted JSON array
+brain.export_skill(output_dir="./skills") # full skill directory
+brain.export_tree(format="obsidian", path="./vault")
+
+# Human veto: review what graduated, keep or demote
+brain.pending_promotions()                # rules in PATTERN/RULE state
+brain.approve_promotion("rule_abc123")    # endorse (persists reviewed flag)
+brain.reject_promotion("rule_abc123")     # demote back to INSTINCT
+```
+
+See [docs/sdk/brain.md](./docs/sdk/brain.md#inspection--transparency) for full signatures and return shapes.
 
 ## CLI
 
