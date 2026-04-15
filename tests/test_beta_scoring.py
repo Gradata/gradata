@@ -10,8 +10,11 @@ from gradata.rules.rule_engine import (
 
 
 def test_beta_reliability_high_success():
+    # Beta(20, 2) exact 5th percentile ≈ 0.793. The previous assertion
+    # of > 0.8 measured the bias of the normal approximation, not the
+    # statistic itself. Scipy-backed PPF closes that bias.
     score = beta_domain_reliability(fires=20, misfires=1)
-    assert score > 0.8
+    assert score > 0.75
 
 
 def test_beta_reliability_uncertain_with_few_observations():

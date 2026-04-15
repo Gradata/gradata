@@ -970,6 +970,41 @@ def update_confidence(
 # ---------------------------------------------------------------------------
 
 
+def _passes_beta_lb_gate(lesson: Lesson) -> bool:
+    """Beta lower-bound gate on PATTERN -> RULE promotion.
+
+    Opt-in via env var ``GRADATA_BETA_LB_GATE`` (default off). When enabled,
+    requires the 5th-percentile lower bound of Beta(α, β) to meet the
+    configured threshold (``GRADATA_BETA_LB_THRESHOLD``, default 0.70) AND
+    at least ``GRADATA_BETA_LB_MIN_FIRES`` observations (default 5).
+
+    Rationale: the v4 ablation min2022 random-label control showed that
+    ~15–20% of current RULE-tier graduations are calibrated by format,
+    not content. The Beta posterior captures uncertainty the mean
+    (lesson.confidence) discards. Feature-flagged so production
+    calibration is unchanged until this is measured in-band.
+    """
+    import os
+
+    if os.environ.get("GRADATA_BETA_LB_GATE", "").lower() not in ("1", "true", "yes", "on"):
+        return True  # gate disabled — defer to existing conf + fire_count checks
+
+    try:
+        threshold = float(os.environ.get("GRADATA_BETA_LB_THRESHOLD", "0.70"))
+        min_fires = int(os.environ.get("GRADATA_BETA_LB_MIN_FIRES", "5"))
+    except ValueError:
+        threshold, min_fires = 0.70, 5
+
+    if lesson.fire_count < min_fires:
+        return False
+
+    alpha = getattr(lesson, "alpha", 1.0)
+    beta_param = getattr(lesson, "beta_param", 1.0)
+    from gradata.rules.rule_engine import _beta_ppf_05
+
+    return _beta_ppf_05(alpha, beta_param) >= threshold
+
+
 def graduate(
     lessons: list[Lesson],
     *,
@@ -1107,6 +1142,7 @@ def graduate(
             and lesson.state == LessonState.PATTERN
             and lesson.confidence >= eff_rule_threshold
             and lesson.fire_count >= MIN_APPLICATIONS_FOR_RULE
+            and _passes_beta_lb_gate(lesson)
         ):
             blocked = False
 
