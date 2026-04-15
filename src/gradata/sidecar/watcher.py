@@ -330,12 +330,34 @@ class FileWatcher:
         edit_distance = _normalise_edit_distance(
             watched.original_content, current_content
         )
+        # Optional AST-aware severity shunt: when GRADATA_AST_SEVERITY is set
+        # and the file is Python, score the AST delta instead of the textual
+        # delta. Falls back to edit-distance severity on any miss (unsupported
+        # language, parse failure, flag off). Keeps this as the single opt-in
+        # shunt point for the SDK.
+        severity = _classify_severity(edit_distance)
+        try:
+            from gradata.enhancements.ast_severity import (
+                ast_severity_enabled,
+                classify_ast_severity,
+                language_supported,
+            )
+
+            if ast_severity_enabled() and language_supported(path=resolved):
+                ast_sev = classify_ast_severity(
+                    watched.original_content, current_content
+                )
+                if ast_sev is not None:
+                    severity = ast_sev
+        except Exception:
+            # Never let the optional shunt break correction capture.
+            pass
         return FileChange(
             path=resolved,
             old_content=watched.original_content,
             new_content=current_content,
             edit_distance=edit_distance,
-            severity=_classify_severity(edit_distance),
+            severity=severity,
             timestamp=now,
         )
 
