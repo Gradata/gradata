@@ -8,7 +8,6 @@ brain/scripts/spawn.py into the SDK patterns/ layer.
 from __future__ import annotations
 
 import pytest
-pytest.importorskip('gradata.enhancements.self_improvement', reason='requires gradata_cloud')
 from pathlib import Path
 from typing import Any
 
@@ -224,19 +223,11 @@ class TestHandoffs:
 # 4. Agent Quality Scores (agent_graduation.py)
 # ---------------------------------------------------------------------------
 
-try:
-    import gradata.enhancements.agent_graduation as _ag  # noqa: F401
-    _HAS_AGENT_GRAD = True
-except ImportError:
-    _HAS_AGENT_GRAD = False
-
-
-@pytest.mark.skipif(not _HAS_AGENT_GRAD, reason="requires gradata.enhancements.agent_graduation")
 class TestComputeQualityScores:
     """Tests for AgentGraduationTracker.compute_quality_scores()."""
 
     def test_empty_tracker_returns_empty(self, tmp_path):
-        from gradata.enhancements.agent_graduation import AgentGraduationTracker
+        from gradata.enhancements.graduation.agent_graduation import AgentGraduationTracker
         tracker = AgentGraduationTracker(tmp_path)
         scores = tracker.compute_quality_scores()
         assert scores["by_agent"] == {}
@@ -245,7 +236,7 @@ class TestComputeQualityScores:
         assert scores["best_agent"] is None
 
     def test_scores_after_recording_outcomes(self, tmp_path):
-        from gradata.enhancements.agent_graduation import AgentGraduationTracker
+        from gradata.enhancements.graduation.agent_graduation import AgentGraduationTracker
         tracker = AgentGraduationTracker(tmp_path)
 
         # Record 10 approvals for research agent
@@ -261,7 +252,7 @@ class TestComputeQualityScores:
         assert agent_scores["reject_count"] == 0
 
     def test_scores_with_mixed_outcomes(self, tmp_path):
-        from gradata.enhancements.agent_graduation import AgentGraduationTracker
+        from gradata.enhancements.graduation.agent_graduation import AgentGraduationTracker
         tracker = AgentGraduationTracker(tmp_path)
 
         # 7 approved, 2 edited, 1 rejected = 70% FDA, 90% acceptance
@@ -279,7 +270,7 @@ class TestComputeQualityScores:
         assert writer["reject_count"] == 1
 
     def test_best_worst_agent_selection(self, tmp_path):
-        from gradata.enhancements.agent_graduation import AgentGraduationTracker
+        from gradata.enhancements.graduation.agent_graduation import AgentGraduationTracker
         tracker = AgentGraduationTracker(tmp_path)
 
         # Research: 100% FDA

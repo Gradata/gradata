@@ -397,14 +397,6 @@ class TestExport:
 # 8. Core Learning Loop (correction capture)
 # ---------------------------------------------------------------------------
 
-try:
-    from gradata.enhancements.edit_classifier import classify_edits as _real_classifier
-    _has_graduation = True
-except ImportError:
-    _has_graduation = False
-
-
-@pytest.mark.skipif(not _has_graduation, reason="requires gradata_cloud")
 class TestCoreLearningLoop:
     def test_correct_produces_diff(self, tmp_path):
         """brain.correct() computes diff and emits CORRECTION event."""
