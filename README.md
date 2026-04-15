@@ -25,6 +25,37 @@ Or, one-command setup including IDE hooks (Node 18+ required):
 npx gradata-install install --ide=claude-code
 ```
 
+### JS/TS apps
+
+The `@gradata/cli` npm package emits correction events from Node to a local Gradata daemon, no Python required at call time:
+
+```bash
+npm i @gradata/cli
+```
+
+```ts
+import { GradataClient } from "@gradata/cli";
+
+const client = new GradataClient({ endpoint: "http://127.0.0.1:8765" });
+await client.correct({
+  draft: "We are pleased to inform you of our new product offering.",
+  final: "Hey, check out what we just shipped.",
+  outputType: "email",
+});
+```
+
+See [`packages/npm/README.md`](./packages/npm/README.md) for the full API and CLI wrapper.
+
+### Docker (self-host the daemon)
+
+```bash
+docker run --rm -p 8765:8765 -v $(pwd)/brain:/brain \
+  ghcr.io/gradata/gradata/daemon:latest \
+  daemon --brain-dir /brain --port 8765
+```
+
+Or build locally from the repo root: `docker build -t gradata/daemon:dev .`. A `docker-compose.yml` is included for local development.
+
 Works with any LLM. Python 3.11+. Zero required dependencies.
 
 ## Intellectual lineage
