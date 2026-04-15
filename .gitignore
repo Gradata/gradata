@@ -180,3 +180,6 @@ design-system/
 .gstack/
 .gitnexus
 .superpowers/
+
+# uv lock file (not committed; regenerated per environment)
+uv.lock
