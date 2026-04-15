@@ -5,17 +5,19 @@ import pytest
 
 
 @pytest.fixture
-def valid_bearer_patches(monkeypatch):
-    """Make get_brain_for_request return a stub brain for any request.
+def valid_bearer_patches(client):
+    """Override ``get_brain_for_request`` to return a stub brain for any request.
 
     Avoids threading Supabase + API key validation through every test.
     """
-    async def _stub_get_brain(brain_id, _credentials):
+    from app.auth import get_brain_for_request
+
+    async def _stub_get_brain(brain_id: str = "brain-1"):
         return {"id": brain_id, "user_id": "u1", "name": "test"}
 
-    monkeypatch.setattr("app.routes.meta_rules.get_brain_for_request", _stub_get_brain)
-    monkeypatch.setattr("app.routes.activity.get_brain_for_request", _stub_get_brain)
-    monkeypatch.setattr("app.routes.rule_patches.get_brain_for_request", _stub_get_brain)
+    client.app.dependency_overrides[get_brain_for_request] = _stub_get_brain
+    yield
+    client.app.dependency_overrides.pop(get_brain_for_request, None)
 
 
 class TestMetaRulesEndpoint:

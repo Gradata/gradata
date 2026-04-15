@@ -21,10 +21,25 @@ from gradata._types import (
     CorrectionType,
     Lesson,
     LessonState,
+    RuleMetadata,
     transition,
 )
 
 _log = logging.getLogger(__name__)
+
+
+def is_hook_enforced(lesson: Lesson) -> bool:
+    """True if this lesson is enforced by an installed generated hook.
+
+    Reads structured metadata first (``lesson.metadata.how_enforced == "hooked"``).
+    Falls back to the legacy ``[hooked]`` description prefix so existing
+    lessons.md files still work until they're rewritten.
+    """
+    md = getattr(lesson, "metadata", None)
+    if md is not None and getattr(md, "how_enforced", "") == "hooked":
+        return True
+    desc = getattr(lesson, "description", "") or ""
+    return desc.lstrip().startswith("[hooked]")
 
 # ---------------------------------------------------------------------------
 # Constants (SPEC-aligned, research-backed)
@@ -847,6 +862,7 @@ def graduate(
     renter: bool = False,
     machine_mode: bool = False,
     salt: str = "",
+    brain=None,
 ) -> tuple[list[Lesson], list[Lesson]]:
     """Apply state transitions and split into active vs graduated.
 
@@ -1039,6 +1055,32 @@ def graduate(
             except Exception:
                 pass  # ToT is optional; graduate with original wording
             lesson.state = transition(lesson.state, "promote")
+
+            # Rule-to-hook graduation: attempt to install a deterministic
+            # PreToolUse hook for this newly-minted RULE. On success, mark
+            # ``lesson.metadata.how_enforced = "hooked"`` so the Python-side
+            # rule_enforcement soft-reminder dedups it (the hook now enforces).
+            # Never raises out of graduate() — any failure falls back to
+            # soft prompt injection silently.
+            try:
+                from gradata.enhancements import rule_to_hook
+
+                desc = lesson.description or ""
+                if desc and not is_hook_enforced(lesson):
+                    candidate = rule_to_hook.classify_rule(
+                        desc, confidence=float(lesson.confidence)
+                    )
+                    gen_result = rule_to_hook.try_generate(
+                        candidate,
+                        brain=brain,
+                        source="graduate",
+                    )
+                    if gen_result.installed:
+                        if lesson.metadata is None:
+                            lesson.metadata = RuleMetadata()
+                        lesson.metadata.how_enforced = "hooked"
+            except Exception:
+                pass  # Hook generation is best-effort; never break graduation.
             continue
 
         # Promote INSTINCT -> PATTERN

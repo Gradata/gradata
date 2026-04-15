@@ -73,6 +73,275 @@ def test_inject_rules_no_lessons_file(tmp_path):
     assert result is None
 
 
+def test_inject_emits_meta_rules_block_for_llm_synth_source(tmp_path):
+    """Meta-rules with source='llm_synth' or 'human_curated' get injected."""
+    (tmp_path / "lessons.md").write_text(
+        "[2026-04-01] [RULE:0.92] PROCESS: Always plan before implementing\n",
+        encoding="utf-8",
+    )
+
+    from gradata.enhancements.meta_rules import MetaRule
+    from gradata.enhancements.meta_rules_storage import save_meta_rules
+
+    db_path = tmp_path / "system.db"
+    meta = MetaRule(
+        id="m-1",
+        principle="Verify before acting — check existing state before creating new artifacts.",
+        source_categories=["PROCESS", "CODE"],
+        source_lesson_ids=["l-1", "l-2", "l-3"],
+        confidence=0.88,
+        created_session=1,
+        last_validated_session=1,
+        source="llm_synth",
+    )
+    save_meta_rules(db_path, [meta])
+
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+        result = inject_main({})
+    assert result is not None
+    text = result.get("result", "")
+    assert "<brain-rules>" in text
+    assert "<brain-meta-rules>" in text
+    assert "Verify before acting" in text
+
+
+def test_inject_skips_meta_rules_with_deterministic_source(tmp_path):
+    """Meta-rules with source='deterministic' (the default for auto-generated
+    cluster output) are EXCLUDED from injection. Empirical: 2026-04-14 ablation
+    showed deterministic principles regress correctness."""
+    (tmp_path / "lessons.md").write_text(
+        "[2026-04-01] [RULE:0.92] PROCESS: Always plan before implementing\n",
+        encoding="utf-8",
+    )
+
+    from gradata.enhancements.meta_rules import MetaRule
+    from gradata.enhancements.meta_rules_storage import save_meta_rules
+
+    db_path = tmp_path / "system.db"
+    # Default source is 'deterministic' — should NOT be injected
+    meta = MetaRule(
+        id="m-2",
+        principle="Code: Avoid: foo. Prefer: bar.",  # the ablation-confirmed garbage shape
+        source_categories=["CODE"],
+        source_lesson_ids=["l-9"],
+        confidence=1.00,  # confidence is high BUT source disqualifies it
+        created_session=1,
+        last_validated_session=1,
+    )
+    save_meta_rules(db_path, [meta])
+
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+        result = inject_main({})
+    assert result is not None
+    text = result.get("result", "")
+    assert "<brain-rules>" in text
+    # Critical: the deterministic meta-rule must NOT appear in the prompt
+    assert "<brain-meta-rules>" not in text
+    assert "Avoid: foo" not in text
+
+
+def test_inject_caps_meta_rules_and_context_promotes_lower_confidence(tmp_path):
+    """Boundary test: with more than MAX_META_RULES injectable metas, the cap
+    must be applied AFTER context-aware ranking, so a lower-confidence rule
+    with a strong context weight can still make the cut.
+
+    Regression guard for the CR finding: pre-slicing by raw confidence would
+    silently exclude the context-promoted rule, giving the LLM the wrong
+    principles for the current task.
+    """
+    from gradata.enhancements.meta_rules import MetaRule
+    from gradata.enhancements.meta_rules_storage import save_meta_rules
+    from gradata.hooks.inject_brain_rules import MAX_META_RULES
+
+    (tmp_path / "lessons.md").write_text(
+        "[2026-04-01] [RULE:0.92] PROCESS: Always plan before implementing\n",
+        encoding="utf-8",
+    )
+
+    db_path = tmp_path / "system.db"
+    # Seed MAX_META_RULES + 2 high-confidence metas that are *neutral* in the
+    # target context, plus one lower-confidence meta that should be *boosted*
+    # by context weight so it makes it into the top-N despite its lower base.
+    metas = []
+    for i in range(MAX_META_RULES + 2):
+        metas.append(
+            MetaRule(
+                id=f"m-hi-{i}",
+                principle=f"Neutral principle number {i} for baseline comparison.",
+                source_categories=["PROCESS"],
+                source_lesson_ids=[f"l-{i}a", f"l-{i}b", f"l-{i}c"],
+                confidence=0.95,
+                created_session=1,
+                last_validated_session=1,
+                source="llm_synth",
+            ),
+        )
+    # Lower base confidence (0.60) but a very strong context weight (3.0) in
+    # the "drafting" context — should beat the neutral 0.95-confidence metas
+    # after weighting (0.60 * 3.0 = 1.80 > 0.95 * 1.0 = 0.95).
+    promoted = MetaRule(
+        id="m-promoted",
+        principle="Promoted drafting principle — context weight lifts this in.",
+        source_categories=["TONE"],
+        source_lesson_ids=["l-p1", "l-p2", "l-p3"],
+        confidence=0.60,
+        created_session=1,
+        last_validated_session=1,
+        source="llm_synth",
+        context_weights={"drafting": 3.0, "default": 1.0},
+    )
+    metas.append(promoted)
+    save_meta_rules(db_path, metas)
+
+    # Run the hook with a context that promotes the low-confidence meta.
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+        result = inject_main({"session_type": "drafting"})
+
+    assert result is not None
+    text = result["result"]
+    assert "<brain-meta-rules>" in text
+
+    # Cap: only MAX_META_RULES meta-rule lines (numbered "1.", "2." ...) appear
+    # between the meta-rules tags.
+    meta_section = text.split("<brain-meta-rules>")[1].split("</brain-meta-rules>")[0]
+    numbered_lines = [
+        line for line in meta_section.splitlines()
+        if line.strip() and line.lstrip()[0].isdigit() and ". [META:" in line
+    ]
+    assert len(numbered_lines) == MAX_META_RULES, (
+        f"expected exactly {MAX_META_RULES} meta-rule lines, got {len(numbered_lines)}"
+    )
+
+    # Context-aware promotion: the lower-confidence but context-boosted rule
+    # must appear in the final output even though MAX_META_RULES other metas
+    # have higher raw confidence.
+    assert "Promoted drafting principle" in text, (
+        "context-weighted rule was excluded — cap is being applied before "
+        "context ranking (CR finding regression)"
+    )
+
+
+def test_inject_tolerates_missing_meta_rules_db(tmp_path):
+    """No system.db file → still returns the rules block, no meta-rules block,
+    and no exception."""
+    (tmp_path / "lessons.md").write_text(
+        "[2026-04-01] [RULE:0.92] PROCESS: Always plan before implementing\n",
+        encoding="utf-8",
+    )
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+        result = inject_main({})
+    assert result is not None
+    text = result.get("result", "")
+    assert "<brain-rules>" in text
+    assert "<brain-meta-rules>" not in text
+
+
+def test_corrupt_meta_rules_db_degrades_to_rules_only(tmp_path):
+    """Corrupt-but-readable system.db → still returns rules block, no
+    meta-rules block, and no exception."""
+    (tmp_path / "lessons.md").write_text(
+        "[2026-04-01] [RULE:0.92] PROCESS: Always plan before implementing\n",
+        encoding="utf-8",
+    )
+    # Write a malformed-but-present system.db. The hook checks `is_file()`
+    # then calls load_meta_rules; the load (or any downstream filter/format)
+    # must not abort SessionStart. Garbage bytes guarantee deserialization
+    # failure in the storage layer.
+    (tmp_path / "system.db").write_bytes(b"this is not a valid sqlite or json payload")
+
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+        result = inject_main({})
+
+    assert result is not None
+    text = result.get("result", "")
+    assert "<brain-rules>" in text
+    assert "<brain-meta-rules>" not in text
+
+
+def test_load_meta_rules_legacy_schema_without_source_column(tmp_path):
+    """Brains upgraded from an older schema may be missing the `source`
+    column. Read-only callers must still get rows back with source
+    synthesized as 'deterministic' rather than raising 'no such column'."""
+    import sqlite3
+
+    from gradata.enhancements.meta_rules_storage import load_meta_rules
+
+    db_path = tmp_path / "system.db"
+    conn = sqlite3.connect(str(db_path))
+    try:
+        # Legacy schema: every column EXCEPT `source`.
+        conn.execute(
+            """CREATE TABLE meta_rules (
+                id TEXT PRIMARY KEY,
+                principle TEXT,
+                source_categories TEXT,
+                source_lesson_ids TEXT,
+                confidence REAL,
+                created_session INTEGER,
+                last_validated_session INTEGER,
+                scope TEXT,
+                examples TEXT,
+                context_weights TEXT,
+                applies_when TEXT,
+                never_when TEXT,
+                transfer_scope TEXT
+            )"""
+        )
+        conn.execute(
+            """INSERT INTO meta_rules VALUES
+               ('m1', 'Always verify', '["PROCESS"]', '["l1"]', 0.85,
+                1, 1, '{}', '[]', '{"default": 1.0}', '[]', '[]', 'personal')"""
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    metas = load_meta_rules(db_path)
+    assert len(metas) == 1
+    assert metas[0].id == "m1"
+    assert metas[0].source == "deterministic"
+
+
+def test_inject_respects_applies_when_never_when(tmp_path):
+    """applies_when / never_when must gate meta-rule injection at
+    SessionStart. A rule with never_when=session_type=code must be
+    excluded when the hook payload says session_type=code."""
+    from gradata.enhancements.meta_rules import MetaRule
+    from gradata.enhancements.meta_rules_storage import save_meta_rules
+
+    (tmp_path / "lessons.md").write_text(
+        "[2026-04-01] [RULE:0.92] PROCESS: Always plan before implementing\n",
+        encoding="utf-8",
+    )
+    db_path = tmp_path / "system.db"
+    gated = MetaRule(
+        id="m_gated",
+        principle="Never chat in code sessions",
+        source_categories=["PROCESS"],
+        source_lesson_ids=["l1", "l2", "l3"],
+        confidence=0.90,
+        created_session=1,
+        last_validated_session=1,
+        never_when=["session_type=code"],
+        source="llm_synth",
+    )
+    save_meta_rules(db_path, [gated])
+
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+        # Blocking payload — never_when matches, meta-rule must be skipped.
+        blocked = inject_main({"session_type": "code"})
+        # Permissive payload — never_when does not match, meta-rule injected.
+        allowed = inject_main({"session_type": "prose"})
+
+    assert blocked is not None
+    assert "<brain-rules>" in blocked["result"]
+    assert "<brain-meta-rules>" not in blocked["result"]
+
+    assert allowed is not None
+    assert "<brain-meta-rules>" in allowed["result"]
+    assert "Never chat in code sessions" in allowed["result"]
+
+
 def test_session_close_emits_event(tmp_path):
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
         with patch("gradata.hooks.session_close._emit_session_end") as mock_emit:

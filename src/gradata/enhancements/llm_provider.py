@@ -57,6 +57,36 @@ class AnthropicProvider(LLMProvider):
             return None
 
 
+def _openai_complete(
+    *, model: str, prompt: str, max_tokens: int, timeout: float,
+    api_key: str | None = None, base_url: str | None = None, log_label: str = "OpenAI",
+) -> str | None:
+    """Shared OpenAI-compatible chat completion. Returns text or None on any failure."""
+    try:
+        import openai
+    except ImportError:
+        _log.debug("openai SDK not installed (needed for %s provider)", log_label)
+        return None
+
+    try:
+        kwargs: dict = {"timeout": timeout}
+        if api_key:
+            kwargs["api_key"] = api_key
+        if base_url:
+            kwargs["base_url"] = base_url
+        client = openai.OpenAI(**kwargs)
+        resp = client.chat.completions.create(
+            model=model,
+            max_tokens=max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = (resp.choices[0].message.content or "").strip()
+        return text if 5 < len(text) < 500 else None
+    except Exception as e:
+        _log.debug("%s completion failed: %s", log_label, e)
+        return None
+
+
 class OpenAIProvider(LLMProvider):
     """OpenAI-compatible provider (works with OpenAI, Azure OpenAI)."""
 
@@ -67,29 +97,10 @@ class OpenAIProvider(LLMProvider):
         self.base_url = base_url
 
     def complete(self, prompt: str, *, max_tokens: int = 100, timeout: float = 12.0) -> str | None:
-        try:
-            import openai
-        except ImportError:
-            _log.debug("openai SDK not installed")
-            return None
-
-        try:
-            kwargs: dict = {"timeout": timeout}
-            if self._auth:
-                kwargs["api_key"] = self._auth
-            if self.base_url:
-                kwargs["base_url"] = self.base_url
-            client = openai.OpenAI(**kwargs)
-            resp = client.chat.completions.create(
-                model=self.model,
-                max_tokens=max_tokens,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            text = (resp.choices[0].message.content or "").strip()
-            return text if 5 < len(text) < 500 else None
-        except Exception as e:
-            _log.debug("OpenAI completion failed: %s", e)
-            return None
+        return _openai_complete(
+            model=self.model, prompt=prompt, max_tokens=max_tokens, timeout=timeout,
+            api_key=self._auth, base_url=self.base_url, log_label="OpenAI",
+        )
 
 
 class GenericHTTPProvider(LLMProvider):
@@ -108,27 +119,11 @@ class GenericHTTPProvider(LLMProvider):
         self._auth = auth_token or os.environ.get("GRADATA_LLM_AUTH", "")
 
     def complete(self, prompt: str, *, max_tokens: int = 100, timeout: float = 12.0) -> str | None:
-        try:
-            import openai
-        except ImportError:
-            _log.debug("openai SDK not installed (needed for generic HTTP provider)")
-            return None
-
-        try:
-            kwargs: dict = {"base_url": self.base_url, "timeout": timeout}
-            # openai SDK requires a key even for local — use placeholder if none set
-            kwargs["api_key"] = self._auth or "local"
-            client = openai.OpenAI(**kwargs)
-            resp = client.chat.completions.create(
-                model=self.model,
-                max_tokens=max_tokens,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            text = (resp.choices[0].message.content or "").strip()
-            return text if 5 < len(text) < 500 else None
-        except Exception as e:
-            _log.debug("Generic HTTP completion failed: %s", e)
-            return None
+        # openai SDK requires a key even for local — use placeholder if none set
+        return _openai_complete(
+            model=self.model, prompt=prompt, max_tokens=max_tokens, timeout=timeout,
+            api_key=self._auth or "local", base_url=self.base_url, log_label="Generic HTTP",
+        )
 
 
 # ---------------------------------------------------------------------------

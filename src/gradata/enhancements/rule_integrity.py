@@ -27,6 +27,10 @@ import secrets
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gradata._paths import BrainContext
 
 logger = logging.getLogger("gradata.rule_integrity")
 
@@ -210,9 +214,9 @@ def verify_lesson_file(lessons_path: Path, signatures: dict[str, str]) -> list[s
 # ---------------------------------------------------------------------------
 
 
-def _ensure_table(db_path: Path) -> None:
+def _ensure_table(ctx: BrainContext) -> None:
     """Create rule_signatures table if it doesn't exist."""
-    with sqlite3.connect(str(db_path)) as conn:
+    with sqlite3.connect(str(ctx.db_path)) as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS rule_signatures (
                 category TEXT PRIMARY KEY,
@@ -223,46 +227,40 @@ def _ensure_table(db_path: Path) -> None:
         conn.commit()
 
 
-def store_signature(db_path: Path, category: str, signature: str) -> None:
+def store_signature(ctx: BrainContext, category: str, signature: str) -> None:
     """Store or update a rule signature in system.db.
 
     Args:
-        db_path: Path to system.db.
+        ctx: BrainContext (provides db_path and other brain-scoped paths).
         category: Lesson category.
         signature: HMAC hex signature.
     """
     if not signature:
         return
-    _ensure_table(db_path)
-    conn = sqlite3.connect(str(db_path))
-    try:
+    _ensure_table(ctx)
+    with sqlite3.connect(str(ctx.db_path)) as conn:
         conn.execute(
             """INSERT OR REPLACE INTO rule_signatures (category, signature, signed_at)
                VALUES (?, ?, ?)""",
             (category.upper(), signature, datetime.now(UTC).isoformat()),
         )
         conn.commit()
-    finally:
-        conn.close()
 
 
-def load_signatures(db_path: Path) -> dict[str, str]:
+def load_signatures(ctx: BrainContext) -> dict[str, str]:
     """Load all stored signatures from system.db.
 
     Returns:
         Dict mapping category -> signature. Empty if table doesn't exist.
     """
-    _ensure_table(db_path)
-    conn = sqlite3.connect(str(db_path))
-    try:
+    _ensure_table(ctx)
+    with sqlite3.connect(str(ctx.db_path)) as conn:
         rows = conn.execute("SELECT category, signature FROM rule_signatures").fetchall()
         return {row[0]: row[1] for row in rows}
-    finally:
-        conn.close()
 
 
 def sign_and_store(
-    db_path: Path, rule_text: str, category: str, confidence: float
+    ctx: BrainContext, rule_text: str, category: str, confidence: float
 ) -> str:
     """Sign a rule and store the signature in the database.
 
@@ -273,11 +271,11 @@ def sign_and_store(
     """
     sig = sign_rule(rule_text, category, confidence)
     if sig:
-        store_signature(db_path, category, sig)
+        store_signature(ctx, category, sig)
     return sig
 
 
-def _load_signature(db_path: Path, category: str) -> str:
+def _load_signature(ctx: BrainContext, category: str) -> str:
     """Load a single signature for one category from system.db.
 
     More efficient than load_signatures() when only one category is needed.
@@ -285,20 +283,17 @@ def _load_signature(db_path: Path, category: str) -> str:
     Returns:
         Hex signature string, or empty string if not found.
     """
-    _ensure_table(db_path)
-    conn = sqlite3.connect(str(db_path))
-    try:
+    _ensure_table(ctx)
+    with sqlite3.connect(str(ctx.db_path)) as conn:
         row = conn.execute(
             "SELECT signature FROM rule_signatures WHERE category = ?",
             (category.upper(),),
         ).fetchone()
         return row[0] if row else ""
-    finally:
-        conn.close()
 
 
 def verify_from_db(
-    db_path: Path, rule_text: str, category: str, confidence: float
+    ctx: BrainContext, rule_text: str, category: str, confidence: float
 ) -> bool:
     """Verify a rule against the signature stored in system.db.
 
@@ -312,5 +307,5 @@ def verify_from_db(
     """
     if not _get_secret_key():
         return True
-    stored_sig = _load_signature(db_path, category)
+    stored_sig = _load_signature(ctx, category)
     return verify_rule(rule_text, category, confidence, stored_sig)

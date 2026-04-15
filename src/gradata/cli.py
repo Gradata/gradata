@@ -111,6 +111,39 @@ def cmd_audit(args):
 
 
 def cmd_export(args):
+    """Export brain. Two modes:
+
+    - With --target: emit graduated RULE-tier lessons in a platform-specific
+      rule file format (cursor/agents/aider).
+    - Otherwise: marketplace archive export via Brain.export(mode=...).
+    """
+    target = getattr(args, "target", None)
+    if target:
+        from gradata.enhancements.rule_export import export_rules
+        brain_root = _resolve_brain_root(args)
+        # Prefer the canonical lessons path the rest of the SDK uses, rather
+        # than hardcoding brain_root/"lessons.md" inside the exporter.
+        lessons_path: Path | None = None
+        try:
+            brain = _get_brain(args)
+            lessons_path = brain._find_lessons_path()
+        except Exception:
+            lessons_path = None
+        try:
+            text = export_rules(brain_root, target=target, lessons_path=lessons_path)
+        except ValueError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return
+        output = getattr(args, "output", None)
+        if output:
+            out_path = Path(output)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(text, encoding="utf-8")
+            print(f"exported {text.count(chr(10))} lines to {out_path}")
+        else:
+            print(text, end="")
+        return
+
     brain = _get_brain(args)
     path = brain.export(mode=args.mode)
     print(f"Exported: {path}")
@@ -435,6 +468,255 @@ def cmd_demo(args):
     print(f"Try: gradata convergence --brain-dir {target}")
 
 
+def _resolve_brain_root(args):
+    """Figure out where brain lives. Prefer env override for tests, then --brain-dir arg, then default."""
+    import os
+    override = os.environ.get("GRADATA_BRAIN")
+    if override:
+        return Path(override)
+    brain_dir = getattr(args, "brain_dir", None)
+    if brain_dir:
+        return Path(brain_dir)
+    return Path("brain")
+
+
+def cmd_rule_add(args):
+    """Fast-track a user-declared rule. Writes at RULE tier conf=1.0, tries to install a hook."""
+    from gradata.enhancements import rule_to_hook
+
+    text = " ".join(args.text).strip() if isinstance(args.text, list) else str(args.text).strip()
+    if not text:
+        print("error: rule text required", file=sys.stderr)
+        return
+
+    # Classify first to see if a hook is possible
+    candidate = rule_to_hook.classify_rule(text, confidence=1.0)
+
+    # Best-effort brain handle for event logging + add_rule API.  A user
+    # running `gradata rule add` without an initialized brain should still
+    # succeed; try_generate treats brain=None as "skip logging".
+    brain = None
+    try:
+        brain = _get_brain(args)
+    except Exception:
+        brain = None
+
+    result = rule_to_hook.try_generate(candidate, brain=brain, source="user_declared")
+
+    # Persist to lessons.md via the canonical parse/format pipeline — the
+    # same code path graduation uses, so any future lesson-schema change
+    # automatically propagates here. Prefix description with [hooked]
+    # marker if a hook was installed, so `gradata rule list` can show
+    # hook status.
+    if candidate.enforcement == rule_to_hook.EnforcementType.HOOK:
+        category = candidate.determinism.value.upper()
+    else:
+        category = "USER"
+    description = f"[hooked] {text}" if result.installed else text
+
+    # Resolve the brain root the user intends (respects GRADATA_BRAIN env
+    # + --brain-dir). Do NOT use _get_brain() here — that falls back to
+    # CWD which would write to the wrong brain when running from a
+    # project that happens to contain brain files.
+    brain_root = _resolve_brain_root(args)
+    brain_root.mkdir(parents=True, exist_ok=True)
+
+    # Route through Brain.add_rule — the canonical parse/format pipeline.
+    # Brain() works whether or not system.db exists (run_migrations no-ops
+    # on a missing db), so we don't need a second hand-rolled write path.
+    from gradata import Brain as _Brain
+
+    add_result = _Brain(brain_root).add_rule(
+        description=description, category=category, state="RULE", confidence=1.0,
+    )
+    if not add_result.get("added"):
+        reason = add_result.get("reason", "unknown")
+        print(f"error: failed to add rule: {reason}", file=sys.stderr)
+        sys.exit(1)
+
+    if result.installed:
+        print(f"rule graduated to hook: installed at {result.hook_path}")
+    else:
+        print(f"rule added as soft injection ({result.reason})")
+
+
+def cmd_rule_list(args):
+    """List RULE-tier lessons and their hook status."""
+    import os
+    import re as _re
+
+    from gradata.enhancements.rule_to_hook import _slug
+
+    brain_root = _resolve_brain_root(args)
+    lessons_file = brain_root / "lessons.md"
+
+    # Parse RULE-tier entries WITH [hooked] marker preserved
+    rules: list[tuple[str, str, bool]] = []  # (category, description, hooked_marker_in_lessons)
+    if lessons_file.exists():
+        # Accept both modern layout (marker inside description) and the legacy
+        # "[RULE:conf] [hooked] CATEGORY: desc" layout where the marker appears
+        # between the state bracket and the category.
+        lesson_re = _re.compile(
+            r"^\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+(?:\[hooked\]\s+)?(\w+):\s+(.+)$"
+        )
+        for line in lessons_file.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            # Legacy marker position: remember it, then strip for regex.
+            legacy_marker = bool(_re.search(r"\[RULE:[\d.]+\]\s+\[hooked\]\s+", stripped))
+            m = lesson_re.match(stripped)
+            if not m:
+                continue
+            category = m.group(1)
+            desc = m.group(2).strip()
+            modern_marker = desc.startswith("[hooked] ")
+            clean_desc = desc[len("[hooked] "):] if modern_marker else desc
+            rules.append((category, clean_desc, modern_marker or legacy_marker))
+
+    # Discover installed hook files (pre + post)
+    pre_dir = Path(os.environ.get("GRADATA_HOOK_ROOT")
+                   or ".claude/hooks/pre-tool/generated")
+    post_dir = Path(os.environ.get("GRADATA_HOOK_ROOT_POST")
+                    or ".claude/hooks/post-tool/generated")
+
+    installed_files: dict[str, Path] = {}  # slug (file stem) -> path
+    for d in (pre_dir, post_dir):
+        if d.exists():
+            for js in d.glob("*.js"):
+                installed_files[js.stem] = js
+
+    if not rules and not installed_files:
+        print("No RULE-tier rules or installed hooks.")
+        return
+
+    print("RULE-tier lessons")
+    print("-" * 17)
+
+    hooked_count = 0
+    matched_slugs: set[str] = set()
+    for category, desc, marker in rules:
+        slug = _slug(desc)
+        file_exists = slug in installed_files
+        if marker and file_exists:
+            tag = "[hooked]"
+            hooked_count += 1
+            matched_slugs.add(slug)
+        elif marker and not file_exists:
+            tag = "[STALE] "
+        else:
+            tag = "        "
+        print(f"{tag}  {category:<18} {desc}")
+
+    orphan_slugs = [s for s in installed_files if s not in matched_slugs]
+
+    print()
+    print("Hook files installed:")
+    for _slug_key, path in sorted(installed_files.items()):
+        print(f"  {path}")
+
+    if orphan_slugs:
+        print()
+        print("Orphan hook files (no matching lesson):")
+        for slug in sorted(orphan_slugs):
+            print(f"  [ORPHAN] {installed_files[slug]}")
+
+    print()
+    print(f"{hooked_count} hooked / {len(rules)} total rules")
+
+
+def cmd_rule_remove(args):
+    """Remove a graduated hook: delete the .js file and unmark (or purge) its lesson."""
+    import os
+    import re as _re
+
+    # Reuse the canonical slug impl — single source of truth with cmd_rule_list
+    # and the graduation pipeline.
+    from gradata.enhancements.rule_to_hook import _slug
+
+    slug = args.slug.strip()
+    if not slug:
+        print("error: slug required", file=sys.stderr)
+        return
+
+    brain_root = _resolve_brain_root(args)
+    lessons_file = brain_root / "lessons.md"
+
+    # 1. Delete hook file from whichever generated dir holds it
+    pre_dir = Path(os.environ.get("GRADATA_HOOK_ROOT")
+                   or ".claude/hooks/pre-tool/generated")
+    post_dir = Path(os.environ.get("GRADATA_HOOK_ROOT_POST")
+                    or ".claude/hooks/post-tool/generated")
+
+    removed_file = None
+    for d in (pre_dir, post_dir):
+        candidate = d / f"{slug}.js"
+        if candidate.exists():
+            candidate.unlink()
+            removed_file = candidate
+            break
+
+    # 2. Find matching lesson by slug → description
+    touched_lesson = False
+    if lessons_file.exists():
+        lines = lessons_file.read_text(encoding="utf-8").splitlines()
+        out_lines = []
+        # Accept optional legacy "[hooked]" token between the state bracket
+        # and the category (normalised out of the prefix so reformatted lines
+        # carry the marker only in the description).
+        lesson_re = _re.compile(
+            r"^(\[[\d-]+\]\s+\[RULE:[\d.]+\])\s+(?:\[hooked\]\s+)?(\w+):\s+(.+)$"
+        )
+        for line in lines:
+            stripped = line.strip()
+            m = lesson_re.match(stripped)
+            if not m:
+                out_lines.append(line)
+                continue
+            state_prefix = m.group(1)
+            category = m.group(2)
+            prefix = f"{state_prefix} {category}"
+            desc = m.group(3).strip()
+            legacy_marker = bool(_re.search(r"\[RULE:[\d.]+\]\s+\[hooked\]\s+", stripped))
+            modern_marker = desc.startswith("[hooked] ")
+            was_hooked = legacy_marker or modern_marker
+            clean_desc = desc[len("[hooked] "):] if modern_marker else desc
+            if _slug(clean_desc) == slug:
+                if args.purge:
+                    touched_lesson = True
+                    continue  # drop the line entirely
+                if was_hooked:
+                    touched_lesson = True
+                    out_lines.append(f"{prefix}: {clean_desc}")
+                else:
+                    # Already unmarked — no change needed
+                    out_lines.append(line)
+            else:
+                out_lines.append(line)
+        if touched_lesson:
+            lessons_file.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+
+    if removed_file:
+        print(f"Removed hook: {removed_file}")
+    if touched_lesson and args.purge:
+        print("Deleted lesson from lessons.md")
+    elif touched_lesson:
+        print("Unmarked lesson in lessons.md (rule kept as soft injection)")
+    if not removed_file and not touched_lesson:
+        print(f"nothing to remove for slug: {slug}")
+
+
+def cmd_rule(args):
+    """Dispatch `gradata rule <subcommand>`."""
+    sub = getattr(args, "rule_cmd", None)
+    if sub == "add":
+        cmd_rule_add(args)
+    elif sub == "list":
+        cmd_rule_list(args)
+    elif sub == "remove":
+        cmd_rule_remove(args)
+    else:
+        print(f"error: unknown rule subcommand: {sub}", file=sys.stderr)
+
+
 def cmd_hooks(args):
     """Manage Claude Code hook integration."""
     action = args.action
@@ -490,10 +772,20 @@ def main():
     p_audit = sub.add_parser("audit", help="Data flow audit")
     p_audit.add_argument("--json", action="store_true")
 
-    # export
-    p_export = sub.add_parser("export", help="Export brain for marketplace")
+    # export — marketplace archive OR platform-specific rule export
+    p_export = sub.add_parser(
+        "export",
+        help="Export brain (marketplace archive, or graduated rules for cursor/agents/aider)",
+    )
     p_export.add_argument("--mode", choices=["full", "no-prospects", "domain-only"],
                           default="full")
+    p_export.add_argument(
+        "--target",
+        choices=["cursor", "agents", "aider", "codex", "cline", "continue"],
+        help="Emit graduated RULE-tier lessons in platform-specific format",
+    )
+    p_export.add_argument("--output", "-o",
+                          help="Output file when using --target (default: stdout)")
 
     # context
     p_ctx = sub.add_parser("context", help="Compile context for a message")
@@ -564,6 +856,17 @@ def main():
     p_hooks.add_argument("--profile", choices=["minimal", "standard", "strict"],
                          default="standard", help="Hook profile tier (default: standard)")
 
+    # rule — user-declared rules (fast-track to RULE tier, try hook install)
+    p_rule = sub.add_parser("rule", help="Manage user-declared rules")
+    rule_sub = p_rule.add_subparsers(dest="rule_cmd", required=True)
+    p_rule_add = rule_sub.add_parser("add", help="Declare a rule at RULE tier (fast-track)")
+    p_rule_add.add_argument("text", nargs="+", help="Rule text")
+    rule_sub.add_parser("list", help="List RULE-tier lessons and hook status")
+    p_rule_remove = rule_sub.add_parser("remove", help="Remove a graduated hook by slug")
+    p_rule_remove.add_argument("slug", help="Hook slug (from `gradata rule list`)")
+    p_rule_remove.add_argument("--purge", action="store_true",
+                               help="Also delete the lesson (default: keep as soft injection)")
+
     args = parser.parse_args()
 
     commands = {
@@ -589,6 +892,7 @@ def main():
     commands["convergence"] = cmd_convergence
     commands["demo"] = cmd_demo
     commands["hooks"] = cmd_hooks
+    commands["rule"] = cmd_rule
 
     if args.command in commands:
         commands[args.command](args)
