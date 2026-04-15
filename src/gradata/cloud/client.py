@@ -87,22 +87,29 @@ class CloudClient:
         category: str | None = None,
         context: dict | None = None,
         session: int | None = None,
+        applies_to: str | None = None,
     ) -> dict:
         """Send correction to cloud for server-side graduation.
 
         The cloud runs the full pipeline: diff -> classify -> extract
         patterns -> graduate -> update rules. Returns the same event
         dict format as local Brain.correct().
+
+        ``applies_to`` is an optional free-form scope token (e.g.
+        ``"client:acme"``) forwarded to the cloud payload for persistence.
         """
+        payload = {
+            "brain_id": self._brain_id,
+            "draft": draft[:2000],
+            "final": final[:2000],
+            "category": category,
+            "context": context,
+            "session": session,
+        }
+        if applies_to:
+            payload["applies_to"] = applies_to
         try:
-            return self._post("/brains/correct", {
-                "brain_id": self._brain_id,
-                "draft": draft[:2000],
-                "final": final[:2000],
-                "category": category,
-                "context": context,
-                "session": session,
-            })
+            return self._post("/brains/correct", payload)
         except Exception as e:
             logger.warning("Cloud correct() failed, falling back to local: %s", e)
             raise  # Let Brain.correct() catch and fall back

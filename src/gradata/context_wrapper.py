@@ -174,12 +174,20 @@ class BrainContextState:
             with suppress(Exception):
                 self._brain.log_output(response, output_type="general")
 
-    def correct(self, draft: str | None = None, final: str = "") -> dict | None:
+    def correct(
+        self,
+        draft: str | None = None,
+        final: str = "",
+        *,
+        applies_to: str | None = None,
+    ) -> dict | None:
         """Record a correction (user edited the AI's output).
 
         Args:
             draft: The original AI output. If None, uses the last captured response.
             final: The user's edited version.
+            applies_to: Optional free-form scope token (e.g. ``"client:acme"``)
+                passed through to ``Brain.correct``. See Brain.correct docs.
 
         Returns:
             Correction event dict, or None if no brain.
@@ -196,7 +204,7 @@ class BrainContextState:
             return None
 
         try:
-            return self._brain.correct(draft, final)
+            return self._brain.correct(draft, final, applies_to=applies_to)
         except Exception as e:
             logger.warning("Correction failed: %s", e)
             return None
