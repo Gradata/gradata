@@ -14,6 +14,7 @@ from pathlib import Path
 
 from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
+from gradata.rules.rule_ranker import rank_rules
 
 try:
     from gradata.enhancements.self_improvement import is_hook_enforced, parse_lessons
@@ -46,12 +47,39 @@ MAX_META_RULES = 5  # meta-rules are high-level principles — separate cap from
 
 
 def _score(lesson) -> float:
-    """Score a lesson dict or Lesson object for injection priority."""
+    """Back-compat scorer. Kept so existing tests / callers keep working.
+
+    Prefer :func:`rank_rules` directly for new code — it supports BM25 context
+    relevance and optional Thompson sampling. This function is a simple
+    state/confidence blend retained for tie-breaking snapshots.
+    """
     conf = lesson["confidence"] if isinstance(lesson, dict) else lesson.confidence
     state = lesson["state"] if isinstance(lesson, dict) else lesson.state.name
     conf_norm = (conf - MIN_CONFIDENCE) / (1.0 - MIN_CONFIDENCE)
     state_bonus = 1.0 if state == "RULE" else 0.7
     return 0.4 * state_bonus + 0.3 * conf_norm + 0.3 * conf
+
+
+def _lesson_to_rule_dict(lesson) -> dict:
+    """Flatten a Lesson object (or dict) into the shape rank_rules expects.
+
+    Carries Beta posterior fields (alpha / beta_param) through so Thompson
+    sampling works when ``GRADATA_THOMPSON_RANKING=1``.
+    """
+    if isinstance(lesson, dict):
+        return dict(lesson)
+    return {
+        "id": getattr(lesson, "description", ""),
+        "description": getattr(lesson, "description", ""),
+        "category": getattr(lesson, "category", ""),
+        "confidence": float(getattr(lesson, "confidence", 0.5)),
+        "fire_count": int(getattr(lesson, "fire_count", 0)),
+        "last_session": 0,  # not tracked on Lesson — recency degrades gracefully
+        "alpha": float(getattr(lesson, "alpha", 1.0)),
+        "beta_param": float(getattr(lesson, "beta_param", 1.0)),
+        "state": lesson.state.name if hasattr(lesson, "state") else "PATTERN",
+        "_lesson": lesson,  # stash original for output formatting
+    }
 
 
 def _wiki_categories(context: str) -> set[str]:
@@ -130,19 +158,52 @@ def main(data: dict) -> dict | None:
     )
     wiki_cats = _wiki_categories(context)
 
+    # Route everything through the unified rule_ranker. Wiki-matched categories
+    # become a wiki_boost signal (+0.3 on context component) rather than a
+    # hard pre-filter, so BM25 + Thompson can still surface strong cross-
+    # category matches when the wiki miss-matches.
+    rule_dicts = [_lesson_to_rule_dict(lesson) for lesson in filtered]
+    wiki_boost: dict[str, float] = {}
     if wiki_cats:
-        boosted = [lesson for lesson in filtered if lesson.category.upper() in wiki_cats]
-        rest = [lesson for lesson in filtered if lesson.category.upper() not in wiki_cats]
-        boosted_sorted = sorted(boosted, key=_score, reverse=True)[:MAX_RULES]
-        rest_sorted = sorted(rest, key=_score, reverse=True)
-        remaining = MAX_RULES - len(boosted_sorted)
-        scored = (boosted_sorted + rest_sorted[:max(0, remaining)])[:MAX_RULES]
-        _log.debug(
-            "Wiki-aware injection: %d boosted (%s), %d fill",
-            len(boosted_sorted), wiki_cats, min(len(rest_sorted), max(0, remaining)),
+        for rd in rule_dicts:
+            if rd.get("category", "").upper() in wiki_cats:
+                wiki_boost[rd["id"]] = 0.3
+
+    context_keywords = [
+        kw for kw in (
+            data.get("session_type", ""),
+            data.get("task_type", ""),
+            context,
         )
-    else:
-        scored = sorted(filtered, key=_score, reverse=True)[:MAX_RULES]
+        if kw
+    ]
+
+    # Derive a per-session seed for deterministic Thompson sampling.
+    session_seed = data.get("session_number") or data.get("session_id")
+    if isinstance(session_seed, str):
+        try:
+            session_seed = int(session_seed)
+        except ValueError:
+            session_seed = abs(hash(session_seed)) % (2**31)
+
+    ranked = rank_rules(
+        rule_dicts,
+        current_session=int(data.get("session_number") or 0),
+        task_type=data.get("task_type") or data.get("session_type") or None,
+        context_keywords=context_keywords or None,
+        max_rules=MAX_RULES,
+        wiki_boost=wiki_boost or None,
+        session_seed=session_seed if isinstance(session_seed, int) else None,
+    )
+    scored: list = []
+    for rd in ranked:
+        lesson = rd.get("_lesson")
+        if lesson is not None:
+            scored.append(lesson)
+    _log.debug(
+        "Unified injection: %d ranked (wiki_boost=%d)",
+        len(scored), len(wiki_boost),
+    )
 
     lines = [
         f"[{r.state.name}:{r.confidence:.2f}] {r.category}: {r.description}"
