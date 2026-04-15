@@ -23,6 +23,11 @@ def run_generated_hooks(*, env_var: str, default_dir: str, per_hook_timeout: int
     check, ``minimal`` users would still have generated rule-hooks
     executed on every Edit/Write/Bash.
     """
+    # Short-circuit before any I/O so GRADATA_BYPASS truly zeros the overhead
+    # (no stdin drain, no filesystem scan).
+    if os.environ.get("GRADATA_BYPASS") == "1":
+        return 0
+
     # Profile gating — match the registry entry in _installer.HOOK_REGISTRY
     # (both generated_runner + generated_runner_post are Profile.STANDARD).
     if not should_run(Profile.STANDARD):
@@ -44,9 +49,6 @@ def run_generated_hooks(*, env_var: str, default_dir: str, per_hook_timeout: int
 
     hooks = sorted(root.glob("*.js"))
     if not hooks:
-        return 0
-
-    if os.environ.get("GRADATA_BYPASS") == "1":
         return 0
 
     for hook_path in hooks:

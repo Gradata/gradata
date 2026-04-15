@@ -94,111 +94,55 @@ def _normalize(text: str) -> str:
     return re.sub(r"[^\w\s]", " ", text.lower()).strip()
 
 
+_STOPWORDS = frozenset({
+    "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "could",
+    "should", "may", "might", "shall", "can", "to", "of", "in", "for",
+    "on", "with", "at", "by", "from", "as", "into", "through", "during",
+    "it", "its", "this", "that", "these", "those",
+    "i", "we", "you", "they", "he", "she",
+    "and", "but", "or", "not", "no", "if", "then", "else", "when", "while",
+    "so", "than", "too", "very", "just", "also",
+    "all", "each", "every", "any", "some", "only",
+})
+
+
 def _extract_topic_words(text: str) -> set[str]:
     """Extract meaningful topic words (nouns/adjectives), skipping stopwords."""
-    stopwords = {
-        "a",
-        "an",
-        "the",
-        "is",
-        "are",
-        "was",
-        "were",
-        "be",
-        "been",
-        "being",
-        "have",
-        "has",
-        "had",
-        "do",
-        "does",
-        "did",
-        "will",
-        "would",
-        "could",
-        "should",
-        "may",
-        "might",
-        "shall",
-        "can",
-        "to",
-        "of",
-        "in",
-        "for",
-        "on",
-        "with",
-        "at",
-        "by",
-        "from",
-        "as",
-        "into",
-        "through",
-        "during",
-        "it",
-        "its",
-        "this",
-        "that",
-        "these",
-        "those",
-        "i",
-        "we",
-        "you",
-        "they",
-        "he",
-        "she",
-        "and",
-        "but",
-        "or",
-        "not",
-        "no",
-        "if",
-        "then",
-        "else",
-        "when",
-        "while",
-        "so",
-        "than",
-        "too",
-        "very",
-        "just",
-        "also",
-        "all",
-        "each",
-        "every",
-        "any",
-        "some",
-        "only",
-    }
-    words = set(_normalize(text).split())
-    return words - stopwords
+    return set(_normalize(text).split()) - _STOPWORDS
+
+
+def _contains_phrase(text: str, phrase: str) -> bool:
+    """Word-boundary match — avoids false hits like 'allow' inside 'disallow'."""
+    return re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", text) is not None
+
+
+def _check_pair_list(
+    new_norm: str,
+    existing_norm: str,
+    pairs: list[tuple[str, str]],
+    score: float,
+) -> float:
+    """Return *score* (clamped to [0.0, 1.0]) if any pair matches on opposite sides, else 0.0."""
+    clamped = min(max(score, 0.0), 1.0)
+    for left, right in pairs:
+        if (_contains_phrase(new_norm, left) and _contains_phrase(existing_norm, right)) or (
+            _contains_phrase(new_norm, right) and _contains_phrase(existing_norm, left)
+        ):
+            return clamped
+    return 0.0
 
 
 def _check_polarity(new_norm: str, existing_norm: str) -> float:
     """Check for polarity contradictions (always vs never)."""
-    for pos, neg in _POLARITY_PAIRS:
-        if pos in new_norm and neg in existing_norm:
-            return 0.9
-        if neg in new_norm and pos in existing_norm:
-            return 0.9
-    return 0.0
+    return _check_pair_list(new_norm, existing_norm, _POLARITY_PAIRS, 0.9)
 
 
 def _check_negation(new_norm: str, existing_norm: str) -> float:
     """Check for action negation (use vs avoid/don't use)."""
-    for action, opposite in _ACTION_OPPOSITES:
-        # New rule uses action, existing uses opposite (or vice versa)
-        if action in new_norm and opposite in existing_norm:
-            return 0.85
-        if opposite in new_norm and action in existing_norm:
-            return 0.85
-    return 0.0
+    return _check_pair_list(new_norm, existing_norm, _ACTION_OPPOSITES, 0.85)
 
 
 def _check_opposite_sentiment(new_norm: str, existing_norm: str) -> float:
     """Check for opposite sentiment on overlapping topics."""
-    for pos, neg in _SENTIMENT_OPPOSITES:
-        if pos in new_norm and neg in existing_norm:
-            return 0.7
-        if neg in new_norm and pos in existing_norm:
-            return 0.7
-    return 0.0
+    return _check_pair_list(new_norm, existing_norm, _SENTIMENT_OPPOSITES, 0.7)

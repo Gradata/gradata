@@ -7,9 +7,10 @@ from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
 
 try:
-    from gradata.enhancements.self_improvement import parse_lessons
+    from gradata.enhancements.self_improvement import is_hook_enforced, parse_lessons
 except ImportError:
     parse_lessons = None
+    is_hook_enforced = None  # type: ignore[assignment]
 
 HOOK_META = {
     "event": "PreToolUse",
@@ -37,13 +38,18 @@ def main(data: dict) -> dict | None:
     all_lessons = parse_lessons(text)
     rule_lessons = [lesson for lesson in all_lessons if lesson.state.name == "RULE"]
 
-    # Dedup: skip rules whose description is marked [hooked] — a generated
-    # PreToolUse hook under .claude/hooks/pre-tool/generated/ is enforcing them
-    # deterministically, so firing the soft text reminder here is noise.
-    rule_lessons = [
-        lesson for lesson in rule_lessons
-        if not lesson.description.lstrip().startswith("[hooked]")
-    ]
+    # Dedup: skip rules that are enforced by a generated PreToolUse hook
+    # (metadata.how_enforced == "hooked", or legacy "[hooked]" description
+    # prefix). A generated hook under .claude/hooks/pre-tool/generated/ is
+    # enforcing them deterministically, so firing the soft text reminder here
+    # is noise.
+    if is_hook_enforced is not None:
+        rule_lessons = [lesson for lesson in rule_lessons if not is_hook_enforced(lesson)]
+    else:
+        rule_lessons = [
+            lesson for lesson in rule_lessons
+            if not lesson.description.lstrip().startswith("[hooked]")
+        ]
 
     if not rule_lessons:
         return None

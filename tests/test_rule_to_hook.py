@@ -1,5 +1,8 @@
 """Tests for rule-to-hook graduation."""
+import json as _json
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -19,6 +22,30 @@ pytestmark = pytest.mark.skipif(
     shutil.which("node") is None,
     reason="node not installed — rule-to-hook integration tests shell out to Node",
 )
+
+
+def test_correction_event_captures_draft_text(tmp_path: Path) -> None:
+    """CORRECTION events must carry the raw violating assistant draft under
+    ``data['draft_text']`` so later tasks can use it as ground truth when
+    self-testing generated hooks."""
+    brain = Brain.init(
+        tmp_path / "brain",
+        name="RuleToHookTest",
+        domain="Testing",
+        embedding="local",
+        interactive=False,
+    )
+
+    brain.record_correction(
+        text="no don't use em dashes",
+        assistant_draft="Subject: Let me — help you out",
+        category="FORMATTING",
+    )
+
+    events = brain.query_events(event_type="CORRECTION", last_n_sessions=1)
+    assert len(events) == 1
+    assert events[0]["data"]["draft_text"] == "Subject: Let me — help you out"
+    assert events[0]["data"]["category"] == "FORMATTING"
 
 
 def test_correction_event_captures_draft_text(tmp_path: Path) -> None:
@@ -122,10 +149,6 @@ class TestFindHookCandidates:
         assert len(candidates) == 1
 
 
-import subprocess
-import json as _json
-
-
 class TestRenderHook:
     def test_render_substitutes_placeholders(self):
         from gradata.enhancements.rule_to_hook import classify_rule, render_hook
@@ -216,10 +239,6 @@ class TestTryGenerate:
         result = try_generate(candidate, positive_example="plain ascii no dashes here")
         assert result.installed is False
         assert "self-test" in result.reason.lower() or "did not block" in result.reason.lower()
-
-
-import subprocess
-import sys
 
 
 class TestCliRuleAdd:
@@ -321,10 +340,17 @@ class TestGraduateIntegration:
             f"expected 1 hook file, found: {[f.name for f in tmp_path.iterdir()]}"
         )
 
-        # Assertion 3: lesson description now carries [hooked] marker so
-        # rule_enforcement dedup skips it.
-        assert lesson.description.lstrip().startswith("[hooked]"), (
-            f"lesson should be marked hooked, got: {lesson.description!r}"
+        # Assertion 3: lesson carries structured "hooked" metadata so the
+        # soft-reminder rule_enforcement hook dedup skips it. The legacy
+        # "[hooked] " description prefix should NOT be used anymore.
+        from gradata.enhancements.self_improvement import is_hook_enforced
+
+        assert is_hook_enforced(lesson), (
+            f"lesson should be marked hooked via metadata, got metadata="
+            f"{getattr(lesson, 'metadata', None)} desc={lesson.description!r}"
+        )
+        assert not lesson.description.lstrip().startswith("[hooked]"), (
+            "description should NOT carry the legacy [hooked] prefix"
         )
 
     def test_graduate_non_deterministic_rule_not_hooked(self, tmp_path, monkeypatch):
@@ -349,8 +375,12 @@ class TestGraduateIntegration:
         assert len(js_files) == 0, (
             f"advisory rule should not install a hook, got: {[f.name for f in js_files]}"
         )
-        # Description should NOT be marked [hooked]
+        # Description should NOT be marked [hooked] (legacy) and metadata
+        # must not report "hooked" enforcement.
+        from gradata.enhancements.self_improvement import is_hook_enforced
+
         assert not lesson.description.lstrip().startswith("[hooked]")
+        assert not is_hook_enforced(lesson)
 
 
 class TestBypassEnv:
@@ -582,23 +612,25 @@ class TestSecretScanTemplate:
         assert try_generate(candidate).installed
 
     def test_secret_hook_blocks_openai_key(self, tmp_path, monkeypatch):
-        import subprocess, json as _j
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         candidate = classify_rule("Never commit secrets", 0.95)
         result = try_generate(candidate)
+        # Synthetic key broken via string concatenation to match the pattern used
+        # in _synthesize_positive and avoid tripping secret scanners.
+        fake_key = "sk" + "-" + "abc123def456ghi789jklmno"
         proc = subprocess.run(
             ["node", str(result.hook_path)],
-            input=_j.dumps({"tool_name": "Write",
-                            "tool_input": {"content": "OPENAI_KEY = 'sk-abc123def456ghi789jklmno'"}}),
+            input=_json.dumps({"tool_name": "Write",
+                               "tool_input": {"content": f"OPENAI_KEY = '{fake_key}'"}}),
             capture_output=True, text=True, timeout=5,
         )
         assert proc.returncode == 2
         # Clean content passes
         proc = subprocess.run(
             ["node", str(result.hook_path)],
-            input=_j.dumps({"tool_name": "Write",
-                            "tool_input": {"content": "OPENAI_KEY = os.environ['OPENAI_API_KEY']"}}),
+            input=_json.dumps({"tool_name": "Write",
+                               "tool_input": {"content": "OPENAI_KEY = os.environ['OPENAI_API_KEY']"}}),
             capture_output=True, text=True, timeout=5,
         )
         assert proc.returncode == 0
@@ -808,7 +840,7 @@ class TestCliExport:
         out_dir.mkdir()
 
         # Resolve src/ to absolute path so cwd=tmp_path doesn't break imports
-        repo_src = str((__import__("pathlib").Path(__file__).resolve().parent.parent / "src"))
+        repo_src = str(Path(__file__).resolve().parent.parent / "src")
         existing_pp = os.environ.get("PYTHONPATH", "")
         env = {**os.environ,
                "GRADATA_BRAIN": str(brain),
@@ -833,7 +865,7 @@ class TestCliExport:
             encoding="utf-8",
         )
         # Resolve src/ to absolute path so cwd=tmp_path doesn't break imports
-        repo_src = str((__import__("pathlib").Path(__file__).resolve().parent.parent / "src"))
+        repo_src = str(Path(__file__).resolve().parent.parent / "src")
         existing_pp = os.environ.get("PYTHONPATH", "")
         env = {**os.environ,
                "GRADATA_BRAIN": str(brain),

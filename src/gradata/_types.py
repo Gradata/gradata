@@ -176,7 +176,7 @@ class Lesson:
     tree_level: int = 0  # Current depth: 0=leaf, 1=branch, 2=trunk
     # Transient runtime state (not persisted to lessons.md) — self_improvement
     # / rule_evolution decay confidence once this crosses a threshold.
-    _contradiction_streak: int = 0
+    _contradiction_streak: int = 0  # Consecutive contradictions; triggers self-correction / penalty acceleration
 
     def __post_init__(self) -> None:
         self.confidence = round(max(0.0, min(1.0, self.confidence)), 2)

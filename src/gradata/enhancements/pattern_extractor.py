@@ -103,7 +103,6 @@ def extract_patterns(
                     used.add(j)
 
             if len(cluster) >= 2:
-                used.update(cluster)
                 cluster_edits = [edits[k] for k in cluster]
                 # Synthesize description from common keywords
                 common = keyword_sets[cluster[0]]

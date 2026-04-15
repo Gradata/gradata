@@ -324,7 +324,7 @@ def install_hook(slug: str, hook_source: str, *, template: str) -> Path:
     path = root / f"{slug}.js"
     # Preserve LF line endings regardless of platform
     path.write_text(hook_source, encoding="utf-8", newline="\n")
-    # Windows or filesystem that doesn't support chmod
+    # Windows or filesystem that doesn't support chmod will raise; suppress.
     with contextlib.suppress(Exception):
         path.chmod(0o755)
     return path
@@ -357,8 +357,10 @@ def _synthesize_positive(candidate: HookCandidate) -> str:
             return "git reset --hard HEAD"
         return "rm -rf /tmp/foo"
     if candidate.hook_template == "secret_scan":
-        # Synthetic test key (broken into pieces to avoid pre-commit secret scanner).
-        return "sk" + "-" + "abc123def456ghi789jklmno"
+        # Clearly-fake synthetic test key — string-concatenated to slip past
+        # naive secret scanners while still matching the regex (sk- + 20+
+        # alphanumerics). NOT a real credential; self-test only.
+        return "sk" + "-" + "FAKEGRADATASELFTESTKEY000000"
     if candidate.hook_template == "file_size_check":
         limit = int(candidate.template_arg or "500")
         return "x\n" * (limit + 10)

@@ -1,74 +1,120 @@
 site_name: Gradata
-site_description: AI behavioral adaptation engine. Corrections graduate into rules.
+site_description: Learns from corrections. Enforces with hooks. Procedural memory for AI agents.
+site_url: https://docs.gradata.ai/
 repo_url: https://github.com/Gradata/gradata
 repo_name: Gradata/gradata
 docs_dir: docs
+strict: true
+
+validation:
+  omitted_files: ignore
+  absolute_links: warn
+  unrecognized_links: warn
+  nav:
+    omitted_files: ignore
+    not_found: warn
+    absolute_links: warn
 
 theme:
   name: material
+  logo: assets/logo.svg
+  favicon: assets/favicon.svg
   palette:
     - scheme: slate
-      primary: deep purple
-      accent: amber
+      primary: black
+      accent: deep purple
       toggle:
-        icon: material/brightness-4
+        icon: material/weather-night
         name: Light mode
     - scheme: default
-      primary: deep purple
-      accent: amber
+      primary: black
+      accent: deep purple
       toggle:
-        icon: material/brightness-7
+        icon: material/weather-sunny
         name: Dark mode
+  font:
+    text: Inter
+    code: JetBrains Mono
   features:
+    - navigation.tabs
+    - navigation.sections
     - navigation.instant
     - navigation.tracking
-    - navigation.sections
-    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - toc.follow
     - content.code.copy
     - content.code.annotate
+    - content.tabs.link
     - search.highlight
+    - search.suggest
+    - search.share
+  icon:
+    repo: fontawesome/brands/github
+
+extra_css:
+  - assets/theme.css
+
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Gradata/gradata
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/gradata/
 
 nav:
   - Home: index.md
   - Getting Started:
     - Installation: getting-started/install.md
-    - Quick Start: getting-started/quickstart.md
-    - Core Concepts: getting-started/concepts.md
-  - Guides:
-    - Training a Brain: guides/training.md
-    - Custom Domains: guides/custom-domains.md
-    - MCP Integration: guides/mcp.md
-    - Claude Code Setup: getting-started/claude-code-setup.md
-  - API Reference:
-    - Brain Class: api/brain.md
-    - CLI: api/cli.md
-    - Patterns API: api/patterns.md
-    - Enhancements API: api/enhancements.md
-  - Contributing:
-    - Architecture: architecture/overview.md
-    - Patterns: architecture/patterns.md
-    - Enhancements: architecture/enhancements.md
-    - Brain Data: architecture/brain.md
-    - Agent Adaptation: architecture/agent-graduation.md
+    - Your First Brain: getting-started/first-brain.md
+    - Claude Code Setup: getting-started/claude-code.md
+  - Concepts:
+    - Corrections: concepts/corrections.md
+    - Graduation: concepts/graduation.md
+    - Meta-Rules: concepts/meta-rules.md
+  - SDK:
+    - Brain Class: sdk/brain.md
+    - Middleware: sdk/middleware.md
+    - Rule-to-Hook: sdk/rule-to-hook.md
+  - Cloud:
+    - Overview: cloud/overview.md
+    - Dashboard: cloud/dashboard.md
+    - API Reference: cloud/api.md
+  - CLI: cli.md
+  - FAQ: faq.md
+  - Contributing: contributing.md
+  - Changelog: changelog.md
 
 plugins:
   - search
-  - mkdocstrings:
-      handlers:
-        python:
-          paths: [src]
-          options:
-            show_source: false
-            show_root_heading: true
-            heading_level: 2
 
 markdown_extensions:
   - admonition
-  - pymdownx.details
-  - pymdownx.superfences
-  - pymdownx.highlight:
-      anchor_linenums: true
-  - pymdownx.tabbed:
-      alternate_style: true
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
   - toc:
       permalink: true
+      toc_depth: 3
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg

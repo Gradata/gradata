@@ -71,17 +71,13 @@ async def list_members(
     results: list[MemberResponse] = []
     for m in members:
         member_user_id = m["user_id"]
-        # Pull the user's most recent brain in this workspace for last_sync_at.
         brains = await db.select(
             "brains",
             columns="id,last_sync_at",
             filters={"workspace_id": workspace_id, "user_id": member_user_id},
         )
-        last_sync_at: str | None = None
-        for b in brains:
-            ts = b.get("last_sync_at")
-            if ts and (last_sync_at is None or ts > last_sync_at):
-                last_sync_at = ts
+        sync_times = [b["last_sync_at"] for b in brains if b.get("last_sync_at")]
+        last_sync_at = max(sync_times) if sync_times else None
 
         results.append(
             MemberResponse(
@@ -111,17 +107,17 @@ async def create_invite(
     db = get_db()
 
     token = secrets.token_urlsafe(32)
-    expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
-    created_at = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
+    expires_at = (now + timedelta(days=7)).isoformat()
 
     invite_data = {
         "workspace_id": workspace_id,
         "email": str(body.email),
-        "role": body.role.value if hasattr(body.role, "value") else body.role,
+        "role": body.role.value,
         "invited_by": user_id,
         "token": token,
         "expires_at": expires_at,
-        "created_at": created_at,
+        "created_at": now.isoformat(),
     }
 
     rows = await db.insert("workspace_invites", invite_data)
@@ -197,7 +193,7 @@ async def update_member_role(
     await _require_admin(workspace_id, user_id)
     db = get_db()
 
-    new_role = body.role.value if hasattr(body.role, "value") else body.role
+    new_role = body.role.value
     if new_role == "owner":
         raise HTTPException(
             status_code=400,
