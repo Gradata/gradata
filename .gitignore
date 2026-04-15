@@ -162,6 +162,7 @@ templates/
 research/
 !docs/research/
 scripts/*
+!scripts/publish-npm.sh
 !cloud/scripts/
 !scripts/migrate_legacy_scopes.py
 docs/cloud/
