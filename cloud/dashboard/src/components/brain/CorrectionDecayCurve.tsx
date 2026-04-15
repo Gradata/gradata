@@ -97,9 +97,11 @@ export function CorrectionDecayCurve({
                 fontSize: 12,
               }}
               labelStyle={{ color: '#F8FAFC' }}
-              labelFormatter={(ts: number) =>
-                new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-              }
+              labelFormatter={(label) => {
+                const ts = typeof label === 'number' ? label : Number(label)
+                if (!Number.isFinite(ts)) return String(label ?? '')
+                return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              }}
             />
             {/* Visual graduation markers: dashed vertical lines mapped to
                 graduation timestamps. Numeric XAxis above is what makes
