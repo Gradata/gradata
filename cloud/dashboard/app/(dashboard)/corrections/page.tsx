@@ -6,8 +6,6 @@ import { useApi } from '@/hooks/useApi'
 import type { Brain, Correction, PaginatedResponse } from '@/types/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
 
 const SEVERITY_STYLE: Record<Correction['severity'], string> = {
   trivial:  'bg-white/[0.04] text-[var(--color-body)]',
@@ -36,8 +34,7 @@ export default function CorrectionsPage() {
   if (!primaryId) return (
     <EmptyState
       title="No brain yet"
-      description="Install the SDK and log your first correction to see it here."
-      action={<Link href="/setup"><Button>Get started →</Button></Link>}
+      description="Install the SDK and log your first correction to see it here. See Setup in the left nav for install instructions."
     />
   )
 

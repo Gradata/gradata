@@ -7,8 +7,6 @@ import { useApi } from '@/hooks/useApi'
 import type { Brain, BrainAnalytics } from '@/types/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
 
 export default function PrivacyPage() {
   const { data: brains, loading: loadingBrains } = useApi<Brain[]>('/brains')
@@ -24,8 +22,7 @@ export default function PrivacyPage() {
   if (!primaryId) return (
     <EmptyState
       title="No brain yet"
-      description="Install the SDK first — privacy controls appear per brain."
-      action={<Link href="/setup"><Button>Get started →</Button></Link>}
+      description="Install the SDK first — privacy controls appear per brain. See Setup in the left nav for install instructions."
     />
   )
 
