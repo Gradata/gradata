@@ -208,6 +208,16 @@ def brain_correct(
     except Exception as e:
         _log.warning("Pattern extraction failed: %s", e)
 
+    # Observation dedup — suppress near-identical corrections inside a recent
+    # session window so repeat corrections don't inflate fire_count/confidence.
+    # See gradata/enhancements/dedup.py for MERGE-vs-DROP policy notes.
+    from gradata.enhancements.dedup import annotate_event_with_dedup
+    is_observation_dup = annotate_event_with_dedup(
+        event, brain.db_path,
+        draft=draft_redacted, final=final_redacted,
+        category=category, session=session,
+    )
+
     # Close the loop: correction → lesson
     desc = ""  # Will be set if severity threshold is met
     try:
@@ -221,7 +231,7 @@ def brain_correct(
             update_confidence,
         )
 
-        if _SEV_RANK.get(diff.severity, 0) >= _SEV_RANK.get(min_severity, 0):
+        if not is_observation_dup and _SEV_RANK.get(diff.severity, 0) >= _SEV_RANK.get(min_severity, 0):
             lessons_path = brain._find_lessons_path(create=True)
             if lessons_path:
                 existing_text = ""
