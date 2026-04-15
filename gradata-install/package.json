@@ -1,0 +1,17 @@
+{
+  "name": "gradata-install",
+  "version": "0.1.0",
+  "description": "One-command installer for Gradata. Wraps pip/pipx + IDE hook setup.",
+  "bin": {
+    "gradata-install": "./bin/gradata-install.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gradata/gradata.git",
+    "directory": "gradata-install"
+  },
+  "license": "AGPL-3.0-or-later",
+  "engines": { "node": ">=18" },
+  "files": ["bin/", "README.md"],
+  "keywords": ["gradata", "claude", "ai", "memory", "installer"]
+}

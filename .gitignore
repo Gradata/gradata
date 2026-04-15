@@ -51,6 +51,8 @@ skills/
 .claudeignore
 package.json
 package-lock.json
+# Exception: npm packages we intentionally ship
+!gradata-install/package.json
 
 # Sales data (private, never in public repo)
 Leads/
