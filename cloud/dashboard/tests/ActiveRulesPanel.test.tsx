@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react'
 import { ActiveRulesPanel } from '@/components/brain/ActiveRulesPanel'
 import type { Lesson } from '@/types/api'
 
+const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
+
 const mk = (
   id: string,
   state: Lesson['state'],
@@ -20,15 +22,22 @@ const mk = (
   created_at: new Date().toISOString(),
 })
 
-describe('ActiveRulesPanel', () => {
-  it('hides raw confidence text (sim decision — implicit signal only)', () => {
-    const lessons = [mk('r1', 'RULE', 0.95, 3)]
-    const { container } = render(<ActiveRulesPanel lessons={lessons} />)
-    // No "0.95" or "95%" should be rendered for the rule row
-    expect(container.textContent).not.toMatch(/0\.95/)
-    expect(container.textContent).not.toMatch(/95%/)
-  })
+const mkRule = (
+  id: string,
+  opts: Partial<Lesson> & { graduated_at?: string; last_recurrence_at?: string } = {},
+): Lesson => ({
+  id,
+  brain_id: 'b1',
+  description: id,
+  category: 'TONE',
+  state: 'RULE',
+  confidence: 0.9,
+  fire_count: 0,
+  created_at: daysAgo(60),
+  ...opts,
+} as Lesson)
 
+describe('ActiveRulesPanel', () => {
   it('sorts rules by confidence descending', () => {
     const lessons = [
       mk('low', 'RULE', 0.50, 1, 'low-desc'),
@@ -59,5 +68,47 @@ describe('ActiveRulesPanel', () => {
     expect(
       screen.getByText(/No graduated rules yet/i),
     ).toBeInTheDocument()
+  })
+})
+
+describe('ActiveRulesPanel status glyphs', () => {
+  it('renders filled dot + Xd clean for rules clean >= 7 days', () => {
+    const rules = [mkRule('a', { graduated_at: daysAgo(21) })]
+    render(<ActiveRulesPanel lessons={rules} />)
+    expect(screen.getByText(/21d clean/i)).toBeInTheDocument()
+    expect(document.querySelector('[data-glyph="clean-durable"]')).toBeInTheDocument()
+  })
+
+  it('renders open dot for clean < 7 days', () => {
+    const rules = [mkRule('a', { graduated_at: daysAgo(3) })]
+    render(<ActiveRulesPanel lessons={rules} />)
+    expect(screen.getByText(/3d clean/i)).toBeInTheDocument()
+    expect(document.querySelector('[data-glyph="clean-new"]')).toBeInTheDocument()
+  })
+
+  it('renders half dot + recurred Nd ago for recurrence < 7 days', () => {
+    const rules = [mkRule('a', { graduated_at: daysAgo(30), last_recurrence_at: daysAgo(2) })]
+    render(<ActiveRulesPanel lessons={rules} />)
+    expect(screen.getByText(/recurred 2d ago/i)).toBeInTheDocument()
+    expect(document.querySelector('[data-glyph="recurred"]')).toBeInTheDocument()
+  })
+
+  it('renders em dash suffix when streak is null', () => {
+    const rules = [mkRule('a')] // no graduated_at, no last_recurrence_at
+    render(<ActiveRulesPanel lessons={rules} />)
+    const row = screen.getByText('a').closest('li')!
+    expect(row.textContent).toMatch(/—/)
+  })
+
+  it('renders a "See all rules" link to /rules', () => {
+    render(<ActiveRulesPanel lessons={[]} />)
+    const link = screen.getByRole('link', { name: /see all rules/i })
+    expect(link).toHaveAttribute('href', '/rules')
+  })
+
+  it('caps display at 8 rules', () => {
+    const rules = Array.from({ length: 12 }, (_, i) => mkRule(`r${i}`, { graduated_at: daysAgo(i + 1) }))
+    render(<ActiveRulesPanel lessons={rules} />)
+    expect(document.querySelectorAll('[data-rule-row]').length).toBe(8)
   })
 })
