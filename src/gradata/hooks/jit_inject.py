@@ -34,9 +34,10 @@ if TYPE_CHECKING:
     from gradata._types import Lesson
 
 try:
-    from gradata.enhancements.self_improvement import parse_lessons
+    from gradata.enhancements.self_improvement import is_hook_enforced, parse_lessons
 except ImportError:
     parse_lessons = None  # type: ignore[assignment]
+    is_hook_enforced = None  # type: ignore[assignment]
 
 _log = logging.getLogger(__name__)
 
@@ -190,6 +191,9 @@ def main(data: dict) -> dict | None:
         return None
 
     lessons = parse_lessons(text)
+    # Phase 5: skip rules already enforced deterministically by an installed hook.
+    if is_hook_enforced is not None:
+        lessons = [lesson for lesson in lessons if not is_hook_enforced(lesson)]
     if not lessons:
         return None
 

@@ -393,6 +393,86 @@ def _log_outcome(brain, source: str, candidate: HookCandidate, result: Generatio
         pass  # never fail graduation on a logging error
 
 
+def promote(
+    description: str,
+    confidence: float,
+    *,
+    brain=None,
+    positive_example: str | None = None,
+    source: str = "promote",
+) -> GenerationResult:
+    """Public entry point: classify + generate + install a hook for a rule.
+
+    Phase 5 auto-promotion: a convenience wrapper around classify_rule +
+    try_generate that callers outside the graduation pipeline (CLI,
+    tests, external tooling) can use to promote a single rule. Callers
+    that need lesson-state round-tripping (setting ``metadata.how_enforced``
+    on the source Lesson) should mutate the lesson themselves after checking
+    ``result.installed`` — promote() intentionally does not touch lessons.md
+    so it stays composable with the graduation loop's own persistence step.
+
+    Returns a GenerationResult. Not-deterministic rules return
+    ``installed=False`` with an explanatory reason; callers should fall back
+    to prompt injection.
+    """
+    candidate = classify_rule(description, confidence)
+    if candidate.determinism == DeterminismCheck.NOT_DETERMINISTIC:
+        return GenerationResult(
+            installed=False,
+            reason=candidate.reason,
+        )
+    return try_generate(
+        candidate,
+        positive_example=positive_example,
+        brain=brain,
+        source=source,
+    )
+
+
+def demote(slug: str, *, brain=None, source: str = "demote") -> GenerationResult:
+    """Remove an installed hook file. Inverse of promote().
+
+    Looks in both pre-tool and post-tool generated directories. Returns a
+    GenerationResult whose ``installed`` field is True iff the file existed
+    and was removed, with ``hook_path`` set to the removed path.
+
+    Does not touch lessons.md — callers should clear
+    ``metadata.how_enforced`` on the matching lesson themselves to re-enable
+    text injection at the next graduation pass.
+    """
+    roots = [_hook_root()]
+    post_override = os.environ.get("GRADATA_HOOK_ROOT_POST")
+    post_root = Path(post_override) if post_override else Path(".claude/hooks/post-tool/generated")
+    roots.append(post_root)
+
+    for root in roots:
+        target = root / f"{slug}.js"
+        if target.exists():
+            try:
+                target.unlink()
+            except OSError as exc:
+                return GenerationResult(
+                    installed=False,
+                    reason=f"unlink failed: {exc}",
+                    hook_path=target,
+                )
+            if brain is not None:
+                with contextlib.suppress(Exception):
+                    brain.emit("RULE_TO_HOOK_REMOVED", source, {
+                        "slug": slug,
+                        "hook_path": str(target),
+                    })
+            return GenerationResult(
+                installed=True,
+                reason=f"removed {target}",
+                hook_path=target,
+            )
+    return GenerationResult(
+        installed=False,
+        reason=f"no hook file found for slug: {slug}",
+    )
+
+
 def try_generate(
     candidate: HookCandidate,
     *,
