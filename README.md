@@ -33,6 +33,24 @@ Gradata synthesizes research from Constitutional AI (Anthropic, 2022), Duolingo'
 
 ## Quick Start
 
+### Claude Code (recommended)
+
+```
+/plugin marketplace add Gradata/gradata
+/plugin install gradata
+```
+
+Requires `pipx install gradata` first (Python 3.11+). See [.claude-plugin/README.md](./.claude-plugin/README.md) for full setup and troubleshooting.
+
+### Python SDK (advanced)
+
+```bash
+pipx install gradata
+gradata install-hook --ide=claude-code
+```
+
+### Library usage
+
 ```python
 from gradata import Brain
 
