@@ -27,8 +27,14 @@ export function Hero() {
               Start free
             </a>
             <a
-              href="/how-it-works/"
+              href={site.proofUrl}
               className="inline-flex w-full items-center justify-center rounded-md border border-[color:var(--color-border)] px-5 py-2.5 text-sm font-medium text-[color:var(--color-foreground)] transition-colors hover:bg-[color:var(--color-card)] sm:w-auto"
+            >
+              See the 192-trial ablation
+            </a>
+            <a
+              href="/how-it-works/"
+              className="inline-flex w-full items-center justify-center rounded-md px-5 py-2.5 text-sm font-medium text-[color:var(--color-muted-foreground)] transition-colors hover:text-[color:var(--color-foreground)] sm:w-auto"
             >
               How it works
             </a>

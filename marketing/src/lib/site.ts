@@ -2,6 +2,7 @@ export const site = {
   name: "Gradata",
   url: "https://gradata.ai",
   appUrl: "https://app.gradata.ai",
+  proofUrl: "https://app.gradata.ai/proof",
   docsUrl: "https://github.com/Gradata/gradata",
   tagline: "AI that learns the corrections you keep making.",
   description:
