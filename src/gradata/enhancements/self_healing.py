@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from gradata._scope import RuleScope
     from gradata._types import Lesson
+    from gradata.brain import Brain
 
 # Only RULE state with confidence >= this threshold triggers self-healing.
 # This is intentionally lower than RULE_THRESHOLD (0.90): self-healing must
@@ -490,7 +491,7 @@ def narrow_rule_scope(
 
 
 def auto_heal_failures(
-    brain,
+    brain: Brain,
     failure_events: list[dict] | None = None,
     *,
     max_patches: int = 5,

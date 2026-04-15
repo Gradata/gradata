@@ -6,6 +6,28 @@ import pytest
 from gradata._types import Lesson, LessonState
 
 
+@pytest.fixture(scope="function")
+def brain_with_rule(tmp_path):
+    """Shared fixture: brain seeded with a graduated TONE rule at 0.92 conf.
+
+    Used across self-healing test classes. Module-scope deduplication per
+    CodeRabbit review on PR #77.
+    """
+    from gradata._db import write_lessons_safe
+    from gradata.brain import Brain
+    from gradata.enhancements.self_improvement import format_lessons
+
+    brain = Brain.init(str(tmp_path / "test-brain"))
+    rule = Lesson(
+        date="2026-04-01", state=LessonState.RULE, confidence=0.92,
+        category="TONE", description="Never use exclamation marks",
+        fire_count=8,
+    )
+    lessons_path = brain._find_lessons_path(create=True)
+    write_lessons_safe(lessons_path, format_lessons([rule]))
+    return brain
+
+
 class TestDetectRuleFailure:
     """detect_rule_failure: given lessons + a correction category, find rules that should have prevented it."""
 
@@ -117,24 +139,6 @@ class TestDetectRuleFailure:
 class TestBrainCorrectRuleFailure:
     """brain.correct() emits RULE_FAILURE when a RULE should have caught the correction."""
 
-    @pytest.fixture
-    def brain_with_rule(self, tmp_path):
-        """Create a brain with a graduated RULE in TONE category."""
-        from gradata._db import write_lessons_safe
-        from gradata._types import Lesson, LessonState
-        from gradata.brain import Brain
-        from gradata.enhancements.self_improvement import format_lessons
-
-        brain = Brain.init(str(tmp_path / "test-brain"))
-        rule = Lesson(
-            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
-            category="TONE", description="Never use exclamation marks in professional emails",
-            fire_count=8,
-        )
-        lessons_path = brain._find_lessons_path(create=True)
-        write_lessons_safe(lessons_path, format_lessons([rule]))
-        return brain
-
     def test_correction_in_ruled_category_emits_rule_failure(self, brain_with_rule):
         result = brain_with_rule.correct(
             draft="Great to hear from you! Let's connect!",
@@ -159,23 +163,6 @@ class TestBrainCorrectRuleFailure:
 
 class TestPatchRule:
     """brain.patch_rule() rewrites a rule's description while preserving metadata."""
-
-    @pytest.fixture
-    def brain_with_rule(self, tmp_path):
-        from gradata._db import write_lessons_safe
-        from gradata._types import Lesson, LessonState
-        from gradata.brain import Brain
-        from gradata.enhancements.self_improvement import format_lessons
-
-        brain = Brain.init(str(tmp_path / "test-brain"))
-        rule = Lesson(
-            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
-            category="TONE", description="Never use exclamation marks",
-            fire_count=8,
-        )
-        lessons_path = brain._find_lessons_path(create=True)
-        write_lessons_safe(lessons_path, format_lessons([rule]))
-        return brain
 
     def test_patch_rewrites_description(self, brain_with_rule):
         result = brain_with_rule.patch_rule(
@@ -435,23 +422,6 @@ class TestNarrowRuleScope:
 class TestAutoHeal:
     """brain.auto_heal + auto_heal_failures: the closed-loop orchestrator."""
 
-    @pytest.fixture
-    def brain_with_rule(self, tmp_path):
-        from gradata._db import write_lessons_safe
-        from gradata._types import Lesson, LessonState
-        from gradata.brain import Brain
-        from gradata.enhancements.self_improvement import format_lessons
-
-        brain = Brain.init(str(tmp_path / "test-brain"))
-        rule = Lesson(
-            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
-            category="TONE", description="Never use exclamation marks",
-            fire_count=8,
-        )
-        lessons_path = brain._find_lessons_path(create=True)
-        write_lessons_safe(lessons_path, format_lessons([rule]))
-        return brain
-
     def test_empty_failures_returns_zero_summary(self, brain_with_rule):
         result = brain_with_rule.auto_heal(failure_events=[])
         assert result == {
@@ -565,42 +535,46 @@ class TestAutoHeal:
 class TestCorrectAutoHealIntegration:
     """brain.correct() closes the heal loop only when auto_heal=True is opted in."""
 
-    @pytest.fixture
-    def brain_with_rule(self, tmp_path):
-        from gradata._db import write_lessons_safe
-        from gradata._types import Lesson, LessonState
-        from gradata.brain import Brain
-        from gradata.enhancements.self_improvement import format_lessons
+    def test_auto_heal_detects_rule_failure(self, brain_with_rule):
+        """A correction in a ruled category flags RULE_FAILURE detection.
 
-        brain = Brain.init(str(tmp_path / "test-brain"))
-        rule = Lesson(
-            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
-            category="TONE", description="Never use exclamation marks",
-            fire_count=8,
-        )
-        lessons_path = brain._find_lessons_path(create=True)
-        write_lessons_safe(lessons_path, format_lessons([rule]))
-        return brain
-
-    def test_auto_heal_triggers_on_rule_failure(self, brain_with_rule):
-        """A correction in a ruled category auto-emits RULE_PATCHED when opted in."""
+        Split from the original combined test per CodeRabbit review: this
+        half asserts only the detection signal, which is deterministic.
+        """
         result = brain_with_rule.correct(
             draft="Thanks for joining! Excited!",
             final="Thanks for joining. Excited.",
             category="TONE",
             auto_heal=True,
         )
-        # The correction fired a RULE_FAILURE detection
         assert result.get("rule_failure_detected") is True
 
-        # And auto_heal closed the loop in the same call
+    def test_auto_heal_emits_patch_when_retroactive_test_passes(self, brain_with_rule):
+        """With delta text that guarantees retroactive-test pass, RULE_PATCHED
+        must fire and carry the auto_heal reason prefix.
+
+        Split from the original combined test per CodeRabbit review: this
+        half uses input with sufficient delta words to make patching
+        deterministic, so the assertions are unconditional.
+        """
+        # Failure event crafted to carry explicit delta words (casual, Slack)
+        # which `_generate_deterministic_patch` appends to narrow scope, and
+        # which `retroactive_test` matches to confirm the patch covers the
+        # failure. This makes RULE_PATCHED emission deterministic.
+        failures = [{
+            "data": {
+                "failed_rule_category": "TONE",
+                "failed_rule_description": "Never use exclamation marks",
+                "failed_rule_confidence": 0.92,
+                "correction_description": "Removed exclamation marks from casual Slack message",
+            }
+        }]
+        summary = brain_with_rule.auto_heal(failure_events=failures)
+        assert summary["patched"] == 1
+
         patched = brain_with_rule.query_events(event_type="RULE_PATCHED", limit=10)
-        # At least one patch should have happened when the delta contains
-        # the failure context. "Thanks for joining! Excited!" / "joining."
-        # carries enough delta words to pass the retroactive test.
-        if patched:
-            assert patched[0]["data"]["reason"].startswith("auto_heal:")
-            assert "auto_healed" in result
+        assert len(patched) >= 1
+        assert patched[0]["data"]["reason"].startswith("auto_heal:")
 
     def test_auto_heal_opt_out(self, brain_with_rule):
         """auto_heal=False keeps the old behavior: emit RULE_FAILURE but no patch."""
@@ -670,23 +644,6 @@ class TestCorrectAutoHealIntegration:
 
 class TestSelfHealingE2E:
     """Full flow: correct -> RULE_FAILURE detected -> patch generated -> rule updated."""
-
-    @pytest.fixture
-    def brain_with_rule(self, tmp_path):
-        from gradata._db import write_lessons_safe
-        from gradata._types import Lesson, LessonState
-        from gradata.brain import Brain
-        from gradata.enhancements.self_improvement import format_lessons
-
-        brain = Brain.init(str(tmp_path / "test-brain"))
-        rule = Lesson(
-            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
-            category="TONE", description="Never use exclamation marks",
-            fire_count=8,
-        )
-        lessons_path = brain._find_lessons_path(create=True)
-        write_lessons_safe(lessons_path, format_lessons([rule]))
-        return brain
 
     def test_full_self_healing_flow(self, brain_with_rule):
         brain = brain_with_rule

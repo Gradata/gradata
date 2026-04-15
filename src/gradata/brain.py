@@ -383,8 +383,15 @@ class Brain(BrainInspectionMixin):
         correction to a specific context. When set, it is persisted on the
         event and propagated to any lesson that graduates from this
         correction's lineage. Injection-time filtering by ``applies_to``
-        is a follow-up — persistence only for now. A ``None`` value preserves
+        is a follow-up, persistence only for now. A ``None`` value preserves
         the existing global behaviour.
+
+        ``auto_heal`` controls whether detected RULE_FAILURE events trigger
+        automatic patching via the self-healing loop. Defaults to ``False``
+        (silent detection only). Set to ``True`` to apply patches inline; each
+        patch returns a ``PatchReceipt`` and emits a stderr line. Auto-heal is
+        also skipped when ``dry_run=True``, ``approval_required=True``, or
+        when the brain is in renter mode.
         """
         self._rule_cache.invalidate()  # Correction invalidates cached rules
         from gradata._core import brain_correct
