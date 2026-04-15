@@ -72,6 +72,16 @@ def emit(event_type: str, source: str, data: dict | None = None, tags: list | No
     if valid_from is None:
         valid_from = ts
 
+    # Enrich data dict with auto-detected platform source (env-var based).
+    # Keeps public API signatures untouched — callers get this for free.
+    data = dict(data) if data else {}
+    if "platform_source" not in data:
+        try:
+            from gradata._platform import detect_platform_source
+            data["platform_source"] = detect_platform_source()
+        except Exception:
+            data["platform_source"] = "raw-python"
+
     enriched_tags = tags or []
     try:
         from gradata._tag_taxonomy import enrich_tags, validate_tags
