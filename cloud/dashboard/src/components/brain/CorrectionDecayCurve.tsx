@@ -105,10 +105,14 @@ export function CorrectionDecayCurve({
             />
             {/* Visual graduation markers: dashed vertical lines mapped to
                 graduation timestamps. Numeric XAxis above is what makes
-                ReferenceLine x={ms} actually align with the curve. */}
+                ReferenceLine x={ms} actually align with the curve. The
+                custom `label` renders an invisible SVG <g> carrying the
+                test hook attribute + accessible <title> tooltip shown on
+                hover (native SVG — no extra JS). */}
             {visibleMarkers.map((l) => {
               const gMs = l.graduated_at ? new Date(l.graduated_at).getTime() : null
               if (gMs === null) return null
+              const ariaLabel = `Rule graduated: ${l.description ?? l.id}`
               return (
                 <ReferenceLine
                   key={`refline-${l.id}`}
@@ -117,6 +121,33 @@ export function CorrectionDecayCurve({
                   strokeOpacity={0.4}
                   strokeDasharray="4 4"
                   ifOverflow="extendDomain"
+                  label={(props: { viewBox?: { x?: number; y?: number; height?: number } }) => {
+                    const vb = props?.viewBox ?? {}
+                    const cx = typeof vb.x === 'number' ? vb.x : 0
+                    const yTop = typeof vb.y === 'number' ? vb.y : 0
+                    const h = typeof vb.height === 'number' ? vb.height : 0
+                    return (
+                      <g
+                        data-graduation-marker=""
+                        data-lesson-id={l.id}
+                        data-graduated-at={l.graduated_at ?? ''}
+                        data-x={cx}
+                        role="img"
+                        aria-label={ariaLabel}
+                      >
+                        <title>{ariaLabel}</title>
+                        {/* transparent hit-target for hover tooltip */}
+                        <rect
+                          x={cx - 6}
+                          y={yTop}
+                          width={12}
+                          height={h}
+                          fill="transparent"
+                          pointerEvents="all"
+                        />
+                      </g>
+                    )
+                  }}
                 />
               )
             })}
@@ -160,21 +191,6 @@ export function CorrectionDecayCurve({
             />
           </ComposedChart>
         </ResponsiveContainer>
-      </div>
-      {/* Hidden marker list — a11y fallback + test hook. The visible
-          dashed vertical lines are rendered above via <ReferenceLine>,
-          but Recharts emits SVG that screen readers don't surface well,
-          so we keep this list as the accessible representation. Tests
-          also count [data-graduation-marker] from this list. */}
-      <div aria-hidden className="hidden">
-        {visibleMarkers.map((l) => (
-          <span
-            key={l.id}
-            data-graduation-marker
-            data-lesson-id={l.id}
-            data-graduated-at={l.graduated_at ?? ''}
-          />
-        ))}
       </div>
       {visibleMarkers.length > 0 && (
         <div className="mt-2 text-[11px] text-[var(--color-body)]">

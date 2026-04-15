@@ -78,8 +78,10 @@ describe('/dashboard preview-with-sample-data flow', () => {
     // Fixture-backed panels render
     expect(screen.getByText('Time Saved')).toBeInTheDocument()
     expect(screen.getByText('Your Rules')).toBeInTheDocument()
-    // Demo lessons appear (from demo-dashboard fixture)
-    expect(screen.getByText(/Never use em dashes/i)).toBeInTheDocument()
+    // Demo lessons appear (from demo-dashboard fixture). Use getAllByText
+    // because a graduated lesson's description also surfaces in the decay
+    // curve's SVG <title> tooltip on its graduation marker.
+    expect(screen.getAllByText(/Never use em dashes/i).length).toBeGreaterThan(0)
 
     // Exit demo
     await user.click(screen.getByRole('button', { name: /Exit demo/i }))
