@@ -67,10 +67,7 @@ def _tokenize(text: str) -> set[str]:
 def _jaccard(a: set[str], b: set[str]) -> float:
     if not a or not b:
         return 0.0
-    inter = len(a & b)
-    if inter == 0:
-        return 0.0
-    return inter / len(a | b)
+    return len(a & b) / len(a | b)
 
 
 def _jit_enabled() -> bool:
