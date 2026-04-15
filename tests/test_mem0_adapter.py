@@ -172,6 +172,39 @@ def test_push_correction_merges_extra_metadata() -> None:
     assert meta["source"] == "gradata"  # base metadata still present
 
 
+def test_push_correction_caller_metadata_cannot_override_internal_keys() -> None:
+    """Reserved internal keys (source, kind) must win over caller metadata.
+
+    Regression guard for CodeRabbit review on PR #79: if caller metadata were
+    merged AFTER the internal keys, a malicious or careless caller could
+    impersonate gradata-origin records or hide the correction kind.
+    """
+    fake = _FakeMem0Client(add_response={"id": "mem-1"})
+    adapter = Mem0Adapter(user_id="oliver", client=fake)
+    adapter.push_correction(
+        draft="a",
+        final="b",
+        summary="legit summary",
+        tags=["legit"],
+        metadata={
+            "source": "evil",
+            "kind": "evil",
+            "summary": "evil summary",
+            "tags": ["evil"],
+            "session_id": "s42",  # non-reserved keys should still pass through
+        },
+    )
+    _, payload = fake.calls[0]
+    meta = payload["metadata"]
+    # Reserved internal keys must be preserved.
+    assert meta["source"] == "gradata"
+    assert meta["kind"] == "correction"
+    assert meta["summary"] == "legit summary"
+    assert meta["tags"] == ["legit"]
+    # Non-reserved caller keys still flow through.
+    assert meta["session_id"] == "s42"
+
+
 # ---------------------------------------------------------------------------
 # pull_memory_for_context
 # ---------------------------------------------------------------------------

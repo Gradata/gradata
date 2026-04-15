@@ -115,16 +115,16 @@ class Mem0Adapter:
             {"role": "user", "content": final},
         ]
 
-        meta: dict[str, Any] = {
-            "source": "gradata",
-            "kind": "correction",
-        }
+        meta: dict[str, Any] = {}
+        if metadata:
+            meta.update(metadata)
+        # Internal keys set AFTER caller metadata so they cannot be overridden.
+        meta["source"] = "gradata"
+        meta["kind"] = "correction"
         if summary:
             meta["summary"] = summary
         if tags:
             meta["tags"] = list(tags)
-        if metadata:
-            meta.update(metadata)
 
         try:
             response = self._client.add(
