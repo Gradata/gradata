@@ -16,6 +16,10 @@ token.json
 ~$*
 gradata-plugin/
 
+# Orphans from PR #76 cloud split — dirs removed from repo, remain on disk
+/cloud/
+/sdk/
+
 # OS files
 Thumbs.db
 Desktop.ini
