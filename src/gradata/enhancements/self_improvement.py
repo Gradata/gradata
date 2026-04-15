@@ -8,8 +8,8 @@ This is the open-source graduation engine. Corrections become procedural
 memory: confidence scoring, lesson parsing, FSRS-inspired graduation,
 adversarial validation, and formatting.
 
-The proprietary cloud version (gradata_cloud.graduation.self_improvement)
-adds FSRS-based scheduling and multi-brain optimization on top.
+An optional hosted-service enhancement adds FSRS-based scheduling and
+multi-brain optimization on top when available.
 """
 
 from __future__ import annotations

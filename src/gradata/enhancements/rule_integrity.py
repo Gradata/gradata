@@ -12,7 +12,7 @@ Backward compatible: when no secret key is configured (solo use),
 rules pass through unsigned and unverified.
 
 OPEN SOURCE: Signing algorithm is open. Key management and
-multi-tenant signing are proprietary cloud-side.
+multi-tenant signing are optional hosted-service enhancements.
 """
 
 from __future__ import annotations

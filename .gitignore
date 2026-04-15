@@ -179,3 +179,9 @@ design-system/
 .gstack/
 .gitnexus
 .superpowers/
+
+# Hosted-service modules (live in separate private repo Gradata/gradata-cloud)
+gradata_cloud_backup/
+**/gradata_cloud_backup/
+**/*_cloud_backup/
+gradata-cloud-backup/

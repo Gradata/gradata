@@ -35,7 +35,7 @@ AVAILABLE modules (open source, shipped in SDK):
   router_warmstart     -- Bootstrap Q-Learning router from vault data
   rule_to_hook         -- Deterministic rules auto-generate enforcement hooks
 
-CLOUD-ONLY modules (require gradata_cloud package):
+Hosted-tier modules (available when optional hosted-service is installed):
   agent_graduation     -- Agent/subagent behavioral graduation
 
 PLANNED modules (not yet implemented):
