@@ -69,6 +69,11 @@ sdk/research/_archived_v2_reference/
 .pytest_cache/
 .ruff_cache/
 
+# Graphify knowledge-graph cache (third-party tool output, regenerable)
+graphify-out/
+**/graphify-out/
+src/gradata/graphify-out/
+
 # Junk files from cmd.exe redirect misparse (Windows agent output artifacts)
 # When subagents run Bash commands, cmd.exe interprets > in stdout as redirects
 $null
