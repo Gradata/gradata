@@ -305,4 +305,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-AGPL-3.0. Commercial license available — contact hello@gradata.com.
+Gradata is dual-licensed:
+
+- Open source: [AGPL-3.0-or-later](LICENSE)
+- Commercial alternative for organizations that cannot use AGPL: see [docs/LICENSING.md](docs/LICENSING.md) — contact hello@gradata.com.
