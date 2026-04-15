@@ -292,11 +292,13 @@ def _slug(text: str) -> str:
 
 
 def _hook_root() -> Path:
-    """Where generated hooks get installed. Overridable via env for tests."""
-    override = os.environ.get("GRADATA_HOOK_ROOT")
-    if override:
-        return Path(override)
-    return Path(".claude/hooks/pre-tool/generated")
+    """Where generated hooks get installed. Overridable via env for tests.
+
+    Delegates to the shared resolver in ``gradata.hooks._manifest`` so there
+    is exactly one source of truth for the hook-root default path.
+    """
+    from gradata.hooks import _manifest as _mf
+    return _mf._hook_root("pre")
 
 
 def install_hook(
@@ -320,8 +322,10 @@ def install_hook(
     that the dispatcher doesn't implement inline (e.g. auto_test runs pytest).
     """
     if template in _POST_TOOL_TEMPLATES:
-        override = os.environ.get("GRADATA_HOOK_ROOT_POST")
-        root = Path(override) if override else Path(".claude/hooks/post-tool/generated")
+        # Delegate post-tool root to the shared resolver too — keeps the
+        # default path in one place.
+        from gradata.hooks import _manifest as _mf
+        root = _mf._hook_root("post")
         kind = "post"
     else:
         root = _hook_root()

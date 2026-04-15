@@ -77,7 +77,6 @@ def run_generated_hooks(*, env_var: str, default_dir: str, per_hook_timeout: int
 
     # Fast path: bundled dispatcher.
     if dispatcher.exists() and manifest.exists():
-        dispatcher_ran = True
         try:
             proc = subprocess.run(
                 ["node", str(dispatcher)],
@@ -89,6 +88,10 @@ def run_generated_hooks(*, env_var: str, default_dir: str, per_hook_timeout: int
             proc = None
         except Exception:
             proc = None
+        # Only mark dispatcher as having "ran" when it actually succeeded —
+        # otherwise the fallback loop below would skip manifest-backed legacy
+        # hooks even though the dispatcher never evaluated them.
+        dispatcher_ran = proc is not None and proc.returncode in (0, 2)
         if proc is not None and proc.returncode == 2:
             if proc.stdout:
                 with contextlib.suppress(Exception):

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import TYPE_CHECKING
 
 from gradata._types import (
     CorrectionType,
@@ -24,6 +25,11 @@ from gradata._types import (
     RuleMetadata,
     transition,
 )
+
+if TYPE_CHECKING:
+    # Brain is only needed for static type checking — avoid a runtime import
+    # cycle with gradata.brain, which imports from this module.
+    from gradata.brain import Brain
 
 _log = logging.getLogger(__name__)
 
@@ -862,7 +868,7 @@ def graduate(
     renter: bool = False,
     machine_mode: bool = False,
     salt: str = "",
-    brain=None,
+    brain: Brain | None = None,
 ) -> tuple[list[Lesson], list[Lesson]]:
     """Apply state transitions and split into active vs graduated.
 

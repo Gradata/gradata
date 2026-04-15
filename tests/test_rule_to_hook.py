@@ -1550,3 +1550,56 @@ class TestRuleRemoveManifest:
         entries = [e for e in HOOK_REGISTRY if e[0] == "stale_hook_check"]
         assert len(entries) == 1
         assert entries[0][1] == "SessionStart"
+
+
+class TestSharedLessonParser:
+    """Cover gradata._lessons.parse_rule_lesson for both formats."""
+
+    def test_parses_legacy_hooked_marker(self):
+        from gradata._lessons import parse_rule_lesson
+        line = "[2026-04-13] [RULE:1.00] FORMATTING: [hooked] never use em dashes"
+        p = parse_rule_lesson(line)
+        assert p is not None
+        assert p.category == "FORMATTING"
+        assert p.description == "never use em dashes"
+        assert p.hooked is True
+
+    def test_parses_structured_metadata_hooked(self):
+        """Inline ``Metadata: {"how_enforced":"hooked"}`` must set hooked=True
+        and be stripped from the returned description."""
+        from gradata._lessons import parse_rule_lesson
+        line = (
+            '[2026-04-13] [RULE:1.00] FORMATTING: never use em dashes  '
+            'Metadata: {"how_enforced": "hooked", "utility_score": 0.5}'
+        )
+        p = parse_rule_lesson(line)
+        assert p is not None
+        assert p.description == "never use em dashes"
+        assert p.hooked is True
+
+    def test_structured_metadata_non_hooked(self):
+        """Structured metadata with a non-hooked enforcement should parse but
+        leave hooked=False."""
+        from gradata._lessons import parse_rule_lesson
+        line = (
+            '[2026-04-13] [RULE:1.00] STRUCTURE: lead with answer  '
+            'Metadata: {"how_enforced": "prompt_injection"}'
+        )
+        p = parse_rule_lesson(line)
+        assert p is not None
+        assert p.description == "lead with answer"
+        assert p.hooked is False
+
+    def test_malformed_metadata_degrades_gracefully(self):
+        """Bad JSON in the Metadata block should not crash the parser."""
+        from gradata._lessons import parse_rule_lesson
+        line = "[2026-04-13] [RULE:1.00] STRUCTURE: desc  Metadata: {not json"
+        p = parse_rule_lesson(line)
+        # Parser must still return a RuleLesson; hooked stays False.
+        assert p is not None
+        assert p.hooked is False
+
+    def test_non_rule_line_returns_none(self):
+        from gradata._lessons import parse_rule_lesson
+        assert parse_rule_lesson("random text") is None
+        assert parse_rule_lesson("[2026-04-13] [INSTINCT:0.5] x: y") is None

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 import sys
 from pathlib import Path
 
@@ -63,9 +64,9 @@ def _brain_root() -> Path:
 
 
 def _hook_dirs() -> list[Path]:
-    pre = os.environ.get("GRADATA_HOOK_ROOT") or ".claude/hooks/pre-tool/generated"
-    post = os.environ.get("GRADATA_HOOK_ROOT_POST") or ".claude/hooks/post-tool/generated"
-    return [Path(pre), Path(post)]
+    """Delegate to the shared resolver so paths stay consistent across SDK."""
+    from gradata.hooks import _manifest as _mf
+    return [_mf._hook_root("pre"), _mf._hook_root("post")]
 
 
 def main() -> int:
@@ -121,9 +122,22 @@ def main() -> int:
 
     # Also check manifest-only entries (legacy .js may have been deleted after
     # a migrate --delete-legacy, leaving only the bundled manifest).
+    #
+    # Slug-drift case: when a lesson's text was edited the slug changes, so
+    # lessons_by_slug[recorded_slug] is None. Before giving up we scan every
+    # current lesson's hash — if ANY matches the recorded hash it means the
+    # lesson merely moved slugs (same text, different key path). Not stale.
+    # If nothing matches, the entry is truly orphaned (lesson deleted) and
+    # we also report it as stale so the user can clean it up.
     try:
         from gradata.hooks import _manifest as _mf
         dirs = _hook_dirs()
+        # Precompute current_hash -> (slug, text) for every lesson so drift
+        # detection is O(1) per manifest entry instead of O(n*m).
+        current_hash_index: dict[str, tuple[str, str]] = {
+            _source_hash(text): (slug, text)
+            for slug, text in lessons_by_slug.items()
+        }
         for kind, d in (("pre", dirs[0]), ("post", dirs[1])):
             for entry in _mf.read_manifest(kind):
                 slug = entry.get("slug")
@@ -134,6 +148,15 @@ def main() -> int:
                     continue
                 current_text = lessons_by_slug.get(slug)
                 if current_text is None:
+                    # Slug-drift probe: did the lesson survive with a new slug?
+                    hit = current_hash_index.get(recorded)
+                    if hit is not None:
+                        # Same text, slug changed -> not stale (hash matches).
+                        continue
+                    # No hash match -> lesson was deleted or text changed AND
+                    # slug drifted. Report so user can `rule remove` the entry.
+                    pseudo_path = d / f"{slug} (bundled, orphan)"
+                    stale.append((slug, pseudo_path, recorded, "<missing>", f"[lesson missing for slug {slug}]"))
                     continue
                 current_hash = _source_hash(current_text)
                 if current_hash != recorded:
@@ -152,7 +175,10 @@ def main() -> int:
             print(f"  - {slug}")
             print(f"      hook:    {path}")
             print(f"      hash:    {old_hash} (installed) -> {new_hash} (current)")
-            print(f"      fix:     gradata rule remove {slug} && gradata rule add \"{current_text}\"")
+            # shlex.quote: lesson text may contain quotes/backticks/$(...) —
+            # interpolating raw into a shell command would be injection-prone.
+            safe_text = shlex.quote(current_text)
+            print(f"      fix:     gradata rule remove {slug} && gradata rule add {safe_text}")
             print()
 
     return 0

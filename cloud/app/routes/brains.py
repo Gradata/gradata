@@ -124,10 +124,24 @@ async def create_brain(
             {"workspace_id": workspace_id, "user_id": user_id, "role": "owner"},
         )
         if not member_rows:
-            _log.warning(
+            # Hard failure: a workspace without a confirmed owner row would
+            # leave the caller unable to reach their own brain. Attempt a
+            # best-effort rollback of the workspace we just created and abort.
+            _log.error(
                 "Failed to create workspace membership for user=%s workspace=%s",
                 user_id,
                 workspace_id,
+            )
+            try:
+                await db.delete("workspaces", filters={"id": workspace_id})
+            except Exception:
+                _log.exception(
+                    "Rollback of workspace %s failed after missing owner membership",
+                    workspace_id,
+                )
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to provision workspace membership",
             )
 
     # Generate a cloud-scope API key so the SDK can authenticate right away.

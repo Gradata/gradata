@@ -528,7 +528,10 @@ def cmd_rule_add(args):
             "safety_score": 0.5,
         }
         line += f"  Metadata: {_json.dumps(meta)}\n"
-    with lessons.open("a", encoding="utf-8") as f:
+    # Lock while appending — concurrent CLI calls would otherwise interleave
+    # partial writes and corrupt lessons.md (per _db.lessons_lock contract).
+    from gradata._db import lessons_lock
+    with lessons_lock(lessons), lessons.open("a", encoding="utf-8") as f:
         f.write(line)
 
     if result.installed:
@@ -538,11 +541,13 @@ def cmd_rule_add(args):
 
 
 def _generated_hook_dirs() -> list[Path]:
-    """Pre- and post-tool generated-hook directories, honoring env overrides."""
-    import os
-    pre = os.environ.get("GRADATA_HOOK_ROOT") or ".claude/hooks/pre-tool/generated"
-    post = os.environ.get("GRADATA_HOOK_ROOT_POST") or ".claude/hooks/post-tool/generated"
-    return [Path(pre), Path(post)]
+    """Pre- and post-tool generated-hook directories.
+
+    Delegates to ``gradata.hooks._manifest._hook_root`` so env overrides and
+    default paths stay centralized.
+    """
+    from gradata.hooks import _manifest as _mf
+    return [_mf._hook_root("pre"), _mf._hook_root("post")]
 
 
 def cmd_rule_list(args):
@@ -656,30 +661,35 @@ def cmd_rule_remove(args):
     removed_manifest = removed_manifest_pre or removed_manifest_post
 
 
-    # 2. Find matching lesson by slug → description
+    # 2. Find matching lesson by slug → description.
+    #    Read + write are wrapped in a single lessons_lock so concurrent CLI
+    #    invocations can't TOCTOU-clobber each other (e.g. `rule add` landing
+    #    between our read and write).
+    from gradata._db import lessons_lock
     touched_lesson = False
     if lessons_file.exists():
-        lines = lessons_file.read_text(encoding="utf-8").splitlines()
-        out_lines = []
-        for line in lines:
-            parsed = parse_rule_lesson(line)
-            if parsed is None:
-                out_lines.append(line)
-                continue
-            if _slug(parsed.description) == slug:
-                if args.purge:
-                    touched_lesson = True
-                    continue  # drop the line entirely
-                if parsed.hooked:
-                    touched_lesson = True
-                    out_lines.append(f"{parsed.prefix}: {parsed.description}")
-                else:
-                    # Already unmarked — no change needed
+        with lessons_lock(lessons_file):
+            lines = lessons_file.read_text(encoding="utf-8").splitlines()
+            out_lines = []
+            for line in lines:
+                parsed = parse_rule_lesson(line)
+                if parsed is None:
                     out_lines.append(line)
-            else:
-                out_lines.append(line)
-        if touched_lesson:
-            lessons_file.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+                    continue
+                if _slug(parsed.description) == slug:
+                    if args.purge:
+                        touched_lesson = True
+                        continue  # drop the line entirely
+                    if parsed.hooked:
+                        touched_lesson = True
+                        out_lines.append(f"{parsed.prefix}: {parsed.description}")
+                    else:
+                        # Already unmarked — no change needed
+                        out_lines.append(line)
+                else:
+                    out_lines.append(line)
+            if touched_lesson:
+                lessons_file.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
 
     if removed_file:
         print(f"Removed hook: {removed_file}")
