@@ -1,36 +1,41 @@
-"""Tests for brain.scope(), detect_cross_domain_candidates(), and suggest_scope_narrowing."""
+"""Tests for brain.scoped_rules(), detect_cross_domain_candidates(), and suggest_scope_narrowing.
+
+The legacy string-returning scope API moved to :meth:`Brain.scoped_rules`; the
+name ``scope`` now returns a :class:`ScopedBrain` object (see
+``tests/test_scoped_brains.py``).
+"""
 from __future__ import annotations
 import json
 import pytest
 
 
-# Feature 1: brain.scope()
+# Feature 1: brain.scoped_rules()
 
-def test_brain_scope_returns_str(tmp_path):
+def test_brain_scoped_rules_returns_str(tmp_path):
     from gradata.brain import Brain
     brain = Brain.init(str(tmp_path))
-    result = brain.scope(domain="sales")
+    result = brain.scoped_rules(domain="sales")
     assert isinstance(result, str)
 
 
-def test_brain_scope_no_args_returns_str(tmp_path):
+def test_brain_scoped_rules_no_args_returns_str(tmp_path):
     from gradata.brain import Brain
     brain = Brain.init(str(tmp_path))
-    result = brain.scope()
+    result = brain.scoped_rules()
     assert isinstance(result, str)
 
 
-def test_brain_scope_with_task_type(tmp_path):
+def test_brain_scoped_rules_with_task_type(tmp_path):
     from gradata.brain import Brain
     brain = Brain.init(str(tmp_path))
-    result = brain.scope(domain="sales", task_type="email_draft")
+    result = brain.scoped_rules(domain="sales", task_type="email_draft")
     assert isinstance(result, str)
 
 
-def test_brain_scope_with_agent_type(tmp_path):
+def test_brain_scoped_rules_with_agent_type(tmp_path):
     from gradata.brain import Brain
     brain = Brain.init(str(tmp_path))
-    result = brain.scope(domain="engineering", agent_type="reviewer")
+    result = brain.scoped_rules(domain="engineering", agent_type="reviewer")
     assert isinstance(result, str)
 
 
