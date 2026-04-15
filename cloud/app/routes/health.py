@@ -6,11 +6,12 @@ import os
 import time
 from typing import Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from app.config import get_settings
 from app.db import get_db
+from app.rate_limit import public_limit
 
 _log = logging.getLogger(__name__)
 
@@ -39,13 +40,15 @@ class ReadyResponse(BaseModel):
 
 
 @router.get("/health", response_model=HealthResponse)
-async def health() -> HealthResponse:
+@public_limit
+async def health(request: Request) -> HealthResponse:
     """Liveness probe. Always returns 200 if the process is responding."""
     return HealthResponse(status="healthy", service="gradata-cloud", version="0.1.0")
 
 
 @router.get("/ready", response_model=ReadyResponse)
-async def ready() -> ReadyResponse:
+@public_limit
+async def ready(request: Request) -> ReadyResponse:
     """Readiness probe — verifies the DB is reachable. Use this for uptime monitors."""
     settings = get_settings()
     release = os.environ.get("RAILWAY_GIT_COMMIT_SHA", "dev")[:7]

@@ -32,12 +32,21 @@ Complete list of env vars for the `gradata-production` service on Railway. Every
 - Events: `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`, `checkout.session.completed`
 - Copy the signing secret → `GRADATA_STRIPE_WEBHOOK_SECRET`
 
+**Webhook hardening** (automatic, no env vars):
+
+- Signature is verified via `stripe.Webhook.construct_event`.
+- Events with `created` older than 5 minutes are rejected with 400.
+- Events already seen (keyed by `event.id` in `processed_webhooks`) return 200 without re-running the handler.
+
+**Migration required**: `migrations/005_processed_webhooks.sql` — run in Supabase SQL Editor before enabling webhook hardening in production, otherwise duplicate deliveries may double-apply.
+
 ## Optional — Sentry error tracking
 
 | Var | Purpose |
 |-----|---------|
 | `GRADATA_SENTRY_DSN` | DSN from Sentry project `gradata-cloud`. Unset = Sentry disabled (prod-safe) |
 | `GRADATA_SENTRY_TRACES_SAMPLE_RATE` | Default `0.1`. Drop to `0.02` if cost becomes an issue |
+| `GRADATA_SENTRY_PROFILES_SAMPLE_RATE` | Default `0.1`. Requires traces to be sampled first |
 | `GRADATA_SENTRY_RELEASE` | Override the release tag. Default uses `RAILWAY_GIT_COMMIT_SHA` |
 
 ## Optional — App config
@@ -47,6 +56,15 @@ Complete list of env vars for the `gradata-production` service on Railway. Every
 | `GRADATA_ENVIRONMENT` | `development` | Set to `production` on Railway |
 | `GRADATA_LOG_LEVEL` | `INFO` | Use `DEBUG` only when actively diagnosing |
 | `GRADATA_CORS_ORIGINS` | `http://localhost:3000,https://app.gradata.ai` | Comma-separated allow-list |
+
+## Optional — Rate limiting (slowapi)
+
+| Var | Default | Purpose |
+|-----|---------|---------|
+| `GRADATA_RATE_LIMIT_ENABLED` | `true` in prod, `false` in tests | Global kill switch |
+| `GRADATA_RATE_LIMIT_PUBLIC` | `60/minute` | Per-IP cap on `/health`, `/ready`, public GETs |
+| `GRADATA_RATE_LIMIT_AUTHENTICATED` | `300/minute` | Per-user cap on authenticated API routes |
+| `GRADATA_RATE_LIMIT_SENSITIVE` | `10/minute` | Per-IP cap on `/billing/webhook` and auth callbacks |
 
 ## Auto-provided by Railway
 

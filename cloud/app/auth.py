@@ -12,6 +12,7 @@ from jose import JWTError, jwt as jose_jwt, jwk
 
 from app.config import get_settings
 from app.db import get_db
+from app.sentry_init import tag_user
 
 _log = logging.getLogger(__name__)
 _bearer = HTTPBearer()
@@ -97,6 +98,18 @@ async def verify_jwt(signed_jwt: str) -> str:
     return claims["sub"]
 
 
+def _tag_brain(brain: dict, user_id: str | None = None) -> None:
+    """Tag the Sentry scope with the brain's owner + workspace.
+
+    Centralised so every auth path (API key, JWT, ownership check) produces
+    the same Sentry context. `user_id` wins when provided (JWT path); otherwise
+    fall back to the brain record's own user_id/id fields (API-key path).
+    """
+    resolved = user_id or str(brain.get("user_id") or brain.get("id") or "")
+    ws = str(brain.get("workspace_id") or "") or None
+    tag_user(resolved, workspace_id=ws)
+
+
 async def get_current_brain(
     credentials: HTTPAuthorizationCredentials = Security(_bearer),
 ) -> dict:
@@ -108,13 +121,21 @@ async def get_current_brain(
     """
     cred = credentials.credentials
     if cred.startswith("gd_"):
-        return await verify_api_key(cred)
+        brain = await verify_api_key(cred)
+        # Tag Sentry immediately after auth succeeds so any later failures
+        # (ownership mismatches, missing records) still carry identity context.
+        _tag_brain(brain)
+        return brain
 
     user_id = await verify_jwt(cred)
+    # Tag Sentry as soon as we know who's calling — before the brain lookup,
+    # so "No brain found" 404s are still attributed to a user in Sentry.
+    tag_user(user_id)
     db = get_db()
     rows = await db.select("brains", filters={"user_id": user_id})
     if not rows:
         raise HTTPException(status_code=404, detail="No brain found for this user")
+    _tag_brain(rows[0], user_id=user_id)
     return rows[0]
 
 
@@ -122,7 +143,9 @@ async def get_current_user_id(
     credentials: HTTPAuthorizationCredentials = Security(_bearer),
 ) -> str:
     """Extract user_id from JWT. For dashboard-only endpoints."""
-    return await verify_jwt(credentials.credentials)
+    user_id = await verify_jwt(credentials.credentials)
+    tag_user(user_id)
+    return user_id
 
 
 async def get_current_user_id_flexible(
@@ -161,12 +184,18 @@ async def get_brain_for_request(
     cred = credentials.credentials
     if cred.startswith("gd_"):
         brain = await verify_api_key(cred)
+        # Tag immediately so 403 "Not your brain" rejections are attributed.
+        _tag_brain(brain)
         if brain.get("id") != brain_id:
             raise HTTPException(status_code=403, detail="Not your brain")
         return brain
 
     user_id = await verify_jwt(cred)
-    return await verify_brain_ownership(brain_id, user_id)
+    # Tag the user before ownership check so 403/404s carry Sentry context.
+    tag_user(user_id)
+    brain = await verify_brain_ownership(brain_id, user_id)
+    _tag_brain(brain, user_id=user_id)
+    return brain
 
 
 async def _resolve_user_email(user_id: str, claims: dict) -> str | None:
@@ -199,6 +228,8 @@ async def require_operator(
     """
     claims = await verify_jwt_claims(credentials.credentials)
     user_id = claims["sub"]
+    # Tag immediately so operator-denied 403s carry identity context in Sentry.
+    tag_user(user_id)
 
     email = await _resolve_user_email(user_id, claims)
     if not email:

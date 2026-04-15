@@ -113,6 +113,93 @@ def test_resolve_release_falls_back_to_dev(monkeypatch):
     assert _resolve_release(settings) == "gradata-cloud@dev"
 
 
+def test_scrub_event_scrubs_keys_inside_lists_and_tuples():
+    """PII protection must recurse through list/tuple containers.
+
+    Sentry sometimes serialises nested arrays (breadcrumbs, trail items,
+    batched values) under extras/contexts. If the scrubber only walks
+    dicts, sensitive keys embedded in lists slip through unfiltered.
+    """
+    event = {
+        "extra": {
+            "batch": [
+                {"email": "a@b.c", "ok": 1},
+                {"password": "hunter2", "other": "safe"},
+            ],
+            "tuple_case": ({"user_email": "x@y.z"}, {"safe": "keep"}),
+            "deep": [[{"api_key": "should-scrub"}]],
+        },
+    }
+    scrubbed = _scrub_event(event, {})
+    assert scrubbed["extra"]["batch"][0]["email"] == "[Filtered]"
+    assert scrubbed["extra"]["batch"][0]["ok"] == 1
+    assert scrubbed["extra"]["batch"][1]["password"] == "[Filtered]"
+    assert scrubbed["extra"]["batch"][1]["other"] == "safe"
+    assert scrubbed["extra"]["tuple_case"][0]["user_email"] == "[Filtered]"
+    assert scrubbed["extra"]["tuple_case"][1]["safe"] == "keep"
+    assert scrubbed["extra"]["deep"][0][0]["api_key"] == "[Filtered]"
+
+
+def test_scrub_event_scrubs_email_fields():
+    """PII: email keys under extras/contexts must be [Filtered]."""
+    event = {
+        "extra": {"email": "oliver@sprites.ai", "user_email": "x@y.z"},
+        "contexts": {"user_ctx": {"email_address": "a@b.c", "ok": 1}},
+    }
+    scrubbed = _scrub_event(event, {})
+    assert scrubbed["extra"]["email"] == "[Filtered]"
+    assert scrubbed["extra"]["user_email"] == "[Filtered]"
+    assert scrubbed["contexts"]["user_ctx"]["email_address"] == "[Filtered]"
+    assert scrubbed["contexts"]["user_ctx"]["ok"] == 1
+
+
+def test_init_sentry_passes_profiles_sample_rate(monkeypatch):
+    """Verify profiles_sample_rate is forwarded to sentry_sdk.init."""
+    captured = {}
+
+    def _fake_init(**kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(sentry_sdk, "init", _fake_init)
+    settings = _make_settings(
+        sentry_dsn="https://publickey@o0.ingest.sentry.io/0",
+        sentry_traces_sample_rate=0.1,
+        sentry_profiles_sample_rate=0.1,
+    )
+    init_sentry(settings)
+    assert captured["traces_sample_rate"] == 0.1
+    assert captured["profiles_sample_rate"] == 0.1
+
+
+def test_tag_user_sets_scope_user_and_workspace_tag():
+    """tag_user() must attach user.id + workspace_id to the current scope."""
+    from app.sentry_init import init_sentry, tag_user
+
+    settings = _make_settings(sentry_dsn="https://publickey@o0.ingest.sentry.io/0")
+    init_sentry(settings)
+
+    with sentry_sdk.isolation_scope() as iso_scope:
+        tag_user("user-abc-123", workspace_id="ws-xyz-9")
+        # tag_user writes to the isolation scope; read it back the same way.
+        data = iso_scope.to_dict() if hasattr(iso_scope, "to_dict") else {}
+        user = data.get("user") or getattr(iso_scope, "_user", None)
+        tags = data.get("tags") or dict(getattr(iso_scope, "_tags", {}) or {})
+        assert user and user.get("id") == "user-abc-123", f"user not tagged: {data}"
+        assert tags.get("workspace_id") == "ws-xyz-9", f"workspace not tagged: {data}"
+
+
+def test_tag_user_noop_when_sentry_disabled(monkeypatch):
+    """With DSN unset, tag_user must be a safe no-op (no raise)."""
+    # Close any active Sentry client from prior tests so get_client().is_active() == False.
+    client = sentry_sdk.get_client()
+    if client is not None:
+        client.close()
+
+    from app.sentry_init import tag_user
+    # Must not raise even when Sentry isn't configured.
+    tag_user("user-1", workspace_id="ws-1")
+
+
 def test_app_creates_cleanly_without_sentry_dsn(monkeypatch):
     """Regression: create_app() must not raise when Sentry is disabled."""
     monkeypatch.delenv("GRADATA_SENTRY_DSN", raising=False)

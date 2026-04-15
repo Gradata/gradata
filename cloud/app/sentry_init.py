@@ -34,6 +34,12 @@ _SENSITIVE_KEYS = {
     "access_token",
     "refresh_token",
     "api_key",
+    # PII — opaque user.id is fine (set via set_user), but raw email never
+    # belongs in event extras/contexts. Scrub defensively even though
+    # send_default_pii=False covers the default integrations.
+    "email",
+    "email_address",
+    "user_email",
 }
 
 
@@ -60,22 +66,47 @@ def _scrub_event(event: Any, _hint: Any) -> Any:
         if isinstance(query, str) and ("token=" in query.lower() or "access_token=" in query.lower()):
             request["query_string"] = "[Filtered]"
 
-    # Scrub extras and contexts
+    # Scrub extras and contexts — Sentry sometimes nests lists of dicts here
+    # (e.g. breadcrumb-like items under contexts), so the scrubber must walk
+    # list/tuple containers as well as dicts.
     for section in ("extra", "contexts"):
         block = event.get(section)
-        if isinstance(block, dict):
-            _scrub_dict(block)
+        if block is not None:
+            event[section] = _scrub_value(block)
 
     return event
 
 
+def _scrub_value(value: Any) -> Any:
+    """Recursively scrub sensitive keys inside dicts / lists / tuples.
+
+    - dict: replace values whose keys match _SENSITIVE_KEYS (case-insensitive)
+      with "[Filtered]"; recurse into other values in-place.
+    - list: recurse into each element in-place.
+    - tuple: return a new tuple with each element scrubbed (tuples are immutable).
+    - other: return as-is.
+    """
+    if isinstance(value, dict):
+        for key, child in list(value.items()):
+            if isinstance(key, str) and key.lower() in _SENSITIVE_KEYS:
+                value[key] = "[Filtered]"
+            else:
+                value[key] = _scrub_value(child)
+        return value
+    if isinstance(value, list):
+        for i, child in enumerate(value):
+            value[i] = _scrub_value(child)
+        return value
+    if isinstance(value, tuple):
+        return tuple(_scrub_value(child) for child in value)
+    return value
+
+
+# Kept for backwards compatibility with any external callers. New code should
+# use `_scrub_value` which handles list/tuple containers too.
 def _scrub_dict(d: dict[str, Any]) -> None:
-    """Recursively replace values whose keys look sensitive."""
-    for key, value in list(d.items()):
-        if isinstance(key, str) and key.lower() in _SENSITIVE_KEYS:
-            d[key] = "[Filtered]"
-        elif isinstance(value, dict):
-            _scrub_dict(value)
+    """Recursively replace values whose keys look sensitive (in-place)."""
+    _scrub_value(d)
 
 
 def _resolve_release(settings: Settings) -> str:
@@ -100,6 +131,7 @@ def init_sentry(settings: Settings) -> None:
         environment=settings.environment,
         release=release,
         traces_sample_rate=settings.sentry_traces_sample_rate,
+        profiles_sample_rate=settings.sentry_profiles_sample_rate,
         send_default_pii=False,
         # Never capture request bodies — Stripe webhooks contain customer data
         max_request_body_size="never",
@@ -112,8 +144,31 @@ def init_sentry(settings: Settings) -> None:
         before_send=_scrub_event,
     )
     _log.info(
-        "Sentry initialized: environment=%s release=%s traces_sample_rate=%.2f",
+        "Sentry initialized: environment=%s release=%s "
+        "traces_sample_rate=%.2f profiles_sample_rate=%.2f",
         settings.environment,
         release,
         settings.sentry_traces_sample_rate,
+        settings.sentry_profiles_sample_rate,
     )
+
+
+def tag_user(user_id: str, workspace_id: str | None = None) -> None:
+    """Attach user.id + workspace_id to the current Sentry scope.
+
+    No-op when Sentry isn't initialised. Call from auth dependencies
+    (get_current_user_id, get_current_brain, require_operator) so any
+    exception raised downstream already carries the request's owner.
+    """
+    client = sentry_sdk.get_client()
+    if client is None or not client.is_active():
+        return
+    # Use the isolation scope so the tag lives for the whole request,
+    # not just the current task. Both FastAPI and Starlette integrations
+    # push an isolation scope per request.
+    scope = sentry_sdk.get_isolation_scope()
+    # `set_user` only sends the opaque UUID — no email/username — which
+    # matches our GDPR-minimal stance (send_default_pii=False).
+    scope.set_user({"id": user_id})
+    if workspace_id:
+        scope.set_tag("workspace_id", workspace_id)

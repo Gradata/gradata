@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -10,6 +11,7 @@ from fastapi.responses import JSONResponse
 from app.auth import get_current_user_id
 from app.config import get_settings
 from app.db import get_db
+from app.rate_limit import auth_limit, sensitive_limit
 from app.models import (
     CheckoutRequest,
     CheckoutResponse,
@@ -52,9 +54,10 @@ def _stripe():
 
 
 @router.post("/billing/checkout", response_model=CheckoutResponse)
+@auth_limit
 async def create_checkout(
-    body: CheckoutRequest,
     request: Request,
+    body: CheckoutRequest,
     user_id: str = Depends(get_current_user_id),
 ) -> CheckoutResponse:
     """Create a Stripe Checkout Session and return its URL."""
@@ -96,6 +99,7 @@ async def create_checkout(
 
 
 @router.post("/billing/portal", response_model=PortalResponse)
+@auth_limit
 async def create_portal_session(
     request: Request,
     user_id: str = Depends(get_current_user_id),
@@ -122,9 +126,259 @@ async def create_portal_session(
     return PortalResponse(url=session.url)
 
 
+# Stripe retries failed webhooks for up to 3 days. We only replay-reject
+# events whose `created` timestamp is older than this window — longer than
+# Stripe's own retry schedule would backdate a legitimate delivery.
+WEBHOOK_MAX_AGE_SECONDS = 5 * 60
+# Extra grace for clock skew between Stripe's edge and our servers. NTP
+# normally keeps drift <1s, but Stripe's `created` is server-side so
+# transient delivery delays or a dozing NTP daemon can push real events
+# right up to the threshold.
+WEBHOOK_MAX_AGE_GRACE_SECONDS = 30
+
+
+def _event_id(event) -> str | None:
+    """Extract `id` from either a dict event or a Stripe.Event object."""
+    if isinstance(event, dict):
+        return event.get("id")
+    return getattr(event, "id", None)
+
+
+def _event_type(event) -> str:
+    if isinstance(event, dict):
+        return event.get("type", "") or ""
+    return getattr(event, "type", "") or ""
+
+
+def _event_created(event) -> int | None:
+    """Stripe's `created` field is a Unix timestamp (seconds)."""
+    if isinstance(event, dict):
+        created = event.get("created")
+    else:
+        created = getattr(event, "created", None)
+    if isinstance(created, (int, float)):
+        return int(created)
+    return None
+
+
+# Stale 'processing' claims get reclaimed after this window. Chosen to be
+# larger than any expected handler runtime but well under Stripe's 3-day
+# retry window, so a worker crash doesn't permanently poison an event_id.
+WEBHOOK_CLAIM_STALE_SECONDS = 10 * 60
+
+
+async def _already_processed(event_id: str) -> bool:
+    """Return True when we've already FINISHED handling this event.id.
+
+    Only short-circuits on rows with status='processed'. A row with
+    status='processing' is NOT treated as a duplicate here — it might be a
+    stale claim from a worker that crashed mid-handler, and _claim_event
+    below will reclaim it if it's older than WEBHOOK_CLAIM_STALE_SECONDS.
+    This is the fix for the "poison pill" failure mode where a dead worker
+    would permanently block every retry for a given event_id.
+
+    Treats a lookup failure as "not processed" so `_claim_event` can still
+    attempt an atomic INSERT — if the store really is unavailable, the
+    INSERT will fail and surface ClaimStoreUnavailable upstream, forcing
+    Stripe to retry. The old behaviour of returning False here is still
+    correct because it was never the authoritative guard — the real
+    race-proof check lives in `_claim_event`.
+    """
+    db = get_db()
+    try:
+        rows = await db.select(
+            "processed_webhooks",
+            columns="event_id,status",
+            filters={"event_id": event_id},
+        )
+    except Exception as exc:
+        # Lookup failure just means "let _claim_event decide". We do NOT
+        # return False silently without flagging — _claim_event will raise
+        # ClaimStoreUnavailable if the store really is down, so Stripe gets
+        # a 5xx and retries instead of us swallowing the event.
+        _log.warning("processed_webhooks lookup failed (store unavailable?): %s", exc)
+        return False
+    if not rows:
+        return False
+    return (rows[0].get("status") or "") == "processed"
+
+
+class ClaimStoreUnavailable(RuntimeError):
+    """Raised when the ``processed_webhooks`` store can't answer a claim.
+
+    Distinguishes "we can't safely claim right now" (missing migration,
+    transient DB failure) from "another worker legitimately holds this
+    claim". The webhook handler converts the former into a 5xx so Stripe
+    retries, rather than acknowledging an un-processed event.
+    """
+
+
+async def _claim_event(event_id: str, event_type: str) -> bool:
+    """Atomically claim an event_id before running the handler.
+
+    Returns True if this worker won the claim (we must run the handler),
+    False if another delivery holds an active claim (skip — duplicate).
+    Raises :class:`ClaimStoreUnavailable` when we can't determine claim
+    state safely (DB down, table missing) — caller MUST NOT ack the event.
+
+    Flow:
+    1. Try INSERT with status='processing'. Wins on fresh event_ids.
+    2. On conflict: look at the existing row.
+       - status='processed' -> already done, skip.
+       - status='processing' and claimed_at younger than stale window ->
+         an active worker holds the claim, skip.
+       - status='processing' and claimed_at older than stale window ->
+         worker almost certainly crashed; reclaim by resetting claimed_at
+         (UPDATE with a claimed_at filter AND status='processing' to keep
+         it atomic vs racing reclaim attempts AND vs a worker that just
+         flipped the row to 'processed' between our SELECT and UPDATE).
+    """
+    db = get_db()
+    insert_exc: Exception | None = None
+    try:
+        rows = await db.insert(
+            "processed_webhooks",
+            {
+                "event_id": event_id,
+                "event_type": event_type,
+                "status": "processing",
+            },
+        )
+    except Exception as exc:
+        # PK conflict is expected for duplicate deliveries. Fall through to
+        # the staleness check. Keep the exception around — if the follow-up
+        # SELECT also fails, we know the store is actually unavailable (not
+        # just a benign PK conflict) and must NOT ack the event.
+        insert_exc = exc
+        _log.info(
+            "processed_webhooks insert failed for event=%s, checking for stale claim: %s",
+            event_id, exc,
+        )
+    else:
+        return bool(rows)
+
+    # Conflict path: decide whether the existing row is poisoned.
+    try:
+        existing = await db.select(
+            "processed_webhooks",
+            columns="event_id,status,claimed_at",
+            filters={"event_id": event_id},
+        )
+    except Exception as exc:
+        # INSERT failed AND SELECT failed — the store is almost certainly
+        # unreachable (or the migration hasn't run). Signal the caller so
+        # Stripe keeps retrying rather than us silently dropping the event.
+        _log.warning(
+            "processed_webhooks stale-check failed for %s: %s (insert_exc=%s)",
+            event_id, exc, insert_exc,
+        )
+        raise ClaimStoreUnavailable(
+            f"processed_webhooks unavailable for event={event_id}"
+        ) from exc
+
+    if not existing:
+        # INSERT conflicted but the row is gone now — could only happen if
+        # the store is racing with us in a way we can't reason about. Force
+        # Stripe to retry rather than silently swallow.
+        raise ClaimStoreUnavailable(
+            f"processed_webhooks row vanished for event={event_id}"
+        )
+    row = existing[0]
+    if (row.get("status") or "") == "processed":
+        return False
+
+    claimed_at_raw = row.get("claimed_at")
+    if not _claim_is_stale(claimed_at_raw):
+        return False
+
+    # Stale 'processing' row — another worker almost certainly died. Reclaim.
+    # The filter on BOTH claimed_at AND status='processing' is load-bearing:
+    #   - claimed_at guard prevents two concurrent reclaim attempts from both
+    #     winning (whichever UPDATE lands first bumps the timestamp, so the
+    #     second matches zero rows).
+    #   - status='processing' guard prevents reclaiming a row that another
+    #     worker just flipped to 'processed' between our SELECT and UPDATE —
+    #     without this, we'd reset a completed row back to 'processing' and
+    #     double-run the handler.
+    try:
+        updated = await db.update(
+            "processed_webhooks",
+            data={"status": "processing", "claimed_at": "now()"},
+            filters={
+                "event_id": event_id,
+                "claimed_at": claimed_at_raw,
+                "status": "processing",
+            },
+        )
+    except Exception as exc:
+        _log.warning("processed_webhooks reclaim failed for %s: %s", event_id, exc)
+        raise ClaimStoreUnavailable(
+            f"processed_webhooks reclaim failed for event={event_id}"
+        ) from exc
+    if updated:
+        _log.warning(
+            "Reclaimed stale processed_webhooks row for event=%s (prior claim at %s)",
+            event_id, claimed_at_raw,
+        )
+        return True
+    return False
+
+
+def _claim_is_stale(claimed_at_raw) -> bool:
+    """Return True when a `processing` row's claimed_at is older than the
+    stale window. Best-effort parsing — unparseable values are NOT treated
+    as stale (safer to skip than to double-process)."""
+    if not claimed_at_raw:
+        return False
+    from datetime import datetime, timezone
+    try:
+        if isinstance(claimed_at_raw, str):
+            # Postgres timestamptz comes back as ISO8601; tolerate 'Z' suffix.
+            s = claimed_at_raw.replace("Z", "+00:00")
+            ts = datetime.fromisoformat(s)
+        elif isinstance(claimed_at_raw, datetime):
+            ts = claimed_at_raw
+        else:
+            return False
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        age = (datetime.now(timezone.utc) - ts).total_seconds()
+        return age > WEBHOOK_CLAIM_STALE_SECONDS
+    except (ValueError, TypeError):
+        return False
+
+
+async def _mark_processed(event_id: str, event_type: str) -> None:
+    """Flip the claimed row from 'processing' -> 'processed' after success.
+
+    event_type is accepted for symmetry with the claim call but not written
+    (it's already set at claim time). Best-effort — a failed update just
+    leaves status='processing', which still blocks future duplicates.
+    """
+    db = get_db()
+    try:
+        await db.update(
+            "processed_webhooks",
+            data={"status": "processed", "processed_at": "now()"},
+            filters={"event_id": event_id},
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        # Update failure is non-fatal: the claim row already exists with
+        # status='processing' which still guarantees idempotency. Just log.
+        _log.info("processed_webhooks status-update swallowed: %s", exc)
+
+
 @router.post("/billing/webhook")
+@sensitive_limit
 async def stripe_webhook(request: Request) -> JSONResponse:
-    """Handle Stripe webhook events. No JWT auth — verified by Stripe signature."""
+    """Handle Stripe webhook events. No JWT auth — verified by Stripe signature.
+
+    Hardening:
+    - signature verified via stripe.Webhook.construct_event (unchanged).
+    - replay protection: reject events whose `created` is older than 5 min.
+    - idempotency: if we've already processed event.id, return 200 without
+      re-running the handler.
+    """
     payload = await request.body()
     sig = request.headers.get("stripe-signature", "")
     webhook_sig_key = get_settings().stripe_webhook_secret
@@ -140,31 +394,75 @@ async def stripe_webhook(request: Request) -> JSONResponse:
         _log.warning("Invalid Stripe signature: %s", exc)
         raise HTTPException(status_code=400, detail="Invalid signature") from exc
 
+    # --- Replay protection -------------------------------------------------
+    created = _event_created(event)
+    if created is None:
+        # Stripe always sets `created`; absence implies the body was tampered
+        # with (and signature-verified events shouldn't reach here without it).
+        _log.warning("Stripe event missing `created` — treating as replay")
+        raise HTTPException(status_code=400, detail="Event missing `created` timestamp")
+    now = int(time.time())
+    age = now - created
+    max_age = WEBHOOK_MAX_AGE_SECONDS + WEBHOOK_MAX_AGE_GRACE_SECONDS
+    if age > max_age:
+        _log.warning(
+            "Rejecting stale Stripe event id=%s type=%s age=%ss (max=%ss)",
+            _event_id(event), _event_type(event), age, max_age,
+        )
+        raise HTTPException(status_code=400, detail="Event too old")
+
+    # --- Idempotency (atomic claim-first) ---------------------------------
+    # Cheap short-circuit: if we've seen this event.id before, return early.
+    # The REAL race-proof guard is _claim_event below — this just avoids a
+    # pointless INSERT round-trip for the 99% case of a retried delivery.
+    event_id = _event_id(event)
+    if event_id and await _already_processed(event_id):
+        _log.info("Ignoring duplicate Stripe event id=%s", event_id)
+        return JSONResponse({"status": "ok", "duplicate": True})
+
+    # Atomic claim: INSERT with status='processing'. If a concurrent delivery
+    # beats us to the PK, claim_won=False and we treat it as a duplicate.
+    # If the claim store itself is unavailable (missing migration, DB down),
+    # raise 503 so Stripe retries — never ack an un-processed event.
+    claim_won = True
+    if event_id:
+        try:
+            claim_won = await _claim_event(event_id, _event_type(event))
+        except ClaimStoreUnavailable as exc:
+            _log.error(
+                "Claim store unavailable for Stripe event id=%s — returning 503 to force retry: %s",
+                event_id, exc,
+            )
+            raise HTTPException(
+                status_code=503,
+                detail="Webhook store unavailable; please retry",
+            ) from exc
+        if not claim_won:
+            _log.info("Lost claim race for Stripe event id=%s — skipping", event_id)
+            return JSONResponse({"status": "ok", "duplicate": True})
+
     await _handle_event(event)
+
+    if event_id and claim_won:
+        # Flip status=processing -> processed. Non-fatal on failure —
+        # the claim row already blocks duplicates.
+        await _mark_processed(event_id, _event_type(event))
+
     return JSONResponse({"status": "ok"})
 
 
 async def _handle_event(event: dict) -> None:
     """Dispatch Stripe event to the appropriate handler.
 
-    Idempotent — the processed_webhooks table keys on event.id, so Stripe
-    retries (which can happen on transient 5xx) won't double-apply.
+    Idempotency is handled by the outer ``_claim_event`` / ``_mark_processed``
+    wrappers in the webhook route — this function trusts that its caller has
+    already won an atomic claim on ``event_id`` and is responsible for flipping
+    the status to ``processed`` afterwards. Do NOT insert into
+    ``processed_webhooks`` here; doing so would double-insert on every call.
     """
     etype = event.get("type", "")
-    event_id = event.get("id", "")
     data = event.get("data", {}).get("object", {})
     db = get_db()
-
-    if event_id:
-        try:
-            await db.insert(
-                "processed_webhooks",
-                {"event_id": event_id, "event_type": etype},
-            )
-        except Exception as exc:
-            # Unique-constraint violation on event_id -> already processed.
-            _log.info("Skipping duplicate Stripe webhook event_id=%s (%s)", event_id, exc)
-            return
 
     if etype == "checkout.session.completed":
         customer_id = data.get("customer")
@@ -244,6 +542,7 @@ def _extract_plan(subscription: dict) -> str:
 
 
 @router.get("/billing/subscription", response_model=SubscriptionResponse)
+@auth_limit
 async def get_subscription(
     request: Request,
     user_id: str = Depends(get_current_user_id),
