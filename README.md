@@ -27,9 +27,9 @@ brain.correct(
     draft="We are pleased to inform you of our new product offering.",
     final="Hey, check out what we just shipped."
 )
-# Brain extracts: "Write in a casual, direct tone — avoid formal business language"
+# Brain extracts: "Write in a casual, direct tone, avoid formal business language"
 
-# Next session — inject learned rules into the prompt:
+# Next session, inject learned rules into the prompt:
 rules = brain.apply_brain_rules("write an email")
 # > "[RULE] TONE: Write in a casual, direct tone..."
 
@@ -81,21 +81,26 @@ Rules don't just accumulate. They compete. Contradicted rules lose confidence an
 
 **Corrections are signal.** Every time you edit an AI's output, you're encoding your expertise. Most systems throw that signal away. Gradata captures it, extracts what you meant, and turns it into a rule.
 
-**Meta-rules are personalized intelligence.** When individual rules start clustering, meta-rules emerge. The AI starts predicting your patterns across domains. To you, it just "gets it." That's not general intelligence. That's convergence on your judgment.
+**Meta-rules compress clusters of graduated rules.** When 3+ rules share structure, an LLM synthesizes a meta-rule with scoped applies_when / never_when tags. Ablation v3: LLM-synthesized meta-rules add value on smaller models and sit neutral on larger ones. Deterministic-template meta-rules regressed and are gated out. Meta-rules are optional and off by default on frontier models.
 
 **Convergence is measurable.** Track corrections-per-session over time. When the curve flattens, the brain has learned your style. That curve is the product demo.
 
 ## Ablation Experiment Results
 
-We ran a controlled experiment: 10 tasks scored with and without brain rules.
+Ablation v4: 4 models (Sonnet 4.6, DeepSeek V3, qwen2.5-coder:14b, gemma3:4b) x 6 conditions x 16 tasks x 3 iterations, 432 trials, judged blind by Haiku 4.5.
 
-| Metric | Without Rules | With Rules | Delta |
-|--------|--------------|------------|-------|
-| Overall quality | 6.60 | 7.47 | **+13.2%** |
-| Preference adherence | 5.40 | 6.90 | **+1.50** |
-| Correctness | 7.50 | 7.80 | +0.30 |
+| Model | Preference lift (rules vs base) | Correctness (rules vs base) |
+|-------|--------------------------------:|----------------------------:|
+| Sonnet 4.6     | +2.7% | +0.4% |
+| DeepSeek V3    | +5.1% | +0.9% |
+| qwen2.5-coder 14B | +5.7% | +3.6% |
+| gemma3:4b      | +3.4% | +1.1% |
 
-The rules didn't make the AI generally smarter. They made it smarter **for that specific user**.
+Preference-adherence lift is the load-bearing claim. Correctness lift is neutral-to-positive on rules alone. Small, local models (qwen14b, gemma3:4b) benefit more than frontier models.
+
+**Min 2022 random-label control.** A known ICL-skeptic challenge: are rules doing real work, or is the XML envelope just giving the model a format hint? We re-ran the rules condition with Sonnet-generated plausible-but-semantically-unrelated rule text in the same envelope. Three of four models regress on preference by 3-10% when content is randomized. Content is doing the work, not format.
+
+The rules don't make the AI generally smarter. They calibrate it to one user's preferences.
 
 ## Behavioral Extraction
 
