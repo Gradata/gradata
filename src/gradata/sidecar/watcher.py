@@ -148,6 +148,25 @@ def _normalise_edit_distance(old: str, new: str) -> float:
     return round(1.0 - ratio, 4)
 
 
+def _ast_severity_or_none(before: str, after: str, path: str) -> str | None:
+    """Optional AST shunt: engages only when the flag is set and the file
+    is a supported language. Returns ``None`` on any miss so the caller
+    falls back to the edit-distance classifier. Never raises.
+    """
+    try:
+        from gradata.enhancements.ast_severity import (
+            ast_severity_enabled,
+            classify_ast_severity,
+            language_supported,
+        )
+
+        if not (ast_severity_enabled() and language_supported(path=path)):
+            return None
+        return classify_ast_severity(before, after)
+    except Exception:
+        return None
+
+
 def _classify_severity(edit_distance: float) -> str:
     """Map edit distance to severity label (aligned with diff_engine 5-label scale).
 
@@ -330,12 +349,15 @@ class FileWatcher:
         edit_distance = _normalise_edit_distance(
             watched.original_content, current_content
         )
+        severity = _ast_severity_or_none(
+            watched.original_content, current_content, resolved
+        ) or _classify_severity(edit_distance)
         return FileChange(
             path=resolved,
             old_content=watched.original_content,
             new_content=current_content,
             edit_distance=edit_distance,
-            severity=_classify_severity(edit_distance),
+            severity=severity,
             timestamp=now,
         )
 
