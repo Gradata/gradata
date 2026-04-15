@@ -28,9 +28,14 @@ Desktop.ini
 brain.manifest.json
 system.db
 *.db-wal
+*.sqlite
+*.jsonl
 __pycache__/
 *.pyc
 vendor/
+
+# Internal session handoff memory (never ships in the public repo)
+memory/
 .claude-flow
 autoresearch-results.tsv
 
