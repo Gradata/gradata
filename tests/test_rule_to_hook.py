@@ -311,9 +311,32 @@ class TestGraduateIntegration:
     """Task 7: graduate() should auto-attempt hook install on PATTERN->RULE promotion."""
 
     def test_graduate_promotes_and_installs_hook_for_em_dash(self, tmp_path, monkeypatch):
+        import json as _json
+        from datetime import UTC as _UTC
+        from datetime import datetime as _dt
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
-        from gradata.enhancements.self_improvement import graduate
+        from gradata import _paths as _p
         from gradata._types import Lesson, LessonState
+        from gradata.enhancements.self_improvement import graduate
+
+        # Council empirical gate: seed events.jsonl with 3 distinct-session
+        # correction IDs so fire_count + distinct sessions + zero reversals
+        # all clear. Without this the gate now blocks promotion.
+        brain_dir = tmp_path / "brain"
+        brain_dir.mkdir()
+        events_jsonl = brain_dir / "events.jsonl"
+        with events_jsonl.open("w", encoding="utf-8") as fh:
+            for i, sess in enumerate((1, 2, 3), start=1):
+                fh.write(_json.dumps({
+                    "id": f"e{i}",
+                    "session": sess,
+                    "type": "CORRECTION",
+                    "ts": _dt.now(_UTC).isoformat(),
+                    "data": {},
+                }) + "\n")
+        monkeypatch.setattr(_p, "EVENTS_JSONL", events_jsonl)
+        monkeypatch.setattr(_p, "BRAIN_DIR", brain_dir)
 
         # Build a lesson at PATTERN tier with high confidence + enough fires
         # to promote to RULE. The description matches rule_to_hook's em-dash
@@ -324,7 +347,8 @@ class TestGraduateIntegration:
             confidence=0.95,
             category="FORMATTING",
             description="Never use em dashes",
-            fire_count=10,  # past MIN_APPLICATIONS_FOR_RULE=5 threshold
+            fire_count=10,  # also satisfies council gate >=10
+            correction_event_ids=["e1", "e2", "e3"],
         )
         active, graduated = graduate([lesson], maturity="MATURE")
 

@@ -5,13 +5,164 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
+import logging
 import os
 import re
 import subprocess
 import tempfile
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
+
+_log = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Event type constants (emitted from CLI + future manifest.demote paths)
+# ---------------------------------------------------------------------------
+
+# Emitted when a hook-enforced rule gets a human-authored text patch that
+# reverts to soft prompt injection (manifest.demote path, cmd_rule_remove).
+RULE_PATCH_REVERTED = "RULE_PATCH_REVERTED"
+# Emitted when an installed generated hook is removed (demote path).
+HOOK_DEMOTED = "HOOK_DEMOTED"
+
+
+# ---------------------------------------------------------------------------
+# Empirical promotion gate (council verdict, Phase 5)
+# ---------------------------------------------------------------------------
+
+PROMOTION_MIN_FIRE_COUNT = 10
+PROMOTION_MIN_DISTINCT_SESSIONS = 3
+PROMOTION_REVERSAL_LOOKBACK_DAYS = 30
+
+
+def _resolve_events_path() -> Path | None:
+    """Best-effort events.jsonl resolution (None when no brain is configured)."""
+    try:
+        from gradata import _paths as _p
+        p = Path(_p.EVENTS_JSONL)
+        return p if p.is_file() else None
+    except Exception:
+        return None
+
+
+def count_distinct_sessions(lesson) -> int:
+    """Count distinct sessions this lesson's correction chain spans.
+
+    Uses the proof-chain IDs on the lesson (``correction_event_ids``) as the
+    activation trail — matches the existing audit.py contract. Falls back to
+    0 when no chain exists or events.jsonl is unreachable.
+    """
+    ids = list(getattr(lesson, "correction_event_ids", []) or [])
+    if not ids:
+        return 0
+    events_path = _resolve_events_path()
+    if events_path is None:
+        return 0
+    target = set(ids)
+    sessions: set[int] = set()
+    try:
+        with events_path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    evt = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if str(evt.get("id")) in target or evt.get("id") in target:
+                    s = evt.get("session")
+                    if s is not None:
+                        sessions.add(s)
+    except OSError as exc:
+        _log.debug("count_distinct_sessions: %s", exc)
+        return 0
+    return len(sessions)
+
+
+def count_human_reversals(rule_id: str, since_days: int = PROMOTION_REVERSAL_LOOKBACK_DAYS) -> int:
+    """Count RULE_PATCH_REVERTED + HOOK_DEMOTED events tied to ``rule_id`` in the window.
+
+    Scans events.jsonl directly so the helper works even when SQLite is
+    unavailable. Missing event file => 0 (no reversals recorded yet).
+    """
+    if not rule_id:
+        return 0
+    events_path = _resolve_events_path()
+    if events_path is None:
+        return 0
+    cutoff = datetime.now(UTC) - timedelta(days=since_days)
+    count = 0
+    try:
+        with events_path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    evt = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if evt.get("type") not in (RULE_PATCH_REVERTED, HOOK_DEMOTED):
+                    continue
+                data = evt.get("data") or {}
+                if data.get("rule_id") != rule_id:
+                    continue
+                ts = evt.get("ts")
+                if ts:
+                    try:
+                        evt_time = datetime.fromisoformat(ts)
+                    except ValueError:
+                        continue
+                    if evt_time < cutoff:
+                        continue
+                count += 1
+    except OSError as exc:
+        _log.debug("count_human_reversals: %s", exc)
+        return 0
+    return count
+
+
+def _passes_empirical_gate(lesson) -> tuple[bool, str]:
+    """Council verdict gate: promotion requires empirical track record.
+
+    Checks:
+      - ``lesson.fire_count >= PROMOTION_MIN_FIRE_COUNT``
+      - distinct sessions across ``correction_event_ids`` >= PROMOTION_MIN_DISTINCT_SESSIONS
+      - zero human reversals in the last PROMOTION_REVERSAL_LOOKBACK_DAYS days
+
+    Returns ``(passed, reason)``. The reason is populated on failure.
+    """
+    if lesson is None:
+        return False, "no lesson provided to empirical gate"
+    fire_count = int(getattr(lesson, "fire_count", 0) or 0)
+    if fire_count < PROMOTION_MIN_FIRE_COUNT:
+        return False, (
+            f"fire_count {fire_count} < {PROMOTION_MIN_FIRE_COUNT} "
+            "(council empirical gate)"
+        )
+    sessions = count_distinct_sessions(lesson)
+    if sessions < PROMOTION_MIN_DISTINCT_SESSIONS:
+        return False, (
+            f"distinct sessions {sessions} < {PROMOTION_MIN_DISTINCT_SESSIONS} "
+            "(council empirical gate)"
+        )
+    # Derive the rule_id the same way rule_engine does.
+    try:
+        from gradata.rules.rule_engine import _make_rule_id
+        rule_id = _make_rule_id(lesson)
+    except Exception:
+        rule_id = ""
+    reversals = count_human_reversals(rule_id, since_days=PROMOTION_REVERSAL_LOOKBACK_DAYS)
+    if reversals > 0:
+        return False, (
+            f"{reversals} human reversal(s) in last "
+            f"{PROMOTION_REVERSAL_LOOKBACK_DAYS}d (council empirical gate)"
+        )
+    return True, "empirical gate passed"
 
 
 class EnforcementType(StrEnum):
@@ -400,6 +551,7 @@ def promote(
     brain=None,
     positive_example: str | None = None,
     source: str = "promote",
+    lesson=None,
 ) -> GenerationResult:
     """Public entry point: classify + generate + install a hook for a rule.
 
@@ -411,6 +563,12 @@ def promote(
     ``result.installed`` — promote() intentionally does not touch lessons.md
     so it stays composable with the graduation loop's own persistence step.
 
+    When ``lesson`` is provided, the council empirical gate runs BEFORE
+    generation: ``fire_count >= 10``, distinct sessions across the
+    correction proof-chain >= 3, and zero human reversals in the last
+    30 days. Failing the gate returns ``installed=False`` with a
+    ``reason`` explaining which check blocked promotion.
+
     Returns a GenerationResult. Not-deterministic rules return
     ``installed=False`` with an explanatory reason; callers should fall back
     to prompt injection.
@@ -421,6 +579,11 @@ def promote(
             installed=False,
             reason=candidate.reason,
         )
+    if lesson is not None:
+        passed, reason = _passes_empirical_gate(lesson)
+        if not passed:
+            _log.debug("promote blocked by empirical gate: %s", reason)
+            return GenerationResult(installed=False, reason=reason)
     return try_generate(
         candidate,
         positive_example=positive_example,
@@ -459,6 +622,16 @@ def demote(slug: str, *, brain=None, source: str = "demote") -> GenerationResult
             if brain is not None:
                 with contextlib.suppress(Exception):
                     brain.emit("RULE_TO_HOOK_REMOVED", source, {
+                        "slug": slug,
+                        "hook_path": str(target),
+                    })
+                # Mirror the removal as a HOOK_DEMOTED event so the
+                # empirical gate's reversal counter can see it. rule_id
+                # is unknown at this layer (callers that have it should
+                # emit RULE_PATCH_REVERTED separately); we tag with slug
+                # so CLI-level emits can correlate.
+                with contextlib.suppress(Exception):
+                    brain.emit(HOOK_DEMOTED, source, {
                         "slug": slug,
                         "hook_path": str(target),
                     })

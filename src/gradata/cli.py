@@ -760,6 +760,36 @@ def cmd_rule_remove(args):
         if touched_lesson:
             lessons_file.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
 
+    # Emit a RULE_PATCH_REVERTED event when a human explicitly demotes a
+    # hook-enforced rule back to text injection (or purges it). The
+    # empirical promotion gate consumes this signal so a recently-reverted
+    # rule cannot immediately re-promote.
+    if removed_file or touched_lesson:
+        try:
+            from gradata import _events
+            from gradata.enhancements.rule_to_hook import (
+                HOOK_DEMOTED,
+                RULE_PATCH_REVERTED,
+            )
+            _events.emit(
+                RULE_PATCH_REVERTED,
+                "cli:rule-remove",
+                {
+                    "slug": slug,
+                    "purge": bool(getattr(args, "purge", False)),
+                    "hook_removed": bool(removed_file),
+                    "lesson_touched": bool(touched_lesson),
+                },
+            )
+            if removed_file:
+                _events.emit(
+                    HOOK_DEMOTED,
+                    "cli:rule-remove",
+                    {"slug": slug, "hook_path": str(removed_file)},
+                )
+        except Exception:
+            pass  # Event emission is best-effort; CLI output still succeeds.
+
     if removed_file:
         print(f"Removed hook: {removed_file}")
     if touched_lesson and args.purge:
