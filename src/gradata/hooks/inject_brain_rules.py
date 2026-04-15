@@ -153,31 +153,43 @@ def main(data: dict) -> dict | None:
     meta_block = ""
     db_path = Path(brain_dir) / "system.db"
     if load_meta_rules and format_meta_rules_for_prompt and db_path.is_file():
+        # Wrap the entire load -> filter -> format pipeline. A partially corrupt
+        # system.db can deserialize successfully (e.g. JSON `null` for
+        # source_lesson_ids) and then blow up later with TypeError inside the
+        # formatter. We must degrade to rules-only rather than aborting
+        # SessionStart.
         try:
             metas = load_meta_rules(db_path)
+            injectable = [
+                m for m in metas
+                if getattr(m, "source", "deterministic") in INJECTABLE_META_SOURCES
+            ]
+            if injectable:
+                # Pass the full injectable set with `limit=MAX_META_RULES` so
+                # the cap is applied AFTER context-aware ranking inside the
+                # formatter. Pre-slicing by raw confidence would let a
+                # lower-confidence rule with a strong context weight get
+                # silently excluded.
+                formatted = format_meta_rules_for_prompt(
+                    injectable, context=context, limit=MAX_META_RULES,
+                )
+                if formatted:
+                    meta_block = (
+                        "\n<brain-meta-rules>\n"
+                        + formatted
+                        + "\n</brain-meta-rules>"
+                    )
+            elif metas:
+                _log.debug(
+                    "Skipped meta-rule injection: %d metas in DB, none with "
+                    "injectable source (llm_synth or human_curated)",
+                    len(metas),
+                )
         except Exception as exc:
-            _log.debug("meta-rule load failed (%s) — skipping injection", exc)
-            metas = []
-        injectable = [
-            m for m in metas
-            if getattr(m, "source", "deterministic") in INJECTABLE_META_SOURCES
-        ]
-        if injectable:
-            # Pass the full injectable set with `limit=MAX_META_RULES` so the
-            # cap is applied AFTER context-aware ranking inside the formatter.
-            # Pre-slicing by raw confidence would let a lower-confidence rule
-            # with a strong context weight get silently excluded.
-            formatted = format_meta_rules_for_prompt(
-                injectable, context=context, limit=MAX_META_RULES,
-            )
-            if formatted:
-                meta_block = "\n<brain-meta-rules>\n" + formatted + "\n</brain-meta-rules>"
-        elif metas:
             _log.debug(
-                "Skipped meta-rule injection: %d metas in DB, none with "
-                "injectable source (llm_synth or human_curated)",
-                len(metas),
+                "meta-rule pipeline failed (%s) — degrading to rules-only", exc,
             )
+            meta_block = ""
 
     return {"result": rules_block + meta_block}
 

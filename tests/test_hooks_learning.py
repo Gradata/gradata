@@ -236,6 +236,28 @@ def test_inject_tolerates_missing_meta_rules_db(tmp_path):
     assert "<brain-meta-rules>" not in text
 
 
+def test_corrupt_meta_rules_db_degrades_to_rules_only(tmp_path):
+    """Corrupt-but-readable system.db → still returns rules block, no
+    meta-rules block, and no exception."""
+    (tmp_path / "lessons.md").write_text(
+        "[2026-04-01] [RULE:0.92] PROCESS: Always plan before implementing\n",
+        encoding="utf-8",
+    )
+    # Write a malformed-but-present system.db. The hook checks `is_file()`
+    # then calls load_meta_rules; the load (or any downstream filter/format)
+    # must not abort SessionStart. Garbage bytes guarantee deserialization
+    # failure in the storage layer.
+    (tmp_path / "system.db").write_bytes(b"this is not a valid sqlite or json payload")
+
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+        result = inject_main({})
+
+    assert result is not None
+    text = result.get("result", "")
+    assert "<brain-rules>" in text
+    assert "<brain-meta-rules>" not in text
+
+
 def test_session_close_emits_event(tmp_path):
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
         with patch("gradata.hooks.session_close._emit_session_end") as mock_emit:
