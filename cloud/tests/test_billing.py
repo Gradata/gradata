@@ -472,10 +472,19 @@ class TestWebhookHardening:
 
         This is the core correctness guarantee of the claim-first design: a
         concurrent delivery that inserts first wins; any later inserter gets
-        a PK conflict (simulated here by insert raising) and must skip
-        processing entirely to avoid double-apply.
+        a PK conflict (simulated here by insert raising). The follow-up SELECT
+        sees the winner's active 'processing' row (recent claimed_at), so we
+        skip processing entirely to avoid double-apply.
         """
         import time as _time
+        from datetime import datetime, timedelta, timezone
+
+        # Winner's active claim — recent claimed_at, still 'processing'.
+        recent_ts = (datetime.now(timezone.utc) - timedelta(seconds=5)).isoformat()
+        mock_supabase.add_response(
+            "processed_webhooks", "select",
+            [{"event_id": "evt_race_loser", "status": "processing", "claimed_at": recent_ts}],
+        )
 
         async def _raise_pk_conflict(table, data):
             # Simulate Supabase/Postgres returning 409 on PK violation.
@@ -610,3 +619,53 @@ class TestWebhookHardening:
         assert not reclaims, "Active claim must NOT be reclaimed"
         workspace_writes = [u for u in update_calls if u["table"] == "workspaces"]
         assert not workspace_writes, "Handler must NOT run while another worker holds the claim"
+
+    def test_claim_store_unavailable_returns_503_not_duplicate_ack(
+        self, client, mock_supabase, configured_prices, fake_stripe
+    ):
+        """If the processed_webhooks store is unreachable, return 503 so Stripe retries.
+
+        Regression (CR-CRITICAL): previously, any failure in _claim_event collapsed
+        to a 200 {"duplicate": true}, which told Stripe to stop retrying even when
+        we had NOT actually processed the event. A missing migration or a transient
+        DB outage could silently swallow subscription/payment webhooks.
+        """
+        import time as _time
+
+        async def _raise_on_insert(table, data):
+            if table == "processed_webhooks":
+                raise RuntimeError("relation \"processed_webhooks\" does not exist")
+            return [data] if isinstance(data, dict) else list(data)
+
+        async def _raise_on_select(
+            table, columns="*", filters=None, in_=None,
+        ):
+            if table == "processed_webhooks":
+                raise RuntimeError("relation \"processed_webhooks\" does not exist")
+            return []
+
+        handler_updates: list[dict] = []
+
+        async def _capture_update(table, data, filters=None):
+            handler_updates.append({"table": table, "data": data, "filters": filters})
+            return [data]
+
+        mock_supabase.insert = _raise_on_insert  # type: ignore[method-assign]
+        mock_supabase.select = _raise_on_select  # type: ignore[method-assign]
+        mock_supabase.update = _capture_update  # type: ignore[method-assign]
+
+        event = {
+            "id": "evt_store_down_1",
+            "type": "customer.subscription.updated",
+            "created": int(_time.time()),
+            "data": {"object": {"customer": "cus_x", "status": "active"}},
+        }
+        resp = self._post_with(client, fake_stripe, event)
+
+        # MUST NOT ack — Stripe has to retry until we can safely claim.
+        assert resp.status_code == 503, (
+            f"Store-unavailable must 5xx so Stripe retries, got {resp.status_code}: {resp.text}"
+        )
+        # Handler MUST NOT have run.
+        workspace_writes = [u for u in handler_updates if u["table"] == "workspaces"]
+        assert not workspace_writes, "Handler must NOT run when we can't safely claim"

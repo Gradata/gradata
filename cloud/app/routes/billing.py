@@ -176,6 +176,13 @@ async def _already_processed(event_id: str) -> bool:
     below will reclaim it if it's older than WEBHOOK_CLAIM_STALE_SECONDS.
     This is the fix for the "poison pill" failure mode where a dead worker
     would permanently block every retry for a given event_id.
+
+    Treats a lookup failure as "not processed" so `_claim_event` can still
+    attempt an atomic INSERT — if the store really is unavailable, the
+    INSERT will fail and surface ClaimStoreUnavailable upstream, forcing
+    Stripe to retry. The old behaviour of returning False here is still
+    correct because it was never the authoritative guard — the real
+    race-proof check lives in `_claim_event`.
     """
     db = get_db()
     try:
@@ -184,14 +191,26 @@ async def _already_processed(event_id: str) -> bool:
             columns="event_id,status",
             filters={"event_id": event_id},
         )
-    except Exception as exc:  # pragma: no cover - defensive
-        # If the table doesn't exist yet (migration not applied), fall back
-        # to "not processed" — better than 5xxing every webhook during rollout.
-        _log.warning("processed_webhooks lookup failed (table missing?): %s", exc)
+    except Exception as exc:
+        # Lookup failure just means "let _claim_event decide". We do NOT
+        # return False silently without flagging — _claim_event will raise
+        # ClaimStoreUnavailable if the store really is down, so Stripe gets
+        # a 5xx and retries instead of us swallowing the event.
+        _log.warning("processed_webhooks lookup failed (store unavailable?): %s", exc)
         return False
     if not rows:
         return False
     return (rows[0].get("status") or "") == "processed"
+
+
+class ClaimStoreUnavailable(RuntimeError):
+    """Raised when the ``processed_webhooks`` store can't answer a claim.
+
+    Distinguishes "we can't safely claim right now" (missing migration,
+    transient DB failure) from "another worker legitimately holds this
+    claim". The webhook handler converts the former into a 5xx so Stripe
+    retries, rather than acknowledging an un-processed event.
+    """
 
 
 async def _claim_event(event_id: str, event_type: str) -> bool:
@@ -199,6 +218,8 @@ async def _claim_event(event_id: str, event_type: str) -> bool:
 
     Returns True if this worker won the claim (we must run the handler),
     False if another delivery holds an active claim (skip — duplicate).
+    Raises :class:`ClaimStoreUnavailable` when we can't determine claim
+    state safely (DB down, table missing) — caller MUST NOT ack the event.
 
     Flow:
     1. Try INSERT with status='processing'. Wins on fresh event_ids.
@@ -208,10 +229,12 @@ async def _claim_event(event_id: str, event_type: str) -> bool:
          an active worker holds the claim, skip.
        - status='processing' and claimed_at older than stale window ->
          worker almost certainly crashed; reclaim by resetting claimed_at
-         (UPDATE with a claimed_at filter to keep it atomic vs racing
-         reclaim attempts).
+         (UPDATE with a claimed_at filter AND status='processing' to keep
+         it atomic vs racing reclaim attempts AND vs a worker that just
+         flipped the row to 'processed' between our SELECT and UPDATE).
     """
     db = get_db()
+    insert_exc: Exception | None = None
     try:
         rows = await db.insert(
             "processed_webhooks",
@@ -223,9 +246,10 @@ async def _claim_event(event_id: str, event_type: str) -> bool:
         )
     except Exception as exc:
         # PK conflict is expected for duplicate deliveries. Fall through to
-        # the staleness check. Also covers missing-table during rollout —
-        # the stale-check will also raise and return False, preserving the
-        # "skip when we can't safely claim" behaviour.
+        # the staleness check. Keep the exception around — if the follow-up
+        # SELECT also fails, we know the store is actually unavailable (not
+        # just a benign PK conflict) and must NOT ack the event.
+        insert_exc = exc
         _log.info(
             "processed_webhooks insert failed for event=%s, checking for stale claim: %s",
             event_id, exc,
@@ -240,12 +264,25 @@ async def _claim_event(event_id: str, event_type: str) -> bool:
             columns="event_id,status,claimed_at",
             filters={"event_id": event_id},
         )
-    except Exception as exc:  # pragma: no cover - defensive
-        _log.warning("processed_webhooks stale-check failed for %s: %s", event_id, exc)
-        return False
+    except Exception as exc:
+        # INSERT failed AND SELECT failed — the store is almost certainly
+        # unreachable (or the migration hasn't run). Signal the caller so
+        # Stripe keeps retrying rather than us silently dropping the event.
+        _log.warning(
+            "processed_webhooks stale-check failed for %s: %s (insert_exc=%s)",
+            event_id, exc, insert_exc,
+        )
+        raise ClaimStoreUnavailable(
+            f"processed_webhooks unavailable for event={event_id}"
+        ) from exc
 
     if not existing:
-        return False
+        # INSERT conflicted but the row is gone now — could only happen if
+        # the store is racing with us in a way we can't reason about. Force
+        # Stripe to retry rather than silently swallow.
+        raise ClaimStoreUnavailable(
+            f"processed_webhooks row vanished for event={event_id}"
+        )
     row = existing[0]
     if (row.get("status") or "") == "processed":
         return False
@@ -255,18 +292,29 @@ async def _claim_event(event_id: str, event_type: str) -> bool:
         return False
 
     # Stale 'processing' row — another worker almost certainly died. Reclaim.
-    # The filter on the prior claimed_at prevents two reclaim attempts from
-    # both winning: whichever UPDATE lands first changes the timestamp so
-    # the second one matches zero rows.
+    # The filter on BOTH claimed_at AND status='processing' is load-bearing:
+    #   - claimed_at guard prevents two concurrent reclaim attempts from both
+    #     winning (whichever UPDATE lands first bumps the timestamp, so the
+    #     second matches zero rows).
+    #   - status='processing' guard prevents reclaiming a row that another
+    #     worker just flipped to 'processed' between our SELECT and UPDATE —
+    #     without this, we'd reset a completed row back to 'processing' and
+    #     double-run the handler.
     try:
         updated = await db.update(
             "processed_webhooks",
             data={"status": "processing", "claimed_at": "now()"},
-            filters={"event_id": event_id, "claimed_at": claimed_at_raw},
+            filters={
+                "event_id": event_id,
+                "claimed_at": claimed_at_raw,
+                "status": "processing",
+            },
         )
     except Exception as exc:
         _log.warning("processed_webhooks reclaim failed for %s: %s", event_id, exc)
-        return False
+        raise ClaimStoreUnavailable(
+            f"processed_webhooks reclaim failed for event={event_id}"
+        ) from exc
     if updated:
         _log.warning(
             "Reclaimed stale processed_webhooks row for event=%s (prior claim at %s)",
@@ -374,9 +422,21 @@ async def stripe_webhook(request: Request) -> JSONResponse:
 
     # Atomic claim: INSERT with status='processing'. If a concurrent delivery
     # beats us to the PK, claim_won=False and we treat it as a duplicate.
+    # If the claim store itself is unavailable (missing migration, DB down),
+    # raise 503 so Stripe retries — never ack an un-processed event.
     claim_won = True
     if event_id:
-        claim_won = await _claim_event(event_id, _event_type(event))
+        try:
+            claim_won = await _claim_event(event_id, _event_type(event))
+        except ClaimStoreUnavailable as exc:
+            _log.error(
+                "Claim store unavailable for Stripe event id=%s — returning 503 to force retry: %s",
+                event_id, exc,
+            )
+            raise HTTPException(
+                status_code=503,
+                detail="Webhook store unavailable; please retry",
+            ) from exc
         if not claim_won:
             _log.info("Lost claim race for Stripe event id=%s — skipping", event_id)
             return JSONResponse({"status": "ok", "duplicate": True})
