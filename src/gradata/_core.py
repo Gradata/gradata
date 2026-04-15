@@ -82,6 +82,7 @@ def brain_correct(
     session: int | None = None, agent_type: str | None = None,
     approval_required: bool = False, dry_run: bool = False,
     min_severity: str = "as-is", scope: str | None = None,
+    applies_to: str | None = None,
 ) -> dict:
     """Record a correction: user edited draft into final version."""
     # Input validation
@@ -104,10 +105,18 @@ def brain_correct(
         if scope is not None and scope not in _valid_scopes:
             raise ValueError(f"Unsupported correction scope: {scope!r}. Must be one of {_valid_scopes}")
 
+    # Normalize free-form scope binding (sim21). Any truthy string is accepted;
+    # empty strings collapse to None so callers can pass through user input
+    # safely. Injection-side filtering on this token is a follow-up.
+    if applies_to is not None:
+        applies_to = str(applies_to).strip() or None
+
     # Route to cloud if connected
     if brain._cloud and brain._cloud.connected:
         try:
-            return brain._cloud.correct(draft, final, category, context, session)
+            return brain._cloud.correct(
+                draft, final, category, context, session, applies_to=applies_to
+            )
         except Exception as e:
             _log.warning("Cloud correct() failed, falling back to local: %s", e)
             brain._cloud.connected = False
@@ -158,6 +167,8 @@ def brain_correct(
     # Tag correction scope (default: domain)
     correction_scope = scope or "domain"
     scope_data["correction_scope"] = correction_scope
+    if applies_to:
+        scope_data["applies_to"] = applies_to
 
     data = {
         "draft_text": draft_redacted[:2000], "final_text": final_redacted[:2000],
@@ -170,17 +181,23 @@ def brain_correct(
         "lines_removed": diff.summary_stats.get("lines_removed", 0),
         "correction_scope": correction_scope,
     }
+    if applies_to:
+        data["applies_to"] = applies_to
     if scope_data:
         data["scope"] = scope_data
 
     tags = [f"category:{category or 'UNKNOWN'}", f"severity:{diff.severity}"]
     if diff.severity in ("major", "discarded"):
         tags.append("major_edit:true")
+    if applies_to:
+        tags.append(f"applies_to:{applies_to}")
 
     event = brain.emit("CORRECTION", "brain.correct", data, tags, session)
     event["diff"] = diff
     event["classifications"] = classifications
     event["correction_scope"] = correction_scope
+    if applies_to:
+        event["applies_to"] = applies_to
 
     # Auto-extract patterns
     try:
@@ -306,6 +323,8 @@ def brain_correct(
                         scope_dict = {}
                     # Always tag correction_scope on new lessons
                     scope_dict["correction_scope"] = correction_scope
+                    if applies_to:
+                        scope_dict["applies_to"] = applies_to
                     lesson_scope = _json.dumps(scope_dict)
 
                     init_conf = 0.0 if approval_required else INITIAL_CONFIDENCE

@@ -43,6 +43,7 @@ def correct(
     *,
     category: str | None = None,
     brain_dir: str | Path | None = None,
+    applies_to: str | None = None,
 ) -> dict[str, Any]:
     """Log a correction: compute diff between draft and final, classify, store.
 
@@ -56,6 +57,10 @@ def correct(
             If not provided, auto-detected from the diff content.
         brain_dir: Optional brain directory path. If not provided, uses
             the default from _paths.
+        applies_to: Optional free-form scope token (e.g. ``"client:acme"``,
+            ``"task:emails"``) passed through to ``Brain.correct``. Persisted
+            on the correction event and any lesson created from it. See
+            ``Brain.correct`` for details.
 
     Returns:
         Dict with keys:
@@ -89,7 +94,7 @@ def correct(
             from gradata.brain import Brain
 
             brain = Brain(brain_dir)
-            brain.correct(draft, final)
+            brain.correct(draft, final, applies_to=applies_to)
             lesson_created = True
     except Exception:
         # Brain not available or not initialized -- still return diff results

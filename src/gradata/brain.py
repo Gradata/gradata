@@ -373,8 +373,18 @@ class Brain(BrainInspectionMixin):
         dry_run: bool = False,
         min_severity: str = "as-is",
         scope: str | None = None,
+        applies_to: str | None = None,
     ) -> dict:
-        """Record a correction: user edited draft into final version."""
+        """Record a correction: user edited draft into final version.
+
+        ``applies_to`` is an optional free-form scope token (e.g.
+        ``"client:acme"``, ``"task:emails"``, ``"global"``) that binds the
+        correction to a specific context. When set, it is persisted on the
+        event and propagated to any lesson that graduates from this
+        correction's lineage. Injection-time filtering by ``applies_to``
+        is a follow-up — persistence only for now. A ``None`` value preserves
+        the existing global behaviour.
+        """
         self._rule_cache.invalidate()  # Correction invalidates cached rules
         from gradata._core import brain_correct
 
@@ -390,6 +400,7 @@ class Brain(BrainInspectionMixin):
             dry_run=dry_run,
             min_severity=min_severity,
             scope=scope,
+            applies_to=applies_to,
         )
 
         # Activation telemetry — fires once per machine, only if opted in.

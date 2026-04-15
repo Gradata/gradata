@@ -160,3 +160,70 @@ def test_non_one_off_can_graduate():
     active, graduated = graduate([lesson])
     # Should promote to PATTERN
     assert lesson.state == LessonState.PATTERN
+
+
+# ---------------------------------------------------------------------------
+# Free-form applies_to scope binding (sim21 ask)
+# ---------------------------------------------------------------------------
+
+def test_applies_to_persisted_on_event(tmp_path: Path):
+    """brain.correct(applies_to='client:acme') persists the token on the event."""
+    from tests.conftest import init_brain
+
+    brain = init_brain(tmp_path)
+    result = brain.correct(
+        "Dear Sir/Madam,",
+        "Hey Acme team,",
+        applies_to="client:acme",
+    )
+    assert result.get("applies_to") == "client:acme"
+    assert result["data"]["applies_to"] == "client:acme"
+    assert result["data"]["scope"]["applies_to"] == "client:acme"
+    assert "applies_to:client:acme" in result["tags"]
+
+
+def test_applies_to_none_is_backward_compatible(tmp_path: Path):
+    """Omitting applies_to leaves the event clear of the token (legacy behaviour)."""
+    from tests.conftest import init_brain
+
+    brain = init_brain(tmp_path)
+    result = brain.correct("bad output", "good output")
+    assert "applies_to" not in result
+    assert "applies_to" not in result.get("data", {})
+    assert not any(t.startswith("applies_to:") for t in result.get("tags", []))
+
+
+def test_applies_to_empty_string_collapses_to_none(tmp_path: Path):
+    """Empty / whitespace-only applies_to is normalised away."""
+    from tests.conftest import init_brain
+
+    brain = init_brain(tmp_path)
+    result = brain.correct("bad output", "good output", applies_to="   ")
+    assert "applies_to" not in result
+    assert "applies_to" not in result.get("data", {})
+
+
+def test_applies_to_propagates_to_lesson_scope_json(tmp_path: Path):
+    """applies_to appears in the new lesson's scope_json alongside correction_scope."""
+    from gradata.enhancements.self_improvement import parse_lessons
+    from tests.conftest import init_brain
+
+    brain = init_brain(tmp_path)
+    brain.correct(
+        "This is a completely wrong paragraph that needs total rewriting with different content.",
+        "Here is the corrected version with entirely new accurate information and proper formatting.",
+        applies_to="task:emails",
+    )
+
+    lessons_path = brain._find_lessons_path()
+    assert lessons_path and lessons_path.is_file(), "lessons.md not created"
+    text = lessons_path.read_text(encoding="utf-8")
+    lessons = parse_lessons(text)
+    tagged = [
+        l for l in lessons
+        if l.scope_json and "applies_to" in l.scope_json
+    ]
+    assert tagged, f"No lesson carried applies_to. scope_jsons={[l.scope_json for l in lessons]}"
+    scope_data = json.loads(tagged[0].scope_json)
+    assert scope_data.get("applies_to") == "task:emails"
+    assert scope_data.get("correction_scope") == "domain"  # default preserved
