@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose a new capability or improvement
+title: "[feat]: "
+labels: ["enhancement"]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One-line description of the proposal.
+      placeholder: "Support Ollama as a first-class LLM provider"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What you want and why. Link prior discussion if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: usecase
+    attributes:
+      label: Use case
+      description: Concrete scenario this unlocks. Who benefits, and how.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds or other approaches you ruled out (optional).

@@ -301,7 +301,7 @@ gradata init ./my-brain
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+PRs welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) for the quick-start, branch conventions, and PR checklist. Every commit must be signed off per the [Developer Certificate of Origin](https://developercertificate.org/) — `git commit -s` — and the DCO workflow enforces this on every PR. We follow the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 

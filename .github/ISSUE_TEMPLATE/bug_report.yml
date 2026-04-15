@@ -1,0 +1,40 @@
+name: Bug report
+description: Report a defect in Gradata
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One-line description of the bug.
+      placeholder: "brain.correct() raises KeyError on empty final"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, what you expected, and why it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: Minimal steps (or code snippet) to reproduce the issue.
+      placeholder: |
+        1. `pip install gradata==X.Y.Z`
+        2. Run the snippet below
+        3. Observe the traceback
+      render: bash
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: Python version, OS, Gradata version.
+      placeholder: "Python 3.12, macOS 14, gradata 0.5.2"
+    validations:
+      required: true
