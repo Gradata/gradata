@@ -46,7 +46,8 @@ export default function HomePage() {
           <GlassCard className="p-6">
             <div className="font-heading text-lg font-semibold">Graduates lessons to rules</div>
             <p className="mt-2 text-sm text-[color:var(--color-muted-foreground)]">
-              Instincts become patterns become rules as evidence compounds — scoped per task.
+              Instincts become patterns become rules as evidence accumulates, scoped per task.
+              Promotion is gated by a survival-penalty loss calibrated against ground-truth correction severity.
             </p>
           </GlassCard>
           <GlassCard className="p-6">

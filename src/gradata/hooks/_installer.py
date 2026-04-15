@@ -26,6 +26,8 @@ HOOK_REGISTRY: list[tuple[str, str, str | None, Profile, int, str]] = [
     ("secret_scan",          "PreToolUse",       "Write|Edit|MultiEdit", Profile.STANDARD, 5000,  "Gradata: block secrets in written content"),
     ("config_protection",    "PreToolUse",       "Write|Edit|MultiEdit", Profile.STANDARD, 3000,  "Gradata: block linter config weakening"),
     ("rule_enforcement",     "PreToolUse",       "Write|Edit|MultiEdit", Profile.STANDARD, 5000,  "Gradata: inject RULE reminders before edits"),
+    ("generated_runner",     "PreToolUse",       "Write|Edit|MultiEdit|Bash", Profile.STANDARD, 10000, "Gradata: run user-installed generated hooks from gradata rule add"),
+    ("generated_runner_post","PostToolUse",      "Write|Edit|MultiEdit",      Profile.STANDARD, 35000, "Gradata: run user-installed post-tool hooks (e.g. auto_test)"),
     ("agent_precontext",     "PreToolUse",       "Agent",                Profile.STANDARD, 8000,  "Gradata: inject rules into sub-agent prompts"),
     ("agent_graduation",     "PostToolUse",      "Agent",                Profile.STANDARD, 10000, "Gradata: record agent outcomes for graduation"),
     ("tool_failure_emit",    "PostToolUse",      "Bash",                 Profile.STANDARD, 5000,  "Gradata: track tool failures with backoff"),
@@ -37,6 +39,7 @@ HOOK_REGISTRY: list[tuple[str, str, str | None, Profile, int, str]] = [
     ("brain_maintain",       "Stop",             None,                   Profile.STRICT,   20000, "Gradata: FTS rebuild + brain maintenance"),
     ("session_persist",      "Stop",             None,                   Profile.STRICT,   10000, "Gradata: crash-safe session handoff"),
     ("implicit_feedback",    "UserPromptSubmit", None,                   Profile.STRICT,   5000,  "Gradata: detect pushback as implicit corrections"),
+    ("stale_hook_check",     "SessionStart",     None,                   Profile.STANDARD, 5000,  "Gradata: warn on stale generated hooks at session start"),
 ]
 
 SETTINGS_PATH = Path.home() / ".claude" / "settings.json"

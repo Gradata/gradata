@@ -20,6 +20,17 @@ try:
 except ImportError:
     parse_lessons = None
 
+try:
+    from gradata.enhancements.meta_rules import (
+        INJECTABLE_META_SOURCES,
+        format_meta_rules_for_prompt,
+    )
+    from gradata.enhancements.meta_rules_storage import load_meta_rules
+except ImportError:
+    format_meta_rules_for_prompt = None  # type: ignore[assignment]
+    load_meta_rules = None  # type: ignore[assignment]
+    INJECTABLE_META_SOURCES = frozenset()  # type: ignore[assignment]
+
 _log = logging.getLogger(__name__)
 
 HOOK_META = {
@@ -30,6 +41,7 @@ HOOK_META = {
 
 MAX_RULES = 10
 MIN_CONFIDENCE = 0.60
+MAX_META_RULES = 5  # meta-rules are high-level principles — separate cap from MAX_RULES
 
 
 def _score(lesson) -> float:
@@ -129,8 +141,72 @@ def main(data: dict) -> dict | None:
         for r in scored
     ]
 
-    block = "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
-    return {"result": block}
+    rules_block = "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
+
+    # Also inject tier-1 meta-rules (compound principles across 3+ lessons).
+    # Without this, meta-rules are created + stored but never reach the LLM.
+    # Quality gate: only inject metas whose principle text was LLM-synthesized
+    # or human-curated. Deterministic auto-generated principles (the OSS
+    # default) are excluded — the 2026-04-14 ablation (432 trials) showed they
+    # regress correctness on Sonnet (-1.1%), DeepSeek (-1.4%), and halve the
+    # qwen14b lift from +8.1% to +2.9%. Better to inject nothing than noise.
+    meta_block = ""
+    db_path = Path(brain_dir) / "system.db"
+    if load_meta_rules and format_meta_rules_for_prompt and db_path.is_file():
+        # Wrap the entire load -> filter -> format pipeline. A partially corrupt
+        # system.db can deserialize successfully (e.g. JSON `null` for
+        # source_lesson_ids) and then blow up later with TypeError inside the
+        # formatter. We must degrade to rules-only rather than aborting
+        # SessionStart.
+        try:
+            metas = load_meta_rules(db_path)
+            injectable = [
+                m for m in metas
+                if getattr(m, "source", "deterministic") in INJECTABLE_META_SOURCES
+            ]
+            if injectable:
+                # Build a sanitized condition_context from the hook payload so
+                # applies_when / never_when are honored during SessionStart.
+                # We only forward small, string-shaped fields the rule engine
+                # uses for gating — no file contents, transcripts, or secrets.
+                condition_context = {
+                    k: data[k]
+                    for k in ("session_type", "task_type", "source", "cwd")
+                    if isinstance(data.get(k), (str, int, float, bool))
+                }
+                if context and "context" not in condition_context:
+                    condition_context["context"] = context
+
+                # Pass the full injectable set with `limit=MAX_META_RULES` so
+                # the cap is applied AFTER context-aware ranking inside the
+                # formatter. Pre-slicing by raw confidence would let a
+                # lower-confidence rule with a strong context weight get
+                # silently excluded.
+                formatted = format_meta_rules_for_prompt(
+                    injectable,
+                    context=context,
+                    condition_context=condition_context,
+                    limit=MAX_META_RULES,
+                )
+                if formatted:
+                    meta_block = (
+                        "\n<brain-meta-rules>\n"
+                        + formatted
+                        + "\n</brain-meta-rules>"
+                    )
+            elif metas:
+                _log.debug(
+                    "Skipped meta-rule injection: %d metas in DB, none with "
+                    "injectable source (llm_synth or human_curated)",
+                    len(metas),
+                )
+        except Exception as exc:
+            _log.debug(
+                "meta-rule pipeline failed (%s) — degrading to rules-only", exc,
+            )
+            meta_block = ""
+
+    return {"result": rules_block + meta_block}
 
 
 if __name__ == "__main__":

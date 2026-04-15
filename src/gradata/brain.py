@@ -408,6 +408,42 @@ class Brain(BrainInspectionMixin):
 
         return result
 
+    def record_correction(
+        self,
+        text: str,
+        *,
+        assistant_draft: str | None = None,
+        category: str = "GENERAL",
+        **extras,
+    ) -> dict:
+        """Record a user correction as a CORRECTION event.
+
+        Lightweight companion to :meth:`correct` — does not run the diff /
+        classification pipeline; simply persists the raw correction signal
+        plus the assistant draft that triggered it (under ``draft_text``)
+        so downstream tooling (e.g. rule-to-hook graduation) can replay
+        generated hooks against the ground-truth violating text.
+
+        Args:
+            text: The user's correction message (what they wrote).
+            assistant_draft: The AI output the user was correcting. Stored
+                under ``data['draft_text']`` when provided.
+            category: Correction category (defaults to ``"GENERAL"``).
+            **extras: Any additional fields to merge into the event's
+                ``data`` dict.
+
+        Returns:
+            The emitted CORRECTION event dict.
+        """
+        # Apply extras first, then explicit fields so callers can't override
+        # the primary signals (detail/category/draft_text) via **extras.
+        data: dict = dict(extras)
+        data["detail"] = text
+        data["category"] = category
+        if assistant_draft is not None:
+            data["draft_text"] = assistant_draft
+        return self.emit("CORRECTION", "user", data, [f"category:{category}"])
+
     def patch_rule(
         self, category: str, old_description: str, new_description: str, reason: str = ""
     ) -> dict:
@@ -433,7 +469,7 @@ class Brain(BrainInspectionMixin):
         try:
             from gradata.enhancements.rule_integrity import sign_and_store
 
-            sign_and_store(self.db_path, new_description, category, patched.confidence)
+            sign_and_store(self.ctx, new_description, category, patched.confidence)
         except ImportError:
             pass  # unsigned mode — no-op
 
@@ -455,6 +491,154 @@ class Brain(BrainInspectionMixin):
             "old_description": old_description,
             "new_description": new_description,
             "confidence_preserved": patched.confidence,
+        }
+
+    def add_rule(
+        self,
+        description: str,
+        category: str,
+        state: str = "RULE",
+        confidence: float = 0.90,
+        data: dict | None = None,
+    ) -> dict:
+        """Add a rule to lessons.md via the canonical parse/format pipeline.
+
+        This is the programmatic entry point for fast-tracking user-declared
+        rules. Unlike hand-formatting a ``[date] [STATE:conf] CATEGORY: desc``
+        line directly, this method routes through :func:`parse_lessons` /
+        :func:`format_lessons` (the same code path graduation uses), so any
+        future schema change auto-propagates to callers like ``gradata rule
+        add``.
+
+        Args:
+            description: The rule's human-readable text (must be non-empty).
+            category: Rule category (e.g. ``"USER"``, ``"DRAFTING"``). Must
+                be non-empty — this matches how graduation classifies rules.
+            state: Lesson state name. Defaults to ``"RULE"``. Accepts any
+                member of :class:`LessonState` (e.g. ``"INSTINCT"``,
+                ``"PATTERN"``, ``"RULE"``). Case-insensitive.
+            confidence: Confidence score in ``[0.0, 1.0]``. Values outside
+                the range are clamped (same as :class:`Lesson.__post_init__`).
+                Defaults to ``0.90`` (the RULE-tier threshold).
+            data: Optional dict with extra lesson fields (e.g.
+                ``{"root_cause": "...", "agent_type": "researcher"}``). Only
+                known :class:`Lesson` fields are applied; unknown keys are
+                ignored silently.
+
+        Returns:
+            Dict with ``added`` (bool), ``category``, ``description``, and
+            ``confidence`` (post-clamp). On error: ``added=False`` + ``reason``.
+
+        Example:
+            >>> brain.add_rule("Use colons not em-dashes", "DRAFTING")
+            {'added': True, 'category': 'DRAFTING', ...}
+        """
+        from datetime import date
+
+        from gradata._db import lessons_lock
+        from gradata._types import Lesson, LessonState
+        from gradata.enhancements.self_improvement import format_lessons, parse_lessons
+
+        description = (description or "").strip()
+        # Canonicalize category casing so callers passing "drafting" and
+        # "DRAFTING" don't create duplicate logical buckets (parse_lessons
+        # preserves whatever casing is on disk, so we pick one form — upper —
+        # at the add_rule boundary). Must match the form used by duplicate
+        # comparisons, persistence, and the emit() tag below.
+        category = (category or "").strip().upper()
+
+        if not description:
+            return {"added": False, "reason": "empty_description"}
+        if not category:
+            return {"added": False, "reason": "empty_category"}
+
+        # Resolve LessonState (case-insensitive, fallback to RULE on unknown)
+        state_upper = str(state or "RULE").upper()
+        try:
+            lesson_state = LessonState[state_upper]
+        except KeyError:
+            return {"added": False, "reason": f"unknown_state: {state!r}"}
+
+        # Clamp confidence (Lesson.__post_init__ does this too, but we want
+        # to report the clamped value in the return dict)
+        try:
+            conf = float(confidence)
+        except (TypeError, ValueError):
+            return {"added": False, "reason": f"invalid_confidence: {confidence!r}"}
+        conf = round(max(0.0, min(1.0, conf)), 2)
+
+        lessons_path = self._find_lessons_path(create=True)
+        if lessons_path is None:  # pragma: no cover — create=True always returns
+            return {"added": False, "reason": "no_lessons_file"}
+
+        # Duplicate check: same canonical category + normalized description
+        def _norm(s: str) -> str:
+            return " ".join(s.split()).lower()
+
+        desc_norm = _norm(description)
+
+        # Build the new Lesson (cheap, no I/O) before locking so we hold the
+        # critical section as briefly as possible.
+        lesson = Lesson(
+            date=date.today().isoformat(),
+            state=lesson_state,
+            confidence=conf,
+            category=category,
+            description=description,
+        )
+        if data:
+            field_names = set(Lesson.__dataclass_fields__.keys())  # type: ignore[attr-defined]
+            # Don't let callers override the primary fields (date/state/conf/
+            # category/description) via data — those come from explicit args.
+            protected = {"date", "state", "confidence", "category", "description"}
+            for k, v in data.items():
+                if k in field_names and k not in protected:
+                    setattr(lesson, k, v)
+
+        # TOCTOU protection: hold the same lock write_lessons_safe uses for
+        # the entire read → duplicate-check → append → write sequence so
+        # concurrent add_rule calls can't both observe "no duplicate" and
+        # then each append the same lesson.
+        with lessons_lock(lessons_path):
+            existing = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+            for l in existing:
+                # l.category may have arbitrary casing (parse_lessons preserves
+                # on-disk form); compare case-insensitively against the canonical
+                # upper-cased `category` we're inserting.
+                if (l.category or "").strip().upper() == category and _norm(l.description) == desc_norm:
+                    return {
+                        "added": False,
+                        "reason": "duplicate",
+                        "category": category,
+                        "description": description,
+                    }
+            existing.append(lesson)
+            # Write inside the lock — reuse the same serializer but call the
+            # raw writer directly since we already hold the lock.
+            lessons_path.write_text(format_lessons(existing), encoding="utf-8")
+
+        # Best-effort event log — never fail the add if event emission fails
+        try:
+            self.emit(
+                "LESSON_ADDED",
+                "brain.add_rule",
+                {
+                    "category": category,
+                    "description": description[:200],
+                    "state": lesson_state.value,
+                    "confidence": conf,
+                },
+                [f"category:{category}", f"state:{lesson_state.value}"],
+            )
+        except Exception as e:  # pragma: no cover — defensive
+            logger.debug("add_rule event emit failed: %s", e)
+
+        return {
+            "added": True,
+            "category": category,
+            "description": description,
+            "state": lesson_state.value,
+            "confidence": conf,
         }
 
     def end_session(

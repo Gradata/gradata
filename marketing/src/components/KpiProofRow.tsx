@@ -8,19 +8,19 @@ type Kpi = {
 
 const DEFAULT_KPIS: Kpi[] = [
   {
-    value: "70%",
-    label: "Win rate vs hand-written rules",
-    sub: "Blind test across 3,000 comparisons",
+    value: "+2.7–5.7%",
+    label: "Preference-adherence lift from graduated rules",
+    sub: "Blind Haiku 4.5 judge, 432 trials across Sonnet, DeepSeek, qwen14b, gemma4",
   },
   {
-    value: "93%",
-    label: "Fewer corrections after ~3 sessions",
-    sub: "Measured on S101 validation cohort",
+    value: "3–10%",
+    label: "Regression when rule content is randomized",
+    sub: "Min 2022 random-label control: content carries the signal, not format",
   },
   {
-    value: "65%",
-    label: "Fewer tokens per task",
-    sub: "Scoped rule injection vs full context",
+    value: "4 / 4",
+    label: "Models where graduated rules beat base prompt on preference",
+    sub: "Same 16 tasks, 3 iterations each, rule set held at confidence ≥ 0.90",
   },
 ];
 
