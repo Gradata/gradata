@@ -35,18 +35,17 @@ async def list_rule_patches(
     lessons = await db.select(
         "lessons", columns="id", filters={"brain_id": brain["id"]},
     )
-    lesson_ids = {row["id"] for row in lessons}
+    lesson_ids = [row["id"] for row in lessons]
     if not lesson_ids:
         return []
 
-    # PostgREST doesn't support IN filters through our thin wrapper, so
-    # fetch all patches and filter in-process. Acceptable for MVP volume.
-    all_patches = await db.select(
+    # Push the WHERE lesson_id IN (...) filter into PostgREST so we don't
+    # haul down the entire rule_patches table on each request.
+    patches = await db.select(
         "rule_patches",
         columns="id,lesson_id,old_description,new_description,reason,created_at",
+        in_={"lesson_id": lesson_ids},
     )
-
-    patches = [p for p in all_patches if p.get("lesson_id") in lesson_ids]
     patches.sort(key=lambda r: r.get("created_at") or "", reverse=True)
     return patches[offset : offset + limit]
 

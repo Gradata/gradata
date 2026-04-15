@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { GlassCard } from '@/components/layout/GlassCard'
 import { Button } from '@/components/ui/button'
 import { useApi } from '@/hooks/useApi'
@@ -22,13 +23,21 @@ export default function SetupPage() {
   const { data: keys, loading: loadingKeys } = useApi<ApiKey[]>('/api-keys')
   const { data: brains, loading: loadingBrains } = useApi<Brain[]>('/brains')
   const [copied, setCopied] = useState<string | null>(null)
+  const params = useSearchParams()
+  // When the user comes from api-keys via "Continue to setup", the freshly
+  // generated key is in the URL once. Use it inline and advise copy-and-drop.
+  const fullKeyFromUrl = params?.get('key')
 
   const hasKey = !!keys?.length
   const hasBrain = !!brains?.length
   const firstKeyPrefix = keys?.[0]?.key_prefix
 
   const initSnippet = useMemo(() => {
-    const key = firstKeyPrefix ? `gd_${firstKeyPrefix}...` : 'gd_YOUR_API_KEY_HERE'
+    const key = fullKeyFromUrl
+      ? fullKeyFromUrl
+      : firstKeyPrefix
+        ? `gd_${firstKeyPrefix}...`
+        : 'gd_YOUR_API_KEY_HERE'
     return `import gradata
 
 brain = gradata.Brain.init(
@@ -43,7 +52,7 @@ with brain.session() as s:
 
 brain.end_session()
 `
-  }, [firstKeyPrefix])
+  }, [firstKeyPrefix, fullKeyFromUrl])
 
   const copy = (text: string, label: string) => {
     navigator.clipboard.writeText(text)

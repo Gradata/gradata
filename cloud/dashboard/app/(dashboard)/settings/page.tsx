@@ -19,9 +19,11 @@ export default function SettingsPage() {
   if (error) return <ErrorState message={error} onRetry={refetch} />
   if (!profile) return <ErrorState message="Could not load profile" />
 
-  const memberSince = new Date(profile.created_at).toLocaleDateString('en-US', {
-    year: 'numeric', month: 'long', day: 'numeric',
-  })
+  const memberSince = profile.created_at
+    ? new Date(profile.created_at).toLocaleDateString('en-US', {
+        year: 'numeric', month: 'long', day: 'numeric',
+      })
+    : 'unknown'
 
   const currentPlan = (profile.plan?.toLowerCase() ?? 'free') as PlanTier
 
@@ -50,7 +52,7 @@ export default function SettingsPage() {
         <h3 className="mb-5 text-[15px] font-semibold">Profile</h3>
         <div className="space-y-3">
           <Row label="Display name" value={profile.display_name || 'Not set'} />
-          <Row label="Email" value={profile.email} />
+          <Row label="Email" value={profile.email ?? '—'} />
           <Row label="Member since" value={memberSince} />
         </div>
       </GlassCard>

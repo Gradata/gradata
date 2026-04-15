@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,6 +20,7 @@ import api from '@/lib/api'
 import type { ApiKey, ApiKeyCreateResponse } from '@/types/api'
 
 export default function ApiKeysPage() {
+  const router = useRouter()
   const { data: keys, loading, error, refetch } = useApi<ApiKey[]>('/api-keys')
   const [showCreate, setShowCreate] = useState(false)
   const [newKey, setNewKey] = useState<ApiKeyCreateResponse | null>(null)
@@ -167,9 +169,20 @@ export default function ApiKeysPage() {
             </div>
             <code className="block break-all font-mono text-[12px]">{newKey?.key}</code>
           </div>
-          <Button onClick={handleCopy} className="w-full">
-            {copied ? 'Copied!' : 'Copy to clipboard'}
-          </Button>
+          <div className="flex flex-col gap-2">
+            <Button onClick={handleCopy} className="w-full">
+              {copied ? 'Copied!' : 'Copy to clipboard'}
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                if (newKey) router.push(`/setup?key=${encodeURIComponent(newKey.key)}`)
+              }}
+            >
+              Continue to setup →
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

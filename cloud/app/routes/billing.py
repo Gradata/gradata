@@ -392,10 +392,26 @@ async def stripe_webhook(request: Request) -> JSONResponse:
 
 
 async def _handle_event(event: dict) -> None:
-    """Dispatch Stripe event to the appropriate handler."""
+    """Dispatch Stripe event to the appropriate handler.
+
+    Idempotent — the processed_webhooks table keys on event.id, so Stripe
+    retries (which can happen on transient 5xx) won't double-apply.
+    """
     etype = event.get("type", "")
+    event_id = event.get("id", "")
     data = event.get("data", {}).get("object", {})
     db = get_db()
+
+    if event_id:
+        try:
+            await db.insert(
+                "processed_webhooks",
+                {"event_id": event_id, "event_type": etype},
+            )
+        except Exception as exc:
+            # Unique-constraint violation on event_id -> already processed.
+            _log.info("Skipping duplicate Stripe webhook event_id=%s (%s)", event_id, exc)
+            return
 
     if etype == "checkout.session.completed":
         customer_id = data.get("customer")
@@ -490,15 +506,16 @@ async def get_subscription(
     ws = ws_rows[0]
 
     brains = await db.select("brains", columns="id", filters={"user_id": user_id})
-    brain_ids = [b["id"] for b in brains]
+    brain_ids = {b["id"] for b in brains}
 
+    # Single fetch + in-process count — avoids 2*N DB calls per user brains.
     lesson_count = 0
     event_count = 0
-    for bid in brain_ids:
-        ls = await db.select("lessons", columns="id", filters={"brain_id": bid})
-        ev = await db.select("events", columns="id", filters={"brain_id": bid})
-        lesson_count += len(ls)
-        event_count += len(ev)
+    if brain_ids:
+        lessons = await db.select("lessons", columns="brain_id")
+        events = await db.select("events", columns="brain_id")
+        lesson_count = sum(1 for l in lessons if l.get("brain_id") in brain_ids)
+        event_count = sum(1 for e in events if e.get("brain_id") in brain_ids)
 
     period_end = ws.get("subscription_period_end")
     if isinstance(period_end, int):

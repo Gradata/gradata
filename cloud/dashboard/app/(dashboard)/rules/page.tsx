@@ -30,7 +30,12 @@ export default function RulesPage() {
     .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
 
   if (loadingBrains || loading) return <LoadingSpinner className="py-20" />
-  if (!primaryId) return <EmptyState title="No brain yet" description="Install the SDK to start graduating rules." />
+  if (!primaryId) return (
+    <EmptyState
+      title="No brain yet"
+      description="Install the SDK and graduate your first rule to see it here. See Setup in the left nav for install instructions."
+    />
+  )
 
   const states: Array<'all' | Lesson['state']> = ['all', 'INSTINCT', 'PATTERN', 'RULE']
 
