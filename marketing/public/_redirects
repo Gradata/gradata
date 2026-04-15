@@ -1,8 +1,0 @@
-# Redirect www to apex
-https://www.gradata.ai/*  https://gradata.ai/:splat  301!
-
-# Route app/dashboard traffic to app subdomain
-/app/*       https://app.gradata.ai/:splat  301
-/dashboard/* https://app.gradata.ai/:splat   301
-/signup      https://app.gradata.ai/signup   302
-/login       https://app.gradata.ai/login    302

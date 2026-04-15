@@ -1,1 +1,0 @@
-"""Gradata Cloud API."""
