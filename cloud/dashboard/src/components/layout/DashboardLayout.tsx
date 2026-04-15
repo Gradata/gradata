@@ -13,6 +13,7 @@ const SECTIONS = [
       { href: '/dashboard', label: 'Overview', icon: '◐' },
       { href: '/corrections', label: 'Corrections', icon: '◷' },
       { href: '/rules', label: 'Latest Rules', icon: '▣' },
+      { href: '/proof', label: 'Proof', icon: '◎' },
       { href: '/meta-rules', label: 'Meta Rules', icon: '◈' },
       { href: '/self-healing', label: 'Self-Healing', icon: '✦' },
       { href: '/observability', label: 'Observability', icon: '◐' },
@@ -185,7 +186,7 @@ function LegalFooter() {
 }
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? 'https://gradata-production.up.railway.app/api/v1'
+  process.env.NEXT_PUBLIC_API_URL ?? 'https://api.gradata.ai/api/v1'
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)

@@ -9,8 +9,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
-import secrets
-
 from app.auth import (
     get_brain_for_request,
     get_current_brain,
@@ -56,23 +54,37 @@ async def list_brains(user_id: str = Depends(get_current_user_id_flexible)) -> l
         columns="id,user_id,brain_name,domain,last_sync_at,created_at",
         filters={"user_id": user_id},
     )
-    results = []
-    for row in rows:
-        lessons = await db.select("lessons", columns="id", filters={"brain_id": row["id"]})
-        corrections = await db.select("corrections", columns="id", filters={"brain_id": row["id"]})
-        results.append(
-            BrainDetail(
-                id=row["id"],
-                user_id=row["user_id"],
-                name=row.get("brain_name"),
-                domain=row.get("domain"),
-                lesson_count=len(lessons),
-                correction_count=len(corrections),
-                last_sync=row.get("last_sync_at"),
-                created_at=row.get("created_at"),
-            )
+    if not rows:
+        return []
+
+    brain_ids = [r["id"] for r in rows]
+    # Two batched fetches instead of 2*N — count lessons + corrections per brain.
+    lessons = await db.select("lessons", columns="brain_id", in_={"brain_id": brain_ids})
+    corrections = await db.select("corrections", columns="brain_id", in_={"brain_id": brain_ids})
+    lesson_count: dict[str, int] = {}
+    correction_count: dict[str, int] = {}
+    for l in lessons:
+        bid = l.get("brain_id")
+        if bid:
+            lesson_count[bid] = lesson_count.get(bid, 0) + 1
+    for c in corrections:
+        bid = c.get("brain_id")
+        if bid:
+            correction_count[bid] = correction_count.get(bid, 0) + 1
+
+    return [
+        BrainDetail(
+            id=row["id"],
+            user_id=row["user_id"],
+            name=row.get("brain_name"),
+            domain=row.get("domain"),
+            lesson_count=lesson_count.get(row["id"], 0),
+            correction_count=correction_count.get(row["id"], 0),
+            last_sync=row.get("last_sync_at"),
+            created_at=row.get("created_at"),
         )
-    return results
+        for row in rows
+    ]
 
 
 class CreateBrainRequest(BaseModel):
@@ -113,7 +125,9 @@ async def create_brain(
         )
 
     # Generate a cloud-scope API key so the SDK can authenticate right away.
-    api_key = f"gd_{secrets.token_urlsafe(32)}"
+    # Delegate to the canonical helper so prefix + entropy stays consistent.
+    from app.routes.api_keys import _generate_key
+    api_key = _generate_key()
 
     brain_rows = await db.insert(
         "brains",

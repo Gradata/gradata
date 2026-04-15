@@ -26,9 +26,10 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 _PLAN_MRR_USD: dict[str, float] = {
     "free": 0.0,
-    "pro": 29.0,  # "cloud" tier in the public pricing — stored as "pro" in DB
+    "pro": 29.0,      # legacy name for the cloud tier
+    "cloud": 29.0,    # public-facing name; matches S104 pricing page
     "team": 99.0,
-    # "enterprise": custom -> excluded from automatic MRR
+    "enterprise": 500.0,  # default; override with real ARR/12 from Stripe once wired
 }
 
 _HEALTHY_DAYS = 14

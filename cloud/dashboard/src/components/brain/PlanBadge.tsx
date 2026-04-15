@@ -73,18 +73,24 @@ export function PlanBadge({ tier }: { tier: PlanTier }) {
 /**
  * "Upgrade to unlock" gate. Wraps children with a blur + CTA when the
  * current plan's rank is below `requires`. Renders children normally otherwise.
+ *
+ * `bypass` (UX-only, e.g. operator-domain users) skips the blur. The backend
+ * still enforces plan gates on data endpoints — bypass only hides the overlay.
  */
 export function PlanGate({
   current,
   requires,
   children,
   featureName,
+  bypass = false,
 }: {
   current: PlanTier
   requires: PlanTier
   children: React.ReactNode
   featureName: string
+  bypass?: boolean
 }) {
+  if (bypass) return <>{children}</>
   if (PLANS[current].rank >= PLANS[requires].rank) return <>{children}</>
 
   return (

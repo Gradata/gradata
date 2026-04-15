@@ -117,15 +117,29 @@ async def update_profile(
     )
 
 
+async def _primary_workspace_id(user_id: str) -> str | None:
+    """Return the user's primary (first-joined) workspace membership id."""
+    db = get_db()
+    rows = await db.select(
+        "workspace_members",
+        columns="workspace_id",
+        filters={"user_id": user_id},
+    )
+    return rows[0]["workspace_id"] if rows else None
+
+
 @router.get("/users/me/notifications", response_model=NotificationPrefs)
 async def get_notifications(
     user_id: str = Depends(get_current_user_id),
 ) -> NotificationPrefs:
     db = get_db()
+    ws_id = await _primary_workspace_id(user_id)
+    if not ws_id:
+        return NotificationPrefs()
     rows = await db.select(
         "workspace_members",
         columns="notification_prefs",
-        filters={"user_id": user_id},
+        filters={"user_id": user_id, "workspace_id": ws_id},
     )
     if not rows or not rows[0].get("notification_prefs"):
         return NotificationPrefs()
@@ -138,9 +152,16 @@ async def update_notifications(
     user_id: str = Depends(get_current_user_id),
 ) -> NotificationPrefs:
     db = get_db()
+    ws_id = await _primary_workspace_id(user_id)
+    # Scope the update so a user in multiple workspaces doesn't clobber
+    # prefs across all of them. Primary workspace wins until we add per-
+    # workspace notification settings in the UI.
+    filters: dict[str, str] = {"user_id": user_id}
+    if ws_id:
+        filters["workspace_id"] = ws_id
     await db.update(
         "workspace_members",
         data={"notification_prefs": prefs.model_dump()},
-        filters={"user_id": user_id},
+        filters=filters,
     )
     return prefs
