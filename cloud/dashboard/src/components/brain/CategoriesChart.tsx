@@ -37,7 +37,33 @@ const DIMENSIONS = [
   'Actionability',
 ] as const
 
+const CATEGORIZED_THRESHOLD = 0.7
+
 export function CategoriesChart({ analytics }: { analytics: BrainAnalytics }) {
+  // Classifier-health gate: protect users from seeing a chart that's mostly
+  // OTHER / UNKNOWN while the correction categorizer is being recalibrated.
+  // Ship criterion: >= 70% of corrections must have a real category.
+  const raw = analytics.corrections_by_category ?? {}
+  const entries = Object.entries(raw)
+  const total = entries.reduce((sum, [, count]) => sum + (count as number), 0)
+  const categorized = entries.reduce(
+    (sum, [key, count]) =>
+      key === 'OTHER' || key === 'UNKNOWN' ? sum : sum + (count as number),
+    0,
+  )
+  const healthy = total > 0 && categorized / total >= CATEGORIZED_THRESHOLD
+
+  if (!healthy) {
+    return (
+      <GlassCard>
+        <h3 className="mb-2 text-[15px] font-semibold">Corrections by Category</h3>
+        <p className="text-[13px] text-[var(--color-body)]">
+          We are recalibrating the correction categorizer. Check back next week.
+        </p>
+      </GlassCard>
+    )
+  }
+
   const folded: Record<string, number> = Object.fromEntries(
     DIMENSIONS.map((d) => [d, 0]),
   )

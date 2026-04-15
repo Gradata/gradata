@@ -25,8 +25,10 @@ const DIMENSIONS = [
 ]
 
 describe('CategoriesChart', () => {
-  it('always renders all 6 dimensions even with no data', () => {
-    render(<CategoriesChart analytics={mkAnalytics({})} />)
+  it('renders all 6 dimensions when classifier is healthy (>= 70% categorized)', () => {
+    // Seed enough categorized data to pass the classifier-health gate so the
+    // chart (not the recalibrating empty state) is rendered.
+    render(<CategoriesChart analytics={mkAnalytics({ TONE: 1 })} />)
     DIMENSIONS.forEach((d) => {
       expect(screen.getByText(d)).toBeInTheDocument()
     })
@@ -66,5 +68,32 @@ describe('CategoriesChart', () => {
     render(<CategoriesChart analytics={mkAnalytics({ UNKNOWN_THING: 9 })} />)
     const fact = screen.getByText('Factual Integrity').closest('li')
     expect(fact?.textContent).toContain('9')
+  })
+})
+
+describe('CategoriesChart classifier health', () => {
+  it('renders recalibration empty state when < 70% corrections are categorized', () => {
+    // 3 OTHER + 1 TONE = 25% categorized
+    render(
+      <CategoriesChart
+        analytics={mkAnalytics({ OTHER: 3, TONE: 1 })}
+      />,
+    )
+    expect(screen.getByText(/recalibrating/i)).toBeInTheDocument()
+  })
+
+  it('renders the chart when >= 70% corrections have a real category', () => {
+    // 3 TONE + 1 ACCURACY + 1 OTHER = 80% categorized
+    render(
+      <CategoriesChart
+        analytics={mkAnalytics({ TONE: 3, ACCURACY: 1, OTHER: 1 })}
+      />,
+    )
+    expect(screen.queryByText(/recalibrating/i)).not.toBeInTheDocument()
+  })
+
+  it('renders empty state when no corrections at all', () => {
+    render(<CategoriesChart analytics={mkAnalytics({})} />)
+    expect(screen.getByText(/recalibrating|no corrections/i)).toBeInTheDocument()
   })
 })
