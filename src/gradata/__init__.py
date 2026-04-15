@@ -33,6 +33,7 @@ if _log_level in ("DEBUG", "INFO", "WARNING", "ERROR"):
     _logging.getLogger("gradata").setLevel(getattr(_logging, _log_level))
 
 from gradata._paths import BrainContext
+from gradata._scoped_brain import ScopedBrain
 from gradata._types import Lesson, LessonState, RuleTransferScope
 from gradata.brain import Brain
 from gradata.context_wrapper import brain_context
@@ -68,6 +69,7 @@ __all__ = [
     "LessonState",
     "Notification",
     "RuleTransferScope",
+    "ScopedBrain",
     "TaxonomyError",
     "ValidationError",
     "__version__",

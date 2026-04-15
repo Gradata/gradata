@@ -842,14 +842,15 @@ class Brain(BrainInspectionMixin):
         self._rule_cache.put(cache_key, result)
         return result
 
-    def scope(
+    def scoped_rules(
         self, domain: str = "", task_type: str = "", agent_type: str = "", max_rules: int = 10
     ) -> str:
-        """Get brain rules scoped to a specific domain and task type.
+        """Get brain rules scoped to a specific domain and task type, as a string.
 
-        A convenience wrapper around :meth:`apply_brain_rules` that builds the
-        context dict from named domain/task_type parameters instead of a raw
-        task string.
+        Convenience wrapper around :meth:`apply_brain_rules` that builds the
+        context dict from named parameters. For an object-oriented view that
+        exposes ``rules()``, ``inject()``, and scoped ``correct()``, see
+        :meth:`scope`.
 
         Args:
             domain: Operational domain, e.g. ``"sales"``, ``"engineering"``.
@@ -872,6 +873,30 @@ class Brain(BrainInspectionMixin):
             agent_type=agent_type or None,
             max_rules=max_rules,
         )
+
+    def scope(self, domain: str):
+        """Return a :class:`ScopedBrain` view over this brain.
+
+        A ScopedBrain filters graduated rules to those tagged with ``domain``
+        (via ``scope_json.domain``, ``scope_json.applies_to`` starting with
+        ``"{domain}:"``, or a matching category) and proxies writes (correct,
+        emit) through to this brain so learning still accrues to one store.
+
+        Args:
+            domain: Non-empty domain string, e.g. ``"code"``, ``"sales"``.
+
+        Returns:
+            A :class:`gradata._scoped_brain.ScopedBrain` bound to this brain.
+
+        Example::
+
+            code_brain = brain.scope("code")
+            prompt = code_brain.inject("refactor the parser")
+            code_brain.correct("old draft", "new draft")  # tagged applies_to="code"
+        """
+        from gradata._scoped_brain import ScopedBrain
+
+        return ScopedBrain(self, domain)
 
     def plan(self, task: str, context: dict | None = None) -> dict:
         """Generate a structured plan using graduated rules."""
