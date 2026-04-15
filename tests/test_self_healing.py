@@ -550,30 +550,39 @@ class TestCorrectAutoHealIntegration:
         assert result.get("rule_failure_detected") is True
 
     def test_auto_heal_emits_patch_when_retroactive_test_passes(self, brain_with_rule):
-        """With delta text that guarantees retroactive-test pass, RULE_PATCHED
-        must fire and carry the auto_heal reason prefix.
-
-        Split from the original combined test per CodeRabbit review: this
-        half uses input with sufficient delta words to make patching
-        deterministic, so the assertions are unconditional.
+        """INLINE path: brain.correct(auto_heal=True) must itself emit
+        RULE_PATCHED with the auto_heal: reason prefix. No standalone
+        auto_heal() call and no manual patch_rule() fallback -- if the
+        inline orchestration regresses, this test fails.
         """
-        # Failure event crafted to carry explicit delta words (casual, Slack)
-        # which `_generate_deterministic_patch` appends to narrow scope, and
-        # which `retroactive_test` matches to confirm the patch covers the
-        # failure. This makes RULE_PATCHED emission deterministic.
-        failures = [{
-            "data": {
-                "failed_rule_category": "TONE",
-                "failed_rule_description": "Never use exclamation marks",
-                "failed_rule_confidence": 0.92,
-                "correction_description": "Removed exclamation marks from casual Slack message",
-            }
-        }]
-        summary = brain_with_rule.auto_heal(failure_events=failures)
-        assert summary["patched"] == 1
+        # Pre-condition: no prior RULE_PATCHED events, so any assertion
+        # below is attributable to the inline call.
+        pre = brain_with_rule.query_events(event_type="RULE_PATCHED", limit=10)
+        assert len(pre) == 0
 
+        # The draft/final classifies as STYLE: "Punctuation or formatting
+        # change" which carries enough delta words to pass
+        # retroactive_test against the seeded rule "Never use exclamation
+        # marks", so the inline path reliably emits RULE_PATCHED.
+        result = brain_with_rule.correct(
+            draft="Thanks for joining! Excited!",
+            final="Thanks for joining. Excited.",
+            category="TONE",
+            auto_heal=True,
+        )
+
+        # The inline correction detected the failure AND closed the loop
+        assert result.get("rule_failure_detected") is True
+        assert "auto_healed" in result
+        assert result["auto_healed"]["patched"] == 1
+        receipt = result["auto_healed"]["patches"][0]
+        assert receipt["rule_id"].startswith("TONE:")
+        assert receipt["revert_command"] == f"gradata rule revert {receipt['rule_id']}"
+
+        # RULE_PATCHED event came from the inline orchestration, not from
+        # a manual patch_rule() call, and carries the auto_heal: prefix.
         patched = brain_with_rule.query_events(event_type="RULE_PATCHED", limit=10)
-        assert len(patched) >= 1
+        assert len(patched) == 1
         assert patched[0]["data"]["reason"].startswith("auto_heal:")
 
     def test_auto_heal_opt_out(self, brain_with_rule):
@@ -643,48 +652,59 @@ class TestCorrectAutoHealIntegration:
 
 
 class TestSelfHealingE2E:
-    """Full flow: correct -> RULE_FAILURE detected -> patch generated -> rule updated."""
+    """Full flow through the INLINE path only:
+    correct(auto_heal=True) -> RULE_FAILURE detected -> patch generated ->
+    rule updated -> RULE_PATCHED emitted. No manual review_rule_failures()
+    or brain.patch_rule() fallback, so a regression in the inline
+    orchestration fails this test instead of being masked by the manual
+    code path.
+    """
 
-    def test_full_self_healing_flow(self, brain_with_rule):
+    def test_inline_auto_heal_emits_rule_patched(self, brain_with_rule):
         brain = brain_with_rule
 
-        # 1. Correction triggers RULE_FAILURE (opt into auto-heal for E2E)
+        # Sanity: no RULE_PATCHED exists yet, so any assertion below is
+        # attributable to the inline call -- the manual fallback cannot
+        # mask a broken inline path.
+        pre_patches = brain.query_events(event_type="RULE_PATCHED", limit=10)
+        assert len(pre_patches) == 0
+
+        # 1. Single inline correct() call with auto_heal=True. The draft /
+        # final pair produces a STYLE/"Punctuation or formatting change"
+        # classification whose delta words ("formatting", "punctuation",
+        # "change") reliably pass retroactive_test against the rule
+        # "Never use exclamation marks".
         result = brain.correct(
             draft="Thanks for joining! Excited to work together!",
             final="Thanks for joining. Excited to work together.",
             category="TONE",
             auto_heal=True,
         )
+
+        # 2. Inline path flagged the rule failure
         assert result.get("rule_failure_detected") is True
 
-        # 2. Verify RULE_FAILURE event was emitted
+        # 3. Inline path emitted the RULE_FAILURE event
         failures = brain.query_events(event_type="RULE_FAILURE", limit=10)
         assert len(failures) >= 1
 
-        # 3. Review generates a patch
-        from gradata.enhancements.self_healing import review_rule_failures
-        patches = review_rule_failures(failures)
-        assert len(patches) >= 1
-
-        # 4. Apply passing patches via brain.patch_rule()
-        for patch in patches:
-            if patch.get("retroactive_test", {}).get("passes"):
-                brain.patch_rule(
-                    category=patch["category"],
-                    old_description=patch["original_description"],
-                    new_description=patch["proposed_description"],
-                    reason="E2E self-healing test",
-                )
-
-        # 5. Verify RULE_PATCHED event
+        # 4. Inline path closed the loop: RULE_PATCHED event exists with
+        # the auto_heal: reason prefix, and the correction event carries
+        # the auto_healed summary.
         patched_events = brain.query_events(event_type="RULE_PATCHED", limit=10)
-        # May or may not have patches depending on deterministic heuristic
-        # But the flow should complete without errors
+        assert len(patched_events) >= 1, (
+            "Inline brain.correct(auto_heal=True) did not emit RULE_PATCHED"
+        )
+        assert patched_events[0]["data"]["reason"].startswith("auto_heal:")
+        assert "auto_healed" in result
+        assert result["auto_healed"]["patched"] >= 1
 
-        # 6. Verify the lesson was updated (if patched)
-        if patched_events:
-            lessons = brain._load_lessons()
-            tone_rules = [l for l in lessons if l.category == "TONE"]
-            assert len(tone_rules) >= 1
-            # Confidence may drop due to correction penalty, but should still be high
-            assert tone_rules[0].confidence >= 0.70
+        # 5. Lesson text was rewritten on disk and confidence preserved
+        # within the expected correction-penalty band.
+        lessons = brain._load_lessons()
+        tone_rules = [l for l in lessons if l.category == "TONE"]
+        assert len(tone_rules) >= 1
+        assert tone_rules[0].confidence >= 0.70
+        assert tone_rules[0].description != "Never use exclamation marks", (
+            "Rule description should have been narrowed by auto-heal"
+        )

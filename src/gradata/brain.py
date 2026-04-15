@@ -539,9 +539,18 @@ class Brain(BrainInspectionMixin):
         """
         from gradata.enhancements.self_healing import auto_heal_failures
 
-        return auto_heal_failures(
+        result = auto_heal_failures(
             self, failure_events=failure_events, max_patches=max_patches
         )
+        # Patching rewrites lessons.md; invalidate the in-memory rule cache
+        # so subsequent apply_brain_rules() calls see the patched text
+        # instead of a stale pre-patch prompt.
+        if result.get("patched"):
+            try:
+                self._rule_cache.invalidate()
+            except Exception:  # pragma: no cover -- defensive
+                pass
+        return result
 
     def add_rule(
         self,

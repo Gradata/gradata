@@ -111,8 +111,11 @@ def brain_correct(
     if applies_to is not None:
         applies_to = str(applies_to).strip() or None
 
-    # Route to cloud if connected
-    if brain._cloud and brain._cloud.connected:
+    # Route to cloud if connected. Skip when auto_heal=True because the
+    # cloud client does not yet forward the self-healing flag; running
+    # through cloud would silently drop the request. Fall through to the
+    # local pipeline instead so the opt-in actually fires.
+    if brain._cloud and brain._cloud.connected and not auto_heal:
         try:
             return brain._cloud.correct(
                 draft, final, category, context, session, applies_to=applies_to
@@ -446,11 +449,10 @@ def brain_correct(
                     )
                     if heal_summary["patched"]:
                         event["auto_healed"] = heal_summary
-                        # Make auto-heal visible: one stderr line per patch so
+                        # Make auto-heal visible: one log line per patch so
                         # silent rule edits can't sneak through. Guarded so a
-                        # printing bug can never break the learning loop.
+                        # logging bug can never break the learning loop.
                         try:
-                            import sys as _sys
                             for _patch in heal_summary.get("patches", []) or []:
                                 _rid = _patch.get("rule_id", "?")
                                 _old = _patch.get("old_confidence")
@@ -458,11 +460,10 @@ def brain_correct(
                                 _revert = _patch.get(
                                     "revert_command", f"gradata rule revert {_rid}"
                                 )
-                                print(
-                                    f"[gradata] auto-healed R-{_rid}: "
-                                    f"confidence {_old} -> {_new}, "
-                                    f"revert with `{_revert}`",
-                                    file=_sys.stderr,
+                                _log.warning(
+                                    "auto-healed R-%s: confidence %s -> %s, "
+                                    "revert with `%s`",
+                                    _rid, _old, _new, _revert,
                                 )
                         except Exception:  # pragma: no cover — defensive
                             pass
