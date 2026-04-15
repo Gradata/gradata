@@ -120,28 +120,22 @@ def test_push_correction_returns_id_from_results_envelope() -> None:
     assert meta["tags"] == ["email", "greeting"]
 
 
-def test_push_correction_handles_flat_id_response() -> None:
-    fake = _FakeMem0Client(add_response={"id": "mem-flat"})
+@pytest.mark.parametrize(
+    "add_response, expected_id",
+    [
+        ({"id": "mem-flat"}, "mem-flat"),
+        ([{"id": "mem-list"}], "mem-list"),
+        ("mem-str", "mem-str"),
+        ({"no": "id"}, None),
+    ],
+    ids=["flat_id", "list_response", "string_response", "unknown_shape"],
+)
+def test_push_correction_handles_response_shapes(
+    add_response: Any, expected_id: str | None
+) -> None:
+    fake = _FakeMem0Client(add_response=add_response)
     adapter = Mem0Adapter(user_id="oliver", client=fake)
-    assert adapter.push_correction(draft="a", final="b") == "mem-flat"
-
-
-def test_push_correction_handles_list_response() -> None:
-    fake = _FakeMem0Client(add_response=[{"id": "mem-list"}])
-    adapter = Mem0Adapter(user_id="oliver", client=fake)
-    assert adapter.push_correction(draft="a", final="b") == "mem-list"
-
-
-def test_push_correction_handles_string_response() -> None:
-    fake = _FakeMem0Client(add_response="mem-str")
-    adapter = Mem0Adapter(user_id="oliver", client=fake)
-    assert adapter.push_correction(draft="a", final="b") == "mem-str"
-
-
-def test_push_correction_returns_none_on_unknown_shape() -> None:
-    fake = _FakeMem0Client(add_response={"no": "id"})
-    adapter = Mem0Adapter(user_id="oliver", client=fake)
-    assert adapter.push_correction(draft="a", final="b") is None
+    assert adapter.push_correction(draft="a", final="b") == expected_id
 
 
 def test_push_correction_returns_none_and_logs_on_exception(
