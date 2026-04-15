@@ -1,6 +1,6 @@
 {
   "name": "gradata-install",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "description": "One-command installer for Gradata. Wraps pip/pipx + IDE hook setup.",
   "bin": {
     "gradata-install": "./bin/gradata-install.js"
@@ -9,6 +9,10 @@
     "type": "git",
     "url": "git+https://github.com/Gradata/gradata.git",
     "directory": "gradata-install"
+  },
+  "homepage": "https://github.com/Gradata/gradata#readme",
+  "bugs": {
+    "url": "https://github.com/Gradata/gradata/issues"
   },
   "license": "AGPL-3.0-or-later",
   "engines": { "node": ">=18" },
