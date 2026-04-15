@@ -1,6 +1,6 @@
 'use client'
 
-import { Area, AreaChart, CartesianGrid, Line, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, CartesianGrid, Line, ComposedChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { GlassCard } from '@/components/layout/GlassCard'
 import { buildDecayCurve } from '@/lib/analytics-client'
 import type { Correction, Lesson } from '@/types/api'
@@ -70,7 +70,13 @@ export function CorrectionDecayCurve({
           <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
             <XAxis
-              dataKey="day"
+              dataKey="ts"
+              type="number"
+              scale="time"
+              domain={[rangeStartMs, now]}
+              tickFormatter={(ts: number) =>
+                new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              }
               tick={{ fill: '#8895A7', fontSize: 10 }}
               tickLine={false}
               axisLine={false}
@@ -91,7 +97,29 @@ export function CorrectionDecayCurve({
                 fontSize: 12,
               }}
               labelStyle={{ color: '#F8FAFC' }}
+              labelFormatter={(label) => {
+                const ts = typeof label === 'number' ? label : Number(label)
+                if (!Number.isFinite(ts)) return String(label ?? '')
+                return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              }}
             />
+            {/* Visual graduation markers: dashed vertical lines mapped to
+                graduation timestamps. Numeric XAxis above is what makes
+                ReferenceLine x={ms} actually align with the curve. */}
+            {visibleMarkers.map((l) => {
+              const gMs = l.graduated_at ? new Date(l.graduated_at).getTime() : null
+              if (gMs === null) return null
+              return (
+                <ReferenceLine
+                  key={`refline-${l.id}`}
+                  x={gMs}
+                  stroke="var(--color-accent-blue, #3A82FF)"
+                  strokeOpacity={0.4}
+                  strokeDasharray="4 4"
+                  ifOverflow="extendDomain"
+                />
+              )
+            })}
             {/* 95% CI band from exponential decay fit */}
             <Area
               type="monotone"
@@ -133,10 +161,11 @@ export function CorrectionDecayCurve({
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-      {/* Hidden marker list — a11y + testable. Visible overlay could be
-          added with Recharts ReferenceLine once the XAxis switches to
-          numeric timestamps; for now the marker count + "+N more" note
-          surfaces graduation density. */}
+      {/* Hidden marker list — a11y fallback + test hook. The visible
+          dashed vertical lines are rendered above via <ReferenceLine>,
+          but Recharts emits SVG that screen readers don't surface well,
+          so we keep this list as the accessible representation. Tests
+          also count [data-graduation-marker] from this list. */}
       <div aria-hidden className="hidden">
         {visibleMarkers.map((l) => (
           <span

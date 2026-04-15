@@ -6,11 +6,11 @@ import { site } from "@/lib/site";
 export const metadata: Metadata = {
   title: "How it works",
   description:
-    "Corrections become instincts. Instincts become patterns. Patterns become rules. Rules become meta-rules. Gradata's graduation pipeline, explained.",
+    "Corrections become instincts, patterns, then rules. Rules with tight scope inject back into matching prompts. Gradata's graduation pipeline, explained.",
   openGraph: {
     title: "How it works — Gradata",
     description:
-      "Corrections become instincts. Instincts become patterns. Patterns become rules. Rules become meta-rules.",
+      "Corrections become instincts, patterns, then rules. Rules with tight scope inject back into matching prompts.",
     url: `${site.url}/how-it-works/`,
     type: "article",
   },
@@ -42,9 +42,9 @@ const STAGES = [
   {
     tag: "04",
     name: "META-RULE",
-    threshold: "3+ graduated rules cluster",
+    threshold: "3+ graduated rules, LLM-synthesized with scoped applies_when",
     description:
-      "Rules that share structure collapse into meta-rules — the compressed principles behind your judgment.",
+      "Clusters of graduated rules are synthesized into meta-rules with tight scope tags. Ablation v3: LLM-synthesized meta-rules add value on smaller models, neutral on larger. Deterministic-template meta-rules regressed across models and are not shipped.",
   },
 ];
 
@@ -103,9 +103,10 @@ next_draft = llm.generate(prompt, context=brain.context_for("reply"))`}
         <GlassCard className="p-6">
           <div className="font-heading text-lg font-semibold">Injection, not retraining</div>
           <p className="mt-2 text-sm text-[color:var(--color-muted-foreground)]">
-            Matching rules are injected as structured context at prompt-time — no fine-tuning, no
-            model upload, works across Claude, GPT, Gemini, or local models. Scope-matched per task.
-            Primacy/recency positioning. Max 10 per session.
+            Matching rules are injected as structured context at prompt-time: no fine-tuning, no
+            model upload, works across Claude, GPT, Gemini, or local models. Scope-matched per task,
+            primacy/recency positioning, max 10 per session. Because base weights are frozen,
+            replay-via-injection sidesteps the catastrophic forgetting that fine-tuning trips on.
           </p>
         </GlassCard>
       </section>
