@@ -48,6 +48,12 @@ def create_app() -> FastAPI:
     from app.routes.health import router as health_router
     app.include_router(health_router)
 
+    # Public, unauthenticated telemetry endpoint. Mounted at the root so the
+    # SDK can POST to https://api.gradata.ai/telemetry/event without needing
+    # an API key.
+    from app.routes.telemetry import router as telemetry_router
+    app.include_router(telemetry_router)
+
     return app
 
 

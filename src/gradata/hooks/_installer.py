@@ -140,6 +140,14 @@ def install(profile: str = "standard") -> None:
     _log.info("Gradata hooks installed (%d hooks, profile=%s)", count, profile)
     _log.info("  Settings: %s", SETTINGS_PATH)
 
+    # Activation telemetry — fires once per machine, only if opted in.
+    try:
+        from gradata import _telemetry
+
+        _telemetry.send_once("first_hook_installed")
+    except Exception:
+        pass
+
 
 def uninstall() -> None:
     """Remove all Gradata hooks from ~/.claude/settings.json."""

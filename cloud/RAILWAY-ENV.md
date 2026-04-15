@@ -98,6 +98,34 @@ INFO:app.sentry_init:Sentry initialized: environment=production release=...
 
 and confirm the app started without missing-env errors.
 
+## SDK telemetry (opt-in activation events)
+
+The SDK posts anonymous activation events (`brain_initialized`,
+`first_correction_captured`, `first_graduation`, `first_hook_installed`)
+to `POST /telemetry/event` when the user has explicitly opted in via
+`gradata init`. Strictly opt-in, off by default.
+
+No Railway env vars required — the endpoint is public, rate-limited
+(100/min/IP), and writes to the `telemetry_events` table.
+Migration: `cloud/migrations/007_telemetry_events.sql`.
+
+Client-side kill switch: `GRADATA_TELEMETRY=0` (always wins, even if
+the user opted in). See `src/gradata/_telemetry.py`.
+
+## Marketing site (Cloudflare Pages, not Railway)
+
+The marketing site at `gradata.ai` runs on Cloudflare Pages, not Railway, but
+its env vars are documented here for single-source-of-truth. See also
+`marketing/.env.example`.
+
+| Var | Default | Purpose |
+|-----|---------|---------|
+| `NEXT_PUBLIC_ENABLE_ANALYTICS` | `false` | Set to `true` for prod only. Gates Plausible event firing so local dev stays clean. |
+| `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | `gradata.ai` | Domain key Plausible groups stats by. |
+
+Events tracked (all client-side, no PII):
+`signup_click`, `signup_complete`, `docs_click`, `install_copy`.
+
 ## Verify locally
 
 ```bash

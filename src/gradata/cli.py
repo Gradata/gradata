@@ -21,8 +21,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 from pathlib import Path
+
+_log = logging.getLogger("gradata.cli")
 
 
 def _get_brain(args):
@@ -33,7 +36,8 @@ def _get_brain(args):
 
 
 def cmd_init(args):
-    from gradata import Brain
+    from gradata import Brain, _telemetry
+
     kwargs = {}
     if args.domain:
         kwargs["domain"] = args.domain
@@ -46,6 +50,29 @@ def cmd_init(args):
     if args.no_interactive:
         kwargs["interactive"] = False
     Brain.init(args.path, **kwargs)
+
+    # Opt-in telemetry prompt — only on first init (when the user has never
+    # been asked). Stays silent in non-interactive mode so CI doesn't hang.
+    if not args.no_interactive and not _telemetry.has_been_asked():
+        try:
+            cfg_path = _telemetry.config_path()
+            enabled = _telemetry.prompt_and_persist()
+            if enabled:
+                _log.info("Telemetry enabled. Thanks for helping us improve Gradata.")
+                _log.info("To disable later: edit %s or set GRADATA_TELEMETRY=0", cfg_path)
+            else:
+                _log.info("Telemetry disabled. You can enable it later in %s", cfg_path)
+        except Exception as exc:
+            # Prompting must never break init.
+            _log.debug("telemetry prompt failed: %s", exc)
+
+    # brain_initialized — once per machine, even across multiple `gradata init`
+    # runs. ``send_once`` already gates on ``is_enabled()`` internally; the
+    # try/except guards against a telemetry bug or DNS hiccup breaking init.
+    try:
+        _telemetry.send_once("brain_initialized")
+    except Exception as exc:
+        _log.debug("telemetry send_once(brain_initialized) failed: %s", exc)
 
 
 def cmd_search(args):
