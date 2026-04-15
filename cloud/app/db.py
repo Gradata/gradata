@@ -90,11 +90,40 @@ class SupabaseClient:
     async def update(
         self, table: str, data: dict[str, Any], filters: dict[str, Any] | None = None,
     ) -> list[dict]:
-        """UPDATE rows matching eq filters."""
+        """UPDATE rows matching filters.
+
+        Filter values may be a scalar (eq match) or a list/tuple (in match).
+        Empty list filter values are treated as a no-op and return ``[]`` —
+        we never issue an unfiltered PATCH which would rewrite every row in
+        the table (GDPR cascade safety).
+
+        Refuses to issue any PATCH without at least one filter constraint.
+        Callers that want a true full-table update must pass filters explicitly.
+        """
+        # Hard guard: never allow unfiltered PATCH. A missing/empty filters dict
+        # would otherwise send PATCH /{table} with no params and rewrite every row.
+        if not filters:
+            _log.error("Refusing unfiltered update on %s", table)
+            raise HTTPException(status_code=500, detail="Database error")
+
         params: dict[str, str] = {}
-        if filters:
-            for key, val in filters.items():
+        for key, val in filters.items():
+            if isinstance(val, (list, tuple, set)):
+                if not val:
+                    # No matches possible; refuse to PATCH without a filter.
+                    return []
+                # PostgREST in.() syntax: column=in.(a,b,c)
+                joined = ",".join(str(v) for v in val)
+                params[key] = f"in.({joined})"
+            else:
                 params[key] = f"eq.{val}"
+
+        # Final safety net: if every filter value was stripped away somehow,
+        # refuse rather than issue a full-table PATCH.
+        if not params:
+            _log.error("Refusing unfiltered update on %s (all filters empty)", table)
+            raise HTTPException(status_code=500, detail="Database error")
+
         resp = await self._http.patch(f"/{table}", params=params, json=data)
         if resp.is_error:
             _raise_db_error("update", table, resp)
@@ -103,11 +132,22 @@ class SupabaseClient:
     async def delete(
         self, table: str, filters: dict[str, Any] | None = None,
     ) -> list[dict]:
-        """DELETE rows matching eq filters. Returns deleted rows when PostgREST sends them back."""
+        """DELETE rows matching eq filters. Returns deleted rows when PostgREST sends them back.
+
+        Refuses to issue any DELETE without at least one filter constraint to
+        prevent accidental full-table deletion.
+        """
+        if not filters:
+            _log.error("Refusing unfiltered delete on %s", table)
+            raise HTTPException(status_code=500, detail="Database error")
         params: dict[str, str] = {}
-        if filters:
-            for key, val in filters.items():
-                params[key] = f"eq.{val}"
+        for key, val in filters.items():
+            params[key] = f"eq.{val}"
+        # Final safety net: if every filter value was stripped away somehow,
+        # refuse rather than issue a full-table DELETE.
+        if not params:
+            _log.error("Refusing unfiltered delete on %s (all filters empty)", table)
+            raise HTTPException(status_code=500, detail="Database error")
         resp = await self._http.delete(f"/{table}", params=params)
         if resp.is_error:
             _raise_db_error("delete", table, resp)

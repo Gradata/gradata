@@ -10,6 +10,7 @@ from app.routes.api_keys import router as api_keys_router
 from app.routes.billing import router as billing_router
 from app.routes.brains import router as brains_router
 from app.routes.corrections import router as corrections_router
+from app.routes.gdpr import router as gdpr_router
 from app.routes.lessons import router as lessons_router
 from app.routes.meta_rules import router as meta_rules_router
 from app.routes.operator import router as operator_router
@@ -34,5 +35,6 @@ router.include_router(rule_patches_router, tags=["rule-patches"])
 router.include_router(billing_router, tags=["billing"])
 router.include_router(team_router, tags=["team"])
 router.include_router(operator_router, tags=["operator"])
+router.include_router(gdpr_router, tags=["gdpr"])
 router.include_router(proof_router, tags=["proof"])
 router.include_router(public_router, tags=["public"])

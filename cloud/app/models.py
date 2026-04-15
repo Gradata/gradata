@@ -324,3 +324,54 @@ class AdminAlert(BaseModel):
     customer: str
     detail: str
     created_at: str  # ISO timestamp
+
+
+# ---------------------------------------------------------------------------
+# GDPR models (Article 15 export + Article 17 deletion)
+# ---------------------------------------------------------------------------
+
+
+class DataSummaryResponse(BaseModel):
+    """Counts + date range of everything we store for a user. Powers the
+    "what data do you have on me" modal in account settings."""
+
+    user_id: str
+    workspaces: int = 0
+    brains: int = 0
+    corrections: int = 0
+    lessons: int = 0
+    meta_rules: int = 0
+    events: int = 0
+    oldest_record: str | None = None
+    newest_record: str | None = None
+
+
+class DataExportResponse(BaseModel):
+    """Response from GET /me/export.
+
+    When the serialized payload is < 10MB we return it inline under
+    ``data``. Otherwise ``download_url`` points at a signed URL (future —
+    see module docstring for details). One of the two is always populated.
+    """
+
+    user_id: str
+    generated_at: str
+    size_bytes: int
+    format: str = "json"
+    data: dict[str, Any] | None = None
+    download_url: str | None = None
+
+
+class DeleteAccountResponse(BaseModel):
+    """Response from POST /me/delete. We soft-delete immediately; actual
+    row purge happens after a 30-day grace period via a nightly cron."""
+
+    status: str = "accepted"
+    user_id: str
+    deleted_at: str
+    purge_after: str
+    message: str = (
+        "Your account has been scheduled for deletion. All data will be "
+        "permanently purged after the 30-day grace period. Contact "
+        "privacy@gradata.ai to cancel before then."
+    )

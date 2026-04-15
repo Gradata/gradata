@@ -46,6 +46,8 @@ async def verify_api_key(key: str) -> dict:
 
     db = get_db()
     rows = await db.select("brains", filters={"api_key": key})
+    # Soft-deleted brains cannot authenticate (GDPR soft-delete, migration 005).
+    rows = [r for r in rows if not r.get("deleted_at")]
     if not rows:
         raise HTTPException(status_code=401, detail="Invalid API key")
     return rows[0]
@@ -133,6 +135,7 @@ async def get_current_brain(
     tag_user(user_id)
     db = get_db()
     rows = await db.select("brains", filters={"user_id": user_id})
+    rows = [r for r in rows if not r.get("deleted_at")]
     if not rows:
         raise HTTPException(status_code=404, detail="No brain found for this user")
     _tag_brain(rows[0], user_id=user_id)
@@ -168,6 +171,7 @@ async def verify_brain_ownership(brain_id: str, user_id: str) -> dict:
     """Verify the authenticated user owns the brain. Returns brain or raises 403."""
     db = get_db()
     rows = await db.select("brains", filters={"id": brain_id})
+    rows = [r for r in rows if not r.get("deleted_at")]
     if not rows:
         raise HTTPException(status_code=404, detail="Brain not found")
     brain = rows[0]
