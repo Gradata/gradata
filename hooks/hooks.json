@@ -1,0 +1,53 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "description": "Gradata: inject graduated rules at session start",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m gradata.hooks.inject_brain_rules",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "description": "Gradata: inject brain context on user message",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m gradata.hooks.context_inject",
+            "timeout": 8000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "description": "Gradata: capture corrections from edits",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m gradata.hooks.auto_correct",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "description": "Gradata: emit SESSION_END + run graduation sweep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m gradata.hooks.session_close",
+            "timeout": 15000
+          }
+        ]
+      }
+    ]
+  }
+}
