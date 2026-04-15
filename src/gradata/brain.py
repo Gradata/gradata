@@ -374,6 +374,7 @@ class Brain(BrainInspectionMixin):
         min_severity: str = "as-is",
         scope: str | None = None,
         applies_to: str | None = None,
+        auto_heal: bool = False,
     ) -> dict:
         """Record a correction: user edited draft into final version.
 
@@ -382,8 +383,15 @@ class Brain(BrainInspectionMixin):
         correction to a specific context. When set, it is persisted on the
         event and propagated to any lesson that graduates from this
         correction's lineage. Injection-time filtering by ``applies_to``
-        is a follow-up — persistence only for now. A ``None`` value preserves
+        is a follow-up, persistence only for now. A ``None`` value preserves
         the existing global behaviour.
+
+        ``auto_heal`` controls whether detected RULE_FAILURE events trigger
+        automatic patching via the self-healing loop. Defaults to ``False``
+        (silent detection only). Set to ``True`` to apply patches inline; each
+        patch returns a ``PatchReceipt`` and emits a stderr line. Auto-heal is
+        also skipped when ``dry_run=True``, ``approval_required=True``, or
+        when the brain is in renter mode.
         """
         self._rule_cache.invalidate()  # Correction invalidates cached rules
         from gradata._core import brain_correct
@@ -401,6 +409,7 @@ class Brain(BrainInspectionMixin):
             min_severity=min_severity,
             scope=scope,
             applies_to=applies_to,
+            auto_heal=auto_heal,
         )
 
         # Activation telemetry — fires once per machine, only if opted in.
@@ -503,6 +512,43 @@ class Brain(BrainInspectionMixin):
             "new_description": new_description,
             "confidence_preserved": patched.confidence,
         }
+
+    def auto_heal(
+        self,
+        failure_events: list[dict] | None = None,
+        *,
+        max_patches: int = 5,
+    ) -> dict:
+        """Close the self-healing loop for recent RULE_FAILURE events.
+
+        Reads recent RULE_FAILURE events, generates deterministic patch
+        candidates, gates them through ``retroactive_test``, and applies
+        the survivors via ``self.patch_rule``. Emits ``RULE_PATCHED``
+        events for each successful patch.
+
+        Args:
+            failure_events: Optional list of RULE_FAILURE events. When
+                omitted, reads the most recent events from the brain's
+                log.
+            max_patches: Hard cap on patches applied per call
+                (default 5).
+
+        Returns:
+            Summary dict with ``examined``, ``patched``, ``skipped``,
+            ``patches`` (applied), and ``skipped_reasons``.
+        """
+        from gradata.enhancements.self_healing import auto_heal_failures
+
+        result = auto_heal_failures(
+            self, failure_events=failure_events, max_patches=max_patches
+        )
+        # Patching rewrites lessons.md; invalidate the in-memory rule cache
+        # so subsequent apply_brain_rules() calls see the patched text
+        # instead of a stale pre-patch prompt.
+        if result.get("patched"):
+            with contextlib.suppress(Exception):  # pragma: no cover -- defensive
+                self._rule_cache.invalidate()
+        return result
 
     def add_rule(
         self,

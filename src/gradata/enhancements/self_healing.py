@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from gradata._scope import RuleScope
     from gradata._types import Lesson
+    from gradata.brain import Brain
 
 # Only RULE state with confidence >= this threshold triggers self-healing.
 # This is intentionally lower than RULE_THRESHOLD (0.90): self-healing must
@@ -483,4 +484,138 @@ def narrow_rule_scope(
         "narrowed": True,
         "new_scope_json": new_scope_json,
         "excluded_domain": domain,
+    }
+
+
+# ── Auto-heal loop ────────────────────────────────────────────────────
+
+
+def auto_heal_failures(
+    brain: Brain,
+    failure_events: list[dict] | None = None,
+    *,
+    max_patches: int = 5,
+) -> dict:
+    """Close the self-healing loop: read RULE_FAILURE events, patch rules.
+
+    For each RULE_FAILURE:
+      1. generate a patch candidate via `_generate_deterministic_patch`
+      2. gate with `retroactive_test`
+      3. on pass, invoke `brain.patch_rule` (preserves metadata + emits
+         RULE_PATCHED)
+
+    This is the orchestration the PR #21 helpers were missing. It takes
+    a Brain, not raw lessons, so the patch is persisted + signed via the
+    existing `brain.patch_rule` code path.
+
+    Args:
+        brain: A Brain instance with ``patch_rule`` and ``query_events``.
+        failure_events: Optional list of RULE_FAILURE event dicts. When
+            omitted, pulls the most recent ``max_patches * 4`` events
+            from the brain's log.
+        max_patches: Hard cap on patches applied per call. Defaults to
+            5. Prevents runaway rewrites when a session has many
+            corrections in a ruled category.
+
+    Returns:
+        ``{"examined": int, "patched": int, "skipped": int, "patches":
+        [...], "skipped_reasons": [...]}``.
+    """
+    if failure_events is None:
+        try:
+            failure_events = brain.query_events(
+                event_type="RULE_FAILURE",
+                limit=max_patches * 4,
+            )
+        except Exception:
+            failure_events = []
+
+    if not failure_events:
+        return {
+            "examined": 0,
+            "patched": 0,
+            "skipped": 0,
+            "patches": [],
+            "skipped_reasons": [],
+        }
+
+    patch_candidates = review_rule_failures(failure_events)
+
+    patched: list[dict] = []
+    skipped: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+
+    for candidate in patch_candidates:
+        if len(patched) >= max_patches:
+            skipped.append({"reason": "max_patches_reached", "candidate": candidate})
+            continue
+
+        test = candidate.get("retroactive_test", {})
+        if not test.get("passes"):
+            skipped.append(
+                {
+                    "reason": f"retroactive_test_failed: {test.get('reason', 'unknown')}",
+                    "candidate": candidate,
+                }
+            )
+            continue
+
+        key = (candidate["category"].upper(), candidate["original_description"].strip())
+        if key in seen:
+            # Same (category, original) already patched this call — skip dupes
+            skipped.append({"reason": "duplicate_in_batch", "candidate": candidate})
+            continue
+        seen.add(key)
+
+        try:
+            result = brain.patch_rule(
+                category=candidate["category"],
+                old_description=candidate["original_description"],
+                new_description=candidate["proposed_description"],
+                reason=f"auto_heal: {test.get('reason', '')[:100]}",
+            )
+        except Exception as exc:  # pragma: no cover — defensive
+            skipped.append({"reason": f"patch_exception: {exc}", "candidate": candidate})
+            continue
+
+        if result.get("patched"):
+            # Stable, deterministic rule id derived from category + original
+            # description. Mirrors the convention used elsewhere in the
+            # graph layer so `gradata rule revert {id}` can round-trip.
+            rule_id = (
+                f"{candidate['category'].upper()}:"
+                f"{hash(candidate['original_description']) % 10000:04d}"
+            )
+            preserved = result.get("confidence_preserved")
+            old_desc = candidate["original_description"]
+            new_desc = candidate["proposed_description"]
+            patch_diff = f"- {old_desc}\n+ {new_desc}"
+            receipt = {
+                "rule_id": rule_id,
+                "old_confidence": preserved,
+                "new_confidence": preserved,
+                "patch_diff": patch_diff,
+                "revert_command": f"gradata rule revert {rule_id}",
+                # Legacy fields retained for backwards compatibility with
+                # existing tests / tooling that read these keys.
+                "category": candidate["category"],
+                "old_description": old_desc,
+                "new_description": new_desc,
+                "delta_score": test.get("delta_score"),
+            }
+            patched.append(receipt)
+        else:
+            skipped.append(
+                {
+                    "reason": f"patch_rule_returned: {result.get('error', 'no_change')}",
+                    "candidate": candidate,
+                }
+            )
+
+    return {
+        "examined": len(patch_candidates),
+        "patched": len(patched),
+        "skipped": len(skipped),
+        "patches": patched,
+        "skipped_reasons": skipped,
     }

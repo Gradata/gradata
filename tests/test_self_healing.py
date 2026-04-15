@@ -2,7 +2,30 @@
 from __future__ import annotations
 
 import pytest
+
 from gradata._types import Lesson, LessonState
+
+
+@pytest.fixture(scope="function")
+def brain_with_rule(tmp_path):
+    """Shared fixture: brain seeded with a graduated TONE rule at 0.92 conf.
+
+    Used across self-healing test classes. Module-scope deduplication per
+    CodeRabbit review on PR #77.
+    """
+    from gradata._db import write_lessons_safe
+    from gradata.brain import Brain
+    from gradata.enhancements.self_improvement import format_lessons
+
+    brain = Brain.init(str(tmp_path / "test-brain"))
+    rule = Lesson(
+        date="2026-04-01", state=LessonState.RULE, confidence=0.92,
+        category="TONE", description="Never use exclamation marks",
+        fire_count=8,
+    )
+    lessons_path = brain._find_lessons_path(create=True)
+    write_lessons_safe(lessons_path, format_lessons([rule]))
+    return brain
 
 
 class TestDetectRuleFailure:
@@ -116,24 +139,6 @@ class TestDetectRuleFailure:
 class TestBrainCorrectRuleFailure:
     """brain.correct() emits RULE_FAILURE when a RULE should have caught the correction."""
 
-    @pytest.fixture
-    def brain_with_rule(self, tmp_path):
-        """Create a brain with a graduated RULE in TONE category."""
-        from gradata.brain import Brain
-        from gradata._types import Lesson, LessonState
-        from gradata.enhancements.self_improvement import format_lessons
-        from gradata._db import write_lessons_safe
-
-        brain = Brain.init(str(tmp_path / "test-brain"))
-        rule = Lesson(
-            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
-            category="TONE", description="Never use exclamation marks in professional emails",
-            fire_count=8,
-        )
-        lessons_path = brain._find_lessons_path(create=True)
-        write_lessons_safe(lessons_path, format_lessons([rule]))
-        return brain
-
     def test_correction_in_ruled_category_emits_rule_failure(self, brain_with_rule):
         result = brain_with_rule.correct(
             draft="Great to hear from you! Let's connect!",
@@ -158,23 +163,6 @@ class TestBrainCorrectRuleFailure:
 
 class TestPatchRule:
     """brain.patch_rule() rewrites a rule's description while preserving metadata."""
-
-    @pytest.fixture
-    def brain_with_rule(self, tmp_path):
-        from gradata.brain import Brain
-        from gradata._types import Lesson, LessonState
-        from gradata.enhancements.self_improvement import format_lessons
-        from gradata._db import write_lessons_safe
-
-        brain = Brain.init(str(tmp_path / "test-brain"))
-        rule = Lesson(
-            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
-            category="TONE", description="Never use exclamation marks",
-            fire_count=8,
-        )
-        lessons_path = brain._find_lessons_path(create=True)
-        write_lessons_safe(lessons_path, format_lessons([rule]))
-        return brain
 
     def test_patch_rewrites_description(self, brain_with_rule):
         result = brain_with_rule.patch_rule(
@@ -384,6 +372,7 @@ class TestNarrowRuleScope:
 
     def test_adds_domain_exclusion(self):
         import json
+
         from gradata.enhancements.self_healing import narrow_rule_scope
 
         rule = Lesson(
@@ -412,6 +401,7 @@ class TestNarrowRuleScope:
 
     def test_accumulates_exclusions(self):
         import json
+
         from gradata.enhancements.self_healing import narrow_rule_scope
 
         rule = Lesson(
@@ -429,65 +419,292 @@ class TestNarrowRuleScope:
         assert "internal_notes" in scope["excluded_domains"]
 
 
-class TestSelfHealingE2E:
-    """Full flow: correct -> RULE_FAILURE detected -> patch generated -> rule updated."""
+class TestAutoHeal:
+    """brain.auto_heal + auto_heal_failures: the closed-loop orchestrator."""
 
-    @pytest.fixture
-    def brain_with_rule(self, tmp_path):
-        from gradata.brain import Brain
+    def test_empty_failures_returns_zero_summary(self, brain_with_rule):
+        result = brain_with_rule.auto_heal(failure_events=[])
+        assert result == {
+            "examined": 0,
+            "patched": 0,
+            "skipped": 0,
+            "patches": [],
+            "skipped_reasons": [],
+        }
+
+    def test_passing_candidate_auto_patches_and_emits_event(self, brain_with_rule):
+        failures = [{
+            "data": {
+                "failed_rule_category": "TONE",
+                "failed_rule_description": "Never use exclamation marks",
+                "failed_rule_confidence": 0.92,
+                "correction_description": "Removed exclamation marks from casual Slack message",
+            }
+        }]
+        result = brain_with_rule.auto_heal(failure_events=failures)
+        assert result["examined"] == 1
+        assert result["patched"] == 1
+        assert result["patches"][0]["category"] == "TONE"
+
+        # RULE_PATCHED event emitted by brain.patch_rule
+        events = brain_with_rule.query_events(event_type="RULE_PATCHED", limit=10)
+        assert len(events) >= 1
+        assert events[0]["data"]["reason"].startswith("auto_heal:")
+
+    def test_failing_retroactive_test_is_skipped(self, brain_with_rule):
+        # Correction word-identical to rule -> no delta -> retroactive_test rejects
+        failures = [{
+            "data": {
+                "failed_rule_category": "TONE",
+                "failed_rule_description": "Never use exclamation marks",
+                "failed_rule_confidence": 0.92,
+                "correction_description": "Never use exclamation marks",
+            }
+        }]
+        result = brain_with_rule.auto_heal(failure_events=failures)
+        assert result["patched"] == 0
+        assert result["skipped"] == 1
+        assert "retroactive_test_failed" in result["skipped_reasons"][0]["reason"]
+
+    def test_deduplicates_same_category_in_batch(self, brain_with_rule):
+        # Two failures for the same rule in one call -> only one patch
+        failures = [
+            {
+                "data": {
+                    "failed_rule_category": "TONE",
+                    "failed_rule_description": "Never use exclamation marks",
+                    "failed_rule_confidence": 0.92,
+                    "correction_description": "Removed exclamation marks from sales email",
+                }
+            },
+            {
+                "data": {
+                    "failed_rule_category": "TONE",
+                    "failed_rule_description": "Never use exclamation marks",
+                    "failed_rule_confidence": 0.92,
+                    "correction_description": "Removed exclamation marks from sales email",
+                }
+            },
+        ]
+        result = brain_with_rule.auto_heal(failure_events=failures)
+        assert result["patched"] == 1
+        assert any(s["reason"] == "duplicate_in_batch" for s in result["skipped_reasons"])
+
+    def test_respects_max_patches_cap(self, brain_with_rule):
+        from gradata._db import write_lessons_safe
         from gradata._types import Lesson, LessonState
         from gradata.enhancements.self_improvement import format_lessons
-        from gradata._db import write_lessons_safe
 
-        brain = Brain.init(str(tmp_path / "test-brain"))
-        rule = Lesson(
-            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
-            category="TONE", description="Never use exclamation marks",
-            fire_count=8,
+        # Seed 3 rules in distinct categories
+        lessons = [
+            Lesson(date="2026-04-01", state=LessonState.RULE, confidence=0.92,
+                   category=f"CAT_{i}", description=f"Rule number {i}",
+                   fire_count=5)
+            for i in range(3)
+        ]
+        lessons_path = brain_with_rule._find_lessons_path(create=True)
+        write_lessons_safe(lessons_path, format_lessons(lessons))
+
+        failures = [
+            {
+                "data": {
+                    "failed_rule_category": f"CAT_{i}",
+                    "failed_rule_description": f"Rule number {i}",
+                    "failed_rule_confidence": 0.92,
+                    "correction_description": f"Rule number {i} failed in sales context",
+                }
+            }
+            for i in range(3)
+        ]
+        result = brain_with_rule.auto_heal(failure_events=failures, max_patches=1)
+        assert result["patched"] == 1
+        assert any(s["reason"] == "max_patches_reached" for s in result["skipped_reasons"])
+
+    def test_reads_events_from_brain_when_none_passed(self, brain_with_rule):
+        # Trigger a RULE_FAILURE via brain.correct, then auto_heal without args
+        brain_with_rule.correct(
+            draft="Thanks for joining! Excited!",
+            final="Thanks for joining. Excited.",
+            category="TONE",
         )
-        lessons_path = brain._find_lessons_path(create=True)
-        write_lessons_safe(lessons_path, format_lessons([rule]))
-        return brain
+        result = brain_with_rule.auto_heal()
+        # Should have read the RULE_FAILURE from the event log
+        assert result["examined"] >= 1
 
-    def test_full_self_healing_flow(self, brain_with_rule):
+
+class TestCorrectAutoHealIntegration:
+    """brain.correct() closes the heal loop only when auto_heal=True is opted in."""
+
+    def test_auto_heal_detects_rule_failure(self, brain_with_rule):
+        """A correction in a ruled category flags RULE_FAILURE detection.
+
+        Split from the original combined test per CodeRabbit review: this
+        half asserts only the detection signal, which is deterministic.
+        """
+        result = brain_with_rule.correct(
+            draft="Thanks for joining! Excited!",
+            final="Thanks for joining. Excited.",
+            category="TONE",
+            auto_heal=True,
+        )
+        assert result.get("rule_failure_detected") is True
+
+    def test_auto_heal_emits_patch_when_retroactive_test_passes(self, brain_with_rule):
+        """INLINE path: brain.correct(auto_heal=True) must itself emit
+        RULE_PATCHED with the auto_heal: reason prefix. No standalone
+        auto_heal() call and no manual patch_rule() fallback -- if the
+        inline orchestration regresses, this test fails.
+        """
+        # Pre-condition: no prior RULE_PATCHED events, so any assertion
+        # below is attributable to the inline call.
+        pre = brain_with_rule.query_events(event_type="RULE_PATCHED", limit=10)
+        assert len(pre) == 0
+
+        # The draft/final classifies as STYLE: "Punctuation or formatting
+        # change" which carries enough delta words to pass
+        # retroactive_test against the seeded rule "Never use exclamation
+        # marks", so the inline path reliably emits RULE_PATCHED.
+        result = brain_with_rule.correct(
+            draft="Thanks for joining! Excited!",
+            final="Thanks for joining. Excited.",
+            category="TONE",
+            auto_heal=True,
+        )
+
+        # The inline correction detected the failure AND closed the loop
+        assert result.get("rule_failure_detected") is True
+        assert "auto_healed" in result
+        assert result["auto_healed"]["patched"] == 1
+        receipt = result["auto_healed"]["patches"][0]
+        assert receipt["rule_id"].startswith("TONE:")
+        assert receipt["revert_command"] == f"gradata rule revert {receipt['rule_id']}"
+
+        # RULE_PATCHED event came from the inline orchestration, not from
+        # a manual patch_rule() call, and carries the auto_heal: prefix.
+        patched = brain_with_rule.query_events(event_type="RULE_PATCHED", limit=10)
+        assert len(patched) == 1
+        assert patched[0]["data"]["reason"].startswith("auto_heal:")
+
+    def test_auto_heal_opt_out(self, brain_with_rule):
+        """auto_heal=False keeps the old behavior: emit RULE_FAILURE but no patch."""
+        brain_with_rule.correct(
+            draft="Thanks for joining! Excited!",
+            final="Thanks for joining. Excited.",
+            category="TONE",
+            auto_heal=False,
+        )
+        failures = brain_with_rule.query_events(event_type="RULE_FAILURE", limit=10)
+        patches = brain_with_rule.query_events(event_type="RULE_PATCHED", limit=10)
+        assert len(failures) >= 1
+        assert len(patches) == 0
+
+    def test_default_off_no_patch(self, brain_with_rule):
+        """Council verdict: auto_heal defaults to False. correct() with no
+        ``auto_heal=`` kwarg must detect RULE_FAILURE but never call the
+        orchestrator and never emit RULE_PATCHED.
+        """
+        result = brain_with_rule.correct(
+            draft="Thanks for joining! Excited!",
+            final="Thanks for joining. Excited.",
+            category="TONE",
+        )
+        # Failure still detected (that path is independent of auto_heal)
+        assert result.get("rule_failure_detected") is True
+        # But no patch event, and no auto_healed key on the correction event
+        patches = brain_with_rule.query_events(event_type="RULE_PATCHED", limit=10)
+        assert len(patches) == 0
+        assert "auto_healed" not in result
+
+    def test_patch_receipt_shape(self, brain_with_rule):
+        """When auto_heal=True successfully patches, the returned summary
+        exposes PatchReceipt fields (rule_id, old/new_confidence, patch_diff,
+        revert_command) so downstream tooling can show the edit.
+        """
+        failures = [{
+            "data": {
+                "failed_rule_category": "TONE",
+                "failed_rule_description": "Never use exclamation marks",
+                "failed_rule_confidence": 0.92,
+                "correction_description": "Removed exclamation marks from casual Slack message",
+            }
+        }]
+        summary = brain_with_rule.auto_heal(failure_events=failures)
+        assert summary["patched"] == 1
+        receipt = summary["patches"][0]
+        for key in ("rule_id", "old_confidence", "new_confidence", "patch_diff", "revert_command"):
+            assert key in receipt, f"PatchReceipt missing {key!r}"
+        assert receipt["rule_id"].startswith("TONE:")
+        assert receipt["revert_command"] == f"gradata rule revert {receipt['rule_id']}"
+        assert receipt["patch_diff"].startswith("- ")
+        assert "\n+ " in receipt["patch_diff"]
+
+    def test_auto_heal_skipped_in_dry_run(self, brain_with_rule):
+        """dry_run=True should not trigger auto-heal even if a failure is detected."""
+        brain_with_rule.correct(
+            draft="Thanks for joining! Excited!",
+            final="Thanks for joining. Excited.",
+            category="TONE",
+            dry_run=True,
+            auto_heal=True,
+        )
+        patches = brain_with_rule.query_events(event_type="RULE_PATCHED", limit=10)
+        assert len(patches) == 0
+
+
+class TestSelfHealingE2E:
+    """Full flow through the INLINE path only:
+    correct(auto_heal=True) -> RULE_FAILURE detected -> patch generated ->
+    rule updated -> RULE_PATCHED emitted. No manual review_rule_failures()
+    or brain.patch_rule() fallback, so a regression in the inline
+    orchestration fails this test instead of being masked by the manual
+    code path.
+    """
+
+    def test_inline_auto_heal_emits_rule_patched(self, brain_with_rule):
         brain = brain_with_rule
 
-        # 1. Correction triggers RULE_FAILURE
+        # Sanity: no RULE_PATCHED exists yet, so any assertion below is
+        # attributable to the inline call -- the manual fallback cannot
+        # mask a broken inline path.
+        pre_patches = brain.query_events(event_type="RULE_PATCHED", limit=10)
+        assert len(pre_patches) == 0
+
+        # 1. Single inline correct() call with auto_heal=True. The draft /
+        # final pair produces a STYLE/"Punctuation or formatting change"
+        # classification whose delta words ("formatting", "punctuation",
+        # "change") reliably pass retroactive_test against the rule
+        # "Never use exclamation marks".
         result = brain.correct(
             draft="Thanks for joining! Excited to work together!",
             final="Thanks for joining. Excited to work together.",
             category="TONE",
+            auto_heal=True,
         )
+
+        # 2. Inline path flagged the rule failure
         assert result.get("rule_failure_detected") is True
 
-        # 2. Verify RULE_FAILURE event was emitted
+        # 3. Inline path emitted the RULE_FAILURE event
         failures = brain.query_events(event_type="RULE_FAILURE", limit=10)
         assert len(failures) >= 1
 
-        # 3. Review generates a patch
-        from gradata.enhancements.self_healing import review_rule_failures
-        patches = review_rule_failures(failures)
-        assert len(patches) >= 1
-
-        # 4. Apply passing patches via brain.patch_rule()
-        for patch in patches:
-            if patch.get("retroactive_test", {}).get("passes"):
-                brain.patch_rule(
-                    category=patch["category"],
-                    old_description=patch["original_description"],
-                    new_description=patch["proposed_description"],
-                    reason="E2E self-healing test",
-                )
-
-        # 5. Verify RULE_PATCHED event
+        # 4. Inline path closed the loop: RULE_PATCHED event exists with
+        # the auto_heal: reason prefix, and the correction event carries
+        # the auto_healed summary.
         patched_events = brain.query_events(event_type="RULE_PATCHED", limit=10)
-        # May or may not have patches depending on deterministic heuristic
-        # But the flow should complete without errors
+        assert len(patched_events) >= 1, (
+            "Inline brain.correct(auto_heal=True) did not emit RULE_PATCHED"
+        )
+        assert patched_events[0]["data"]["reason"].startswith("auto_heal:")
+        assert "auto_healed" in result
+        assert result["auto_healed"]["patched"] >= 1
 
-        # 6. Verify the lesson was updated (if patched)
-        if patched_events:
-            lessons = brain._load_lessons()
-            tone_rules = [l for l in lessons if l.category == "TONE"]
-            assert len(tone_rules) >= 1
-            # Confidence may drop due to correction penalty, but should still be high
-            assert tone_rules[0].confidence >= 0.70
+        # 5. Lesson text was rewritten on disk and confidence preserved
+        # within the expected correction-penalty band.
+        lessons = brain._load_lessons()
+        tone_rules = [l for l in lessons if l.category == "TONE"]
+        assert len(tone_rules) >= 1
+        assert tone_rules[0].confidence >= 0.70
+        assert tone_rules[0].description != "Never use exclamation marks", (
+            "Rule description should have been narrowed by auto-heal"
+        )
