@@ -236,27 +236,125 @@ def test_sync_rule_patched_malformed_payload_is_warned_and_skipped(
                         "tags": [],
                         "session": None,
                     },
+                    # Missing reason entirely — must be gated, NOT silently
+                    # coerced to "self_healing".
+                    {
+                        "type": "RULE_PATCHED",
+                        "source": "brain.patch_rule",
+                        "data": {
+                            "category": "TONE",
+                            "old_description": "old",
+                            "new_description": "new",
+                        },
+                        "tags": [],
+                        "session": None,
+                    },
+                    # Non-string reason (e.g. int) — must be treated as missing.
+                    {
+                        "type": "RULE_PATCHED",
+                        "source": "brain.patch_rule",
+                        "data": {
+                            "category": "TONE",
+                            "old_description": "old",
+                            "new_description": "new",
+                            "reason": 123,
+                        },
+                        "tags": [],
+                        "session": None,
+                    },
                 ],
             },
             headers=auth_headers,
         )
 
     assert resp.status_code == 200, resp.text
-    # All three events still land in the events table — only the rule_patches side is skipped
-    assert resp.json()["events_synced"] == 3
+    # All five events still land in the events table — only the rule_patches side is skipped
+    assert resp.json()["events_synced"] == 5
 
     # A warning must have been emitted for each malformed event
     warning_msgs = [
         r.getMessage() for r in caplog.records
         if r.levelno >= logging.WARNING and "rule-patches" in r.getMessage()
     ]
-    assert len(warning_msgs) >= 3, f"expected >=3 warnings, got {warning_msgs}"
+    assert len(warning_msgs) >= 5, f"expected >=5 warnings, got {warning_msgs}"
     assert any("missing category" in m for m in warning_msgs)
     assert any(
         "old_description" in m and "new_description" in m for m in warning_msgs
     )
+    # Reason validation is now part of the malformed-event gate — regressing
+    # it must fail this test.
+    assert any("reason" in m for m in warning_msgs), (
+        f"expected a warning mentioning 'reason', got {warning_msgs}"
+    )
 
     # No rule_patches insert should have been attempted
+    rule_patch_inserts = [
+        row for row in mock_supabase._inserts
+        if "old_description" in row and "new_description" in row
+    ]
+    assert rule_patch_inserts == []
+
+
+def test_sync_rule_patches_write_failure_does_not_fail_sync(
+    client, mock_supabase, auth_headers, caplog, monkeypatch
+):
+    """If the rule_patches write path raises, /sync still returns 200.
+
+    Events have already been persisted by that point; failing the handler
+    would cause the SDK to retry and duplicate the event stream. The
+    self-healing dashboard is best-effort telemetry — dropping a patch row
+    is survivable.
+    """
+    mock_supabase.add_response(
+        "brains", "select",
+        [{"id": "brain-1", "workspace_id": "ws-1", "user_id": "user-1", "api_key": "gd_TVAL"}],
+    )
+
+    # Force the lessons lookup to explode mid-flight by swapping the mock's
+    # `select` for one that raises when the route reaches the lessons query.
+    original_select = mock_supabase.select
+
+    async def boom(table, *args, **kwargs):
+        if table == "lessons":
+            raise RuntimeError("simulated PostgREST outage")
+        return await original_select(table, *args, **kwargs)
+
+    monkeypatch.setattr(mock_supabase, "select", boom)
+
+    with caplog.at_level(logging.ERROR, logger="app.routes.sync"):
+        resp = client.post(
+            "/api/v1/sync",
+            json={
+                "brain_name": "default",
+                "corrections": [],
+                "lessons": [],
+                "events": [
+                    {
+                        "type": "RULE_PATCHED",
+                        "source": "brain.patch_rule",
+                        "data": {
+                            "category": "TONE",
+                            "old_description": "old",
+                            "new_description": "new",
+                            "reason": "self_healing",
+                        },
+                        "tags": [],
+                        "session": None,
+                    }
+                ],
+            },
+            headers=auth_headers,
+        )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["events_synced"] == 1
+    # Error was logged but not raised
+    error_msgs = [
+        r.getMessage() for r in caplog.records
+        if r.levelno >= logging.ERROR and "rule-patches" in r.getMessage()
+    ]
+    assert error_msgs, "expected an error log from the rule_patches write path"
+    # No rule_patches row made it through
     rule_patch_inserts = [
         row for row in mock_supabase._inserts
         if "old_description" in row and "new_description" in row

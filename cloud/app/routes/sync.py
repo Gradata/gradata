@@ -96,7 +96,7 @@ async def sync_brain(
             # First pass: validate every RULE_PATCHED event so missing-field
             # warnings are always emitted, even if *all* events are malformed
             # (i.e. `categories` below would be empty).
-            valid_events: list[tuple] = []  # (ev, cat, old_desc, new_desc)
+            valid_events: list[tuple] = []  # (ev, cat, old_desc, new_desc, reason)
             for ev in patched:
                 data = ev.data if isinstance(ev.data, dict) else {}
                 # Defensive: SDK clients are untrusted, so type-check before
@@ -105,15 +105,18 @@ async def sync_brain(
                 raw_cat = data.get("category")
                 raw_old = data.get("old_description")
                 raw_new = data.get("new_description")
+                raw_reason = data.get("reason")
                 cat = raw_cat.strip().upper() if isinstance(raw_cat, str) else ""
                 old_desc = raw_old.strip() if isinstance(raw_old, str) else ""
                 new_desc = raw_new.strip() if isinstance(raw_new, str) else ""
-                if not cat or not old_desc or not new_desc:
+                reason = raw_reason.strip() if isinstance(raw_reason, str) else ""
+                if not cat or not old_desc or not new_desc or not reason:
                     missing = [
                         name for name, val in (
                             ("category", cat),
                             ("old_description", old_desc),
                             ("new_description", new_desc),
+                            ("reason", reason),
                         ) if not val
                     ]
                     _log.warning(
@@ -122,60 +125,68 @@ async def sync_brain(
                         brain_id, ",".join(missing), ev.created_at or "?",
                     )
                     continue
-                valid_events.append((ev, cat, old_desc, new_desc))
+                valid_events.append((ev, cat, old_desc, new_desc, reason))
 
             if valid_events:
-                categories = sorted({cat for _, cat, _, _ in valid_events})
-                # One query per category (our thin PostgREST wrapper only
-                # supports eq filters). Small N — one per patched category.
-                by_cat: dict[str, list[dict]] = {}
-                for cat in categories:
-                    rows = await db.select(
-                        "lessons",
-                        columns="id,category,description",
-                        filters={"brain_id": brain_id, "category": cat},
-                    )
-                    if rows:
-                        by_cat[cat] = rows
-
-                def _resolve_lesson_id(cat: str, old_desc: str, new_desc: str) -> str | None:
-                    candidates = by_cat.get(cat, [])
-                    if not candidates:
-                        return None
-                    # Prefer a lesson whose current description matches either
-                    # side of the patch (ordering-agnostic). Fall back to first.
-                    for lesson in candidates:
-                        if lesson.get("description") in (new_desc, old_desc):
-                            return lesson["id"]
-                    return candidates[0]["id"]
-
-                patch_rows: list[dict] = []
-                for ev, cat, old_desc, new_desc in valid_events:
-                    data = ev.data if isinstance(ev.data, dict) else {}
-                    lesson_id = _resolve_lesson_id(cat, old_desc, new_desc)
-                    if lesson_id is None:
-                        _log.warning(
-                            "rule-patches: no lesson for brain=%s category=%s — skipping",
-                            brain_id, cat,
+                # Isolate the rule_patches write path: failures here must NOT
+                # fail /sync after events were already persisted. The
+                # self-healing dashboard is best-effort telemetry; dropping a
+                # patch row is survivable, but losing the event stream is not.
+                try:
+                    categories = sorted({cat for _, cat, _, _, _ in valid_events})
+                    # One query per category (our thin PostgREST wrapper only
+                    # supports eq filters). Small N — one per patched category.
+                    by_cat: dict[str, list[dict]] = {}
+                    for cat in categories:
+                        rows = await db.select(
+                            "lessons",
+                            columns="id,category,description",
+                            filters={"brain_id": brain_id, "category": cat},
                         )
-                        continue
-                    raw_reason = data.get("reason")
-                    reason = (
-                        raw_reason.strip()
-                        if isinstance(raw_reason, str) and raw_reason.strip()
-                        else "self_healing"
+                        if rows:
+                            by_cat[cat] = rows
+
+                    def _resolve_lesson_id(cat: str, old_desc: str, new_desc: str) -> str | None:
+                        candidates = by_cat.get(cat, [])
+                        if not candidates:
+                            return None
+                        # Prefer a lesson whose current description matches either
+                        # side of the patch (ordering-agnostic). Fall back to first.
+                        for lesson in candidates:
+                            if lesson.get("description") in (new_desc, old_desc):
+                                return lesson["id"]
+                        return candidates[0]["id"]
+
+                    patch_rows: list[dict] = []
+                    for ev, cat, old_desc, new_desc, reason in valid_events:
+                        lesson_id = _resolve_lesson_id(cat, old_desc, new_desc)
+                        if lesson_id is None:
+                            _log.warning(
+                                "rule-patches: no lesson for brain=%s category=%s — skipping",
+                                brain_id, cat,
+                            )
+                            continue
+                        row = {
+                            "lesson_id": lesson_id,
+                            "old_description": old_desc,
+                            "new_description": new_desc,
+                            "reason": reason,
+                        }
+                        if ev.created_at:
+                            row["created_at"] = ev.created_at
+                        patch_rows.append(row)
+                    if patch_rows:
+                        await db.insert("rule_patches", patch_rows)
+                except Exception:
+                    # Swallow + log: /sync must still succeed so the SDK
+                    # client doesn't retry and duplicate the event stream.
+                    _log.error(
+                        "rule-patches: write path failed for brain=%s "
+                        "(categories=%s); events persisted, patches dropped",
+                        brain_id,
+                        sorted({cat for _, cat, _, _, _ in valid_events}),
+                        exc_info=True,
                     )
-                    row = {
-                        "lesson_id": lesson_id,
-                        "old_description": old_desc,
-                        "new_description": new_desc,
-                        "reason": reason,
-                    }
-                    if ev.created_at:
-                        row["created_at"] = ev.created_at
-                    patch_rows.append(row)
-                if patch_rows:
-                    await db.insert("rule_patches", patch_rows)
 
     # Insert meta-rules
     if body.meta_rules:
