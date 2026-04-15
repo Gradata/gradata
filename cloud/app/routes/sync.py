@@ -99,9 +99,15 @@ async def sync_brain(
             valid_events: list[tuple] = []  # (ev, cat, old_desc, new_desc)
             for ev in patched:
                 data = ev.data if isinstance(ev.data, dict) else {}
-                cat = (data.get("category") or "").upper()
-                old_desc = data.get("old_description") or ""
-                new_desc = data.get("new_description") or ""
+                # Defensive: SDK clients are untrusted, so type-check before
+                # any string ops. A non-string truthy value (e.g. category=123)
+                # would otherwise raise AttributeError mid-handler.
+                raw_cat = data.get("category")
+                raw_old = data.get("old_description")
+                raw_new = data.get("new_description")
+                cat = raw_cat.strip().upper() if isinstance(raw_cat, str) else ""
+                old_desc = raw_old.strip() if isinstance(raw_old, str) else ""
+                new_desc = raw_new.strip() if isinstance(raw_new, str) else ""
                 if not cat or not old_desc or not new_desc:
                     missing = [
                         name for name, val in (
@@ -153,11 +159,17 @@ async def sync_brain(
                             brain_id, cat,
                         )
                         continue
+                    raw_reason = data.get("reason")
+                    reason = (
+                        raw_reason.strip()
+                        if isinstance(raw_reason, str) and raw_reason.strip()
+                        else "self_healing"
+                    )
                     row = {
                         "lesson_id": lesson_id,
                         "old_description": old_desc,
                         "new_description": new_desc,
-                        "reason": data.get("reason") or "self_healing",
+                        "reason": reason,
                     }
                     if ev.created_at:
                         row["created_at"] = ev.created_at

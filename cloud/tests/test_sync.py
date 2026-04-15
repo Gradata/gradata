@@ -223,21 +223,34 @@ def test_sync_rule_patched_malformed_payload_is_warned_and_skipped(
                         "tags": [],
                         "session": None,
                     },
+                    # Malformed type: category is an int (not a string).
+                    # Must be treated as missing — no AttributeError, no insert.
+                    {
+                        "type": "RULE_PATCHED",
+                        "source": "brain.patch_rule",
+                        "data": {
+                            "category": 123,
+                            "old_description": "x",
+                            "new_description": "y",
+                        },
+                        "tags": [],
+                        "session": None,
+                    },
                 ],
             },
             headers=auth_headers,
         )
 
     assert resp.status_code == 200, resp.text
-    # Both events still land in the events table — only the rule_patches side is skipped
-    assert resp.json()["events_synced"] == 2
+    # All three events still land in the events table — only the rule_patches side is skipped
+    assert resp.json()["events_synced"] == 3
 
     # A warning must have been emitted for each malformed event
     warning_msgs = [
         r.getMessage() for r in caplog.records
         if r.levelno >= logging.WARNING and "rule-patches" in r.getMessage()
     ]
-    assert len(warning_msgs) >= 2, f"expected >=2 warnings, got {warning_msgs}"
+    assert len(warning_msgs) >= 3, f"expected >=3 warnings, got {warning_msgs}"
     assert any("missing category" in m for m in warning_msgs)
     assert any(
         "old_description" in m and "new_description" in m for m in warning_msgs
