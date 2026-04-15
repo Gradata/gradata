@@ -52,7 +52,7 @@ export default function SettingsPage() {
         <h3 className="mb-5 text-[15px] font-semibold">Profile</h3>
         <div className="space-y-3">
           <Row label="Display name" value={profile.display_name || 'Not set'} />
-          <Row label="Email" value={profile.email ?? '—'} />
+          <Row label="Email" value={profile.email || 'Not set'} />
           <Row label="Member since" value={memberSince} />
         </div>
       </GlassCard>

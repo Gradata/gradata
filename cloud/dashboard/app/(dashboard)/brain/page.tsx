@@ -12,6 +12,7 @@ import { KpiStrip } from '@/components/brain/KpiStrip'
 import { GraduationProgressBar } from '@/components/brain/GraduationProgressBar'
 import { ActiveRulesPanel } from '@/components/brain/ActiveRulesPanel'
 import { CategoriesChart } from '@/components/brain/CategoriesChart'
+import { ClearDemoButton } from '@/components/brain/ClearDemoButton'
 import { computeKpis, computeGraduationCounts } from '@/lib/analytics-client'
 
 export default function BrainDetailPage() {
@@ -88,6 +89,15 @@ function BrainDetail() {
           <Row label="User ID" value={brain.user_id} mono />
           <Row label="Domain" value={brain.domain} />
         </dl>
+      </GlassCard>
+
+      <GlassCard gradTop className="mt-4">
+        <h3 className="mb-2 text-[15px] font-semibold">Demo data</h3>
+        <p className="mb-4 text-[12px] text-[var(--color-body)]">
+          New accounts get a seeded demo brain so the dashboard has something to show on day one.
+          Remove it once you&apos;ve connected your own brain.
+        </p>
+        <ClearDemoButton brainId={brain.id} onCleared={refetch} />
       </GlassCard>
     </>
   )

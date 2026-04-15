@@ -7,6 +7,8 @@ import { isOperatorEmail } from '@/lib/operator'
 import { useApi } from '@/hooks/useApi'
 import type { UserProfile } from '@/types/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
+import { ErrorState } from '@/components/shared/ErrorState'
+import { pickWorkspaceId } from '@/lib/team'
 
 interface TeamMemberStat {
   user_id: string
@@ -30,15 +32,30 @@ interface TeamStats {
 }
 
 export default function TeamOverviewPage() {
-  const { data: profile, loading: loadingProfile } = useApi<UserProfile>('/users/me')
-  const workspaceId = profile?.workspaces?.[0]?.id ?? null
-  const { data: stats, loading: loadingStats } = useApi<TeamStats>(
-    workspaceId ? `/workspaces/${workspaceId}/team-stats` : null,
-  )
+  const {
+    data: profile,
+    loading: loadingProfile,
+    error: profileError,
+    refetch: refetchProfile,
+  } = useApi<UserProfile>('/users/me')
+  const workspaceId = pickWorkspaceId(profile?.workspaces)
+
+  const {
+    data: stats,
+    loading: loadingStats,
+    error: statsError,
+    refetch: refetchStats,
+  } = useApi<TeamStats>(workspaceId ? `/workspaces/${workspaceId}/team-stats` : null)
 
   if (loadingProfile) return <LoadingSpinner className="py-20" />
+  if (profileError) return <ErrorState message={profileError} onRetry={refetchProfile} />
 
   const currentPlan = (profile?.plan?.toLowerCase() ?? 'free') as PlanTier
+
+  if (!workspaceId) {
+    return <TeamEmptyState message="No workspace found for your account yet." />
+  }
+
   const agg = stats ?? {
     corrections_week: 0, rules_graduated_30d: 0, avg_delta_pct: 0,
     active_brains: 0, total_members: 0, members: [],
@@ -65,9 +82,16 @@ export default function TeamOverviewPage() {
         </Link>
       </header>
 
-      <PlanGate current={currentPlan} requires="team" featureName="Team analytics" bypass={isOperatorEmail(profile?.email)}>
+      <PlanGate
+        current={currentPlan}
+        requires="team"
+        featureName="Team analytics"
+        bypass={isOperatorEmail(profile?.email)}
+      >
         {loadingStats ? (
           <LoadingSpinner className="py-12" />
+        ) : statsError ? (
+          <ErrorState message={statsError} onRetry={refetchStats} />
         ) : (
           <>
             <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -108,6 +132,15 @@ export default function TeamOverviewPage() {
   )
 }
 
+function TeamEmptyState({ message }: { message: string }) {
+  return (
+    <div className="py-12 text-center">
+      <h1 className="text-[22px]">Team Overview</h1>
+      <p className="mt-3 text-[13px] text-[var(--color-body)]">{message}</p>
+    </div>
+  )
+}
+
 function Kpi({ label, value, sub, tone }: {
   label: string; value: string; sub?: string; tone: 'pos' | 'neg' | 'neu'
 }) {
@@ -136,7 +169,10 @@ function LeaderRow({ member, rank }: { member: TeamMemberStat; rank: number }) {
       : member.correction_delta_pct > 0 ? 'text-[var(--color-destructive)]'
         : 'text-[var(--color-body)]'
   return (
-    <li className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-[0.5rem] border border-[var(--color-border)] bg-white/[0.02] p-3 sm:flex-nowrap">
+    <li
+      data-testid="leader-row"
+      className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-[0.5rem] border border-[var(--color-border)] bg-white/[0.02] p-3 sm:flex-nowrap"
+    >
       <span className="w-6 font-mono text-[12px] text-[var(--color-body)]">#{rank}</span>
       <div className="min-w-0 flex-1 basis-[calc(100%-3rem)] sm:basis-auto">
         <div className="text-[13px] font-medium truncate">

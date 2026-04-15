@@ -1,55 +1,64 @@
 'use client'
 
 import { GlassCard } from '@/components/layout/GlassCard'
-import { PlanBadge, type PlanTier } from '@/components/brain/PlanBadge'
 import { useApi } from '@/hooks/useApi'
-import { useAuth } from '@/hooks/useAuth'
 import type {
-  UserProfile,
-  AdminGlobalKpis,
-  AdminCustomer,
   AdminAlert,
+  AdminCustomer,
+  AdminGlobalKpis,
+  UserProfile,
 } from '@/types/api'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
+import { ErrorState } from '@/components/shared/ErrorState'
+import { CustomerRow, isForbidden } from '@/components/operator/CustomerRow'
+import { formatRelativeAgo } from '@/lib/format'
 
-// Email domain gate. Backend also enforces via require_operator, so this is UX-only.
-const OPERATOR_EMAIL_DOMAINS = ['gradata.ai', 'sprites.ai']
-
-const HEALTH_STYLE: Record<AdminCustomer['health'], string> = {
-  healthy: 'bg-[rgba(34,197,94,0.12)] text-[var(--color-success)]',
-  'at-risk': 'bg-[rgba(234,179,8,0.12)] text-[var(--color-warning)]',
-  churning: 'bg-[rgba(239,68,68,0.12)] text-[var(--color-destructive)]',
+/**
+ * Operator panel — god-mode. Backend enforces the @gradata.ai / @sprites.ai
+ * allowlist via `require_operator`; on forbidden we render a friendly empty
+ * state instead of surfacing a raw 403.
+ */
+const ALERT_STYLE: Record<string, string> = {
+  'churn-risk':     'border-[var(--color-warning)]/40 bg-[rgba(234,179,8,0.05)]',
+  'failed-payment': 'border-[var(--color-destructive)]/40 bg-[rgba(239,68,68,0.05)]',
+  'usage-spike':    'border-[var(--color-accent-blue)]/40 bg-[rgba(58,130,255,0.05)]',
 }
 
-const ALERT_STYLE = {
-  'churn-risk': 'border-[var(--color-warning)]/40 bg-[rgba(234,179,8,0.05)]',
-  'failed-payment': 'border-[var(--color-destructive)]/40 bg-[rgba(239,68,68,0.05)]',
-  'usage-spike': 'border-[var(--color-accent-blue)]/40 bg-[rgba(58,130,255,0.05)]',
-} as const
-
 export default function OperatorPage() {
-  const { user } = useAuth()
   const { data: profile, loading: profileLoading } = useApi<UserProfile>('/users/me')
-  // Prefer backend-resolved email; fall back to session email so the gate works
-  // even before the backend /users/me deploy catches up or the profile resolves.
-  const email = profile?.email ?? user?.email ?? ''
-  const domain = email.split('@')[1]?.toLowerCase() ?? ''
-  const isOperator = OPERATOR_EMAIL_DOMAINS.includes(domain)
 
-  // Gate by email; don't fetch admin endpoints if we're not operator.
-  const { data: kpis, loading: kpisLoading } = useApi<AdminGlobalKpis>(
-    isOperator ? '/admin/global-kpis' : null,
-  )
-  const { data: customers, loading: customersLoading } = useApi<AdminCustomer[]>(
-    isOperator ? '/admin/customers?sort=mrr&order=desc&limit=100' : null,
-  )
-  const { data: alerts } = useApi<AdminAlert[]>(
-    isOperator ? '/admin/alerts' : null,
-  )
+  const {
+    data: kpis,
+    loading: kpisLoading,
+    error: kpisError,
+    errorStatus: kpisStatus,
+    refetch: refetchKpis,
+  } = useApi<AdminGlobalKpis>('/admin/global-kpis')
+  const {
+    data: customers,
+    loading: customersLoading,
+    error: customersError,
+    errorStatus: customersStatus,
+    refetch: refetchCustomers,
+  } = useApi<AdminCustomer[]>('/admin/customers')
+  const {
+    data: alerts,
+    loading: alertsLoading,
+    error: alertsError,
+    errorStatus: alertsStatus,
+    refetch: refetchAlerts,
+  } = useApi<AdminAlert[]>('/admin/alerts')
 
   if (profileLoading) return <LoadingSpinner className="py-20" />
 
-  if (!isOperator) {
+  // The backend is the source of truth for operator access, but we surface
+  // a friendlier screen when it returns 403 rather than the raw error.
+  const blocked =
+    isForbidden({ message: kpisError, status: kpisStatus }) ||
+    isForbidden({ message: customersError, status: customersStatus }) ||
+    isForbidden({ message: alertsError, status: alertsStatus })
+
+  if (blocked) {
     return (
       <div className="py-12 text-center">
         <h1 className="text-[22px]">Operator</h1>
@@ -60,8 +69,30 @@ export default function OperatorPage() {
     )
   }
 
-  const customerList = customers ?? []
-  const alertList = alerts ?? []
+  if (kpisLoading || customersLoading || alertsLoading) {
+    return <LoadingSpinner className="py-20" />
+  }
+
+  // Any non-403 fetch failure should surface as a retryable error instead of
+  // falling through to an empty customer/alert list.
+  const loadError = kpisError || customersError || alertsError
+  if (loadError) {
+    return (
+      <ErrorState
+        message={loadError}
+        onRetry={() => {
+          refetchKpis()
+          refetchCustomers()
+          refetchAlerts()
+        }}
+      />
+    )
+  }
+
+  const customerRows = customers ?? []
+  const alertRows = alerts ?? []
+  const k = kpis
+  const domain = profile?.email?.split('@')[1] ?? ''
 
   return (
     <>
@@ -71,52 +102,36 @@ export default function OperatorPage() {
           <p className="mt-1 text-[13px] text-[var(--color-body)]">Customer fleet overview · live data</p>
         </div>
         <span className="font-mono text-[11px] uppercase tracking-wider text-[var(--color-accent-violet)]">
-          god mode · {domain}
+          god mode{domain ? ` · ${domain}` : ''}
         </span>
       </header>
 
-      {/* Global KPIs */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {kpisLoading || !kpis ? (
-          <div className="sm:col-span-2 lg:col-span-4">
-            <LoadingSpinner className="py-6" />
-          </div>
-        ) : (
-          <>
-            <Kpi
-              label="MRR"
-              value={`$${kpis.mrr_usd.toLocaleString()}`}
-              sub={
-                kpis.mrr_delta_pct === 0
-                  ? 'no change'
-                  : `${kpis.mrr_delta_pct > 0 ? '+' : ''}${kpis.mrr_delta_pct.toFixed(1)}% MoM`
-              }
-              tone={kpis.mrr_delta_pct > 0 ? 'pos' : kpis.mrr_delta_pct < 0 ? 'neg' : 'neu'}
-            />
-            <Kpi label="ARR" value={`$${kpis.arr_usd.toLocaleString()}`} sub="annual run rate" tone="neu" />
-            <Kpi
-              label="Churn (30d)"
-              value={`${(kpis.churn_rate * 100).toFixed(1)}%`}
-              sub={kpis.churn_rate < 0.05 ? 'below 5% target' : 'over 5% target'}
-              tone={kpis.churn_rate < 0.05 ? 'pos' : 'neg'}
-            />
-            <Kpi
-              label="NRR"
-              value={`${(kpis.net_revenue_retention * 100).toFixed(0)}%`}
-              sub={kpis.net_revenue_retention >= 1.1 ? 'above 110% target' : 'below 110% target'}
-              tone={kpis.net_revenue_retention >= 1.1 ? 'pos' : 'neg'}
-            />
-          </>
-        )}
-      </div>
+      {k && (
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Kpi label="MRR" value={`$${k.mrr_usd.toLocaleString()}`}
+               sub={`${k.mrr_delta_pct >= 0 ? '+' : ''}${k.mrr_delta_pct.toFixed(1)}% MoM`}
+               tone={k.mrr_delta_pct >= 0 ? 'pos' : 'neg'} />
+          <Kpi label="ARR" value={`$${k.arr_usd.toLocaleString()}`} sub="annual run rate" tone="neu" />
+          <Kpi label="Churn (30d)"
+               value={`${(k.churn_rate * 100).toFixed(1)}%`}
+               sub={k.churn_rate < 0.05 ? 'below target 5%' : 'over target'}
+               tone={k.churn_rate < 0.05 ? 'pos' : 'neg'} />
+          <Kpi label="NRR" value={`${(k.net_revenue_retention * 100).toFixed(0)}%`}
+               sub={k.net_revenue_retention >= 1.10 ? 'above target 110%' : 'below target'}
+               tone={k.net_revenue_retention >= 1.10 ? 'pos' : 'neg'} />
+        </div>
+      )}
 
-      {/* Alerts */}
-      {alertList.length > 0 && (
+      {alertRows.length > 0 && (
         <GlassCard gradTop className="mb-4">
           <h3 className="mb-4 text-[15px] font-semibold">Alerts</h3>
           <ul className="space-y-2">
-            {alertList.map((a) => (
-              <li key={a.id} className={`rounded-[0.5rem] border p-3 ${ALERT_STYLE[a.kind]}`}>
+            {alertRows.map((a) => (
+              <li
+                key={a.id}
+                data-testid="operator-alert"
+                className={`rounded-[0.5rem] border p-3 ${ALERT_STYLE[a.kind] ?? 'border-[var(--color-border)]'}`}
+              >
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                   <div className="min-w-0 flex-1">
                     <span className="font-mono text-[10px] uppercase tracking-wider">
@@ -126,7 +141,7 @@ export default function OperatorPage() {
                     <span className="ml-2 text-[13px] text-[var(--color-body)]">· {a.detail}</span>
                   </div>
                   <span className="font-mono text-[10px] text-[var(--color-body)] shrink-0">
-                    {formatAgo(a.created_at)}
+                    {formatRelativeAgo(a.created_at)}
                   </span>
                 </div>
               </li>
@@ -135,50 +150,20 @@ export default function OperatorPage() {
         </GlassCard>
       )}
 
-      {/* Customer list */}
       <GlassCard gradTop>
         <div className="mb-5 flex items-baseline justify-between">
           <h3 className="text-[15px] font-semibold">Customers</h3>
-          <span className="text-[12px] text-[var(--color-body)]">
-            {kpis ? `${kpis.customers_active}/${kpis.customers_total} active` : ''}
-          </span>
+          {k && (
+            <span className="text-[12px] text-[var(--color-body)]">
+              {k.customers_active}/{k.customers_total} active
+            </span>
+          )}
         </div>
-        {customersLoading ? (
-          <LoadingSpinner className="py-6" />
-        ) : customerList.length === 0 ? (
+        {customerRows.length === 0 ? (
           <p className="py-6 text-center text-[13px] text-[var(--color-body)]">No customers yet.</p>
         ) : (
           <ul className="divide-y divide-[var(--color-border)]">
-            {customerList.map((c) => (
-              <li key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 py-3 first:pt-0 last:pb-0 sm:flex-nowrap">
-                <div className="min-w-0 flex-1 basis-full sm:basis-auto">
-                  <div className="flex flex-wrap items-baseline gap-2.5">
-                    <span className="text-[13px] font-medium">{c.company || '(unnamed)'}</span>
-                    <PlanBadge tier={c.plan as PlanTier} />
-                    <span
-                      className={`rounded-[0.25rem] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${HEALTH_STYLE[c.health]}`}
-                    >
-                      {c.health}
-                    </span>
-                  </div>
-                  <div className="font-mono text-[10px] text-[var(--color-body)]">
-                    last active {c.last_active ? formatAgo(c.last_active) : 'never'}
-                  </div>
-                </div>
-                <div className="flex-1 sm:w-24 sm:flex-none sm:text-right">
-                  <div className="font-mono text-[13px] tabular-nums">${c.mrr_usd}</div>
-                  <div className="font-mono text-[10px] text-[var(--color-body)]">MRR</div>
-                </div>
-                <div className="flex-1 sm:w-20 sm:flex-none sm:text-right">
-                  <div className="font-mono text-[13px] tabular-nums">{c.active_users}</div>
-                  <div className="font-mono text-[10px] text-[var(--color-body)]">users</div>
-                </div>
-                <div className="flex-1 sm:w-20 sm:flex-none sm:text-right">
-                  <div className="font-mono text-[13px] tabular-nums">{c.brains}</div>
-                  <div className="font-mono text-[10px] text-[var(--color-body)]">brains</div>
-                </div>
-              </li>
-            ))}
+            {customerRows.map((c) => <CustomerRow key={c.id} customer={c} />)}
           </ul>
         )}
       </GlassCard>
@@ -208,10 +193,3 @@ function Kpi({ label, value, sub, tone }: { label: string; value: string; sub: s
   )
 }
 
-function formatAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime()
-  const h = Math.floor(diffMs / 3600_000)
-  if (h < 1) return 'just now'
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
-}

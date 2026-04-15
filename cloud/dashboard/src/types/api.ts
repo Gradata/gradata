@@ -59,18 +59,23 @@ export interface ApiKeyCreateResponse {
   name: string
 }
 
+export interface WorkspaceSummary {
+  id: string
+  name?: string
+  plan?: string
+  role?: string
+}
+
 export interface UserProfile {
   user_id: string
-  email: string | null
+  // `email` and `plan` may be omitted by /users/me depending on backend
+  // version (auth payload can be thin). Mark optional so the compiler
+  // catches missing-field usages in callers.
+  email?: string | null
   display_name: string | null
-  plan: string | null
-  workspaces: Array<{
-    id: string
-    name: string
-    plan: string
-    role: string | null
-  }>
+  plan?: string | null
   created_at: string | null
+  workspaces?: WorkspaceSummary[]
 }
 
 export interface PaginatedResponse<T> {
@@ -80,7 +85,35 @@ export interface PaginatedResponse<T> {
   per_page: number
 }
 
+// -----------------------------------------------------------------------------
+// Team / workspace members
+// -----------------------------------------------------------------------------
+
+export type MemberRole = 'owner' | 'admin' | 'member'
+export type InviteRole = 'admin' | 'member'
+
+export interface TeamMember {
+  user_id: string
+  email: string | null
+  display_name: string | null
+  role: MemberRole
+  joined_at: string | null
+  last_sync_at: string | null
+}
+
+export interface InviteResponse {
+  id: string
+  email: string
+  role: InviteRole
+  token: string
+  accept_url: string
+  expires_at: string | null
+}
+
+// -----------------------------------------------------------------------------
 // Operator / god-mode (require_operator gated)
+// -----------------------------------------------------------------------------
+
 export interface AdminGlobalKpis {
   mrr_usd: number
   arr_usd: number
@@ -91,21 +124,35 @@ export interface AdminGlobalKpis {
   net_revenue_retention: number
 }
 
+export type AdminHealth = 'healthy' | 'at-risk' | 'churning'
+export type AdminPlan = 'free' | 'cloud' | 'team' | 'enterprise' | 'pro'
+
 export interface AdminCustomer {
   id: string
   company: string
-  plan: 'free' | 'cloud' | 'team' | 'enterprise' | string
+  plan: AdminPlan | string
   mrr_usd: number
   active_users: number
   brains: number
   last_active: string | null
-  health: 'healthy' | 'at-risk' | 'churning'
+  health: AdminHealth
 }
+
+export type AdminAlertKind = 'churn-risk' | 'failed-payment' | 'usage-spike'
 
 export interface AdminAlert {
   id: string
-  kind: 'churn-risk' | 'failed-payment' | 'usage-spike'
+  kind: AdminAlertKind | string
   customer: string
   detail: string
   created_at: string
+}
+
+// -----------------------------------------------------------------------------
+// Clear demo response
+// -----------------------------------------------------------------------------
+
+export interface ClearDemoResponse {
+  deleted: number
+  by_table: Record<string, number>
 }
