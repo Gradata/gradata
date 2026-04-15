@@ -112,6 +112,11 @@ def _extract_topic_words(text: str) -> set[str]:
     return set(_normalize(text).split()) - _STOPWORDS
 
 
+def _contains_phrase(text: str, phrase: str) -> bool:
+    """Word-boundary match — avoids false hits like 'allow' inside 'disallow'."""
+    return re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", text) is not None
+
+
 def _check_pair_list(
     new_norm: str,
     existing_norm: str,
@@ -121,8 +126,8 @@ def _check_pair_list(
     """Return *score* (clamped to [0.0, 1.0]) if any pair matches on opposite sides, else 0.0."""
     clamped = min(max(score, 0.0), 1.0)
     for left, right in pairs:
-        if (left in new_norm and right in existing_norm) or (
-            right in new_norm and left in existing_norm
+        if (_contains_phrase(new_norm, left) and _contains_phrase(existing_norm, right)) or (
+            _contains_phrase(new_norm, right) and _contains_phrase(existing_norm, left)
         ):
             return clamped
     return 0.0
