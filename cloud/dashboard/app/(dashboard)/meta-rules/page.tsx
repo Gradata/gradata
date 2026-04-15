@@ -2,6 +2,7 @@
 
 import { MetaRulesGrid } from '@/components/brain/MetaRulesGrid'
 import { PlanGate, type PlanTier } from '@/components/brain/PlanBadge'
+import { isOperatorEmail } from '@/lib/operator'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { useApi } from '@/hooks/useApi'
 import type { UserProfile } from '@/types/api'
@@ -21,7 +22,7 @@ export default function MetaRulesPage() {
         </p>
       </header>
 
-      <PlanGate current={currentPlan} requires="cloud" featureName="Meta rules">
+      <PlanGate current={currentPlan} requires="cloud" featureName="Meta rules" bypass={isOperatorEmail(profile?.email)}>
         <MetaRulesGrid />
       </PlanGate>
     </>

@@ -8,22 +8,30 @@
 import type { BrainAnalytics, Correction, Lesson } from '@/types/api'
 
 export interface KpiMetrics {
-  /** Correction rate change vs prior period, negative = improving (learning) */
   correctionRateDeltaPct: number
   correctionsThisWeek: number
   correctionsPriorWeek: number
+  /** WoW delta percent, null when below sample-size floor */
+  correctionRateWoWDelta: number | null
 
-  /** Mean sessions to graduation. Placeholder math until backend ships per-lesson timelines */
   sessionsToGraduation: number
-  sessionsToGraduationLow: number  // 95% CI lower
-  sessionsToGraduationHigh: number // 95% CI upper
+  sessionsToGraduationLow: number
+  sessionsToGraduationHigh: number
 
-  /** Absolute misfire count. Trust signal — ideally 0. */
   misfireCount: number
+  misfireCountPriorWeek: number
+  /** WoW delta percent, null when below sample-size floor */
+  misfireWoWDelta: number | null
   totalFires: number
 
-  /** Brain footprint approximated from correction + lesson counts (KB) */
   footprintKb: number
+
+  /** Estimated minutes saved this period (current window); always shown with "Est." prefix */
+  timeSavedMinutes: number
+  /** Prior-period time saved; null when not computable (requires per-fire timestamps) */
+  timeSavedMinutesPriorWeek: number | null
+  /** WoW delta percent for time saved; null when prior is null or below floor */
+  timeSavedWoWDelta: number | null
 }
 
 export interface GraduationCounts {
@@ -78,16 +86,38 @@ export function computeKpis(
   // Brain footprint: ~11 KB per correction per S103 ANALYSIS
   const footprintKb = Math.round(corrections.length * 11)
 
+  const timeSavedMinutes = computeTimeSaved(lessons)
+
+  // Prior-week Time Saved requires per-fire timestamps. Until backend ships
+  // them, return null to avoid a misleading 0.
+  const timeSavedMinutesPriorWeek: number | null = null
+  const timeSavedWoWDelta: number | null =
+    timeSavedMinutesPriorWeek === null
+      ? null
+      : computeWoWDelta(timeSavedMinutes, timeSavedMinutesPriorWeek)
+
+  const correctionRateWoWDelta = computeWoWDelta(correctionsThisWeek, correctionsPriorWeek)
+
+  // Misfire prior-week is 0 until backend exposes misfire timeline
+  const misfireCountPriorWeek = 0
+  const misfireWoWDelta = computeWoWDelta(misfireCount, misfireCountPriorWeek)
+
   return {
     correctionRateDeltaPct,
     correctionsThisWeek,
     correctionsPriorWeek,
+    correctionRateWoWDelta,
     sessionsToGraduation,
     sessionsToGraduationLow,
     sessionsToGraduationHigh,
     misfireCount,
+    misfireCountPriorWeek,
+    misfireWoWDelta,
     totalFires,
     footprintKb,
+    timeSavedMinutes,
+    timeSavedMinutesPriorWeek,
+    timeSavedWoWDelta,
   }
 }
 
@@ -164,4 +194,68 @@ export function buildDecayCurve(
       ciHigh: Math.round((fitted + ciBand) * 10) / 10,
     }
   })
+}
+
+const MINUTES_PER_CORRECTION = 3
+
+/**
+ * Estimated minutes saved by the brain this period.
+ *
+ * Honest formula: only count fires on rules with `recurrence_blocked = true`
+ * (rule has a history of preventing re-corrections).
+ *
+ * Fallback (until backend ships `recurrence_blocked`): count fires on rules
+ * where fire_count > 1 AND correction_count > 0. This excludes first-fire-ever
+ * and rules that never caught a real correction.
+ *
+ * Returns integer minutes. Always labelled "Est." in the UI.
+ */
+export function computeTimeSaved(lessons: Lesson[]): number {
+  let fires = 0
+  for (const l of lessons) {
+    const hasRecurrenceFlag = typeof (l as unknown as { recurrence_blocked?: boolean }).recurrence_blocked === 'boolean'
+    if (hasRecurrenceFlag) {
+      if ((l as unknown as { recurrence_blocked: boolean }).recurrence_blocked) {
+        fires += l.fire_count ?? 0
+      }
+    } else {
+      const fc = l.fire_count ?? 0
+      const cc = (l as unknown as { correction_count?: number }).correction_count ?? 0
+      if (fc > 1 && cc > 0) fires += fc
+    }
+  }
+  return fires * MINUTES_PER_CORRECTION
+}
+
+/**
+ * Week-over-week percent change with sample-size floor.
+ *
+ * Returns null when either period is below the floor, or when prior is 0.
+ * Caller renders null as `—`. Result is rounded to a whole percent.
+ */
+export function computeWoWDelta(
+  thisPeriod: number,
+  priorPeriod: number,
+  opts: { floor?: number } = {},
+): number | null {
+  const floor = opts.floor ?? 5
+  if (thisPeriod < floor || priorPeriod < floor) return null
+  if (priorPeriod === 0) return null
+  return Math.round(((thisPeriod - priorPeriod) / priorPeriod) * 100)
+}
+
+/**
+ * Days since the rule last triggered a correction or recurrence.
+ *
+ * Max of `last_recurrence_at` and `graduated_at`. Returns null when neither
+ * is present. Zero when the more recent of the two is today.
+ */
+export function computeRuleStreak(lesson: Lesson): number | null {
+  const rec = (lesson as unknown as { last_recurrence_at?: string }).last_recurrence_at
+  const grad = (lesson as unknown as { graduated_at?: string }).graduated_at
+  const candidates = [rec, grad].filter((v): v is string => typeof v === 'string' && v.length > 0)
+  if (candidates.length === 0) return null
+  const mostRecentMs = Math.max(...candidates.map((iso) => new Date(iso).getTime()))
+  const diffMs = Date.now() - mostRecentMs
+  return Math.max(0, Math.floor(diffMs / 86_400_000))
 }

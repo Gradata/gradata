@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { GlassCard } from '@/components/layout/GlassCard'
 import { Button } from '@/components/ui/button'
 import { PlanGate, type PlanTier } from '@/components/brain/PlanBadge'
+import { isOperatorEmail } from '@/lib/operator'
 import { useApi } from '@/hooks/useApi'
 import type { Brain, UserProfile } from '@/types/api'
 import api from '@/lib/api'
@@ -116,7 +117,7 @@ export default function SelfHealingPage() {
         </p>
       </header>
 
-      <PlanGate current={currentPlan} requires="cloud" featureName="Self-healing audit trail">
+      <PlanGate current={currentPlan} requires="cloud" featureName="Self-healing audit trail" bypass={isOperatorEmail(profile?.email)}>
         <ul className="space-y-4">
           {patches.map((p) => {
             const isRolledBack = rolledBack[p.id]
