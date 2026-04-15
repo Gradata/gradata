@@ -14,11 +14,14 @@ import logging
 
 from gradata._types import Lesson, LessonState
 from gradata.enhancements.self_improvement import (
+    MAX_PER_SESSION_DELTA,
+    MAX_PER_STEP_PENALTY,
     MIN_APPLICATIONS_FOR_PATTERN,
     MIN_APPLICATIONS_FOR_RULE,
     PATTERN_THRESHOLD,
     RULE_THRESHOLD,
     graduate,
+    update_confidence,
 )
 
 
@@ -166,3 +169,175 @@ class TestConfidenceJumpWarning:
         with caplog.at_level(logging.WARNING, logger="gradata.enhancements.self_improvement"):
             graduate([lesson])
         assert not any("Safety assertion" in r.message for r in caplog.records)
+
+
+class TestSurvivalBonusRequiresInjectionEvidence:
+    """Fix for gap-analysis/01-internal-audit.md #1.10.
+
+    Survival path must not bypass the no-promotion-from-silence invariant
+    by auto-incrementing fire_count for lessons that were never injected.
+    """
+
+    def test_silent_survival_does_not_increment_fire_count(self) -> None:
+        lesson = _make_lesson(
+            state=LessonState.INSTINCT,
+            confidence=0.30,
+            fire_count=0,
+            category="DRAFTING",
+        )
+        update_confidence([lesson], [{"category": "ACCURACY"}])
+        assert lesson.fire_count == 0, (
+            "Survival without injection evidence must NOT increment fire_count"
+        )
+        # Confidence bonus is still applied (legacy behaviour preserved)
+        assert lesson.confidence > 0.30
+
+    def test_injected_flag_allows_fire_count_increment(self) -> None:
+        lesson = _make_lesson(
+            state=LessonState.INSTINCT,
+            confidence=0.30,
+            fire_count=0,
+            category="DRAFTING",
+        )
+        lesson._was_injected_this_session = True  # type: ignore[attr-defined]
+        update_confidence([lesson], [{"category": "ACCURACY"}])
+        assert lesson.fire_count == 1
+
+    def test_injected_keys_set_allows_fire_count_increment(self) -> None:
+        lesson = _make_lesson(
+            state=LessonState.INSTINCT,
+            confidence=0.30,
+            fire_count=0,
+            category="DRAFTING",
+            description="keep prose tight",
+        )
+        key = f"DRAFTING:{'keep prose tight'[:60]}"
+        update_confidence(
+            [lesson],
+            [{"category": "ACCURACY"}],
+            injected_lesson_keys={key},
+        )
+        assert lesson.fire_count == 1
+
+    def test_silent_survival_cannot_graduate_from_zero(self) -> None:
+        """Sybil scenario: 3 silent survivals must not promote INSTINCT->PATTERN."""
+        lesson = _make_lesson(
+            state=LessonState.INSTINCT,
+            confidence=0.55,
+            fire_count=0,  # never actually injected
+            category="DRAFTING",
+        )
+        for _ in range(5):
+            update_confidence([lesson], [{"category": "ACCURACY"}])
+        # Without injection evidence, fire_count gate must still block promotion
+        assert lesson.fire_count == 0
+        assert lesson.state == LessonState.INSTINCT
+
+
+class TestPenaltyCap:
+    """Fix for gap-analysis/01-internal-audit.md #1.3.
+
+    Compound FSRS penalty must not exceed MAX_PER_STEP_PENALTY in one tick,
+    even when ACCELERATION * streak_mult * severity_boost * rule_override
+    combine with a rewrite severity weight.
+    """
+
+    def test_rewrite_contradiction_capped_on_rule(self) -> None:
+        """Full-stacked penalty on a RULE must not exceed the cap."""
+        lesson = _make_lesson(
+            state=LessonState.RULE,
+            confidence=0.90,
+            fire_count=8,
+            category="DRAFTING",
+            description="tighten prose",
+        )
+        pre = lesson.confidence
+        update_confidence(
+            [lesson],
+            [
+                {
+                    "category": "DRAFTING",
+                    "description": "loosen prose more",
+                    "direction": "CONTRADICTING",
+                    "severity_label": "rewrite",
+                }
+            ],
+            severity_data={"DRAFTING": "rewrite"},
+        )
+        drop = pre - lesson.confidence
+        assert drop > 0, "Penalty must still apply"
+        assert drop <= MAX_PER_STEP_PENALTY + 1e-9, (
+            f"Penalty {drop} exceeded cap {MAX_PER_STEP_PENALTY}"
+        )
+
+    def test_sybil_burst_cannot_chain_tier_transitions(self) -> None:
+        """10 same-session reinforcements must not push INSTINCT through RULE.
+
+        gap-analysis/01-internal-audit.md Gap 4: without a per-session cap,
+        a fresh lesson can be pushed 0 -> PATTERN -> RULE in one call by
+        stacking +0.12/rewrite reinforcements. The cap allows at most ONE
+        tier transition (INSTINCT->PATTERN OR PATTERN->RULE) per session.
+        """
+        lesson = _make_lesson(
+            state=LessonState.INSTINCT,
+            confidence=0.50,
+            fire_count=10,  # satisfy fire_count gate
+            category="DRAFTING",
+            description="tighten prose",
+        )
+        lesson._was_injected_this_session = True  # type: ignore[attr-defined]
+        update_confidence(
+            [lesson],
+            [
+                {
+                    "category": "DRAFTING",
+                    "direction": "REINFORCING",
+                    "severity_label": "rewrite",
+                }
+            ] * 10,
+            severity_data={"DRAFTING": "rewrite"},
+        )
+        # Cannot chain INSTINCT -> PATTERN -> RULE in a single tick
+        assert lesson.state != LessonState.RULE, (
+            f"Sybil burst promoted past ONE tier: {lesson.state} at {lesson.confidence}"
+        )
+        # Net confidence delta bounded by MAX_PER_SESSION_DELTA
+        drop = abs(lesson.confidence - 0.50)
+        assert drop <= MAX_PER_SESSION_DELTA + 1e-9, (
+            f"Per-session delta {drop} exceeded cap {MAX_PER_SESSION_DELTA}"
+        )
+
+    def test_monotone_under_alternating_corrections(self) -> None:
+        """Alternating contradict/reinforce must not oscillate wildly.
+
+        Each contradict tick must decrease confidence; each reinforce tick
+        must not decrease it. The Bayesian blend cannot pull the update in
+        the opposite direction of the current event.
+        """
+        lesson = _make_lesson(
+            state=LessonState.PATTERN,
+            confidence=0.70,
+            fire_count=5,
+            category="DRAFTING",
+            description="tighten prose",
+        )
+        # 5 contradict events then 5 reinforce events
+        prev = lesson.confidence
+        for _ in range(5):
+            update_confidence(
+                [lesson],
+                [{"category": "DRAFTING", "direction": "CONTRADICTING"}],
+            )
+            assert lesson.confidence <= prev + 1e-9, (
+                "Contradict event must not increase confidence"
+            )
+            prev = lesson.confidence
+        for _ in range(5):
+            update_confidence(
+                [lesson],
+                [{"category": "DRAFTING", "direction": "REINFORCING"}],
+            )
+            assert lesson.confidence >= prev - 1e-9, (
+                "Reinforce event must not decrease confidence"
+            )
+            prev = lesson.confidence

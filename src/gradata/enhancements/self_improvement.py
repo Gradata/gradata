@@ -47,7 +47,13 @@ def is_hook_enforced(lesson: Lesson) -> bool:
 
 INITIAL_CONFIDENCE = 0.60
 PATTERN_THRESHOLD = 0.60
-RULE_THRESHOLD = 0.80
+# RULE_THRESHOLD is 0.90 to match the hard floor enforced at injection time
+# by validate_assumptions in rule_engine.py. Keeping graduation below that
+# floor silently blocks freshly-promoted rules from ever being injected,
+# which the audit (gap-analysis/01-internal-audit.md #1.1) flagged as
+# non-deterministic behaviour. The injection gate wins because it is the
+# one that actually governs which rules reach the model.
+RULE_THRESHOLD = 0.90
 MIN_APPLICATIONS_FOR_PATTERN = 3
 MIN_APPLICATIONS_FOR_RULE = 3
 
@@ -133,6 +139,25 @@ MACHINE_SEVERITY_WEIGHTS: dict[str, float] = {
 
 # Graduation gate thresholds
 _GRADUATION_DEDUP_THRESHOLD = 0.85  # Near-duplicate rule detection
+
+# Per-step compound-penalty ceiling.
+# gap-analysis/01-internal-audit.md #1.3: without a cap, a single rewrite
+# contradiction on a RULE at 0.90 can compound to ~0.63 in one tick
+# (base 0.17 * FSRS ~1.22 * severity 1.30 * ACCELERATION 1.50 *
+# streak 1.00 * sev_boost 1.80 * rule_override 1.20). Combined with the
+# Bayesian blend that follows, the update oscillates under alternating
+# corrections. 0.20 is one graduation tier's worth of confidence
+# (INSTINCT->PATTERN band) — the maximum a single correction should
+# ever move the rule in one step. Matches MAX_PER_SESSION_DELTA so that
+# one correction cannot chain two tier demotions in a single session.
+MAX_PER_STEP_PENALTY = 0.20
+
+# Per-session net confidence-delta ceiling. Caps the Sybil attack where
+# a burst of same-session corrections (10 x +0.12/rewrite) pushes a
+# fresh lesson 0 -> 0.90 in a single tick. 0.30 permits exactly one
+# tier transition (INSTINCT->PATTERN 0.20, or PATTERN->RULE 0.30) but
+# not two. See gap-analysis/01-internal-audit.md Gap 4 red-team note.
+MAX_PER_SESSION_DELTA = 0.30
 
 # Auto-detection threshold: if a session has more than this many corrections,
 # it's likely machine-driven. Set high enough that intensive human sessions
@@ -611,6 +636,7 @@ def update_confidence(
     renter: bool = False,
     machine_mode: bool | None = None,
     salt: str = "",
+    injected_lesson_keys: set[str] | None = None,
 ) -> list[Lesson]:
     """Update confidence for each lesson based on session corrections.
 
@@ -640,6 +666,15 @@ def update_confidence(
         machine_mode: If None, auto-detect from correction volume (>10 = machine).
             If True/False, override auto-detection. Machine mode uses softer
             penalties and higher kill limits for high-volume correction contexts.
+        injected_lesson_keys: Optional set of "CATEGORY:description[:60]" keys
+            (same key format as _core._lesson_key) identifying lessons that
+            were actually injected into the session prompt. The per-lesson
+            attribute ``_was_injected_this_session`` is also honoured for
+            callers that prefer to mark evidence inline. When neither signal
+            is present for a surviving lesson, the confidence bonus is still
+            applied but ``fire_count`` is NOT incremented — this preserves
+            the "no promotion from silence" invariant documented on
+            ``graduate()`` (see gap-analysis/01-internal-audit.md #1.10).
     """
     if renter:
         return lessons
@@ -679,6 +714,19 @@ def update_confidence(
         # Skip terminal states
         if lesson.state in (LessonState.KILLED, LessonState.ARCHIVED):
             continue
+
+        # Snapshot pre-session state for the per-session invariant enforced
+        # below. graduate() also reads _pre_session_confidence to emit its
+        # safety-jump warning; setting it here makes update_confidence the
+        # single source of truth.
+        # Invariant (gap-analysis/01-internal-audit.md Gap 4 red-team note):
+        # a single session can at most cause ONE graduation tier transition
+        # and ONE MAX_PER_SESSION_DELTA-sized move in confidence. Blocks the
+        # Sybil scenario where 10 coordinated corrections push a fresh
+        # lesson 0 -> RULE in a single tick.
+        if not hasattr(lesson, "_pre_session_confidence"):
+            lesson._pre_session_confidence = lesson.confidence  # type: ignore[attr-defined]
+            lesson._pre_session_state = lesson.state  # type: ignore[attr-defined]
 
         cat = lesson.category.upper()
 
@@ -729,8 +777,14 @@ def update_confidence(
                         bonus = base_bonus * weight
                     else:
                         bonus = base_bonus
+                    _pre_bonus_conf = lesson.confidence
                     lesson.confidence = round(max(0.0, min(1.0, lesson.confidence + bonus)), 2)
-                    lesson.confidence = max(0.0, min(1.0, _bayesian_confidence(lesson)))
+                    # Monotonicity: on a reinforcement event, the Bayesian
+                    # blend cannot pull confidence DOWN. Mirrors the symmetric
+                    # penalty-path guard. See gap-analysis/01-internal-audit.md
+                    # #1.3.
+                    _bayes = max(0.0, min(1.0, _bayesian_confidence(lesson)))
+                    lesson.confidence = max(_bayes, _pre_bonus_conf)
                     lesson.fire_count += 1
                 else:
                     # CONTRADICTING or UNKNOWN: FSRS penalty
@@ -771,8 +825,22 @@ def update_confidence(
                         and direction != "CONTRADICTING"
                     ):
                         penalty *= PREFERENCE_DECAY_DAMPER
+                    # Cap compound penalty. Without this, a single rewrite
+                    # contradiction on a RULE can subtract ~0.63 in one step;
+                    # see gap-analysis/01-internal-audit.md #1.3 and the
+                    # MAX_PER_STEP_PENALTY comment at module top.
+                    penalty = min(penalty, MAX_PER_STEP_PENALTY)
+                    _pre_penalty_conf = lesson.confidence
                     lesson.confidence = round(max(0.0, min(1.0, lesson.confidence - penalty)), 2)
-                    lesson.confidence = max(0.0, min(1.0, _bayesian_confidence(lesson)))
+                    # Single principled update rule: FSRS-then-blend. We take
+                    # the Bayesian posterior as a second opinion but enforce
+                    # monotonicity on penalty events — the blend cannot pull
+                    # confidence UP after a correction. Without this guard
+                    # the two update paths (FSRS and Bayesian) overwrite
+                    # each other and oscillate under alternating corrections
+                    # (audit finding gap-analysis/01-internal-audit.md #1.3).
+                    _bayes = max(0.0, min(1.0, _bayesian_confidence(lesson)))
+                    lesson.confidence = min(_bayes, _pre_penalty_conf)
             else:
                 # Survived: category was testable, corrections exist elsewhere
                 # Cooling period: skip survival bonus if recently contradicted
@@ -799,10 +867,20 @@ def update_confidence(
                 else:
                     bonus = base_bonus
                 lesson.confidence = round(max(0.0, min(1.0, lesson.confidence + bonus)), 2)
-                # Cold-start: survival counts as an application (lesson was
-                # injected and the user did NOT correct this category).
-                lesson.fire_count += 1
-                lesson.sessions_since_fire = 0
+                # Gate fire_count increment on evidence of actual injection.
+                # gap-analysis/01-internal-audit.md #1.10: auto-incrementing
+                # fire_count on "survived" bypasses the no-promotion-from-silence
+                # gate asserted in graduate(). Without injection evidence we
+                # still apply the confidence bonus (legacy behaviour) but leave
+                # fire_count untouched so promotion remains gated on real fires.
+                lesson_key = f"{lesson.category.upper()}:{lesson.description[:60]}"
+                was_injected = bool(
+                    getattr(lesson, "_was_injected_this_session", False)
+                    or (injected_lesson_keys and lesson_key in injected_lesson_keys)
+                )
+                if was_injected:
+                    lesson.fire_count += 1
+                    lesson.sessions_since_fire = 0
 
         # Track sessions since fire
         lesson.sessions_since_fire += 1
@@ -815,6 +893,32 @@ def update_confidence(
             not in (LessonState.UNTESTABLE, LessonState.KILLED, LessonState.ARCHIVED)
         ):
             lesson.state = LessonState.UNTESTABLE
+
+    # Enforce per-session delta invariant BEFORE graduation evaluates
+    # state transitions. A session can move confidence by at most
+    # MAX_PER_SESSION_DELTA (0.30), which permits exactly one tier
+    # transition (INSTINCT->PATTERN spans 0.20, PATTERN->RULE spans 0.30)
+    # but blocks the Sybil scenario where coordinated corrections chain
+    # two transitions in a single tick. See module-top comment and
+    # gap-analysis/01-internal-audit.md Gap 4.
+    for lesson in lessons:
+        if lesson.state in (LessonState.KILLED, LessonState.ARCHIVED):
+            continue
+        pre = getattr(lesson, "_pre_session_confidence", None)
+        if isinstance(pre, (int, float)):
+            low = max(0.0, pre - MAX_PER_SESSION_DELTA)
+            high = min(1.0, pre + MAX_PER_SESSION_DELTA)
+            clamped = max(low, min(high, lesson.confidence))
+            if clamped != lesson.confidence:
+                _log.debug(
+                    "Per-session delta cap: %s %.2f->%.2f clamped from %.2f (pre=%.2f)",
+                    lesson.category,
+                    pre,
+                    clamped,
+                    lesson.confidence,
+                    pre,
+                )
+                lesson.confidence = round(clamped, 2)
 
     # Inline promotion/demotion after confidence updates
     # (UNTESTABLE detection already handled above — don't re-run
@@ -832,19 +936,30 @@ def update_confidence(
     for lesson in lessons:
         if lesson.state in (LessonState.KILLED, LessonState.ARCHIVED, LessonState.UNTESTABLE):
             continue
+        # Per-session tier cap: at most one graduation tier transition
+        # per session, regardless of supporting corrections. If the
+        # lesson already moved in this session, block the next move.
+        pre_state = getattr(lesson, "_pre_session_state", None)
+        already_transitioned = pre_state is not None and pre_state != lesson.state
         # Promote PATTERN -> RULE
         if (
-            lesson.state == LessonState.PATTERN
+            not already_transitioned
+            and lesson.state == LessonState.PATTERN
             and lesson.confidence >= _uc_rule_thr
             and lesson.fire_count >= MIN_APPLICATIONS_FOR_RULE
         ) or (
-            lesson.state == LessonState.INSTINCT
+            not already_transitioned
+            and lesson.state == LessonState.INSTINCT
             and lesson.confidence >= _uc_pattern_thr
             and lesson.fire_count >= MIN_APPLICATIONS_FOR_PATTERN
         ):
             lesson.state = transition(lesson.state, "promote")
         # Demote PATTERN -> INSTINCT
-        elif lesson.state == LessonState.PATTERN and lesson.confidence < _uc_pattern_thr:
+        elif (
+            not already_transitioned
+            and lesson.state == LessonState.PATTERN
+            and lesson.confidence < _uc_pattern_thr
+        ):
             lesson.state = transition(lesson.state, "demote")
 
     return lessons
@@ -943,6 +1058,15 @@ def graduate(
                     block_promotion = True
             except (ValueError, TypeError):
                 pass
+
+        # Per-session invariant: at most ONE graduation tier transition per
+        # session. If update_confidence already moved this lesson between
+        # tiers (INSTINCT->PATTERN or PATTERN->INSTINCT), do not stack
+        # another transition in graduate(). See MAX_PER_SESSION_DELTA
+        # comment and gap-analysis/01-internal-audit.md Gap 4.
+        pre_state_graduate = getattr(lesson, "_pre_session_state", None)
+        if pre_state_graduate is not None and pre_state_graduate != lesson.state:
+            block_promotion = True
 
         # UNTESTABLE lessons: check if they should be killed (enough idle sessions)
         if lesson.state == LessonState.UNTESTABLE:
