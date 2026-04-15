@@ -1,0 +1,29 @@
+# Local-dev compose for the Gradata daemon.
+# Usage:
+#   docker compose up --build
+#   curl http://localhost:8765/health
+#
+# The `brain/` volume persists the brain directory across container
+# restarts. Override env via a `.env` file alongside this compose file.
+
+services:
+  gradata-daemon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gradata/daemon:dev
+    container_name: gradata-daemon
+    restart: unless-stopped
+    command: ["daemon", "--brain-dir", "/brain", "--port", "8765"]
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./brain:/brain
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "/venv/bin/python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8765/health', timeout=2).status == 200 else 1)"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s

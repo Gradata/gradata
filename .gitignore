@@ -53,6 +53,8 @@ package.json
 package-lock.json
 # Exception: npm packages we intentionally ship
 !gradata-install/package.json
+!packages/npm/package.json
+!packages/**/package.json
 
 # Sales data (private, never in public repo)
 Leads/
@@ -122,12 +124,15 @@ docs/north-star-research.md
 # Internal dev tooling — not part of SDK
 CLAUDE.md
 FEATURES.md
-Dockerfile
-.dockerignore
 .claude/
-packages/
 docs/GTM-Execution-Plan.md
 docs/gradata-comparison-table.md
+
+# npm package build artifacts (sources tracked, outputs ignored)
+packages/npm/node_modules/
+packages/npm/dist/
+packages/*/node_modules/
+packages/*/dist/
 
 # Secrets
 .env
@@ -157,6 +162,7 @@ templates/
 research/
 !docs/research/
 scripts/*
+!scripts/publish-npm.sh
 !cloud/scripts/
 !scripts/migrate_legacy_scopes.py
 docs/cloud/
