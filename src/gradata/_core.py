@@ -192,31 +192,14 @@ def brain_correct(
         _log.warning("Pattern extraction failed: %s", e)
 
     # Observation dedup — suppress near-identical corrections inside a recent
-    # session window so 10 copies of the same correction don't inflate
-    # fire_count / confidence 10x. Default semantic: DROP within window.
+    # session window so repeat corrections don't inflate fire_count/confidence.
     # See gradata/enhancements/dedup.py for MERGE-vs-DROP policy notes.
-    is_observation_dup = False
-    try:
-        from gradata.enhancements.dedup import check_and_register
-        dedup_cat = (category or "UNKNOWN")
-        # Fingerprint on the (draft, final) pair so truly-identical
-        # corrections dedup but genuinely distinct corrections (even with
-        # the same summary/category) do NOT. This preserves graduation
-        # evidence while blocking confidence inflation from N-time repeats
-        # of the same correction.
-        dedup_text = f"{draft_redacted[:500]}||{final_redacted[:500]}"
-        if dedup_text:
-            dedup_info = check_and_register(
-                brain.db_path, dedup_text,
-                category=dedup_cat, session=session,
-            )
-            event["observation_fingerprint"] = dedup_info["fingerprint"]
-            event["observation_seen_count"] = dedup_info["seen_count"]
-            if dedup_info["is_duplicate"]:
-                is_observation_dup = True
-                event["observation_deduped"] = True
-    except Exception as e:
-        _log.debug("Observation dedup failed: %s", e)
+    from gradata.enhancements.dedup import annotate_event_with_dedup
+    is_observation_dup = annotate_event_with_dedup(
+        event, brain.db_path,
+        draft=draft_redacted, final=final_redacted,
+        category=category, session=session,
+    )
 
     # Close the loop: correction → lesson
     desc = ""  # Will be set if severity threshold is met

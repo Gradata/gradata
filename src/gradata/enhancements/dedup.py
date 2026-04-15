@@ -66,10 +66,15 @@ and cheap enough to compute on every ingestion.
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
+
+from gradata._db import ensure_table, get_connection
+
+_log = logging.getLogger(__name__)
 
 _WS_RE = re.compile(r"\s+")
 _TRAILING_PUNCT_RE = re.compile(r"[.,;:!?]+$")
@@ -101,10 +106,8 @@ def _normalize_text(text: str) -> str:
     """
     if not text:
         return ""
-    s = text.strip().lower()
-    s = _WS_RE.sub(" ", s)
-    s = _TRAILING_PUNCT_RE.sub("", s)
-    return s.strip()
+    s = _WS_RE.sub(" ", text.strip().lower())
+    return _TRAILING_PUNCT_RE.sub("", s).strip()
 
 
 def _normalize_category(category: str | None) -> str:
@@ -120,23 +123,16 @@ def observation_fingerprint(text: str, category: str | None = None) -> str:
     design, since the same phrase can mean different things in different
     categories.
     """
-    norm_cat = _normalize_category(category)
-    norm_text = _normalize_text(text)
-    payload = f"{norm_cat}|{norm_text}".encode()
+    payload = f"{_normalize_category(category)}|{_normalize_text(text)}".encode()
     return hashlib.sha1(payload).hexdigest()
 
 
-def _ensure_table(conn: sqlite3.Connection) -> None:
-    conn.execute(_CREATE_SQL)
+def _open(db_path: str | Path) -> sqlite3.Connection:
+    """Open a connection with schema ensured. Caller owns the connection."""
+    conn = get_connection(db_path)
+    ensure_table(conn, _CREATE_SQL)
     conn.execute(_CREATE_IDX_LAST_SESSION)
     conn.commit()
-
-
-def _open(db_path: str | Path) -> sqlite3.Connection:
-    """Open a connection with table ensured. Caller owns the connection."""
-    conn = sqlite3.connect(str(db_path))
-    conn.execute("PRAGMA busy_timeout=5000")
-    _ensure_table(conn)
     return conn
 
 
@@ -263,7 +259,46 @@ def check_and_register(
     }
 
 
+def annotate_event_with_dedup(
+    event: dict,
+    db_path: str | Path,
+    *,
+    draft: str,
+    final: str,
+    category: str | None,
+    session: int | None,
+) -> bool:
+    """Single-seam ingestion hook used by `brain_correct`.
+
+    Fingerprints on the (draft, final) pair (first 500 chars each) so truly
+    identical corrections dedup but genuinely distinct ones do NOT. Mutates
+    ``event`` in place to add ``observation_fingerprint`` and
+    ``observation_seen_count``, plus ``observation_deduped`` when a hit is
+    inside the recent-session window.
+
+    Returns True if the observation was a duplicate (caller should skip the
+    lesson create/reinforce branch). Any error is swallowed and returns False
+    so dedup cannot break the ingestion path.
+    """
+    try:
+        dedup_text = f"{(draft or '')[:500]}||{(final or '')[:500]}"
+        info = check_and_register(
+            db_path, dedup_text,
+            category=(category or "UNKNOWN"), session=session,
+        )
+        event["observation_fingerprint"] = info["fingerprint"]
+        event["observation_seen_count"] = info["seen_count"]
+        if info["is_duplicate"]:
+            event["observation_deduped"] = True
+            return True
+        return False
+    except Exception as e:
+        _log.debug("Observation dedup failed: %s", e)
+        return False
+
+
 __all__ = [
+    "annotate_event_with_dedup",
     "check_and_register",
     "is_duplicate",
     "observation_fingerprint",
