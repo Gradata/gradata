@@ -56,5 +56,6 @@ tracker.log_review(
 The graduation thresholds are informed by:
 
 - **Brown et al. (2024)**: Calibration of human-AI trust in automation
-- **NIST Bayesian Framework**: Statistical confidence in system reliability
 - **Lee & See (2004)**: Trust in automation, appropriate reliance
+
+The current confidence update is a loss-weighted survival score (see `self_improvement.py`), not a Bayesian posterior. A calibrated Beta-posterior path is on the roadmap but has not shipped.
