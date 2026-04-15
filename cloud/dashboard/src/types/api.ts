@@ -18,6 +18,10 @@ export interface Lesson {
   confidence: number
   fire_count: number
   created_at: string
+  recurrence_blocked?: boolean
+  last_recurrence_at?: string | null
+  graduated_at?: string | null
+  correction_count?: number
 }
 
 export interface Correction {
@@ -56,11 +60,17 @@ export interface ApiKeyCreateResponse {
 }
 
 export interface UserProfile {
-  id: string
-  email: string
+  user_id: string
+  email: string | null
   display_name: string | null
-  plan: string
-  created_at: string
+  plan: string | null
+  workspaces: Array<{
+    id: string
+    name: string
+    plan: string
+    role: string | null
+  }>
+  created_at: string | null
 }
 
 export interface PaginatedResponse<T> {
@@ -68,4 +78,34 @@ export interface PaginatedResponse<T> {
   total: number
   page: number
   per_page: number
+}
+
+// Operator / god-mode (require_operator gated)
+export interface AdminGlobalKpis {
+  mrr_usd: number
+  arr_usd: number
+  mrr_delta_pct: number
+  customers_total: number
+  customers_active: number
+  churn_rate: number
+  net_revenue_retention: number
+}
+
+export interface AdminCustomer {
+  id: string
+  company: string
+  plan: 'free' | 'cloud' | 'team' | 'enterprise' | string
+  mrr_usd: number
+  active_users: number
+  brains: number
+  last_active: string | null
+  health: 'healthy' | 'at-risk' | 'churning'
+}
+
+export interface AdminAlert {
+  id: string
+  kind: 'churn-risk' | 'failed-payment' | 'usage-spike'
+  customer: string
+  detail: string
+  created_at: string
 }

@@ -51,6 +51,8 @@ skills/
 .claudeignore
 package.json
 package-lock.json
+# Exception: npm packages we intentionally ship
+!gradata-install/package.json
 
 # Sales data (private, never in public repo)
 Leads/
@@ -68,6 +70,11 @@ sdk/research/_archived_v2_reference/
 # Cache directories
 .pytest_cache/
 .ruff_cache/
+
+# Graphify knowledge-graph cache (third-party tool output, regenerable)
+graphify-out/
+**/graphify-out/
+src/gradata/graphify-out/
 
 # Junk files from cmd.exe redirect misparse (Windows agent output artifacts)
 # When subagents run Bash commands, cmd.exe interprets > in stdout as redirects
@@ -148,6 +155,7 @@ templates/
 research/
 !docs/research/
 scripts/
+!cloud/scripts/
 docs/cloud/
 docs/study-protocol.md
 

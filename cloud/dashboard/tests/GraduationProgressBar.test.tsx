@@ -14,16 +14,16 @@ const counts: GraduationCounts = {
 describe('GraduationProgressBar', () => {
   it('renders three tier segments via aria-label', () => {
     const { container } = render(<GraduationProgressBar counts={counts} />)
-    expect(container.querySelector('[aria-label^="INSTINCT"]')).toBeTruthy()
-    expect(container.querySelector('[aria-label^="PATTERN"]')).toBeTruthy()
-    expect(container.querySelector('[aria-label^="RULE"]')).toBeTruthy()
+    expect(container.querySelector('[aria-label^="Watching"]')).toBeTruthy()
+    expect(container.querySelector('[aria-label^="Learning"]')).toBeTruthy()
+    expect(container.querySelector('[aria-label^="Graduated"]')).toBeTruthy()
   })
 
-  it('shows the three threshold values 0.40 / 0.60 / 0.90', () => {
+  it('shows the three human-readable tier labels', () => {
     render(<GraduationProgressBar counts={counts} />)
-    expect(screen.getByText(/threshold 0\.40/)).toBeInTheDocument()
-    expect(screen.getByText(/threshold 0\.60/)).toBeInTheDocument()
-    expect(screen.getByText(/threshold 0\.90/)).toBeInTheDocument()
+    expect(screen.getByText('Watching')).toBeInTheDocument()
+    expect(screen.getByText('Learning')).toBeInTheDocument()
+    expect(screen.getByText('Graduated')).toBeInTheDocument()
   })
 
   it('segment widths sum to 100% (or 0% when no lessons)', () => {
@@ -53,8 +53,8 @@ describe('GraduationProgressBar', () => {
     segments.forEach((el) => expect(el.style.width).toBe('0%'))
   })
 
-  it('shows total lesson count summary', () => {
+  it('shows total count summary', () => {
     render(<GraduationProgressBar counts={counts} />)
-    expect(screen.getByText('8 lessons total')).toBeInTheDocument()
+    expect(screen.getByText('8 total')).toBeInTheDocument()
   })
 })
