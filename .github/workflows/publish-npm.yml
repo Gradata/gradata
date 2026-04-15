@@ -1,0 +1,54 @@
+name: Publish npm packages
+
+# Fires only on version tag push (e.g. v0.5.0, v1.2.3).
+# Publishes both the unscoped (gradata-install) and scoped (@gradata/install)
+# variants from the gradata-install/ package via matrix.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: publish-npm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish ${{ matrix.pkg_name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pkg_name: gradata-install
+          - pkg_name: "@gradata/install"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Verify tag matches package.json version
+        working-directory: gradata-install
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "${TAG_VERSION}" != "${PKG_VERSION}" ]; then
+            echo "::error::Tag v${TAG_VERSION} does not match gradata-install/package.json version ${PKG_VERSION}."
+            exit 1
+          fi
+          echo "Version match: ${PKG_VERSION}"
+
+      - name: Rewrite package name for this matrix entry
+        working-directory: gradata-install
+        run: node -e "const f='package.json',p=require('./'+f);p.name='${{ matrix.pkg_name }}';require('fs').writeFileSync(f,JSON.stringify(p,null,2)+'\n');"
+
+      - name: Publish to npm
+        working-directory: gradata-install
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
