@@ -43,6 +43,7 @@ from socketserver import ThreadingMixIn
 import gradata
 from gradata._scope import RuleScope
 from gradata._types import LessonState
+from gradata._workers import WorkerPool
 from gradata.detection.addition_pattern import AdditionTracker, classify_addition, is_addition
 from gradata.detection.correction_conflict import (
     ConflictTracker,
@@ -621,6 +622,11 @@ class GradataDaemon:
         # Idle auto-shutdown
         self._idle_timer: threading.Timer | None = None
 
+        # Background worker pool (heavy jobs: meta-rule synthesis, decay,
+        # consolidation, DP export). Stays None until start(); tests can
+        # construct a daemon without a live pool.
+        self._worker_pool: WorkerPool | None = None
+
     # ── Session ID → number mapping ────────────────────────────────────
 
     def _get_session_num(self, session_id: str) -> int:
@@ -691,6 +697,10 @@ class GradataDaemon:
         # Start idle timer
         self._reset_idle_timer()
 
+        # Spin up the background worker pool alongside the HTTP server.
+        self._worker_pool = WorkerPool(self._brain.db_path)
+        self._worker_pool.start()
+
         # Opt-in anonymous telemetry
         self._maybe_send_telemetry()
 
@@ -723,6 +733,10 @@ class GradataDaemon:
     def _cleanup(self) -> None:
         if self._idle_timer:
             self._idle_timer.cancel()
+        if self._worker_pool is not None:
+            with contextlib.suppress(Exception):
+                self._worker_pool.stop(drain_timeout=5.0)
+            self._worker_pool = None
         if self._pid_file and self._pid_file.exists():
             with contextlib.suppress(OSError):
                 self._pid_file.unlink()
