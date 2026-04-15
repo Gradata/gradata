@@ -13,6 +13,7 @@ const SECTIONS = [
       { href: '/dashboard', label: 'Overview', icon: '◐' },
       { href: '/corrections', label: 'Corrections', icon: '◷' },
       { href: '/rules', label: 'Latest Rules', icon: '▣' },
+      { href: '/proof', label: 'Proof', icon: '◎' },
       { href: '/meta-rules', label: 'Meta Rules', icon: '◈' },
       { href: '/self-healing', label: 'Self-Healing', icon: '✦' },
       { href: '/observability', label: 'Observability', icon: '◐' },

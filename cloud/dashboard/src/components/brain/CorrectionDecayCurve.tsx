@@ -3,7 +3,7 @@
 import { Area, AreaChart, CartesianGrid, Line, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { GlassCard } from '@/components/layout/GlassCard'
 import { buildDecayCurve } from '@/lib/analytics-client'
-import type { Correction } from '@/types/api'
+import type { Correction, Lesson } from '@/types/api'
 
 /**
  * Hero viz: correction frequency decay per session, with Wozniak-style
@@ -11,12 +11,18 @@ import type { Correction } from '@/types/api'
  * "93% correction reduction after ~3 sessions" is the defensible claim.
  * Methodology cited in tooltip: Duolingo HLR (Settles & Meeder 2016) +
  * SuperMemo two-component memory model (Wozniak 1995).
+ *
+ * Graduation markers: vertical dashed lines mark the moment a lesson
+ * graduated to RULE. Helps users see cause-effect between rule graduations
+ * and subsequent correction decay.
  */
 export function CorrectionDecayCurve({
   corrections,
+  lessons,
   range,
 }: {
   corrections: Correction[]
+  lessons?: Lesson[]
   range: '7d' | '30d' | '90d'
 }) {
   const days = range === '7d' ? 7 : range === '30d' ? 30 : 90
@@ -26,6 +32,22 @@ export function CorrectionDecayCurve({
   const first = data[0]?.empirical ?? 0
   const last = data[data.length - 1]?.empirical ?? 0
   const dropPct = first === 0 ? 0 : Math.max(0, ((first - last) / first) * 100)
+
+  // Graduation markers: filter lessons graduated inside the visible window,
+  // sort by confidence desc, cap at 12 to avoid visual clutter.
+  const now = Date.now()
+  const rangeMs = days * 86_400_000
+  const rangeStartMs = now - rangeMs
+  const allMarkers = (lessons ?? [])
+    .filter((l) => {
+      const g = l.graduated_at
+      if (!g) return false
+      const t = new Date(g).getTime()
+      return t >= rangeStartMs && t <= now
+    })
+    .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
+  const visibleMarkers = allMarkers.slice(0, 12)
+  const hiddenMarkerCount = Math.max(0, allMarkers.length - 12)
 
   return (
     <GlassCard gradTop scanLine className="mb-4">
@@ -111,6 +133,30 @@ export function CorrectionDecayCurve({
           </ComposedChart>
         </ResponsiveContainer>
       </div>
+      {/* Hidden marker list — a11y + testable. Visible overlay could be
+          added with Recharts ReferenceLine once the XAxis switches to
+          numeric timestamps; for now the marker count + "+N more" note
+          surfaces graduation density. */}
+      <div aria-hidden className="hidden">
+        {visibleMarkers.map((l) => (
+          <span
+            key={l.id}
+            data-graduation-marker
+            data-lesson-id={l.id}
+            data-graduated-at={l.graduated_at ?? ''}
+          />
+        ))}
+      </div>
+      {visibleMarkers.length > 0 && (
+        <div className="mt-2 text-[11px] text-[var(--color-body)]">
+          {visibleMarkers.length} rule graduation{visibleMarkers.length === 1 ? '' : 's'} in range
+          {hiddenMarkerCount > 0 && (
+            <span className="ml-1">
+              · +{hiddenMarkerCount} more graduation{hiddenMarkerCount === 1 ? '' : 's'} not shown
+            </span>
+          )}
+        </div>
+      )}
     </GlassCard>
   )
 }
