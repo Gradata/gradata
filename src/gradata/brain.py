@@ -876,13 +876,43 @@ class Brain(BrainInspectionMixin):
 
         lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
 
-        # Try tree-based retrieval first (falls back to flat if no paths)
+        # Try tree-based retrieval first (falls back to flat if no paths).
+        # Pass the brain's bus so rule_engine can fire `rule_scoped_out`
+        # events for observers (notifications, session-history, embeddings).
+        _bus = getattr(self, "bus", None)
         try:
             from gradata.rules.rule_engine import apply_rules_with_tree
 
-            applied = apply_rules_with_tree(lessons, scope, max_rules=max_rules)
+            applied = apply_rules_with_tree(
+                lessons, scope, max_rules=max_rules, event_bus=_bus,
+            )
         except (ImportError, Exception):
-            applied = apply_rules(lessons, scope, max_rules=max_rules)
+            applied = apply_rules(lessons, scope, max_rules=max_rules, bus=_bus)
+
+        # Emit `rules.injected` so downstream effectiveness tracking
+        # (SessionHistory.compute_effectiveness) sees what entered this
+        # session's prompts. Fire-and-forget — never fails apply_brain_rules.
+        if _bus is not None and applied:
+            try:
+                _bus.emit("rules.injected", {
+                    "rules": [
+                        {
+                            "id": a.rule_id,
+                            "category": a.lesson.category,
+                            "confidence": a.lesson.confidence,
+                            "state": a.lesson.state.value,
+                        }
+                        for a in applied
+                    ],
+                    "scope": {
+                        "task_type": scope.task_type,
+                        "domain": scope.domain,
+                        "audience": scope.audience,
+                    },
+                    "task": task,
+                })
+            except Exception as e:
+                logger.debug("rules.injected emit failed: %s", e)
 
         result = format_rules_for_prompt(applied)
         self._rule_cache.put(cache_key, result)

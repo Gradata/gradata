@@ -502,14 +502,25 @@ def filter_by_scope(
 
 
 def _beta_ppf_05(alpha: float, beta_param: float) -> float:
-    """Approximate 5th percentile of Beta(alpha, beta) distribution.
+    """5th percentile of Beta(alpha, beta) distribution.
 
-    Uses normal approximation. For tiny samples, returns conservative estimate.
+    Uses scipy.stats.beta.ppf when available (exact). Falls back to the
+    normal approximation otherwise. The normal approx is biased for
+    small samples (α+β < 10), precisely the regime ~40% of PATTERN-tier
+    rules sit in — prefer scipy when present.
     """
-    import math
-
     if alpha <= 0 or beta_param <= 0:
         return 0.0
+
+    try:
+        from scipy.stats import beta as _scipy_beta
+
+        return max(0.0, min(1.0, float(_scipy_beta.ppf(0.05, alpha, beta_param))))
+    except ImportError:
+        pass
+
+    import math
+
     total = alpha + beta_param
     mean = alpha / total
     if total <= 2:

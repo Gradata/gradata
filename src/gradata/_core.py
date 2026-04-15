@@ -683,6 +683,18 @@ def brain_end_session(
                         "confidence": lesson.confidence, "fire_count": lesson.fire_count})
                 except Exception as e:
                     _log.debug("Graduation emit failed: %s", e)
+                # Canary enrollment: every new RULE enters canary state so
+                # check_canary_health (next session) can regression-gate it.
+                # Best-effort — never breaks graduation if the canary table
+                # / DB path is unavailable.
+                if new_state == "RULE":
+                    try:
+                        from gradata.enhancements.rule_canary import promote_to_canary
+                        promote_to_canary(
+                            lesson.category, brain.session, db_path=brain.db_path,
+                        )
+                    except Exception as e:
+                        _log.debug("promote_to_canary failed: %s", e)
                 # User-facing graduation notification
                 try:
                     brain.bus.emit("lesson.graduated", {
@@ -836,6 +848,57 @@ def brain_end_session(
             "new_rules": [l.description[:60] for l in new_rules] if new_rules else [],
             "graduated_rules": graduated_rules,
             "meta_rules_discovered": meta_rules_discovered}
+
+        # Canary health sweep: for every RULE-tier lesson previously enrolled
+        # in canary, check if corrections landed in its category since it
+        # graduated. Healthy canaries promote to ACTIVE; unhealthy ones roll
+        # back to INSTINCT-range confidence. Best-effort; never fails the
+        # session close. See enhancements/rule_canary.py.
+        try:
+            from gradata.enhancements.rule_canary import (
+                CANARY_SESSIONS,
+                check_canary_health,
+                promote_to_active,
+                rollback_rule,
+            )
+
+            rule_lessons = [l for l in all_lessons if l.state.value == "RULE"]
+            seen_categories: set[str] = set()
+            for l in rule_lessons:
+                if l.category in seen_categories:
+                    continue
+                seen_categories.add(l.category)
+                try:
+                    health = check_canary_health(
+                        l.category, current_session, db_path=brain.db_path,
+                    )
+                except Exception as e:
+                    _log.debug("check_canary_health(%s) failed: %s", l.category, e)
+                    continue
+
+                rec = health.get("recommendation")
+                if rec == "PROMOTE":
+                    try:
+                        promote_to_active(l.category, db_path=brain.db_path)
+                    except Exception as e:
+                        _log.debug("promote_to_active(%s) failed: %s", l.category, e)
+                elif rec == "ROLLBACK":
+                    try:
+                        rollback_rule(
+                            l.category,
+                            reason=(
+                                f"canary_unhealthy: {health.get('corrections_caused', 0)} "
+                                f"correction(s) in {health.get('sessions_active', 0)}/"
+                                f"{CANARY_SESSIONS} canary sessions"
+                            ),
+                            db_path=brain.db_path,
+                        )
+                    except Exception as e:
+                        _log.debug("rollback_rule(%s) failed: %s", l.category, e)
+        except ImportError:
+            pass  # rule_canary optional; skip silently
+        except Exception as e:
+            _log.debug("Canary sweep failed: %s", e)
 
         # Session boundary marker for dashboard queries
         try:
