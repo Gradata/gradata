@@ -145,77 +145,38 @@ def adjust_severity_by_semantics(
 # ---------------------------------------------------------------------------
 
 
-def _extract_changed_sections(
+def _analyze_line_opcodes(
     draft_lines: list[str],
     final_lines: list[str],
-) -> list[ChangedSection]:
-    """Extract contiguous changed blocks from a unified diff.
+) -> tuple[list[ChangedSection], dict[str, int]]:
+    """Walk line-level SequenceMatcher opcodes once and return sections + stats.
 
-    Uses ``difflib.SequenceMatcher`` opcodes to identify replace/insert/
-    delete operations and converts them into :class:`ChangedSection` objects.
+    Combines extraction of :class:`ChangedSection` blocks with per-line
+    added/removed/changed counts so we only build the matcher once per diff.
 
     Args:
         draft_lines: Lines from the original draft (without newlines).
         final_lines: Lines from the final version (without newlines).
 
     Returns:
-        List of :class:`ChangedSection` instances, one per contiguous change
-        block.  Empty list when the texts are identical.
+        ``(changed_sections, summary_stats)`` where ``summary_stats`` has
+        keys ``lines_added``, ``lines_removed``, ``lines_changed``.
     """
     matcher = difflib.SequenceMatcher(None, draft_lines, final_lines, autojunk=False)
     sections: list[ChangedSection] = []
+    added = removed = changed = 0
 
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if tag == "equal":
             continue
 
-        old_text = "\n".join(draft_lines[i1:i2])
-        new_text = "\n".join(final_lines[j1:j2])
+        sections.append(ChangedSection(
+            start_line=j1,
+            end_line=j2,
+            old_text="\n".join(draft_lines[i1:i2]),
+            new_text="\n".join(final_lines[j1:j2]),
+        ))
 
-        sections.append(
-            ChangedSection(
-                start_line=j1,
-                end_line=j2,
-                old_text=old_text,
-                new_text=new_text,
-            )
-        )
-
-    return sections
-
-
-# ---------------------------------------------------------------------------
-# Summary stats
-# ---------------------------------------------------------------------------
-
-
-def _compute_summary_stats(
-    draft_lines: list[str],
-    final_lines: list[str],
-) -> dict[str, int]:
-    """Count added, removed, and changed lines.
-
-    A line present only in ``final_lines`` is *added*; a line present only
-    in ``draft_lines`` is *removed*; a replace opcode contributes to
-    *changed* (the smaller of the two side lengths is counted as changed,
-    the remainder as added or removed).
-
-    Args:
-        draft_lines: Lines from the original draft.
-        final_lines: Lines from the final version.
-
-    Returns:
-        Dictionary with keys ``lines_added``, ``lines_removed``, and
-        ``lines_changed``.
-    """
-    added = 0
-    removed = 0
-    changed = 0
-
-    matcher = difflib.SequenceMatcher(None, draft_lines, final_lines, autojunk=False)
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag == "equal":
-            continue
         old_count = i2 - i1
         new_count = j2 - j1
         if tag == "insert":
@@ -230,11 +191,12 @@ def _compute_summary_stats(
             elif old_count > new_count:
                 removed += old_count - new_count
 
-    return {
+    stats = {
         "lines_added": added,
         "lines_removed": removed,
         "lines_changed": changed,
     }
+    return sections, stats
 
 
 # ---------------------------------------------------------------------------
@@ -317,7 +279,7 @@ def compute_diff(draft: str, final: str) -> DiffResult:
     else:
         compression_dist = edit_distance  # NCD unreliable on short texts
 
-    changed_sections = _extract_changed_sections(draft_lines, final_lines)
+    changed_sections, summary_stats = _analyze_line_opcodes(draft_lines, final_lines)
     # Severity: use compression distance for long texts, edit_distance for short.
     # Blended approach avoids NCD's short-text weakness while capturing
     # block operations on real documents.
@@ -325,7 +287,6 @@ def compute_diff(draft: str, final: str) -> DiffResult:
         severity = _classify_severity(compression_dist)
     else:
         severity = _classify_severity(edit_distance)
-    summary_stats = _compute_summary_stats(draft_lines, final_lines)
 
     return DiffResult(
         edit_distance=edit_distance,

@@ -36,7 +36,6 @@ async def sync_brain(
     events_count = 0
     meta_rules_count = 0
 
-    # Insert corrections
     if body.corrections:
         rows = [
             {
@@ -54,7 +53,7 @@ async def sync_brain(
         await db.insert("corrections", rows)
         corrections_count = len(rows)
 
-    # Upsert lessons (idempotent by description)
+    # Upsert (not insert) — lessons are idempotent by (brain_id, description).
     if body.lessons:
         rows = [
             {
@@ -71,7 +70,6 @@ async def sync_brain(
         await db.upsert("lessons", rows)
         lessons_count = len(rows)
 
-    # Insert events
     if body.events:
         rows = [
             {
@@ -202,7 +200,6 @@ async def sync_brain(
         await db.insert("meta_rules", rows)
         meta_rules_count = len(rows)
 
-    # Update last_sync_at timestamp
     await db.update(
         "brains",
         data={"last_sync_at": datetime.now(timezone.utc).isoformat()},

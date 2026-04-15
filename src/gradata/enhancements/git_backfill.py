@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,24 @@ __all__ = [
     "backfill_from_git",
     "scan_git_diffs",
 ]
+
+
+@dataclass
+class _GitResult:
+    """Result of a `_git` invocation.
+
+    ``completed`` is set when the subprocess ran to completion (even with
+    non-zero exit). ``error`` is set when the subprocess failed to launch
+    or timed out — callers can surface ``type(error).__name__`` and
+    ``str(error)`` in log messages to preserve root cause.
+    """
+
+    completed: subprocess.CompletedProcess | None = None
+    error: Exception | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.completed is not None and self.completed.returncode == 0
 
 
 class BackfillStats:
@@ -85,103 +104,104 @@ def scan_git_diffs(
     repo_path = Path(repo_path).resolve()
     since_date = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
 
-    # Get commit hashes
-    if not repo_path.exists():
-        return []
+    def _git(args: list[str], timeout: int = 10) -> _GitResult:
+        try:
+            completed = subprocess.run(
+                ["git", *args],
+                capture_output=True, text=True, timeout=timeout,
+                encoding="utf-8", errors="replace", cwd=str(repo_path),
+            )
+            return _GitResult(completed=completed)
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
+            return _GitResult(error=exc)
 
-    try:
-        result = subprocess.run(
-            ["git", "log", f"--since={since_date}", "--format=%H", f"-{max_commits}"],
-            capture_output=True, text=True, timeout=30, encoding="utf-8", errors="replace",
-            cwd=str(repo_path),
+    # Get commit hashes AND commit dates in one pass ("<hash> <iso-date>").
+    # Avoids N+1 subprocesses (previously one `git log -1` per commit).
+    result = _git(
+        ["log", f"--since={since_date}", "--format=%H %cI", f"-{max_commits}"],
+        timeout=30,
+    )
+    if result.completed is None:
+        exc = result.error
+        _log.warning(
+            "git not available at %s: %s: %s",
+            repo_path,
+            type(exc).__name__ if exc else "UnknownError",
+            exc,
         )
-        if result.returncode != 0:
-            _log.warning("git log failed: %s", result.stderr)
-            return []
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
-        _log.warning("git not available: %s", e)
+        return []
+    if result.completed.returncode != 0:
+        _log.warning(
+            "git log failed at %s (rc=%d): %s",
+            repo_path,
+            result.completed.returncode,
+            result.completed.stderr.strip(),
+        )
         return []
 
-    commits = [h.strip() for h in result.stdout.strip().splitlines() if h.strip()]
-    if not commits:
+    commit_entries: list[tuple[str, str]] = []
+    for line in result.completed.stdout.strip().splitlines():
+        parts = line.strip().split(" ", 1)
+        if not parts or not parts[0]:
+            continue
+        commit_hash = parts[0]
+        commit_date = parts[1] if len(parts) > 1 else ""
+        commit_entries.append((commit_hash, commit_date))
+
+    if not commit_entries:
         return []
 
     diffs: list[dict[str, Any]] = []
     patterns = file_patterns or ["*.py", "*.md", "*.ts", "*.js", "*.txt"]
 
-    for commit_hash in commits:
-        try:
-            # Get files changed in this commit
-            files_result = subprocess.run(
-                ["git", "diff-tree", "--no-commit-id", "-r", "--name-only", commit_hash],
-                capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace",
-                cwd=str(repo_path),
-            )
-            if files_result.returncode != 0:
+    for commit_hash, commit_date in commit_entries:
+        files_result = _git(["diff-tree", "--no-commit-id", "-r", "--name-only", commit_hash])
+        if not files_result.ok:
+            if files_result.error is not None:
+                _log.warning(
+                    "git diff-tree failed at %s for %s: %s: %s",
+                    repo_path, commit_hash[:8],
+                    type(files_result.error).__name__, files_result.error,
+                )
+            elif files_result.completed is not None:
+                _log.warning(
+                    "git diff-tree failed at %s for %s (rc=%d): %s",
+                    repo_path, commit_hash[:8],
+                    files_result.completed.returncode,
+                    (files_result.completed.stderr or files_result.completed.stdout or "").strip(),
+                )
+            continue
+
+        assert files_result.completed is not None
+        filtered_files = [
+            f.strip() for f in files_result.completed.stdout.strip().splitlines()
+            if any(Path(f.strip()).match(p) for p in patterns)
+        ]
+
+        for file_path in filtered_files[:10]:  # Cap files per commit
+            old_result = _git(["show", f"{commit_hash}~1:{file_path}"])
+            new_result = _git(["show", f"{commit_hash}:{file_path}"])
+            old_content = old_result.completed.stdout if old_result.ok and old_result.completed else ""
+            new_content = new_result.completed.stdout if new_result.ok and new_result.completed else ""
+
+            if not old_content or not new_content or old_content == new_content:
                 continue
 
-            changed_files = files_result.stdout.strip().splitlines()
+            # Skip huge diffs (too noisy)
+            old_lines = old_content.count("\n")
+            new_lines = new_content.count("\n")
+            if abs(old_lines - new_lines) > max_diff_lines:
+                continue
+            if max(old_lines, new_lines) > max_diff_lines * 5:
+                continue
 
-            # Filter by patterns
-            filtered_files = []
-            for f in changed_files:
-                f = f.strip()
-                if any(Path(f).match(p) for p in patterns):
-                    filtered_files.append(f)
-
-            # Get date
-            date_result = subprocess.run(
-                ["git", "log", "-1", "--format=%aI", commit_hash],
-                capture_output=True, text=True, timeout=5, encoding="utf-8", errors="replace",
-                cwd=str(repo_path),
-            )
-            commit_date = date_result.stdout.strip() if date_result.returncode == 0 else ""
-
-            for file_path in filtered_files[:10]:  # Cap files per commit
-                try:
-                    # Get old version (parent)
-                    old_result = subprocess.run(
-                        ["git", "show", f"{commit_hash}~1:{file_path}"],
-                        capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace",
-                        cwd=str(repo_path),
-                    )
-                    old_content = old_result.stdout if old_result.returncode == 0 else ""
-
-                    # Get new version
-                    new_result = subprocess.run(
-                        ["git", "show", f"{commit_hash}:{file_path}"],
-                        capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace",
-                        cwd=str(repo_path),
-                    )
-                    new_content = new_result.stdout if new_result.returncode == 0 else ""
-
-                    # Skip if no meaningful diff
-                    if not old_content or not new_content:
-                        continue
-                    if old_content == new_content:
-                        continue
-
-                    # Skip huge diffs (too noisy)
-                    old_lines = old_content.count("\n")
-                    new_lines = new_content.count("\n")
-                    if abs(old_lines - new_lines) > max_diff_lines:
-                        continue
-                    if max(old_lines, new_lines) > max_diff_lines * 5:
-                        continue
-
-                    diffs.append({
-                        "commit": commit_hash[:8],
-                        "file": file_path,
-                        "old": old_content[:5000],
-                        "new": new_content[:5000],
-                        "date": commit_date,
-                    })
-
-                except (subprocess.TimeoutExpired, Exception):
-                    continue
-
-        except (subprocess.TimeoutExpired, Exception):
-            continue
+            diffs.append({
+                "commit": commit_hash[:8],
+                "file": file_path,
+                "old": old_content[:5000],
+                "new": new_content[:5000],
+                "date": commit_date,
+            })
 
     return diffs
 

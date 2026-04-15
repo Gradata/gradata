@@ -98,6 +98,12 @@ DEFAULT_ANTI_PATTERNS: list[str] = [
 ]
 
 
+def _compile_anti_pattern(p: AntiPattern) -> re.Pattern:
+    """Compile an AntiPattern, escaping literal patterns."""
+    source = p.pattern if p.is_regex else re.escape(p.pattern)
+    return re.compile(source, re.IGNORECASE)
+
+
 class AntiPatternDetector:
     """Detects anti-patterns in AI output text."""
 
@@ -107,12 +113,9 @@ class AntiPatternDetector:
             self._patterns.extend(DEFAULT_PATTERNS)
         if patterns:
             self._patterns.extend(patterns)
-        self._compiled: list[tuple[AntiPattern, re.Pattern]] = []
-        for p in self._patterns:
-            if p.is_regex:
-                self._compiled.append((p, re.compile(p.pattern, re.IGNORECASE)))
-            else:
-                self._compiled.append((p, re.compile(re.escape(p.pattern), re.IGNORECASE)))
+        self._compiled: list[tuple[AntiPattern, re.Pattern]] = [
+            (p, _compile_anti_pattern(p)) for p in self._patterns
+        ]
 
     def check(self, text: str) -> list[Detection]:
         if not text:
@@ -137,11 +140,11 @@ class AntiPatternDetector:
         return max(0.0, 1.0 - total_weight / 10.0)
 
     def add_pattern(self, pattern: AntiPattern) -> None:
+        # Compile first so a regex error leaves both lists untouched
+        # (atomic add — no partial state if compilation raises).
+        compiled = _compile_anti_pattern(pattern)
         self._patterns.append(pattern)
-        if pattern.is_regex:
-            self._compiled.append((pattern, re.compile(pattern.pattern, re.IGNORECASE)))
-        else:
-            self._compiled.append((pattern, re.compile(re.escape(pattern.pattern), re.IGNORECASE)))
+        self._compiled.append((pattern, compiled))
 
     @property
     def pattern_count(self) -> int:

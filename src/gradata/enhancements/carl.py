@@ -213,10 +213,7 @@ class ContractRegistry:
 
         Returns True if any applicable MUST constraints exist for this task.
         """
-        must_constraints = self.get_prioritized_constraints(
-            task, min_priority=RulePriority.MUST
-        )
-        return any(c.priority == RulePriority.MUST for c in must_constraints)
+        return bool(self.get_prioritized_constraints(task, min_priority=RulePriority.MUST))
 
 
     def format_constraints_prompt(self, task: str) -> str:
