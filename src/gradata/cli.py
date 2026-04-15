@@ -111,6 +111,39 @@ def cmd_audit(args):
 
 
 def cmd_export(args):
+    """Export brain. Two modes:
+
+    - With --target: emit graduated RULE-tier lessons in a platform-specific
+      rule file format (cursor/agents/aider).
+    - Otherwise: marketplace archive export via Brain.export(mode=...).
+    """
+    target = getattr(args, "target", None)
+    if target:
+        from gradata.enhancements.rule_export import export_rules
+        brain_root = _resolve_brain_root(args)
+        # Prefer the canonical lessons path the rest of the SDK uses, rather
+        # than hardcoding brain_root/"lessons.md" inside the exporter.
+        lessons_path: Path | None = None
+        try:
+            brain = _get_brain(args)
+            lessons_path = brain._find_lessons_path()
+        except Exception:
+            lessons_path = None
+        try:
+            text = export_rules(brain_root, target=target, lessons_path=lessons_path)
+        except ValueError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return
+        output = getattr(args, "output", None)
+        if output:
+            out_path = Path(output)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(text, encoding="utf-8")
+            print(f"exported {text.count(chr(10))} lines to {out_path}")
+        else:
+            print(text, end="")
+        return
+
     brain = _get_brain(args)
     path = brain.export(mode=args.mode)
     print(f"Exported: {path}")
@@ -435,6 +468,79 @@ def cmd_demo(args):
     print(f"Try: gradata convergence --brain-dir {target}")
 
 
+def _resolve_brain_root(args):
+    """Figure out where brain lives. Prefer env override for tests, then --brain-dir arg, then default."""
+    import os
+    override = os.environ.get("GRADATA_BRAIN")
+    if override:
+        return Path(override)
+    brain_dir = getattr(args, "brain_dir", None)
+    if brain_dir:
+        return Path(brain_dir)
+    return Path("brain")
+
+
+def cmd_rule_add(args):
+    """Fast-track a user-declared rule. Writes at RULE tier conf=1.0, tries to install a hook."""
+    import json as _json
+    from datetime import date
+
+    from gradata.enhancements import rule_to_hook
+
+    text = " ".join(args.text).strip() if isinstance(args.text, list) else str(args.text).strip()
+    if not text:
+        print("error: rule text required", file=sys.stderr)
+        return
+
+    # Classify first to see if a hook is possible
+    candidate = rule_to_hook.classify_rule(text, confidence=1.0)
+    result = rule_to_hook.try_generate(candidate)
+
+    # Persist to lessons.md — record install state in structured metadata
+    # (how_enforced="hooked"), not as a description prefix. See PR #26 review.
+    brain_root = _resolve_brain_root(args)
+    lessons = brain_root / "lessons.md"
+    lessons.parent.mkdir(parents=True, exist_ok=True)
+    if candidate.enforcement == rule_to_hook.EnforcementType.HOOK:
+        category = candidate.determinism.value.upper()
+    else:
+        category = "USER"
+    line = f"[{date.today().isoformat()}] [RULE:1.00] {category}: {text}\n"
+    if result.installed:
+        meta = {
+            "what": "",
+            "why": "",
+            "who": "",
+            "when_created": "",
+            "when_validated": "",
+            "where_scope": "",
+            "how_enforced": "hooked",
+            "utility_score": 0.5,
+            "safety_score": 0.5,
+        }
+        line += f"  Metadata: {_json.dumps(meta)}\n"
+    with lessons.open("a", encoding="utf-8") as f:
+        f.write(line)
+
+    if result.installed:
+        print(f"rule graduated to hook: installed at {result.hook_path}")
+    else:
+        print(f"rule added as soft injection ({result.reason})")
+
+
+def cmd_rule(args):
+    """Dispatch to a `rule <subcmd>` handler."""
+    handlers = {
+        "add": cmd_rule_add,
+    }
+    rule_cmd = getattr(args, "rule_cmd", None)
+    handler = handlers.get(rule_cmd) if isinstance(rule_cmd, str) else None
+    if handler is None:
+        print("error: unknown rule subcommand (expected one of: add)", file=sys.stderr)
+        return
+    handler(args)
+
+
 def cmd_hooks(args):
     """Manage Claude Code hook integration."""
     action = args.action
@@ -490,10 +596,17 @@ def main():
     p_audit = sub.add_parser("audit", help="Data flow audit")
     p_audit.add_argument("--json", action="store_true")
 
-    # export
-    p_export = sub.add_parser("export", help="Export brain for marketplace")
+    # export — marketplace archive OR platform-specific rule export
+    p_export = sub.add_parser(
+        "export",
+        help="Export brain (marketplace archive, or graduated rules for cursor/agents/aider)",
+    )
     p_export.add_argument("--mode", choices=["full", "no-prospects", "domain-only"],
                           default="full")
+    p_export.add_argument("--target", choices=["cursor", "agents", "aider"],
+                          help="Emit graduated RULE-tier lessons in platform-specific format")
+    p_export.add_argument("--output", "-o",
+                          help="Output file when using --target (default: stdout)")
 
     # context
     p_ctx = sub.add_parser("context", help="Compile context for a message")
@@ -564,6 +677,12 @@ def main():
     p_hooks.add_argument("--profile", choices=["minimal", "standard", "strict"],
                          default="standard", help="Hook profile tier (default: standard)")
 
+    # rule — user-declared rules (fast-track to RULE tier, try hook install)
+    p_rule = sub.add_parser("rule", help="Manage user-declared rules")
+    rule_sub = p_rule.add_subparsers(dest="rule_cmd", required=True)
+    p_rule_add = rule_sub.add_parser("add", help="Declare a rule at RULE tier (fast-track)")
+    p_rule_add.add_argument("text", nargs="+", help="Rule text")
+
     args = parser.parse_args()
 
     commands = {
@@ -589,6 +708,7 @@ def main():
     commands["convergence"] = cmd_convergence
     commands["demo"] = cmd_demo
     commands["hooks"] = cmd_hooks
+    commands["rule"] = cmd_rule
 
     if args.command in commands:
         commands[args.command](args)

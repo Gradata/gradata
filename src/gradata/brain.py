@@ -392,6 +392,38 @@ class Brain(BrainInspectionMixin):
             scope=scope,
         )
 
+    def record_correction(
+        self,
+        text: str,
+        *,
+        assistant_draft: str | None = None,
+        category: str = "GENERAL",
+        **extras,
+    ) -> dict:
+        """Record a user correction as a CORRECTION event.
+
+        Lightweight companion to :meth:`correct` — does not run the diff /
+        classification pipeline; simply persists the raw correction signal
+        plus the assistant draft that triggered it (under ``draft_text``)
+        so downstream tooling (e.g. rule-to-hook graduation) can replay
+        generated hooks against the ground-truth violating text.
+
+        Args:
+            text: The user's correction message (what they wrote).
+            assistant_draft: The AI output the user was correcting. Stored
+                under ``data['draft_text']`` when provided.
+            category: Correction category (defaults to ``"GENERAL"``).
+            **extras: Any additional fields to merge into the event's
+                ``data`` dict.
+
+        Returns:
+            The emitted CORRECTION event dict.
+        """
+        data: dict = {"detail": text, "category": category, **extras}
+        if assistant_draft is not None:
+            data["draft_text"] = assistant_draft
+        return self.emit("CORRECTION", "user", data, [f"category:{category}"])
+
     def patch_rule(
         self, category: str, old_description: str, new_description: str, reason: str = ""
     ) -> dict:

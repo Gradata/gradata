@@ -152,6 +152,7 @@ website/
 website-next/
 onboarding/
 templates/
+!src/gradata/hooks/templates/
 # examples/ — included for open source hygiene
 research/
 !docs/research/
