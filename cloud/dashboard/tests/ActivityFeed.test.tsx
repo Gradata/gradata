@@ -7,7 +7,11 @@ vi.mock('@/hooks/useApi', () => ({
   useApi: (...args: unknown[]) => useApiMock(...args),
 }))
 
-import { ActivityFeed } from '@/components/brain/ActivityFeed'
+import { ActivityFeed, type OutcomeActivityEvent } from '@/components/brain/ActivityFeed'
+
+// Typed helper so schema drift on OutcomeActivityEvent breaks the tests
+// instead of being silenced by `as any` casts.
+const events = (...evts: OutcomeActivityEvent[]): OutcomeActivityEvent[] => evts
 
 beforeEach(() => {
   useApiMock.mockReset()
@@ -92,7 +96,7 @@ describe('ActivityFeed outcome reframes', () => {
   it('renders "Rule graduated" label for rule.graduated kind', () => {
     render(
       <ActivityFeed
-        events={[{ id: '1', kind: 'rule.graduated', description: 'Attach case studies as PDF', at: at(2) }] as any}
+        events={events({ id: '1', kind: 'rule.graduated', description: 'Attach case studies as PDF', at: at(2) })}
       />,
     )
     expect(screen.getByText(/Rule graduated/i)).toBeInTheDocument()
@@ -102,7 +106,7 @@ describe('ActivityFeed outcome reframes', () => {
   it('renders "Rule updated" label for rule.patched kind', () => {
     render(
       <ActivityFeed
-        events={[{ id: '2', kind: 'rule.patched', description: 'No em dashes', at: at(24) }] as any}
+        events={events({ id: '2', kind: 'rule.patched', description: 'No em dashes', at: at(24) })}
       />,
     )
     expect(screen.getByText(/Rule updated/i)).toBeInTheDocument()
@@ -111,7 +115,7 @@ describe('ActivityFeed outcome reframes', () => {
   it('renders "Slipped back" label for rule.recurrence kind', () => {
     render(
       <ActivityFeed
-        events={[{ id: '3', kind: 'rule.recurrence', description: 'Colons over dashes', at: at(48) }] as any}
+        events={events({ id: '3', kind: 'rule.recurrence', description: 'Colons over dashes', at: at(48) })}
       />,
     )
     expect(screen.getByText(/Slipped back/i)).toBeInTheDocument()
@@ -120,7 +124,7 @@ describe('ActivityFeed outcome reframes', () => {
   it('does NOT render meta_rule.emerged events', () => {
     render(
       <ActivityFeed
-        events={[{ id: '4', kind: 'meta_rule.emerged', description: 'Verify before acting', at: at(72) }] as any}
+        events={events({ id: '4', kind: 'meta_rule.emerged', description: 'Verify before acting', at: at(72) })}
       />,
     )
     expect(screen.queryByText(/Meta-rule/i)).not.toBeInTheDocument()
@@ -128,7 +132,9 @@ describe('ActivityFeed outcome reframes', () => {
   })
 
   it('renders empty-state copy when no rendered events exist', () => {
-    render(<ActivityFeed events={[{ id: '5', kind: 'meta_rule.emerged', description: 'x', at: at(1) }] as any} />)
+    render(
+      <ActivityFeed events={events({ id: '5', kind: 'meta_rule.emerged', description: 'x', at: at(1) })} />,
+    )
     expect(screen.getByText(/AI has been quiet/i)).toBeInTheDocument()
   })
 })

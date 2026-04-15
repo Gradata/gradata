@@ -7,11 +7,22 @@ type RuleStatus = 'clean-durable' | 'clean-new' | 'recurred' | 'unknown'
 
 function statusFor(lesson: Lesson): { status: RuleStatus; streakDays: number | null; recurredDays: number | null } {
   const streakDays = computeRuleStreak(lesson)
-  const lastRec = (lesson as unknown as { last_recurrence_at?: string }).last_recurrence_at
-  const recurredDays = lastRec ? Math.floor((Date.now() - new Date(lastRec).getTime()) / 86_400_000) : null
+  const lastRec = lesson.last_recurrence_at
+  const lastGrad = lesson.graduated_at
+  const recMs =
+    typeof lastRec === 'string' && lastRec.length > 0 ? new Date(lastRec).getTime() : null
+  const gradMs =
+    typeof lastGrad === 'string' && lastGrad.length > 0 ? new Date(lastGrad).getTime() : null
+  const recurredDays =
+    recMs === null ? null : Math.max(0, Math.floor((Date.now() - recMs) / 86_400_000))
 
   if (streakDays === null) return { status: 'unknown', streakDays: null, recurredDays: null }
-  if (recurredDays !== null && recurredDays < 7) return { status: 'recurred', streakDays, recurredDays }
+  // Only flag as recurred if the recurrence is the LATEST event. If the rule
+  // was re-graduated AFTER slipping, the recurrence is stale and the streak
+  // (which already starts from graduated_at) tells the truth.
+  if (recurredDays !== null && recurredDays < 7 && (gradMs === null || recMs! >= gradMs)) {
+    return { status: 'recurred', streakDays, recurredDays }
+  }
   if (streakDays >= 7) return { status: 'clean-durable', streakDays, recurredDays }
   return { status: 'clean-new', streakDays, recurredDays }
 }

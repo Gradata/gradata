@@ -10,6 +10,7 @@ import type {
   Correction,
   Lesson,
 } from '@/types/api'
+import type { OutcomeActivityEvent } from '@/components/brain/ActivityFeed'
 
 // Compute timestamps lazily on render so demo data stays anchored to "now"
 // even if the app stays open for hours/days.
@@ -27,11 +28,14 @@ export const demoAnalytics: BrainAnalytics = {
   avg_confidence: 0.82,
   lessons_by_state: { INSTINCT: 7, PATTERN: 5, RULE: 11 },
   corrections_by_severity: { trivial: 34, minor: 62, moderate: 31, major: 12, rewrite: 3 },
+  // Keys MUST match the LEGACY_MAP in CategoriesChart.tsx
+  // (TONE, DRAFTING, FORMAT, PROCESS, ACCURACY). Anything outside that map
+  // gets dumped into the "Factual Integrity" fallback bucket.
   corrections_by_category: {
     TONE: 48,
     ACCURACY: 37,
-    FORMATTING: 22,
-    COMPLETENESS: 19,
+    FORMAT: 22,
+    PROCESS: 19,
     DRAFTING: 11,
     OTHER: 5,
   },
@@ -42,7 +46,7 @@ export const demoCorrections: Correction[] = /* @__PURE__ */ Array.from({ length
   id: `demo-c-${i}`,
   brain_id: 'demo',
   severity: (['trivial', 'minor', 'moderate', 'major', 'rewrite'] as const)[i % 5],
-  category: (['TONE', 'ACCURACY', 'FORMATTING', 'COMPLETENESS', 'DRAFTING'] as const)[i % 5],
+  category: (['TONE', 'ACCURACY', 'FORMAT', 'PROCESS', 'DRAFTING'] as const)[i % 5],
   description: `Sample correction ${i + 1}`,
   draft_preview: null,
   final_preview: null,
@@ -94,7 +98,7 @@ export const demoLessons: Lesson[] = [
     id: 'demo-l-4',
     brain_id: 'demo',
     description: 'Attach case studies as PDF',
-    category: 'FORMATTING',
+    category: 'FORMAT',
     state: 'RULE',
     confidence: 0.89,
     fire_count: 17,
@@ -120,7 +124,7 @@ export const demoLessons: Lesson[] = [
     id: 'demo-l-6',
     brain_id: 'demo',
     description: 'Include Calendly link in outreach emails',
-    category: 'COMPLETENESS',
+    category: 'PROCESS',
     state: 'PATTERN',
     confidence: 0.72,
     fire_count: 5,
@@ -142,10 +146,23 @@ export const demoLessons: Lesson[] = [
     id: 'demo-l-8',
     brain_id: 'demo',
     description: 'Save lead CSVs to Leads/active/',
-    category: 'FORMATTING',
+    category: 'FORMAT',
     state: 'INSTINCT',
     confidence: 0.48,
     fire_count: 0,
     created_at: daysAgo(3),
   },
+]
+
+// Outcome-first activity events for the dashboard preview.
+// Drives <ActivityFeed events={demoActivityEvents} /> when demoMode is on,
+// so the Activity panel isn't empty in the preview.
+const hoursAgo = (n: number) => new Date(Date.now() - n * 3_600_000).toISOString()
+export const demoActivityEvents: OutcomeActivityEvent[] = [
+  { id: 'demo-act-1', kind: 'rule.graduated', description: '"Attach case studies as PDF"', at: hoursAgo(3) },
+  { id: 'demo-act-2', kind: 'rule.patched',   description: '"Use colons over dashes" updated to cover headlines', at: hoursAgo(9) },
+  { id: 'demo-act-3', kind: 'category.spike', description: 'Tone fixes up 38% this week', at: hoursAgo(20) },
+  { id: 'demo-act-4', kind: 'rule.recurrence', description: '"Use colons over dashes" slipped 2x', at: hoursAgo(36) },
+  { id: 'demo-act-5', kind: 'rule.mastered',  description: '"Never commit secrets" — auto-applied 9x with no edits', at: hoursAgo(54) },
+  { id: 'demo-act-6', kind: 'rule.graduated', description: '"Plan + adversary before implementing"', at: hoursAgo(80) },
 ]

@@ -8,7 +8,12 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Button } from '@/components/ui/button'
 import { computeKpis, computeGraduationCounts } from '@/lib/analytics-client'
-import { demoAnalytics, demoCorrections, demoLessons } from '@/lib/fixtures/demo-dashboard'
+import {
+  demoAnalytics,
+  demoCorrections,
+  demoLessons,
+  demoActivityEvents,
+} from '@/lib/fixtures/demo-dashboard'
 import { KpiStrip } from '@/components/brain/KpiStrip'
 import { GraduationProgressBar } from '@/components/brain/GraduationProgressBar'
 import { CorrectionDecayCurve } from '@/components/brain/CorrectionDecayCurve'
@@ -145,7 +150,7 @@ export default function DashboardPage() {
 
       {/* Activity */}
       <div className="mb-4">
-        <ActivityFeed />
+        <ActivityFeed events={demoMode ? demoActivityEvents : undefined} />
       </div>
     </>
   )
