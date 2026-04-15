@@ -16,9 +16,10 @@ from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
 
 try:
-    from gradata.enhancements.self_improvement import parse_lessons
+    from gradata.enhancements.self_improvement import is_hook_enforced, parse_lessons
 except ImportError:
     parse_lessons = None
+    is_hook_enforced = None  # type: ignore[assignment]
 
 try:
     from gradata.enhancements.meta_rules import (
@@ -111,6 +112,13 @@ def main(data: dict) -> dict | None:
         lesson for lesson in all_lessons
         if lesson.state.name in ("RULE", "PATTERN") and lesson.confidence >= MIN_CONFIDENCE
     ]
+    # Phase 5 rule-to-hook auto-promotion: rules enforced by an installed
+    # generated hook (metadata.how_enforced == "hooked", or legacy "[hooked]"
+    # description prefix) are applied deterministically, so injecting them as
+    # text wastes context. Hook removal clears the marker and re-enables text
+    # injection automatically.
+    if is_hook_enforced is not None:
+        filtered = [lesson for lesson in filtered if not is_hook_enforced(lesson)]
     if not filtered:
         return None
 

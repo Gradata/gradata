@@ -682,21 +682,32 @@ def cmd_rule_remove(args):
             break
 
     # 2. Find matching lesson by slug → description
+    # Also clear `metadata.how_enforced = "hooked"` from any structured
+    # Metadata JSON line attached to this lesson, so the next graduation
+    # pass treats the rule as ordinary prompt injection again.
     touched_lesson = False
     if lessons_file.exists():
+        import json as _json_meta
+
         lines = lessons_file.read_text(encoding="utf-8").splitlines()
-        out_lines = []
+        out_lines: list[str] = []
         # Accept optional legacy "[hooked]" token between the state bracket
         # and the category (normalised out of the prefix so reformatted lines
         # carry the marker only in the description).
         lesson_re = _re.compile(
             r"^(\[[\d-]+\]\s+\[RULE:[\d.]+\])\s+(?:\[hooked\]\s+)?(\w+):\s+(.+)$"
         )
-        for line in lines:
+        # When purging, skip the lesson's trailing metadata block (indented
+        # lines) so we don't leave orphans. When unmarking, we process each
+        # indented line normally but rewrite the Metadata JSON.
+        i = 0
+        while i < len(lines):
+            line = lines[i]
             stripped = line.strip()
             m = lesson_re.match(stripped)
             if not m:
                 out_lines.append(line)
+                i += 1
                 continue
             state_prefix = m.group(1)
             category = m.group(2)
@@ -706,20 +717,78 @@ def cmd_rule_remove(args):
             modern_marker = desc.startswith("[hooked] ")
             was_hooked = legacy_marker or modern_marker
             clean_desc = desc[len("[hooked] "):] if modern_marker else desc
-            if _slug(clean_desc) == slug:
-                if args.purge:
-                    touched_lesson = True
-                    continue  # drop the line entirely
-                if was_hooked:
-                    touched_lesson = True
-                    out_lines.append(f"{prefix}: {clean_desc}")
-                else:
-                    # Already unmarked — no change needed
-                    out_lines.append(line)
+            match_this = _slug(clean_desc) == slug
+
+            if not match_this:
+                out_lines.append(line)
+                i += 1
+                continue
+
+            if args.purge:
+                # Drop header + all indented follow-on lines belonging to it.
+                touched_lesson = True
+                i += 1
+                while i < len(lines) and lines[i].startswith("  "):
+                    i += 1
+                continue
+
+            # Unmark path: rewrite the header (strip [hooked] prefix) and
+            # rewrite any Metadata: JSON so how_enforced goes back to "injected".
+            if was_hooked:
+                touched_lesson = True
+                out_lines.append(f"{prefix}: {clean_desc}")
             else:
                 out_lines.append(line)
+            i += 1
+            while i < len(lines) and lines[i].startswith("  "):
+                meta_line = lines[i]
+                meta_stripped = meta_line.strip()
+                if meta_stripped.startswith("Metadata:"):
+                    payload = meta_stripped[len("Metadata:"):].strip()
+                    try:
+                        md = _json_meta.loads(payload)
+                    except (ValueError, TypeError):
+                        md = None
+                    if isinstance(md, dict) and md.get("how_enforced") == "hooked":
+                        md["how_enforced"] = "injected"
+                        touched_lesson = True
+                        out_lines.append(f"  Metadata: {_json_meta.dumps(md)}")
+                        i += 1
+                        continue
+                out_lines.append(meta_line)
+                i += 1
         if touched_lesson:
             lessons_file.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+
+    # Emit a RULE_PATCH_REVERTED event when a human explicitly demotes a
+    # hook-enforced rule back to text injection (or purges it). The
+    # empirical promotion gate consumes this signal so a recently-reverted
+    # rule cannot immediately re-promote.
+    if removed_file or touched_lesson:
+        try:
+            from gradata import _events
+            from gradata.enhancements.rule_to_hook import (
+                HOOK_DEMOTED,
+                RULE_PATCH_REVERTED,
+            )
+            _events.emit(
+                RULE_PATCH_REVERTED,
+                "cli:rule-remove",
+                {
+                    "slug": slug,
+                    "purge": bool(getattr(args, "purge", False)),
+                    "hook_removed": bool(removed_file),
+                    "lesson_touched": bool(touched_lesson),
+                },
+            )
+            if removed_file:
+                _events.emit(
+                    HOOK_DEMOTED,
+                    "cli:rule-remove",
+                    {"slug": slug, "hook_path": str(removed_file)},
+                )
+        except Exception:
+            pass  # Event emission is best-effort; CLI output still succeeds.
 
     if removed_file:
         print(f"Removed hook: {removed_file}")

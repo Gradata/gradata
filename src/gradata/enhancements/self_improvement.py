@@ -1194,15 +1194,25 @@ def graduate(
                     candidate = rule_to_hook.classify_rule(
                         desc, confidence=float(lesson.confidence)
                     )
-                    gen_result = rule_to_hook.try_generate(
-                        candidate,
-                        brain=brain,
-                        source="graduate",
-                    )
-                    if gen_result.installed:
-                        if lesson.metadata is None:
-                            lesson.metadata = RuleMetadata()
-                        lesson.metadata.how_enforced = "hooked"
+                    # Council empirical gate: fire_count + distinct sessions
+                    # + zero human reversals (last 30d). If any fails, skip
+                    # hook generation — rule stays as text injection.
+                    passed, gate_reason = rule_to_hook._passes_empirical_gate(lesson)
+                    if not passed:
+                        _log.debug(
+                            "rule-to-hook promotion blocked by empirical gate: %s",
+                            gate_reason,
+                        )
+                    else:
+                        gen_result = rule_to_hook.try_generate(
+                            candidate,
+                            brain=brain,
+                            source="graduate",
+                        )
+                        if gen_result.installed:
+                            if lesson.metadata is None:
+                                lesson.metadata = RuleMetadata()
+                            lesson.metadata.how_enforced = "hooked"
             except Exception:
                 pass  # Hook generation is best-effort; never break graduation.
             continue

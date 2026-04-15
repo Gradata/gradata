@@ -178,6 +178,10 @@ class Lesson:
     # / rule_evolution decay confidence once this crosses a threshold.
     _contradiction_streak: int = 0  # Consecutive contradictions; triggers self-correction / penalty acceleration
     stale: bool = False  # True = demoted via TTL (sessions_since_fire >= ttl); flagged for review
+    # Phase 5 council hook: optional registry slot for AST-class promotion routing.
+    # Unset today (rule_to_hook uses the regex-matched DETERMINISTIC_PATTERNS table).
+    # Reserved for a future AST-transform registry (shell substitution, path enforcement, etc.).
+    determinism_class: str | None = None
 
     def __post_init__(self) -> None:
         self.confidence = round(max(0.0, min(1.0, self.confidence)), 2)
