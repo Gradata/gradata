@@ -15,8 +15,8 @@ Only RULE-tier lessons are parsed here; INSTINCT/PATTERN lines are ignored.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from typing import Iterable, Iterator
 
 # Captures: group(1) = full prefix, group(2) = category, group(3) = description.
 _RULE_LESSON_RE = re.compile(
@@ -57,4 +57,4 @@ def iter_rule_lessons(lines: Iterable[str]) -> Iterator[RuleLesson]:
             yield parsed
 
 
-__all__ = ["RuleLesson", "parse_rule_lesson", "iter_rule_lessons"]
+__all__ = ["RuleLesson", "iter_rule_lessons", "parse_rule_lesson"]
