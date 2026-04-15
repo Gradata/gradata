@@ -1,0 +1,126 @@
+{
+  "available": true,
+  "source": "gradata-ablation-v2-2026-04-14",
+  "subjects": [
+    "deepseek",
+    "qwen14b",
+    "sonnet"
+  ],
+  "conditions": [
+    "base",
+    "full",
+    "rules"
+  ],
+  "judge": "claude-haiku-4-5-20251001",
+  "trials": 427,
+  "dimensions": [
+    {
+      "dimension": "correctness",
+      "baseline_mean": 0.833,
+      "with_rules_mean": 0.853,
+      "with_full_mean": 0.832,
+      "best_mean": 0.832,
+      "ci_low": 0.806,
+      "ci_high": 0.857,
+      "delta_pp": -0.1,
+      "n_base": 144,
+      "n_with": 139
+    },
+    {
+      "dimension": "preference_adherence",
+      "baseline_mean": 0.732,
+      "with_rules_mean": 0.762,
+      "with_full_mean": 0.755,
+      "best_mean": 0.755,
+      "ci_low": 0.728,
+      "ci_high": 0.782,
+      "delta_pp": 2.3,
+      "n_base": 144,
+      "n_with": 139
+    },
+    {
+      "dimension": "quality",
+      "baseline_mean": 0.793,
+      "with_rules_mean": 0.823,
+      "with_full_mean": 0.799,
+      "best_mean": 0.799,
+      "ci_low": 0.774,
+      "ci_high": 0.825,
+      "delta_pp": 0.6,
+      "n_base": 144,
+      "n_with": 139
+    }
+  ],
+  "per_model": [
+    {
+      "model": "deepseek",
+      "dimensions": [
+        {
+          "dimension": "correctness",
+          "baseline_mean": 0.865,
+          "with_best_mean": 0.853,
+          "delta_pp": -1.1
+        },
+        {
+          "dimension": "preference_adherence",
+          "baseline_mean": 0.773,
+          "with_best_mean": 0.795,
+          "delta_pp": 2.2
+        },
+        {
+          "dimension": "quality",
+          "baseline_mean": 0.831,
+          "with_best_mean": 0.837,
+          "delta_pp": 0.6
+        }
+      ]
+    },
+    {
+      "model": "qwen14b",
+      "dimensions": [
+        {
+          "dimension": "correctness",
+          "baseline_mean": 0.731,
+          "with_best_mean": 0.752,
+          "delta_pp": 2.1
+        },
+        {
+          "dimension": "preference_adherence",
+          "baseline_mean": 0.633,
+          "with_best_mean": 0.648,
+          "delta_pp": 1.5
+        },
+        {
+          "dimension": "quality",
+          "baseline_mean": 0.677,
+          "with_best_mean": 0.69,
+          "delta_pp": 1.2
+        }
+      ]
+    },
+    {
+      "model": "sonnet",
+      "dimensions": [
+        {
+          "dimension": "correctness",
+          "baseline_mean": 0.902,
+          "with_best_mean": 0.892,
+          "delta_pp": -1.0
+        },
+        {
+          "dimension": "preference_adherence",
+          "baseline_mean": 0.79,
+          "with_best_mean": 0.827,
+          "delta_pp": 3.8
+        },
+        {
+          "dimension": "quality",
+          "baseline_mean": 0.871,
+          "with_best_mean": 0.875,
+          "delta_pp": 0.4
+        }
+      ]
+    }
+  ],
+  "updated_at": "2026-04-14T15:18:17.798198+00:00"
+}

@@ -48,8 +48,8 @@ async def list_activity(
         "events",
         columns="id,brain_id,type,source,data,tags,session,created_at",
         filters={"brain_id": brain["id"]},
+        in_={"type": list(_VISIBLE_EVENT_TYPES)},
     )
 
-    visible = [r for r in rows if r.get("type") in _VISIBLE_EVENT_TYPES]
-    visible.sort(key=lambda r: r.get("created_at") or "", reverse=True)
-    return visible[offset : offset + limit]
+    rows.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+    return rows[offset : offset + limit]

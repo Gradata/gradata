@@ -29,6 +29,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import signal
 import sqlite3
 import threading
@@ -416,11 +417,7 @@ class _Handler(BaseHTTPRequestHandler):
         if query.strip():
             try:
                 with d._brain_lock:
-                    results = (
-                        d._brain.search(query)
-                        if hasattr(d._brain, "search")
-                        else []
-                    )
+                    results = d._brain.search(query)
                     if isinstance(results, list):
                         context_parts = [str(r) for r in results[:5]]
             except Exception as e:
@@ -487,8 +484,7 @@ class _Handler(BaseHTTPRequestHandler):
         old_content = body.get("old_content", "")
         new_content = body.get("new_content", "")
 
-        ext = Path(file_path).suffix.lower() if file_path else ""
-        category = _EXT_CATEGORY.get(ext, "GENERAL")
+        category = _category_from_path(file_path) if file_path else "GENERAL"
 
         tags: list[str] = []
         if not old_content and new_content:
@@ -565,8 +561,7 @@ class _Handler(BaseHTTPRequestHandler):
                         d._brain.manifest()
                         completed.append("manifest")
                     elif task_name == "fts_rebuild":
-                        if hasattr(d._brain, "search"):
-                            d._brain.search("")
+                        d._brain.search("")
                         completed.append("fts_rebuild")
                     elif task_name == "patterns":
                         d._brain.export_rules(min_state="PATTERN")
@@ -699,26 +694,24 @@ class GradataDaemon:
         # Opt-in anonymous telemetry
         self._maybe_send_telemetry()
 
-        assert self._server is not None
         try:
             self._server.serve_forever()
         finally:
             self._cleanup()
 
-    def _try_bind(self, port: int) -> int:
-        """Try to bind to *port*, falling back up to 10 attempts."""
+    def _try_bind(self, port: int) -> None:
+        """Try to bind to *port*, falling back up to 10 attempts, then OS-assigned."""
         last_err: Exception | None = None
         for attempt in range(10):
             try:
                 self._server = _ThreadingHTTPServer(("127.0.0.1", port + attempt), _Handler)
-                return port + attempt
+                return
             except OSError as exc:
                 last_err = exc
                 logger.debug("Port %d in use, trying next", port + attempt)
         # If all 10 failed, try OS-assigned
         try:
             self._server = _ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
-            return 0
         except OSError:
             raise RuntimeError(f"Could not bind to any port (last error: {last_err})") from last_err
 
@@ -736,17 +729,16 @@ class GradataDaemon:
 
     def _maybe_send_telemetry(self) -> None:
         """Send anonymous daily heartbeat if telemetry is opted in."""
-        import re as _re
         config_path = Path.home() / ".gradata" / "config.toml"
         try:
             config_text = config_path.read_text(encoding="utf-8")
         except FileNotFoundError:
             return
 
-        if not _re.search(r"^\s*telemetry\s*=\s*true\s*$", config_text, _re.IGNORECASE | _re.MULTILINE):
+        if not re.search(r"^\s*telemetry\s*=\s*true\s*$", config_text, re.IGNORECASE | re.MULTILINE):
             return
 
-        match = _re.search(r'telemetry_last_sent\s*=\s*"([^"]+)"', config_text)
+        match = re.search(r'telemetry_last_sent\s*=\s*"([^"]+)"', config_text)
         if match:
             try:
                 last_sent = datetime.fromisoformat(match.group(1))
@@ -785,10 +777,9 @@ class GradataDaemon:
             except Exception:
                 pass
             try:
-                import re as _re2
                 now = datetime.now(UTC).isoformat()
                 if "telemetry_last_sent" in config_text:
-                    new_config = _re2.sub(
+                    new_config = re.sub(
                         r'telemetry_last_sent\s*=\s*"[^"]*"',
                         f'telemetry_last_sent = "{now}"',
                         config_text,

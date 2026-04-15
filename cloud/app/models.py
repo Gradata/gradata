@@ -108,6 +108,7 @@ class UserProfile(BaseModel):
     user_id: str
     display_name: str | None = None
     email: str | None = None
+    plan: str | None = None  # top-level plan derived from owner workspace
     workspaces: list[dict] = Field(default_factory=list)
     created_at: str | None = None
 

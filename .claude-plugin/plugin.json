@@ -1,0 +1,19 @@
+{
+  "name": "gradata",
+  "version": "0.1.0",
+  "description": "AI that learns your judgment. Corrections become rules.",
+  "author": {
+    "name": "Gradata",
+    "url": "https://gradata.ai"
+  },
+  "homepage": "https://gradata.ai",
+  "repository": "https://github.com/Gradata/gradata",
+  "license": "AGPL-3.0-or-later",
+  "keywords": [
+    "learning",
+    "corrections",
+    "rules",
+    "memory",
+    "personalization"
+  ]
+}

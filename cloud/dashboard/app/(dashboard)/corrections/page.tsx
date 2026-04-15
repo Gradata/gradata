@@ -31,7 +31,12 @@ export default function CorrectionsPage() {
   const filtered = filter === 'all' ? corrections : corrections.filter((c) => c.severity === filter)
 
   if (loadingBrains || loading) return <LoadingSpinner className="py-20" />
-  if (!primaryId) return <EmptyState title="No brain yet" description="Install the SDK to start logging corrections." />
+  if (!primaryId) return (
+    <EmptyState
+      title="No brain yet"
+      description="Install the SDK and log your first correction to see it here. See Setup in the left nav for install instructions."
+    />
+  )
 
   const severities: Array<'all' | Correction['severity']> = ['all', 'trivial', 'minor', 'moderate', 'major', 'rewrite']
 
