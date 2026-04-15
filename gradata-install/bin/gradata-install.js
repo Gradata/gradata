@@ -1,15 +1,14 @@
 #!/usr/bin/env node
 /**
- * gradata-install — One-command installer for Gradata.
+ * gradata-install — [DEPRECATED] Legacy npm wrapper for Gradata.
  *
- * Wraps: Python check -> pipx/pip install gradata -> gradata hooks install.
- * Does NOT bundle Python. Spawns the local python/pipx/pip binaries.
+ * As of Gradata v0.6, this package is deprecated. The primary install path is:
  *
- * Usage:
- *   npx gradata-install install [--ide=<name>]
- *   npx gradata-install --help
+ *     pip install gradata
+ *     gradata hooks install
  *
- * Supported IDEs: claude-code (default), cursor, codex, gemini-cli, continue
+ * This shim remains for backwards compatibility but will print a deprecation
+ * notice and otherwise function identically.
  */
 
 "use strict";
@@ -17,6 +16,16 @@
 const { spawnSync } = require("node:child_process");
 const os = require("node:os");
 const process = require("node:process");
+
+// ---- Deprecation notice ------------------------------------------------------
+
+process.stderr.write(
+  "\n" +
+  "\u001b[33m⚠  gradata-install is deprecated as of v0.6.\u001b[0m\n" +
+  "   Use `pip install gradata && gradata hooks install` directly.\n" +
+  "   This wrapper still works but will not receive new features.\n" +
+  "   See: https://github.com/Gradata/gradata#install\n\n"
+);
 
 // ---- Constants ---------------------------------------------------------------
 

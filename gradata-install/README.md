@@ -1,45 +1,44 @@
 # gradata-install
 
-One command to install Gradata and wire it into your IDE.
+> ⚠️ **Deprecated as of Gradata v0.6.** This npm wrapper is no longer the primary install path.
+>
+> Use the Python package directly:
+>
+> ```bash
+> pip install gradata
+> gradata hooks install
+> ```
+>
+> This npm package remains published for backwards compatibility but will not receive new IDE integrations or feature updates. For Cursor, Codex, Gemini CLI, or Continue support, [open an issue](https://github.com/Gradata/gradata/issues) — we'll prioritize adding the installer to the main `gradata` Python package.
 
-## Usage
+## Why the deprecation?
+
+The Gradata SDK is a Python tool. A Python-ecosystem install path (`pip` / `pipx`) is the natural choice. Wrapping it in an npm package created:
+
+- Two install paths competing for the same user journey
+- An extra maintenance surface (Node version compat, npm audit warnings, semver coordination)
+- Confusion about what's Python vs what's Node
+
+One install, one mental model:
+
+```bash
+pip install gradata           # Install the SDK
+gradata hooks install         # Wire up Claude Code hooks
+```
+
+## Historical usage (still works, not recommended)
 
 ```bash
 npx gradata-install install --ide=claude-code
 ```
 
-No clone, no venv, no multi-step setup. This wrapper spawns the Python tooling that's already on your machine.
+Under the hood this always did exactly two things:
 
-## Supported IDEs
+1. `pip install gradata` (via pipx if available)
+2. `gradata hooks install`
 
-- `claude-code` (default)
-- `cursor`
-- `codex`
-- `gemini-cli`
-- `continue`
-
-## What it does
-
-Transparent three-step flow:
-
-1. Verifies Python >= 3.11 is installed (fails with exact install instructions for macOS/Linux/Windows if missing).
-2. Installs the `gradata` Python package — prefers `pipx`, falls back to `pip install --user` if pipx isn't available.
-3. Runs `gradata hooks install` to wire up your chosen IDE (correction capture, rule injection, status reporting).
-
-This package is a thin Node shim. It does not bundle Python or any Gradata logic. All real work happens in the `gradata` Python package.
-
-## Prerequisites
-
-- Node.js >= 18 (you have this if you ran `npx`)
-- Python >= 3.11 ([python.org/downloads](https://www.python.org/downloads/))
-- `pipx` recommended ([pipx.pypa.io](https://pipx.pypa.io/)) for clean isolated installs
-
-## After install
-
-- Restart your IDE so it picks up the new hook.
-- Verify with `gradata status`.
-- Docs and source: [github.com/Gradata/gradata](https://github.com/Gradata/gradata).
+Running those two commands directly is equivalent and transparent.
 
 ## License
 
-AGPL-3.0-or-later — same as the main Gradata project.
+Apache-2.0 — matches the main Gradata SDK.
