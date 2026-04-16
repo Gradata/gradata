@@ -31,6 +31,8 @@ class PipelineResult:
     freshness_updates: int = 0
     errors: list[str] = field(default_factory=list)
     skills_generated: list[str] = field(default_factory=list)
+    skills_updated: int = 0
+    self_observation_candidates: int = 0
 
 
 def _generate_skill_file(
@@ -69,6 +71,21 @@ def _generate_skill_file(
 
     skill_path = skill_dir / "SKILL.md"
 
+    # Skip regeneration if skill exists and confidence hasn't changed significantly
+    if skill_path.is_file():
+        existing_text = skill_path.read_text(encoding="utf-8")
+        conf_match = re.search(r"confidence:\s*([\d.]+)", existing_text)
+        if conf_match:
+            old_conf = float(conf_match.group(1))
+            if abs(lesson.confidence - old_conf) < 0.05:
+                return None  # No significant change — skip regeneration
+        else:
+            return None  # Can't parse old confidence — skip (don't assume infinite delta)
+
+    from datetime import UTC, datetime
+
+    updated_at = datetime.now(UTC).isoformat()
+
     content = f"""---
 name: {lesson.description[:60]}
 description: Auto-graduated from correction-driven learning (confidence {lesson.confidence:.2f}, fired {getattr(lesson, 'fire_count', 0)} times)
@@ -76,6 +93,7 @@ source: gradata-behavioral-engine
 confidence: {lesson.confidence}
 category: {lesson.category}
 graduated_at_session: {getattr(lesson, 'created_session', 0)}
+updated_at: {updated_at}
 ---
 
 # {lesson.description}
@@ -254,6 +272,52 @@ def run_rule_pipeline(
     except ImportError:
         pass  # retrieval_fusion not available
 
+    # ── Phase 1.5: Self-observation (consume SELF_REVIEW_VIOLATION events) ──
+    # Must run after Phase 1 so all_lessons is already populated for dedup.
+    try:
+        from gradata._db import get_connection
+        if db_path.is_file():
+            conn = get_connection(db_path)
+            rows = conn.execute(
+                "SELECT data FROM events WHERE type = 'SELF_REVIEW_VIOLATION' "
+                "AND session = ? ORDER BY id DESC LIMIT 20",
+                (current_session,),
+            ).fetchall()
+            conn.close()
+
+            import json as _json
+            for row in rows:
+                try:
+                    vdata = _json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                except (TypeError, _json.JSONDecodeError):
+                    continue
+                rule_desc = vdata.get("rule", "")
+                cat = vdata.get("category", "UNKNOWN").upper()
+                if not rule_desc:
+                    continue
+                desc = f"Violated: {rule_desc}"
+                already_exists = any(
+                    l.category == cat and l.description == desc
+                    for l in all_lessons
+                )
+                if already_exists:
+                    continue
+                from gradata._types import Lesson as _Lesson
+                from datetime import date as _date
+                candidate = _Lesson(
+                    date=_date.today().isoformat(),
+                    state=LessonState.INSTINCT,
+                    confidence=0.40,
+                    category=cat,
+                    description=desc,
+                    pending_approval=True,
+                    agent_type="self_observation",
+                )
+                all_lessons.append(candidate)
+                result.self_observation_candidates += 1
+    except (ImportError, Exception) as exc:
+        result.errors.append(f"Phase 0: self-observation: {exc}")
+
     # ── Phase 2: Atomic writes ────────────────────────────────────────────────
     # Graduate rules, update confidence, create meta-rules.
     for lesson in all_lessons:
@@ -359,6 +423,13 @@ def run_rule_pipeline(
         try:
             skills_dir = lessons_path.parent.parent / ".claude" / "skills" / "generated"
             for lesson in all_lessons:
+                # Detect whether skill file pre-existed to distinguish new vs updated
+                slug = re.sub(
+                    r"[^a-z0-9]+",
+                    "-",
+                    f"{lesson.category}-{lesson.description[:40]}".lower(),
+                ).strip("-")
+                skill_existed = (skills_dir / slug / "SKILL.md").is_file()
                 skill_path = _generate_skill_file(lesson, skills_dir)
                 if skill_path:
                     review = review_generated_skill(skill_path)
@@ -367,6 +438,8 @@ def run_rule_pipeline(
                         result.errors.append(f"Phase 3: skill rejected: {review['issues']}")
                     else:
                         result.skills_generated.append(str(skill_path))
+                        if skill_existed:
+                            result.skills_updated += 1
         except Exception as exc:
             result.errors.append(f"Phase 3: skill generation: {exc}")
 
@@ -380,3 +453,94 @@ def run_rule_pipeline(
         len(result.errors),
     )
     return result
+
+
+def build_knowledge_graph(lessons_path: Path, db_path: Path) -> dict:
+    """Assemble existing lessons data into a queryable knowledge graph.
+
+    Args:
+        lessons_path: Path to lessons.md.
+        db_path: Path to system.db (unused directly; passed for future causal link queries).
+
+    Returns:
+        Dict with keys: nodes, clusters, causal_links, contradictions, cross_domain, stats.
+    """
+    from gradata.enhancements.self_improvement import parse_lessons
+
+    graph: dict = {
+        "nodes": [],
+        "clusters": [],
+        "causal_links": [],
+        "contradictions": [],
+        "cross_domain": [],
+        "stats": {},
+    }
+
+    if not lessons_path.is_file():
+        graph["stats"] = {
+            "total_nodes": 0,
+            "clusters": 0,
+            "contradictions": 0,
+            "cross_domain": 0,
+            "causal_links": 0,
+        }
+        return graph
+
+    text = lessons_path.read_text(encoding="utf-8")
+    lessons = parse_lessons(text)
+
+    # Nodes: each lesson is a node
+    for lesson in lessons:
+        graph["nodes"].append({
+            "id": f"{lesson.category}:{lesson.description[:40]}",
+            "description": lesson.description,
+            "category": lesson.category,
+            "confidence": lesson.confidence,
+            "state": lesson.state.name,
+            "fire_count": getattr(lesson, "fire_count", 0),
+        })
+
+    # Clusters
+    try:
+        from gradata.enhancements.clustering import cluster_rules  # type: ignore[import]
+        graph["clusters"] = [
+            {
+                "cluster_id": c.cluster_id,
+                "domain": c.domain,
+                "category": c.category,
+                "size": c.size,
+                "confidence": c.cluster_confidence,
+                "has_contradictions": c.has_contradictions,
+            }
+            for c in cluster_rules(lessons)
+        ]
+    except (ImportError, Exception):
+        pass
+
+    # Contradictions (across graduated rules)
+    try:
+        from gradata.enhancements.clustering import detect_contradictions  # type: ignore[import]
+        graduated = [l for l in lessons if l.state.name in ("RULE", "PATTERN")]
+        graph["contradictions"] = [
+            {"rule_a": a, "rule_b": b}
+            for a, b in detect_contradictions(graduated)
+        ]
+    except (ImportError, Exception):
+        pass
+
+    # Cross-domain candidates
+    try:
+        from gradata.enhancements.meta_rules import detect_cross_domain_candidates  # type: ignore[import]
+        graph["cross_domain"] = detect_cross_domain_candidates(lessons)
+    except (ImportError, Exception):
+        pass
+
+    graph["stats"] = {
+        "total_nodes": len(graph["nodes"]),
+        "clusters": len(graph["clusters"]),
+        "contradictions": len(graph["contradictions"]),
+        "cross_domain": len(graph["cross_domain"]),
+        "causal_links": len(graph["causal_links"]),
+    }
+
+    return graph

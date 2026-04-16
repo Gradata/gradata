@@ -1705,6 +1705,41 @@ class Brain(BrainInspectionMixin):
         except ImportError:
             return "# Brain Briefing\n\nBriefing module not available."
 
+    def knowledge_graph(self) -> dict:
+        """Return a knowledge graph of learned rules, clusters, and causal links.
+
+        Assembles nodes (one per lesson), rule clusters, cross-domain candidates,
+        and contradiction pairs from existing brain data without any additional I/O
+        beyond reading lessons.md.
+
+        Returns:
+            Dict with keys: nodes, clusters, causal_links, contradictions,
+            cross_domain, stats.
+        """
+        try:
+            from gradata.enhancements.rule_pipeline import build_knowledge_graph
+
+            lessons_path = self._find_lessons_path()
+            if not lessons_path:
+                return {
+                    "nodes": [],
+                    "clusters": [],
+                    "causal_links": [],
+                    "contradictions": [],
+                    "cross_domain": [],
+                    "stats": {},
+                }
+            return build_knowledge_graph(lessons_path, self.db_path)
+        except ImportError:
+            return {
+                "nodes": [],
+                "clusters": [],
+                "causal_links": [],
+                "contradictions": [],
+                "cross_domain": [],
+                "stats": {},
+            }
+
     def backfill_from_git(
         self,
         repo_path: str | Path = ".",

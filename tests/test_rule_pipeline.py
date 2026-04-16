@@ -6,6 +6,8 @@ meta_rules, rule_to_hook) are mocked or suppressed via import patching.
 """
 from __future__ import annotations
 
+import json
+import sqlite3
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -13,7 +15,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from gradata._types import Lesson, LessonState
-from gradata.enhancements.rule_pipeline import PipelineResult, run_rule_pipeline
+from gradata.enhancements.rule_pipeline import (
+    PipelineResult,
+    _generate_skill_file,
+    build_knowledge_graph,
+    run_rule_pipeline,
+)
 from gradata.enhancements.self_improvement import format_lessons
 
 
@@ -276,3 +283,235 @@ def test_pipeline_missing_lessons_file_returns_phase1_error(tmp_path: Path) -> N
 
     assert any("Phase 1" in e for e in result.errors)
     assert result.graduated == []
+
+
+# ---------------------------------------------------------------------------
+# Helpers for Phase 0 / self-observation tests
+# ---------------------------------------------------------------------------
+
+
+def _make_db_with_violations(db_path: Path, session: int, violations: list[dict]) -> None:
+    """Create a minimal events table and insert SELF_REVIEW_VIOLATION rows."""
+    conn = sqlite3.connect(str(db_path))
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS events "
+        "(id INTEGER PRIMARY KEY, type TEXT, session INTEGER, data TEXT)"
+    )
+    for v in violations:
+        conn.execute(
+            "INSERT INTO events (type, session, data) VALUES (?, ?, ?)",
+            ("SELF_REVIEW_VIOLATION", session, json.dumps(v)),
+        )
+    conn.commit()
+    conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Feature A: Phase 0 self-observation tests
+# ---------------------------------------------------------------------------
+
+
+def test_phase0_self_observation_creates_candidates(tmp_path: Path) -> None:
+    """SELF_REVIEW_VIOLATION events produce new INSTINCT lesson candidates."""
+    lessons_path = tmp_path / "lessons.md"
+    lessons_path.write_text("", encoding="utf-8")
+    db_path = tmp_path / "system.db"
+    _make_db_with_violations(
+        db_path,
+        session=7,
+        violations=[{"rule": "Always validate input", "category": "SECURITY"}],
+    )
+
+    result = run_rule_pipeline(lessons_path, db_path, current_session=7)
+
+    assert result.self_observation_candidates == 1
+    updated_text = lessons_path.read_text(encoding="utf-8")
+    assert "Violated: Always validate input" in updated_text
+
+
+def test_phase0_deduplicates_existing_violations(tmp_path: Path) -> None:
+    """A violation that matches an existing lesson description is not re-added."""
+    existing = _make_lesson(
+        category="SECURITY",
+        description="Violated: Always validate input",
+        state=LessonState.INSTINCT,
+        confidence=0.40,
+    )
+    lessons_path = tmp_path / "lessons.md"
+    _write_lessons(lessons_path, [existing])
+    db_path = tmp_path / "system.db"
+    _make_db_with_violations(
+        db_path,
+        session=7,
+        violations=[{"rule": "Always validate input", "category": "SECURITY"}],
+    )
+
+    result = run_rule_pipeline(lessons_path, db_path, current_session=7)
+
+    assert result.self_observation_candidates == 0
+
+
+def test_phase0_marks_pending_approval(tmp_path: Path) -> None:
+    """Self-observation candidates are written with pending_approval=True."""
+    lessons_path = tmp_path / "lessons.md"
+    lessons_path.write_text("", encoding="utf-8")
+    db_path = tmp_path / "system.db"
+    _make_db_with_violations(
+        db_path,
+        session=1,
+        violations=[{"rule": "Never skip tests", "category": "QUALITY"}],
+    )
+
+    run_rule_pipeline(lessons_path, db_path, current_session=1)
+
+    from gradata.enhancements.self_improvement import parse_lessons
+
+    lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+    candidates = [l for l in lessons if l.description == "Violated: Never skip tests"]
+    assert candidates, "Candidate lesson not written"
+    assert candidates[0].pending_approval is True
+    assert candidates[0].agent_type == "self_observation"
+
+
+# ---------------------------------------------------------------------------
+# Feature B: Skill auto-update tests
+# ---------------------------------------------------------------------------
+
+
+def _make_rule_lesson(description: str = "Use colons not dashes", confidence: float = 0.95) -> Lesson:
+    return Lesson(
+        date="2026-01-01",
+        state=LessonState.RULE,
+        confidence=confidence,
+        category="FORMATTING",
+        description=description,
+        fire_count=5,
+    )
+
+
+def test_skill_update_skips_small_delta(tmp_path: Path) -> None:
+    """_generate_skill_file returns None when confidence delta < 0.05."""
+    lesson = _make_rule_lesson(confidence=0.95)
+    # Write existing skill with confidence 0.94 (delta = 0.01 < 0.05)
+    slug = "formatting-use-colons-not-dashes"
+    skill_dir = tmp_path / slug
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text(
+        "---\nconfidence: 0.94\n---\n# Existing skill\n",
+        encoding="utf-8",
+    )
+
+    result = _generate_skill_file(lesson, tmp_path)
+
+    assert result is None
+
+
+def test_skill_update_regenerates_large_delta(tmp_path: Path) -> None:
+    """_generate_skill_file regenerates when confidence delta >= 0.05."""
+    lesson = _make_rule_lesson(confidence=0.95)
+    # Write existing skill with confidence 0.80 (delta = 0.15 >= 0.05)
+    slug = "formatting-use-colons-not-dashes"
+    skill_dir = tmp_path / slug
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text(
+        "---\nconfidence: 0.80\n---\n# Old skill\n",
+        encoding="utf-8",
+    )
+
+    result = _generate_skill_file(lesson, tmp_path)
+
+    assert result is not None
+    assert result.is_file()
+    updated = result.read_text(encoding="utf-8")
+    assert "confidence: 0.95" in updated
+    assert "updated_at:" in updated
+
+
+def test_skill_update_skips_unparseable_confidence(tmp_path: Path) -> None:
+    """_generate_skill_file returns None when existing file has no parseable confidence."""
+    lesson = _make_rule_lesson(confidence=0.95)
+    slug = "formatting-use-colons-not-dashes"
+    skill_dir = tmp_path / slug
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text(
+        "---\nno-confidence-here: true\n---\n# Broken frontmatter\n",
+        encoding="utf-8",
+    )
+
+    result = _generate_skill_file(lesson, tmp_path)
+
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Feature C: build_knowledge_graph tests
+# ---------------------------------------------------------------------------
+
+
+def test_build_knowledge_graph_empty_lessons(tmp_path: Path) -> None:
+    """An empty lessons file yields a graph with zero nodes."""
+    lessons_path = tmp_path / "lessons.md"
+    lessons_path.write_text("", encoding="utf-8")
+    db_path = tmp_path / "system.db"
+
+    graph = build_knowledge_graph(lessons_path, db_path)
+
+    assert graph["nodes"] == []
+    assert graph["stats"]["total_nodes"] == 0
+
+
+def test_build_knowledge_graph_missing_file(tmp_path: Path) -> None:
+    """A missing lessons file yields an empty graph without raising."""
+    lessons_path = tmp_path / "lessons.md"
+    db_path = tmp_path / "system.db"
+
+    graph = build_knowledge_graph(lessons_path, db_path)
+
+    assert graph["nodes"] == []
+    assert graph["stats"]["total_nodes"] == 0
+
+
+def test_build_knowledge_graph_assembles_nodes(tmp_path: Path) -> None:
+    """Each lesson in lessons.md becomes a node in the graph."""
+    lessons = [
+        _make_lesson(category="FORMATTING", description="Never use em dashes"),
+        _make_lesson(category="TONE", description="Use peer-to-peer language"),
+    ]
+    lessons_path = tmp_path / "lessons.md"
+    _write_lessons(lessons_path, lessons)
+    db_path = tmp_path / "system.db"
+
+    graph = build_knowledge_graph(lessons_path, db_path)
+
+    assert graph["stats"]["total_nodes"] == 2
+    ids = [n["id"] for n in graph["nodes"]]
+    assert any("FORMATTING" in i for i in ids)
+    assert any("TONE" in i for i in ids)
+
+
+def test_build_knowledge_graph_includes_clusters(tmp_path: Path) -> None:
+    """build_knowledge_graph returns clusters when the clustering module is present."""
+    lessons = [_make_lesson(category="TONE", description="Use peer-to-peer language")]
+    lessons_path = tmp_path / "lessons.md"
+    _write_lessons(lessons_path, lessons)
+    db_path = tmp_path / "system.db"
+
+    # Mock the clustering module
+    mock_cluster = MagicMock()
+    mock_cluster.cluster_id = "c1"
+    mock_cluster.domain = "sales"
+    mock_cluster.category = "TONE"
+    mock_cluster.size = 1
+    mock_cluster.cluster_confidence = 0.7
+    mock_cluster.has_contradictions = False
+
+    mock_clustering = MagicMock()
+    mock_clustering.cluster_rules.return_value = [mock_cluster]
+    mock_clustering.detect_contradictions.return_value = []
+
+    with patch.dict(sys.modules, {"gradata.enhancements.clustering": mock_clustering}):
+        graph = build_knowledge_graph(lessons_path, db_path)
+
+    assert len(graph["clusters"]) == 1
+    assert graph["clusters"][0]["cluster_id"] == "c1"
+    assert graph["stats"]["clusters"] == 1
