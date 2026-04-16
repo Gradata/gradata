@@ -42,4 +42,4 @@ This package is a thin Node shim. It does not bundle Python or any Gradata logic
 
 ## License
 
-AGPL-3.0-or-later — same as the main Gradata project.
+Apache-2.0 — same as the main Gradata project.

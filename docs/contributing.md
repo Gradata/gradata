@@ -111,6 +111,6 @@ For security issues, email `security@gradata.ai` instead of opening an issue.
 
 ## License
 
-By contributing, you agree your contributions will be licensed under **AGPL-3.0** (for SDK code) or the applicable proprietary terms (for Cloud-only code under `cloud/`, which is not open source).
+By contributing, you agree your contributions will be licensed under **Apache-2.0**, the same license as the rest of the SDK.
 
 See [`LICENSE`](https://github.com/Gradata/gradata/blob/main/LICENSE) for the full text.

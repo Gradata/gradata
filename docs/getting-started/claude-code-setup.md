@@ -131,4 +131,4 @@ You should see a JSON-RPC response with `protocolVersion` and `serverInfo`.
 | Tools | memory, recall, whoAmI | correct, recall, manifest |
 | Learning | Stores memories | Graduates corrections into rules |
 | Proof | None | brain.manifest.json |
-| Open source | Partial | Full SDK (AGPL) |
+| Open source | Partial | Full SDK (Apache-2.0) |
