@@ -1102,20 +1102,35 @@ def _cloud_sync_session(
         sync_client.sync_metrics(payload)
         _log.debug("Cloud telemetry synced for session %d", session)
 
-        # 4. Sync events/corrections via the full cloud client
+        # Finding 11: respect sync_mode — default is metrics_only.
+        # Only sync full events/corrections if explicitly opted in via config.
+        sync_mode = "metrics_only"
         try:
-            from gradata.cloud.client import CloudClient
+            cfg = _parse_toml_cloud(config_path)
+            sync_mode = cfg.get("sync_mode", "metrics_only")
+        except Exception:
+            pass
 
-            cloud = CloudClient(
-                brain_dir=brain.dir,
-                api_key=api_key,
-                endpoint=api_url or None,
+        if sync_mode == "full":
+            # 4. Sync events/corrections via the full cloud client (opt-in only)
+            try:
+                from gradata.cloud.client import CloudClient
+
+                cloud = CloudClient(
+                    brain_dir=brain.dir,
+                    api_key=api_key,
+                    endpoint=api_url or None,
+                )
+                if cloud.connect():
+                    cloud.sync()
+                    _log.debug("Cloud event sync completed for session %d", session)
+            except Exception as e:
+                _log.debug("Cloud event sync failed (non-fatal): %s", e)
+        else:
+            _log.debug(
+                "Cloud sync_mode=%s — skipping event/correction sync for session %d",
+                sync_mode, session,
             )
-            if cloud.connect():
-                cloud.sync()
-                _log.debug("Cloud event sync completed for session %d", session)
-        except Exception as e:
-            _log.debug("Cloud event sync failed (non-fatal): %s", e)
 
     except Exception as e:
         _log.debug("Cloud sync failed (non-fatal): %s", e)
