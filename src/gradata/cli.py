@@ -568,7 +568,7 @@ def cmd_login(args):
     device_code = code_data["device_code"]
     expires_in = code_data.get("expires_in", 600)
     interval = code_data.get("interval", 2)
-    verification_url = code_data.get("verification_url", "https://app.gradata.ai/auth/device")
+    verification_url = code_data.get("verification_url", "https://app.gradata.ai/connect")
 
     # Format with dash for readability: ABCD-EF
     formatted = f"{user_code[:4]}-{user_code[4:]}" if len(user_code) > 4 else user_code
