@@ -77,4 +77,4 @@ Methods:
 
 ## License
 
-AGPL-3.0-or-later. See `LICENSE` at the repository root.
+Apache-2.0. See `LICENSE` at the repository root.

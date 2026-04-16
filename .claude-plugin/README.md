@@ -94,4 +94,4 @@ New corrections start at `INSTINCT`. It takes repeated reinforcement before a ru
 - SDK: https://pypi.org/project/gradata/
 - Source: https://github.com/Gradata/gradata
 - Docs: https://gradata.ai
-- License: AGPL-3.0-or-later
+- License: Apache-2.0

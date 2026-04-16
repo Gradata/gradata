@@ -38,4 +38,4 @@ Gradata's novel contribution is the **graduation pipeline + correction tracking 
 
 ## License
 
-Gradata is **AGPL-3.0** — use it, fork it, host it. If you host a SaaS version, your modifications must be open-source too. This is deliberate: the common ecosystem wins, the fork-and-close play doesn't.
+Gradata is **Apache-2.0** — use it, fork it, embed it. No copyleft restrictions on your application.
