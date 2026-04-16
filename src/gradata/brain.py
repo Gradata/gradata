@@ -130,9 +130,9 @@ class Brain(BrainInspectionMixin):
 
         # Initialize pattern registries (lazy — ImportError safe)
         try:
-            from gradata.enhancements.carl import ContractRegistry
+            from gradata.enhancements.behavioral_engine import DirectiveRegistry
 
-            self.contracts = ContractRegistry()
+            self.contracts = DirectiveRegistry()
         except ImportError:
             self.contracts = None  # type: ignore[assignment]
         try:

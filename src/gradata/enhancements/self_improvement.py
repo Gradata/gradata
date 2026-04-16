@@ -16,6 +16,9 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass, field
+from enum import StrEnum
+from pathlib import Path
 
 from gradata._types import (
     CorrectionType,
@@ -1469,3 +1472,340 @@ def compute_learning_velocity(
         "correction_categories": cat_dist,
         "avg_time_to_rule": round(avg_time, 1),
     }
+
+
+# ---------------------------------------------------------------------------
+# Rule Pipeline Orchestrator (3-phase, adapted from Hindsight retain)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class PipelineResult:
+    """Result of a full rule pipeline run."""
+
+    graduated: list[str] = field(default_factory=list)
+    demoted: list[str] = field(default_factory=list)
+    meta_rules_created: list[str] = field(default_factory=list)
+    hooks_promoted: list[str] = field(default_factory=list)
+    disposition_updates: dict[str, dict] = field(default_factory=dict)
+    freshness_updates: int = 0
+    errors: list[str] = field(default_factory=list)
+
+
+def run_rule_pipeline(
+    lessons_path: Path,
+    db_path: Path,
+    current_session: int,
+    corrections: list[dict] | None = None,
+) -> PipelineResult:
+    """Coordinated 3-phase rule pipeline.
+
+    Adapted from Hindsight's 3-phase retain orchestrator:
+    - Phase 1 (read): Load state, compute freshness, rank rules
+    - Phase 2 (atomic): Graduate rules, create meta-rules, update confidence
+    - Phase 3 (best-effort): Hook promotion, disposition updates, events
+
+    Args:
+        lessons_path: Path to lessons.md file.
+        db_path: Path to system.db.
+        current_session: Current session number.
+        corrections: Recent corrections from this session.
+
+    Returns:
+        PipelineResult with all changes made.
+    """
+    result = PipelineResult()
+    corrections = corrections or []
+
+    # ── Phase 1: Read (non-destructive) ──────────────────────────────────────
+    # Load all state needed for decision-making. No writes.
+    try:
+        text = lessons_path.read_text(encoding="utf-8")
+        all_lessons = parse_lessons(text)
+    except Exception as exc:
+        result.errors.append(f"Phase 1: failed to load lessons: {exc}")
+        return result
+
+    # Compute freshness for all graduated rules
+    try:
+        from gradata.enhancements.freshness import (  # type: ignore[import]
+            Trend,
+            compute_trend,
+        )
+
+        for lesson in all_lessons:
+            if lesson.state.name in ("RULE", "PATTERN"):
+                correction_sessions = [
+                    {"session": current_session - i, "severity": "minor"}
+                    for i in range(getattr(lesson, "fire_count", 0))
+                ]
+                trend = compute_trend(correction_sessions, current_session)
+                if trend == Trend.STALE:
+                    sessions_stale = getattr(lesson, "sessions_since_fire", 0)
+                    if sessions_stale > 30:
+                        decay = -0.01 * (sessions_stale - 29)
+                        lesson.confidence = max(0.0, lesson.confidence + decay)
+                        result.freshness_updates += 1
+    except ImportError:
+        pass  # freshness module not available
+
+    # Rank rules using retrieval fusion if available
+    try:
+        from gradata.enhancements.retrieval_fusion import (  # type: ignore[import]
+            ScoredRule,
+            apply_correction_boost,
+            reciprocal_rank_fusion,
+        )
+
+        scored_by_confidence = [
+            ScoredRule(
+                rule_id=getattr(l, "description", "")[:40],
+                text=l.description,
+                score=l.confidence,
+                source="confidence",
+                metadata={
+                    "from_correction": bool(getattr(l, "correction_event_ids", None)),
+                    "recency_score": 0.8 if l.state.name == "RULE" else 0.5,
+                    "severity_score": 0.5,
+                },
+            )
+            for l in all_lessons
+            if l.state.name in ("RULE", "PATTERN") and l.confidence >= 0.60
+        ]
+        if scored_by_confidence:
+            merged = reciprocal_rank_fusion([scored_by_confidence])
+            apply_correction_boost(merged)
+            _log.debug("Phase 1: ranked %d rules via fusion", len(merged))
+    except ImportError:
+        pass  # retrieval_fusion not available
+
+    # ── Phase 2: Atomic writes ────────────────────────────────────────────────
+    # Graduate rules, update confidence, create meta-rules.
+    for lesson in all_lessons:
+        if lesson.state.name == "INSTINCT" and lesson.confidence >= PATTERN_THRESHOLD:
+            if lesson.fire_count >= MIN_APPLICATIONS_FOR_PATTERN:
+                lesson.state = LessonState.PATTERN
+                result.graduated.append(f"{lesson.category}:{lesson.description[:30]}")
+        elif lesson.state.name == "PATTERN" and lesson.confidence >= RULE_THRESHOLD:
+            if lesson.fire_count >= MIN_APPLICATIONS_FOR_RULE:
+                lesson.state = LessonState.RULE
+                result.graduated.append(f"{lesson.category}:{lesson.description[:30]}")
+
+    # Synthesize meta-rules from graduated rules
+    try:
+        from gradata.enhancements.meta_rules import synthesize_meta_rules_agentic  # type: ignore[import]
+        from gradata.enhancements.meta_rules_storage import (  # type: ignore[import]
+            load_meta_rules,
+            save_meta_rules,
+        )
+
+        existing_metas = []
+        if db_path.is_file():
+            existing_metas = load_meta_rules(db_path)
+
+        new_metas = synthesize_meta_rules_agentic(
+            lessons=all_lessons,
+            existing_metas=existing_metas,
+            current_session=current_session,
+        )
+        if new_metas and db_path.is_file():
+            save_meta_rules(db_path, existing_metas + new_metas)
+            result.meta_rules_created = [m.id for m in new_metas]
+    except (ImportError, Exception) as exc:
+        result.errors.append(f"Phase 2: meta-rule synthesis: {exc}")
+
+    # Write lessons back
+    try:
+        lessons_path.write_text(format_lessons(all_lessons), encoding="utf-8")
+    except Exception as exc:
+        result.errors.append(f"Phase 2: failed to write lessons: {exc}")
+
+    # ── Phase 3: Best-effort (non-critical) ───────────────────────────────────
+    # Hook promotion, disposition updates, event emission.
+    # Failures here are logged but don't abort the pipeline.
+
+    # Hook promotion for newly graduated RULE-state lessons
+    try:
+        from gradata.enhancements.rule_to_hook import classify_rule, promote  # type: ignore[import]
+
+        for lesson in all_lessons:
+            if lesson.state.name == "RULE" and lesson.confidence >= RULE_THRESHOLD:
+                candidate = classify_rule(lesson.description, lesson.confidence)
+                if candidate.determinism.value != "not_deterministic":
+                    try:
+                        gen_result = promote(
+                            lesson.description,
+                            lesson.confidence,
+                            lesson=lesson,
+                            source="pipeline",
+                        )
+                        if getattr(gen_result, "installed", False):
+                            result.hooks_promoted.append(lesson.description[:40])
+                    except Exception as exc:
+                        result.errors.append(f"Phase 3: hook promotion: {exc}")
+    except ImportError:
+        pass
+
+    # Disposition updates from this session's corrections
+    try:
+        from gradata.enhancements.behavioral_engine import DispositionTracker  # type: ignore[import]
+
+        tracker = DispositionTracker()
+        disp_path = lessons_path.parent / "disposition.json"
+        if disp_path.is_file():
+            import json as _json
+            tracker = DispositionTracker.from_dict(
+                _json.loads(disp_path.read_text(encoding="utf-8"))
+            )
+        for correction in corrections:
+            category = correction.get("category", "")
+            severity = correction.get("severity", "minor")
+            domain = correction.get("domain", "global")
+            disp = tracker.update_from_correction(domain, category, severity)
+            if domain not in result.disposition_updates:
+                result.disposition_updates[domain] = {
+                    "skepticism": disp.skepticism,
+                    "literalism": disp.literalism,
+                    "empathy": disp.empathy,
+                }
+        if result.disposition_updates:
+            try:
+                import json as _json
+                disp_path.write_text(
+                    _json.dumps(tracker.to_dict(), indent=2), encoding="utf-8",
+                )
+            except Exception as exc:
+                result.errors.append(f"Phase 3: disposition write: {exc}")
+    except ImportError:
+        pass
+
+    _log.info(
+        "Pipeline complete: %d graduated, %d meta-rules, %d hooks, %d freshness updates, %d errors",
+        len(result.graduated),
+        len(result.meta_rules_created),
+        len(result.hooks_promoted),
+        result.freshness_updates,
+        len(result.errors),
+    )
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Causal Chain Tracking (adapted from Hindsight causal relations)
+# ---------------------------------------------------------------------------
+
+
+class CausalRelation(StrEnum):
+    CORRECTION_TO_RULE = "correction_to_rule"  # Correction produced this rule
+    RULE_TO_BEHAVIOR = "rule_to_behavior"  # Rule changed this behavior
+    CORRECTION_CHAIN = "correction_chain"  # Corrections share root cause
+    REINFORCEMENT = "reinforcement"  # Correction reinforced existing rule
+
+
+@dataclass
+class CausalLink:
+    """A causal relationship between two events in the learning pipeline."""
+
+    source_id: str  # Event/correction/rule that caused this
+    target_id: str  # Event/correction/rule that was caused
+    relation: CausalRelation  # Type of causal link
+    strength: float = 1.0  # 0.0-1.0 confidence in the link
+    session: int = 0
+
+
+class CausalChain:
+    """Tracks causal links between corrections, rules, and behaviors."""
+
+    def __init__(self) -> None:
+        self._links: list[CausalLink] = []
+
+    def add_link(
+        self,
+        source_id: str,
+        target_id: str,
+        relation: CausalRelation,
+        strength: float = 1.0,
+        session: int = 0,
+    ) -> CausalLink:
+        link = CausalLink(source_id, target_id, relation, strength, session)
+        self._links.append(link)
+        return link
+
+    def trace_rule_origin(self, rule_id: str) -> list[CausalLink]:
+        """Trace backward: what corrections produced this rule?"""
+        return [
+            l
+            for l in self._links
+            if l.target_id == rule_id
+            and l.relation in (CausalRelation.CORRECTION_TO_RULE, CausalRelation.REINFORCEMENT)
+        ]
+
+    def trace_rule_impact(self, rule_id: str) -> list[CausalLink]:
+        """Trace forward: what behaviors did this rule change?"""
+        return [
+            l
+            for l in self._links
+            if l.source_id == rule_id and l.relation == CausalRelation.RULE_TO_BEHAVIOR
+        ]
+
+    def find_correction_chains(self, correction_id: str) -> list[CausalLink]:
+        """Find corrections sharing a root cause with this one."""
+        return [
+            l
+            for l in self._links
+            if (l.source_id == correction_id or l.target_id == correction_id)
+            and l.relation == CausalRelation.CORRECTION_CHAIN
+        ]
+
+    def get_rule_provenance(self, rule_id: str) -> dict:
+        """Full provenance for a rule: corrections that built it + behaviors it changed.
+
+        This is the data structure ablation testing needs to prove causation.
+        """
+        origins = self.trace_rule_origin(rule_id)
+        impacts = self.trace_rule_impact(rule_id)
+        return {
+            "rule_id": rule_id,
+            "correction_sources": [
+                {"id": l.source_id, "strength": l.strength, "session": l.session}
+                for l in origins
+            ],
+            "behavioral_impacts": [
+                {"id": l.target_id, "strength": l.strength, "session": l.session}
+                for l in impacts
+            ],
+            "total_evidence": len(origins) + len(impacts),
+        }
+
+    def to_list(self) -> list[dict]:
+        """Serialize all links."""
+        return [
+            {
+                "source_id": l.source_id,
+                "target_id": l.target_id,
+                "relation": l.relation.value,
+                "strength": l.strength,
+                "session": l.session,
+            }
+            for l in self._links
+        ]
+
+    @classmethod
+    def from_list(cls, data: list[dict]) -> CausalChain:
+        """Deserialize from list of dicts."""
+        chain = cls()
+        for item in data:
+            chain._links.append(
+                CausalLink(
+                    source_id=item["source_id"],
+                    target_id=item["target_id"],
+                    relation=CausalRelation(item["relation"]),
+                    strength=item.get("strength", 1.0),
+                    session=item.get("session", 0),
+                )
+            )
+        return chain
+
+    @property
+    def link_count(self) -> int:
+        return len(self._links)

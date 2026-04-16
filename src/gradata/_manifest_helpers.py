@@ -110,7 +110,7 @@ def _sdk_capabilities() -> dict:
     ]
     # Core enhancements
     _core_modules = [
-        ("carl_priority_tiers", "gradata.enhancements.carl", "ChristopherKahler/paul+gradata"),
+        ("behavioral_engine", "gradata.enhancements.behavioral_engine", "gradata"),
         ("learning_pipeline", "gradata.enhancements.learning_pipeline", "gradata"),
         ("self_improvement", "gradata.enhancements.self_improvement", "gradata"),
         ("quality_gates", "gradata.contrib.enhancements.quality_gates", "gradata"),
