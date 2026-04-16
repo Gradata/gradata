@@ -222,10 +222,10 @@ class TestMetricsAndSuccess:
 class TestGuardrails:
     """SPEC Section 6: 6 guardrails from Build Directive."""
 
-    def test_carl_contracts_exist(self):
-        from gradata.enhancements.carl import ContractRegistry
+    def test_behavioral_engine_directives_exist(self):
+        from gradata.enhancements.behavioral_engine import DirectiveRegistry
 
-        reg = ContractRegistry()
+        reg = DirectiveRegistry()
         assert reg.stats()["total_contracts"] == 0
 
     def test_quality_gate_8_0_threshold(self):
@@ -268,12 +268,12 @@ class TestDomainAgnostic:
         task, _ = classify_scope("review contract for compliance")
         assert task == "legal_review"
 
-    def test_carl_multi_domain(self):
-        from gradata.enhancements.carl import BehavioralContract, ContractRegistry
+    def test_behavioral_engine_multi_domain(self):
+        from gradata.enhancements.behavioral_engine import Directive, DirectiveRegistry
 
-        reg = ContractRegistry()
+        reg = DirectiveRegistry()
         reg.register(
-            BehavioralContract(
+            Directive(
                 name="sales-email",
                 domain="sales",
                 trigger_keywords=["email"],
@@ -281,7 +281,7 @@ class TestDomainAgnostic:
             )
         )
         reg.register(
-            BehavioralContract(
+            Directive(
                 name="eng-review",
                 domain="engineering",
                 trigger_keywords=["review"],

@@ -181,6 +181,7 @@ class DeterminismCheck(StrEnum):
     FILE_CHECK = "file_check"  # Can verify file properties (size, existence)
     COMMAND_BLOCK = "command_block"  # Can block specific commands
     TEST_TRIGGER = "test_trigger"  # Can trigger test runs
+    SESSION_DIRECTIVE = "session_directive"  # Positive session-start directive (use X, OODA, etc.)
     NOT_DETERMINISTIC = "not_deterministic"  # Requires LLM judgment
 
 
@@ -246,6 +247,15 @@ DETERMINISTIC_PATTERNS: list[tuple[re.Pattern[str], DeterminismCheck, str, str |
     (re.compile(r"never save.+root|no files? (in|at) root|don.t save.+root"), DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
     (re.compile(r"(keep|put) (files|scripts) in (subfolder|subdir)"), DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
     (re.compile(r"never commit.+to root|no commits to root"), DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
+    # Positive session directives — "always use X", "use X before Y", "start with X"
+    (re.compile(r"(always |must )?(use|run|invoke|apply|start with|begin with) (superpowers|council|worktree|brainstorm|parallel)"), DeterminismCheck.SESSION_DIRECTIVE, "session_directive", "positive_directive"),
+    (re.compile(r"before (building|implementing|coding|creating|planning).*(use|run|invoke|apply)"), DeterminismCheck.SESSION_DIRECTIVE, "session_directive", "positive_directive"),
+    (re.compile(r"(use|run|invoke|apply).*(before|prior to) (building|implementing|coding|creating|planning)"), DeterminismCheck.SESSION_DIRECTIVE, "session_directive", "positive_directive"),
+    # OODA / autonomous mode
+    (re.compile(r"(ooda|godmode|autonomous|never stop to ask|never ask permission|keep building)"), DeterminismCheck.SESSION_DIRECTIVE, "session_directive", "positive_directive"),
+    # Parallel agents
+    (re.compile(r"(spawn|use) parallel (agents?|tasks?|workers?)"), DeterminismCheck.SESSION_DIRECTIVE, "session_directive", "positive_directive"),
+    (re.compile(r"never work sequential"), DeterminismCheck.SESSION_DIRECTIVE, "session_directive", "positive_directive"),
 ]
 
 
@@ -321,16 +331,22 @@ _IMPLEMENTED_TEMPLATES = {
     "secret_scan",
     "file_size_check",
     "auto_test",
+    "session_directive",
 }
 
 # Templates that fire on PostToolUse (after an edit/write) rather than PreToolUse.
 # install_hook routes these to GRADATA_HOOK_ROOT_POST instead of GRADATA_HOOK_ROOT.
 _POST_TOOL_TEMPLATES = {"auto_test"}
 
+# Templates that fire on SessionStart rather than PreToolUse.
+# install_hook routes these to GRADATA_HOOK_ROOT_SESSION instead of GRADATA_HOOK_ROOT.
+_SESSION_START_TEMPLATES = {"session_directive"}
+
 # Templates whose self-test we skip during graduation. auto_test would need a
 # real test file on disk to exit 2; synthesizing that during graduation is more
-# noise than signal, so we trust the template and skip.
-_TEMPLATES_SKIP_SELFTEST = {"auto_test"}
+# noise than signal, so we trust the template and skip. session_directive hooks
+# output JSON to stdout (no blocking) so there is nothing to self-test against.
+_TEMPLATES_SKIP_SELFTEST = {"auto_test", "session_directive"}
 
 # Templates that receive the violating text as a Bash command rather than Write content.
 _BASH_TEMPLATES = {"destructive_block", "fstring_block"}
@@ -355,6 +371,30 @@ def render_hook(candidate: HookCandidate) -> str | None:
         return None
     if candidate.template_arg is None:
         return None
+
+    # session_directive: self-contained JS — no template file needed
+    if candidate.hook_template == "session_directive":
+        safe_text = (
+            candidate.rule_description
+            .replace("\\", "\\\\")
+            .replace('"', '\\"')
+            .replace("\n", " ")
+        )
+        directive_js = (
+            "#!/usr/bin/env node\n"
+            "// Auto-generated session-start directive hook\n"
+            f"// Source hash: {_source_hash(candidate.rule_description)}\n"
+            "const data = JSON.parse(require('fs').readFileSync(0, 'utf-8') || '{}');\n"
+            "const directive = {\n"
+            "  result: [\n"
+            "    '<mandatory-directive>',\n"
+            f"    {json.dumps(candidate.rule_description)},\n"
+            "    '</mandatory-directive>',\n"
+            "  ].join('\\n')\n"
+            "};\n"
+            "process.stdout.write(JSON.stringify(directive) + '\\n');\n"
+        )
+        return directive_js
 
     template_path = _TEMPLATE_DIR / f"{candidate.hook_template}.js.tmpl"
     # Read with explicit UTF-8; preserve LF endings (shebang requires LF on Unix)
@@ -463,10 +503,15 @@ def install_hook(slug: str, hook_source: str, *, template: str) -> Path:
     PreToolUse hooks -> GRADATA_HOOK_ROOT (default .claude/hooks/pre-tool/generated/).
     PostToolUse hooks (e.g. auto_test) -> GRADATA_HOOK_ROOT_POST
     (default .claude/hooks/post-tool/generated/).
+    SessionStart hooks (e.g. session_directive) -> GRADATA_HOOK_ROOT_SESSION
+    (default .claude/hooks/session-start/generated/).
 
     Creates the directory if needed. Chmods to 0o755 on platforms that support it.
     """
-    if template in _POST_TOOL_TEMPLATES:
+    if template in _SESSION_START_TEMPLATES:
+        override = os.environ.get("GRADATA_HOOK_ROOT_SESSION")
+        root = Path(override) if override else Path(".claude/hooks/session-start/generated")
+    elif template in _POST_TOOL_TEMPLATES:
         override = os.environ.get("GRADATA_HOOK_ROOT_POST")
         root = Path(override) if override else Path(".claude/hooks/post-tool/generated")
     else:

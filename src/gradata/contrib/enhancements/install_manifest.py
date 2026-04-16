@@ -151,6 +151,9 @@ class InstallState:
 
     def is_installed(self, module_id: str) -> bool:
         """Check if a module is currently installed."""
+        # Backward compat: "carl" was renamed to "behavioral-engine"
+        if module_id == "carl":
+            module_id = "behavioral-engine"
         return module_id in self.installed_modules
 
 
@@ -212,11 +215,11 @@ DEFAULT_MODULES: list[Module] = [
         default_install=True,
     ),
     Module(
-        id="carl",
-        name="CARL Behavioral Contracts",
-        description="Domain-specific behavioral constraints with MUST/SHOULD/MAY tiers.",
+        id="behavioral-engine",
+        name="Behavioral Engine",
+        description="Domain-specific behavioral directives with MUST/SHOULD/MAY tiers.",
         kind="enhancement",
-        components=["enhancements.carl"],
+        components=["enhancements.behavioral_engine"],
         cost=ModuleCost.LIGHT,
         stability=ModuleStability.STABLE,
         default_install=True,
@@ -311,10 +314,10 @@ DEFAULT_PROFILES: list[Profile] = [
     ),
     Profile(
         name="standard",
-        description="Recommended. Core + learning pipeline + CARL + context management.",
+        description="Recommended. Core + learning pipeline + behavioral engine + context management.",
         modules=[
             "core-patterns", "context-management", "quality-gates",
-            "learning-pipeline", "carl", "truth-protocol", "agent-modes",
+            "learning-pipeline", "behavioral-engine", "truth-protocol", "agent-modes",
         ],
     ),
     Profile(
@@ -327,7 +330,7 @@ DEFAULT_PROFILES: list[Profile] = [
         description="Full pipeline + RL router + observation hooks for research.",
         modules=[
             "core-patterns", "context-management", "quality-gates",
-            "learning-pipeline", "carl", "truth-protocol", "agent-modes",
+            "learning-pipeline", "behavioral-engine", "truth-protocol", "agent-modes",
             "observation-hooks", "q-learning-router", "meta-rules",
             "rule-integrity",
         ],
@@ -394,6 +397,9 @@ class InstallManifest:
         visiting: set[str] = set()  # Detect circular deps
 
         def _resolve(mid: str) -> None:
+            # Backward compat: "carl" was renamed to "behavioral-engine"
+            if mid == "carl":
+                mid = "behavioral-engine"
             if mid in seen:
                 return
             if mid in visiting:

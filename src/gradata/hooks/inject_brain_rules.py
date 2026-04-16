@@ -212,6 +212,64 @@ def main(data: dict) -> dict | None:
 
     rules_block = "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
 
+    # Inject disposition (behavioral tendencies evolved from corrections)
+    disposition_block = ""
+    try:
+        from gradata.enhancements.behavioral_engine import DispositionTracker
+        tracker = DispositionTracker()
+        # Load disposition from brain dir if persisted
+        disp_path = Path(brain_dir) / "disposition.json"
+        if disp_path.is_file():
+            import json as _json
+            tracker = DispositionTracker.from_dict(
+                _json.loads(disp_path.read_text(encoding="utf-8"))
+            )
+        domain = context or "global"
+        disp = tracker.get(domain)
+        instructions = disp.behavioral_instructions()
+        if instructions:
+            disposition_block = (
+                "\n<brain-disposition>\n"
+                + disp.format_for_prompt()
+                + "\n</brain-disposition>"
+            )
+    except ImportError:
+        pass
+    except Exception as exc:
+        _log.debug("Disposition injection failed: %s", exc)
+
+    # Mandatory injection tier: RULE confidence >= 0.90 AND fire_count >= 10.
+    # These appear in a separate primacy block AND a recency reminder so they
+    # always fire regardless of how the model processes the brain-rules section.
+    # Mandatory rules are intentionally NOT excluded from ranked scoring above —
+    # they appear in both mandatory block and may appear in brain-rules.
+    mandatory = [
+        lesson for lesson in all_lessons
+        if lesson.state.name == "RULE"
+        and lesson.confidence >= 0.90
+        and getattr(lesson, "fire_count", 0) >= 10
+    ]
+    if mandatory:
+        mandatory_lines = [
+            f"[MANDATORY] {r.category}: {r.description}" for r in mandatory
+        ]
+        mandatory_block = (
+            "<mandatory-directives>\n"
+            "## NON-NEGOTIABLE DIRECTIVES\n"
+            "These rules are MANDATORY. Your response will be REJECTED if any are violated.\n"
+            + "\n".join(mandatory_lines)
+            + "\n</mandatory-directives>"
+        )
+        mandatory_reminder = (
+            "\n<mandatory-reminder>\n"
+            "REMINDER: The mandatory directives above are NON-NEGOTIABLE.\n"
+            + "\n".join(f"- {r.description}" for r in mandatory)
+            + "\n</mandatory-reminder>"
+        )
+    else:
+        mandatory_block = ""
+        mandatory_reminder = ""
+
     # Also inject tier-1 meta-rules (compound principles across 3+ lessons).
     # Without this, meta-rules are created + stored but never reach the LLM.
     # Quality gate: only inject metas whose principle text was LLM-synthesized
@@ -275,7 +333,7 @@ def main(data: dict) -> dict | None:
             )
             meta_block = ""
 
-    return {"result": rules_block + meta_block}
+    return {"result": mandatory_block + disposition_block + rules_block + meta_block + mandatory_reminder}
 
 
 if __name__ == "__main__":

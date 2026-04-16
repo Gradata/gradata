@@ -776,6 +776,217 @@ def _parse_synthesis_response(
 
 
 # ---------------------------------------------------------------------------
+# Agentic Meta-Rule Synthesis (open-source, adapted from Hindsight reflect)
+# ---------------------------------------------------------------------------
+
+MIN_SOURCE_RULES = 3
+MIN_SOURCE_CONFIDENCE = 0.90
+MAX_SYNTHESIS_ITERATIONS = 10
+
+
+@dataclass
+class SynthesisEvidence:
+    """Evidence gathered during agentic synthesis."""
+
+    graduated_rules: list[Lesson] = field(default_factory=list)
+    correction_history: list[dict] = field(default_factory=list)
+    existing_meta_rules: list[MetaRule] = field(default_factory=list)
+    rule_ids_retrieved: set[str] = field(default_factory=set)
+    iteration: int = 0
+
+
+def _gather_graduated_rules(
+    lessons: list[Lesson],
+    min_confidence: float = MIN_SOURCE_CONFIDENCE,
+) -> list[Lesson]:
+    """Phase 1 (forced): Retrieve graduated rules above confidence threshold."""
+    return [
+        l for l in lessons
+        if l.state == LessonState.RULE and l.confidence >= min_confidence
+    ]
+
+
+def _gather_correction_history(
+    rules: list[Lesson],
+) -> list[dict]:
+    """Phase 2 (forced): Gather correction history for graduated rules."""
+    history = []
+    for rule in rules:
+        history.append({
+            "rule_id": _lesson_id(rule),
+            "category": rule.category,
+            "description": rule.description,
+            "confidence": rule.confidence,
+            "fire_count": getattr(rule, "fire_count", 0),
+            "correction_count": len(getattr(rule, "correction_event_ids", []) or []),
+        })
+    return history
+
+
+def _group_rules_by_category(
+    rules: list[Lesson],
+    min_group_size: int = MIN_SOURCE_RULES,
+) -> dict[str, list[Lesson]]:
+    """Group rules by category, filtering groups below minimum size."""
+    groups: dict[str, list[Lesson]] = defaultdict(list)
+    for rule in rules:
+        groups[rule.category].append(rule)
+    return {cat: rules for cat, rules in groups.items() if len(rules) >= min_group_size}
+
+
+def _validate_citations(
+    source_ids: list[str],
+    available_ids: set[str],
+) -> list[str]:
+    """Only accept citations that reference actually-retrieved rules."""
+    return [sid for sid in source_ids if sid in available_ids]
+
+
+def synthesize_meta_rules_agentic(
+    lessons: list[Lesson],
+    existing_metas: list[MetaRule] | None = None,
+    current_session: int = 0,
+    min_group_size: int = MIN_SOURCE_RULES,
+    min_confidence: float = MIN_SOURCE_CONFIDENCE,
+    max_iterations: int = MAX_SYNTHESIS_ITERATIONS,
+) -> list[MetaRule]:
+    """Agentic meta-rule synthesis using forced-then-free iteration.
+
+    Adapted from Hindsight's reflect agent pattern:
+    1. FORCE: Retrieve graduated rules (confidence >= threshold)
+    2. FORCE: Gather correction history for those rules
+    3. FORCE: Load existing meta-rules for deduplication
+    4. FREE: Group rules by category, synthesize where groups are large enough
+
+    Quality gates (Gradata-unique):
+    - Evidence guardrail: won't synthesize without >= min_group_size source rules
+    - Confidence gate: source rules must all be >= min_confidence
+    - Citation validation: meta-rule source_lesson_ids validated against retrieved set
+
+    Args:
+        lessons: All lessons from the brain.
+        existing_metas: Previously created meta-rules (for deduplication).
+        current_session: Current session number.
+        min_group_size: Minimum rules per category to trigger synthesis.
+        min_confidence: Minimum rule confidence to be included.
+        max_iterations: Max synthesis iterations (safety cap).
+
+    Returns:
+        List of newly synthesized MetaRule objects.
+    """
+    evidence = SynthesisEvidence()
+
+    # --- Phase 1 (forced): Retrieve graduated rules ---
+    evidence.graduated_rules = _gather_graduated_rules(lessons, min_confidence)
+    evidence.rule_ids_retrieved = {_lesson_id(r) for r in evidence.graduated_rules}
+    evidence.iteration += 1
+
+    if len(evidence.graduated_rules) < min_group_size:
+        _log.debug(
+            "Agentic synthesis: only %d graduated rules (need %d), skipping",
+            len(evidence.graduated_rules), min_group_size,
+        )
+        return []
+
+    # --- Phase 2 (forced): Gather correction history ---
+    evidence.correction_history = _gather_correction_history(evidence.graduated_rules)
+    evidence.iteration += 1
+
+    # --- Phase 3 (forced): Load existing meta-rules for deduplication ---
+    evidence.existing_meta_rules = existing_metas or []
+    existing_ids = {m.id for m in evidence.existing_meta_rules}
+    evidence.iteration += 1
+
+    # --- Phase 4+ (free): Group and synthesize ---
+    groups = _group_rules_by_category(evidence.graduated_rules, min_group_size)
+    if not groups:
+        _log.debug("Agentic synthesis: no category groups meet minimum size %d", min_group_size)
+        return []
+
+    new_metas: list[MetaRule] = []
+
+    for category, rules in groups.items():
+        if evidence.iteration >= max_iterations:
+            _log.debug("Agentic synthesis: hit max iterations %d", max_iterations)
+            break
+
+        lesson_ids = [_lesson_id(r) for r in rules]
+        validated_ids = _validate_citations(lesson_ids, evidence.rule_ids_retrieved)
+
+        if len(validated_ids) < min_group_size:
+            continue
+
+        mid = _meta_id(validated_ids)
+
+        # Deduplication: skip if this combination already exists
+        if mid in existing_ids:
+            continue
+
+        avg_conf = round(sum(r.confidence for r in rules) / len(rules), 4)
+        categories = sorted(set(r.category for r in rules))
+
+        # Build principle from rule descriptions (deterministic for OSS)
+        # Cloud can override with LLM synthesis via source="llm_synth"
+        descriptions = [r.description for r in rules]
+        principle = f"Across {len(rules)} corrections in {category}: " + "; ".join(descriptions[:5])
+        if len(descriptions) > 5:
+            principle += f" (and {len(descriptions) - 5} more)"
+
+        meta = MetaRule(
+            id=mid,
+            principle=principle,
+            source_categories=categories,
+            source_lesson_ids=validated_ids,
+            confidence=avg_conf,
+            created_session=current_session,
+            last_validated_session=current_session,
+            source="deterministic",
+        )
+
+        new_metas.append(meta)
+        existing_ids.add(mid)
+        evidence.iteration += 1
+
+    # --- Phase 5: Cross-domain universal candidates ---
+    # Rules appearing in 3+ domains are universal principle candidates.
+    if evidence.iteration < max_iterations:
+        cross_domain = detect_cross_domain_candidates(
+            evidence.graduated_rules, min_domains=3,
+        )
+        for candidate in cross_domain:
+            if evidence.iteration >= max_iterations:
+                break
+            cd_ids = [_lesson_id(r) for r in evidence.graduated_rules
+                      if r.description.strip() == candidate["description"]]
+            validated_cd = _validate_citations(cd_ids, evidence.rule_ids_retrieved)
+            if len(validated_cd) < 3:
+                continue
+            mid = _meta_id(validated_cd)
+            if mid in existing_ids:
+                continue
+            meta = MetaRule(
+                id=mid,
+                principle=f"Universal ({len(candidate['domains'])} domains): {candidate['description']}",
+                source_categories=candidate["domains"],
+                source_lesson_ids=validated_cd,
+                confidence=candidate["avg_confidence"],
+                created_session=current_session,
+                last_validated_session=current_session,
+                source="deterministic",
+                transfer_scope=RuleTransferScope.UNIVERSAL,
+            )
+            new_metas.append(meta)
+            existing_ids.add(mid)
+            evidence.iteration += 1
+
+    _log.info(
+        "Agentic synthesis: %d new meta-rules from %d groups + cross-domain (%d iterations)",
+        len(new_metas), len(groups), evidence.iteration,
+    )
+    return new_metas
+
+
+# ---------------------------------------------------------------------------
 # Lazy re-exports (break circular import: meta_rules ↔ meta_rules_storage)
 # ---------------------------------------------------------------------------
 

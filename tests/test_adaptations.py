@@ -448,16 +448,19 @@ class TestExecuteQualify:
 
 
 # ---------------------------------------------------------------------------
-# 5. CARL Rule Priority Tiers
+# 5. Behavioral Engine (formerly CARL) Priority Tiers
 # ---------------------------------------------------------------------------
 
-from gradata.enhancements.carl import (
-    BehavioralContract,
+from gradata.enhancements.behavioral_engine import (
     ConstraintViolation,
-    ContractRegistry,
+    Directive,
+    DirectiveRegistry,
     PrioritizedConstraint,
     RulePriority,
 )
+
+BehavioralContract = Directive
+ContractRegistry = DirectiveRegistry
 
 
 class TestCARLPriorities:
@@ -551,7 +554,7 @@ class TestCARLPriorities:
             ],
         ))
         prompt = registry.format_constraints_prompt("deploy now")
-        assert "<carl-constraints>" in prompt
+        assert "<behavioral-directives>" in prompt
         assert "MUST" in prompt
         assert "SHOULD" in prompt
         assert "Outages" in prompt
@@ -817,11 +820,11 @@ class TestInstallManifest:
         manifest = InstallManifest.default()
         plan = manifest.plan_install(
             profile="lite",
-            include=["carl"],
+            include=["behavioral-engine"],
             exclude=["agent-modes"],
         )
         ids = plan.module_ids
-        assert "carl" in ids
+        assert "behavioral-engine" in ids
         assert "agent-modes" not in ids
 
     def test_estimated_cost(self):
@@ -842,14 +845,14 @@ class TestInstallManifest:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             filepath = Path(tmpdir) / "state.json"
             state = InstallState(
-                installed_modules=["core-patterns", "carl"],
+                installed_modules=["core-patterns", "behavioral-engine"],
                 profile="lite",
             )
             state.save(filepath)
 
             loaded = InstallState.load(filepath)
             assert loaded.profile == "lite"
-            assert "carl" in loaded.installed_modules
+            assert "behavioral-engine" in loaded.installed_modules
 
     def test_state_is_installed(self):
         state = InstallState(installed_modules=["core-patterns"])
@@ -858,11 +861,11 @@ class TestInstallManifest:
 
     def test_diff(self):
         manifest = InstallManifest.default()
-        current = InstallState(installed_modules=["core-patterns", "carl"])
+        current = InstallState(installed_modules=["core-patterns", "behavioral-engine"])
         plan = manifest.plan_install(modules=["core-patterns", "quality-gates"])
         diff = manifest.diff(plan, current)
         assert "quality-gates" in diff["add"]
-        assert "carl" in diff["remove"]
+        assert "behavioral-engine" in diff["remove"]
         assert "core-patterns" in diff["keep"]
 
     def test_unknown_module(self):
@@ -1447,7 +1450,7 @@ class TestManifestCapabilities:
             "context_brackets", "reconciliation", "task_escalation",
             "execute_qualify", "q_learning_router", "observation_hooks",
             "install_manifest", "memory_taxonomy", "cluster_manager",
-            "lesson_discriminator", "carl_priority_tiers", "learning_pipeline",
+            "lesson_discriminator", "behavioral_engine", "learning_pipeline",
         ]
         for name in expected:
             assert name in modules, f"Missing module: {name}"
@@ -1460,7 +1463,7 @@ class TestManifestCapabilities:
         assert modules["q_learning_router"]["source"] == "ruflo"
         assert modules["observation_hooks"]["source"] == "ecc"
         assert modules["memory_taxonomy"]["source"] == "everos"
-        assert modules["carl_priority_tiers"]["source"] == "ChristopherKahler/paul+gradata"
+        assert modules["behavioral_engine"]["source"] == "gradata"
 
     def test_available_count_matches(self):
         caps = _sdk_capabilities()

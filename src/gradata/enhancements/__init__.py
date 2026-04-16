@@ -9,7 +9,8 @@ AVAILABLE modules (open source, shipped in SDK):
   quality_gates        -- (moved to contrib/enhancements/)
   truth_protocol       -- (moved to contrib/enhancements/)
   self_improvement     -- INSTINCT->PATTERN->RULE graduation
-  carl                 -- Behavioral contracts with MUST/SHOULD/MAY tiers
+  behavioral_engine    -- Behavioral directives with MUST/SHOULD/MAY tiers
+  carl                 -- (backward-compat shim for behavioral_engine)
   correction_tracking  -- Density, half-life, MTBF
   brain_scores         -- (moved to contrib/enhancements/)
   edit_classifier      -- 5-category classification

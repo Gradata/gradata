@@ -212,6 +212,17 @@ def brain_correct(
     if requires_review and not approval_required:
         approval_required = True
 
+    # Structured correction extraction (Hindsight-inspired what/why/type/domain)
+    # Uses already-redacted text so PII is never stored in what_wrong/why fields.
+    structured_correction = None
+    try:
+        from gradata.correction_detector import extract_structured_correction
+        structured_correction = extract_structured_correction(
+            draft_redacted, final_redacted, context=str(context or ""),
+        )
+    except (ImportError, Exception) as _sc_err:
+        _log.debug("Structured correction extraction skipped: %s", _sc_err)
+
     data = {
         "draft_text": draft_redacted[:2000], "final_text": final_redacted[:2000],
         "edit_distance": diff.edit_distance, "severity": diff.severity,
@@ -231,6 +242,8 @@ def brain_correct(
         data["applies_to"] = applies_to
     if scope_data:
         data["scope"] = scope_data
+    if structured_correction:
+        data["structured"] = structured_correction.to_dict()
 
     tags = [f"category:{category or 'UNKNOWN'}", f"severity:{diff.severity}"]
     if diff.severity in ("major", "discarded"):
@@ -376,6 +389,22 @@ def brain_correct(
                         }, [f"category:{cat}", "provenance"], session)
                     except Exception as e:
                         _log.debug("Provenance emit failed: %s", e)
+                    # Causal chain: correction reinforces existing rule
+                    try:
+                        from gradata.enhancements.causal_chains import CausalChain, CausalRelation
+                        from gradata.enhancements.meta_rules import _lesson_id
+                        if not hasattr(brain, "_causal_chain"):
+                            brain._causal_chain = CausalChain()
+                        correction_id = str(event.get("id", ""))
+                        rule_id = _lesson_id(best_match)
+                        brain._causal_chain.add_link(
+                            correction_id, rule_id,
+                            CausalRelation.REINFORCEMENT,
+                            strength=min(1.0, best_match.confidence),
+                            session=session or 0,
+                        )
+                    except (ImportError, Exception):
+                        pass
                 else:
                     import json as _json
                     lesson_scope = ""
@@ -412,6 +441,22 @@ def brain_correct(
 
                     existing_lessons.append(new_lesson)
                     event["lessons_created"] = 1
+                    # Causal chain: correction creates new rule
+                    try:
+                        from gradata.enhancements.causal_chains import CausalChain, CausalRelation
+                        from gradata.enhancements.meta_rules import _lesson_id
+                        if not hasattr(brain, "_causal_chain"):
+                            brain._causal_chain = CausalChain()
+                        correction_id = str(event.get("id", ""))
+                        rule_id = _lesson_id(new_lesson)
+                        brain._causal_chain.add_link(
+                            correction_id, rule_id,
+                            CausalRelation.CORRECTION_TO_RULE,
+                            strength=1.0,
+                            session=session or 0,
+                        )
+                    except (ImportError, Exception):
+                        pass
                     if approval_required:
                         event["approval_required"] = True
                         try:
