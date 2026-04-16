@@ -844,12 +844,10 @@ class Brain(BrainInspectionMixin):
         if self._query_budget.is_rate_exceeded("apply_rules"):
             logger.warning("Query budget exceeded for apply_rules")
             return ""  # enforce: block injection when budget exhausted
-        if self._cloud and self._cloud.connected:
-            try:
-                return self._cloud.apply_rules(task, context)
-            except Exception as e:
-                logger.warning("Cloud apply_rules() failed: %s", e)
-                self._cloud.connected = False
+        # SECURITY: Never pull rules from cloud. Cloud is a read-only dashboard.
+        # Rules are always computed locally from the brain's own lessons.
+        # Pulling rules from cloud would allow a compromised server to inject
+        # malicious instructions into AI prompts → remote code execution.
         try:
             from gradata.enhancements.self_improvement import parse_lessons
         except ImportError:

@@ -114,21 +114,9 @@ class CloudClient:
             logger.warning("Cloud correct() failed, falling back to local: %s", e)
             raise  # Let Brain.correct() catch and fall back
 
-    def apply_rules(self, task: str, context: dict | None = None) -> str:
-        """Get applicable rules from cloud (server-side graduation state).
-
-        Returns formatted rules string for prompt injection.
-        """
-        try:
-            resp = self._post("/brains/rules", {
-                "brain_id": self._brain_id,
-                "task": task,
-                "context": context,
-            })
-            return resp.get("rules_text", "")
-        except Exception as e:
-            logger.warning("Cloud apply_rules() failed, falling back to local: %s", e)
-            raise
+    # REMOVED: apply_rules() — pulling rules from cloud is a security risk.
+    # A compromised cloud server could inject malicious prompt instructions.
+    # Rules are ALWAYS computed locally from the brain's own lessons.
 
     def sync(self) -> dict:
         """Sync local brain state to cloud.
