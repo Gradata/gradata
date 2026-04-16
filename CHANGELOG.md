@@ -1,5 +1,65 @@
 # Changelog
 
+## [0.6.0] - 2026-04-15 — "We opened up"
+
+**Strategic pivot:** the moat is not the algorithm code, it's the hosted service.
+Gradata now open-sources everything and charges for the cloud tier.
+
+### Breaking
+
+- **License changed: AGPL-3.0-or-later → Apache-2.0.** SDK is now permissively open.
+  Enterprise adoption unblocked. No copyleft linking obligations. No "commercial
+  license" upsell. Past releases (v0.4, v0.5) remain under AGPL-3.0 forever —
+  users who pinned those keep AGPL rights indefinitely.
+- **`gradata-install` npm package deprecated.** Install path consolidated to
+  `pip install gradata && gradata hooks install`. Old npm wrapper still functions
+  with a deprecation notice; new IDE integrations go into the Python CLI.
+
+### Added
+
+- **Cloud algorithms now in SDK** — previously proprietary modules merged under
+  `gradata.enhancements`:
+  - `enhancements/graduation/` — `agent_graduation`, `judgment_decay`, `rules_distillation`
+  - `enhancements/scoring/` — `brain_scores`, `calibration`, `correction_tracking`,
+    `failure_detectors`, `gate_calibration`, `loop_intelligence`, `memory_extraction`,
+    `reports`, `success_conditions`
+  - `enhancements/bandits/` — `contextual_bandit`, `collaborative_filter`
+  - `enhancements/profiling/` — `tone_profile` (universal style extraction)
+- **Opt-in cloud sync client** (`gradata.cloud.sync`) — transmits aggregated
+  metrics (NOT correction content) to the Gradata Cloud dashboard when user
+  enables `cloud.sync = true`. Separate stricter opt-in for corpus contribution.
+  Never blocks the learning loop on cloud availability.
+- `get_maturity_phase()` helper on `self_improvement` (INFANT/ADOLESCENT/MATURE/STABLE
+  based on session count).
+- `format_metrics()` on `enhancements/metrics` — human-readable MetricsWindow summary.
+- `examples/domain-profiles/` — `call_profile` and `sales_profile` as
+  domain-adapter recipes (not SDK primitives).
+
+### Changed
+
+- Product positioning: "Corrections become behavioral rules that compound.
+  Free SDK does the job. Paid cloud adds team brain, corpus network effects,
+  and brain marketplace."
+- All docs rewritten for Apache-2.0 + hosted SaaS pitch (docs/LICENSING.md,
+  docs/cloud/overview.md, docs/faq.md, marketing strategy, launch strategy).
+- `MetricsWindow.avg_edit_distance` renamed to `edit_distance_avg` internally
+  (minor API cleanup for consistency).
+
+### Coverage
+
+- **2598 tests passing** (up from 2561). 37 previously cloud-gated tests
+  now run. 19 legitimate skips remain (external API smoke tests, proprietary
+  `meta_rules` flat module that lives only in the private cloud repo).
+- 2 tests marked `@pytest.mark.xfail` for v0.7 reconciliation — API drift
+  between the cloud_backup snapshot and current SDK constants.
+
+### Security / Governance
+
+- SDK is sole-authored by Oliver Le — unilateral relicense is legally clean
+  (no CLA required, no external contributors to `_types.py` or `_scope.py`
+  as of git history audit 2026-04-15).
+- No secrets transmitted without explicit opt-in.
+
 ## [0.5.0] - 2026-04-15
 
 First public release. Aligns `gradata-install` npm wrapper to 0.5.0.

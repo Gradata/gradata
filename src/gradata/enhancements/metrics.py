@@ -119,3 +119,44 @@ def compute_metrics(
         return {}
 
 
+def format_metrics(m) -> str:
+    """Format a metrics result (MetricsWindow or dict) as human-readable summary.
+
+    Accepts either a MetricsWindow dataclass instance or a dict with the same
+    keys (as returned by compute_metrics).
+    """
+    from typing import Any
+
+    def get(key: str, default: Any = 0) -> Any:
+        if isinstance(m, dict):
+            return m.get(key, default)
+        return getattr(m, key, default)
+
+    sample_size = int(get("sample_size", 0))
+    window_size = int(get("window_size", 0))
+
+    if sample_size == 0:
+        return (
+            f"MetricsWindow (window={window_size})\n"
+            "  No data — no OUTPUT events in window.\n"
+        )
+
+    acceptance = get("acceptance_distribution", {}) or {}
+    dist_parts = ", ".join(f"{k}: {v}" for k, v in sorted(acceptance.items()))
+
+    blandness = float(get("blandness_score", 0.0))
+    edit_avg = float(get("edit_distance_avg", get("avg_edit_distance", 0.0)))
+
+    lines = [
+        f"MetricsWindow (window={window_size}, outputs={sample_size})",
+        f"  Rewrite rate:           {float(get('rewrite_rate', 0.0)):.1%}",
+        f"  Avg edit distance:      {edit_avg:.2f}",
+        f"  Acceptance dist:        {dist_parts or 'none'}",
+        f"  Rule success rate:      {float(get('rule_success_rate', 0.0)):.1%}",
+        f"  Rule misfire rate:      {float(get('rule_misfire_rate', 0.0)):.1%}",
+        f"  Blandness score:        {blandness:.3f} "
+        f"({'generic' if blandness > 0.7 else 'varied'})",
+    ]
+    return "\n".join(lines)
+
+

@@ -9,7 +9,7 @@ hide:
 
 Gradata is procedural memory for AI agents. Every time you edit AI output, Gradata captures the correction, graduates it into a rule, and auto-generates a hook that enforces the rule on the next run. Your AI stops making the same mistake. It converges on your judgment.
 
-One brain, many hosts. Open source SDK (AGPL-3.0), optional hosted cloud at [gradata.ai](https://gradata.ai).
+One brain, many hosts. Open source SDK (Apache-2.0), optional hosted cloud at [gradata.ai](https://gradata.ai).
 
 ---
 
@@ -130,4 +130,4 @@ See [Concepts → Graduation](concepts/graduation.md) for the confidence math.
 
 **Shareable.** Export your brain as an archive. Rent it. Sell it. A senior engineer's code review brain, a top AE's email brain — expertise as a product.
 
-**Open.** SDK is AGPL-3.0. No lock-in, no vendor trap. Self-host or use [Gradata Cloud](cloud/overview.md).
+**Open.** SDK is Apache-2.0 — no copyleft, no lock-in, no vendor trap. Self-host with BYOK, or subscribe to [Gradata Cloud](cloud/overview.md) for team features and the corrections corpus.

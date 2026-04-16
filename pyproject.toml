@@ -7,7 +7,7 @@ name = "gradata"
 version = "0.5.0"
 description = "AI that learns your judgment. Corrections become behavioral rules that converge on your style."
 readme = "README.md"
-license = "AGPL-3.0-or-later"
+license = "Apache-2.0"
 requires-python = ">=3.11"
 authors = [
     { name = "Gradata", email = "oliver@gradata.com" },
@@ -16,7 +16,7 @@ keywords = ["ai", "learning", "behavioral", "agents", "personalization", "judgme
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",

@@ -2,9 +2,9 @@
 
 ## 1. Is Gradata open source?
 
-Yes. The SDK is released under **AGPL-3.0** on [GitHub](https://github.com/Gradata/gradata). You can self-host it, fork it, extend it, and ship products on top of it.
+Yes, and with no strings attached. The SDK is released under **Apache-2.0** on [GitHub](https://github.com/Gradata/gradata). You can self-host it, fork it, extend it, ship it in commercial products, bundle it in your own SaaS, or keep your modifications private. No copyleft. No dual-license paperwork.
 
-Gradata Cloud is a proprietary hosted service built on the SDK. It is optional. Nothing in the SDK depends on Cloud being reachable.
+Gradata Cloud is a paid hosted service layered on top of the SDK. It is optional. Nothing in the SDK depends on Cloud being reachable — with BYOK you have the full product locally.
 
 ## 2. Who owns the data in my brain?
 
@@ -24,9 +24,9 @@ When you sync, Cloud stores a mirror plus derived metrics. You can delete that m
 
 ## 4. Can I self-host the Cloud back-end?
 
-The Cloud back-end lives in `cloud/` in the public repo. It is not licensed for production use under AGPL in the same way as the SDK; self-hosting requires a commercial license.
+Cloud is a hosted SaaS product — team workspaces, corrections corpus aggregation, brain marketplace, and a managed LLM option. It is not something you install from the repo; it is a service you subscribe to.
 
-For teams who need the dashboard experience without SaaS, we offer a single-tenant deployment option — see the **Enterprise** plan or email `sales@gradata.ai`.
+For teams that need the dashboard experience inside their own infrastructure, we offer a single-tenant deployment option — see the **Enterprise** plan or email `sales@gradata.ai`.
 
 ## 5. What's the rate limit?
 
@@ -57,7 +57,7 @@ Yes. The SDK is provider-agnostic:
 
 ## 8. What's the pricing?
 
-Self-hosted SDK is free (AGPL). Cloud plans:
+SDK is free forever (Apache-2.0) — 100% capable standalone with BYOK. Cloud adds team features, corrections corpus, and brain marketplace:
 
 | Plan | Price | Includes |
 |------|-------|----------|

@@ -5,7 +5,7 @@
 [![Tests](https://github.com/Gradata/gradata/actions/workflows/test.yml/badge.svg)](https://github.com/Gradata/gradata/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/gradata)](https://pypi.org/project/gradata/)
 [![Python](https://img.shields.io/pypi/pyversions/gradata)](https://pypi.org/project/gradata/)
-[![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 You fix a tone. You rewrite a regex. You re-explain how your team formats PRs. Then the AI forgets, and you do it all again next session.
 
@@ -21,7 +21,7 @@ One-command setup for Claude Code, Cursor, Windsurf, or any MCP-compatible IDE:
 npx gradata-install install --ide=claude-code
 ```
 
-Works with any LLM. Python 3.11+. Zero required dependencies. Local-first. AGPL-3.0.
+Works with any LLM. Python 3.11+. Zero required dependencies. Local-first. Apache-2.0.
 
 ---
 
@@ -307,4 +307,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-AGPL-3.0. Commercial license available — contact hello@gradata.com.
+**Apache-2.0.** The full SDK — rules, hooks, graduation, meta-synthesis, scoring, profiling — is permissively open. Use it anywhere: commercial, proprietary, SaaS, internal tooling. No copyleft, no linking obligations, no commercial-license upsell.
+
+**[Gradata Cloud](https://gradata.ai)** is an optional hosted service (team brain, corrections corpus, brain marketplace, managed LLM). The SDK does not require it — everything works locally with your own LLM key.

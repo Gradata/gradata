@@ -1307,6 +1307,29 @@ def propagate_confidence(
 
 
 # ---------------------------------------------------------------------------
+# Maturity phase helpers
+# ---------------------------------------------------------------------------
+
+
+def get_maturity_phase(total_sessions: int) -> str:
+    """Determine brain maturity phase from total session count.
+
+    INFANT (<50):    fresh brain, high correction rate expected
+    ADOLESCENT (<100): patterns forming, lessons graduating
+    MATURE (<200):   stable rules, meta-rules emerging
+    STABLE (200+):   compound learning, minimal new instincts
+    """
+    if total_sessions < 50:
+        return "INFANT"
+    elif total_sessions < 100:
+        return "ADOLESCENT"
+    elif total_sessions < 200:
+        return "MATURE"
+    else:
+        return "STABLE"
+
+
+# ---------------------------------------------------------------------------
 # Formatting
 # ---------------------------------------------------------------------------
 

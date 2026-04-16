@@ -1058,7 +1058,7 @@ def brain_export_rules(brain: Brain, *, min_state: str = "PATTERN", skill_name: 
         "---", f"name: {skill_name}",
         f"description: Behavioral rules for {domain} tasks covering {categories_str}. "
         f"Graduated from {len(qualified)} corrections via Gradata.",
-        "license: AGPL-3.0",
+        "license: Apache-2.0",
         "compatibility: Requires Python 3.11+ and gradata SDK",
         "metadata:",
         "  author: gradata",

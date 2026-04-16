@@ -22,7 +22,7 @@ Gradata Cloud is the hosted dashboard and back-end that complements the open-sou
 | Cloud-side rule evaluation and A/B harness | No | Yes |
 | Managed backups | No | Yes |
 
-The SDK is AGPL-3.0 and will stay that way. Cloud is a proprietary service layered on top.
+The SDK is Apache-2.0 and will stay permissively open. Cloud is a hosted SaaS tier with team features, corpus aggregation, and brain marketplace on top.
 
 ## When to self-host vs use Cloud
 

@@ -81,8 +81,7 @@ npx gradata-install
 
 ## License
 
-AGPL-3.0-or-later. Full text in `LICENSE`. See `docs/LICENSING.md` for the
-dual-license story (AGPL for community, commercial for closed-source use).
+Apache-2.0. Full text in `LICENSE`. See `docs/LICENSING.md` — SDK is permissively open, hosted SaaS at gradata.ai is the paid tier.
 ```
 
 ## After the release

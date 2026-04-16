@@ -41,4 +41,4 @@ Open an issue on [GitHub](https://github.com/Gradata/gradata/issues). Include:
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under AGPL-3.0.
+By contributing, you agree that your contributions will be licensed under Apache-2.0.

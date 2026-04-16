@@ -1,7 +1,7 @@
 {
   "name": "gradata-install",
-  "version": "0.5.0",
-  "description": "One-command installer for Gradata. Wraps pip/pipx + IDE hook setup.",
+  "version": "0.6.0",
+  "description": "[DEPRECATED] Legacy npm wrapper — use `pip install gradata` instead.",
   "bin": {
     "gradata-install": "./bin/gradata-install.js"
   },
@@ -14,8 +14,9 @@
   "bugs": {
     "url": "https://github.com/Gradata/gradata/issues"
   },
-  "license": "AGPL-3.0-or-later",
+  "license": "Apache-2.0",
   "engines": { "node": ">=18" },
   "files": ["bin/", "README.md"],
-  "keywords": ["gradata", "claude", "ai", "memory", "installer"]
+  "keywords": ["gradata", "claude", "ai", "memory", "installer", "deprecated"],
+  "deprecated": "Use `pip install gradata && gradata hooks install` directly. This npm wrapper is no longer the primary install path."
 }
