@@ -555,7 +555,7 @@ def cmd_login(args):
         req = Request(
             f"{api_url}/auth/device/code",
             data=b"{}",
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", "User-Agent": "gradata-sdk/0.6"},
             method="POST",
         )
         with urlopen(req, timeout=15) as resp:
@@ -590,7 +590,7 @@ def cmd_login(args):
             poll_req = Request(
                 f"{api_url}/auth/device/token",
                 data=_json.dumps({"device_code": device_code}).encode(),
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json", "User-Agent": "gradata-sdk/0.6"},
                 method="POST",
             )
             with urlopen(poll_req, timeout=10) as resp:
