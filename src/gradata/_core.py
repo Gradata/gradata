@@ -213,11 +213,12 @@ def brain_correct(
         approval_required = True
 
     # Structured correction extraction (Hindsight-inspired what/why/type/domain)
+    # Uses already-redacted text so PII is never stored in what_wrong/why fields.
     structured_correction = None
     try:
         from gradata.correction_detector import extract_structured_correction
         structured_correction = extract_structured_correction(
-            draft, final, context=str(context or ""),
+            draft_redacted, final_redacted, context=str(context or ""),
         )
     except (ImportError, Exception) as _sc_err:
         _log.debug("Structured correction extraction skipped: %s", _sc_err)
@@ -391,10 +392,11 @@ def brain_correct(
                     # Causal chain: correction reinforces existing rule
                     try:
                         from gradata.enhancements.causal_chains import CausalChain, CausalRelation
+                        from gradata.enhancements.meta_rules import _lesson_id
                         if not hasattr(brain, "_causal_chain"):
                             brain._causal_chain = CausalChain()
                         correction_id = str(event.get("id", ""))
-                        rule_id = f"{cat}:{best_match.description[:40]}"
+                        rule_id = _lesson_id(best_match)
                         brain._causal_chain.add_link(
                             correction_id, rule_id,
                             CausalRelation.REINFORCEMENT,
@@ -442,10 +444,11 @@ def brain_correct(
                     # Causal chain: correction creates new rule
                     try:
                         from gradata.enhancements.causal_chains import CausalChain, CausalRelation
+                        from gradata.enhancements.meta_rules import _lesson_id
                         if not hasattr(brain, "_causal_chain"):
                             brain._causal_chain = CausalChain()
                         correction_id = str(event.get("id", ""))
-                        rule_id = f"{cat}:{desc[:40]}"
+                        rule_id = _lesson_id(new_lesson)
                         brain._causal_chain.add_link(
                             correction_id, rule_id,
                             CausalRelation.CORRECTION_TO_RULE,

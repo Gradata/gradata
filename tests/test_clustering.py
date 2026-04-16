@@ -227,7 +227,11 @@ def _instinct_lesson(description: str, category: str = "DRAFTING", confidence: f
 
 
 def test_promote_instinct_clusters_promotes_coherent_group():
-    """3+ coherent INSTINCT lessons in the same category should be promoted to PATTERN."""
+    """3+ coherent INSTINCT lessons in the same category should be promoted to PATTERN.
+
+    Confidence is intentionally NOT raised — the graduation pipeline handles
+    thresholds. The cluster promotion only advances the state.
+    """
     lessons = [
         _instinct_lesson("Use clear subject lines in all outbound emails", confidence=0.52),
         _instinct_lesson("Write concise paragraphs in all outbound messages", confidence=0.54),
@@ -237,7 +241,8 @@ def test_promote_instinct_clusters_promotes_coherent_group():
     assert len(promoted) == 3
     for lesson in lessons:
         assert lesson.state == LessonState.PATTERN
-        assert lesson.confidence >= 0.60
+        # Original confidence is preserved; the graduation pipeline decides thresholds
+        assert lesson.confidence < 0.60
 
 
 def test_promote_instinct_clusters_skips_contradicting_groups():

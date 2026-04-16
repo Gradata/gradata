@@ -410,7 +410,10 @@ def extract_structured_correction(
             # that differ — treat as a correction.
             if draft.strip() == final.strip():
                 return None
-        elif not draft and not final:
+            # else: fall through and treat differing texts as a correction
+        else:
+            # No correction signal and either: texts are similar edits, or
+            # one/both of draft/final are empty. Nothing to extract.
             return None
 
     correction_text = final or context

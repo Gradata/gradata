@@ -973,7 +973,7 @@ def synthesize_meta_rules_agentic(
                 created_session=current_session,
                 last_validated_session=current_session,
                 source="deterministic",
-                transfer_scope=RuleTransferScope.PERSONAL,
+                transfer_scope=RuleTransferScope.UNIVERSAL,
             )
             new_metas.append(meta)
             existing_ids.add(mid)

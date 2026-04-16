@@ -79,24 +79,34 @@ def cluster_rules(
     lessons: list[Lesson],
     min_cluster_size: int = 2,
 ) -> list[RuleCluster]:
-    """Group graduated rules into clusters by category.
+    """Group graduated rules into clusters by (category, domain).
 
-    Rules in the same category with similar descriptions are clustered.
+    Rules in the same category and domain with similar descriptions are clustered.
     Cluster confidence = weighted mean of member confidences.
     """
     import json
     from collections import defaultdict
 
+    def _extract_domain(lesson: Lesson) -> str:
+        if lesson.scope_json:
+            try:
+                scope = json.loads(lesson.scope_json)
+                return scope.get("domain", "") or "global"
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return "global"
+
     # Only cluster RULE and PATTERN tier
     graduated = [l for l in lessons if l.state.name in ("RULE", "PATTERN")]
 
-    # Group by category
-    by_category: dict[str, list[Lesson]] = defaultdict(list)
+    # Group by (category, domain)
+    by_category_domain: dict[tuple[str, str], list[Lesson]] = defaultdict(list)
     for lesson in graduated:
-        by_category[lesson.category].append(lesson)
+        key = (lesson.category, _extract_domain(lesson))
+        by_category_domain[key].append(lesson)
 
     clusters: list[RuleCluster] = []
-    for category, members in by_category.items():
+    for (category, domain), members in by_category_domain.items():
         if len(members) < min_cluster_size:
             continue
 
@@ -112,17 +122,9 @@ def cluster_rules(
         if len(members) > 5:
             summary += f" (+{len(members) - 5} more)"
 
-        domain = ""
-        if members[0].scope_json:
-            try:
-                scope = json.loads(members[0].scope_json)
-                domain = scope.get("domain", "")
-            except (json.JSONDecodeError, TypeError):
-                pass
-
         cluster = RuleCluster(
-            cluster_id=f"cluster-{category.lower()}",
-            domain=domain or "global",
+            cluster_id=f"cluster-{category.lower()}-{domain.lower()}",
+            domain=domain,
             category=category,
             member_ids=member_ids,
             cluster_confidence=round(avg_conf, 4),
@@ -171,10 +173,10 @@ def promote_instinct_clusters(
         if std_dev > (1.0 - coherence_threshold):
             continue  # Too much variance
 
-        # Promote all members to PATTERN
+        # Promote all members to PATTERN; leave confidence untouched so the
+        # graduation pipeline can apply its own thresholds.
         for member in members:
             member.state = LessonState.PATTERN
-            member.confidence = max(member.confidence, 0.60)
             promoted.append(member.description)
 
     return promoted

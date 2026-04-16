@@ -151,6 +151,9 @@ class InstallState:
 
     def is_installed(self, module_id: str) -> bool:
         """Check if a module is currently installed."""
+        # Backward compat: "carl" was renamed to "behavioral-engine"
+        if module_id == "carl":
+            module_id = "behavioral-engine"
         return module_id in self.installed_modules
 
 
@@ -394,6 +397,9 @@ class InstallManifest:
         visiting: set[str] = set()  # Detect circular deps
 
         def _resolve(mid: str) -> None:
+            # Backward compat: "carl" was renamed to "behavioral-engine"
+            if mid == "carl":
+                mid = "behavioral-engine"
             if mid in seen:
                 return
             if mid in visiting:

@@ -207,7 +207,7 @@ class DirectiveRegistry:
 
 
     def has_blocking_violations(self, task: str) -> bool:
-        """Check whether any MUST constraints are violated.
+        """Check whether any MUST constraints apply to this task.
 
         Returns True if any applicable MUST constraints exist for this task.
         """
@@ -355,11 +355,13 @@ class DispositionTracker:
     def from_dict(cls, data: dict[str, dict[str, float]]) -> DispositionTracker:
         tracker = cls()
         for domain, vals in data.items():
-            tracker._dispositions[domain] = Disposition(
+            d = Disposition(
                 skepticism=vals.get("skepticism", 3.0),
                 literalism=vals.get("literalism", 3.0),
                 empathy=vals.get("empathy", 3.0),
             )
+            d.clamp()
+            tracker._dispositions[domain] = d
         return tracker
 
 

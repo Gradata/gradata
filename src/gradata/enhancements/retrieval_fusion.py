@@ -58,10 +58,12 @@ def reciprocal_rank_fusion(
     all_rules: dict[str, ScoredRule] = {}
 
     for idx, results in enumerate(result_lists):
-        source = source_names[idx] if idx < len(source_names) else f"source_{idx}"
-        weight = (source_weights or {}).get(source, 1.0)
+        list_source = source_names[idx] if idx < len(source_names) else f"source_{idx}"
 
         for rank, rule in enumerate(results, start=1):
+            # Use rule.source for weight lookup (actual source, not list position)
+            source = rule.source
+            weight = (source_weights or {}).get(source, 1.0)
             # First-seen metadata wins (deduplication)
             if rule.rule_id not in all_rules:
                 all_rules[rule.rule_id] = rule
@@ -70,7 +72,7 @@ def reciprocal_rank_fusion(
                 source_ranks[rule.rule_id] = {}
 
             rrf_scores[rule.rule_id] += weight / (k + rank)
-            source_ranks[rule.rule_id][f"{source}_rank"] = rank
+            source_ranks[rule.rule_id][f"{list_source}_rank"] = rank
 
     sorted_ids = sorted(rrf_scores, key=lambda rid: rrf_scores[rid], reverse=True)
 
@@ -119,11 +121,11 @@ def apply_correction_boost(
         correction_boost = 1.0 + correction_alpha * (is_correction - 0.5)
 
         # Recency boost (0.0 = stale, 1.0 = just fired)
-        recency = float(meta.get("recency_score", 0.5))
+        recency = max(0.0, min(1.0, float(meta.get("recency_score", 0.5))))
         recency_boost = 1.0 + recency_alpha * (recency - 0.5)
 
         # Severity boost (normalized 0-1 from avg correction severity)
-        severity = float(meta.get("severity_score", 0.5))
+        severity = max(0.0, min(1.0, float(meta.get("severity_score", 0.5))))
         severity_boost = 1.0 + severity_alpha * (severity - 0.5)
 
         mr.combined_score = mr.rrf_score * correction_boost * recency_boost * severity_boost
