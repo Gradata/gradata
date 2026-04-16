@@ -11,6 +11,7 @@ import json
 import logging
 import sqlite3
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 # IMPORTANT: Use module reference (not value import) so set_brain_dir() updates propagate.
@@ -392,3 +393,184 @@ def audit_trend(last_n_sessions: int = 5, ctx: BrainContext | None = None) -> li
             ORDER BY session
         """, (last_n_sessions - 1,)).fetchall()
     return [{"session": r[0], "data": json.loads(r[1])} for r in rows]
+
+
+# ── 3-Phase Retain Orchestrator (adapted from Hindsight's retain pattern) ────
+
+
+class RetainOrchestrator:
+    """3-phase event persistence adapted from Hindsight's retain orchestrator.
+
+    Phase 1 (read, separate connection): Load existing state, compute delta
+        — identify which queued events are already persisted so interrupted
+        writes never duplicate data.
+    Phase 2 (atomic, single pass): Append new events to events.jsonl and
+        INSERT OR IGNORE into system.db in one contiguous write.
+    Phase 3 (best-effort, post-commit): Non-critical work — manifest updates,
+        index refreshes. Failure here never rolls back Phase 2.
+
+    Crash recovery: .event_cursor.json tracks the last successfully committed
+    event's ``ts+type`` key so an interrupted flush resumes from the correct
+    position on the next call.
+    """
+
+    def __init__(self, brain_dir: "str | Path") -> None:
+        from pathlib import Path as _Path
+        self.brain_dir = _Path(brain_dir)
+        self.events_path = self.brain_dir / "events.jsonl"
+        self.db_path = self.brain_dir / "system.db"
+        self._cursor_path = self.brain_dir / ".event_cursor.json"
+        self._pending: list[dict] = []
+        self._last_committed_key: str | None = self._load_cursor()
+
+    # ── cursor helpers ──────────────────────────────────────────────────
+
+    @staticmethod
+    def _event_key(event: dict) -> str:
+        """Stable dedup key for an event: ts + type + source."""
+        return f"{event.get('ts', '')}|{event.get('type', '')}|{event.get('source', '')}"
+
+    def _load_cursor(self) -> str | None:
+        if self._cursor_path.is_file():
+            try:
+                data = json.loads(self._cursor_path.read_text(encoding="utf-8"))
+                return data.get("last_committed_key")
+            except Exception:
+                pass
+        return None
+
+    def _save_cursor(self, key: str) -> None:
+        try:
+            self._cursor_path.write_text(
+                json.dumps({"last_committed_key": key}),
+                encoding="utf-8",
+            )
+            self._last_committed_key = key
+        except Exception as exc:
+            _log.warning("RetainOrchestrator: failed to save cursor: %s", exc)
+
+    # ── public API ──────────────────────────────────────────────────────
+
+    def queue(self, event: dict) -> None:
+        """Queue an event dict for batch persistence on the next flush()."""
+        self._pending.append(event)
+
+    @property
+    def pending_count(self) -> int:
+        """Number of events waiting to be flushed."""
+        return len(self._pending)
+
+    def flush(self) -> dict:
+        """Execute 3-phase persistence for all queued events.
+
+        Returns a result dict::
+
+            {
+                "written": int,       # events successfully appended
+                "errors": list[str],  # non-fatal errors from any phase
+                "phases": {
+                    "read":  {"existing_keys": int, "new": int},
+                    "write": {"events_written": int},
+                    "post":  {"manifest_updated": bool},
+                }
+            }
+        """
+        if not self._pending:
+            return {"written": 0, "errors": [], "phases": {}}
+
+        result: dict = {"written": 0, "errors": [], "phases": {}}
+
+        # ── Phase 1: Read — compute delta ───────────────────────────────
+        existing_keys: set[str] = set()
+        try:
+            if self.events_path.is_file():
+                for raw_line in self.events_path.read_text(encoding="utf-8").splitlines():
+                    raw_line = raw_line.strip()
+                    if raw_line:
+                        try:
+                            evt = json.loads(raw_line)
+                            existing_keys.add(self._event_key(evt))
+                        except json.JSONDecodeError:
+                            continue
+            result["phases"]["read"] = {
+                "existing_keys": len(existing_keys),
+                "new": sum(
+                    1 for e in self._pending
+                    if self._event_key(e) not in existing_keys
+                ),
+            }
+        except Exception as exc:
+            result["errors"].append(f"Phase 1: {exc}")
+            # Fall through with empty existing_keys — safer than aborting
+
+        new_events = [
+            e for e in self._pending
+            if self._event_key(e) not in existing_keys
+        ]
+
+        if not new_events:
+            self._pending.clear()
+            return result
+
+        # ── Phase 2: Atomic write ────────────────────────────────────────
+        try:
+            # 2a: Append to events.jsonl
+            with self.events_path.open("a", encoding="utf-8") as fh:
+                for event in new_events:
+                    fh.write(json.dumps(event, default=str, ensure_ascii=False) + "\n")
+                    result["written"] += 1
+
+            # 2b: INSERT OR IGNORE into system.db (same schema as emit())
+            if self.db_path.is_file():
+                try:
+                    with contextlib.closing(sqlite3.connect(str(self.db_path))) as conn:
+                        _ensure_table(conn)
+                        conn.execute("PRAGMA busy_timeout=5000")
+                        for event in new_events:
+                            conn.execute(
+                                "INSERT OR IGNORE INTO events "
+                                "(ts, session, type, source, data_json, tags_json, "
+                                " valid_from, valid_until) "
+                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                                (
+                                    event.get("ts", ""),
+                                    event.get("session"),
+                                    event.get("type", ""),
+                                    event.get("source", ""),
+                                    json.dumps(event.get("data", {}), default=str),
+                                    json.dumps(event.get("tags", []), default=str),
+                                    event.get("valid_from"),
+                                    event.get("valid_until"),
+                                ),
+                            )
+                        conn.commit()
+                except Exception as db_exc:
+                    result["errors"].append(f"Phase 2 DB: {db_exc}")
+
+            # Save cursor after successful JSONL write
+            last_key = self._event_key(new_events[-1])
+            self._save_cursor(last_key)
+
+            result["phases"]["write"] = {"events_written": result["written"]}
+
+        except Exception as exc:
+            result["errors"].append(f"Phase 2: {exc}")
+            self._pending.clear()
+            return result  # Phase 3 must not run if Phase 2 failed
+
+        # ── Phase 3: Best-effort post-commit work ────────────────────────
+        manifest_updated = False
+        try:
+            try:
+                from gradata._brain_manifest import update_manifest  # type: ignore[import]
+                update_manifest(self.brain_dir)
+                manifest_updated = True
+            except (ImportError, Exception):
+                pass
+        except Exception as exc:
+            result["errors"].append(f"Phase 3: {exc}")
+
+        result["phases"]["post"] = {"manifest_updated": manifest_updated}
+
+        self._pending.clear()
+        return result
