@@ -235,7 +235,10 @@ def compute_brain_scores(
     try:
         import gradata._events as _events  # noqa: PLC0415
 
-        raw: dict = _events.compute_brain_scores(
+        _fn = getattr(_events, "compute_brain_scores", None)
+        if _fn is None:
+            raise AttributeError("compute_brain_scores not available")
+        raw: dict = _fn(
             last_n_prospect_sessions=last_n_prospect_sessions
         )
         return _reshape(raw)
