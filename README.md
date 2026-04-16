@@ -307,6 +307,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-**SDK:** Apache-2.0. Use it anywhere — commercial, proprietary, SaaS, internal tooling. No copyleft, no linking obligations.
+**Apache-2.0.** The full SDK — rules, hooks, graduation, meta-synthesis, scoring, profiling — is permissively open. Use it anywhere: commercial, proprietary, SaaS, internal tooling. No copyleft, no linking obligations, no commercial-license upsell.
 
-**Cloud** (`gradata-cloud` repo): BSL-1.1, auto-converts to Apache-2.0 on 2029-04-15. You can read the code, fork it, and self-host for internal use. You cannot run it as a competing commercial SaaS. After the Change Date, all restrictions lift.
+**[Gradata Cloud](https://gradata.ai)** is an optional hosted service (team brain, corrections corpus, brain marketplace, managed LLM). The SDK does not require it — everything works locally with your own LLM key.
