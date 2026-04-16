@@ -17,7 +17,10 @@ class Trend(StrEnum):
     STALE = "stale"
 
 
-# Severity weights for density computation
+# Severity weights for DENSITY computation (how much a correction counts
+# toward trend acceleration/deceleration). Distinct from self_improvement.py
+# SEVERITY_WEIGHTS (confidence-delta) and behavioral_engine._SEVERITY_DELTAS
+# (disposition shift). These scale evidence density, not confidence.
 SEVERITY_WEIGHTS = {
     "trivial": 0.5,
     "minor": 1.0,

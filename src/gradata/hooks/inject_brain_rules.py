@@ -233,8 +233,10 @@ def main(data: dict) -> dict | None:
                 + disp.format_for_prompt()
                 + "\n</brain-disposition>"
             )
-    except (ImportError, Exception) as exc:
-        _log.debug("Disposition injection skipped: %s", exc)
+    except ImportError:
+        pass
+    except Exception as exc:
+        _log.debug("Disposition injection failed: %s", exc)
 
     # Mandatory injection tier: RULE confidence >= 0.90 AND fire_count >= 10.
     # These appear in a separate primacy block AND a recency reminder so they

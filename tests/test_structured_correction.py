@@ -1,7 +1,7 @@
 """Tests for StructuredCorrection and extract_structured_correction().
 
 Covers:
-- Each CorrectionType classification via keyword patterns
+- Each StructuredCorrectionType classification via keyword patterns
 - what_wrong extraction from draft/final diff
 - Domain detection
 - to_dict / from_dict round-trip
@@ -14,7 +14,7 @@ from __future__ import annotations
 import pytest
 
 from gradata.correction_detector import (
-    CorrectionType,
+    StructuredCorrectionType,
     StructuredCorrection,
     _classify_correction_type,
     _classify_domain,
@@ -26,44 +26,44 @@ from gradata.correction_detector import (
 
 
 # ---------------------------------------------------------------------------
-# CorrectionType classification
+# StructuredCorrectionType classification
 # ---------------------------------------------------------------------------
 
 
-class TestClassifyCorrectionType:
+class TestClassifyStructuredCorrectionType:
     def test_factual_error(self):
-        assert _classify_correction_type("That is wrong, the number is 42") == CorrectionType.FACTUAL_ERROR
+        assert _classify_correction_type("That is wrong, the number is 42") == StructuredCorrectionType.FACTUAL_ERROR
 
     def test_hallucination_priority_over_factual(self):
         # "hallucin" keyword should win over "wrong" because it appears first in pattern list.
-        assert _classify_correction_type("You hallucinated that endpoint, it doesn't exist") == CorrectionType.HALLUCINATION
+        assert _classify_correction_type("You hallucinated that endpoint, it doesn't exist") == StructuredCorrectionType.HALLUCINATION
 
     def test_tone(self):
-        assert _classify_correction_type("The tone is too cold and formal for this prospect") == CorrectionType.TONE
+        assert _classify_correction_type("The tone is too cold and formal for this prospect") == StructuredCorrectionType.TONE
 
     def test_style_dash(self):
-        assert _classify_correction_type("Don't use em dash in the email") == CorrectionType.STYLE
+        assert _classify_correction_type("Don't use em dash in the email") == StructuredCorrectionType.STYLE
 
     def test_style_emoji(self):
-        assert _classify_correction_type("Remove the emoji from the subject line") == CorrectionType.STYLE
+        assert _classify_correction_type("Remove the emoji from the subject line") == StructuredCorrectionType.STYLE
 
     def test_format(self):
-        assert _classify_correction_type("The layout and heading structure is off") == CorrectionType.FORMAT
+        assert _classify_correction_type("The layout and heading structure is off") == StructuredCorrectionType.FORMAT
 
     def test_omission(self):
-        assert _classify_correction_type("You forgot to include the pricing section") == CorrectionType.OMISSION
+        assert _classify_correction_type("You forgot to include the pricing section") == StructuredCorrectionType.OMISSION
 
     def test_approach(self):
-        assert _classify_correction_type("Please change the strategy and workflow here") == CorrectionType.APPROACH
+        assert _classify_correction_type("Please change the strategy and workflow here") == StructuredCorrectionType.APPROACH
 
     def test_scope(self):
-        assert _classify_correction_type("This rule is only for email scope, not code") == CorrectionType.SCOPE
+        assert _classify_correction_type("This rule is only for email scope, not code") == StructuredCorrectionType.SCOPE
 
     def test_unknown_fallback(self):
-        assert _classify_correction_type("Please update this") == CorrectionType.UNKNOWN
+        assert _classify_correction_type("Please update this") == StructuredCorrectionType.UNKNOWN
 
     def test_empty_string(self):
-        assert _classify_correction_type("") == CorrectionType.UNKNOWN
+        assert _classify_correction_type("") == StructuredCorrectionType.UNKNOWN
 
 
 # ---------------------------------------------------------------------------
@@ -208,7 +208,7 @@ class TestExtractStructuredCorrection:
         final = "Don't use em dashes in the email"
         result = extract_structured_correction(draft, final)
         assert result is not None
-        assert result.correction_type == CorrectionType.STYLE
+        assert result.correction_type == StructuredCorrectionType.STYLE
         assert result.domain == "email"
 
     def test_returns_none_for_empty_inputs(self):
@@ -236,28 +236,28 @@ class TestExtractStructuredCorrection:
         final = "You hallucinated that — WebSockets aren't supported"
         result = extract_structured_correction(draft, final)
         assert result is not None
-        assert result.correction_type == CorrectionType.HALLUCINATION
+        assert result.correction_type == StructuredCorrectionType.HALLUCINATION
 
     def test_tone_correction(self):
         draft = "Dear Sir/Madam, I am writing to formally inquire..."
         final = "Too formal — make the tone more casual and warm"
         result = extract_structured_correction(draft, final)
         assert result is not None
-        assert result.correction_type == CorrectionType.TONE
+        assert result.correction_type == StructuredCorrectionType.TONE
 
     def test_omission_correction(self):
         draft = "Here is your plan: step 1, step 2"
         final = "You forgot to include step 3 and the timeline"
         result = extract_structured_correction(draft, final)
         assert result is not None
-        assert result.correction_type == CorrectionType.OMISSION
+        assert result.correction_type == StructuredCorrectionType.OMISSION
 
     def test_approach_correction(self):
         draft = "Use a challenger approach to open the email"
         final = "Change the strategy — use a peer-to-peer workflow instead"
         result = extract_structured_correction(draft, final)
         assert result is not None
-        assert result.correction_type == CorrectionType.APPROACH
+        assert result.correction_type == StructuredCorrectionType.APPROACH
 
     def test_what_wrong_populated(self):
         draft = "The deadline is March 15"
@@ -294,7 +294,7 @@ class TestStructuredCorrectionSerialization:
         return StructuredCorrection(
             what_wrong="em dashes throughout the email",
             why="they read as too informal for cold outreach",
-            correction_type=CorrectionType.STYLE,
+            correction_type=StructuredCorrectionType.STYLE,
             domain="email",
             severity="minor",
             related_rule_id="rule_42",
@@ -332,7 +332,7 @@ class TestStructuredCorrectionSerialization:
         obj = StructuredCorrection(
             what_wrong="something",
             why="reason",
-            correction_type=CorrectionType.UNKNOWN,
+            correction_type=StructuredCorrectionType.UNKNOWN,
             domain="general",
             severity="trivial",
             related_rule_id=None,
@@ -343,7 +343,7 @@ class TestStructuredCorrectionSerialization:
         assert restored.related_rule_id is None
 
     def test_from_dict_with_all_correction_types(self):
-        for ct in CorrectionType:
+        for ct in StructuredCorrectionType:
             d = {
                 "what_wrong": "x",
                 "why": "y",
@@ -359,7 +359,7 @@ class TestStructuredCorrectionSerialization:
         obj = StructuredCorrection.from_dict({})
         assert obj.what_wrong == ""
         assert obj.why == ""
-        assert obj.correction_type == CorrectionType.UNKNOWN
+        assert obj.correction_type == StructuredCorrectionType.UNKNOWN
         assert obj.domain == "general"
         assert obj.severity == "minor"
         assert obj.related_rule_id is None

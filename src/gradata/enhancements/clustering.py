@@ -47,22 +47,23 @@ def detect_contradictions(
 
     Returns list of (rule_id_1, rule_id_2) pairs.
     """
-    _NEGATION_WORDS = {"never", "dont", "don", "not", "no", "stop", "avoid", "without"}
+    _NEGATION_WORDS = {"never", "dont", "don", "not", "stop", "avoid", "without"}
 
     def tokenize(text: str) -> set[str]:
         return set(re.findall(r"[a-z]{3,}", text.lower()))
 
-    def has_negation(tokens: set[str]) -> bool:
-        return bool(tokens & _NEGATION_WORDS)
+    def has_negation(text: str) -> bool:
+        words = set(re.findall(r"[a-z]+", text.lower()))
+        return bool(words & _NEGATION_WORDS | {w for w in words if w == "no"})
 
     contradictions: list[tuple[str, str]] = []
     for i, a in enumerate(lessons):
         tokens_a = tokenize(a.description)
-        neg_a = has_negation(tokens_a)
+        neg_a = has_negation(a.description)
 
         for b in lessons[i + 1 :]:
             tokens_b = tokenize(b.description)
-            neg_b = has_negation(tokens_b)
+            neg_b = has_negation(b.description)
 
             # Need significant overlap AND different negation status
             overlap = len(tokens_a & tokens_b)

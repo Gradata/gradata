@@ -28,15 +28,12 @@ _NEVER_RE = re.compile(
     r"never\s+(?:use|do|create|add|include)\s+(.+)", re.I
 )
 
+# Process-level cache: (brain_dir, mtime) → parsed mandatory rules
+_rules_cache: dict[tuple[str, float], list[dict]] = {}
+
 
 def _load_mandatory_rules(brain_dir: str) -> list[dict]:
-    """Load RULE-tier lessons with high confidence as mandatory checks.
-
-    Filters to lessons that have:
-      - state == RULE
-      - confidence >= 0.90
-      - fire_count >= 10  (proven in practice, not just freshly graduated)
-    """
+    """Load RULE-tier mandatory lessons, cached by file mtime."""
     try:
         from gradata.enhancements.self_improvement import parse_lessons
         from gradata._types import LessonState
@@ -44,15 +41,22 @@ def _load_mandatory_rules(brain_dir: str) -> list[dict]:
         lessons_path = Path(brain_dir) / "lessons.md"
         if not lessons_path.is_file():
             return []
+        mtime = lessons_path.stat().st_mtime
+        cache_key = (brain_dir, mtime)
+        if cache_key in _rules_cache:
+            return _rules_cache[cache_key]
         text = lessons_path.read_text(encoding="utf-8")
         lessons = parse_lessons(text)
-        return [
+        result = [
             {"description": l.description, "category": l.category}
             for l in lessons
             if l.state == LessonState.RULE
             and l.confidence >= 0.90
             and l.fire_count >= 10
         ]
+        _rules_cache.clear()
+        _rules_cache[cache_key] = result
+        return result
     except Exception as exc:
         _log.debug("_load_mandatory_rules failed: %s", exc)
         return []

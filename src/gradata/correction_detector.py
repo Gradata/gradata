@@ -73,7 +73,7 @@ _IMPLICIT_PATTERNS: list[tuple[re.Pattern, float, str]] = [
 # Structured Correction Types
 # ---------------------------------------------------------------------------
 
-# Keyword → CorrectionType mapping: list of (pattern, type) in priority order.
+# Keyword → StructuredCorrectionType mapping: list of (pattern, type) in priority order.
 # First match wins.
 _TYPE_KEYWORD_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"\bhallucin|made\s+up|doesn'?t\s+exist\b", re.IGNORECASE), "hallucination"),
@@ -100,7 +100,7 @@ _DOMAIN_KEYWORD_PATTERNS: list[tuple[re.Pattern, str]] = [
 ]
 
 
-class CorrectionType(StrEnum):
+class StructuredCorrectionType(StrEnum):
     """Classification of what kind of correction was made."""
 
     FACTUAL_ERROR = "factual_error"
@@ -132,7 +132,7 @@ class StructuredCorrection:
 
     what_wrong: str
     why: str
-    correction_type: CorrectionType
+    correction_type: StructuredCorrectionType
     domain: str
     severity: str
     related_rule_id: str | None = None
@@ -154,7 +154,7 @@ class StructuredCorrection:
         return cls(
             what_wrong=data.get("what_wrong", ""),
             why=data.get("why", ""),
-            correction_type=CorrectionType(data.get("correction_type", "unknown")),
+            correction_type=StructuredCorrectionType(data.get("correction_type", "unknown")),
             domain=data.get("domain", "general"),
             severity=data.get("severity", "minor"),
             related_rule_id=data.get("related_rule_id"),
@@ -498,12 +498,12 @@ def _extract_why(context: str, final: str) -> str:
     return final[:120] if final else "no reason provided"
 
 
-def _classify_correction_type(text: str) -> CorrectionType:
+def _classify_correction_type(text: str) -> StructuredCorrectionType:
     """Classify correction type by matching keyword patterns in order."""
     for pattern, type_value in _TYPE_KEYWORD_PATTERNS:
         if pattern.search(text):
-            return CorrectionType(type_value)
-    return CorrectionType.UNKNOWN
+            return StructuredCorrectionType(type_value)
+    return StructuredCorrectionType.UNKNOWN
 
 
 def _classify_domain(text: str) -> str:
