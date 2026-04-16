@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from gradata._types import CorrectionType, Lesson, LessonState, RuleTransferScope
-from gradata.enhancements.self_improvement import (
+from gradata.enhancements.clustering import (
     RuleCluster,
     cluster_rules,
     detect_contradictions,

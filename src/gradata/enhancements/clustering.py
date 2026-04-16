@@ -1,0 +1,179 @@
+"""Rule Clustering and Contradiction Detection — Phase 1 cluster analysis.
+
+SDK LAYER: Layer 1 (enhancements). Imports from gradata._types only.
+
+Extracted from self_improvement.py to isolate cluster analysis into a focused
+module. Used by the rule pipeline and tests to detect contradictions between
+rules and group related lessons by category/domain.
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+
+from gradata._types import Lesson, LessonState
+
+
+@dataclass
+class RuleCluster:
+    """A cluster of related rules with shared domain/category."""
+
+    cluster_id: str
+    domain: str
+    category: str
+    member_ids: list[str] = field(default_factory=list)
+    cluster_confidence: float = 0.0
+    summary: str = ""
+    contradictions: list[tuple[str, str]] = field(default_factory=list)
+
+    @property
+    def size(self) -> int:
+        return len(self.member_ids)
+
+    @property
+    def has_contradictions(self) -> bool:
+        return len(self.contradictions) > 0
+
+
+def detect_contradictions(
+    lessons: list[Lesson],
+) -> list[tuple[str, str]]:
+    """Find potentially contradicting rules within a group.
+
+    Uses keyword overlap + negation detection. Two rules contradict if:
+    - They share significant keyword overlap (>= 3 common tokens)
+    - One contains negation language the other doesn't
+
+    Returns list of (rule_id_1, rule_id_2) pairs.
+    """
+    _NEGATION_WORDS = {"never", "dont", "don", "not", "no", "stop", "avoid", "without"}
+
+    def tokenize(text: str) -> set[str]:
+        return set(re.findall(r"[a-z]{3,}", text.lower()))
+
+    def has_negation(tokens: set[str]) -> bool:
+        return bool(tokens & _NEGATION_WORDS)
+
+    contradictions: list[tuple[str, str]] = []
+    for i, a in enumerate(lessons):
+        tokens_a = tokenize(a.description)
+        neg_a = has_negation(tokens_a)
+
+        for b in lessons[i + 1 :]:
+            tokens_b = tokenize(b.description)
+            neg_b = has_negation(tokens_b)
+
+            # Need significant overlap AND different negation status
+            overlap = len(tokens_a & tokens_b)
+            if overlap >= 3 and neg_a != neg_b:
+                id_a = f"{a.category}:{a.description[:40]}"
+                id_b = f"{b.category}:{b.description[:40]}"
+                contradictions.append((id_a, id_b))
+
+    return contradictions
+
+
+def cluster_rules(
+    lessons: list[Lesson],
+    min_cluster_size: int = 2,
+) -> list[RuleCluster]:
+    """Group graduated rules into clusters by category.
+
+    Rules in the same category with similar descriptions are clustered.
+    Cluster confidence = weighted mean of member confidences.
+    """
+    import json
+    from collections import defaultdict
+
+    # Only cluster RULE and PATTERN tier
+    graduated = [l for l in lessons if l.state.name in ("RULE", "PATTERN")]
+
+    # Group by category
+    by_category: dict[str, list[Lesson]] = defaultdict(list)
+    for lesson in graduated:
+        by_category[lesson.category].append(lesson)
+
+    clusters: list[RuleCluster] = []
+    for category, members in by_category.items():
+        if len(members) < min_cluster_size:
+            continue
+
+        member_ids = [f"{m.category}:{m.description[:40]}" for m in members]
+        avg_conf = sum(m.confidence for m in members) / len(members)
+
+        # Detect contradictions within cluster
+        contradictions = detect_contradictions(members)
+
+        # Build summary from member descriptions
+        descriptions = [m.description for m in members[:5]]
+        summary = f"{len(members)} rules in {category}: " + "; ".join(descriptions)
+        if len(members) > 5:
+            summary += f" (+{len(members) - 5} more)"
+
+        domain = ""
+        if members[0].scope_json:
+            try:
+                scope = json.loads(members[0].scope_json)
+                domain = scope.get("domain", "")
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        cluster = RuleCluster(
+            cluster_id=f"cluster-{category.lower()}",
+            domain=domain or "global",
+            category=category,
+            member_ids=member_ids,
+            cluster_confidence=round(avg_conf, 4),
+            summary=summary,
+            contradictions=contradictions,
+        )
+        clusters.append(cluster)
+
+    return clusters
+
+
+def promote_instinct_clusters(
+    lessons: list[Lesson],
+    min_cluster_size: int = 3,
+    coherence_threshold: float = 0.80,
+) -> list[str]:
+    """Find INSTINCT-tier clusters that deserve PATTERN promotion.
+
+    3+ INSTINCT rules in the same category with high inter-coherence
+    (no contradictions, similar confidence) get promoted as a group.
+
+    Returns list of promoted lesson descriptions.
+    """
+    from collections import defaultdict
+
+    instinct = [l for l in lessons if l.state.name == "INSTINCT"]
+    by_category: dict[str, list[Lesson]] = defaultdict(list)
+    for lesson in instinct:
+        by_category[lesson.category].append(lesson)
+
+    promoted: list[str] = []
+    for category, members in by_category.items():
+        if len(members) < min_cluster_size:
+            continue
+
+        contradictions = detect_contradictions(members)
+        if contradictions:
+            continue  # Incoherent cluster, skip
+
+        # Check confidence coherence (std dev < threshold complement)
+        confs = [m.confidence for m in members]
+        mean_conf = sum(confs) / len(confs)
+        variance = sum((c - mean_conf) ** 2 for c in confs) / len(confs)
+        std_dev = variance ** 0.5
+
+        if std_dev > (1.0 - coherence_threshold):
+            continue  # Too much variance
+
+        # Promote all members to PATTERN
+        for member in members:
+            member.state = LessonState.PATTERN
+            member.confidence = max(member.confidence, 0.60)
+            promoted.append(member.description)
+
+    return promoted

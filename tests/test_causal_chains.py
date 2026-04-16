@@ -2,7 +2,7 @@
 
 import pytest
 
-from gradata.enhancements.self_improvement import CausalChain, CausalLink, CausalRelation
+from gradata.enhancements.causal_chains import CausalChain, CausalLink, CausalRelation
 
 
 # ---------------------------------------------------------------------------

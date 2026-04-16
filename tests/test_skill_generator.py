@@ -23,7 +23,7 @@ from pathlib import Path
 import pytest
 
 from gradata._types import Lesson, LessonState
-from gradata.enhancements.self_improvement import (
+from gradata.enhancements.rule_pipeline import (
     _generate_skill_file,
     review_generated_skill,
     run_rule_pipeline,

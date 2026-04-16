@@ -93,7 +93,7 @@ def _run_pipeline(brain_dir: str, data: dict) -> None:
     try:
         from pathlib import Path
 
-        from gradata.enhancements.self_improvement import run_rule_pipeline
+        from gradata.enhancements.rule_pipeline import run_rule_pipeline
 
         lessons_path = Path(brain_dir) / "lessons.md"
         db_path = Path(brain_dir) / "system.db"

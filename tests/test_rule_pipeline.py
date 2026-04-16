@@ -13,11 +13,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from gradata._types import Lesson, LessonState
-from gradata.enhancements.self_improvement import (
-    PipelineResult,
-    format_lessons,
-    run_rule_pipeline,
-)
+from gradata.enhancements.rule_pipeline import PipelineResult, run_rule_pipeline
+from gradata.enhancements.self_improvement import format_lessons
 
 
 # ---------------------------------------------------------------------------

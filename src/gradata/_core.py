@@ -390,7 +390,7 @@ def brain_correct(
                         _log.debug("Provenance emit failed: %s", e)
                     # Causal chain: correction reinforces existing rule
                     try:
-                        from gradata.enhancements.self_improvement import CausalChain, CausalRelation
+                        from gradata.enhancements.causal_chains import CausalChain, CausalRelation
                         if not hasattr(brain, "_causal_chain"):
                             brain._causal_chain = CausalChain()
                         correction_id = str(event.get("id", ""))
@@ -441,7 +441,7 @@ def brain_correct(
                     event["lessons_created"] = 1
                     # Causal chain: correction creates new rule
                     try:
-                        from gradata.enhancements.self_improvement import CausalChain, CausalRelation
+                        from gradata.enhancements.causal_chains import CausalChain, CausalRelation
                         if not hasattr(brain, "_causal_chain"):
                             brain._causal_chain = CausalChain()
                         correction_id = str(event.get("id", ""))
