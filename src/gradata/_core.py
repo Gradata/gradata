@@ -964,11 +964,183 @@ def brain_end_session(
             "stats": result,
         })
 
+        # Cloud sync: upload session telemetry if user has run `gradata login`.
+        # NEVER blocks the learning loop — all failures are silently logged.
+        _cloud_sync_session(
+            brain, current_session, all_lessons,
+            session_corrections or [], result,
+        )
+
         return result
 
     except Exception as e:
         _log.warning("Graduation sweep failed: %s", e)
         return {"error": str(e)}
+
+
+def _cloud_sync_session(
+    brain: Brain,
+    session: int,
+    all_lessons: list[Lesson],
+    session_corrections: list[dict],
+    result: dict,
+) -> None:
+    """Best-effort cloud sync at session end. Never raises, never blocks."""
+    try:
+        import hashlib
+        import os
+
+        from pathlib import Path
+
+        # 1. Resolve cloud credentials: ~/.gradata/config.toml or env var
+        api_key = os.environ.get("GRADATA_API_KEY", "")
+        api_url = ""
+        brain_id_from_config = ""
+
+        config_path = Path.home() / ".gradata" / "config.toml"
+        if config_path.is_file():
+            try:
+                _cfg = _parse_toml_cloud(config_path)
+                api_key = api_key or _cfg.get("api_key", "")
+                api_url = _cfg.get("api_url", "")
+                brain_id_from_config = _cfg.get("brain_id", "")
+            except Exception as e:
+                _log.debug("cloud config parse failed: %s", e)
+
+        if not api_key:
+            return  # No cloud credentials — nothing to sync
+
+        # 2. Build TelemetryPayload from session data
+        from gradata.cloud.sync import CloudClient as SyncClient
+        from gradata.cloud.sync import CloudConfig, TelemetryPayload
+
+        # Derive brain_id: use config value, or hash the brain directory path
+        b_id = brain_id_from_config or hashlib.sha256(
+            str(brain.dir).encode()
+        ).hexdigest()[:16]
+
+        # Compute metrics from session corrections
+        n_corrections = len(session_corrections)
+        rewrite_count = sum(
+            1 for c in session_corrections
+            if c.get("severity") == "rewrite"
+            or c.get("edit_distance", 0) > 0.8
+        )
+        edit_distances = [
+            float(c.get("edit_distance", 0))
+            for c in session_corrections
+            if "edit_distance" in c
+        ]
+        rewrite_rate = rewrite_count / n_corrections if n_corrections else 0.0
+        edit_distance_avg = (
+            sum(edit_distances) / len(edit_distances) if edit_distances else 0.0
+        )
+
+        # Correction density: corrections per output (approximate from session)
+        correction_density = 0.0
+        try:
+            from gradata.enhancements.metrics import compute_metrics
+
+            m = compute_metrics(db_path=brain.db_path, window=1)
+            correction_density = float(m.get("correction_density", 0.0))
+        except Exception:
+            pass
+
+        # Blandness: compute from correction finals if available
+        blandness_score = 0.0
+        try:
+            from gradata.enhancements.metrics import compute_blandness
+
+            finals = [
+                c.get("final", "") for c in session_corrections if c.get("final")
+            ]
+            if finals:
+                blandness_score = compute_blandness(finals)
+        except Exception:
+            pass
+
+        # Rule stats from lessons
+        rules_active = sum(
+            1 for l in all_lessons if l.state.value in ("INSTINCT", "PATTERN")
+        )
+        rules_graduated = sum(
+            1 for l in all_lessons if l.state.value == "RULE"
+        )
+        total_fires = sum(getattr(l, "fire_count", 0) for l in all_lessons)
+        total_misfires = sum(getattr(l, "misfire_count", 0) for l in all_lessons)
+        rule_success_rate = (
+            (total_fires - total_misfires) / total_fires
+            if total_fires > 0
+            else 0.0
+        )
+        rule_misfire_rate = (
+            total_misfires / total_fires if total_fires > 0 else 0.0
+        )
+
+        payload = TelemetryPayload(
+            brain_id=b_id,
+            session=session,
+            window_size=1,
+            sample_size=n_corrections,
+            rewrite_rate=round(rewrite_rate, 4),
+            edit_distance_avg=round(edit_distance_avg, 4),
+            correction_density=round(correction_density, 4),
+            blandness_score=round(blandness_score, 4),
+            rule_success_rate=round(rule_success_rate, 4),
+            rule_misfire_rate=round(rule_misfire_rate, 4),
+            rules_active=rules_active,
+            rules_graduated=rules_graduated,
+        )
+
+        # 3. Sync metrics via the telemetry client
+        sync_cfg = CloudConfig(
+            sync_enabled=True,
+            token=api_key,
+            api_base=api_url or "https://api.gradata.ai",
+        )
+        sync_client = SyncClient(brain.dir, config=sync_cfg)
+        sync_client.sync_metrics(payload)
+        _log.debug("Cloud telemetry synced for session %d", session)
+
+        # 4. Sync events/corrections via the full cloud client
+        try:
+            from gradata.cloud.client import CloudClient
+
+            cloud = CloudClient(
+                brain_dir=brain.dir,
+                api_key=api_key,
+                endpoint=api_url or None,
+            )
+            if cloud.connect():
+                cloud.sync()
+                _log.debug("Cloud event sync completed for session %d", session)
+        except Exception as e:
+            _log.debug("Cloud event sync failed (non-fatal): %s", e)
+
+    except Exception as e:
+        _log.debug("Cloud sync failed (non-fatal): %s", e)
+
+
+def _parse_toml_cloud(config_path: Path) -> dict:
+    """Parse the [cloud] section from a minimal TOML config file.
+
+    Zero-dependency: handles only simple key = "value" pairs under [cloud].
+    """
+    result: dict[str, str] = {}
+    in_cloud = False
+    for line in config_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped == "[cloud]":
+            in_cloud = True
+            continue
+        if stripped.startswith("[") and in_cloud:
+            break  # Entered a different section
+        if in_cloud and "=" in stripped:
+            key, _, val = stripped.partition("=")
+            key = key.strip()
+            val = val.strip().strip('"').strip("'")
+            result[key] = val
+    return result
 
 
 # ── auto_evolve() ──────────────────────────────────────────────────────
