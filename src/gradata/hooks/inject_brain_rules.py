@@ -205,11 +205,40 @@ def main(data: dict) -> dict | None:
         len(scored), len(wiki_boost),
     )
 
-    lines = [
-        f"[{r.state.name}:{r.confidence:.2f}] {r.category}: {r.description}"
-        for r in scored
-    ]
+    # Cluster-level injection: replace groups of related rules with summaries.
+    # For clusters with confidence >= 0.75 and size >= 3 (and no contradictions),
+    # inject one summary line instead of each individual member rule.
+    # This reduces total injection slot usage while preserving semantic density.
+    cluster_injected_ids: set[str] = set()
+    cluster_lines: list[str] = []
+    try:
+        from gradata.enhancements.clustering import cluster_rules
+        clusters = cluster_rules(filtered, min_cluster_size=3)
+        for cluster in clusters:
+            if cluster.cluster_confidence >= 0.75 and not cluster.has_contradictions:
+                cluster_lines.append(
+                    f"[CLUSTER:{cluster.cluster_confidence:.2f}|{cluster.size} rules] "
+                    f"{cluster.category}: {cluster.summary}"
+                )
+                cluster_injected_ids.update(cluster.member_ids)
+    except ImportError:
+        pass
 
+    _log.debug(
+        "Cluster injection: %d clusters replaced %d individual rules",
+        len(cluster_lines), len(cluster_injected_ids),
+    )
+
+    # Individual rules: only those NOT already covered by a qualifying cluster.
+    individual_lines: list[str] = []
+    for r in scored:
+        rule_id = f"{r.category}:{r.description[:40]}"
+        if rule_id not in cluster_injected_ids:
+            individual_lines.append(
+                f"[{r.state.name}:{r.confidence:.2f}] {r.category}: {r.description}"
+            )
+
+    lines = cluster_lines + individual_lines
     rules_block = "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
 
     # Inject disposition (behavioral tendencies evolved from corrections)

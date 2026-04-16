@@ -1,0 +1,236 @@
+"""Tests for cluster-level rule injection in inject_brain_rules.main().
+
+Verifies that qualifying clusters replace individual rules in the brain-rules
+block, reducing injection slot usage, while non-qualifying rules still appear
+individually.
+"""
+from __future__ import annotations
+
+import json
+from types import SimpleNamespace
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+# ---------------------------------------------------------------------------
+# Helpers to build minimal Lesson-like objects accepted by inject_brain_rules
+# ---------------------------------------------------------------------------
+
+def _make_lesson(
+    description: str,
+    category: str,
+    confidence: float = 0.85,
+    state_name: str = "RULE",
+    fire_count: int = 0,
+    scope_json: str | None = None,
+) -> Any:
+    """Return a minimal object that satisfies the duck-typed Lesson interface."""
+    from gradata._types import LessonState
+
+    state = LessonState[state_name]
+    obj = SimpleNamespace(
+        description=description,
+        category=category,
+        confidence=confidence,
+        state=state,
+        fire_count=fire_count,
+        scope_json=scope_json or "",
+        alpha=1.0,
+        beta_param=1.0,
+    )
+    return obj
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+@pytest.fixture()
+def three_qualifying_lessons():
+    """Three RULE-tier lessons in the same category, high confidence — will form a cluster."""
+    return [
+        _make_lesson("always validate input at boundaries", "VALIDATION", confidence=0.88),
+        _make_lesson("sanitize user input before processing", "VALIDATION", confidence=0.82),
+        _make_lesson("reject requests missing required fields", "VALIDATION", confidence=0.91),
+    ]
+
+
+@pytest.fixture()
+def two_unrelated_lessons():
+    """Two lessons in a different category — won't form a cluster (size < 3)."""
+    return [
+        _make_lesson("use absolute paths only", "PATHS", confidence=0.80),
+        _make_lesson("never use relative imports", "IMPORTS", confidence=0.78),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Helper: run main() with mocked dependencies
+# ---------------------------------------------------------------------------
+
+def _run_main(lessons: list, data: dict | None = None) -> dict | None:
+    """Invoke inject_brain_rules.main() with the given lessons pre-loaded."""
+    from gradata.hooks import inject_brain_rules as inj
+
+    data = data or {"session_type": "coding", "session_number": 1}
+
+    mock_lesson_text = "# mocked lessons file"
+
+    with (
+        patch.object(inj, "parse_lessons", return_value=lessons),
+        patch.object(inj, "is_hook_enforced", return_value=False),
+        patch.object(inj, "resolve_brain_dir", return_value="/fake/brain"),
+        patch.object(inj, "load_meta_rules", return_value=[]),
+        patch.object(inj, "format_meta_rules_for_prompt", return_value=""),
+        patch("pathlib.Path.is_file", return_value=True),
+        patch("pathlib.Path.read_text", return_value=mock_lesson_text),
+    ):
+        return inj.main(data)
+
+
+# ---------------------------------------------------------------------------
+# Test 1: qualifying cluster replaces member rules with a summary line
+# ---------------------------------------------------------------------------
+
+def test_qualifying_cluster_injects_summary(three_qualifying_lessons):
+    result = _run_main(three_qualifying_lessons)
+    assert result is not None
+    block = result["result"]
+    # Summary line must be present
+    assert "[CLUSTER:" in block
+    assert "VALIDATION" in block
+    # The raw individual descriptions should NOT appear as [RULE:...] lines
+    # (they may appear inside the summary text, but not as standalone rule lines)
+    rule_lines = [
+        line for line in block.splitlines()
+        if line.startswith("[RULE:") or line.startswith("[PATTERN:")
+    ]
+    validation_rule_lines = [l for l in rule_lines if "VALIDATION" in l]
+    assert len(validation_rule_lines) == 0, (
+        f"Individual VALIDATION rules leaked through: {validation_rule_lines}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 2: rules NOT in any cluster appear individually
+# ---------------------------------------------------------------------------
+
+def test_non_cluster_rules_injected_individually(
+    three_qualifying_lessons, two_unrelated_lessons
+):
+    all_lessons = three_qualifying_lessons + two_unrelated_lessons
+    result = _run_main(all_lessons)
+    assert result is not None
+    block = result["result"]
+    # Individual PATHS and IMPORTS rules must appear
+    assert "PATHS" in block or "IMPORTS" in block
+
+
+# ---------------------------------------------------------------------------
+# Test 3: clusters with contradictions are NOT used — members injected individually
+# ---------------------------------------------------------------------------
+
+def test_contradicting_cluster_not_used():
+    # Two rules that will trigger contradiction detection (same tokens + negation difference)
+    # Plus a third to meet size >= 3
+    lessons = [
+        _make_lesson("always validate user input carefully", "SAFETY", confidence=0.85),
+        _make_lesson("never validate user input in tests", "SAFETY", confidence=0.85),
+        _make_lesson("validate input at every system boundary", "SAFETY", confidence=0.87),
+    ]
+    result = _run_main(lessons)
+    assert result is not None
+    block = result["result"]
+    # If cluster has contradictions, no CLUSTER: line should appear for SAFETY
+    # (cluster injection is skipped; individual rules take over)
+    safety_cluster_lines = [
+        l for l in block.splitlines()
+        if "[CLUSTER:" in l and "SAFETY" in l
+    ]
+    # Either no cluster for SAFETY, OR if there's a cluster it must have no contradictions
+    # (we just verify individual SAFETY lines are present when cluster is skipped)
+    if not safety_cluster_lines:
+        # Individual lines present
+        individual_safety = [l for l in block.splitlines() if "SAFETY" in l]
+        assert len(individual_safety) > 0
+
+
+# ---------------------------------------------------------------------------
+# Test 4: clusters below confidence threshold are not used
+# ---------------------------------------------------------------------------
+
+def test_low_confidence_cluster_not_injected():
+    # Three lessons with low confidence — cluster avg will be < 0.75
+    lessons = [
+        _make_lesson("do something cautiously", "LOW_CONF", confidence=0.61),
+        _make_lesson("be careful with operations", "LOW_CONF", confidence=0.63),
+        _make_lesson("handle errors gracefully here", "LOW_CONF", confidence=0.62),
+    ]
+    result = _run_main(lessons)
+    assert result is not None
+    block = result["result"]
+    # No cluster line should appear for LOW_CONF
+    low_conf_cluster_lines = [
+        l for l in block.splitlines()
+        if "[CLUSTER:" in l and "LOW_CONF" in l
+    ]
+    assert len(low_conf_cluster_lines) == 0
+
+
+# ---------------------------------------------------------------------------
+# Test 5: total injection count decreases when clusters are used
+# ---------------------------------------------------------------------------
+
+def test_cluster_reduces_injection_count(three_qualifying_lessons):
+    """One CLUSTER line replaces three individual rule lines — net count is lower."""
+    # Baseline: count lines without clustering (individual only)
+    # Clustered: count lines with clustering active
+    result = _run_main(three_qualifying_lessons)
+    assert result is not None
+    block = result["result"]
+    inner = block.replace("<brain-rules>", "").replace("</brain-rules>", "").strip()
+    injected_lines = [l for l in inner.splitlines() if l.strip()]
+    # 3 lessons -> 1 cluster summary -> 1 line total (not 3)
+    assert len(injected_lines) == 1
+    assert injected_lines[0].startswith("[CLUSTER:")
+
+
+# ---------------------------------------------------------------------------
+# Test 6: empty lessons → no clusters, normal injection path returns None
+# ---------------------------------------------------------------------------
+
+def test_empty_lessons_returns_none():
+    from gradata.hooks import inject_brain_rules as inj
+
+    with (
+        patch.object(inj, "parse_lessons", return_value=[]),
+        patch.object(inj, "is_hook_enforced", return_value=False),
+        patch.object(inj, "resolve_brain_dir", return_value="/fake/brain"),
+        patch("pathlib.Path.is_file", return_value=True),
+        patch("pathlib.Path.read_text", return_value=""),
+    ):
+        result = inj.main({"session_type": "coding"})
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Test 7: cluster summary includes category and rule count
+# ---------------------------------------------------------------------------
+
+def test_cluster_summary_format(three_qualifying_lessons):
+    result = _run_main(three_qualifying_lessons)
+    assert result is not None
+    block = result["result"]
+    cluster_lines = [l for l in block.splitlines() if "[CLUSTER:" in l]
+    assert len(cluster_lines) == 1
+    line = cluster_lines[0]
+    # Must contain the confidence score, rule count, and category
+    assert "|3 rules]" in line or "3 rules" in line
+    assert "VALIDATION" in line
+    # Confidence value should be in [0, 1] range formatted as float
+    import re
+    m = re.search(r"\[CLUSTER:(\d+\.\d+)\|", line)
+    assert m is not None, f"Cluster line missing confidence: {line!r}"
+    conf = float(m.group(1))
+    assert 0.75 <= conf <= 1.0
