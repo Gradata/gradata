@@ -128,6 +128,16 @@ def main(data: dict) -> dict | None:
     if parse_lessons is None:
         return None
 
+    # Skip re-injection on compact/resume: the compacted summary already
+    # carries rules from the prior session, and the new session's primacy
+    # slot is consumed by the summary itself. Re-firing here duplicates
+    # ~1.9KB per compact event (measured 10x in a long session = ~3.7k tok).
+    # Opt back in with GRADATA_INJECT_ON_COMPACT=1 for ablation.
+    if os.environ.get("GRADATA_INJECT_ON_COMPACT", "0") != "1":
+        source = str(data.get("source", "") or "").lower()
+        if source in ("compact", "resume"):
+            return None
+
     brain_dir = resolve_brain_dir()
     if not brain_dir:
         return None
