@@ -11,7 +11,6 @@ fallback also fails).
 from __future__ import annotations
 
 import importlib
-import io
 import json
 import sys
 import urllib.error

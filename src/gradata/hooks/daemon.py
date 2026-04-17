@@ -23,6 +23,7 @@ direct invocation when the daemon is not running.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import importlib
 import io
 import json
@@ -132,10 +133,8 @@ def _write_pid() -> None:
 
 
 def _clear_pid() -> None:
-    try:
+    with contextlib.suppress(FileNotFoundError):
         PID_FILE.unlink()
-    except FileNotFoundError:
-        pass
 
 
 def _running_pid() -> int | None:
