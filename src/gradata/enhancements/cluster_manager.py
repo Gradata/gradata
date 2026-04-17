@@ -132,7 +132,11 @@ class ClusterAssignment:
     cluster_size: int = 1
 
 
-from gradata._stats import cosine_similarity
+# ---------------------------------------------------------------------------
+# Math utilities (shared implementation in _math.py)
+# ---------------------------------------------------------------------------
+
+from gradata._math import cosine_similarity
 
 # ---------------------------------------------------------------------------
 # Cluster Manager

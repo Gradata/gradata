@@ -342,20 +342,4 @@ def mtbf_mttr(corrections: list, total_sessions: int) -> dict:
 
 
 # ============================================================================
-# 9. VECTOR SIMILARITY
-# ============================================================================
-
-def cosine_similarity(a, b) -> float:
-    """Cosine similarity between two vectors. Returns 0.0 for zero or mismatched vectors."""
-    if len(a) != len(b):
-        return 0.0
-    dot = sum(x * y for x, y in zip(a, b, strict=False))
-    norm_a = math.sqrt(sum(x * x for x in a))
-    norm_b = math.sqrt(sum(x * x for x in b))
-    if norm_a == 0.0 or norm_b == 0.0:
-        return 0.0
-    return dot / (norm_a * norm_b)
-
-
-# ============================================================================
 # 9-12: Additional statistical tests
