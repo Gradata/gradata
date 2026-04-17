@@ -80,15 +80,15 @@ def _ensure_table(conn: sqlite3.Connection):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_session ON events(session)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_type ON events(type)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_session_type ON events(session, type)")
-    # Dedup guard: (ts, type, source) uniquely identifies an event for the
-    # purposes of retry-safe idempotent writes. RetainOrchestrator also uses
-    # this key in its cursor, so the constraint and the orchestrator stay in
-    # lockstep. Pre-existing duplicate rows (if any) are preserved -- the
-    # index is created with IF NOT EXISTS on a fresh key set.
+    # Dedup guard keyed by (tenant_id, ts, type, source). Tenant scoping
+    # prevents cross-tenant collisions after multi-tenant rollout while
+    # preserving retry-safe idempotent writes within a tenant.
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("DROP INDEX IF EXISTS idx_events_dedup")
     with contextlib.suppress(sqlite3.OperationalError):
         conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedup "
-            "ON events(ts, type, source)"
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedup_tenant "
+            "ON events(tenant_id, ts, type, source)"
         )
     with contextlib.suppress(sqlite3.OperationalError):
         conn.execute("ALTER TABLE events ADD COLUMN valid_from TEXT")

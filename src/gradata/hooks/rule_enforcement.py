@@ -124,6 +124,12 @@ def main(data: dict) -> dict | None:
     if os.environ.get("GRADATA_RULE_ENFORCEMENT", "0") != "1":
         return None
 
+    # Operators use GRADATA_MAX_REMINDERS=0 to disable injection without
+    # toggling GRADATA_RULE_ENFORCEMENT; respect that as "off" instead of
+    # returning a header with no rules.
+    if MAX_REMINDERS <= 0:
+        return None
+
     if parse_lessons is None:
         return None
 

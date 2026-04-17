@@ -54,8 +54,13 @@ def get_tenant_id(brain_dir: str | Path) -> str:
 
     brain.mkdir(parents=True, exist_ok=True)
     tid = str(uuid.uuid4())
-    fpath.write_text(tid, encoding="utf-8")
-    return tid
+    try:
+        with open(fpath, "x", encoding="utf-8") as fh:
+            fh.write(tid)
+        return tid
+    except FileExistsError:
+        existing = fpath.read_text(encoding="utf-8").strip()
+        return existing if _is_valid_uuid(existing) else tid
 
 
 def peek_tenant_id(brain_dir: str | Path) -> str | None:
