@@ -58,8 +58,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, Literal
 
-from gradata._config_paths import get_config_dir
-
 logger = logging.getLogger("gradata.telemetry")
 
 # ── Constants ─────────────────────────────────────────────────────────
@@ -67,15 +65,23 @@ DEFAULT_ENDPOINT: Final[str] = "https://api.gradata.ai/telemetry/event"
 ENV_ENDPOINT: Final[str] = "GRADATA_TELEMETRY_ENDPOINT"
 ENV_KILL_SWITCH: Final[str] = "GRADATA_TELEMETRY"
 _CONFIG_FILENAME: Final[str] = "config.toml"
+_ENV_CONFIG_DIR: Final[str] = "GRADATA_CONFIG_DIR"
+_ENV_XDG_CONFIG_HOME: Final[str] = "XDG_CONFIG_HOME"
 
 
 def _config_dir() -> Path:
-    """Shared resolver for the user-level Gradata config directory.
+    """Resolve the user-level Gradata config directory.
 
-    Delegates to :mod:`gradata._config_paths` so all SDK modules agree on
-    where ``config.toml`` lives and no one hardcodes ``Path.home()``.
+    Order: ``GRADATA_CONFIG_DIR`` env override, ``XDG_CONFIG_HOME/gradata``
+    on POSIX, else ``~/.gradata``. Does not create the directory.
     """
-    return get_config_dir()
+    override = os.environ.get(_ENV_CONFIG_DIR, "").strip()
+    if override:
+        return Path(override).expanduser().resolve()
+    xdg = os.environ.get(_ENV_XDG_CONFIG_HOME, "").strip()
+    if xdg and os.name != "nt":
+        return (Path(xdg).expanduser() / "gradata").resolve()
+    return (Path.home() / ".gradata").resolve()
 
 
 def _config_path() -> Path:
