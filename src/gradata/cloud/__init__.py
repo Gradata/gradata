@@ -28,6 +28,4 @@ Usage:
     brain.correct(draft, final)  # graduation runs server-side
 """
 
-from gradata.cloud.client import CloudClient
-
-__all__ = ["CloudClient"]
+__all__: list[str] = []
