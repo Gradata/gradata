@@ -374,12 +374,22 @@ def render_hook(candidate: HookCandidate) -> str | None:
 
     # session_directive: self-contained JS — no template file needed
     if candidate.hook_template == "session_directive":
-        safe_text = (
-            candidate.rule_description
-            .replace("\\", "\\\\")
-            .replace('"', '\\"')
-            .replace("\n", " ")
+        # Sanitize before embedding in JS.  json.dumps() handles backslash and
+        # double-quote but NOT backtick (template-literal injection) or
+        # </script>-style breakouts.  Apply js_template escaping after dumps.
+        from gradata.enhancements._sanitize import sanitize_lesson_content
+
+        # Neutralize prompt-injection markers in the text that will surface to
+        # the LLM via the mandatory-directive wrapper.
+        clean_description = sanitize_lesson_content(
+            candidate.rule_description, "llm_prompt"
         )
+        # json.dumps produces a valid JSON string literal including surrounding
+        # quotes.  Then strip residual template-literal / script-breakout
+        # characters that json.dumps does not touch.
+        js_literal = json.dumps(clean_description)
+        js_literal = sanitize_lesson_content(js_literal, "js_template")
+
         directive_js = (
             "#!/usr/bin/env node\n"
             "// Auto-generated session-start directive hook\n"
@@ -388,7 +398,7 @@ def render_hook(candidate: HookCandidate) -> str | None:
             "const directive = {\n"
             "  result: [\n"
             "    '<mandatory-directive>',\n"
-            f"    {json.dumps(candidate.rule_description)},\n"
+            f"    {js_literal},\n"
             "    '</mandatory-directive>',\n"
             "  ].join('\\n')\n"
             "};\n"

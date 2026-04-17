@@ -70,11 +70,16 @@ def synthesise_principle_llm(
         return None
 
     # Build bullet list of lesson descriptions
+    # Sanitize each description before embedding in the LLM prompt to neutralize
+    # prompt-injection attempts that may have bypassed the ingest blocklist.
+    from gradata.enhancements._sanitize import sanitize_lesson_content
+
     bullets = []
     for lesson in lessons[:10]:  # Cap at 10 to limit prompt size
         desc = lesson.description
         if desc:
-            bullets.append(f"- {desc}")
+            safe_desc = sanitize_lesson_content(desc, "llm_prompt")
+            bullets.append(f"- {safe_desc}")
 
     if not bullets:
         return None

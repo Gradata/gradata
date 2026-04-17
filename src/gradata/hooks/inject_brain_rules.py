@@ -209,6 +209,11 @@ def main(data: dict) -> dict | None:
     # For clusters with confidence >= 0.75 and size >= 3 (and no contradictions),
     # inject one summary line instead of each individual member rule.
     # This reduces total injection slot usage while preserving semantic density.
+    # Sanitize lesson/rule text before embedding in XML.
+    # A lesson containing "</brain-rules>" would terminate the block early and
+    # allow injection of arbitrary content into the agent context.
+    from gradata.enhancements._sanitize import sanitize_lesson_content
+
     cluster_injected_ids: set[str] = set()
     cluster_lines: list[str] = []
     try:
@@ -216,9 +221,11 @@ def main(data: dict) -> dict | None:
         clusters = cluster_rules(filtered, min_cluster_size=3)
         for cluster in clusters:
             if cluster.cluster_confidence >= 0.75 and not cluster.has_contradictions:
+                safe_summary = sanitize_lesson_content(cluster.summary, "xml")
+                safe_category = sanitize_lesson_content(cluster.category, "xml")
                 cluster_lines.append(
                     f"[CLUSTER:{cluster.cluster_confidence:.2f}|{cluster.size} rules] "
-                    f"{cluster.category}: {cluster.summary}"
+                    f"{safe_category}: {safe_summary}"
                 )
                 cluster_injected_ids.update(cluster.member_ids)
     except ImportError:
@@ -234,8 +241,10 @@ def main(data: dict) -> dict | None:
     for r in scored:
         rule_id = f"{r.category}:{r.description[:40]}"
         if rule_id not in cluster_injected_ids:
+            safe_desc = sanitize_lesson_content(r.description, "xml")
+            safe_cat = sanitize_lesson_content(r.category, "xml")
             individual_lines.append(
-                f"[{r.state.name}:{r.confidence:.2f}] {r.category}: {r.description}"
+                f"[{r.state.name}:{r.confidence:.2f}] {safe_cat}: {safe_desc}"
             )
 
     lines = cluster_lines + individual_lines

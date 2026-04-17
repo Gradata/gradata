@@ -618,7 +618,13 @@ def _call_llm_for_synthesis(
     if not key or not base:
         raise RuntimeError("No LLM credentials configured")
 
-    bullet_text = "\n".join(f"- {d}" for d in descriptions)
+    # Sanitize descriptions before embedding in the LLM prompt.
+    # This neutralizes prompt-injection attempts that may have bypassed the
+    # ingest-gate blocklist (e.g. rephrased or context-shifted injections).
+    from gradata.enhancements._sanitize import sanitize_lesson_content
+
+    safe_descriptions = [sanitize_lesson_content(d, "llm_prompt") for d in descriptions]
+    bullet_text = "\n".join(f"- {d}" for d in safe_descriptions)
     prompt = (
         f'Given these {len(descriptions)} learned rules in the "{category}" category:\n'
         f"{bullet_text}\n\n"
