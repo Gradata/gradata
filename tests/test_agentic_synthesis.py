@@ -313,3 +313,50 @@ def test_non_rule_state_lessons_excluded():
     assert len(result_with_noise) == 1
     assert len(result_clean) == 1
     assert set(result_with_noise[0].source_lesson_ids) == set(result_clean[0].source_lesson_ids)
+
+
+# ---------------------------------------------------------------------------
+# LLM principle wiring
+# ---------------------------------------------------------------------------
+
+
+def test_llm_principle_used_when_synthesizer_returns_string(monkeypatch):
+    """When LLM synthesis succeeds, principle uses LLM text and source=llm_synth."""
+    import gradata.enhancements.meta_rules as mr
+
+    monkeypatch.setattr(
+        mr, "_try_llm_principle",
+        lambda rules, category: "When drafting, lead with the benefit, not the feature."
+    )
+    lessons = _make_rule_group("DRAFTING", n=3, confidence=0.92)
+    result = synthesize_meta_rules_agentic(lessons=lessons)
+
+    assert len(result) == 1
+    assert result[0].source == "llm_synth"
+    assert result[0].principle == "When drafting, lead with the benefit, not the feature."
+
+
+def test_llm_principle_falls_back_to_deterministic_on_none(monkeypatch):
+    """When LLM returns None (no creds or failure), deterministic path runs."""
+    import gradata.enhancements.meta_rules as mr
+
+    monkeypatch.setattr(mr, "_try_llm_principle", lambda rules, category: None)
+    lessons = _make_rule_group("DRAFTING", n=3, confidence=0.92)
+    result = synthesize_meta_rules_agentic(lessons=lessons)
+
+    assert len(result) == 1
+    assert result[0].source == "deterministic"
+    assert "Across 3 corrections in DRAFTING" in result[0].principle
+
+
+def test_try_llm_principle_returns_none_without_creds(monkeypatch):
+    """_try_llm_principle degrades silently when no credentials configured."""
+    import gradata.enhancements.meta_rules as mr
+
+    monkeypatch.delenv("GRADATA_LLM_KEY", raising=False)
+    monkeypatch.delenv("GRADATA_LLM_BASE", raising=False)
+    monkeypatch.delenv("GRADATA_GEMMA_API_KEY", raising=False)
+    monkeypatch.delenv("GRADATA_GEMMA_BASE", raising=False)
+
+    rules = _make_rule_group("DRAFTING", n=3)
+    assert mr._try_llm_principle(rules, "DRAFTING") is None

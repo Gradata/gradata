@@ -586,17 +586,60 @@ def parse_lessons_from_markdown(text: str) -> list[Lesson]:
 # ---------------------------------------------------------------------------
 
 
+_GEMMA_DEFAULT_BASE = "https://generativelanguage.googleapis.com/v1beta/openai"
+_GEMMA_DEFAULT_MODEL = "gemma-3-27b-it"
+
+
 def _resolve_llm_credentials() -> tuple[str, str, str]:
     """Resolve LLM credentials from environment. Returns (key, base, model).
 
-    Delegates to the same env vars used by ``llm_synthesizer``.
+    Resolution order:
+      1. ``GRADATA_LLM_KEY`` + ``GRADATA_LLM_BASE`` — explicit override.
+      2. ``GRADATA_GEMMA_API_KEY`` — Google AI Studio OpenAI-compat endpoint.
     """
     import os
 
     key = os.environ.get("GRADATA_LLM_KEY", "")
     base = os.environ.get("GRADATA_LLM_BASE", "")
     model = os.environ.get("GRADATA_LLM_MODEL", "gpt-4o-mini")
-    return key, base, model
+    if key and base:
+        return key, base, model
+
+    gemma_key = os.environ.get("GRADATA_GEMMA_API_KEY", "")
+    if gemma_key:
+        return (
+            gemma_key,
+            os.environ.get("GRADATA_GEMMA_BASE", _GEMMA_DEFAULT_BASE),
+            os.environ.get("GRADATA_GEMMA_MODEL", _GEMMA_DEFAULT_MODEL),
+        )
+
+    return "", "", model
+
+
+def _try_llm_principle(rules: list[Lesson], category: str) -> str | None:
+    """Best-effort LLM synthesis of ONE behavioral principle for a rule group.
+
+    Returns the principle string or None (no credentials, empty input, or
+    any LLM error). Never raises -- synthesis must degrade to deterministic.
+    """
+    if not rules:
+        return None
+    key, base, model = _resolve_llm_credentials()
+    if not key or not base:
+        return None
+    try:
+        from gradata.enhancements.llm_synthesizer import synthesise_principle_llm
+
+        return synthesise_principle_llm(
+            lessons=rules,
+            theme=category,
+            api_key=key,
+            api_base=base,
+            model=model,
+        )
+    except Exception as exc:  # noqa: BLE001 -- degrade to deterministic
+        _log.debug("LLM principle synthesis failed for %s: %s", category, exc)
+        return None
 
 
 def _call_llm_for_synthesis(
@@ -924,13 +967,20 @@ def synthesize_meta_rules_agentic(
 
         avg_conf = round(sum(r.confidence for r in rules) / len(rules), 4)
         categories = sorted(set(r.category for r in rules))
-
-        # Build principle from rule descriptions (deterministic for OSS)
-        # Cloud can override with LLM synthesis via source="llm_synth"
         descriptions = [r.description for r in rules]
-        principle = f"Across {len(rules)} corrections in {category}: " + "; ".join(descriptions[:5])
-        if len(descriptions) > 5:
-            principle += f" (and {len(descriptions) - 5} more)"
+
+        # Prefer LLM-synthesized behavioral principle when credentials available.
+        # Empirically (2026-04-14 ablation) deterministic principles regress
+        # correctness; LLM principles are injectable, deterministic are not.
+        llm_principle = _try_llm_principle(rules, category)
+        if llm_principle:
+            principle = llm_principle
+            source = "llm_synth"
+        else:
+            principle = f"Across {len(rules)} corrections in {category}: " + "; ".join(descriptions[:5])
+            if len(descriptions) > 5:
+                principle += f" (and {len(descriptions) - 5} more)"
+            source = "deterministic"
 
         meta = MetaRule(
             id=mid,
@@ -940,7 +990,7 @@ def synthesize_meta_rules_agentic(
             confidence=avg_conf,
             created_session=current_session,
             last_validated_session=current_session,
-            source="deterministic",
+            source=source,
         )
 
         new_metas.append(meta)
