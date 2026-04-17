@@ -18,6 +18,8 @@ from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 
+from gradata._tenant import tenant_for
+
 _log = logging.getLogger(__name__)
 
 
@@ -236,18 +238,26 @@ def store_relationship(
     Confidence is clamped to [0.0, 1.0] before persistence per the SDK
     coding guideline ("Confidence values must be in [0.0, 1.0]").
     """
+    import contextlib
     clamped = max(0.0, min(1.0, confidence))
+    _tid = tenant_for(Path(db_path).parent)
     conn = sqlite3.connect(str(db_path))
+    # Defensive migration: brains created before migration 001 lack tenant_id.
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("ALTER TABLE rule_relationships ADD COLUMN tenant_id TEXT")
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("ALTER TABLE rule_relationships ADD COLUMN visibility TEXT DEFAULT 'private'")
     conn.execute(
         "INSERT INTO rule_relationships "
-        "(rule_a_id, rule_b_id, relationship, confidence, detected_at) "
-        "VALUES (?, ?, ?, ?, ?)",
+        "(rule_a_id, rule_b_id, relationship, confidence, detected_at, tenant_id) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
         (
             rule_a_id,
             rule_b_id,
             rel_type.value,
             clamped,
             datetime.now(UTC).isoformat(),
+            _tid,
         ),
     )
     conn.commit()
