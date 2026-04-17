@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import hashlib
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -61,7 +61,7 @@ class BrainFingerprint:
     category_distribution: dict[str, int]   # category -> rule count
 
     @classmethod
-    def from_lessons(cls, lessons: list, domain: str = "", total_sessions: int = 0) -> "BrainFingerprint":
+    def from_lessons(cls, lessons: list, domain: str = "", total_sessions: int = 0) -> BrainFingerprint:
         """Build a fingerprint from a list of Lesson objects."""
 
         rules = []
@@ -122,7 +122,7 @@ def compute_brain_similarity(a: BrainFingerprint, b: BrainFingerprint) -> float:
     vec_b = [b.category_distribution.get(c, 0) for c in sorted(all_cats)]
 
     # Cosine similarity
-    dot = sum(x * y for x, y in zip(vec_a, vec_b))
+    dot = sum(x * y for x, y in zip(vec_a, vec_b, strict=True))
     mag_a = math.sqrt(sum(x * x for x in vec_a))
     mag_b = math.sqrt(sum(x * x for x in vec_b))
 

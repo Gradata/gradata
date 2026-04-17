@@ -21,11 +21,6 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
-
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -233,7 +228,7 @@ def compute_brain_scores(
     """
     # Primary path: delegate to the authoritative implementation
     try:
-        import gradata._events as _events  # noqa: PLC0415
+        import gradata._events as _events
 
         _fn = getattr(_events, "compute_brain_scores", None)
         if _fn is None:

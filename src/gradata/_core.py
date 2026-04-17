@@ -989,7 +989,6 @@ def _cloud_sync_session(
     try:
         import hashlib
         import os
-
         from pathlib import Path
 
         # 1. Resolve cloud credentials: ~/.gradata/config.toml or env var

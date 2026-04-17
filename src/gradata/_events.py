@@ -414,7 +414,7 @@ class RetainOrchestrator:
     position on the next call.
     """
 
-    def __init__(self, brain_dir: "str | Path") -> None:
+    def __init__(self, brain_dir: str | Path) -> None:
         from pathlib import Path as _Path
         self.brain_dir = _Path(brain_dir)
         self.events_path = self.brain_dir / "events.jsonl"

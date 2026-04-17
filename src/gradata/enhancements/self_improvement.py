@@ -16,9 +16,6 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass, field
-from enum import StrEnum
-from pathlib import Path
 
 from gradata._types import (
     CorrectionType,

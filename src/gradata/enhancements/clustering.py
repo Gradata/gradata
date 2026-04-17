@@ -156,7 +156,7 @@ def promote_instinct_clusters(
         by_category[lesson.category].append(lesson)
 
     promoted: list[str] = []
-    for category, members in by_category.items():
+    for _category, members in by_category.items():
         if len(members) < min_cluster_size:
             continue
 

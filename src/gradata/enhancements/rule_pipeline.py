@@ -187,7 +187,7 @@ Apply this directive when working on tasks related to: {lesson.category}
     return skill_path
 
 
-def review_generated_skill(skill_path: "Path") -> dict:
+def review_generated_skill(skill_path: Path) -> dict:
     """Review a generated skill file for quality issues.
 
     Returns dict with:
@@ -370,8 +370,9 @@ def run_rule_pipeline(
                 )
                 if already_exists:
                     continue
-                from gradata._types import Lesson as _Lesson
                 from datetime import date as _date
+
+                from gradata._types import Lesson as _Lesson
                 candidate = _Lesson(
                     date=_date.today().isoformat(),
                     state=LessonState.INSTINCT,
@@ -404,18 +405,26 @@ def run_rule_pipeline(
     # ── Phase 2: Atomic writes ────────────────────────────────────────────────
     # Graduate rules, update confidence, create meta-rules.
     for lesson in all_lessons:
-        if lesson.state.name == "INSTINCT" and lesson.confidence >= PATTERN_THRESHOLD:
-            if lesson.fire_count >= MIN_APPLICATIONS_FOR_PATTERN:
-                lesson.state = LessonState.PATTERN
-                result.graduated.append(f"{lesson.category}:{lesson.description[:30]}")
-        elif lesson.state.name == "PATTERN" and lesson.confidence >= RULE_THRESHOLD:
-            if lesson.fire_count >= MIN_APPLICATIONS_FOR_RULE:
-                lesson.state = LessonState.RULE
-                result.graduated.append(f"{lesson.category}:{lesson.description[:30]}")
+        if (
+            lesson.state.name == "INSTINCT"
+            and lesson.confidence >= PATTERN_THRESHOLD
+            and lesson.fire_count >= MIN_APPLICATIONS_FOR_PATTERN
+        ):
+            lesson.state = LessonState.PATTERN
+            result.graduated.append(f"{lesson.category}:{lesson.description[:30]}")
+        elif (
+            lesson.state.name == "PATTERN"
+            and lesson.confidence >= RULE_THRESHOLD
+            and lesson.fire_count >= MIN_APPLICATIONS_FOR_RULE
+        ):
+            lesson.state = LessonState.RULE
+            result.graduated.append(f"{lesson.category}:{lesson.description[:30]}")
 
     # Synthesize meta-rules from graduated rules
     try:
-        from gradata.enhancements.meta_rules import synthesize_meta_rules_agentic  # type: ignore[import]
+        from gradata.enhancements.meta_rules import (
+            synthesize_meta_rules_agentic,  # type: ignore[import]
+        )
         from gradata.enhancements.meta_rules_storage import (  # type: ignore[import]
             load_meta_rules,
             save_meta_rules,
@@ -470,7 +479,9 @@ def run_rule_pipeline(
 
     # Disposition updates from this session's corrections
     try:
-        from gradata.enhancements.behavioral_engine import DispositionTracker  # type: ignore[import]
+        from gradata.enhancements.behavioral_engine import (
+            DispositionTracker,  # type: ignore[import]
+        )
 
         tracker = DispositionTracker()
         disp_path = lessons_path.parent / "disposition.json"
@@ -613,7 +624,9 @@ def build_knowledge_graph(lessons_path: Path, db_path: Path) -> dict:
 
     # Cross-domain candidates
     try:
-        from gradata.enhancements.meta_rules import detect_cross_domain_candidates  # type: ignore[import]
+        from gradata.enhancements.meta_rules import (
+            detect_cross_domain_candidates,  # type: ignore[import]
+        )
         graph["cross_domain"] = detect_cross_domain_candidates(lessons)
     except (ImportError, Exception):
         pass

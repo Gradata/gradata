@@ -16,15 +16,15 @@ Layer: enhancements/ (Layer 1) — imports from patterns/ only.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sqlite3
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from gradata._events import emit as _emit_event_fn
-
 
 # ═══════════════════════════════════════════════════════════════════
 # Registries (domain-agnostic defaults, override via register_*)
@@ -126,10 +126,8 @@ def _init_tables(conn: sqlite3.Connection) -> None:
     # Migration: add columns if missing from older schema
     for table in ("activity_log", "prep_outcomes"):
         for col in ("session", "timestamp"):
-            try:
+            with contextlib.suppress(sqlite3.OperationalError):
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT DEFAULT NULL")
-            except sqlite3.OperationalError:
-                pass
 
 
 def log_activity(
@@ -140,13 +138,13 @@ def log_activity(
     detail: str = "",
     prep_level: int = 0,
     source: str = "claude_assisted",
-    session: Optional[int] = None,
-    date: Optional[str] = None,
+    session: int | None = None,
+    date: str | None = None,
     emit_event: bool = True,
 ) -> dict[str, Any]:
     """Log an activity (email, call, meeting, deal change)."""
-    today = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    now = datetime.now(timezone.utc).isoformat()
+    today = date or datetime.now(UTC).strftime("%Y-%m-%d")
+    now = datetime.now(UTC).isoformat()
 
     conn = _get_db(db_path)
     _init_tables(conn)
@@ -162,7 +160,8 @@ def log_activity(
     conn.close()
 
     if emit_event:
-        try:
+        # Never break the logging path on emit failure
+        with contextlib.suppress(Exception):
             _emit_event_fn(
                 "DELTA_TAG", "loop_intelligence",
                 {
@@ -180,8 +179,6 @@ def log_activity(
                 ] if t],
                 session=session,
             )
-        except Exception:
-            pass  # Never break the logging path
 
     return {
         "id": row_id,
@@ -194,12 +191,12 @@ def log_prep(
     prospect: str,
     prep_type: str,
     prep_level: int = 0,
-    session: Optional[int] = None,
-    date: Optional[str] = None,
+    session: int | None = None,
+    date: str | None = None,
 ) -> dict[str, Any]:
     """Log prep work for a prospect (before outcome is known)."""
-    today = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    now = datetime.now(timezone.utc).isoformat()
+    today = date or datetime.now(UTC).strftime("%Y-%m-%d")
+    now = datetime.now(UTC).isoformat()
 
     conn = _get_db(db_path)
     _init_tables(conn)
@@ -226,10 +223,10 @@ def log_outcome(
     prep_type: str,
     outcome: str,
     days: int = 0,
-    date: Optional[str] = None,
+    date: str | None = None,
 ) -> dict[str, Any]:
     """Link an outcome to the most recent unresolved prep for this prospect+type."""
-    today = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = date or datetime.now(UTC).strftime("%Y-%m-%d")
 
     conn = _get_db(db_path)
     _init_tables(conn)
@@ -266,7 +263,7 @@ def log_outcome(
             """INSERT INTO prep_outcomes
                (date, prospect, prep_type, prep_level, outcome, days_to_outcome, claude_assisted, timestamp)
                VALUES (?, ?, ?, 0, ?, ?, 1, ?)""",
-            (today, prospect, prep_type, outcome, days, datetime.now(timezone.utc).isoformat()),
+            (today, prospect, prep_type, outcome, days, datetime.now(UTC).isoformat()),
         )
         conn.commit()
         conn.close()
@@ -282,10 +279,10 @@ def detect_manual(
     gmail_sent: int = 0,
     crm_updates: int = 0,
     session_logged: int = 0,
-    date: Optional[str] = None,
+    date: str | None = None,
 ) -> dict[str, Any]:
     """Detect manual activities by comparing external counts vs session-logged counts."""
-    today = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = date or datetime.now(UTC).strftime("%Y-%m-%d")
 
     conn = _get_db(db_path)
     _init_tables(conn)
@@ -328,7 +325,7 @@ def get_activity_stats(db_path: str | Path, days: int = 30) -> dict[str, Any]:
     conn = _get_db(db_path)
     _init_tables(conn)
 
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    cutoff = (datetime.now(UTC) - timedelta(days=days)).strftime("%Y-%m-%d")
 
     by_source = {
         r["source"]: r["c"]
@@ -391,7 +388,7 @@ def get_activity_stats(db_path: str | Path, days: int = 30) -> dict[str, Any]:
 
 def query_tagged_interactions(
     db_path: str | Path,
-    session: Optional[int] = None,
+    session: int | None = None,
     exclude_sources: tuple[str, ...] = ("instantly",),
 ) -> list[dict[str, str]]:
     """Query DELTA_TAG events with structured tags for pattern analysis."""
@@ -440,7 +437,7 @@ def query_tagged_interactions(
 def aggregate_by_key(
     interactions: list[dict[str, str]],
     key: str,
-    positive_outcomes: Optional[set[str]] = None,
+    positive_outcomes: set[str] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Aggregate interactions by a key field. Returns {value: {sent, replies, rate, confidence}}."""
     pos = positive_outcomes or _POSITIVE_OUTCOMES
@@ -536,7 +533,7 @@ def update_markdown_table(
 def update_patterns_file(
     db_path: str | Path,
     patterns_file: str | Path,
-    session: Optional[int] = None,
+    session: int | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
     """Main entry: update a patterns markdown file from tagged events."""
