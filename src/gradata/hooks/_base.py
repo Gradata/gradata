@@ -85,7 +85,35 @@ def get_brain() -> Brain | None:
         return None
 
 
+def _record_telemetry(meta: dict, hook_name: str, payload: str | None) -> None:
+    """Best-effort: append one JSONL line with bytes-out per hook invocation.
+
+    Disabled when ``GRADATA_TELEMETRY=off``. Failures are silent — telemetry
+    must never break a hook.
+    """
+    if os.environ.get("GRADATA_TELEMETRY", "on").lower() == "off":
+        return
+    try:
+        brain_dir = resolve_brain_dir()
+        if not brain_dir:
+            return
+        import time
+
+        line = json.dumps({
+            "ts": time.time(),
+            "event": meta.get("event", "?"),
+            "hook": hook_name,
+            "bytes": len(payload or ""),
+        })
+        log_path = Path(brain_dir) / "telemetry.jsonl"
+        with log_path.open("a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+    except Exception:
+        pass
+
+
 def run_hook(main_fn, meta: dict, *, raw_input: str | None = None) -> None:
+    payload: str | None = None
     try:
         min_profile = meta.get("profile", Profile.STANDARD)
         if not should_run(min_profile):
@@ -96,6 +124,10 @@ def run_hook(main_fn, meta: dict, *, raw_input: str | None = None) -> None:
             return
         result = main_fn(data or {})
         if result:
-            print(json.dumps(result))
+            payload = json.dumps(result)
+            print(payload)
     except Exception as exc:
         _log.debug("Hook %s suppressed exception: %s", meta.get("event", "?"), exc)
+    finally:
+        hook_name = getattr(main_fn, "__module__", "?").rsplit(".", 1)[-1]
+        _record_telemetry(meta, hook_name, payload)

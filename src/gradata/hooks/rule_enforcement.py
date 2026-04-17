@@ -1,6 +1,16 @@
-"""PreToolUse hook: inject RULE-tier lessons as reminders before code edits."""
+"""PreToolUse hook: inject RULE-tier lessons as reminders before code edits.
+
+Scope-prefilter (LLM-agnostic): rules that declare an explicit scope in
+``scope_json`` (``file_glob``, ``applies_to``, or ``domain``) are filtered
+against the file_path being edited. Rules with no scope declaration are
+always included (preserves prior behavior). When *every* rule is filtered
+out, the hook returns ``None`` and saves the entire injection budget for
+that edit.
+"""
 from __future__ import annotations
 
+import fnmatch
+import json
 from pathlib import Path
 
 from gradata.hooks._base import resolve_brain_dir, run_hook
@@ -21,6 +31,68 @@ HOOK_META = {
 
 MAX_REMINDERS = 5
 
+_CODE_EXTS = frozenset({
+    ".py", ".pyi", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
+    ".rs", ".go", ".java", ".kt", ".scala", ".rb", ".php", ".swift",
+    ".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".cs", ".m", ".mm",
+    ".sh", ".bash", ".zsh", ".fish", ".lua", ".vue", ".svelte",
+    ".sql", ".dart", ".ex", ".exs", ".clj", ".cljs", ".hs", ".ml",
+})
+_PROSE_EXTS = frozenset({".md", ".mdx", ".rst", ".txt", ".org"})
+_DATA_EXTS = frozenset({".json", ".yaml", ".yml", ".toml", ".csv", ".tsv", ".xml"})
+
+
+def _file_domain(file_path: str) -> str:
+    """Heuristically classify a file path: ``code`` | ``prose`` | ``data`` | ``""``."""
+    if not file_path:
+        return ""
+    suffix = Path(file_path).suffix.lower()
+    if suffix in _CODE_EXTS:
+        return "code"
+    if suffix in _PROSE_EXTS:
+        return "prose"
+    if suffix in _DATA_EXTS:
+        return "data"
+    return ""
+
+
+def _rule_applies(lesson, file_path: str, file_domain: str) -> bool:
+    """Return True iff this rule should fire for this file edit.
+
+    Conservative semantics: any unparseable / undeclared scope means "applies".
+    Only an *explicit* declaration that conflicts with the file is grounds to skip.
+    """
+    if not lesson.scope_json:
+        return True
+    try:
+        scope = json.loads(lesson.scope_json)
+    except (json.JSONDecodeError, TypeError):
+        return True
+    if not isinstance(scope, dict):
+        return True
+
+    # 1) Explicit file glob
+    glob = scope.get("file_glob") or scope.get("path_glob")
+    if glob and file_path:
+        if isinstance(glob, str):
+            return fnmatch.fnmatch(file_path, glob)
+        if isinstance(glob, list):
+            return any(fnmatch.fnmatch(file_path, g) for g in glob if isinstance(g, str))
+
+    # 2) Explicit applies_to prefix (e.g. "code:" or "code:src/")
+    applies_to = scope.get("applies_to")
+    if applies_to and isinstance(applies_to, str) and ":" in applies_to:
+        decl_domain = applies_to.split(":", 1)[0].strip()
+        if file_domain and decl_domain and decl_domain != file_domain:
+            return False
+
+    # 3) Explicit domain — only filter when file_domain is known AND mismatched
+    decl_domain = scope.get("domain")
+    if decl_domain and file_domain and decl_domain != file_domain:
+        return False
+
+    return True
+
 
 def main(data: dict) -> dict | None:
     if parse_lessons is None:
@@ -34,15 +106,15 @@ def main(data: dict) -> dict | None:
     if not lessons_path.is_file():
         return None
 
+    tool_input = data.get("tool_input", {}) or {}
+    file_path = str(tool_input.get("file_path") or "")
+    file_domain = _file_domain(file_path)
+
     text = lessons_path.read_text(encoding="utf-8")
     all_lessons = parse_lessons(text)
     rule_lessons = [lesson for lesson in all_lessons if lesson.state.name == "RULE"]
 
-    # Dedup: skip rules that are enforced by a generated PreToolUse hook
-    # (metadata.how_enforced == "hooked", or legacy "[hooked]" description
-    # prefix). A generated hook under .claude/hooks/pre-tool/generated/ is
-    # enforcing them deterministically, so firing the soft text reminder here
-    # is noise.
+    # Dedup: skip rules enforced by a generated PreToolUse hook (deterministic).
     if is_hook_enforced is not None:
         rule_lessons = [lesson for lesson in rule_lessons if not is_hook_enforced(lesson)]
     else:
@@ -50,6 +122,9 @@ def main(data: dict) -> dict | None:
             lesson for lesson in rule_lessons
             if not lesson.description.lstrip().startswith("[hooked]")
         ]
+
+    # Scope-prefilter: drop rules whose declared scope conflicts with this file.
+    rule_lessons = [l for l in rule_lessons if _rule_applies(l, file_path, file_domain)]
 
     if not rule_lessons:
         return None
