@@ -49,8 +49,6 @@ def _locked_append_many(path: Path, lines: list[str]) -> None:
         fh.seek(0, 2)  # seek to end before writing
         fh.write(encoded)
         fh.flush()
-        # Durability on every platform. Suppress OSError on filesystems
-        # (FUSE, some network mounts) that don't implement fsync.
         with contextlib.suppress(OSError):
             os.fsync(fh.fileno())
 

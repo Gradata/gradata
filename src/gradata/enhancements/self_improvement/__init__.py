@@ -78,6 +78,57 @@ from gradata.enhancements.self_improvement._graduation import (
     graduate,
 )
 
+# Explicit re-exports for public consumption via
+# from gradata.enhancements.self_improvement import X. Listed here so
+# linters do not flag the module-level imports above as unused.
+__all__ = [
+    "ACCEPTANCE_BONUS",
+    "CATEGORY_SESSION_MAP",
+    "CONTRADICTION_ACCELERATION",
+    "CONTRADICTION_COOLING_SESSIONS",
+    "CONTRADICTION_PENALTY",
+    "CONTRADICTION_SEVERITY_BOOST",
+    "CONTRADICTION_STREAK_STEP",
+    "INITIAL_CONFIDENCE",
+    "KILL_LIMITS",
+    "MACHINE_ACCEPTANCE_BONUS",
+    "MACHINE_CONTRADICTION_PENALTY",
+    "MACHINE_KILL_LIMITS",
+    "MACHINE_SEVERITY_WEIGHTS",
+    "MAX_PER_SESSION_DELTA",
+    "MAX_PER_STEP_PENALTY",
+    "MIN_APPLICATIONS_FOR_PATTERN",
+    "MIN_APPLICATIONS_FOR_RULE",
+    "MISFIRE_PENALTY",
+    "PATTERN_THRESHOLD",
+    "PREFERENCE_DECAY_DAMPER",
+    "RULE_THRESHOLD",
+    "SEVERITY_WEIGHTS",
+    "SURVIVAL_BONUS",
+    "SURVIVAL_SEVERITY_WEIGHTS",
+    "CorrectionType",
+    "Lesson",
+    "LessonState",
+    "RuleMetadata",
+    "_classify_correction_direction",
+    "_detect_machine_context",
+    "_is_testable",
+    "_normalize_severity",
+    "_passes_beta_lb_gate",
+    "compute_learning_velocity",
+    "detect_correction_poisoning",
+    "format_lessons",
+    "fsrs_bonus",
+    "fsrs_penalty",
+    "get_maturity_phase",
+    "graduate",
+    "is_hook_enforced",
+    "parse_lessons",
+    "propagate_confidence",
+    "transition",
+    "update_confidence",
+]
+
 # Backward-compat lazy re-exports (symbols moved to other focused modules).
 # Preserved from the original flat-module __getattr__.
 

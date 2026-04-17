@@ -42,7 +42,7 @@ def _passes_beta_lb_gate(lesson: Lesson) -> bool:
 
     Opt-in via env var ``GRADATA_BETA_LB_GATE`` (default off). When enabled,
     requires the 5th-percentile lower bound of Beta(α, β) to meet the
-    configured threshold (``GRADATA_BETA_LB_THRESHOLD``, default 0.70) AND
+    configured threshold (``GRADATA_BETA_LB_THRESHOLD``, default 0.85) AND
     at least ``GRADATA_BETA_LB_MIN_FIRES`` observations (default 5).
 
     Rationale: the v4 ablation min2022 random-label control showed that
@@ -56,11 +56,19 @@ def _passes_beta_lb_gate(lesson: Lesson) -> bool:
     if os.environ.get("GRADATA_BETA_LB_GATE", "").lower() not in ("1", "true", "yes", "on"):
         return True  # gate disabled — defer to existing conf + fire_count checks
 
+    import math
+
     try:
-        threshold = float(os.environ.get("GRADATA_BETA_LB_THRESHOLD", "0.70"))
-        min_fires = int(os.environ.get("GRADATA_BETA_LB_MIN_FIRES", "5"))
-    except ValueError:
-        threshold, min_fires = 0.70, 5
+        threshold = float(os.environ.get("GRADATA_BETA_LB_THRESHOLD", "0.85"))
+        if not math.isfinite(threshold):
+            threshold = 0.85
+        threshold = min(max(threshold, 0.0), 1.0)
+    except (TypeError, ValueError):
+        threshold = 0.85
+    try:
+        min_fires = max(0, int(os.environ.get("GRADATA_BETA_LB_MIN_FIRES", "5")))
+    except (TypeError, ValueError):
+        min_fires = 5
 
     if lesson.fire_count < min_fires:
         return False
