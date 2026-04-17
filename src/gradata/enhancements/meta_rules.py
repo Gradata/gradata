@@ -21,6 +21,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from gradata._http import require_https
 from gradata._types import Lesson, LessonState, RuleTransferScope
 
 _log = logging.getLogger(__name__)
@@ -713,7 +714,6 @@ def _call_llm_for_synthesis(
         raise RuntimeError("No LLM credentials configured")
 
     # SSRF + bearer-key exfil guard: refuse HTTP to non-local hosts before any POST.
-    from gradata._http import require_https
     require_https(base, "GRADATA_LLM_BASE")
 
     # Sanitize descriptions before embedding in the LLM prompt. Neutralizes

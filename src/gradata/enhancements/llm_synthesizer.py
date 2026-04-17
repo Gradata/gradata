@@ -23,6 +23,8 @@ import urllib.error
 import urllib.request
 from typing import TYPE_CHECKING
 
+from gradata._http import require_https
+
 if TYPE_CHECKING:
     from gradata._types import Lesson
 
@@ -70,7 +72,6 @@ def synthesise_principle_llm(
         return None
 
     # SSRF / bearer-key exfil guard: refuse HTTP to non-local hosts
-    from gradata._http import require_https
     try:
         require_https(api_base, "GRADATA_LLM_BASE")
     except ValueError as exc:

@@ -45,8 +45,15 @@ memory/
 autoresearch-results.tsv
 
 # Build artifacts (regenerate on deploy)
+.next/
 sdk/website-next/.next/
 sdk/website-next/node_modules/
+
+# Test coverage artifacts
+.coverage
+
+# Local session handoff notes
+sessions/
 
 # User config (personal, not part of SDK)
 CLAUDE.md

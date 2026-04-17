@@ -15,6 +15,8 @@ import logging
 import os
 from abc import ABC, abstractmethod
 
+from gradata._http import require_https
+
 _log = logging.getLogger(__name__)
 
 
@@ -118,7 +120,6 @@ class GenericHTTPProvider(LLMProvider):
         self.model = model or os.environ.get("GRADATA_LLM_MODEL", "llama3")
         self._auth = auth_token or os.environ.get("GRADATA_LLM_AUTH", "")
         # SSRF / bearer-key exfil guard: refuse HTTP to non-local hosts at construction time
-        from gradata._http import require_https
         require_https(self.base_url, "GRADATA_LLM_BASE_URL")
 
     def complete(self, prompt: str, *, max_tokens: int = 100, timeout: float = 12.0) -> str | None:

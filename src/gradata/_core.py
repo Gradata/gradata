@@ -13,6 +13,8 @@ import re  # used by export functions for slug sanitization
 from datetime import UTC
 from typing import TYPE_CHECKING
 
+from gradata._http import require_https
+
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
@@ -1011,7 +1013,6 @@ def _cloud_sync_session(
 
         # Guard: reject any non-HTTPS api_url read from config.toml before use
         if api_url:
-            from gradata._http import require_https
             try:
                 require_https(api_url, "api_url (config.toml)")
             except ValueError as _https_err:

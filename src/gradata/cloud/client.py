@@ -22,6 +22,8 @@ from typing import Any
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
+from gradata._http import require_https
+
 logger = logging.getLogger("gradata.cloud")
 
 DEFAULT_ENDPOINT = "https://api.gradata.com/v1"
@@ -48,7 +50,6 @@ class CloudClient:
             endpoint or os.environ.get(ENV_ENDPOINT, "") or DEFAULT_ENDPOINT
         ).rstrip("/")
         if self.endpoint:
-            from gradata._http import require_https
             require_https(self.endpoint, "GRADATA_ENDPOINT")
         self.connected = False
         self._brain_id: str | None = None

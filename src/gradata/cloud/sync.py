@@ -24,6 +24,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+from gradata._http import require_https
+
 log = logging.getLogger(__name__)
 
 _DEFAULT_API_BASE = os.environ.get("GRADATA_CLOUD_API_BASE", "https://api.gradata.ai")
@@ -104,7 +106,6 @@ class CloudClient:
     def __init__(self, brain_dir: Path, config: CloudConfig | None = None):
         self.brain_dir = Path(brain_dir)
         self.config = config or load_config(self.brain_dir)
-        from gradata._http import require_https
         require_https(self.config.api_base, "GRADATA_CLOUD_API_BASE")
 
     @property
@@ -117,7 +118,6 @@ class CloudClient:
         if not self.enabled:
             return None
 
-        from gradata._http import require_https
         try:
             require_https(self.config.api_base, "api_base")
         except ValueError as exc:
