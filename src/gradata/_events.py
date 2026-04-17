@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 import gradata._paths as _p
 from gradata._file_lock import platform_lock
 from gradata._platform import detect_platform_source
+from gradata._tenant import tenant_for
 
 if TYPE_CHECKING:
     from gradata._paths import BrainContext
@@ -73,7 +74,9 @@ def _ensure_table(conn: sqlite3.Connection):
             tags_json TEXT,
             valid_from TEXT,
             valid_until TEXT,
-            scope TEXT DEFAULT 'local'
+            scope TEXT DEFAULT 'local',
+            tenant_id TEXT,
+            schema_version INTEGER DEFAULT 1
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_session ON events(session)")
@@ -95,6 +98,12 @@ def _ensure_table(conn: sqlite3.Connection):
         conn.execute("ALTER TABLE events ADD COLUMN valid_until TEXT")
     with contextlib.suppress(sqlite3.OperationalError):
         conn.execute("ALTER TABLE events ADD COLUMN scope TEXT DEFAULT 'local'")
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("ALTER TABLE events ADD COLUMN tenant_id TEXT")
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("ALTER TABLE events ADD COLUMN schema_version INTEGER DEFAULT 1")
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_events_tenant ON events(tenant_id)")
     conn.commit()
 
 
@@ -162,11 +171,13 @@ def emit(event_type: str, source: str, data: dict | None = None, tags: list | No
             # event was already persisted (same dedup key), the INSERT is a
             # no-op -- we then look up the pre-existing row's id so callers
             # that depend on `event["id"]` still get the real rowid.
+            _tid = tenant_for(db_path.parent)
             cursor = conn.execute(
-                "INSERT OR IGNORE INTO events (ts, session, type, source, data_json, tags_json, valid_from, valid_until) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO events "
+                "(ts, session, type, source, data_json, tags_json, valid_from, valid_until, tenant_id, schema_version) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
                 (ts, session, event_type, source, json.dumps(data or {}),
-                 json.dumps(enriched_tags), valid_from, valid_until),
+                 json.dumps(enriched_tags), valid_from, valid_until, _tid),
             )
             if cursor.rowcount == 1:
                 event["id"] = cursor.lastrowid
@@ -585,12 +596,13 @@ class RetainOrchestrator:
                     with contextlib.closing(sqlite3.connect(str(self.db_path))) as conn:
                         _ensure_table(conn)
                         conn.execute("PRAGMA busy_timeout=5000")
+                        _tid = tenant_for(self.brain_dir)
                         for event in new_events:
                             conn.execute(
                                 "INSERT OR IGNORE INTO events "
                                 "(ts, session, type, source, data_json, tags_json, "
-                                " valid_from, valid_until) "
-                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                                " valid_from, valid_until, tenant_id, schema_version) "
+                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
                                 (
                                     event.get("ts", ""),
                                     event.get("session"),
@@ -600,6 +612,7 @@ class RetainOrchestrator:
                                     json.dumps(event.get("tags", []), default=str),
                                     event.get("valid_from"),
                                     event.get("valid_until"),
+                                    _tid,
                                 ),
                             )
                         conn.commit()
