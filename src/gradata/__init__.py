@@ -18,7 +18,16 @@ Quick start:
     brain.export()
 """
 
-__version__ = "0.5.0"
+try:
+    from importlib.metadata import PackageNotFoundError as _PkgNotFound
+    from importlib.metadata import version as _pkg_version
+    try:
+        __version__ = _pkg_version("gradata")
+    except _PkgNotFound:
+        # Editable install without installed metadata
+        __version__ = "0.0.0+editable"
+except ImportError:
+    __version__ = "0.0.0+unknown"
 
 # ── Debug logging via env var (like OPENAI_LOG=debug) ──────────────────
 import logging as _logging
