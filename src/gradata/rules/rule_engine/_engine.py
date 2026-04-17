@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -19,7 +20,17 @@ from gradata._scope import RuleScope
 from gradata._types import ELIGIBLE_STATES, Lesson, LessonState
 from gradata.security.score_obfuscation import truncate_score
 
-from ._models import AppliedRule
+
+@dataclass
+class AppliedRule:
+    """A lesson that has been scored and formatted for prompt injection."""
+
+    rule_id: str
+    lesson: Lesson
+    relevance: float
+    instruction: str
+
+
 from ._scoring import (
     _CT_BOOST,
     _STATE_PRIORITY,

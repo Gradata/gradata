@@ -14,7 +14,7 @@ from collections import defaultdict
 
 from gradata._types import Lesson, LessonState, RuleTransferScope
 
-from ._models import AppliedRule
+from ._engine import AppliedRule
 
 
 # ---------------------------------------------------------------------------

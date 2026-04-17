@@ -3,10 +3,9 @@ gradata.rules.rule_engine — public API (backward-compatible re-exports).
 =========================================================================
 The module was split into submodules for maintainability:
 
-  _models.py     — AppliedRule dataclass
   _scoring.py    — difficulty, reliability, scope weighting, transfer scope
   _formatting.py — dedup, merge, entropy ordering, prompt injection
-  _engine.py     — apply_rules, filter_by_scope, TTL demotion, orchestration
+  _engine.py     — apply_rules, filter_by_scope, TTL demotion, AppliedRule
 
 All public symbols remain importable from this package, so existing callers
 (``from gradata.rules.rule_engine import apply_rules``) continue to work
@@ -20,6 +19,7 @@ from ._engine import (
     _tier_label,
     apply_rules,
     apply_rules_with_tree,
+    AppliedRule,
     demote_stale_rules,
     filter_by_scope,
 )
@@ -42,7 +42,6 @@ from ._formatting import (
     format_rules_styled,
     merge_related_rules,
 )
-from ._models import AppliedRule
 from ._scoring import (
     _CT_BOOST,
     _STATE_PRIORITY,
