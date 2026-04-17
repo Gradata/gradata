@@ -19,6 +19,8 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from gradata._text_utils import _FACTUAL_RE, _STOP_WORDS
+
 if TYPE_CHECKING:
     from gradata.enhancements.diff_engine import DiffResult
     from gradata.enhancements.instruction_cache import InstructionCache
@@ -37,9 +39,7 @@ class EditClassification:
 # Heuristic keyword sets
 # ---------------------------------------------------------------------------
 
-_FACTUAL_RE = re.compile(
-    r"(\$[\d,.]+|\d{4}-\d{2}-\d{2}|\d+%|https?://\S+|\b\d{3,}\b)"
-)
+# _FACTUAL_RE and _STOP_WORDS imported from gradata._text_utils above.
 
 _TONE_WORDS = {
     "actually", "just", "really", "basically", "honestly",
@@ -76,17 +76,6 @@ _STRUCTURE_MARKERS = re.compile(
     r"^(\s*[-*+]\s|\s*\d+[.)]\s|\s*#{1,6}\s|</?[a-z])", re.MULTILINE
 )
 
-
-_STOP_WORDS = {
-    "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
-    "should", "may", "can", "could", "might", "to", "of", "in", "for",
-    "on", "with", "at", "by", "from", "as", "into", "about", "that",
-    "this", "it", "its", "and", "or", "but", "not", "no", "if", "so",
-    "than", "too", "very", "s", "t", "d", "ll", "ve", "re", "m",
-    "i", "you", "we", "they", "he", "she", "me", "my", "your", "our",
-    "their", "his", "her", "us", "them", "up", "out", "all", "am",
-}
 
 
 def _word_set(text: str) -> set[str]:

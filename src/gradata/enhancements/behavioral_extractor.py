@@ -32,11 +32,8 @@ if TYPE_CHECKING:
 
 _log = logging.getLogger(__name__)
 
-# Import at module level to avoid private-symbol import inside function body
-try:
-    from gradata.enhancements.edit_classifier import _FACTUAL_RE
-except ImportError:
-    _FACTUAL_RE = re.compile(r"\b\d[\d,.]*\b|\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|https?://\S+")
+# Import canonical factual-token regex from shared text utilities.
+from gradata._text_utils import _FACTUAL_RE
 
 
 # ---------------------------------------------------------------------------
