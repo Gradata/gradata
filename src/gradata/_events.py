@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 # IMPORTANT: Use module reference (not value import) so set_brain_dir() updates propagate.
 # `from X import Y` copies the value at import time — subsequent set_brain_dir() won't update it.
 import gradata._paths as _p
+from gradata._file_lock import platform_lock
 from gradata._platform import detect_platform_source
 
 if TYPE_CHECKING:
@@ -38,41 +39,19 @@ def _locked_append_many(path: Path, lines: list[str]) -> None:
     cannot interleave bytes within a JSON line.
     On POSIX: uses ``fcntl.flock`` (LOCK_EX) which is cheaper and sufficient.
     The lock is always released — even on exception — via try/finally.
+
+    Locking is delegated to :func:`gradata._file_lock.platform_lock`.
     """
     if not lines:
         return
     encoded = b"".join(line.encode("utf-8") for line in lines)
     with open(path, "ab") as fh:
-        if sys.platform == "win32":
-            import msvcrt
-            # Lock the first byte of the file as an advisory mutex.
-            # msvcrt.locking operates on nbytes starting at the current position;
-            # we position at 0 so all writers contend on the same byte range.
-            fh.seek(0)
-            try:
-                msvcrt.locking(fh.fileno(), msvcrt.LK_LOCK, 1)
-            except OSError:
-                pass  # fallback: proceed unlocked rather than drop the event
-            try:
-                fh.seek(0, 2)  # seek to end before writing
-                fh.write(encoded)
-                fh.flush()
+        with platform_lock(fh):
+            fh.seek(0, 2)  # seek to end before writing
+            fh.write(encoded)
+            fh.flush()
+            if sys.platform == "win32":
                 os.fsync(fh.fileno())
-            finally:
-                fh.seek(0)
-                try:
-                    msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
-                except OSError:
-                    pass
-        else:
-            import fcntl
-            fcntl.flock(fh, fcntl.LOCK_EX)
-            try:
-                fh.seek(0, 2)
-                fh.write(encoded)
-                fh.flush()
-            finally:
-                fcntl.flock(fh, fcntl.LOCK_UN)
 
 
 def _locked_append(path: Path, line: str) -> None:
