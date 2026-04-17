@@ -126,6 +126,29 @@ class TestRankRulesForDraft:
         assert ranked[0][0].category == "HIGH"
         assert ranked[0][1] > ranked[1][1]
 
+    def test_bm25_path_ranks_rare_terms_higher(self, monkeypatch) -> None:
+        pytest.importorskip("bm25s")
+        monkeypatch.setattr(jit_inject, "_BM25_AVAILABLE", True)
+        lessons = [
+            _lesson("COMMON", "deploy production today kubernetes"),
+            _lesson("RARE", "rollback postgres replica lag alerts"),
+        ]
+        ranked = rank_rules_for_draft(
+            lessons, "postgres replica lag during rollback",
+            k=5, min_similarity=0.0,
+        )
+        assert ranked[0][0].category == "RARE"
+
+    def test_falls_back_to_jaccard_when_bm25_unavailable(self, monkeypatch) -> None:
+        monkeypatch.setattr(jit_inject, "_BM25_AVAILABLE", False)
+        monkeypatch.setattr(jit_inject, "bm25s", None)
+        lessons = [_lesson("X", "kubernetes deploy production today")]
+        ranked = rank_rules_for_draft(
+            lessons, "deploy kubernetes production today",
+            k=5, min_similarity=0.05,
+        )
+        assert ranked and ranked[0][0].category == "X"
+
 
 class TestMainHookFlagOff:
     def test_flag_off_returns_none(self, monkeypatch, tmp_path: Path) -> None:
