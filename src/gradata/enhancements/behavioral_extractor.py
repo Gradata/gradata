@@ -32,8 +32,8 @@ if TYPE_CHECKING:
 
 _log = logging.getLogger(__name__)
 
-# Import canonical factual-token regex from shared text utilities.
-from gradata._text_utils import _FACTUAL_RE
+# Import canonical factual-token regex from edit_classifier.
+from gradata.enhancements.edit_classifier import _FACTUAL_RE
 
 
 # ---------------------------------------------------------------------------
