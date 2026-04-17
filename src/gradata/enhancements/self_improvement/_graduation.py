@@ -16,15 +16,14 @@ from gradata._types import (
     RuleMetadata,
     transition,
 )
-
 from gradata.enhancements.self_improvement._confidence import (
+    _GRADUATION_DEDUP_THRESHOLD,
     KILL_LIMITS,
     MACHINE_KILL_LIMITS,
     MIN_APPLICATIONS_FOR_PATTERN,
     MIN_APPLICATIONS_FOR_RULE,
     PATTERN_THRESHOLD,
     RULE_THRESHOLD,
-    _GRADUATION_DEDUP_THRESHOLD,
     _classify_correction_direction,
     is_hook_enforced,
 )
