@@ -394,10 +394,10 @@ def brain_correct(
                         from gradata.enhancements.causal_chains import CausalChain, CausalRelation
                         from gradata.enhancements.meta_rules import _lesson_id
                         if not hasattr(brain, "_causal_chain"):
-                            brain._causal_chain = CausalChain()
+                            brain._causal_chain = CausalChain()  # type: ignore[attr-defined]
                         correction_id = str(event.get("id", ""))
                         rule_id = _lesson_id(best_match)
-                        brain._causal_chain.add_link(
+                        brain._causal_chain.add_link(  # type: ignore[attr-defined]
                             correction_id, rule_id,
                             CausalRelation.REINFORCEMENT,
                             strength=min(1.0, best_match.confidence),
@@ -446,10 +446,10 @@ def brain_correct(
                         from gradata.enhancements.causal_chains import CausalChain, CausalRelation
                         from gradata.enhancements.meta_rules import _lesson_id
                         if not hasattr(brain, "_causal_chain"):
-                            brain._causal_chain = CausalChain()
+                            brain._causal_chain = CausalChain()  # type: ignore[attr-defined]
                         correction_id = str(event.get("id", ""))
                         rule_id = _lesson_id(new_lesson)
-                        brain._causal_chain.add_link(
+                        brain._causal_chain.add_link(  # type: ignore[attr-defined]
                             correction_id, rule_id,
                             CausalRelation.CORRECTION_TO_RULE,
                             strength=1.0,
