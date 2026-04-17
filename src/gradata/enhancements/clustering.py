@@ -116,11 +116,15 @@ def cluster_rules(
         # Detect contradictions within cluster
         contradictions = detect_contradictions(members)
 
-        # Build summary from member descriptions
-        descriptions = [m.description for m in members[:5]]
-        summary = f"{len(members)} rules in {category}: " + "; ".join(descriptions)
-        if len(members) > 5:
-            summary += f" (+{len(members) - 5} more)"
+        # Build summary from member descriptions.
+        # Lean format: bracket header already encodes count + category, so the
+        # summary text only needs the descriptions themselves. Cap at 3 (was 5)
+        # since clusters now only fire when no meta-rule covers the category —
+        # the cluster is the fallback abstraction, not the primary one.
+        descriptions = [m.description for m in members[:3]]
+        summary = "; ".join(descriptions)
+        if len(members) > 3:
+            summary += f" (+{len(members) - 3})"
 
         cluster = RuleCluster(
             cluster_id=f"cluster-{category.lower()}-{domain.lower()}",

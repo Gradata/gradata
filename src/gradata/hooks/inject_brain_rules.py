@@ -214,17 +214,43 @@ def main(data: dict) -> dict | None:
     # allow injection of arbitrary content into the agent context.
     from gradata.enhancements._sanitize import sanitize_lesson_content
 
+    # Mutex: pre-compute categories that already have an injectable meta-rule.
+    # When a meta-rule covers a category, suppress the cluster for that category
+    # to avoid double-injection (cluster summary + meta-rule principle = redundant).
+    # Individual rules are unaffected — they remain valuable as concrete examples
+    # alongside the abstract principle.
+    # Cached: the meta-rule loader is reused below in the formatter block to
+    # avoid a second DB open + deserialization pass.
+    meta_covered_categories: set[str] = set()
+    cached_metas: list | None = None
+    db_path = Path(brain_dir) / "system.db"
+    if load_meta_rules and db_path.is_file():
+        try:
+            cached_metas = list(load_meta_rules(db_path))
+            for m in cached_metas:
+                if getattr(m, "source", "deterministic") in INJECTABLE_META_SOURCES:
+                    meta_covered_categories.update(getattr(m, "source_categories", []))
+        except Exception as exc:
+            _log.debug("meta-rule mutex pre-pass failed (%s) — clusters will fire", exc)
+            cached_metas = None
+
     cluster_injected_ids: set[str] = set()
     cluster_lines: list[str] = []
     try:
         from gradata.enhancements.clustering import cluster_rules
         clusters = cluster_rules(filtered, min_cluster_size=3)
         for cluster in clusters:
+            if cluster.category in meta_covered_categories:
+                _log.debug(
+                    "Cluster mutex: skipping cluster for %s (covered by meta-rule)",
+                    cluster.category,
+                )
+                continue
             if cluster.cluster_confidence >= 0.75 and not cluster.has_contradictions:
                 safe_summary = sanitize_lesson_content(cluster.summary, "xml")
                 safe_category = sanitize_lesson_content(cluster.category, "xml")
                 cluster_lines.append(
-                    f"[CLUSTER:{cluster.cluster_confidence:.2f}|{cluster.size} rules] "
+                    f"[CLUSTER:{cluster.cluster_confidence:.2f}|×{cluster.size}] "
                     f"{safe_category}: {safe_summary}"
                 )
                 cluster_injected_ids.update(cluster.member_ids)
@@ -316,7 +342,6 @@ def main(data: dict) -> dict | None:
     # regress correctness on Sonnet (-1.1%), DeepSeek (-1.4%), and halve the
     # qwen14b lift from +8.1% to +2.9%. Better to inject nothing than noise.
     meta_block = ""
-    db_path = Path(brain_dir) / "system.db"
     if load_meta_rules and format_meta_rules_for_prompt and db_path.is_file():
         # Wrap the entire load -> filter -> format pipeline. A partially corrupt
         # system.db can deserialize successfully (e.g. JSON `null` for
@@ -324,7 +349,9 @@ def main(data: dict) -> dict | None:
         # formatter. We must degrade to rules-only rather than aborting
         # SessionStart.
         try:
-            metas = load_meta_rules(db_path)
+            # Reuse the mutex pre-pass result when available to avoid a second
+            # DB open. Fall back to a fresh load if the pre-pass failed.
+            metas = cached_metas if cached_metas is not None else load_meta_rules(db_path)
             injectable = [
                 m for m in metas
                 if getattr(m, "source", "deterministic") in INJECTABLE_META_SOURCES

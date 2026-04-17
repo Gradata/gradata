@@ -225,8 +225,8 @@ def test_cluster_summary_format(three_qualifying_lessons):
     cluster_lines = [l for l in block.splitlines() if "[CLUSTER:" in l]
     assert len(cluster_lines) == 1
     line = cluster_lines[0]
-    # Must contain the confidence score, rule count, and category
-    assert "|3 rules]" in line or "3 rules" in line
+    # Must contain the confidence score, rule count marker, and category
+    assert "\u00d73]" in line or "|3]" in line, f"Missing size marker in: {line!r}"
     assert "VALIDATION" in line
     # Confidence value should be in [0, 1] range formatted as float
     import re
@@ -234,3 +234,105 @@ def test_cluster_summary_format(three_qualifying_lessons):
     assert m is not None, f"Cluster line missing confidence: {line!r}"
     conf = float(m.group(1))
     assert 0.75 <= conf <= 1.0
+
+
+# ---------------------------------------------------------------------------
+# Test 8: meta-rule mutex — cluster suppressed when meta-rule covers category
+# ---------------------------------------------------------------------------
+
+def test_meta_rule_suppresses_cluster_for_same_category(three_qualifying_lessons):
+    """When an injectable meta-rule exists for a category, the cluster summary
+    for that category MUST be suppressed (mutex) to avoid double-injection.
+    Individual rules continue to fire as concrete examples."""
+    from gradata.hooks import inject_brain_rules as inj
+
+    fake_meta = SimpleNamespace(
+        source="llm_synth",
+        source_categories=["VALIDATION"],
+        principle="Validate everything at boundaries",
+    )
+
+    data = {"session_type": "coding", "session_number": 1}
+
+    with (
+        patch.object(inj, "parse_lessons", return_value=three_qualifying_lessons),
+        patch.object(inj, "is_hook_enforced", return_value=False),
+        patch.object(inj, "resolve_brain_dir", return_value="/fake/brain"),
+        patch.object(inj, "load_meta_rules", return_value=[fake_meta]),
+        patch.object(inj, "format_meta_rules_for_prompt", return_value="META: validate"),
+        patch("pathlib.Path.is_file", return_value=True),
+        patch("pathlib.Path.read_text", return_value="# mocked"),
+    ):
+        result = inj.main(data)
+
+    assert result is not None
+    block = result["result"]
+    cluster_lines = [l for l in block.splitlines() if "[CLUSTER:" in l]
+    assert len(cluster_lines) == 0, (
+        f"Mutex failed: cluster fired despite meta-rule covering VALIDATION. "
+        f"Block: {block}"
+    )
+
+
+def test_meta_rule_does_not_suppress_other_category_clusters(three_qualifying_lessons):
+    """Meta-rule for category A must NOT suppress clusters for category B."""
+    from gradata.hooks import inject_brain_rules as inj
+
+    fake_meta = SimpleNamespace(
+        source="llm_synth",
+        source_categories=["UNRELATED_CATEGORY"],
+        principle="something else entirely",
+    )
+
+    data = {"session_type": "coding", "session_number": 1}
+
+    with (
+        patch.object(inj, "parse_lessons", return_value=three_qualifying_lessons),
+        patch.object(inj, "is_hook_enforced", return_value=False),
+        patch.object(inj, "resolve_brain_dir", return_value="/fake/brain"),
+        patch.object(inj, "load_meta_rules", return_value=[fake_meta]),
+        patch.object(inj, "format_meta_rules_for_prompt", return_value="META: other"),
+        patch("pathlib.Path.is_file", return_value=True),
+        patch("pathlib.Path.read_text", return_value="# mocked"),
+    ):
+        result = inj.main(data)
+
+    assert result is not None
+    block = result["result"]
+    cluster_lines = [l for l in block.splitlines() if "[CLUSTER:" in l]
+    assert len(cluster_lines) == 1, (
+        f"Mutex over-fired: cluster suppressed despite meta-rule covering different category. "
+        f"Block: {block}"
+    )
+
+
+def test_deterministic_meta_rule_does_not_suppress_cluster(three_qualifying_lessons):
+    """Only injectable meta-rules (llm_synth/human_curated) trigger the mutex.
+    Deterministic meta-rules are not injected, so they must not suppress clusters."""
+    from gradata.hooks import inject_brain_rules as inj
+
+    fake_meta = SimpleNamespace(
+        source="deterministic",  # NOT injectable
+        source_categories=["VALIDATION"],
+        principle="excluded from injection",
+    )
+
+    data = {"session_type": "coding", "session_number": 1}
+
+    with (
+        patch.object(inj, "parse_lessons", return_value=three_qualifying_lessons),
+        patch.object(inj, "is_hook_enforced", return_value=False),
+        patch.object(inj, "resolve_brain_dir", return_value="/fake/brain"),
+        patch.object(inj, "load_meta_rules", return_value=[fake_meta]),
+        patch.object(inj, "format_meta_rules_for_prompt", return_value=""),
+        patch("pathlib.Path.is_file", return_value=True),
+        patch("pathlib.Path.read_text", return_value="# mocked"),
+    ):
+        result = inj.main(data)
+
+    assert result is not None
+    block = result["result"]
+    cluster_lines = [l for l in block.splitlines() if "[CLUSTER:" in l]
+    assert len(cluster_lines) == 1, (
+        "Deterministic meta-rules must not suppress clusters (they are not injected)."
+    )
