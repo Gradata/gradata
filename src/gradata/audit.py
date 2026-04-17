@@ -16,6 +16,8 @@ import logging
 import sqlite3
 from pathlib import Path
 
+from gradata._tenant import tenant_for
+
 _log = logging.getLogger(__name__)
 
 
@@ -44,13 +46,19 @@ def write_provenance(
     """
     from gradata._db import get_connection
 
+    _tid = tenant_for(Path(db_path).parent)
     try:
+        import contextlib as _ctx
+        import sqlite3 as _sqlite3
         with get_connection(db_path) as conn:
+            # Defensive migration: brains created before migration 001 lack tenant_id.
+            with _ctx.suppress(_sqlite3.OperationalError):
+                conn.execute("ALTER TABLE rule_provenance ADD COLUMN tenant_id TEXT")
             conn.execute(
                 "INSERT INTO rule_provenance "
-                "(rule_id, correction_event_id, session, timestamp, user_context) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (rule_id, correction_event_id, session, timestamp, user_context),
+                "(rule_id, correction_event_id, session, timestamp, user_context, tenant_id) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (rule_id, correction_event_id, session, timestamp, user_context, _tid),
             )
     except Exception as e:
         _log.debug("write_provenance failed: %s", e)
