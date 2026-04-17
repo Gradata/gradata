@@ -85,12 +85,30 @@ def _lesson_to_rule_dict(lesson) -> dict:
     }
 
 
+def _resolve_agent_brain_dir() -> str | None:
+    """Resolve brain dir for the precontext hook.
+
+    Checks BRAIN_DIR before GRADATA_BRAIN_DIR so that sub-agent test
+    fixtures — which monkeypatch BRAIN_DIR — are not clobbered by an
+    ambient GRADATA_BRAIN_DIR set in the parent shell environment.
+    BRAIN_DIR is the canonical SDK env var (used across all other modules);
+    GRADATA_BRAIN_DIR is a namespaced alias.  Neither should silently
+    override the other when the caller has explicitly set one of them.
+    """
+    for var in ("BRAIN_DIR", "GRADATA_BRAIN_DIR"):
+        val = os.environ.get(var, "").strip()
+        if val and Path(val).exists():
+            return val
+    # Fall back to the shared resolver (handles ~/.gradata/brain default)
+    return resolve_brain_dir()
+
+
 def main(data: dict) -> dict | None:
     try:
         if parse_lessons is None:
             return None
 
-        brain_dir = resolve_brain_dir()
+        brain_dir = _resolve_agent_brain_dir()
         if not brain_dir:
             return None
 

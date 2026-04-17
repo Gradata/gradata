@@ -88,6 +88,29 @@ def init_brain(
 
 
 # ---------------------------------------------------------------------------
+# Environment isolation
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _isolate_brain_dir_env():
+    """Restore BRAIN_DIR to its original value after every test.
+
+    Several helper functions (init_brain, _init_brain in test_brain.py, etc.)
+    set os.environ["BRAIN_DIR"] without teardown, causing the value to leak
+    across tests in the same process.  This autouse fixture ensures each test
+    starts with whatever BRAIN_DIR was set to before the test began, so later
+    tests that use patch.dict({"GRADATA_BRAIN_DIR": ...}) are not clobbered
+    by a stale BRAIN_DIR left by an earlier test.
+    """
+    prev = os.environ.get("BRAIN_DIR")
+    yield
+    if prev is None:
+        os.environ.pop("BRAIN_DIR", None)
+    else:
+        os.environ["BRAIN_DIR"] = prev
+
+
+# ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
