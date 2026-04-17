@@ -109,7 +109,7 @@ def _float_env(name: str, default: float) -> float:
 
 
 def _bm25_scores_for_draft(
-    candidates: list[tuple["Lesson", str, str]],
+    candidates: list[tuple[Lesson, str, str]],
     draft_text: str,
 ) -> list[float] | None:
     """Return BM25 scores (normalized to [0,1]) aligned to candidates, or None.

@@ -16,15 +16,14 @@ from gradata._types import (
     RuleMetadata,
     transition,
 )
-
 from gradata.enhancements.self_improvement._confidence import (
+    _GRADUATION_DEDUP_THRESHOLD,
     KILL_LIMITS,
     MACHINE_KILL_LIMITS,
     MIN_APPLICATIONS_FOR_PATTERN,
     MIN_APPLICATIONS_FOR_RULE,
     PATTERN_THRESHOLD,
     RULE_THRESHOLD,
-    _GRADUATION_DEDUP_THRESHOLD,
     _classify_correction_direction,
     is_hook_enforced,
 )
@@ -57,11 +56,19 @@ def _passes_beta_lb_gate(lesson: Lesson) -> bool:
     if os.environ.get("GRADATA_BETA_LB_GATE", "").lower() not in ("1", "true", "yes", "on"):
         return True  # gate disabled — defer to existing conf + fire_count checks
 
+    import math
+
     try:
         threshold = float(os.environ.get("GRADATA_BETA_LB_THRESHOLD", "0.85"))
-        min_fires = int(os.environ.get("GRADATA_BETA_LB_MIN_FIRES", "5"))
-    except ValueError:
-        threshold, min_fires = 0.85, 5
+        if not math.isfinite(threshold):
+            threshold = 0.85
+        threshold = min(max(threshold, 0.0), 1.0)
+    except (TypeError, ValueError):
+        threshold = 0.85
+    try:
+        min_fires = max(0, int(os.environ.get("GRADATA_BETA_LB_MIN_FIRES", "5")))
+    except (TypeError, ValueError):
+        min_fires = 5
 
     if lesson.fire_count < min_fires:
         return False

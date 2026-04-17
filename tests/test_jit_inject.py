@@ -147,7 +147,8 @@ class TestRankRulesForDraft:
             lessons, "deploy kubernetes production today",
             k=5, min_similarity=0.05,
         )
-        assert ranked and ranked[0][0].category == "X"
+        assert len(ranked) == 1
+        assert ranked[0][0].category == "X"
 
 
 class TestMainHookFlagOff:
