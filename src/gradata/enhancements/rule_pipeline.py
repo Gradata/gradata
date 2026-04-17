@@ -537,6 +537,21 @@ def run_rule_pipeline(
         except Exception as exc:
             result.errors.append(f"Phase 3: skill generation: {exc}")
 
+    # Rule verification for this session's corrections (best-effort, env-gated)
+    if os.environ.get("GRADATA_RULE_VERIFIER") and corrections and db_path.is_file():
+        try:
+            from gradata.enhancements.rule_verifier import log_verification, verify_rules
+            applied_rules = [{"category": l.category, "description": l.description} for l in all_lessons]
+            for correction in corrections:
+                output = correction.get("draft", "")
+                if not output:
+                    continue
+                verifications = verify_rules(output, applied_rules)
+                if verifications:
+                    log_verification(session=current_session, results=verifications, db_path=db_path)
+        except Exception as exc:
+            result.errors.append(f"Phase 3: rule verification: {exc}")
+
     _log.info(
         "Pipeline complete: %d graduated, %d meta-rules, %d hooks, %d freshness updates, %d skills, %d errors",
         len(result.graduated),
