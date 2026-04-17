@@ -616,30 +616,81 @@ def _resolve_llm_credentials() -> tuple[str, str, str]:
     return "", "", model
 
 
+def _build_principle_prompt(rules: list[Lesson], category: str) -> str:
+    bullets = "\n".join(f"- {r.description}" for r in rules[:10] if r.description)
+    return (
+        f'Given these {min(len(rules), 10)} user corrections related to "{category}":\n'
+        f"{bullets}\n\n"
+        "Write ONE actionable behavioral principle (1-2 sentences) that captures the pattern.\n"
+        'Format: "When [context], [do X] instead of [Y]."\n'
+        "Do not list individual words. Focus on the behavioral change.\n"
+        "Return ONLY the principle, no preamble."
+    )
+
+
+def _call_gemma_native(prompt: str, creds: str, model: str, timeout: float = 15.0) -> str | None:
+    """Call Google's native Gemma API (the OpenAI-compat endpoint rejects AQ. keys)."""
+    import urllib.error
+    import urllib.request
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    payload = json.dumps({
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"maxOutputTokens": 200, "temperature": 0.3},
+    }).encode()
+    headers = {"Content-Type": "application/json", "x-goog-api-key": creds}
+    try:
+        req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = json.loads(resp.read().decode())
+        text = body["candidates"][0]["content"]["parts"][0]["text"].strip()
+        if 15 <= len(text) <= 500:
+            return text
+        return None
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError, KeyError,
+            json.JSONDecodeError, IndexError) as exc:
+        _log.debug("Gemma native call failed: %s", exc)
+        return None
+
+
 def _try_llm_principle(rules: list[Lesson], category: str) -> str | None:
     """Best-effort LLM synthesis of ONE behavioral principle for a rule group.
 
     Returns the principle string or None (no credentials, empty input, or
     any LLM error). Never raises -- synthesis must degrade to deterministic.
+
+    Provider resolution:
+      1. ``GRADATA_LLM_KEY`` + ``GRADATA_LLM_BASE`` -- OpenAI-compat endpoint.
+      2. ``GRADATA_GEMMA_API_KEY`` -- Google's native Gemma API.
     """
+    import os
+
     if not rules:
         return None
-    key, base, model = _resolve_llm_credentials()
-    if not key or not base:
-        return None
-    try:
-        from gradata.enhancements.llm_synthesizer import synthesise_principle_llm
 
-        return synthesise_principle_llm(
-            lessons=rules,
-            theme=category,
-            api_key=key,
-            api_base=base,
-            model=model,
-        )
-    except Exception as exc:  # noqa: BLE001 -- degrade to deterministic
-        _log.debug("LLM principle synthesis failed for %s: %s", category, exc)
-        return None
+    k = os.environ.get("GRADATA_LLM_KEY", "")
+    b = os.environ.get("GRADATA_LLM_BASE", "")
+    if k and b:
+        try:
+            from gradata.enhancements.llm_synthesizer import synthesise_principle_llm
+
+            return synthesise_principle_llm(
+                lessons=rules,
+                theme=category,
+                api_key=k,
+                api_base=b,
+                model=os.environ.get("GRADATA_LLM_MODEL", "gpt-4o-mini"),
+            )
+        except Exception as exc:  # noqa: BLE001 -- degrade to deterministic
+            _log.debug("OpenAI-compat synthesis failed for %s: %s", category, exc)
+            return None
+
+    g = os.environ.get("GRADATA_GEMMA_API_KEY", "")
+    if g:
+        model = os.environ.get("GRADATA_GEMMA_MODEL", _GEMMA_DEFAULT_MODEL)
+        return _call_gemma_native(_build_principle_prompt(rules, category), g, model)
+
+    return None
 
 
 def _call_llm_for_synthesis(
