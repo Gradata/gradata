@@ -95,10 +95,7 @@ def _rule_applies(lesson, file_path: str, file_domain: str) -> bool:
 
     # 3) Explicit domain — only filter when file_domain is known AND mismatched
     decl_domain = scope.get("domain")
-    if decl_domain and file_domain and decl_domain != file_domain:
-        return False
-
-    return True
+    return not (decl_domain and file_domain and decl_domain != file_domain)
 
 
 def main(data: dict) -> dict | None:
