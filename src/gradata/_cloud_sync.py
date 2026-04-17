@@ -24,13 +24,14 @@ Not yet implemented (future work, explicitly out of scope):
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
 import sqlite3
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
 
@@ -62,22 +63,31 @@ def enabled() -> bool:
 
 
 def _iso_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
+
+
+def _sync_state_exists(conn: sqlite3.Connection) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='sync_state'"
+    ).fetchone()
+    return row is not None
 
 
 def _last_push_at(conn: sqlite3.Connection, tenant_id: str) -> str | None:
-    """Read sync_state.last_push_at. Returns None on first push."""
-    try:
-        row = conn.execute(
-            "SELECT last_push_at FROM sync_state WHERE brain_id = ?",
-            (tenant_id,),
-        ).fetchone()
-    except sqlite3.OperationalError:
-        return None  # table not migrated yet
+    """Read sync_state.last_push_at. Returns None on first push or pre-migration brain."""
+    if not _sync_state_exists(conn):
+        return None
+    row = conn.execute(
+        "SELECT last_push_at FROM sync_state WHERE brain_id = ?",
+        (tenant_id,),
+    ).fetchone()
     return row[0] if row and row[0] else None
 
 
 def _mark_push(conn: sqlite3.Connection, tenant_id: str, when: str) -> None:
+    """Advance sync_state.last_push_at. No-op on pre-migration brains."""
+    if not _sync_state_exists(conn):
+        return
     conn.execute(
         """
         INSERT INTO sync_state (brain_id, last_push_at, updated_at)
@@ -114,7 +124,8 @@ def _rows_since(
         where.append(f"{ts_col} > ?")
         params.append(since)
 
-    sql = f"SELECT * FROM {table} WHERE {' AND '.join(where)}"  # noqa: S608 -- table allowlisted above
+    # table is allowlisted via PUSH_TABLES; column list comes from PRAGMA.
+    sql = f"SELECT * FROM {table} WHERE {' AND '.join(where)}"
     cur = conn.execute(sql, params)
     return [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
 
@@ -139,7 +150,8 @@ def _post(table: str, rows: list[dict[str, Any]]) -> int:
         },
     )
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310 -- trusted URL from env
+        # URL is sourced from GRADATA_CLOUD_URL env; operator-controlled.
+        with urllib.request.urlopen(req, timeout=30) as resp:
             if 200 <= resp.status < 300:
                 return len(rows)
             _log.warning("cloud_sync: %s returned HTTP %s", table, resp.status)
@@ -152,36 +164,61 @@ def _post(table: str, rows: list[dict[str, Any]]) -> int:
         return 0
 
 
+def _resolve_db(brain_dir: str | Path) -> Path | None:
+    """Return the SQLite path inside ``brain_dir`` if present, else None.
+
+    Accepts either the brain directory OR the .db file directly so the caller
+    can pass a BrainContext.db_path without a wrapping if-guard.
+    """
+    p = Path(brain_dir).expanduser().resolve()
+    if p.is_file():
+        return p if p.exists() else None
+    for name in ("system.db", "brain.db"):
+        candidate = p / name
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def push(brain_dir: str | Path) -> dict[str, int]:
     """Push pending rows for this tenant to the cloud.
 
     Returns a dict mapping ``table -> rows_pushed``. A no-op when
     :func:`enabled` is False; safe to call unconditionally from hot paths.
+
+    Watermark semantics: ``sync_state.last_push_at`` only advances when every
+    table that had pending rows also successfully pushed them all. Any partial
+    failure leaves the watermark unchanged so the next call retries.
     """
     if not enabled():
         return {}
 
-    brain = Path(brain_dir).expanduser().resolve()
-    db_path = brain / "system.db"
-    if not db_path.exists():
+    db_path = _resolve_db(brain_dir)
+    if db_path is None:
         return {}
+    brain = db_path.parent
 
     tenant_id = tenant_for(brain)
     conn = sqlite3.connect(db_path)
     try:
         since = _last_push_at(conn, tenant_id)
         pushed: dict[str, int] = {}
+        all_ok = True
         started = _iso_now()
         for table in PUSH_TABLES:
             rows = _rows_since(conn, table, tenant_id, since)
             if not rows:
                 continue
-            pushed[table] = _post(table, rows)
-        if pushed:
-            _mark_push(conn, tenant_id, started)
+            accepted = _post(table, rows)
+            pushed[table] = accepted
+            if accepted != len(rows):
+                all_ok = False
+        if pushed and all_ok:
+            with contextlib.suppress(sqlite3.OperationalError):
+                _mark_push(conn, tenant_id, started)
         return pushed
     finally:
         conn.close()
 
 
-__all__ = ["enabled", "push", "PUSH_TABLES"]
+__all__ = ["PUSH_TABLES", "enabled", "push"]

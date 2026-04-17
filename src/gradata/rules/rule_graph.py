@@ -10,6 +10,7 @@ Persisted as JSON (legacy edges) + SQLite (typed relationships).
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import re
@@ -238,7 +239,6 @@ def store_relationship(
     Confidence is clamped to [0.0, 1.0] before persistence per the SDK
     coding guideline ("Confidence values must be in [0.0, 1.0]").
     """
-    import contextlib
     clamped = max(0.0, min(1.0, confidence))
     _tid = tenant_for(Path(db_path).parent)
     conn = sqlite3.connect(str(db_path))

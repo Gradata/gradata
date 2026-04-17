@@ -25,8 +25,14 @@ from _runner import column_exists, resolve_brain_db, table_exists  # type: ignor
 from tenant_uuid import read_tenant_id  # type: ignore[import-not-found]  # noqa: E402
 
 
-# Tables with tenant_id that are NOT fully wired in the SDK yet.
+# Per-tenant tables with tenant_id that are NOT fully wired in the SDK yet.
 # Safe to backfill because the local SDK is single-tenant per brain.
+#
+# IMPORTANT: This list deliberately EXCLUDES the mixed-visibility tables
+# (meta_rules, frameworks, rule_relationships). In those tables, ``tenant_id
+# IS NULL`` is the sentinel for "global / shareable across brains", so
+# backfilling NULLs would silently capture legitimate global rows into the
+# primary tenant. Migration 001 leaves them NULL on purpose.
 CANDIDATE_TABLES: list[str] = [
     "deals",
     "signals",
@@ -60,9 +66,6 @@ CANDIDATE_TABLES: list[str] = [
     "rule_canary",
     "lesson_transitions",
     "sync_state",
-    "meta_rules",
-    "frameworks",
-    "rule_relationships",
 ]
 
 

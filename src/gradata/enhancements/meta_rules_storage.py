@@ -26,14 +26,11 @@ import random
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from gradata._tenant import tenant_for
 from gradata._types import RuleTransferScope
 from gradata.enhancements.meta_rules import TIER_SUPER_META, MetaRule, SuperMetaRule
-
-if TYPE_CHECKING:
-    pass
 
 # ---------------------------------------------------------------------------
 # Meta-Rule DDL

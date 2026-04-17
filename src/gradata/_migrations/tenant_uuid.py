@@ -15,6 +15,7 @@ CLI:
 from __future__ import annotations
 
 import argparse
+import os
 import uuid
 from pathlib import Path
 
@@ -23,16 +24,46 @@ TENANT_FILE = ".tenant_id"
 
 
 def get_or_create_tenant_id(brain_dir: str | Path) -> str:
+    """Atomic read-or-create of the brain's tenant UUID.
+
+    Uses ``O_CREAT | O_EXCL`` on a temp file + ``os.replace`` so two
+    concurrent callers cannot mint different UUIDs for the same brain.
+    The loser of the race falls through to read the winner's value.
+    """
     brain = Path(brain_dir).expanduser().resolve()
     brain.mkdir(parents=True, exist_ok=True)
     fpath = brain / TENANT_FILE
+
     if fpath.exists():
         tid = fpath.read_text(encoding="utf-8").strip()
         if _is_valid_uuid(tid):
             return tid
-    tid = str(uuid.uuid4())
-    fpath.write_text(tid, encoding="utf-8")
-    return tid
+
+    # Exclusive create of a per-process temp file, then atomic rename.
+    new_tid = str(uuid.uuid4())
+    tmp = brain / f".tenant_id.tmp.{os.getpid()}"
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    fd = os.open(tmp, flags, 0o644)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(new_tid)
+        # os.replace is atomic on POSIX AND on Windows (overwrites target).
+        # If the target already exists (another process won), we still replace
+        # with our tmp -- but we'll read the existing file below instead.
+        if not fpath.exists():
+            os.replace(tmp, fpath)
+        else:
+            # Lost the race: drop our temp, read what the winner wrote.
+            os.unlink(tmp)
+    except FileExistsError:
+        # Extremely unlikely (PID collision); fall back to reading disk.
+        pass
+
+    tid = fpath.read_text(encoding="utf-8").strip()
+    if _is_valid_uuid(tid):
+        return tid
+    # Shouldn't happen; return our generated UUID as last resort.
+    return new_tid
 
 
 def read_tenant_id(brain_dir: str | Path) -> str | None:

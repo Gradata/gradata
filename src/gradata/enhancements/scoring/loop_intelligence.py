@@ -242,8 +242,9 @@ def log_outcome(
     row = conn.execute(
         """SELECT id, date FROM prep_outcomes
            WHERE prospect = ? AND prep_type = ? AND outcome IS NULL
+             AND (tenant_id = ? OR tenant_id IS NULL)
            ORDER BY date DESC, id DESC LIMIT 1""",
-        (prospect, prep_type),
+        (prospect, prep_type, _tid),
     ).fetchone()
 
     if row:
@@ -256,8 +257,9 @@ def log_outcome(
                 pass
 
         conn.execute(
-            "UPDATE prep_outcomes SET outcome = ?, days_to_outcome = ? WHERE id = ?",
-            (outcome, days, row["id"]),
+            "UPDATE prep_outcomes SET outcome = ?, days_to_outcome = ? "
+            "WHERE id = ? AND (tenant_id = ? OR tenant_id IS NULL)",
+            (outcome, days, row["id"], _tid),
         )
         conn.commit()
         conn.close()

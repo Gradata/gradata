@@ -229,15 +229,20 @@ def up(conn: sqlite3.Connection, tenant_id: str) -> dict:
             summary["indexes_created"].append(idx_v)
 
     # 4. events.schema_version
-    if table_exists(conn, "events") and add_column_if_missing(
-        conn, "events", "schema_version", "INTEGER DEFAULT 1"
-    ):
-        summary["columns_added"].append("events.schema_version")
+    # Always backfill NULL values -- even if the column pre-existed from an
+    # earlier partial run. This keeps the migration idempotent across retries
+    # instead of only touching rows the first time the column is added.
+    if table_exists(conn, "events"):
+        if add_column_if_missing(
+            conn, "events", "schema_version", "INTEGER DEFAULT 1"
+        ):
+            summary["columns_added"].append("events.schema_version")
         conn.execute(
             "UPDATE events SET schema_version = 1 WHERE schema_version IS NULL"
         )
 
-    conn.commit()
+    # Commit lives in the caller (_apply_numbered) so the schema/data changes
+    # and the `migrations` tracking row land atomically.
     return summary
 
 

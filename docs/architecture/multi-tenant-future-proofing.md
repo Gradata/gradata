@@ -47,11 +47,15 @@ Add `schema_version INT` to event envelope + a `migrations` table. Forward-only 
 
 ## Per-Table Tenant Classification
 
-**Per-tenant (add `tenant_id` NOT NULL, backfill to Oliver's UUID):**
-deals, signals, activity_log, facts, decisions, pipeline_snapshots, daily_metrics, prep_outcomes, session_metrics, session_gates, events, corrections, output_classifications, correction_severity, tasks, agent_jobs, enrichment_queue, demo_recordings, pending_approvals, brain_embeddings, brain_fts_content, audit_scores, gate_triggers, lesson_applications, prep_outcomes, rule_provenance, correction_patterns
+These lists are the authoritative contract for migration 001
+(`src/gradata/_migrations/001_add_tenant_id.py` — `PER_TENANT_TABLES` and
+`MIXED_VISIBILITY_TABLES`). Keep them in sync with that file.
+
+**Per-tenant (add `tenant_id` NOT NULL, backfill to the primary tenant UUID):**
+deals, signals, activity_log, facts, decisions, pipeline_snapshots, daily_metrics, prep_outcomes, session_metrics, session_gates, events, output_classifications, correction_severity, tasks, agent_jobs, enrichment_queue, enrichment_processed_files, demo_recordings, pending_approvals, brain_embeddings, brain_fts_content, audit_scores, gate_triggers, lesson_applications, rule_provenance, correction_patterns, entities, relationships, ablation_log, rule_canary, lesson_transitions, sync_state
 
 **Mixed (add `tenant_id` nullable + `visibility`):**
-meta_rules, frameworks, rule_relationships, lesson_transitions, ablation_log, entities, rule_canary
+meta_rules, frameworks, rule_relationships
 
 **Global only (no `tenant_id`):**
 periodic_audits (template), sqlite_sequence

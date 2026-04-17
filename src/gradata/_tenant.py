@@ -76,5 +76,13 @@ def _cached(brain_key: str) -> str:
 
 
 def tenant_for(brain_dir: str | Path) -> str:
-    """Cached form of :func:`get_tenant_id` for hot paths."""
+    """Cached form of :func:`get_tenant_id` for hot paths.
+
+    When ``GRADATA_TENANT_ID`` is set, the cache is bypassed so that
+    tests and CI overrides take effect immediately without needing to
+    clear the lru_cache manually.
+    """
+    env = os.environ.get(ENV_TENANT_ID, "").strip()
+    if env and _is_valid_uuid(env):
+        return env
     return _cached(str(Path(brain_dir).expanduser().resolve()))

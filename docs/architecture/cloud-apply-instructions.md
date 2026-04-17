@@ -40,9 +40,9 @@ After the auth user exists, in SQL Editor run:
 ```sql
 INSERT INTO tenant_registry (tenant_id, display_name, email, is_primary, tier)
 VALUES (
-    '402bc79c-1ef3-42e4-a410-52b909babfc6',
-    'Oliver Le',
-    'oliver@hausgem.com',
+    '<your-tenant-uuid>',
+    '<your-display-name>',
+    '<your-email>',
     TRUE,
     'founder'
 ) ON CONFLICT (tenant_id) DO NOTHING;

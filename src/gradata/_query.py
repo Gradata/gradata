@@ -45,7 +45,9 @@ def _ensure_fts_table(conn: sqlite3.Connection):
         )
     """)
     # Defensive migration for brains created before tenant_id was added.
-    with contextlib.suppress(Exception):
+    # Only OperationalError ("duplicate column name") should be suppressed;
+    # other sqlite errors (locking, I/O) must surface.
+    with contextlib.suppress(sqlite3.OperationalError):
         conn.execute("ALTER TABLE brain_fts_content ADD COLUMN tenant_id TEXT")
     conn.execute("""
         CREATE VIRTUAL TABLE IF NOT EXISTS brain_fts USING fts5(

@@ -23,8 +23,8 @@ CREATE TABLE IF NOT EXISTS migrations (
 
 
 def ensure_migrations_table(conn: sqlite3.Connection) -> None:
+    """Create the ``migrations`` tracking table. Caller owns the commit."""
     conn.execute(MIGRATIONS_TABLE_SQL)
-    conn.commit()
 
 
 def has_applied(conn: sqlite3.Connection, name: str) -> bool:
@@ -41,13 +41,14 @@ def mark_applied(
     rows_affected: int = 0,
     notes: str = "",
 ) -> None:
+    """Record a migration as applied. Caller owns the commit so the
+    schema-change + tracking row land in one transaction."""
     ensure_migrations_table(conn)
     conn.execute(
         "INSERT OR REPLACE INTO migrations (name, applied_at, rows_affected, notes) "
         "VALUES (?, ?, ?, ?)",
         (name, datetime.now(timezone.utc).isoformat(), rows_affected, notes),
     )
-    conn.commit()
 
 
 def column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
