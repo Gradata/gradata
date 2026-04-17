@@ -204,7 +204,7 @@ class TestGenericHTTPProviderHttpsGuard:
 # ---------------------------------------------------------------------------
 
 class TestSyncClientHttpsGuard:
-    """H1: sync.CloudClient._post refuses POST when api_base is HTTP non-local."""
+    """H1: sync.CloudClient refuses HTTP non-local api_base at construction and in _post."""
 
     def _make_client(self, api_base: str, tmp_path: Path):
         from gradata.cloud.sync import CloudClient, CloudConfig
@@ -213,9 +213,12 @@ class TestSyncClientHttpsGuard:
         return CloudClient(brain_dir=tmp_path, config=cfg)
 
     def test_http_remote_post_returns_none(self, tmp_path):
-        client = self._make_client("http://evil.com", tmp_path)
-        result = client._post("/v1/telemetry/metrics", {"x": 1})
-        assert result is None
+        # Constructor now raises before _post is ever reached — stronger guard.
+        from gradata.cloud.sync import CloudClient, CloudConfig
+        cfg = CloudConfig(sync_enabled=True, api_base="http://evil.com")
+        cfg.token = _FT
+        with pytest.raises(ValueError, match="HTTPS"):
+            CloudClient(brain_dir=tmp_path, config=cfg)
 
     def test_https_remote_post_attempts_request(self, tmp_path):
         client = self._make_client("https://api.gradata.ai", tmp_path)

@@ -247,6 +247,37 @@ class TestCloudSyncHttpsGuard:
 
 
 # ---------------------------------------------------------------------------
+# Constructor guard — CloudClient.__init__ (Tier1 #6 follow-up)
+# ---------------------------------------------------------------------------
+
+
+class TestCloudClientConstructorHttpsGuard:
+    """CloudClient.__init__ must validate api_base regardless of sync_enabled."""
+
+    def test_negative_http_remote_raises_at_construction_sync_disabled(self, tmp_path):
+        """CloudClient with http:// api_base raises ValueError even when sync is off.
+
+        Before this fix, a disabled client stored the bad URL silently; an
+        attacker who re-enabled sync at a lower level could bypass the guard.
+        """
+        from gradata.cloud.sync import CloudClient, CloudConfig
+        brain_dir = tmp_path / "brain"
+        brain_dir.mkdir(exist_ok=True)
+        bad_config = CloudConfig(api_base="http://evil.test", sync_enabled=False)
+        with pytest.raises(ValueError, match="HTTPS"):
+            CloudClient(brain_dir=brain_dir, config=bad_config)
+
+    def test_positive_https_remote_accepted_sync_disabled(self, tmp_path):
+        """CloudClient with https:// api_base succeeds even when sync is off."""
+        from gradata.cloud.sync import CloudClient, CloudConfig
+        brain_dir = tmp_path / "brain"
+        brain_dir.mkdir(exist_ok=True)
+        good_config = CloudConfig(api_base="https://cloud.gradata.ai", sync_enabled=False)
+        client = CloudClient(brain_dir=brain_dir, config=good_config)
+        assert client.config.api_base == "https://cloud.gradata.ai"
+
+
+# ---------------------------------------------------------------------------
 # cloud/client.CloudClient (GRADATA_ENDPOINT)
 # ---------------------------------------------------------------------------
 
