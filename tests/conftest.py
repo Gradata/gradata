@@ -10,6 +10,7 @@ Run: pytest sdk/tests/ -v
 """
 
 import os
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -144,3 +145,49 @@ def brain_with_content(tmp_path: Path) -> Brain:
         encoding="utf-8",
     )
     return brain
+
+
+# ---------------------------------------------------------------------------
+# Low-level path fixtures — brain directory, events log, and database
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def brain_dir(tmp_path: Path) -> Path:
+    """Return ``tmp_path / "brain"`` with the directory already created.
+
+    Use this instead of repeating the two-liner::
+
+        brain_dir = tmp_path / "brain"
+        brain_dir.mkdir()
+    """
+    d = tmp_path / "brain"
+    d.mkdir()
+    return d
+
+
+@pytest.fixture
+def events_path(brain_dir: Path) -> Path:
+    """Return the canonical events log path inside *brain_dir*.
+
+    The file is *not* created — tests create it as needed (e.g. via
+    ``events_path.write_text("", encoding="utf-8")``).
+    """
+    return brain_dir / "events.jsonl"
+
+
+@pytest.fixture
+def brain_db(brain_dir: Path) -> Path:
+    """Return ``brain_dir / "system.db"`` with the canonical events schema.
+
+    The database is initialised via ``gradata._events._ensure_table`` so
+    callers get a ready-to-use SQLite file without duplicating schema setup.
+    """
+    db_path = brain_dir / "system.db"
+    from gradata._events import _ensure_table  # noqa: PLC0415
+    conn = sqlite3.connect(str(db_path))
+    try:
+        _ensure_table(conn)
+        conn.commit()
+    finally:
+        conn.close()
+    return db_path

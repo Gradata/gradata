@@ -70,10 +70,8 @@ TEST_RULES = [
 # ---------------------------------------------------------------------------
 
 @pytest.fixture()
-def brain(tmp_path: Path) -> Brain:
+def brain(brain_dir: Path) -> Brain:
     """Isolated Brain instance backed by a temp directory with lessons.md."""
-    brain_dir = tmp_path / "brain"
-    brain_dir.mkdir()
     (brain_dir / "lessons.md").write_text(LESSONS_CONTENT, encoding="utf-8")
     return Brain(str(brain_dir))
 
