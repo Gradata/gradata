@@ -464,6 +464,7 @@ def brain_correct(
                         try:
                             import contextlib as _ctx_mod
                             import sqlite3 as _sqlite3_mod
+
                             from gradata._db import get_connection
                             from gradata._tenant import tenant_for as _tenant_for
                             _tid = _tenant_for(brain.dir)

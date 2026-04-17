@@ -8,9 +8,8 @@ Single source of truth for:
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-
 
 MIGRATIONS_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS migrations (
@@ -47,7 +46,7 @@ def mark_applied(
     conn.execute(
         "INSERT OR REPLACE INTO migrations (name, applied_at, rows_affected, notes) "
         "VALUES (?, ?, ?, ?)",
-        (name, datetime.now(timezone.utc).isoformat(), rows_affected, notes),
+        (name, datetime.now(UTC).isoformat(), rows_affected, notes),
     )
 
 

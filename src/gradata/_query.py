@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import gradata._paths as _p
-from gradata._tenant import tenant_for
 from gradata._config import (
     CONFIDENCE_HIGH,
     CONFIDENCE_LOW,
@@ -30,6 +29,7 @@ from gradata._config import (
     SKIP_DIRS,
     SKIP_FILES,
 )
+from gradata._tenant import tenant_for
 
 if TYPE_CHECKING:
     from gradata._paths import BrainContext

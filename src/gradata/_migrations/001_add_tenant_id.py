@@ -1,3 +1,4 @@
+# ruff: noqa: N999  # numbered migration module — digit prefix is intentional
 """Migration 001: add tenant_id, visibility, schema_version.
 
 Makes the brain multi-tenant aware WITHOUT changing how it behaves today.
@@ -26,13 +27,13 @@ from __future__ import annotations
 import argparse
 import sqlite3
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # The file name starts with a digit so it's run as a script, not imported
 # as a module. Add the parent dir to sys.path for the helper imports.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _runner import (  # type: ignore[import-not-found]  # noqa: E402
+from _runner import (  # type: ignore[import-not-found]
     add_column_if_missing,
     column_exists,
     create_index_if_missing,
@@ -41,8 +42,7 @@ from _runner import (  # type: ignore[import-not-found]  # noqa: E402
     resolve_brain_db,
     table_exists,
 )
-from tenant_uuid import get_or_create_tenant_id  # type: ignore[import-not-found]  # noqa: E402
-
+from tenant_uuid import get_or_create_tenant_id  # type: ignore[import-not-found]
 
 NAME = "001_add_tenant_id"
 
@@ -173,7 +173,7 @@ def up(conn: sqlite3.Connection, tenant_id: str) -> dict:
         "INSERT OR IGNORE INTO tenant_registry "
         "(tenant_id, display_name, created_at, is_primary, notes) "
         "VALUES (?, ?, ?, 1, 'primary tenant — first brain, backfilled')",
-        (tenant_id, "primary", datetime.now(timezone.utc).isoformat()),
+        (tenant_id, "primary", datetime.now(UTC).isoformat()),
     )
 
     # 2. Per-tenant tables

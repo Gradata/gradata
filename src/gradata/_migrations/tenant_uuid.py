@@ -19,7 +19,6 @@ import os
 import uuid
 from pathlib import Path
 
-
 TENANT_FILE = ".tenant_id"
 
 

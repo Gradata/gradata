@@ -21,9 +21,12 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "migrations"))
-from _runner import column_exists, resolve_brain_db, table_exists  # type: ignore[import-not-found]  # noqa: E402
-from tenant_uuid import read_tenant_id  # type: ignore[import-not-found]  # noqa: E402
-
+from _runner import (  # type: ignore[import-not-found]
+    column_exists,
+    resolve_brain_db,
+    table_exists,
+)
+from tenant_uuid import read_tenant_id  # type: ignore[import-not-found]
 
 # Per-tenant tables with tenant_id that are NOT fully wired in the SDK yet.
 # Safe to backfill because the local SDK is single-tenant per brain.
