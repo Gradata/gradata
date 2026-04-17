@@ -44,6 +44,7 @@ def _get_modified_files() -> list[str]:
         result = subprocess.run(
             ["git", "diff", "--name-only", "HEAD"],
             capture_output=True, text=True, timeout=5, cwd=cwd, check=False,
+            encoding="utf-8", errors="replace",
         )
         if result.returncode == 0:
             files.extend(f.strip() for f in result.stdout.splitlines() if f.strip())
@@ -55,6 +56,7 @@ def _get_modified_files() -> list[str]:
         result = subprocess.run(
             ["git", "ls-files", "--others", "--exclude-standard"],
             capture_output=True, text=True, timeout=5, cwd=cwd, check=False,
+            encoding="utf-8", errors="replace",
         )
         if result.returncode == 0:
             files.extend(f.strip() for f in result.stdout.splitlines() if f.strip())
