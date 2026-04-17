@@ -20,6 +20,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import logging
 import sys
@@ -516,7 +517,7 @@ def _sanitize_toml_value(val: str) -> str:
     return val.replace("\n", "").replace("\r", "").replace("[", "").replace("]", "").replace('"', "").replace("\\", "").strip()
 
 
-def _check_config_permissions(config_path: "Path") -> None:
+def _check_config_permissions(config_path: Path) -> None:
     """Finding 4: warn if config file is world-readable (Unix only)."""
     import os
     import stat
@@ -538,17 +539,18 @@ def cmd_login(args):
     import os
     import time
     import webbrowser
+    from urllib.error import HTTPError, URLError
     from urllib.request import Request, urlopen
-    from urllib.error import URLError, HTTPError
 
     api_url = os.environ.get("GRADATA_API_URL", "https://api.gradata.ai/api/v1")
 
     # Finding 5: reject non-HTTPS API URLs (allow localhost for development)
-    if not api_url.startswith("https://"):
-        if not (api_url.startswith("http://localhost") or api_url.startswith("http://127.0.0.1")):
-            print(f"Error: GRADATA_API_URL must use HTTPS (got: {api_url})")
-            print("  HTTP is only allowed for localhost/127.0.0.1 during development.")
-            sys.exit(1)
+    if not api_url.startswith("https://") and not (
+        api_url.startswith("http://localhost") or api_url.startswith("http://127.0.0.1")
+    ):
+        print(f"Error: GRADATA_API_URL must use HTTPS (got: {api_url})")
+        print("  HTTP is only allowed for localhost/127.0.0.1 during development.")
+        sys.exit(1)
 
     # Step 1: Request a device code
     try:
@@ -614,10 +616,9 @@ def cmd_login(args):
             config_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Finding 4: restrict directory permissions (Unix)
-            try:
+            # Windows — os.chmod has limited effect, suppress the error
+            with contextlib.suppress(OSError, AttributeError):
                 os.chmod(config_path.parent, 0o700)
-            except (OSError, AttributeError):
-                pass  # Windows — os.chmod has limited effect
 
             # Finding 12: sanitize values before writing TOML
             safe_key = _sanitize_toml_value(api_key)
@@ -634,16 +635,15 @@ def cmd_login(args):
             )
 
             # Finding 4: restrict file permissions (Unix)
-            try:
+            # Windows — os.chmod has limited effect, suppress the error
+            with contextlib.suppress(OSError, AttributeError):
                 os.chmod(config_path, 0o600)
-            except (OSError, AttributeError):
-                pass  # Windows — os.chmod has limited effect
 
             # Also set in the environment for the current process (so
             # subsequent brain operations in the same shell can auto-sync)
             os.environ["GRADATA_API_KEY"] = api_key
 
-            print(f"  Connected! Your brain will sync to app.gradata.ai")
+            print("  Connected! Your brain will sync to app.gradata.ai")
             print(f"  Config saved to {config_path}")
 
             # Finding 4: check permissions on startup

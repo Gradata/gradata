@@ -31,7 +31,7 @@ Reference: Anthropic, "Demystifying Evals for AI Agents" (2025).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass

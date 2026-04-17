@@ -24,7 +24,7 @@ Usage::
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
@@ -149,7 +149,7 @@ class StructuredCorrection:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "StructuredCorrection":
+    def from_dict(cls, data: dict[str, Any]) -> StructuredCorrection:
         """Deserialize from a plain dict."""
         return cls(
             what_wrong=data.get("what_wrong", ""),
@@ -416,7 +416,6 @@ def extract_structured_correction(
             # one/both of draft/final are empty. Nothing to extract.
             return None
 
-    correction_text = final or context
     full_text = " ".join(filter(None, [context, final]))
 
     what_wrong = _extract_what_wrong(draft, final)
