@@ -27,7 +27,18 @@ def ensure_migrations_table(conn: sqlite3.Connection) -> None:
 
 
 def has_applied(conn: sqlite3.Connection, name: str) -> bool:
-    ensure_migrations_table(conn)
+    """Check whether a migration is recorded as applied. Pure read.
+
+    Returns False if the ``migrations`` table does not yet exist — the
+    caller (orchestrator) is responsible for creating it before marking
+    anything applied. Keeping this read-only avoids surprise writes when
+    tooling probes migration state.
+    """
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='migrations'"
+    ).fetchone()
+    if row is None:
+        return False
     row = conn.execute(
         "SELECT 1 FROM migrations WHERE name = ?", (name,)
     ).fetchone()

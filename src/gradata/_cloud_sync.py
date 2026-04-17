@@ -24,7 +24,6 @@ Not yet implemented (future work, explicitly out of scope):
 """
 from __future__ import annotations
 
-import contextlib
 import json
 import logging
 import os
@@ -214,8 +213,7 @@ def push(brain_dir: str | Path) -> dict[str, int]:
             if accepted != len(rows):
                 all_ok = False
         if pushed and all_ok:
-            with contextlib.suppress(sqlite3.OperationalError):
-                _mark_push(conn, tenant_id, started)
+            _mark_push(conn, tenant_id, started)
         return pushed
     finally:
         conn.close()
