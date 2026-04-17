@@ -472,3 +472,53 @@ def test_agent_precontext_respects_env_domain(tmp_path, monkeypatch):
     block = result.get("result", "")
     assert "SALES-RULE" in block
     assert "CODE-RULE" not in block
+
+
+def test_agent_precontext_env_domain_overridden_by_tool_input(tmp_path, monkeypatch):
+    """tool_input.scope_domain takes priority over GRADATA_SCOPE_DOMAIN env var.
+
+    Regression: when both an env-var domain and an explicit tool_input domain
+    are present, the tool_input value must win.  This also verifies that an
+    ambient GRADATA_BRAIN_DIR in the shell does not shadow an explicit
+    BRAIN_DIR set by the test fixture (the env-isolation regression from the
+    original scope-domain bug).
+    """
+    from gradata.brain import Brain
+    from gradata.hooks import agent_precontext
+
+    brain = Brain.init(str(tmp_path))
+    lessons_path = brain.dir / "lessons.md"
+    _write_lessons(
+        lessons_path,
+        [
+            {
+                "category": "STYLE",
+                "description": "CODE-RULE: type hints",
+                "scope_json": json.dumps({"domain": "code"}),
+                "confidence": 0.95,
+            },
+            {
+                "category": "TONE",
+                "description": "SALES-RULE: warm opener",
+                "scope_json": json.dumps({"domain": "sales"}),
+                "confidence": 0.95,
+            },
+        ],
+    )
+
+    monkeypatch.setenv("BRAIN_DIR", str(brain.dir))
+    # Env var says "sales" but tool_input says "code" — tool_input must win.
+    monkeypatch.setenv("GRADATA_SCOPE_DOMAIN", "sales")
+
+    data = {
+        "tool_input": {
+            "subagent_type": "general",
+            "description": "help with a task",
+            "scope_domain": "code",  # explicit override
+        }
+    }
+    result = agent_precontext.main(data)
+    assert result is not None
+    block = result.get("result", "")
+    assert "CODE-RULE" in block, "tool_input.scope_domain='code' must win over env GRADATA_SCOPE_DOMAIN='sales'"
+    assert "SALES-RULE" not in block
