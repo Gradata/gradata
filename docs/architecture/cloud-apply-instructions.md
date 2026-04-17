@@ -23,6 +23,12 @@ from env vars.
 Expect: 13 `CREATE TABLE`, 13 `ENABLE ROW LEVEL SECURITY`, around 48 policies,
 and one row in `cloud_migrations` (`001_cloud_schema_v1`).
 
+Then apply v2 from [cloud-monolith-v2.md](./cloud-monolith-v2.md). After v2
+you should additionally see: `002_cloud_monolith_v2` in `cloud_migrations`,
+`pg_trgm` in `pg_extension`, `search_tsv` columns populated on `events` /
+`meta_rules`, and the `sync_queue` / `tenant_cache` tables with RLS
+policies visible in `pg_policies`.
+
 ## 3. Create Oliver's auth user with a pinned UUID
 
 Critical: Oliver's `auth.users.id` MUST equal his local tenant UUID

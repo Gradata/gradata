@@ -19,6 +19,23 @@ of truth for writes; cloud is the pushable reflection + shared surface.
 
 Every addition is idempotent — re-runs are safe.
 
+### Durability note — `tenant_cache` is UNLOGGED
+
+`UNLOGGED` tables skip the WAL: ~2–3× faster writes, but **all rows are
+truncated on crash, unclean shutdown, or replica promotion**. This is the
+right choice for a cache (lose state, fall back to recompute), but never
+store data here that cannot be re-derived. If you later add durable
+per-tenant settings (e.g. feature flags), put them in a regular table.
+
+### Text-extraction note — JSON-ish columns in `meta_rules.search_tsv`
+
+`meta_rules.scope` and `meta_rules.examples` are stored as JSON-encoded
+TEXT. The v2 tsvector feeds them to `to_tsvector('english', ...)` as-is,
+which tokenizes brace/quote punctuation alongside real content. Keyword
+recall is still usable, but for cleaner ranking extract the string fields
+first (e.g. `coalesce(examples::jsonb->>'text','')`) and rebuild the
+generated column.
+
 ## Apply order
 
 1. Studio → SQL Editor → new query
