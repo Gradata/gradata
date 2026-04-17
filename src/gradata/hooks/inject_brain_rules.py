@@ -7,6 +7,7 @@ session context instead of brute-force top-10 by confidence.
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import subprocess
 import sys
@@ -25,12 +26,14 @@ except ImportError:
 try:
     from gradata.enhancements.meta_rules import (
         INJECTABLE_META_SOURCES,
+        _lesson_id,
         format_meta_rules_for_prompt,
     )
     from gradata.enhancements.meta_rules_storage import load_meta_rules
 except ImportError:
     format_meta_rules_for_prompt = None  # type: ignore[assignment]
     load_meta_rules = None  # type: ignore[assignment]
+    _lesson_id = None  # type: ignore[assignment]
     INJECTABLE_META_SOURCES = frozenset()  # type: ignore[assignment]
 
 _log = logging.getLogger(__name__)
@@ -41,9 +44,10 @@ HOOK_META = {
     "timeout": 10000,
 }
 
-MAX_RULES = 10
-MIN_CONFIDENCE = 0.60
-MAX_META_RULES = 5  # meta-rules are high-level principles — separate cap from MAX_RULES
+MAX_RULES = int(os.environ.get("GRADATA_MAX_RULES", "10"))
+MIN_CONFIDENCE = float(os.environ.get("GRADATA_MIN_CONFIDENCE", "0.60"))
+# Meta-rules are high-level principles — separate cap from MAX_RULES.
+MAX_META_RULES = int(os.environ.get("GRADATA_MAX_META_RULES", "5"))
 
 
 def _score(lesson) -> float:
@@ -126,6 +130,16 @@ def main(data: dict) -> dict | None:
     if parse_lessons is None:
         return None
 
+    # Skip re-injection on compact/resume: the compacted summary already
+    # carries rules from the prior session, and the new session's primacy
+    # slot is consumed by the summary itself. Re-firing here duplicates
+    # ~1.9KB per compact event (measured 10x in a long session = ~3.7k tok).
+    # Opt back in with GRADATA_INJECT_ON_COMPACT=1 for ablation.
+    if os.environ.get("GRADATA_INJECT_ON_COMPACT", "0") != "1":
+        source = str(data.get("source", "") or "").lower()
+        if source in ("compact", "resume"):
+            return None
+
     brain_dir = resolve_brain_dir()
     if not brain_dir:
         return None
@@ -186,12 +200,17 @@ def main(data: dict) -> dict | None:
         except ValueError:
             session_seed = abs(hash(session_seed)) % (2**31)
 
+    # Overshoot the ranker so cluster/meta mutex filters have refill candidates.
+    # Without this, the ranker hard-caps at MAX_RULES and any rule suppressed
+    # by a cluster or meta-rule leaves an empty slot that cannot be filled.
+    # Final render loop enforces the MAX_RULES budget after filtering.
+    rank_overshoot = max(MAX_RULES * 3, MAX_RULES + 10)
     ranked = rank_rules(
         rule_dicts,
         current_session=int(data.get("session_number") or 0),
         task_type=data.get("task_type") or data.get("session_type") or None,
         context_keywords=context_keywords or None,
-        max_rules=MAX_RULES,
+        max_rules=rank_overshoot,
         wiki_boost=wiki_boost or None,
         session_seed=session_seed if isinstance(session_seed, int) else None,
     )
@@ -222,6 +241,7 @@ def main(data: dict) -> dict | None:
     # Cached: the meta-rule loader is reused below in the formatter block to
     # avoid a second DB open + deserialization pass.
     meta_covered_categories: set[str] = set()
+    meta_covered_lesson_ids: set[str] = set()
     cached_metas: list | None = None
     db_path = Path(brain_dir) / "system.db"
     if load_meta_rules and db_path.is_file():
@@ -230,6 +250,9 @@ def main(data: dict) -> dict | None:
             for m in cached_metas:
                 if getattr(m, "source", "deterministic") in INJECTABLE_META_SOURCES:
                     meta_covered_categories.update(getattr(m, "source_categories", []))
+                    meta_covered_lesson_ids.update(
+                        getattr(m, "source_lesson_ids", []) or []
+                    )
         except Exception as exc:
             _log.debug("meta-rule mutex pre-pass failed (%s) — clusters will fire", exc)
             cached_metas = None
@@ -262,16 +285,43 @@ def main(data: dict) -> dict | None:
         len(cluster_lines), len(cluster_injected_ids),
     )
 
-    # Individual rules: only those NOT already covered by a qualifying cluster.
+    # Individual rules: only those NOT already covered by a qualifying cluster
+    # OR by an injectable meta-rule. Meta-rule mutex suppresses leaves whose
+    # abstract principle is already carried by an injected meta — avoids the
+    # "meta says X / leaf says X (example)" double-spend on injection slots.
+    # Opt out with GRADATA_META_RULE_MUTEX=0 for ablation.
+    lesson_id_fn = _lesson_id
+    meta_mutex_enabled = (
+        lesson_id_fn is not None
+        and meta_covered_lesson_ids
+        and os.environ.get("GRADATA_META_RULE_MUTEX", "1") == "1"
+    )
+    suppressed_by_meta = 0
     individual_lines: list[str] = []
+    # Total <brain-rules> entries = cluster_lines + individual_lines.
+    # Enforce MAX_RULES here (after mutex) so freed slots get refilled from
+    # the overshoot pool, and the final block still respects the budget.
+    render_budget = max(0, MAX_RULES - len(cluster_lines))
     for r in scored:
+        if len(individual_lines) >= render_budget:
+            break
         rule_id = f"{r.category}:{r.description[:40]}"
-        if rule_id not in cluster_injected_ids:
-            safe_desc = sanitize_lesson_content(r.description, "xml")
-            safe_cat = sanitize_lesson_content(r.category, "xml")
-            individual_lines.append(
-                f"[{r.state.name}:{r.confidence:.2f}] {safe_cat}: {safe_desc}"
-            )
+        if rule_id in cluster_injected_ids:
+            continue
+        if meta_mutex_enabled and lesson_id_fn is not None \
+                and lesson_id_fn(r) in meta_covered_lesson_ids:
+            suppressed_by_meta += 1
+            continue
+        safe_desc = sanitize_lesson_content(r.description, "xml")
+        safe_cat = sanitize_lesson_content(r.category, "xml")
+        individual_lines.append(
+            f"[{r.state.name}:{r.confidence:.2f}] {safe_cat}: {safe_desc}"
+        )
+    if suppressed_by_meta:
+        _log.debug(
+            "Meta-rule mutex: suppressed %d leaf rules covered by injected metas",
+            suppressed_by_meta,
+        )
 
     lines = cluster_lines + individual_lines
     rules_block = "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
@@ -324,15 +374,8 @@ def main(data: dict) -> dict | None:
             + "\n".join(mandatory_lines)
             + "\n</mandatory-directives>"
         )
-        mandatory_reminder = (
-            "\n<mandatory-reminder>\n"
-            "REMINDER: The mandatory directives above are NON-NEGOTIABLE.\n"
-            + "\n".join(f"- {r.description}" for r in mandatory)
-            + "\n</mandatory-reminder>"
-        )
     else:
         mandatory_block = ""
-        mandatory_reminder = ""
 
     # Also inject tier-1 meta-rules (compound principles across 3+ lessons).
     # Without this, meta-rules are created + stored but never reach the LLM.
@@ -398,7 +441,7 @@ def main(data: dict) -> dict | None:
             )
             meta_block = ""
 
-    return {"result": mandatory_block + disposition_block + rules_block + meta_block + mandatory_reminder}
+    return {"result": mandatory_block + disposition_block + rules_block + meta_block}
 
 
 if __name__ == "__main__":

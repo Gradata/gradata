@@ -181,7 +181,7 @@ def test_context_inject_returns_context(tmp_path):
 
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}), \
          patch("gradata.brain.Brain", return_value=mock_brain):
-            result = context_main({"message": "How do I set up the pipeline for new prospects?"})
+            result = context_main({"message": "How do I set up the pipeline for new prospects in the onboarding workflow? I'd like to understand the full process from lead capture through to qualification."})
 
     assert result is not None
     assert "brain context:" in result["result"]

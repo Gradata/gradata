@@ -1,5 +1,11 @@
 """PreToolUse hook: inject RULE-tier lessons as reminders before code edits.
 
+Disabled by default as of 2026-04-17 — SessionStart inject_brain_rules
+already places rules in primacy position for the whole session, so
+re-injecting on every edit is duplicative. Set
+``GRADATA_RULE_ENFORCEMENT=1`` to re-enable if ablation shows recency
+reinforcement genuinely improves compliance on long sessions.
+
 Scope-prefilter (LLM-agnostic): rules that declare an explicit scope in
 ``scope_json`` (``file_glob``, ``applies_to``, or ``domain``) are filtered
 against the file_path being edited. Rules with no scope declaration are
@@ -11,6 +17,7 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import os
 from pathlib import Path
 
 from gradata.hooks._base import resolve_brain_dir, run_hook
@@ -29,7 +36,7 @@ HOOK_META = {
     "timeout": 5000,
 }
 
-MAX_REMINDERS = 5
+MAX_REMINDERS = int(os.environ.get("GRADATA_MAX_REMINDERS", "5"))
 
 _CODE_EXTS = frozenset({
     ".py", ".pyi", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
@@ -95,6 +102,11 @@ def _rule_applies(lesson, file_path: str, file_domain: str) -> bool:
 
 
 def main(data: dict) -> dict | None:
+    # Default-off: SessionStart primacy injection is the anchor. Opt in via
+    # GRADATA_RULE_ENFORCEMENT=1 to re-enable per-edit recency reinforcement.
+    if os.environ.get("GRADATA_RULE_ENFORCEMENT", "0") != "1":
+        return None
+
     if parse_lessons is None:
         return None
 

@@ -12,10 +12,11 @@ SessionStart behavior is untouched for anyone who hasn't opted in. When
 both are active they complement: SessionStart = broad priors, JIT = tight
 per-prompt overlay.
 
-Similarity is a cheap Jaccard on word unigrams: no embeddings dependency,
-deterministic, under 1 ms per rule for the rule-tier volumes we see in
-practice (~100s of graduated rules max). Cosine on embeddings is a future
-upgrade once the rule-wiki embedding pipeline lands.
+Similarity uses BM25 (via ``bm25s``) when available — it captures term
+rarity that Jaccard can't — and falls back to Jaccard on word unigrams
+when ``bm25s`` isn't installed, keeping the SDK zero-required-deps.
+Deterministic and under a few ms per call for the rule-tier volumes we
+see in practice (~100s of graduated rules max).
 """
 from __future__ import annotations
 
@@ -38,6 +39,13 @@ try:
 except ImportError:
     parse_lessons = None  # type: ignore[assignment]
     is_hook_enforced = None  # type: ignore[assignment]
+
+try:  # BM25 is optional — SDK must stay zero-required-deps.
+    import bm25s  # type: ignore[import-not-found]
+    _BM25_AVAILABLE = True
+except ImportError:  # pragma: no cover - import gate
+    bm25s = None  # type: ignore[assignment]
+    _BM25_AVAILABLE = False
 
 _log = logging.getLogger(__name__)
 
@@ -100,6 +108,45 @@ def _float_env(name: str, default: float) -> float:
         return default
 
 
+def _bm25_scores_for_draft(
+    candidates: list[tuple[Lesson, str, str]],
+    draft_text: str,
+) -> list[float] | None:
+    """Return BM25 scores (normalized to [0,1]) aligned to candidates, or None.
+
+    candidates is ``[(lesson, category, description), ...]``. Returns None when
+    bm25s isn't installed or scoring fails — callers fall back to Jaccard.
+    """
+    if not _BM25_AVAILABLE or bm25s is None or not candidates:
+        return None
+    corpus = [f"{cat} {desc}".strip() for _, cat, desc in candidates]
+    if not any(corpus):
+        return None
+    try:
+        retriever = bm25s.BM25()
+        corpus_tokens = bm25s.tokenize(corpus, stopwords="en", show_progress=False)
+        retriever.index(corpus_tokens, show_progress=False)
+        query_tokens = bm25s.tokenize(
+            [draft_text], stopwords="en", show_progress=False,
+        )
+        doc_ids, scores = retriever.retrieve(
+            query_tokens, k=len(corpus), show_progress=False,
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        _log.debug("bm25 scoring failed (%s) — falling back to Jaccard", exc)
+        return None
+
+    aligned = [0.0] * len(corpus)
+    row_ids = doc_ids[0]
+    row_scores = scores[0]
+    max_score = max((float(s) for s in row_scores), default=0.0)
+    if max_score <= 0:
+        return None
+    for j in range(len(row_ids)):
+        aligned[int(row_ids[j])] = float(row_scores[j]) / max_score
+    return aligned
+
+
 def rank_rules_for_draft(
     lessons: list[Lesson],
     draft_text: str,
@@ -110,9 +157,10 @@ def rank_rules_for_draft(
 ) -> list[tuple[Lesson, float]]:
     """Score each lesson against draft_text and return top-k above threshold.
 
-    Returns a list of (lesson, similarity) tuples, highest first. A rule
-    must clear BOTH confidence and similarity floors to appear; we'd rather
-    inject zero rules than inject noise (same philosophy as the PR #45
+    Uses BM25 (via ``bm25s``) when installed, falling back to Jaccard so the
+    SDK stays zero-required-deps. Returns (lesson, similarity) tuples highest
+    first. A rule must clear BOTH confidence and similarity floors; we'd
+    rather inject zero rules than inject noise (same philosophy as the PR #45
     source-filter gate).
     """
     if not draft_text or not lessons or k <= 0:
@@ -122,7 +170,7 @@ def rank_rules_for_draft(
     if not draft_tokens:
         return []
 
-    scored: list[tuple[Lesson, float]] = []
+    candidates: list[tuple[Lesson, str, str, float]] = []
     for lesson in lessons:
         conf = getattr(lesson, "confidence", 0.0)
         if conf < min_confidence:
@@ -132,8 +180,23 @@ def rank_rules_for_draft(
             continue
         description = getattr(lesson, "description", "") or ""
         category = getattr(lesson, "category", "") or ""
-        rule_tokens = _tokenize(f"{category} {description}")
-        sim = _jaccard(draft_tokens, rule_tokens)
+        candidates.append((lesson, category, description, conf))
+
+    if not candidates:
+        return []
+
+    bm25_scores = _bm25_scores_for_draft(
+        [(lesson, cat, desc) for lesson, cat, desc, _ in candidates],
+        draft_text,
+    )
+
+    scored: list[tuple[Lesson, float]] = []
+    for idx, (lesson, category, description, conf) in enumerate(candidates):
+        if bm25_scores is not None:
+            sim = bm25_scores[idx]
+        else:
+            rule_tokens = _tokenize(f"{category} {description}")
+            sim = _jaccard(draft_tokens, rule_tokens)
         if sim < min_similarity:
             continue
         # Blend similarity with a small confidence tie-break so two equally

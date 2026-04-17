@@ -313,16 +313,9 @@ class TestMandatoryInjectionTier:
                 + "\n".join(mandatory_lines)
                 + "\n</mandatory-directives>"
             )
-            mandatory_reminder = (
-                "\n<mandatory-reminder>\n"
-                "REMINDER: The mandatory directives above are NON-NEGOTIABLE.\n"
-                + "\n".join(f"- {r.description}" for r in mandatory)
-                + "\n</mandatory-reminder>"
-            )
         else:
             mandatory_block = ""
-            mandatory_reminder = ""
-        return mandatory_block + mandatory_reminder
+        return mandatory_block
 
     def test_mandatory_block_appears_for_qualifying_rules(self):
         lessons = [
@@ -332,30 +325,6 @@ class TestMandatoryInjectionTier:
         assert "<mandatory-directives>" in result
         assert "NON-NEGOTIABLE DIRECTIVES" in result
         assert "use superpowers before building" in result
-
-    def test_mandatory_reminder_appears_at_end(self):
-        lessons = [
-            _FakeLesson("use superpowers before building", "workflow", 0.92, 15),
-        ]
-        result = self._build_mandatory_output(lessons)
-        assert "<mandatory-reminder>" in result
-        assert "</mandatory-reminder>" in result
-        # Reminder should be after the mandatory block
-        block_pos = result.index("<mandatory-directives>")
-        reminder_pos = result.index("<mandatory-reminder>")
-        assert reminder_pos > block_pos
-
-    def test_primacy_recency_sandwich(self):
-        """mandatory_block (primacy) + content + mandatory_reminder (recency)."""
-        lessons = [
-            _FakeLesson("use superpowers", "workflow", 0.92, 12),
-        ]
-        mandatory_block = self._build_mandatory_output(lessons)
-        # Simulate the full output
-        rules_block = "<brain-rules>\n[RULE:0.92] workflow: use superpowers\n</brain-rules>"
-        full = mandatory_block[:mandatory_block.index("\n<mandatory-reminder>")] + rules_block + mandatory_block[mandatory_block.index("\n<mandatory-reminder>"):]
-        assert full.index("<mandatory-directives>") < full.index("<brain-rules>")
-        assert full.index("<brain-rules>") < full.index("<mandatory-reminder>")
 
     def test_low_confidence_rule_excluded_from_mandatory(self):
         lessons = [

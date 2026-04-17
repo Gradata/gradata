@@ -1,6 +1,8 @@
 """UserPromptSubmit hook: inject relevant brain context for user messages."""
 from __future__ import annotations
 
+import os
+
 from gradata.hooks._base import extract_message, resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
 
@@ -10,11 +12,18 @@ HOOK_META = {
     "timeout": 8000,
 }
 
-MIN_MESSAGE_LEN = 10
-MAX_CONTEXT_LEN = 2000
+# Default threshold raised to 100: only substantive questions trigger a brain
+# search. Ack-style replies ("ok", "sounds good", "continue where we left off")
+# pass through without FTS cost. Override via GRADATA_MIN_MESSAGE_LEN.
+MIN_MESSAGE_LEN = int(os.environ.get("GRADATA_MIN_MESSAGE_LEN", "100"))
+MAX_CONTEXT_LEN = int(os.environ.get("GRADATA_MAX_CONTEXT_LEN", "2000"))
 
 
 def main(data: dict) -> dict | None:
+    # Kill-switch: GRADATA_CONTEXT_INJECT=0 disables brain context retrieval
+    # entirely. Use when SessionStart rules + manual brain queries suffice.
+    if os.environ.get("GRADATA_CONTEXT_INJECT", "1") != "1":
+        return None
     try:
         message = extract_message(data)
         if not message:
