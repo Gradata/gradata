@@ -17,7 +17,7 @@ import io
 import json
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -143,7 +143,7 @@ def generate_health_report(db_path: Path) -> HealthReport:
         first_draft_acceptance=fda,
         rules_active=rules_count,
         lessons_active=lessons_count,
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         issues=issues,
     )
 

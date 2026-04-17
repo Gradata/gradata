@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 @dataclass
@@ -110,7 +110,7 @@ class MemoryExtractor:
             List of ExtractedFact objects.
         """
         facts: list[ExtractedFact] = []
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         for msg in messages:
             role = msg.get("role", "user")
@@ -211,7 +211,7 @@ class MemoryExtractor:
                     op="invalidate",
                     fact=candidate,
                     target_id=match.get("id"),
-                    reason=f"Superseded by newer information",
+                    reason="Superseded by newer information",
                     supersedes=match.get("id"),
                 ))
                 actions.append(ReconcileAction(

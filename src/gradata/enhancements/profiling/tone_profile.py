@@ -33,7 +33,6 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-
 # ---------------------------------------------------------------------------
 # Tone Feature Extraction
 # ---------------------------------------------------------------------------
@@ -118,7 +117,7 @@ class ToneFeatures:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "ToneFeatures":
+    def from_dict(cls, d: dict[str, Any]) -> ToneFeatures:
         """Deserialize from dict."""
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
@@ -250,7 +249,7 @@ class ToneProfile:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "ToneProfile":
+    def from_dict(cls, d: dict[str, Any]) -> ToneProfile:
         features = ToneFeatures.from_dict(d.get("features", {}))
         return cls(
             task_type=d["task_type"],

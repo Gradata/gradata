@@ -35,11 +35,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from gradata.enhancements.self_improvement import (
-    LessonState,
-    Lesson,
     PATTERN_THRESHOLD,
+    Lesson,
+    LessonState,
 )
-
 
 # Decay constants
 DECAY_PER_IDLE_SESSION = 0.02

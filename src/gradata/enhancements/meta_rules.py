@@ -681,7 +681,7 @@ def _try_llm_principle(rules: list[Lesson], category: str) -> str | None:
                 api_base=b,
                 model=os.environ.get("GRADATA_LLM_MODEL", "gpt-4o-mini"),
             )
-        except Exception as exc:  # noqa: BLE001 -- degrade to deterministic
+        except Exception as exc:
             _log.debug("OpenAI-compat synthesis failed for %s: %s", category, exc)
             return None
 

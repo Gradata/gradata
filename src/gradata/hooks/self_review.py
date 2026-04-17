@@ -35,8 +35,8 @@ _rules_cache: dict[tuple[str, float], list[dict]] = {}
 def _load_mandatory_rules(brain_dir: str) -> list[dict]:
     """Load RULE-tier mandatory lessons, cached by file mtime."""
     try:
-        from gradata.enhancements.self_improvement import parse_lessons
         from gradata._types import LessonState
+        from gradata.enhancements.self_improvement import parse_lessons
 
         lessons_path = Path(brain_dir) / "lessons.md"
         if not lessons_path.is_file():

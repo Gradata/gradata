@@ -1,6 +1,6 @@
 """Backward-compatibility shim — all code moved to behavioral_engine.py."""
 
-from gradata.enhancements.behavioral_engine import (  # noqa: F401
+from gradata.enhancements.behavioral_engine import (
     BehavioralContract,
     ConstraintViolation,
     ContractRegistry,

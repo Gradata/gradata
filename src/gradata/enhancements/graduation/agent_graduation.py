@@ -48,25 +48,24 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Import graduation constants from self_improvement (same research-backed values)
 from gradata.enhancements.self_improvement import (
-    SURVIVAL_BONUS,
     ACCEPTANCE_BONUS,
+    MIN_APPLICATIONS_FOR_PATTERN,
+    MIN_APPLICATIONS_FOR_RULE,
     MISFIRE_PENALTY,
     PATTERN_THRESHOLD,
     RULE_THRESHOLD,
-    MIN_APPLICATIONS_FOR_PATTERN,
-    MIN_APPLICATIONS_FOR_RULE,
-    LessonState,
+    SURVIVAL_BONUS,
     Lesson,
-    parse_lessons,
+    LessonState,
     format_lessons,
     get_maturity_phase,
+    parse_lessons,
 )
-
 
 # ---------------------------------------------------------------------------
 # Approval Gate Thresholds
@@ -250,7 +249,7 @@ def compile_deterministic_rule(lesson: Lesson) -> DeterministicRule | None:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 # ---------------------------------------------------------------------------
@@ -450,7 +449,7 @@ class AgentGraduationTracker:
         category = "AGENT_" + profile.agent_type.upper()
         if edit_category:
             category = edit_category.upper()
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
 
         # Check for duplicate (same edit pattern already captured)
         edit_lower = edits.lower()[:100]
@@ -773,7 +772,7 @@ class AgentGraduationTracker:
             "best_agent": best,
         }
 
-    def get_deterministic_rules(self, agent_type: str, task_type: str = "") -> list["DeterministicRule"]:
+    def get_deterministic_rules(self, agent_type: str, task_type: str = "") -> list[DeterministicRule]:
         """Get RULE-tier lessons compiled into enforceable guard logic.
 
         Only RULE-tier lessons with an enforceable pattern are returned.
@@ -820,7 +819,7 @@ class AgentGraduationTracker:
 
         return rules
 
-    def enforce_rules(self, agent_type: str, output: str, task_type: str = "") -> "EnforcementResult":
+    def enforce_rules(self, agent_type: str, output: str, task_type: str = "") -> EnforcementResult:
         """Apply all deterministic RULE-tier guards to agent output.
 
         Returns an EnforcementResult with pass/fail and details of any violations.
