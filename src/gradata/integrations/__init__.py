@@ -1,41 +1,23 @@
-"""
-Framework Integrations — Be everywhere.
-========================================
-Inspired by: Mem0's integration blitz strategy.
+"""Framework Integrations — DEPRECATED namespace.
 
-Thin adapters that connect the brain to popular AI frameworks.
-Each integration adds behavioral adaptation to the framework
-with minimal configuration.
+.. deprecated::
+    ``gradata.integrations`` is deprecated and will be removed in v0.8.0.
+    The canonical adapters now live in ``gradata.middleware``::
 
-Supported frameworks:
-    - OpenAI (chat completions API)
-    - Anthropic (messages API)
-    - LangChain (memory + callbacks)
-    - CrewAI (agent memory)
-    - Generic (any framework with request/response pattern)
+        from gradata.middleware import wrap_anthropic, wrap_openai
+        from gradata.middleware import LangChainCallback, CrewAIGuard
 
-Usage:
-    # OpenAI
-    from gradata.integrations.openai import patch_openai
-    client = patch_openai(openai_client, brain_dir="./my-brain")
+    ``gradata.integrations.embeddings`` and
+    ``gradata.integrations.session_history`` are NOT deprecated — those
+    remain in this namespace (they have no middleware equivalent).
 
-    # Anthropic
-    from gradata.integrations.anthropic import patch_anthropic
-    client = patch_anthropic(anthropic_client, brain_dir="./my-brain")
-
-    # LangChain
-    from gradata.integrations.langchain import BrainMemory
-    memory = BrainMemory(brain_dir="./my-brain")
-
-    # CrewAI
-    from gradata.integrations.crewai import BrainCrewMemory
-    crew = Crew(memory=BrainCrewMemory(brain_dir="./my-brain"))
+    Adapter modules (anthropic_adapter, openai_adapter, langchain_adapter,
+    crewai_adapter) emit their own ``DeprecationWarning`` on import.
 """
 
 import importlib as _importlib
 
-# Re-export aliases so both `gradata.integrations.openai` and
-# `gradata.integrations.openai_adapter` resolve to the same module.
+# Short-name aliases: gradata.integrations.openai -> gradata.integrations.openai_adapter
 _ADAPTER_ALIASES = {
     "openai": "openai_adapter",
     "anthropic": "anthropic_adapter",

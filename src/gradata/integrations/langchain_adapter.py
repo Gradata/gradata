@@ -1,23 +1,34 @@
-"""
-LangChain Integration — Brain-backed memory for LangChain chains.
-=================================================================
-Provides a LangChain-compatible memory class that uses the brain
-for storage and retrieval, with behavioral adaptation.
+"""LangChain Integration — DEPRECATED.
 
-Usage:
-    from gradata.integrations.langchain_adapter import BrainMemory
-    from langchain.chains import ConversationChain
-    from langchain_openai import ChatOpenAI
+.. deprecated::
+    ``gradata.integrations.langchain_adapter`` is deprecated and will be
+    removed in v0.8.0.
 
-    memory = BrainMemory(brain_dir="./my-brain")
-    chain = ConversationChain(
-        llm=ChatOpenAI(),
-        memory=memory,
-    )
-    response = chain.invoke({"input": "Draft an email to the CFO"})
+    For callback-based injection (recommended)::
+
+        from gradata.middleware import LangChainCallback
+        llm = ChatOpenAI(callbacks=[LangChainCallback(brain_path="./brain")])
+
+    :class:`~gradata.middleware.langchain_adapter.LangChainCallback` injects
+    rules at the LLM layer and enforces RULE-tier patterns on outputs.
+    :class:`BrainMemory` (this module) plugs into LangChain's Memory interface
+    and provides context retrieval — both can coexist.  If you only need
+    rule injection, migrate to the callback.  If you need retrieval memory,
+    keep using :class:`BrainMemory` until v0.8.0.
 """
 
 from __future__ import annotations
+
+import warnings
+
+warnings.warn(
+    "gradata.integrations.langchain_adapter is deprecated and will be removed "
+    "in v0.8.0.  Use 'from gradata.middleware import LangChainCallback' for "
+    "rule injection, or keep BrainMemory here until a retrieval-memory "
+    "equivalent lands in gradata.middleware.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 import contextlib
 import logging
@@ -30,15 +41,11 @@ logger = logging.getLogger("gradata.integrations.langchain")
 
 
 class BrainMemory:
-    """LangChain-compatible memory backed by an Gradata.
+    """LangChain-compatible memory backed by Gradata.
 
-    Implements the minimal interface LangChain expects:
-    - memory_variables: list of variable names
-    - load_memory_variables(): returns context dict
-    - save_context(): stores interaction
-    - clear(): resets (no-op for persistent brain)
-
-    Also injects brain rules into the context automatically.
+    .. deprecated::
+        This class will be removed in v0.8.0.  Use
+        :class:`gradata.middleware.LangChainCallback` for rule injection.
     """
 
     memory_key: str = "brain_context"
@@ -56,15 +63,10 @@ class BrainMemory:
         return [self.memory_key]
 
     def load_memory_variables(self, inputs: dict | None = None) -> dict:
-        """Load brain context for the current input.
-
-        Combines applicable rules + relevant brain knowledge.
-        """
         user_input = (inputs or {}).get(self.input_key, "")
 
         parts: list[str] = []
 
-        # Inject rules
         try:
             rules = self.brain.apply_brain_rules("general", {"task": str(user_input)[:100]})
             if rules:
@@ -72,7 +74,6 @@ class BrainMemory:
         except Exception:
             pass
 
-        # Inject relevant context
         try:
             context = self.brain.context_for(str(user_input)[:200])
             if context:
@@ -83,10 +84,6 @@ class BrainMemory:
         return {self.memory_key: "\n\n".join(parts)}
 
     def save_context(self, inputs: dict, outputs: dict) -> None:
-        """Save an interaction to the brain.
-
-        Logs the AI output and extracts facts from the conversation.
-        """
         user_msg = inputs.get(self.input_key, "")
         ai_msg = outputs.get(self.output_key, "")
 
@@ -94,7 +91,6 @@ class BrainMemory:
             with contextlib.suppress(Exception):
                 self.brain.log_output(str(ai_msg), output_type="chat")
 
-        # Observe conversation for fact extraction
         messages = []
         if user_msg:
             messages.append({"role": "user", "content": str(user_msg)})
@@ -103,11 +99,10 @@ class BrainMemory:
 
         if messages:
             try:
-                if hasattr(self.brain, 'observe'):
+                if hasattr(self.brain, "observe"):
                     self.brain.observe(messages)
             except Exception:
                 pass
 
     def clear(self) -> None:
         """No-op for persistent brain memory."""
-        pass

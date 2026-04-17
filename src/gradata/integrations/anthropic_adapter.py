@@ -1,24 +1,27 @@
-"""
-Anthropic Integration — Patch Anthropic client with brain memory.
-=================================================================
-Wraps the Anthropic messages API to inject brain rules and capture
-conversations for learning.
+"""Anthropic Integration — DEPRECATED.
 
-Usage:
-    from anthropic import Anthropic
-    from gradata.integrations.anthropic_adapter import patch_anthropic
+.. deprecated::
+    ``gradata.integrations.anthropic_adapter`` is deprecated and will be
+    removed in v0.8.0.  Use ``gradata.middleware.anthropic_adapter`` instead::
 
-    client = Anthropic()
-    client = patch_anthropic(client, brain_dir="./my-brain")
+        from gradata.middleware import wrap_anthropic
+        client = wrap_anthropic(Anthropic(), brain_path="./brain")
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=1024,
-        messages=[{"role": "user", "content": "Draft an email..."}],
-    )
+    ``wrap_anthropic`` returns an ``AnthropicMiddleware`` wrapper (richer rule
+    enforcement via :class:`~gradata.middleware._core.RuleSource`).  If you
+    need the legacy in-place patch behaviour, pin to gradata<0.8.
 """
 
 from __future__ import annotations
+
+import warnings
+
+warnings.warn(
+    "gradata.integrations.anthropic_adapter is deprecated and will be removed "
+    "in v0.8.0.  Use 'from gradata.middleware import wrap_anthropic' instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 import logging
 from typing import TYPE_CHECKING, Any
@@ -32,12 +35,8 @@ logger = logging.getLogger("gradata.integrations.anthropic")
 def patch_anthropic(client: Any, brain_dir: str | Path = "./brain") -> Any:
     """Patch an Anthropic client to use brain memory.
 
-    Args:
-        client: An Anthropic client instance.
-        brain_dir: Path to the brain directory.
-
-    Returns:
-        The same client with patched messages.create().
+    .. deprecated::
+        Use :func:`gradata.middleware.wrap_anthropic` instead.
     """
     from gradata.brain import Brain
 
@@ -53,7 +52,6 @@ def patch_anthropic(client: Any, brain_dir: str | Path = "./brain") -> Any:
         messages = kwargs.get("messages", [])
         system = kwargs.get("system", "")
 
-        # Inject brain rules into system prompt
         try:
             user_msg = next(
                 (m["content"] for m in messages if m.get("role") == "user"),
@@ -73,10 +71,8 @@ def patch_anthropic(client: Any, brain_dir: str | Path = "./brain") -> Any:
         except Exception as e:
             logger.debug("Rule injection skipped: %s", e)
 
-        # Call original
         response = original_create(*args, **kwargs)
 
-        # Capture response
         try:
             ai_content = ""
             for block in response.content:
@@ -86,7 +82,7 @@ def patch_anthropic(client: Any, brain_dir: str | Path = "./brain") -> Any:
             if ai_content:
                 brain.log_output(ai_content, output_type="chat")
                 all_msgs = [*messages, {"role": "assistant", "content": ai_content}]
-                if hasattr(brain, 'observe'):
+                if hasattr(brain, "observe"):
                     brain.observe(all_msgs)
         except Exception as e:
             logger.debug("Response capture skipped: %s", e)

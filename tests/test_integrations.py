@@ -439,3 +439,96 @@ class TestCrewAIAdapter:
         ):
             results = mem.search("anything")
             assert results == []
+
+
+# ===========================================================================
+# Deprecation shim tests
+# ===========================================================================
+
+class TestDeprecationWarnings:
+    """Verify that importing integrations adapter modules emits DeprecationWarning."""
+
+    def _reimport(self, module_name: str):
+        """Force a fresh import by removing the module from sys.modules first."""
+        import sys
+        # Remove the module (and any cached sub-module) so the warning fires again.
+        for key in list(sys.modules):
+            if key == module_name or key.startswith(module_name + "."):
+                del sys.modules[key]
+        import importlib
+        return importlib.import_module(module_name)
+
+    def test_anthropic_adapter_warns_on_import(self):
+        """Importing gradata.integrations.anthropic_adapter raises DeprecationWarning."""
+        import warnings
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            self._reimport("gradata.integrations.anthropic_adapter")
+        messages = [str(w.message) for w in caught if issubclass(w.category, DeprecationWarning)]
+        assert any("anthropic_adapter" in m and "v0.8.0" in m for m in messages), messages
+
+    def test_openai_adapter_warns_on_import(self):
+        """Importing gradata.integrations.openai_adapter raises DeprecationWarning."""
+        import warnings
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            self._reimport("gradata.integrations.openai_adapter")
+        messages = [str(w.message) for w in caught if issubclass(w.category, DeprecationWarning)]
+        assert any("openai_adapter" in m and "v0.8.0" in m for m in messages), messages
+
+    def test_langchain_adapter_warns_on_import(self):
+        """Importing gradata.integrations.langchain_adapter raises DeprecationWarning."""
+        import warnings
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            self._reimport("gradata.integrations.langchain_adapter")
+        messages = [str(w.message) for w in caught if issubclass(w.category, DeprecationWarning)]
+        assert any("langchain_adapter" in m and "v0.8.0" in m for m in messages), messages
+
+    def test_crewai_adapter_warns_on_import(self):
+        """Importing gradata.integrations.crewai_adapter raises DeprecationWarning."""
+        import warnings
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            self._reimport("gradata.integrations.crewai_adapter")
+        messages = [str(w.message) for w in caught if issubclass(w.category, DeprecationWarning)]
+        assert any("crewai_adapter" in m and "v0.8.0" in m for m in messages), messages
+
+    def test_warning_points_to_middleware(self):
+        """Deprecation warnings reference the gradata.middleware replacement."""
+        import sys
+        import warnings
+        import importlib
+
+        for mod_name, expected_replacement in [
+            ("gradata.integrations.anthropic_adapter", "wrap_anthropic"),
+            ("gradata.integrations.openai_adapter", "wrap_openai"),
+            ("gradata.integrations.langchain_adapter", "LangChainCallback"),
+            ("gradata.integrations.crewai_adapter", "CrewAIGuard"),
+        ]:
+            for key in list(sys.modules):
+                if key == mod_name or key.startswith(mod_name + "."):
+                    del sys.modules[key]
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                importlib.import_module(mod_name)
+            all_messages = " ".join(
+                str(w.message) for w in caught if issubclass(w.category, DeprecationWarning)
+            )
+            assert expected_replacement in all_messages, (
+                f"{mod_name} warning does not mention {expected_replacement!r}: {all_messages!r}"
+            )
+
+    def test_non_adapter_integrations_not_deprecated(self):
+        """embeddings and session_history do NOT emit DeprecationWarning."""
+        import warnings
+        for mod_name in [
+            "gradata.integrations.embeddings",
+            "gradata.integrations.session_history",
+        ]:
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                import importlib
+                importlib.import_module(mod_name)
+            depr = [w for w in caught if issubclass(w.category, DeprecationWarning)]
+            assert not depr, f"{mod_name} should not emit DeprecationWarning, got: {depr}"

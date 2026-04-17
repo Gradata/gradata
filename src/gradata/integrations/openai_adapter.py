@@ -1,27 +1,27 @@
-"""
-OpenAI Integration — Patch OpenAI client with brain memory.
-============================================================
-Wraps the OpenAI chat completions API to inject brain rules
-and capture conversations for learning.
+"""OpenAI Integration — DEPRECATED.
 
-Usage:
-    from openai import OpenAI
-    from gradata.integrations.openai_adapter import patch_openai
+.. deprecated::
+    ``gradata.integrations.openai_adapter`` is deprecated and will be
+    removed in v0.8.0.  Use ``gradata.middleware.openai_adapter`` instead::
 
-    client = OpenAI()
-    client = patch_openai(client, brain_dir="./my-brain")
+        from gradata.middleware import wrap_openai
+        client = wrap_openai(OpenAI(), brain_path="./brain")
 
-    # Now every chat completion automatically:
-    # 1. Injects applicable brain rules into the system message
-    # 2. Captures the conversation for fact extraction
-    # 3. Logs the AI output for correction tracking
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": "Draft an email..."}],
-    )
+    ``wrap_openai`` returns an ``OpenAIMiddleware`` proxy with richer rule
+    enforcement via :class:`~gradata.middleware._core.RuleSource`.  If you
+    need the legacy in-place patch behaviour, pin to gradata<0.8.
 """
 
 from __future__ import annotations
+
+import warnings
+
+warnings.warn(
+    "gradata.integrations.openai_adapter is deprecated and will be removed "
+    "in v0.8.0.  Use 'from gradata.middleware import wrap_openai' instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 import logging
 from typing import TYPE_CHECKING, Any
@@ -35,15 +35,8 @@ logger = logging.getLogger("gradata.integrations.openai")
 def patch_openai(client: Any, brain_dir: str | Path = "./brain") -> Any:
     """Patch an OpenAI client to use brain memory.
 
-    Non-destructive: wraps the create method, doesn't modify the client class.
-    Falls back to normal behavior if the brain is unavailable.
-
-    Args:
-        client: An OpenAI client instance.
-        brain_dir: Path to the brain directory.
-
-    Returns:
-        The same client with patched chat.completions.create().
+    .. deprecated::
+        Use :func:`gradata.middleware.wrap_openai` instead.
     """
     from gradata.brain import Brain
 
@@ -58,7 +51,6 @@ def patch_openai(client: Any, brain_dir: str | Path = "./brain") -> Any:
     def patched_create(*args: Any, **kwargs: Any) -> Any:
         messages = kwargs.get("messages", args[1] if len(args) > 1 else [])
 
-        # Inject brain rules into system message
         try:
             user_msg = next(
                 (m["content"] for m in messages if m.get("role") == "user"),
@@ -67,7 +59,6 @@ def patch_openai(client: Any, brain_dir: str | Path = "./brain") -> Any:
             rules = brain.apply_brain_rules("general", {"task": user_msg[:100]})
 
             if rules:
-                # Prepend rules to system message or create one
                 has_system = any(m.get("role") == "system" for m in messages)
                 if has_system:
                     for m in messages:
@@ -79,22 +70,21 @@ def patch_openai(client: Any, brain_dir: str | Path = "./brain") -> Any:
         except Exception as e:
             logger.debug("Rule injection skipped: %s", e)
 
-        # Call original
         response = original_create(*args, **kwargs)
 
-        # Capture response for tracking
         try:
             ai_content = response.choices[0].message.content
             if ai_content:
                 brain.log_output(ai_content, output_type="chat")
-                # Observe the full conversation for fact extraction
-                if hasattr(brain, 'observe'):
-                    brain.observe([*messages, {"role": "assistant", "content": ai_content}])
+                if hasattr(brain, "observe"):
+                    brain.observe(
+                        [*messages, {"role": "assistant", "content": ai_content}]
+                    )
         except Exception as e:
             logger.debug("Response capture skipped: %s", e)
 
         return response
 
     client.chat.completions.create = patched_create
-    client._brain = brain  # Expose for correction tracking
+    client._brain = brain
     return client

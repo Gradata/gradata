@@ -1,24 +1,33 @@
-"""
-CrewAI Integration — Brain-backed memory for CrewAI agents.
-=============================================================
-Provides a CrewAI-compatible memory class that uses the brain
-for knowledge storage and behavioral adaptation.
+"""CrewAI Integration — DEPRECATED.
 
-Usage:
-    from gradata.integrations.crewai_adapter import BrainCrewMemory
-    from crewai import Agent, Crew
+.. deprecated::
+    ``gradata.integrations.crewai_adapter`` is deprecated and will be
+    removed in v0.8.0.
 
-    memory = BrainCrewMemory(brain_dir="./my-brain")
+    For output enforcement (recommended)::
 
-    agent = Agent(
-        role="Sales AE",
-        goal="Draft follow-up emails",
-        memory=True,
-    )
-    crew = Crew(agents=[agent], memory=memory)
+        from gradata.middleware import CrewAIGuard
+        agent = Agent(role="Writer", guardrails=[CrewAIGuard(brain_path="./brain")])
+
+    :class:`~gradata.middleware.crewai_adapter.CrewAIGuard` enforces RULE-tier
+    patterns on agent outputs.  :class:`BrainCrewMemory` (this module) provides
+    persistent memory storage — both can coexist.  Migrate to the guard for
+    rule enforcement; a retrieval-memory equivalent for CrewAI is planned for
+    gradata.middleware before v0.8.0.
 """
 
 from __future__ import annotations
+
+import warnings
+
+warnings.warn(
+    "gradata.integrations.crewai_adapter is deprecated and will be removed "
+    "in v0.8.0.  Use 'from gradata.middleware import CrewAIGuard' for rule "
+    "enforcement, or keep BrainCrewMemory here until a memory equivalent "
+    "lands in gradata.middleware.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 import logging
 from typing import TYPE_CHECKING
@@ -30,12 +39,11 @@ logger = logging.getLogger("gradata.integrations.crewai")
 
 
 class BrainCrewMemory:
-    """CrewAI-compatible memory backed by an Gradata.
+    """CrewAI-compatible memory backed by Gradata.
 
-    CrewAI's memory interface expects:
-    - save(): store a memory item
-    - search(): retrieve relevant memories
-    - reset(): clear (no-op for persistent brain)
+    .. deprecated::
+        This class will be removed in v0.8.0.  Use
+        :class:`gradata.middleware.CrewAIGuard` for rule enforcement.
     """
 
     def __init__(self, brain_dir: str | Path = "./brain") -> None:
@@ -43,21 +51,9 @@ class BrainCrewMemory:
 
         self.brain = Brain(brain_dir)
 
-    def save(
-        self,
-        value: str,
-        metadata: dict | None = None,
-        agent: str = "",
-    ) -> None:
-        """Save a memory item to the brain.
-
-        Args:
-            value: The content to remember.
-            metadata: Optional metadata dict.
-            agent: Agent identifier (for agent-scoped memories).
-        """
+    def save(self, value: str, metadata: dict | None = None, agent: str = "") -> None:
         try:
-            if hasattr(self.brain, 'observe'):
+            if hasattr(self.brain, "observe"):
                 self.brain.observe(
                     [{"role": "assistant", "content": value}],
                     user_id=agent or "default",
@@ -66,15 +62,6 @@ class BrainCrewMemory:
             logger.debug("CrewAI memory save skipped: %s", e)
 
     def search(self, query: str, limit: int = 5) -> list[dict]:
-        """Search brain for relevant memories.
-
-        Args:
-            query: Search query.
-            limit: Max results.
-
-        Returns:
-            List of result dicts with 'content' and 'score' keys.
-        """
         try:
             results = self.brain.search(query, top_k=limit)
             return [
@@ -90,14 +77,8 @@ class BrainCrewMemory:
 
     def reset(self) -> None:
         """No-op for persistent brain memory."""
-        pass
 
     def get_rules(self, task: str = "", context: dict | None = None) -> str:
-        """Get applicable brain rules for a task.
-
-        CrewAI-specific helper. Inject the returned string into
-        the agent's system prompt for behavioral adaptation.
-        """
         try:
             return self.brain.apply_brain_rules(task, context)
         except Exception:
