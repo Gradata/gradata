@@ -1,3 +1,4 @@
+# barrel re-export module — names are the public API
 """
 Procedural Memory — INSTINCT → PATTERN → RULE graduation pipeline.
 ===================================================================

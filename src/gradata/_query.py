@@ -29,6 +29,7 @@ from gradata._config import (
     SKIP_DIRS,
     SKIP_FILES,
 )
+from gradata._tenant import tenant_for
 
 if TYPE_CHECKING:
     from gradata._paths import BrainContext
@@ -39,9 +40,15 @@ def _ensure_fts_table(conn: sqlite3.Connection):
     conn.execute("""
         CREATE TABLE IF NOT EXISTS brain_fts_content (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            source TEXT, file_type TEXT, text TEXT, embed_date TEXT
+            source TEXT, file_type TEXT, text TEXT, embed_date TEXT,
+            tenant_id TEXT
         )
     """)
+    # Defensive migration for brains created before tenant_id was added.
+    # Only OperationalError ("duplicate column name") should be suppressed;
+    # other sqlite errors (locking, I/O) must surface.
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("ALTER TABLE brain_fts_content ADD COLUMN tenant_id TEXT")
     conn.execute("""
         CREATE VIRTUAL TABLE IF NOT EXISTS brain_fts USING fts5(
             source, file_type, text, embed_date,
@@ -55,11 +62,13 @@ def _ensure_fts_table(conn: sqlite3.Connection):
 def fts_index(source: str, file_type: str, text: str, embed_date: str = "",
               ctx: "BrainContext | None" = None):
     db = ctx.db_path if ctx else _p.DB_PATH
+    _brain_dir = ctx.brain_dir if ctx else Path(db).parent
+    _tid = tenant_for(_brain_dir)
     conn = sqlite3.connect(str(db))
     _ensure_fts_table(conn)
     cursor = conn.execute(
-        "INSERT INTO brain_fts_content (source, file_type, text, embed_date) VALUES (?, ?, ?, ?)",
-        (source, file_type, text, embed_date),
+        "INSERT INTO brain_fts_content (source, file_type, text, embed_date, tenant_id) VALUES (?, ?, ?, ?, ?)",
+        (source, file_type, text, embed_date, _tid),
     )
     rowid = cursor.lastrowid
     conn.execute(
@@ -72,12 +81,14 @@ def fts_index(source: str, file_type: str, text: str, embed_date: str = "",
 
 def fts_index_batch(docs: list[dict], ctx: "BrainContext | None" = None):
     db = ctx.db_path if ctx else _p.DB_PATH
+    _brain_dir = ctx.brain_dir if ctx else Path(db).parent
+    _tid = tenant_for(_brain_dir)
     conn = sqlite3.connect(str(db))
     _ensure_fts_table(conn)
     for d in docs:
         cursor = conn.execute(
-            "INSERT INTO brain_fts_content (source, file_type, text, embed_date) VALUES (?, ?, ?, ?)",
-            (d["source"], d["file_type"], d["text"], d.get("embed_date", "")),
+            "INSERT INTO brain_fts_content (source, file_type, text, embed_date, tenant_id) VALUES (?, ?, ?, ?, ?)",
+            (d["source"], d["file_type"], d["text"], d.get("embed_date", ""), _tid),
         )
         rowid = cursor.lastrowid
         conn.execute(
@@ -122,10 +133,11 @@ def fts_rebuild(ctx: "BrainContext | None" = None):
                 docs.append({"source": rel, "file_type": file_type, "text": chunk, "embed_date": embed_date})
 
     if docs:
+        _tid = tenant_for(brain_path)
         for d in docs:
             cursor = conn.execute(
-                "INSERT INTO brain_fts_content (source, file_type, text, embed_date) VALUES (?, ?, ?, ?)",
-                (d["source"], d["file_type"], d["text"], d.get("embed_date", "")),
+                "INSERT INTO brain_fts_content (source, file_type, text, embed_date, tenant_id) VALUES (?, ?, ?, ?, ?)",
+                (d["source"], d["file_type"], d["text"], d.get("embed_date", ""), _tid),
             )
             rowid = cursor.lastrowid
             conn.execute(

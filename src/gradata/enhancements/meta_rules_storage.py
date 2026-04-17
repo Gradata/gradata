@@ -25,13 +25,12 @@ import json
 import random
 import sqlite3
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import Any
 
+from gradata._tenant import tenant_for
 from gradata._types import RuleTransferScope
 from gradata.enhancements.meta_rules import TIER_SUPER_META, MetaRule, SuperMetaRule
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Meta-Rule DDL
@@ -48,7 +47,9 @@ CREATE TABLE IF NOT EXISTS meta_rules (
     last_validated_session INTEGER,
     scope TEXT,
     examples TEXT,
-    context_weights TEXT
+    context_weights TEXT,
+    tenant_id TEXT,
+    visibility TEXT DEFAULT 'private'
 );
 """
 
@@ -96,6 +97,8 @@ def ensure_table(db_path: str | Path) -> None:
             _ADD_NEVER_WHEN_SQL,
             _ADD_TRANSFER_SCOPE_SQL,
             _ADD_SOURCE_SQL,
+            "ALTER TABLE meta_rules ADD COLUMN tenant_id TEXT",
+            "ALTER TABLE meta_rules ADD COLUMN visibility TEXT DEFAULT 'private'",
         ):
             with contextlib.suppress(sqlite3.OperationalError):
                 conn.execute(stmt)
@@ -115,6 +118,7 @@ def save_meta_rules(db_path: str | Path, metas: list[MetaRule]) -> int:
         Number of meta-rules saved.
     """
     ensure_table(db_path)
+    _tid = tenant_for(Path(db_path).parent)
     conn = sqlite3.connect(str(db_path))
     try:
         conn.execute("BEGIN IMMEDIATE")
@@ -125,8 +129,8 @@ def save_meta_rules(db_path: str | Path, metas: list[MetaRule]) -> int:
                    (id, principle, source_categories, source_lesson_ids,
                     confidence, created_session, last_validated_session,
                     scope, examples, context_weights, applies_when, never_when,
-                    transfer_scope, source)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    transfer_scope, source, tenant_id, visibility)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'private')""",
                 (
                     meta.id,
                     meta.principle,
@@ -142,6 +146,7 @@ def save_meta_rules(db_path: str | Path, metas: list[MetaRule]) -> int:
                     json.dumps(meta.never_when),
                     meta.transfer_scope.value,
                     meta.source,
+                    _tid,
                 ),
             )
         conn.commit()
@@ -390,6 +395,7 @@ def ensure_pattern_table(db_path: str | Path) -> None:
                 severity TEXT DEFAULT 'minor',
                 severity_weight REAL DEFAULT 1.0,
                 created_at TEXT DEFAULT (datetime('now')),
+                tenant_id TEXT,
                 UNIQUE(pattern_hash, session_id)
             )
         """)
@@ -397,6 +403,9 @@ def ensure_pattern_table(db_path: str | Path) -> None:
             CREATE INDEX IF NOT EXISTS idx_patterns_hash
             ON correction_patterns(pattern_hash)
         """)
+        # Defensive migration for brains created before tenant_id was added.
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute("ALTER TABLE correction_patterns ADD COLUMN tenant_id TEXT")
         conn.commit()
     finally:
         conn.close()
@@ -413,19 +422,20 @@ def upsert_correction_pattern(
     """Record a correction pattern occurrence for a session."""
     ensure_pattern_table(db_path)
     weight = PATTERN_SEVERITY_WEIGHTS.get(severity, 1.0)
+    _tid = tenant_for(Path(db_path).parent)
     conn = sqlite3.connect(str(db_path))
     try:
         conn.execute(
             """INSERT INTO correction_patterns
-               (pattern_hash, category, representative_text, session_id, severity, severity_weight)
-               VALUES (?, ?, ?, ?, ?, ?)
+               (pattern_hash, category, representative_text, session_id, severity, severity_weight, tenant_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(pattern_hash, session_id) DO UPDATE SET
                  severity = CASE WHEN excluded.severity_weight > severity_weight
                                 THEN excluded.severity ELSE severity END,
                  severity_weight = MAX(severity_weight, excluded.severity_weight),
                  representative_text = excluded.representative_text
             """,
-            (pattern_hash, category, representative_text, session_id, severity, weight),
+            (pattern_hash, category, representative_text, session_id, severity, weight, _tid),
         )
         conn.commit()
     finally:
@@ -444,16 +454,17 @@ def upsert_correction_patterns_batch(
     if not patterns:
         return 0
     ensure_pattern_table(db_path)
+    _tid = tenant_for(Path(db_path).parent)
     conn = sqlite3.connect(str(db_path))
     try:
         rows = []
         for pattern_hash, category, representative_text, session_id, severity in patterns:
             weight = PATTERN_SEVERITY_WEIGHTS.get(severity, 1.0)
-            rows.append((pattern_hash, category, representative_text, session_id, severity, weight))
+            rows.append((pattern_hash, category, representative_text, session_id, severity, weight, _tid))
         conn.executemany(
             """INSERT INTO correction_patterns
-               (pattern_hash, category, representative_text, session_id, severity, severity_weight)
-               VALUES (?, ?, ?, ?, ?, ?)
+               (pattern_hash, category, representative_text, session_id, severity, severity_weight, tenant_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(pattern_hash, session_id) DO UPDATE SET
                  severity = CASE WHEN excluded.severity_weight > severity_weight
                                 THEN excluded.severity ELSE severity END,
