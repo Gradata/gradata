@@ -117,6 +117,9 @@ class GenericHTTPProvider(LLMProvider):
         self.base_url = base_url or os.environ.get("GRADATA_LLM_BASE_URL", "http://localhost:11434/v1")
         self.model = model or os.environ.get("GRADATA_LLM_MODEL", "llama3")
         self._auth = auth_token or os.environ.get("GRADATA_LLM_AUTH", "")
+        # SSRF / bearer-key exfil guard: refuse HTTP to non-local hosts at construction time
+        from gradata._http import require_https
+        require_https(self.base_url, "GRADATA_LLM_BASE_URL")
 
     def complete(self, prompt: str, *, max_tokens: int = 100, timeout: float = 12.0) -> str | None:
         # openai SDK requires a key even for local — use placeholder if none set

@@ -618,9 +618,13 @@ def _call_llm_for_synthesis(
     if not key or not base:
         raise RuntimeError("No LLM credentials configured")
 
-    # Sanitize descriptions before embedding in the LLM prompt.
-    # This neutralizes prompt-injection attempts that may have bypassed the
-    # ingest-gate blocklist (e.g. rephrased or context-shifted injections).
+    # SSRF + bearer-key exfil guard: refuse HTTP to non-local hosts before any POST.
+    from gradata._http import require_https
+    require_https(base, "GRADATA_LLM_BASE")
+
+    # Sanitize descriptions before embedding in the LLM prompt. Neutralizes
+    # prompt-injection attempts that may have bypassed the ingest-gate blocklist
+    # (e.g. rephrased or context-shifted injections).
     from gradata.enhancements._sanitize import sanitize_lesson_content
 
     safe_descriptions = [sanitize_lesson_content(d, "llm_prompt") for d in descriptions]
