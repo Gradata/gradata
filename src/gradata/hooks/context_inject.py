@@ -10,7 +10,7 @@ HOOK_META = {
     "timeout": 8000,
 }
 
-MIN_MESSAGE_LEN = 10
+MIN_MESSAGE_LEN = 60  # skip brain search for trivial follow-ups ("ok", "yes", "continue")
 MAX_CONTEXT_LEN = 2000
 
 

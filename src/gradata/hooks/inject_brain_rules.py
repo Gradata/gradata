@@ -324,15 +324,8 @@ def main(data: dict) -> dict | None:
             + "\n".join(mandatory_lines)
             + "\n</mandatory-directives>"
         )
-        mandatory_reminder = (
-            "\n<mandatory-reminder>\n"
-            "REMINDER: The mandatory directives above are NON-NEGOTIABLE.\n"
-            + "\n".join(f"- {r.description}" for r in mandatory)
-            + "\n</mandatory-reminder>"
-        )
     else:
         mandatory_block = ""
-        mandatory_reminder = ""
 
     # Also inject tier-1 meta-rules (compound principles across 3+ lessons).
     # Without this, meta-rules are created + stored but never reach the LLM.
@@ -398,7 +391,7 @@ def main(data: dict) -> dict | None:
             )
             meta_block = ""
 
-    return {"result": mandatory_block + disposition_block + rules_block + meta_block + mandatory_reminder}
+    return {"result": mandatory_block + disposition_block + rules_block + meta_block}
 
 
 if __name__ == "__main__":
