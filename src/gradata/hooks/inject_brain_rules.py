@@ -7,6 +7,7 @@ session context instead of brute-force top-10 by confidence.
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import subprocess
 import sys
@@ -41,9 +42,10 @@ HOOK_META = {
     "timeout": 10000,
 }
 
-MAX_RULES = 10
-MIN_CONFIDENCE = 0.60
-MAX_META_RULES = 5  # meta-rules are high-level principles — separate cap from MAX_RULES
+MAX_RULES = int(os.environ.get("GRADATA_MAX_RULES", "10"))
+MIN_CONFIDENCE = float(os.environ.get("GRADATA_MIN_CONFIDENCE", "0.60"))
+# Meta-rules are high-level principles — separate cap from MAX_RULES.
+MAX_META_RULES = int(os.environ.get("GRADATA_MAX_META_RULES", "5"))
 
 
 def _score(lesson) -> float:

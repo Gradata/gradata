@@ -104,7 +104,7 @@ def test_rule_enforcement_injects_rules(tmp_path):
         "[2026-04-01] [RULE:0.95] CODE: Never hardcode secrets\n",
         encoding="utf-8",
     )
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path), "GRADATA_RULE_ENFORCEMENT": "1"}):
         result = enforce_main({})
     assert result is not None
     assert "ACTIVE RULES" in result["result"]
@@ -117,7 +117,7 @@ def test_rule_enforcement_injects_rules(tmp_path):
 def test_rule_enforcement_no_rules(tmp_path):
     lessons = tmp_path / "lessons.md"
     lessons.write_text("[2026-04-01] [INSTINCT:0.35] CODE: Add docstrings\n", encoding="utf-8")
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path), "GRADATA_RULE_ENFORCEMENT": "1"}):
         result = enforce_main({})
     assert result is None
 
@@ -126,7 +126,7 @@ def test_rule_enforcement_truncates_long_descriptions(tmp_path):
     lessons = tmp_path / "lessons.md"
     long_desc = "A" * 200
     lessons.write_text(f"[2026-04-01] [RULE:0.90] CODE: {long_desc}\n", encoding="utf-8")
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path), "GRADATA_RULE_ENFORCEMENT": "1"}):
         result = enforce_main({})
     assert result is not None
     assert "..." in result["result"]

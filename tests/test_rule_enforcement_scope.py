@@ -5,7 +5,15 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from gradata.hooks import rule_enforcement
+
+
+@pytest.fixture(autouse=True)
+def _enable_rule_enforcement(monkeypatch):
+    """Rule enforcement hook is default-off; opt scope tests in."""
+    monkeypatch.setenv("GRADATA_RULE_ENFORCEMENT", "1")
 
 
 def _write_lesson(lessons_path: Path, *, category: str, desc: str, scope: dict | None) -> None:
