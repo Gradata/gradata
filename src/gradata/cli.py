@@ -26,6 +26,8 @@ import logging
 import sys
 from pathlib import Path
 
+from gradata._env import env_str
+
 _log = logging.getLogger("gradata.cli")
 
 
@@ -542,7 +544,7 @@ def cmd_login(args):
     from urllib.error import HTTPError, URLError
     from urllib.request import Request, urlopen
 
-    api_url = os.environ.get("GRADATA_API_URL", "https://api.gradata.ai/api/v1")
+    api_url = env_str("GRADATA_API_URL", "https://api.gradata.ai/api/v1")
 
     # Finding 5: reject non-HTTPS API URLs (allow localhost for development)
     if not api_url.startswith("https://") and not (
@@ -677,7 +679,7 @@ def cmd_logout(args):
 def _resolve_brain_root(args):
     """Figure out where brain lives. Prefer env override for tests, then --brain-dir arg, then default."""
     import os
-    override = os.environ.get("GRADATA_BRAIN")
+    override = env_str("GRADATA_BRAIN")
     if override:
         return Path(override)
     brain_dir = getattr(args, "brain_dir", None)

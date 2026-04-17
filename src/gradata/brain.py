@@ -50,6 +50,7 @@ logger = logging.getLogger("gradata")
 
 import contextlib
 
+from gradata._env import env_str
 from gradata.brain_inspection import BrainInspectionMixin
 
 
@@ -73,10 +74,8 @@ class Brain(BrainInspectionMixin):
         self.embed_manifest_path = self.dir / ".embed-manifest.json"
 
         # Encryption at rest (optional: pip install gradata[encrypted])
-        import os as _os
-
         self._encryption_key = None
-        if encryption_key or _os.environ.get("GRADATA_ENCRYPTION_KEY"):
+        if encryption_key or env_str("GRADATA_ENCRYPTION_KEY"):
             from gradata._encryption import open_encrypted_db, resolve_encryption_key
 
             self._encryption_key = resolve_encryption_key(encryption_key)

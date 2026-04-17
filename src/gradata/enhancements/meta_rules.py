@@ -21,6 +21,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from gradata._env import env_str
 from gradata._http import require_https
 from gradata._types import Lesson, LessonState, RuleTransferScope
 
@@ -598,20 +599,18 @@ def _resolve_llm_credentials() -> tuple[str, str, str]:
       1. ``GRADATA_LLM_KEY`` + ``GRADATA_LLM_BASE`` — explicit override.
       2. ``GRADATA_GEMMA_API_KEY`` — Google AI Studio OpenAI-compat endpoint.
     """
-    import os
-
-    key = os.environ.get("GRADATA_LLM_KEY", "")
-    base = os.environ.get("GRADATA_LLM_BASE", "")
-    model = os.environ.get("GRADATA_LLM_MODEL", "gpt-4o-mini")
+    key = env_str("GRADATA_LLM_KEY")
+    base = env_str("GRADATA_LLM_BASE")
+    model = env_str("GRADATA_LLM_MODEL", "gpt-4o-mini")
     if key and base:
         return key, base, model
 
-    gemma_key = os.environ.get("GRADATA_GEMMA_API_KEY", "")
+    gemma_key = env_str("GRADATA_GEMMA_API_KEY")
     if gemma_key:
         return (
             gemma_key,
-            os.environ.get("GRADATA_GEMMA_BASE", _GEMMA_DEFAULT_BASE),
-            os.environ.get("GRADATA_GEMMA_MODEL", _GEMMA_DEFAULT_MODEL),
+            env_str("GRADATA_GEMMA_BASE", _GEMMA_DEFAULT_BASE),
+            env_str("GRADATA_GEMMA_MODEL", _GEMMA_DEFAULT_MODEL),
         )
 
     return "", "", model
@@ -664,13 +663,11 @@ def _try_llm_principle(rules: list[Lesson], category: str) -> str | None:
       1. ``GRADATA_LLM_KEY`` + ``GRADATA_LLM_BASE`` -- OpenAI-compat endpoint.
       2. ``GRADATA_GEMMA_API_KEY`` -- Google's native Gemma API.
     """
-    import os
-
     if not rules:
         return None
 
-    k = os.environ.get("GRADATA_LLM_KEY", "")
-    b = os.environ.get("GRADATA_LLM_BASE", "")
+    k = env_str("GRADATA_LLM_KEY")
+    b = env_str("GRADATA_LLM_BASE")
     if k and b:
         try:
             from gradata.enhancements.llm_synthesizer import synthesise_principle_llm
@@ -680,15 +677,15 @@ def _try_llm_principle(rules: list[Lesson], category: str) -> str | None:
                 theme=category,
                 api_key=k,
                 api_base=b,
-                model=os.environ.get("GRADATA_LLM_MODEL", "gpt-4o-mini"),
+                model=env_str("GRADATA_LLM_MODEL", "gpt-4o-mini"),
             )
         except Exception as exc:
             _log.debug("OpenAI-compat synthesis failed for %s: %s", category, exc)
             return None
 
-    g = os.environ.get("GRADATA_GEMMA_API_KEY", "")
+    g = env_str("GRADATA_GEMMA_API_KEY")
     if g:
-        model = os.environ.get("GRADATA_GEMMA_MODEL", _GEMMA_DEFAULT_MODEL)
+        model = env_str("GRADATA_GEMMA_MODEL", _GEMMA_DEFAULT_MODEL)
         return _call_gemma_native(_build_principle_prompt(rules, category), g, model)
 
     return None

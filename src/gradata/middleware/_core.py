@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from gradata._env import env_str
 from gradata.enhancements.rule_to_hook import DeterminismCheck, classify_rule
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -55,7 +56,7 @@ class RuleViolation(Exception):  # noqa: N818 — public API name specified in s
 
 def is_bypassed() -> bool:
     """Return True if GRADATA_BYPASS=1 is set (kill switch for middleware)."""
-    return os.environ.get("GRADATA_BYPASS", "").strip() == "1"
+    return env_str("GRADATA_BYPASS").strip() == "1"
 
 
 def _get(obj: Any, key: str, default: Any = None) -> Any:

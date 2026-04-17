@@ -19,6 +19,8 @@ import os
 import secrets
 from pathlib import Path
 
+from gradata._env import env_str
+
 _SALT_FILE = "system.db.salt"
 _ENC_FILE = "system.db.enc"
 _DB_FILE = "system.db"
@@ -74,7 +76,7 @@ def resolve_encryption_key(explicit_key: str | None = None) -> str | None:
     """Resolve encryption key from explicit param, env var, or key file."""
     if explicit_key:
         return explicit_key
-    env_key = os.environ.get("GRADATA_ENCRYPTION_KEY")
+    env_key = env_str("GRADATA_ENCRYPTION_KEY")
     if env_key:
         return env_key
     key_file = Path.home() / ".gradata" / "encryption.key"

@@ -23,6 +23,7 @@ import urllib.error
 import urllib.request
 from typing import TYPE_CHECKING
 
+from gradata._env import env_str
 from gradata._http import require_https
 
 if TYPE_CHECKING:
@@ -30,8 +31,8 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-_DEFAULT_BASE = os.environ.get("GRADATA_LLM_BASE", "")
-_DEFAULT_MODEL = os.environ.get("GRADATA_LLM_MODEL", "gpt-4o-mini")
+_DEFAULT_BASE = env_str("GRADATA_LLM_BASE", "")
+_DEFAULT_MODEL = env_str("GRADATA_LLM_MODEL", "gpt-4o-mini")
 _MAX_RETRIES = 1
 _RETRY_DELAY = 2.0
 

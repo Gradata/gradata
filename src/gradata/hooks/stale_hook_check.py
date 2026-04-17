@@ -17,6 +17,8 @@ import shlex
 import sys
 from pathlib import Path
 
+from gradata._env import env_str
+
 _HASH_LINE_RE = re.compile(r"^\s*\*\s*Source hash:\s*([0-9a-f]{12})", re.MULTILINE)
 # Kept for legacy pattern detection only. All RULE-tier lesson shapes go
 # through parse_lessons() below so legacy "[RULE] [hooked] CAT: desc" and
@@ -123,7 +125,7 @@ def _parse_lessons(brain_root: Path) -> tuple[dict[str, str], list[str]]:
 
 
 def _brain_root() -> Path:
-    override = os.environ.get("GRADATA_BRAIN")
+    override = env_str("GRADATA_BRAIN")
     if override:
         return Path(override)
     return Path("brain")

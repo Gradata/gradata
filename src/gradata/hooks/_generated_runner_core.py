@@ -7,6 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from gradata._env import env_str
 from gradata.hooks._base import should_run
 from gradata.hooks._profiles import Profile
 
@@ -25,7 +26,7 @@ def run_generated_hooks(*, env_var: str, default_dir: str, per_hook_timeout: int
     """
     # Short-circuit before any I/O so GRADATA_BYPASS truly zeros the overhead
     # (no stdin drain, no filesystem scan).
-    if os.environ.get("GRADATA_BYPASS") == "1":
+    if env_str("GRADATA_BYPASS") == "1":
         return 0
 
     # Profile gating — match the registry entry in _installer.HOOK_REGISTRY
