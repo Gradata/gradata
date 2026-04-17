@@ -104,6 +104,8 @@ class CloudClient:
     def __init__(self, brain_dir: Path, config: CloudConfig | None = None):
         self.brain_dir = Path(brain_dir)
         self.config = config or load_config(self.brain_dir)
+        from gradata._http import require_https
+        require_https(self.config.api_base, "GRADATA_CLOUD_API_BASE")
 
     @property
     def enabled(self) -> bool:
