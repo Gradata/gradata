@@ -515,3 +515,72 @@ def test_build_knowledge_graph_includes_clusters(tmp_path: Path) -> None:
     assert len(graph["clusters"]) == 1
     assert graph["clusters"][0]["cluster_id"] == "c1"
     assert graph["stats"]["clusters"] == 1
+
+
+# ---------------------------------------------------------------------------
+# correction_patterns -> graduated lessons lift
+# ---------------------------------------------------------------------------
+
+
+def _seed_correction_patterns(db_path: Path, rows: list[tuple]) -> None:
+    """Insert raw rows into correction_patterns; schema created on first call."""
+    from gradata.enhancements.meta_rules_storage import ensure_pattern_table
+    ensure_pattern_table(db_path)
+    conn = sqlite3.connect(str(db_path))
+    try:
+        conn.executemany(
+            """INSERT INTO correction_patterns
+               (pattern_hash, category, representative_text, session_id,
+                severity, severity_weight, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            rows,
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def test_patterns_to_graduated_lessons_lifts_qualifying_clusters(tmp_path):
+    from gradata.enhancements.rule_pipeline import _patterns_to_graduated_lessons
+
+    db_path = tmp_path / "system.db"
+    _seed_correction_patterns(db_path, [
+        ("h1", "LEADS", "Don't give prospects a way out when interest is stated", 10, "major", 2.0, "2026-04-01"),
+        ("h1", "LEADS", "Don't give prospects a way out when interest is stated", 11, "major", 2.0, "2026-04-02"),
+        ("h2", "DEMO_PREP", "Always trigger post-demo workflow", 10, "major", 2.0, "2026-04-01"),
+        ("h2", "DEMO_PREP", "Always trigger post-demo workflow", 11, "major", 2.0, "2026-04-02"),
+    ])
+
+    lessons = _patterns_to_graduated_lessons(db_path, current_session=12)
+    assert len(lessons) == 2
+    cats = sorted(l.category for l in lessons)
+    assert cats == ["DEMO_PREP", "LEADS"]
+    for l in lessons:
+        assert l.state == LessonState.RULE
+        assert l.confidence >= 0.90
+
+
+def test_patterns_to_graduated_lessons_strips_noise(tmp_path):
+    """[AUTO] evaluator noise and 'User corrected:' prefixes must be normalized."""
+    from gradata.enhancements.rule_pipeline import _patterns_to_graduated_lessons
+
+    db_path = tmp_path / "system.db"
+    _seed_correction_patterns(db_path, [
+        ("h1", "ACCURACY", "[AUTO] heuristic evaluator output", 10, "minor", 2.0, "2026-04-01"),
+        ("h1", "ACCURACY", "[AUTO] heuristic evaluator output", 11, "minor", 2.0, "2026-04-02"),
+        ("h2", "LEADS", "User corrected: Use reply CTAs not booking links", 10, "major", 2.0, "2026-04-01"),
+        ("h2", "LEADS", "User corrected: Use reply CTAs not booking links", 11, "major", 2.0, "2026-04-02"),
+        ("h3", "LEADS", "Use reply CTAs not booking links", 12, "major", 2.0, "2026-04-03"),
+        ("h3", "LEADS", "Use reply CTAs not booking links", 13, "major", 2.0, "2026-04-04"),
+    ])
+
+    lessons = _patterns_to_graduated_lessons(db_path, current_session=14)
+    assert len(lessons) == 1
+    assert lessons[0].category == "LEADS"
+    assert lessons[0].description == "Use reply CTAs not booking links"
+
+
+def test_patterns_to_graduated_lessons_empty_when_no_db(tmp_path):
+    from gradata.enhancements.rule_pipeline import _patterns_to_graduated_lessons
+
+    assert _patterns_to_graduated_lessons(tmp_path / "absent.db", current_session=1) == []
