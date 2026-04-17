@@ -47,11 +47,9 @@ class CloudClient:
         self.endpoint = (
             endpoint or os.environ.get(ENV_ENDPOINT, "") or DEFAULT_ENDPOINT
         ).rstrip("/")
-        if self.endpoint and not self.endpoint.startswith("https://"):
-            from urllib.parse import urlparse
-            parsed = urlparse(self.endpoint)
-            if parsed.hostname not in ("localhost", "127.0.0.1", "::1"):
-                raise ValueError(f"GRADATA_ENDPOINT must use HTTPS: {self.endpoint}")
+        if self.endpoint:
+            from gradata._http import require_https
+            require_https(self.endpoint, "GRADATA_ENDPOINT")
         self.connected = False
         self._brain_id: str | None = None
 

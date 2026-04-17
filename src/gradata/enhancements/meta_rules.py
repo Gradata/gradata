@@ -618,6 +618,10 @@ def _call_llm_for_synthesis(
     if not key or not base:
         raise RuntimeError("No LLM credentials configured")
 
+    # SSRF / bearer-key exfil guard: refuse HTTP to non-local hosts
+    from gradata._http import require_https
+    require_https(base, "GRADATA_LLM_BASE")
+
     bullet_text = "\n".join(f"- {d}" for d in descriptions)
     prompt = (
         f'Given these {len(descriptions)} learned rules in the "{category}" category:\n'

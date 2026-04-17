@@ -1010,6 +1010,18 @@ def _cloud_sync_session(
         if not api_key:
             return  # No cloud credentials — nothing to sync
 
+        # Guard: reject any non-HTTPS api_url read from config.toml before use
+        if api_url:
+            from gradata._http import require_https
+            try:
+                require_https(api_url, "api_url (config.toml)")
+            except ValueError as _https_err:
+                _log.error(
+                    "Cloud sync aborted — %s. Fix ~/.gradata/config.toml to use HTTPS.",
+                    _https_err,
+                )
+                return
+
         # 2. Build TelemetryPayload from session data
         from gradata.cloud.sync import CloudClient as SyncClient
         from gradata.cloud.sync import CloudConfig, TelemetryPayload

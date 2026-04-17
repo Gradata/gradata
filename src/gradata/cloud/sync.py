@@ -115,6 +115,13 @@ class CloudClient:
         if not self.enabled:
             return None
 
+        from gradata._http import require_https
+        try:
+            require_https(self.config.api_base, "api_base")
+        except ValueError as exc:
+            log.error("Refusing cloud POST — %s", exc)
+            return None
+
         url = f"{self.config.api_base.rstrip('/')}{path}"
         data = json.dumps(payload).encode()
         headers = {

@@ -69,6 +69,14 @@ def synthesise_principle_llm(
         log.debug("LLM synthesis skipped: no api_base configured (set GRADATA_LLM_BASE)")
         return None
 
+    # SSRF / bearer-key exfil guard: refuse HTTP to non-local hosts
+    from gradata._http import require_https
+    try:
+        require_https(api_base, "GRADATA_LLM_BASE")
+    except ValueError as exc:
+        log.error("LLM synthesis refused — %s", exc)
+        return None
+
     # Build bullet list of lesson descriptions
     bullets = []
     for lesson in lessons[:10]:  # Cap at 10 to limit prompt size
