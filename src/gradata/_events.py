@@ -27,15 +27,21 @@ if TYPE_CHECKING:
 _log = logging.getLogger("gradata.events")
 
 
-def _locked_append(path: Path, line: str) -> None:
-    """Append *line* (must already end with \\n) to *path* under an advisory lock.
+def _locked_append_many(path: Path, lines: list[str]) -> None:
+    """Append *lines* (each must already end with \\n) to *path* under one advisory lock.
 
-    On Windows: uses ``msvcrt.locking`` (LK_NBLCK → LK_LOCK) so concurrent
-    processes cannot interleave bytes within a JSON line.
+    Batches N writes into a single lock acquisition + single fsync, so
+    RetainOrchestrator.flush() doesn't pay per-event lock overhead when
+    draining a queue.
+
+    On Windows: uses ``msvcrt.locking`` (LK_LOCK) so concurrent processes
+    cannot interleave bytes within a JSON line.
     On POSIX: uses ``fcntl.flock`` (LOCK_EX) which is cheaper and sufficient.
     The lock is always released — even on exception — via try/finally.
     """
-    encoded = line.encode("utf-8")
+    if not lines:
+        return
+    encoded = b"".join(line.encode("utf-8") for line in lines)
     with open(path, "ab") as fh:
         if sys.platform == "win32":
             import msvcrt
@@ -67,6 +73,11 @@ def _locked_append(path: Path, line: str) -> None:
                 fh.flush()
             finally:
                 fcntl.flock(fh, fcntl.LOCK_UN)
+
+
+def _locked_append(path: Path, line: str) -> None:
+    """Single-line wrapper around :func:`_locked_append_many`."""
+    _locked_append_many(path, [line])
 
 
 def _ensure_table(conn: sqlite3.Connection):
@@ -579,15 +590,15 @@ class RetainOrchestrator:
 
         # ── Phase 2: Atomic write ────────────────────────────────────────
         try:
-            # 2a: Append to events.jsonl — use locked append to prevent
+            # 2a: Append to events.jsonl — one locked batch append to prevent
             # multi-process interleaving on Windows (msvcrt.locking) and POSIX
-            # (fcntl.flock).
-            for event in new_events:
-                _locked_append(
-                    self.events_path,
-                    json.dumps(event, default=str, ensure_ascii=False) + "\n",
-                )
-                result["written"] += 1
+            # (fcntl.flock). Single lock + single fsync for the whole batch.
+            lines = [
+                json.dumps(event, default=str, ensure_ascii=False) + "\n"
+                for event in new_events
+            ]
+            _locked_append_many(self.events_path, lines)
+            result["written"] = len(new_events)
 
             # 2b: INSERT OR IGNORE into system.db (same schema as emit())
             if self.db_path.is_file():

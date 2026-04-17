@@ -369,3 +369,22 @@ class TestResearchBackedConstants:
 
         assert 2 <= MIN_APPLICATIONS_FOR_PATTERN <= 5
         assert 3 <= MIN_APPLICATIONS_FOR_RULE <= 8
+
+    def test_graduation_constants_frozen(self):
+        """Canonical spec values — catches accidental tuning drift.
+
+        Ranges above allow policy changes; these assertions pin the CURRENT
+        shipped values. If you deliberately retune, update these with a
+        CHANGELOG entry noting the behavioral impact.
+        """
+        from gradata.enhancements.self_improvement import (
+            MIN_APPLICATIONS_FOR_PATTERN,
+            MIN_APPLICATIONS_FOR_RULE,
+            PATTERN_THRESHOLD,
+            RULE_THRESHOLD,
+        )
+
+        assert PATTERN_THRESHOLD == 0.60
+        assert RULE_THRESHOLD == 0.90
+        assert MIN_APPLICATIONS_FOR_PATTERN == 3
+        assert MIN_APPLICATIONS_FOR_RULE == 5
