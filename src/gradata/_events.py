@@ -45,6 +45,16 @@ def _ensure_table(conn: sqlite3.Connection):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_session ON events(session)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_type ON events(type)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_session_type ON events(session, type)")
+    # Dedup guard: (ts, type, source) uniquely identifies an event for the
+    # purposes of retry-safe idempotent writes. RetainOrchestrator also uses
+    # this key in its cursor, so the constraint and the orchestrator stay in
+    # lockstep. Pre-existing duplicate rows (if any) are preserved -- the
+    # index is created with IF NOT EXISTS on a fresh key set.
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedup "
+            "ON events(ts, type, source)"
+        )
     with contextlib.suppress(sqlite3.OperationalError):
         conn.execute("ALTER TABLE events ADD COLUMN valid_from TEXT")
     with contextlib.suppress(sqlite3.OperationalError):
@@ -114,13 +124,25 @@ def emit(event_type: str, source: str, data: dict | None = None, tags: list | No
     try:
         with contextlib.closing(sqlite3.connect(str(db_path))) as conn:
             _ensure_table(conn)
+            # INSERT OR IGNORE + UNIQUE(ts,type,source) makes emit() idempotent
+            # across retries and partial-write recoveries. If an identical
+            # event was already persisted (same dedup key), the INSERT is a
+            # no-op -- we then look up the pre-existing row's id so callers
+            # that depend on `event["id"]` still get the real rowid.
             cursor = conn.execute(
-                "INSERT INTO events (ts, session, type, source, data_json, tags_json, valid_from, valid_until) "
+                "INSERT OR IGNORE INTO events (ts, session, type, source, data_json, tags_json, valid_from, valid_until) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (ts, session, event_type, source, json.dumps(data or {}),
                  json.dumps(enriched_tags), valid_from, valid_until),
             )
-            event["id"] = cursor.lastrowid
+            if cursor.rowcount == 1:
+                event["id"] = cursor.lastrowid
+            else:
+                existing = conn.execute(
+                    "SELECT id FROM events WHERE ts=? AND type=? AND source=?",
+                    (ts, event_type, source),
+                ).fetchone()
+                event["id"] = existing[0] if existing else None
             conn.commit()
             sqlite_ok = True
     except Exception as e:
@@ -574,3 +596,31 @@ class RetainOrchestrator:
 
         self._pending.clear()
         return result
+
+
+# ── Module-level singleton so hot paths can queue without re-constructing ────
+
+_ORCHESTRATORS: dict[str, RetainOrchestrator] = {}
+
+
+def get_retain_orchestrator(brain_dir: str | Path) -> RetainOrchestrator:
+    """Return a cached RetainOrchestrator keyed by brain_dir.
+
+    Use for batch scenarios (session_close, graduation sweeps) where we want
+    atomic multi-event flush with crash-recovery. For single-event writes,
+    use :func:`emit` directly -- it has INSERT OR IGNORE dedup built in.
+    """
+    key = str(brain_dir)
+    orch = _ORCHESTRATORS.get(key)
+    if orch is None:
+        orch = RetainOrchestrator(brain_dir)
+        _ORCHESTRATORS[key] = orch
+    return orch
+
+
+def flush_retain(brain_dir: str | Path) -> dict:
+    """Flush any queued events for brain_dir. Safe to call when queue is empty."""
+    orch = _ORCHESTRATORS.get(str(brain_dir))
+    if orch is None or orch.pending_count == 0:
+        return {"written": 0, "errors": [], "phases": {}}
+    return orch.flush()
