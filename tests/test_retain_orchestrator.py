@@ -253,15 +253,16 @@ class TestPhase2FailurePreventsPhase3:
         orch = RetainOrchestrator(tmp_path)
         orch.queue(_make_event())
 
-        # Path.open() is what RetainOrchestrator uses for JSONL writes
-        original_path_open = Path.open
+        # _locked_append uses the builtin open(); patch it in gradata._events
+        import builtins
+        original_open = builtins.open
 
-        def _bad_path_open(self_path, *args, **kwargs):
-            if self_path.name == "events.jsonl":
+        def _bad_open(path, *args, **kwargs):
+            if str(path).endswith("events.jsonl"):
                 raise OSError("disk full")
-            return original_path_open(self_path, *args, **kwargs)
+            return original_open(path, *args, **kwargs)
 
-        with patch.object(Path, "open", _bad_path_open):
+        with patch("gradata._events.open", _bad_open):
             result = orch.flush()
 
         assert result["written"] == 0
@@ -273,14 +274,15 @@ class TestPhase2FailurePreventsPhase3:
         orch = RetainOrchestrator(tmp_path)
         orch.queue(_make_event())
 
-        original_path_open = Path.open
+        import builtins
+        original_open = builtins.open
 
-        def _bad_path_open(self_path, *args, **kwargs):
-            if self_path.name == "events.jsonl":
+        def _bad_open(path, *args, **kwargs):
+            if str(path).endswith("events.jsonl"):
                 raise OSError("disk full")
-            return original_path_open(self_path, *args, **kwargs)
+            return original_open(path, *args, **kwargs)
 
-        with patch.object(Path, "open", _bad_path_open):
+        with patch("gradata._events.open", _bad_open):
             orch.flush()
 
         # Pending cleared regardless of failure

@@ -9,7 +9,9 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import os
 import sqlite3
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -23,6 +25,48 @@ if TYPE_CHECKING:
     from gradata._paths import BrainContext
 
 _log = logging.getLogger("gradata.events")
+
+
+def _locked_append(path: Path, line: str) -> None:
+    """Append *line* (must already end with \\n) to *path* under an advisory lock.
+
+    On Windows: uses ``msvcrt.locking`` (LK_NBLCK → LK_LOCK) so concurrent
+    processes cannot interleave bytes within a JSON line.
+    On POSIX: uses ``fcntl.flock`` (LOCK_EX) which is cheaper and sufficient.
+    The lock is always released — even on exception — via try/finally.
+    """
+    encoded = line.encode("utf-8")
+    with open(path, "ab") as fh:
+        if sys.platform == "win32":
+            import msvcrt
+            # Lock the first byte of the file as an advisory mutex.
+            # msvcrt.locking operates on nbytes starting at the current position;
+            # we position at 0 so all writers contend on the same byte range.
+            fh.seek(0)
+            try:
+                msvcrt.locking(fh.fileno(), msvcrt.LK_LOCK, 1)
+            except OSError:
+                pass  # fallback: proceed unlocked rather than drop the event
+            try:
+                fh.seek(0, 2)  # seek to end before writing
+                fh.write(encoded)
+                fh.flush()
+                os.fsync(fh.fileno())
+            finally:
+                fh.seek(0)
+                try:
+                    msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+                except OSError:
+                    pass
+        else:
+            import fcntl
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            try:
+                fh.seek(0, 2)
+                fh.write(encoded)
+                fh.flush()
+            finally:
+                fcntl.flock(fh, fcntl.LOCK_UN)
 
 
 def _ensure_table(conn: sqlite3.Connection):
@@ -115,8 +159,7 @@ def emit(event_type: str, source: str, data: dict | None = None, tags: list | No
     sqlite_ok = False
 
     try:
-        with open(events_jsonl, "a", encoding="utf-8") as f:
-            f.write(json.dumps(event, ensure_ascii=False) + "\n")
+        _locked_append(events_jsonl, json.dumps(event, ensure_ascii=False) + "\n")
         jsonl_ok = True
     except Exception as e:
         _log.error("JSONL write failed: %s", e)
@@ -536,11 +579,15 @@ class RetainOrchestrator:
 
         # ── Phase 2: Atomic write ────────────────────────────────────────
         try:
-            # 2a: Append to events.jsonl
-            with self.events_path.open("a", encoding="utf-8") as fh:
-                for event in new_events:
-                    fh.write(json.dumps(event, default=str, ensure_ascii=False) + "\n")
-                    result["written"] += 1
+            # 2a: Append to events.jsonl — use locked append to prevent
+            # multi-process interleaving on Windows (msvcrt.locking) and POSIX
+            # (fcntl.flock).
+            for event in new_events:
+                _locked_append(
+                    self.events_path,
+                    json.dumps(event, default=str, ensure_ascii=False) + "\n",
+                )
+                result["written"] += 1
 
             # 2b: INSERT OR IGNORE into system.db (same schema as emit())
             if self.db_path.is_file():
