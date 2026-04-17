@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from gradata._types import LessonState
+from gradata._types import Lesson, LessonState
 
 _log = logging.getLogger(__name__)
 
@@ -33,12 +33,80 @@ class PipelineResult:
     skills_generated: list[str] = field(default_factory=list)
     skills_updated: int = 0
     self_observation_candidates: int = 0
+    patterns_lifted: int = 0
+
+
+def _normalize_pattern_description(text: str) -> str:
+    """Strip noise prefixes so dedup across pipeline runs catches duplicates."""
+    text = text.strip()
+    for prefix in ("User corrected: ", "[AUTO] "):
+        if text.startswith(prefix):
+            text = text[len(prefix):]
+    return text
+
+
+def _patterns_to_graduated_lessons(
+    db_path: Path,
+    current_session: int,
+    min_sessions: int = 2,
+    min_score: float = 3.0,
+) -> list[Lesson]:
+    """Lift graduated correction_patterns into synthetic RULE-state lessons.
+
+    Before this wiring the 437-row correction_patterns table was orphaned --
+    query_graduation_candidates had no production caller, so meta-rule
+    synthesis never saw the real user corrections. This bridges the gap:
+    clusters that already hit (sessions >= min_sessions, weight >= min_score)
+    are lifted directly to RULE state for synthesis.
+    """
+    try:
+        from gradata.enhancements.meta_rules_storage import (  # type: ignore[import]
+            query_graduation_candidates,
+        )
+    except ImportError:
+        return []
+    if not db_path.is_file():
+        return []
+
+    try:
+        candidates = query_graduation_candidates(
+            db_path, min_sessions=min_sessions, min_score=min_score,
+        )
+    except Exception as exc:
+        _log.debug("_patterns_to_graduated_lessons: query failed: %s", exc)
+        return []
+
+    lessons: list[Lesson] = []
+    seen: set[tuple[str, str]] = set()
+    for row in candidates:
+        raw = row.get("representative_text") or ""
+        # Drop evaluator-generated noise -- not real user corrections
+        if raw.startswith("[AUTO]"):
+            continue
+        desc = _normalize_pattern_description(raw)
+        if not desc:
+            continue
+        category = (row.get("category") or "GENERAL").upper()
+        dedup_key = (category, desc)
+        if dedup_key in seen:
+            continue
+        seen.add(dedup_key)
+        first_seen = str(row.get("first_seen") or "")[:10] or "2026-01-01"
+        lessons.append(Lesson(
+            date=first_seen,
+            state=LessonState.RULE,
+            confidence=0.92,
+            category=category,
+            description=desc,
+            fire_count=int(row.get("distinct_sessions") or 2),
+        ))
+    return lessons
 
 
 def _generate_skill_file(
-    lesson: "object",
-    output_dir: "Path",
-) -> "Path | None":
+    lesson: Lesson,
+    output_dir: Path,
+) -> Path | None:
     """Generate a SKILL.md file from a graduated rule.
 
     Only generates for rules meeting quality gate:
@@ -317,6 +385,21 @@ def run_rule_pipeline(
                 result.self_observation_candidates += 1
     except (ImportError, Exception) as exc:
         result.errors.append(f"Phase 0: self-observation: {exc}")
+
+    # ── Phase 1.6: Lift graduated correction_patterns into all_lessons ───────
+    # Bridges the orphaned correction_patterns table (437 user corrections)
+    # into synthesis. Without this, RULE-state lessons come only from
+    # lessons.md which can be empty on fresh brains.
+    try:
+        pattern_lessons = _patterns_to_graduated_lessons(db_path, current_session)
+        if pattern_lessons:
+            existing_keys = {(l.category, l.description) for l in all_lessons}
+            for pl in pattern_lessons:
+                if (pl.category, pl.description) not in existing_keys:
+                    all_lessons.append(pl)
+                    result.patterns_lifted += 1
+    except Exception as exc:
+        result.errors.append(f"Phase 1.6: pattern lift: {exc}")
 
     # ── Phase 2: Atomic writes ────────────────────────────────────────────────
     # Graduate rules, update confidence, create meta-rules.
