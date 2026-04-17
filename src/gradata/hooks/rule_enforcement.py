@@ -36,7 +36,19 @@ HOOK_META = {
     "timeout": 5000,
 }
 
-MAX_REMINDERS = int(os.environ.get("GRADATA_MAX_REMINDERS", "5"))
+def _env_int(name: str, default: int, *, minimum: int = 0) -> int:
+    """Parse int env var with fallback on invalid input; clamp to >= minimum."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, value)
+
+
+MAX_REMINDERS = _env_int("GRADATA_MAX_REMINDERS", 5, minimum=0)
 
 _CODE_EXTS = frozenset({
     ".py", ".pyi", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
@@ -93,9 +105,17 @@ def _rule_applies(lesson, file_path: str, file_domain: str) -> bool:
         if file_domain and decl_domain and decl_domain != file_domain:
             return False
 
-    # 3) Explicit domain — only filter when file_domain is known AND mismatched
+    # 3) Explicit domain — only filter when both are non-empty strings AND
+    # mismatched. Non-string decl_domain (list/dict from malformed config) or
+    # empty file_domain (unknown) is treated as "undeclared" and allows the rule.
     decl_domain = scope.get("domain")
-    return not (decl_domain and file_domain and decl_domain != file_domain)
+    return not (
+        isinstance(decl_domain, str)
+        and decl_domain
+        and isinstance(file_domain, str)
+        and file_domain
+        and decl_domain != file_domain
+    )
 
 
 def main(data: dict) -> dict | None:
