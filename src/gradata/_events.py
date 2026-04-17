@@ -600,10 +600,10 @@ class RetainOrchestrator:
 
 # ── Module-level singleton so hot paths can queue without re-constructing ────
 
-_ORCHESTRATORS: dict[str, "RetainOrchestrator"] = {}
+_ORCHESTRATORS: dict[str, RetainOrchestrator] = {}
 
 
-def get_retain_orchestrator(brain_dir: "str | Path") -> "RetainOrchestrator":
+def get_retain_orchestrator(brain_dir: str | Path) -> RetainOrchestrator:
     """Return a cached RetainOrchestrator keyed by brain_dir.
 
     Use for batch scenarios (session_close, graduation sweeps) where we want
@@ -618,7 +618,7 @@ def get_retain_orchestrator(brain_dir: "str | Path") -> "RetainOrchestrator":
     return orch
 
 
-def flush_retain(brain_dir: "str | Path") -> dict:
+def flush_retain(brain_dir: str | Path) -> dict:
     """Flush any queued events for brain_dir. Safe to call when queue is empty."""
     orch = _ORCHESTRATORS.get(str(brain_dir))
     if orch is None or orch.pending_count == 0:
