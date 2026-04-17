@@ -1,9 +1,34 @@
-"""Stop hook: emit SESSION_END event and run graduation sweep."""
+"""Stop hook: gated graduation/pipeline/tree sweep.
 
+Fires on every Stop (end of every turn) because Claude Code has no
+"real" session-end signal. Running the full waterfall on every turn is
+expensive and pollutes the brain with redundant SESSION_END rows, so
+this hook gates the heavy work on "was there a new correction/edit
+since last run?". If not, it only flushes the retain queue (cheap) and
+returns.
+
+Gating model:
+    <brain>/.last_close_ts    ISO timestamp of the last heavy-work run.
+                              Created on first trigger; updated only when
+                              work actually fires.
+
+Trigger event types (any new row since last_close_ts fires the waterfall):
+    CORRECTION, LESSON_CHANGE, RULE_FAILURE, IMPLICIT_FEEDBACK,
+    OUTPUT_ACCEPTED, AGENT_OUTCOME, RULE_PATCHED
+
+On first run (no stamp file) we run once to bootstrap, then stamp.
+"""
 from __future__ import annotations
+
+import logging
+import sqlite3
+from datetime import UTC, datetime
+from pathlib import Path
 
 from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
+
+_log = logging.getLogger(__name__)
 
 HOOK_META = {
     "event": "Stop",
@@ -11,22 +36,59 @@ HOOK_META = {
     "timeout": 15000,
 }
 
+STAMP_FILE = ".last_close_ts"
 
-def _emit_session_end(brain_dir: str) -> None:
+TRIGGER_TYPES = (
+    "CORRECTION",
+    "LESSON_CHANGE",
+    "RULE_FAILURE",
+    "IMPLICIT_FEEDBACK",
+    "OUTPUT_ACCEPTED",
+    "AGENT_OUTCOME",
+    "RULE_PATCHED",
+)
+
+
+def _read_stamp(brain_dir: Path) -> str | None:
+    p = brain_dir / STAMP_FILE
+    if not p.is_file():
+        return None
     try:
-        from gradata._events import emit
-        from gradata._paths import BrainContext
+        return p.read_text(encoding="utf-8").strip() or None
+    except OSError:
+        return None
 
-        ctx = BrainContext.from_brain_dir(brain_dir)
-        emit("SESSION_END", source="hook:session_close", data={}, ctx=ctx)
-    except Exception:
+
+def _write_stamp(brain_dir: Path, ts: str) -> None:
+    try:
+        (brain_dir / STAMP_FILE).write_text(ts, encoding="utf-8")
+    except OSError:
         pass
+
+
+def _has_new_triggers(brain_dir: Path, since: str | None) -> bool:
+    """True iff any TRIGGER_TYPES event rows exist after ``since``."""
+    db = brain_dir / "system.db"
+    if not db.is_file():
+        return False
+    placeholders = ",".join("?" * len(TRIGGER_TYPES))
+    sql = f"SELECT 1 FROM events WHERE type IN ({placeholders})"
+    params: tuple = TRIGGER_TYPES
+    if since:
+        sql += " AND ts > ?"
+        params = (*TRIGGER_TYPES, since)
+    sql += " LIMIT 1"
+    try:
+        with sqlite3.connect(db) as conn:
+            row = conn.execute(sql, params).fetchone()
+        return row is not None
+    except sqlite3.Error as e:
+        _log.debug("trigger check failed: %s", e)
+        return False
 
 
 def _run_graduation(brain_dir: str) -> None:
     try:
-        from pathlib import Path
-
         from gradata.enhancements.self_improvement import format_lessons, graduate, parse_lessons
 
         lessons_path = Path(brain_dir) / "lessons.md"
@@ -36,17 +98,14 @@ def _run_graduation(brain_dir: str) -> None:
         lessons = parse_lessons(text)
         if not lessons:
             return
-        active, _graduated = graduate(lessons)
+        active, _ = graduate(lessons)
         lessons_path.write_text(format_lessons(active), encoding="utf-8")
-    except Exception:
-        pass
+    except Exception as e:
+        _log.debug("graduation skipped: %s", e)
 
 
 def _run_tree_consolidation(brain_dir: str) -> None:
-    """Post-session tree consolidation: evaluate climbs and contractions."""
     try:
-        from pathlib import Path
-
         from gradata.enhancements.self_improvement import format_lessons, parse_lessons
         from gradata.rules.rule_tree import RuleTree
 
@@ -58,16 +117,10 @@ def _run_tree_consolidation(brain_dir: str) -> None:
         if not lessons:
             return
 
-        # Skip if no lessons have paths (tree not active)
-        has_paths = any(l.path for l in lessons)
-        if not has_paths:
+        if not any(l.path for l in lessons):
             return
 
         tree = RuleTree(lessons)
-
-        # Build session_fires from lessons with paths (use fire_count as proxy)
-        # In a full implementation, this would query events for RULE_FIRED events.
-        # For now, treat all path-bearing lessons as "fired at their path".
         session_fires: dict[str, list] = {}
         for lesson in lessons:
             if lesson.path and lesson.fire_count > 0:
@@ -76,23 +129,17 @@ def _run_tree_consolidation(brain_dir: str) -> None:
         if not session_fires:
             return
 
-        # Get current session number (approximate from lessons count)
         current_session = max(l.fire_count + l.sessions_since_fire for l in lessons)
-
         results = tree.consolidate(session_fires, current_session=current_session)
 
-        # Save updated lessons if any changes occurred
         if results["climbed"] > 0 or results["contracted"] > 0:
             lessons_path.write_text(format_lessons(lessons), encoding="utf-8")
-    except Exception:
-        pass
+    except Exception as e:
+        _log.debug("tree consolidation skipped: %s", e)
 
 
 def _run_pipeline(brain_dir: str, data: dict) -> None:
-    """Run the 3-phase rule pipeline (freshness, fusion, synthesis, hooks)."""
     try:
-        from pathlib import Path
-
         from gradata.enhancements.rule_pipeline import run_rule_pipeline
 
         lessons_path = Path(brain_dir) / "lessons.md"
@@ -106,47 +153,46 @@ def _run_pipeline(brain_dir: str, data: dict) -> None:
             current_session=current_session,
         )
         if result.graduated or result.meta_rules_created or result.hooks_promoted:
-            import logging
-            logging.getLogger(__name__).info(
+            _log.info(
                 "Pipeline: %d graduated, %d meta-rules, %d hooks",
                 len(result.graduated), len(result.meta_rules_created),
                 len(result.hooks_promoted),
             )
-    except Exception:
-        pass
+    except Exception as e:
+        _log.debug("pipeline skipped: %s", e)
 
 
 def _flush_retain_queue(brain_dir: str) -> None:
-    """Flush any events queued via the RetainOrchestrator batch path.
-
-    Most emits go through the synchronous (dedup-safe) ``emit()``; callers
-    that chose the batch path leave events in ``_pending`` until a flush
-    point. Session close is the last-chance flush so no queued events are
-    lost if the process is torn down immediately after.
-    """
+    """Always runs — cheap + essential so no queued events are lost."""
     try:
         from gradata._events import flush_retain
         result = flush_retain(brain_dir)
         if result.get("written"):
-            import logging
-            logging.getLogger(__name__).info(
-                "RetainOrchestrator: flushed %d events at session close",
-                result["written"],
-            )
-    except Exception:
-        pass
+            _log.info("RetainOrchestrator: flushed %d events", result["written"])
+    except Exception as e:
+        _log.debug("retain flush skipped: %s", e)
 
 
 def main(data: dict) -> dict | None:
-    brain_dir = resolve_brain_dir()
-    if not brain_dir:
+    brain_dir_str = resolve_brain_dir()
+    if not brain_dir_str:
         return None
 
-    _emit_session_end(brain_dir)
-    _run_graduation(brain_dir)
-    _run_pipeline(brain_dir, data)
-    _run_tree_consolidation(brain_dir)
-    _flush_retain_queue(brain_dir)
+    brain_dir = Path(brain_dir_str)
+
+    # Always flush: cheap and never idempotent from a data-loss standpoint.
+    _flush_retain_queue(brain_dir_str)
+
+    # Gate the heavy waterfall on "did anything interesting happen?"
+    last_ts = _read_stamp(brain_dir)
+    if not _has_new_triggers(brain_dir, last_ts):
+        return None
+
+    _run_graduation(brain_dir_str)
+    _run_pipeline(brain_dir_str, data)
+    _run_tree_consolidation(brain_dir_str)
+
+    _write_stamp(brain_dir, datetime.now(UTC).isoformat())
     return None
 
 
