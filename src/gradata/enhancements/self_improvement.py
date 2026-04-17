@@ -58,7 +58,7 @@ PATTERN_THRESHOLD = 0.60
 # one that actually governs which rules reach the model.
 RULE_THRESHOLD = 0.90
 MIN_APPLICATIONS_FOR_PATTERN = 3
-MIN_APPLICATIONS_FOR_RULE = 3
+MIN_APPLICATIONS_FOR_RULE = 5
 
 # Misfire is worse than contradiction (rule was completely irrelevant)
 MISFIRE_PENALTY = -0.15
@@ -640,6 +640,7 @@ def update_confidence(
     machine_mode: bool | None = None,
     salt: str = "",
     injected_lesson_keys: set[str] | None = None,
+    session_id: str | None = None,
 ) -> list[Lesson]:
     """Update confidence for each lesson based on session corrections.
 
@@ -678,6 +679,17 @@ def update_confidence(
             applied but ``fire_count`` is NOT incremented — this preserves
             the "no promotion from silence" invariant documented on
             ``graduate()`` (see gap-analysis/01-internal-audit.md #1.10).
+        session_id: Opaque string identifying the current session (e.g. a
+            timestamp or UUID). When provided, the per-lesson
+            ``_pre_session_confidence`` / ``_pre_session_state`` snapshot is
+            refreshed whenever the session changes. This fixes the C1 bug
+            where the ``hasattr`` guard caused session-1 baseline to persist
+            across all later sessions, making the per-session delta cap
+            measure deltas from an ever-staling origin and stalling lessons
+            below the RULE threshold indefinitely.
+            When ``None`` (default, backward-compatible), the first-call
+            snapshot is kept — callers that pass the same lesson list once
+            per session are unaffected.
     """
     if renter:
         return lessons
@@ -727,7 +739,19 @@ def update_confidence(
         # and ONE MAX_PER_SESSION_DELTA-sized move in confidence. Blocks the
         # Sybil scenario where 10 coordinated corrections push a fresh
         # lesson 0 -> RULE in a single tick.
-        if not hasattr(lesson, "_pre_session_confidence"):
+        #
+        # C1 fix: reset snapshot when session_id changes so session-2+ calls
+        # don't measure deltas against a session-1 baseline. When session_id
+        # is None (legacy callers) the first-call snapshot is kept, which is
+        # correct for callers that pass the same list once per session.
+        stored_sid = getattr(lesson, "_pre_session_id", None)  # type: ignore[attr-defined]
+        if session_id is not None and stored_sid != session_id:
+            # New session: refresh snapshot unconditionally.
+            lesson._pre_session_confidence = lesson.confidence  # type: ignore[attr-defined]
+            lesson._pre_session_state = lesson.state  # type: ignore[attr-defined]
+            lesson._pre_session_id = session_id  # type: ignore[attr-defined]
+        elif not hasattr(lesson, "_pre_session_confidence"):
+            # Legacy path (no session_id): snapshot once per lesson lifetime.
             lesson._pre_session_confidence = lesson.confidence  # type: ignore[attr-defined]
             lesson._pre_session_state = lesson.state  # type: ignore[attr-defined]
 
@@ -945,6 +969,10 @@ def update_confidence(
         pre_state = getattr(lesson, "_pre_session_state", None)
         already_transitioned = pre_state is not None and pre_state != lesson.state
         # Promote PATTERN -> RULE
+        # H1 fix: INSTINCT->PATTERN uses strict > (not >=) so a lesson born at
+        # INITIAL_CONFIDENCE (0.60) == PATTERN_THRESHOLD cannot promote without
+        # first receiving a reinforcing correction that pushes confidence above
+        # the threshold. PATTERN->RULE keeps >= since INITIAL_CONFIDENCE < 0.90.
         if (
             not already_transitioned
             and lesson.state == LessonState.PATTERN
@@ -953,7 +981,7 @@ def update_confidence(
         ) or (
             not already_transitioned
             and lesson.state == LessonState.INSTINCT
-            and lesson.confidence >= _uc_pattern_thr
+            and lesson.confidence > _uc_pattern_thr
             and lesson.fire_count >= MIN_APPLICATIONS_FOR_PATTERN
         ):
             lesson.state = transition(lesson.state, "promote")
@@ -1257,10 +1285,12 @@ def graduate(
             continue
 
         # Promote INSTINCT -> PATTERN
+        # H1 fix: strict > prevents a lesson born at INITIAL_CONFIDENCE (0.60)
+        # from satisfying PATTERN_THRESHOLD (0.60) without any earned bonus.
         if (
             not block_promotion
             and lesson.state == LessonState.INSTINCT
-            and lesson.confidence >= eff_pattern_threshold
+            and lesson.confidence > eff_pattern_threshold
             and lesson.fire_count >= MIN_APPLICATIONS_FOR_PATTERN
         ):
             lesson.state = transition(lesson.state, "promote")

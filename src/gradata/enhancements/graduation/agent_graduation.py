@@ -417,7 +417,8 @@ class AgentGraduationTracker:
         self._update_approval_gate(profile)
 
         # Update existing lesson confidence (survival/contradiction)
-        self._update_lesson_confidence(profile, outcome, session)
+        # H2 fix: pass edit_category so fire_count is gated on category match.
+        self._update_lesson_confidence(profile, outcome, session, edit_category=edit_category)
 
         self._save_profile(profile)
         return profile
@@ -479,6 +480,7 @@ class AgentGraduationTracker:
         profile: AgentProfile,
         outcome: str,
         session: int,
+        edit_category: str = "",
     ) -> None:
         """Update confidence on existing agent lessons based on outcome.
 
@@ -486,24 +488,45 @@ class AgentGraduationTracker:
         - Approved unchanged: +0.05 (acceptance bonus)
         - Approved with edits: +0.10 (survival bonus — lesson survived)
         - Rejected: -0.25 (misfire penalty)
+
+        H2 fix: fire_count is only incremented when the lesson's category
+        matches edit_category (or when edit_category is not provided, for
+        backward compatibility). This mirrors the main pipeline's
+        was_injected gate and prevents approval of one category from
+        boosting fire_count for unrelated lessons — which was silently
+        fast-tracking promotion of lessons that never actually fired.
         """
+        norm_edit_cat = edit_category.upper() if edit_category else ""
         for lesson in profile.lessons:
             if lesson.state == LessonState.UNTESTABLE:
                 continue
 
+            # Gate fire_count on category relevance: only count a fire for a
+            # lesson whose category matches the corrected category. When
+            # edit_category is empty (legacy callers), fall back to always
+            # counting (backward compatible).
+            category_matches = (
+                not norm_edit_cat or lesson.category.upper() == norm_edit_cat
+            )
+
             if outcome == "approved":
                 lesson.confidence = min(1.0, lesson.confidence + ACCEPTANCE_BONUS)
-                lesson.fire_count += 1
+                if category_matches:
+                    lesson.fire_count += 1
             elif outcome == "edited":
                 lesson.confidence = min(1.0, lesson.confidence + SURVIVAL_BONUS)
-                lesson.fire_count += 1
+                if category_matches:
+                    lesson.fire_count += 1
             elif outcome == "rejected":
                 lesson.confidence = max(0.0, lesson.confidence - MISFIRE_PENALTY)
 
             # Check for promotion
+            # H1 fix: INSTINCT->PATTERN uses strict > so a lesson born at
+            # INITIAL_CONFIDENCE (0.60) == PATTERN_THRESHOLD (0.60) cannot
+            # promote on the same session it was created.
             if (
                 lesson.state == LessonState.INSTINCT
-                and lesson.confidence >= PATTERN_THRESHOLD
+                and lesson.confidence > PATTERN_THRESHOLD
                 and lesson.fire_count >= MIN_APPLICATIONS_FOR_PATTERN
             ):
                 lesson.state = LessonState.PATTERN

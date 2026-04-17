@@ -396,3 +396,88 @@ class TestDeterministicRules:
         result = tracker.enforce_rules("research", "any output here")
         assert result.passed
         assert result.rules_checked == 0
+
+
+# ---------------------------------------------------------------------------
+# Regression: Bug H2 — fire_count incremented for all lessons on any approval
+# ---------------------------------------------------------------------------
+
+class TestAgentFireCountGate:
+    """Regression for H2: agent _update_lesson_confidence must gate fire_count
+    on category relevance, mirroring the main pipeline's was_injected guard.
+
+    Bug: every "approved" outcome incremented fire_count for ALL lessons,
+    regardless of whether the lesson's category matched the corrected category.
+    This silently fast-tracked lessons toward RULE promotion without evidence.
+
+    Fix: fire_count is only incremented when lesson.category matches
+    edit_category (or when edit_category is empty, for backward compat).
+    """
+
+    def test_approval_only_increments_matching_category(self, tracker):
+        """Approving a TONE edit must not increment fire_count for DRAFTING lessons."""
+        from gradata.enhancements.self_improvement import Lesson, INITIAL_CONFIDENCE
+
+        profile = tracker._load_profile("writer")
+        tone_lesson = Lesson(
+            date="2026-04-01",
+            state=LessonState.INSTINCT,
+            confidence=INITIAL_CONFIDENCE,
+            category="TONE",
+            description="Use warm language",
+            fire_count=0,
+        )
+        drafting_lesson = Lesson(
+            date="2026-04-01",
+            state=LessonState.INSTINCT,
+            confidence=INITIAL_CONFIDENCE,
+            category="DRAFTING",
+            description="Keep sentences short",
+            fire_count=0,
+        )
+        profile.lessons = [tone_lesson, drafting_lesson]
+        tracker._save_profile(profile)
+
+        # Record an approved outcome with edit_category="TONE"
+        tracker.record_outcome(
+            "writer", "sample output", "approved",
+            edit_category="TONE",
+            session=1,
+        )
+
+        profile = tracker._load_profile("writer")
+        tone_lesson_after = next(l for l in profile.lessons if l.category == "TONE")
+        drafting_lesson_after = next(l for l in profile.lessons if l.category == "DRAFTING")
+
+        assert tone_lesson_after.fire_count == 1, (
+            f"TONE lesson should have fire_count=1, got {tone_lesson_after.fire_count}"
+        )
+        assert drafting_lesson_after.fire_count == 0, (
+            f"DRAFTING lesson should not have been incremented (fire_count="
+            f"{drafting_lesson_after.fire_count}); approval was for TONE category"
+        )
+
+    def test_approval_without_edit_category_increments_all(self, tracker):
+        """Backward compat: no edit_category increments all lessons (legacy behaviour)."""
+        from gradata.enhancements.self_improvement import Lesson, INITIAL_CONFIDENCE
+
+        profile = tracker._load_profile("writer")
+        profile.lessons = [
+            Lesson(date="2026-04-01", state=LessonState.INSTINCT,
+                   confidence=INITIAL_CONFIDENCE, category="TONE",
+                   description="lesson A", fire_count=0),
+            Lesson(date="2026-04-01", state=LessonState.INSTINCT,
+                   confidence=INITIAL_CONFIDENCE, category="DRAFTING",
+                   description="lesson B", fire_count=0),
+        ]
+        tracker._save_profile(profile)
+
+        # No edit_category — legacy path must increment all
+        tracker.record_outcome("writer", "output", "approved", session=1)
+
+        profile = tracker._load_profile("writer")
+        for lesson in profile.lessons:
+            assert lesson.fire_count == 1, (
+                f"Legacy path: all lessons should have fire_count=1, "
+                f"{lesson.category} got {lesson.fire_count}"
+            )

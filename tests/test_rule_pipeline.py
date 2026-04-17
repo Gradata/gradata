@@ -143,11 +143,18 @@ def test_pipeline_does_not_graduate_instinct_below_threshold(tmp_path: Path) -> 
 
 
 def test_pipeline_graduates_pattern_to_rule(tmp_path: Path) -> None:
-    """PATTERN lesson at 0.90 confidence with >= 3 fires graduates to RULE."""
+    """PATTERN lesson at 0.90 confidence with >= 5 fires graduates to RULE.
+
+    C2 fix: MIN_APPLICATIONS_FOR_RULE was accidentally lowered to 3 in
+    commit c37bfab. Original SPEC value is 5 (set in ca81eb6, documented
+    in the graduate() docstring). This test was previously using fire_count=3
+    which only passed because of the bug. Updated to fire_count=5 which is
+    the correct threshold.
+    """
     lesson = _make_lesson(
         state=LessonState.PATTERN,
         confidence=0.90,
-        fire_count=3,
+        fire_count=5,  # MIN_APPLICATIONS_FOR_RULE = 5 (was incorrectly 3)
     )
     lessons_path = tmp_path / "lessons.md"
     _write_lessons(lessons_path, [lesson])

@@ -341,3 +341,148 @@ class TestPenaltyCap:
                 "Reinforce event must not decrease confidence"
             )
             prev = lesson.confidence
+
+
+# ---------------------------------------------------------------------------
+# Regression: Bug C1 — _pre_session_confidence never reset between sessions
+# ---------------------------------------------------------------------------
+
+class TestPreSessionConfidenceReset:
+    """Regression for C1: session-id based snapshot reset.
+
+    Bug: hasattr guard set _pre_session_confidence once per lesson lifetime.
+    From session 2 onward the per-session delta cap measured against a stale
+    session-1 baseline, permanently suppressing confidence moves and stalling
+    lessons below RULE threshold.
+    Fix: when session_id kwarg is passed, snapshot resets on session change.
+    """
+
+    def test_snapshot_refreshes_on_new_session_id(self) -> None:
+        """Second-session confidence must be capped from session-2 baseline."""
+        lesson = _make_lesson(
+            state=LessonState.INSTINCT,
+            confidence=0.50,
+            fire_count=10,
+            category="DRAFTING",
+            description="be concise",
+        )
+        lesson._was_injected_this_session = True  # type: ignore[attr-defined]
+        corrections = [{"category": "DRAFTING", "direction": "REINFORCING"}]
+
+        # Session 1: confidence moves up from 0.50
+        update_confidence([lesson], corrections, session_id="session-1")
+        conf_after_s1 = lesson.confidence
+        assert conf_after_s1 > 0.50
+
+        # Manually push confidence high (simulating many reinforcements)
+        lesson.confidence = 0.85
+
+        # Session 2: with new session_id, snapshot must refresh to 0.85
+        # so the delta cap is measured from 0.85, not 0.50
+        lesson._was_injected_this_session = True  # type: ignore[attr-defined]
+        update_confidence([lesson], corrections, session_id="session-2")
+        conf_after_s2 = lesson.confidence
+
+        # If the snapshot had NOT refreshed (bug), the delta cap (0.30) from
+        # 0.50 baseline would have allowed any value up to 0.80 — the new
+        # value (0.85 + bonus) would be clamped to ~0.80. With the fix the
+        # cap is from 0.85, so the small bonus goes through unclamped.
+        # We just assert the lesson moved upward (not incorrectly clamped
+        # back to the stale session-1 maximum of 0.80).
+        assert conf_after_s2 > 0.85 - 1e-9, (
+            f"Session-2 confidence {conf_after_s2} was clamped against stale session-1 baseline"
+        )
+
+    def test_snapshot_unchanged_when_no_session_id(self) -> None:
+        """Legacy callers (no session_id) retain first-call snapshot."""
+        lesson = _make_lesson(
+            state=LessonState.INSTINCT,
+            confidence=0.50,
+            fire_count=5,
+            category="DRAFTING",
+            description="be concise",
+        )
+        lesson._was_injected_this_session = True  # type: ignore[attr-defined]
+        corrections = [{"category": "DRAFTING", "direction": "REINFORCING"}]
+
+        update_confidence([lesson], corrections)
+        # _pre_session_confidence must be set to initial value (0.50)
+        assert getattr(lesson, "_pre_session_confidence", None) == 0.50, (
+            "Legacy path must snapshot on first call and keep 0.50"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Regression: Bug C2 — MIN_APPLICATIONS_FOR_RULE must be 5
+# ---------------------------------------------------------------------------
+
+class TestMinApplicationsForRule:
+    """Regression for C2: MIN_APPLICATIONS_FOR_RULE was accidentally lowered to 3.
+
+    The docstring in graduate() and the original constant definition both
+    specify 5 (introduced in commit ca81eb6). Commit c37bfab silently
+    lowered it to 3 without a note. Restored to 5.
+    """
+
+    def test_constant_is_5(self) -> None:
+        """MIN_APPLICATIONS_FOR_RULE must equal 5 (SPEC + docstring)."""
+        assert MIN_APPLICATIONS_FOR_RULE == 5, (
+            f"Expected 5 (SPEC requirement), got {MIN_APPLICATIONS_FOR_RULE}. "
+            "Do not lower below 5 without updating the graduate() docstring and this test."
+        )
+
+    def test_four_fires_cannot_promote_to_rule(self) -> None:
+        """4 fires (one below threshold) must not promote PATTERN->RULE."""
+        lesson = _make_lesson(
+            state=LessonState.PATTERN,
+            confidence=RULE_THRESHOLD + 0.01,
+            fire_count=4,  # one below MIN_APPLICATIONS_FOR_RULE=5
+        )
+        graduate([lesson])
+        assert lesson.state == LessonState.PATTERN, (
+            f"4-fire lesson promoted to {lesson.state}; expected PATTERN (need 5 fires)"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Regression: Bug H1 — INITIAL_CONFIDENCE (0.60) == PATTERN_THRESHOLD (0.60)
+# ---------------------------------------------------------------------------
+
+class TestInitialConfidenceNotPromotable:
+    """Regression for H1: lessons born at INITIAL_CONFIDENCE must not immediately
+    satisfy the PATTERN_THRESHOLD promotion check.
+
+    Fix: promotion uses strict > instead of >=, so 0.60 confidence requires
+    at least one reinforcing correction (pushing to 0.60+epsilon) before
+    the lesson can leave INSTINCT.
+    """
+
+    def test_new_lesson_at_initial_confidence_cannot_promote(self) -> None:
+        """A lesson at exactly INITIAL_CONFIDENCE == PATTERN_THRESHOLD must not promote."""
+        from gradata.enhancements.self_improvement import INITIAL_CONFIDENCE, PATTERN_THRESHOLD
+        assert INITIAL_CONFIDENCE == PATTERN_THRESHOLD, (
+            "H1 precondition: test is only relevant when INITIAL_CONFIDENCE == PATTERN_THRESHOLD"
+        )
+        lesson = _make_lesson(
+            state=LessonState.INSTINCT,
+            confidence=INITIAL_CONFIDENCE,  # 0.60 == PATTERN_THRESHOLD
+            fire_count=10,  # fire_count gate satisfied
+        )
+        # graduate() with confidence exactly at threshold and no earned bonus
+        graduate([lesson])
+        assert lesson.state == LessonState.INSTINCT, (
+            f"Lesson at INITIAL_CONFIDENCE promoted to {lesson.state} without any earned bonus. "
+            "INSTINCT->PATTERN requires confidence STRICTLY ABOVE PATTERN_THRESHOLD."
+        )
+
+    def test_lesson_above_initial_confidence_can_promote(self) -> None:
+        """A lesson that earned a bonus above 0.60 can promote to PATTERN."""
+        lesson = _make_lesson(
+            state=LessonState.INSTINCT,
+            confidence=0.61,  # strictly above PATTERN_THRESHOLD (0.60)
+            fire_count=MIN_APPLICATIONS_FOR_PATTERN,
+        )
+        graduate([lesson])
+        assert lesson.state == LessonState.PATTERN, (
+            f"Lesson at 0.61 should have promoted to PATTERN, got {lesson.state}"
+        )
