@@ -360,9 +360,7 @@ def test_brain_maintain_no_brain():
 from gradata.hooks.session_persist import main as persist_main
 
 
-def test_session_persist_writes_handoff(tmp_path):
-    brain_dir = tmp_path / "brain"
-    brain_dir.mkdir()
+def test_session_persist_writes_handoff(brain_dir):
     loop_state = brain_dir / "loop-state.md"
     loop_state.write_text("## Session 99\n")
 

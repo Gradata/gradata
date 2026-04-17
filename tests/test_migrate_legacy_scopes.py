@@ -35,14 +35,12 @@ def migrate_mod():
 
 
 @pytest.fixture()
-def brain_with_mixed_lessons(tmp_path):
+def brain_with_mixed_lessons(brain_dir):
     """Create a brain dir with 5 lessons: 2 migratable, 1 ambiguous,
     1 already-scoped, 1 with unknown category."""
     from gradata._types import Lesson, LessonState
     from gradata.enhancements.self_improvement import format_lessons
 
-    brain_dir = tmp_path / "brain"
-    brain_dir.mkdir()
     lessons = [
         Lesson(
             date="2026-04-14",

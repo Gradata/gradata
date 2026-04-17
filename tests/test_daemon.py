@@ -17,11 +17,8 @@ if TYPE_CHECKING:
 # ── Telemetry opt-out / missing config ───────────────────────────────
 
 
-def test_telemetry_not_sent_when_config_missing(tmp_path: Path) -> None:
+def test_telemetry_not_sent_when_config_missing(tmp_path: Path, brain_dir: Path) -> None:
     """Telemetry should not send when ~/.gradata/config.toml doesn't exist."""
-    brain_dir = tmp_path / "brain"
-    brain_dir.mkdir()
-
     fake_home = tmp_path / "fakehome"
     fake_home.mkdir()
 
@@ -33,16 +30,13 @@ def test_telemetry_not_sent_when_config_missing(tmp_path: Path) -> None:
     assert not (fake_home / ".gradata" / "config.toml").exists()
 
 
-def test_telemetry_not_sent_when_opted_out(tmp_path: Path) -> None:
+def test_telemetry_not_sent_when_opted_out(tmp_path: Path, brain_dir: Path) -> None:
     """Telemetry should NOT send when config says telemetry = false."""
     fake_home = tmp_path / "fakehome"
     config_dir = fake_home / ".gradata"
     config_dir.mkdir(parents=True)
     config_path = config_dir / "config.toml"
     config_path.write_text('python_path = "python3"\ntelemetry = false\n', encoding="utf-8")
-
-    brain_dir = tmp_path / "brain"
-    brain_dir.mkdir()
 
     d = GradataDaemon(brain_dir, port=0)
     with patch("gradata.daemon.Path.home", return_value=fake_home):
@@ -52,16 +46,13 @@ def test_telemetry_not_sent_when_opted_out(tmp_path: Path) -> None:
     assert "telemetry_last_sent" not in config_after
 
 
-def test_telemetry_not_sent_when_key_missing(tmp_path: Path) -> None:
+def test_telemetry_not_sent_when_key_missing(tmp_path: Path, brain_dir: Path) -> None:
     """Telemetry should NOT send when config has no telemetry key at all."""
     fake_home = tmp_path / "fakehome"
     config_dir = fake_home / ".gradata"
     config_dir.mkdir(parents=True)
     config_path = config_dir / "config.toml"
     config_path.write_text('python_path = "python3"\n', encoding="utf-8")
-
-    brain_dir = tmp_path / "brain"
-    brain_dir.mkdir()
 
     d = GradataDaemon(brain_dir, port=0)
     with patch("gradata.daemon.Path.home", return_value=fake_home):
@@ -74,16 +65,13 @@ def test_telemetry_not_sent_when_key_missing(tmp_path: Path) -> None:
 # ── Telemetry opt-in ─────────────────────────────────────────────────
 
 
-def test_telemetry_sent_when_opted_in(tmp_path: Path) -> None:
+def test_telemetry_sent_when_opted_in(tmp_path: Path, brain_dir: Path) -> None:
     """Telemetry should fire background thread when telemetry = true."""
     fake_home = tmp_path / "fakehome"
     config_dir = fake_home / ".gradata"
     config_dir.mkdir(parents=True)
     config_path = config_dir / "config.toml"
     config_path.write_text('telemetry = true\n', encoding="utf-8")
-
-    brain_dir = tmp_path / "brain"
-    brain_dir.mkdir()
 
     d = GradataDaemon(brain_dir, port=0)
 
@@ -106,7 +94,7 @@ def test_telemetry_sent_when_opted_in(tmp_path: Path) -> None:
         assert "telemetry_last_sent" in config_after
 
 
-def test_telemetry_skipped_when_sent_recently(tmp_path: Path) -> None:
+def test_telemetry_skipped_when_sent_recently(tmp_path: Path, brain_dir: Path) -> None:
     """Telemetry should skip if last_sent is within 24h."""
     fake_home = tmp_path / "fakehome"
     config_dir = fake_home / ".gradata"
@@ -118,9 +106,6 @@ def test_telemetry_skipped_when_sent_recently(tmp_path: Path) -> None:
         f'telemetry = true\ntelemetry_last_sent = "{now}"\n',
         encoding="utf-8",
     )
-
-    brain_dir = tmp_path / "brain"
-    brain_dir.mkdir()
 
     d = GradataDaemon(brain_dir, port=0)
 

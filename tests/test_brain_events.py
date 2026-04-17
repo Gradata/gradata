@@ -175,48 +175,40 @@ class TestBrainQueryEvents:
 class TestEventsModule:
     """Unit tests for gradata._events.emit() using BrainContext injection."""
 
-    def test_emit_with_explicit_ctx(self, tmp_path):
+    def test_emit_with_explicit_ctx(self, brain_dir):
         from gradata._events import emit
         from gradata._paths import BrainContext
 
-        brain_dir = tmp_path / "brain"
-        brain_dir.mkdir()
         ctx = BrainContext.from_brain_dir(brain_dir)
 
         event = emit("DIRECT", "test", data={"val": 1}, ctx=ctx)
         assert event["type"] == "DIRECT"
         assert event["data"]["val"] == 1
 
-    def test_emit_creates_jsonl_file(self, tmp_path):
+    def test_emit_creates_jsonl_file(self, brain_dir):
         from gradata._events import emit
         from gradata._paths import BrainContext
 
-        brain_dir = tmp_path / "brain"
-        brain_dir.mkdir()
         ctx = BrainContext.from_brain_dir(brain_dir)
 
         emit("FILE_TEST", "test", ctx=ctx)
         assert ctx.events_jsonl.exists()
 
-    def test_emit_creates_sqlite_db(self, tmp_path):
+    def test_emit_creates_sqlite_db(self, brain_dir):
         from gradata._events import emit
         from gradata._paths import BrainContext
 
-        brain_dir = tmp_path / "brain"
-        brain_dir.mkdir()
         ctx = BrainContext.from_brain_dir(brain_dir)
 
         emit("DB_TEST", "test", ctx=ctx)
         assert ctx.db_path.exists()
 
-    def test_emit_raises_when_both_backends_fail(self, tmp_path):
+    def test_emit_raises_when_both_backends_fail(self, brain_dir):
         """If both JSONL and SQLite fail, EventPersistenceError is raised."""
         from gradata._events import emit
         from gradata._paths import BrainContext
         from gradata.exceptions import EventPersistenceError
 
-        brain_dir = tmp_path / "brain"
-        brain_dir.mkdir()
         ctx = BrainContext.from_brain_dir(brain_dir)
 
         # Patch both write paths to raise
@@ -225,13 +217,11 @@ class TestEventsModule:
                 with pytest.raises(EventPersistenceError):
                     emit("FAIL_BOTH", "test", ctx=ctx)
 
-    def test_emit_succeeds_with_only_jsonl(self, tmp_path):
+    def test_emit_succeeds_with_only_jsonl(self, brain_dir):
         """If SQLite fails but JSONL succeeds, no exception is raised."""
         from gradata._events import emit
         from gradata._paths import BrainContext
 
-        brain_dir = tmp_path / "brain"
-        brain_dir.mkdir()
         ctx = BrainContext.from_brain_dir(brain_dir)
 
         with patch("sqlite3.connect", side_effect=sqlite3.OperationalError("db fail")):
@@ -240,23 +230,19 @@ class TestEventsModule:
         assert event["_persisted"]["jsonl"] is True
         assert event["_persisted"]["sqlite"] is False
 
-    def test_emit_valid_from_defaults_to_timestamp(self, tmp_path):
+    def test_emit_valid_from_defaults_to_timestamp(self, brain_dir):
         from gradata._events import emit
         from gradata._paths import BrainContext
 
-        brain_dir = tmp_path / "brain"
-        brain_dir.mkdir()
         ctx = BrainContext.from_brain_dir(brain_dir)
 
         event = emit("VF_TEST", "test", ctx=ctx)
         assert event.get("valid_from") is not None
 
-    def test_query_returns_emitted_event(self, tmp_path):
+    def test_query_returns_emitted_event(self, brain_dir):
         from gradata._events import emit, query
         from gradata._paths import BrainContext
 
-        brain_dir = tmp_path / "brain"
-        brain_dir.mkdir()
         ctx = BrainContext.from_brain_dir(brain_dir)
 
         emit("QUERY_TARGET", "test", data={"marker": "xyz"}, ctx=ctx)
@@ -265,12 +251,10 @@ class TestEventsModule:
         assert len(results) >= 1
         assert results[0]["data"]["marker"] == "xyz"
 
-    def test_query_active_only_excludes_expired(self, tmp_path):
+    def test_query_active_only_excludes_expired(self, brain_dir):
         from gradata._events import emit, query
         from gradata._paths import BrainContext
 
-        brain_dir = tmp_path / "brain"
-        brain_dir.mkdir()
         ctx = BrainContext.from_brain_dir(brain_dir)
 
         # Emit an event with a past valid_until

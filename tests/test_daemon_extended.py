@@ -17,11 +17,8 @@ if TYPE_CHECKING:
 # ── Fixture: spin up a daemon on a random port ─────────────────────────
 
 @pytest.fixture
-def daemon_url(tmp_path: Path):
+def daemon_url(brain_dir: Path):
     """Start a GradataDaemon in a background thread, yield its base URL."""
-    brain_dir = tmp_path / "brain"
-    brain_dir.mkdir()
-
     d = GradataDaemon(brain_dir, port=0)
     # Bind to get the port, then serve in a thread
     d._try_bind(0)
@@ -79,11 +76,8 @@ def test_enforce_rules_no_violations(daemon_url: str) -> None:
 
 
 @pytest.fixture
-def daemon_with_lessons(tmp_path: Path):
+def daemon_with_lessons(brain_dir: Path):
     """Start a daemon with pre-seeded lessons.md."""
-    brain_dir = tmp_path / "brain"
-    brain_dir.mkdir()
-
     # Write a lessons.md with a RULE that says "never use em dashes"
     lessons_md = brain_dir / "lessons.md"
     lessons_md.write_text(
