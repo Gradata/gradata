@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from gradata._types import LessonState
+from gradata._types import Lesson, LessonState
 
 _log = logging.getLogger(__name__)
 
@@ -46,11 +46,11 @@ def _normalize_pattern_description(text: str) -> str:
 
 
 def _patterns_to_graduated_lessons(
-    db_path: "Path",
+    db_path: Path,
     current_session: int,
     min_sessions: int = 2,
     min_score: float = 3.0,
-) -> "list":
+) -> list[Lesson]:
     """Lift graduated correction_patterns into synthetic RULE-state lessons.
 
     Before this wiring the 437-row correction_patterns table was orphaned --
@@ -63,7 +63,6 @@ def _patterns_to_graduated_lessons(
         from gradata.enhancements.meta_rules_storage import (  # type: ignore[import]
             query_graduation_candidates,
         )
-        from gradata._types import Lesson, LessonState  # type: ignore[import]
     except ImportError:
         return []
     if not db_path.is_file():
@@ -77,7 +76,7 @@ def _patterns_to_graduated_lessons(
         _log.debug("_patterns_to_graduated_lessons: query failed: %s", exc)
         return []
 
-    lessons: list = []
+    lessons: list[Lesson] = []
     seen: set[tuple[str, str]] = set()
     for row in candidates:
         raw = row.get("representative_text") or ""
@@ -105,9 +104,9 @@ def _patterns_to_graduated_lessons(
 
 
 def _generate_skill_file(
-    lesson: "object",
-    output_dir: "Path",
-) -> "Path | None":
+    lesson: Lesson,
+    output_dir: Path,
+) -> Path | None:
     """Generate a SKILL.md file from a graduated rule.
 
     Only generates for rules meeting quality gate:
