@@ -60,7 +60,12 @@ def get_tenant_id(brain_dir: str | Path) -> str:
         return tid
     except FileExistsError:
         existing = fpath.read_text(encoding="utf-8").strip()
-        return existing if _is_valid_uuid(existing) else tid
+        if _is_valid_uuid(existing):
+            return existing
+        # Corrupt file — overwrite with our fresh UUID so subsequent reads
+        # are consistent. Losing the junk content is the intended behavior.
+        fpath.write_text(tid, encoding="utf-8")
+        return tid
 
 
 def peek_tenant_id(brain_dir: str | Path) -> str | None:

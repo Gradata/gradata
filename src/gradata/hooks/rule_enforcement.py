@@ -40,11 +40,11 @@ def _env_int(name: str, default: int, *, minimum: int = 0) -> int:
     """Parse int env var with fallback on invalid input; clamp to >= minimum."""
     raw = os.environ.get(name)
     if raw is None:
-        return default
+        return max(minimum, default)
     try:
         value = int(raw)
     except (TypeError, ValueError):
-        return default
+        return max(minimum, default)
     return max(minimum, value)
 
 

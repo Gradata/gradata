@@ -181,8 +181,8 @@ def emit(event_type: str, source: str, data: dict | None = None, tags: list | No
                 event["id"] = cursor.lastrowid
             else:
                 existing = conn.execute(
-                    "SELECT id FROM events WHERE ts=? AND type=? AND source=?",
-                    (ts, event_type, source),
+                    "SELECT id FROM events WHERE tenant_id=? AND ts=? AND type=? AND source=?",
+                    (_tid, ts, event_type, source),
                 ).fetchone()
                 event["id"] = existing[0] if existing else None
             conn.commit()
