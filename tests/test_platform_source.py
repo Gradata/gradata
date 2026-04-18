@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from gradata._platform import detect_platform_source
+from gradata._events import detect_platform_source
 
 # ---------------------------------------------------------------------------
 # detect_platform_source — unit tests via env monkeypatch
@@ -115,7 +115,9 @@ def test_emit_caller_can_override_platform_source(fresh_brain, monkeypatch):
     """Callers (e.g. replay / backfill tools) can set platform_source explicitly."""
     monkeypatch.setenv("CLAUDECODE", "1")
     event = fresh_brain.emit(
-        "TEST_EVENT", "pytest", data={"platform_source": "backfill"},
+        "TEST_EVENT",
+        "pytest",
+        data={"platform_source": "backfill"},
     )
     assert event["data"]["platform_source"] == "backfill"
 
@@ -142,7 +144,8 @@ def test_platform_source_coexists_with_scope_metadata(fresh_brain, monkeypatch):
     """
     monkeypatch.setenv("CLAUDECODE", "1")
     event = fresh_brain.emit(
-        "CORRECTION", "brain.correct",
+        "CORRECTION",
+        "brain.correct",
         data={"applies_to": "scope:feature-xyz", "severity": "minor"},
     )
     assert event["data"]["platform_source"] == "claude-code"
