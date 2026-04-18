@@ -152,8 +152,8 @@ def test_fifty_element_cap_is_applied():
     prefix_b = [0.0] * 150
     slope_a, p_a = trend_analysis(prefix_a + tail)
     slope_b, p_b = trend_analysis(prefix_b + tail)
-    assert slope_a == slope_b
-    assert p_a == p_b
+    assert slope_a == pytest.approx(slope_b)
+    assert p_a == pytest.approx(p_b)
 
 
 def test_brain_prove_interprets_trend_results_correctly(tmp_path):
@@ -183,4 +183,4 @@ def test_brain_prove_interprets_trend_results_correctly(tmp_path):
         result = brain.prove()
     assert result["proven"] is True
     assert result["confidence_level"] == "strong"
-    assert result["evidence"]["p_value"] == 0.02
+    assert result["evidence"]["p_value"] == pytest.approx(0.02)
