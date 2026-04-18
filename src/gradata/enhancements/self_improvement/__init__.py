@@ -21,7 +21,7 @@ _graduation.py  — _passes_beta_lb_gate, graduate
 # All of these imports MUST keep working:
 #   from gradata.enhancements.self_improvement import X
 
-from gradata.enhancements.self_improvement._confidence import (
+from ._confidence import (
     ACCEPTANCE_BONUS,
     CATEGORY_SESSION_MAP,
     CONTRADICTION_ACCELERATION,
@@ -61,7 +61,7 @@ from gradata.enhancements.self_improvement._confidence import (
     propagate_confidence,
     update_confidence,
 )
-from gradata.enhancements.self_improvement._graduation import (
+from ._graduation import (
     _passes_beta_lb_gate,
     graduate,
 )
@@ -70,7 +70,7 @@ from gradata.enhancements.self_improvement._graduation import (
 # they are accessible as self_improvement.Lesson etc. via the namespace, but
 # callers that do `from gradata.enhancements.self_improvement import Lesson`
 # need them explicitly re-exported here.
-from gradata._types import (
+from ..._types import (
     CorrectionType,
     Lesson,
     LessonState,
@@ -98,15 +98,15 @@ def __getattr__(name: str):  # type: ignore[return]
     }
 
     if name in _PIPELINE_NAMES:
-        from gradata.enhancements import rule_pipeline
+        from .. import rule_pipeline
 
         return getattr(rule_pipeline, name)
     if name in _CAUSAL_NAMES:
-        from gradata.enhancements import causal_chains
+        from .. import causal_chains
 
         return getattr(causal_chains, name)
     if name in _CLUSTER_NAMES:
-        from gradata.enhancements import clustering
+        from .. import clustering
 
         return getattr(clustering, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
