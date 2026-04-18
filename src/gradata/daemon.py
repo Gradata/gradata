@@ -833,25 +833,6 @@ def _write_pid_file(
     logger.debug("PID file written: %s", pid_file)
 
 
-# ── Logging setup ───────────────────────────────────────────────────────
-
-def _setup_logging(brain_dir: Path) -> None:
-    log_dir = brain_dir / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    handler = RotatingFileHandler(
-        log_dir / "daemon.log",
-        maxBytes=1_048_576,  # 1 MB
-        backupCount=3,
-        encoding="utf-8",
-    )
-    handler.setFormatter(logging.Formatter(
-        "%(asctime)s %(levelname)s %(name)s: %(message)s"
-    ))
-    root_logger = logging.getLogger("gradata")
-    root_logger.addHandler(handler)
-    root_logger.setLevel(logging.DEBUG)
-
-
 # ── Signal handling ─────────────────────────────────────────────────────
 
 def _register_signal_handler(daemon: GradataDaemon) -> None:
@@ -880,7 +861,15 @@ def main() -> None:
     args = parser.parse_args()
 
     brain_dir = Path(args.brain_dir).resolve()
-    _setup_logging(brain_dir)
+    _log_dir = brain_dir / "logs"
+    _log_dir.mkdir(parents=True, exist_ok=True)
+    _log_handler = RotatingFileHandler(
+        _log_dir / "daemon.log", maxBytes=1_048_576, backupCount=3, encoding="utf-8",
+    )
+    _log_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    _log_root = logging.getLogger("gradata")
+    _log_root.addHandler(_log_handler)
+    _log_root.setLevel(logging.DEBUG)
 
     daemon = GradataDaemon(
         brain_dir=brain_dir,
