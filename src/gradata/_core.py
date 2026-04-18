@@ -13,14 +13,14 @@ import re  # used by export functions for slug sanitization
 from datetime import UTC
 from typing import TYPE_CHECKING
 
-from gradata._http import require_https
+from ._http import require_https
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
-    from gradata._types import Lesson
-    from gradata.brain import Brain
+    from ._types import Lesson
+    from .brain import Brain
 
 _log = logging.getLogger("gradata")
 
@@ -57,7 +57,7 @@ def _attribute_domain_fires(
     For each fired rule, increment fires for the correction's category.
     If the correction contradicts the rule, also increment misfires.
     """
-    from gradata.enhancements.self_improvement import _classify_correction_direction
+    from .enhancements.self_improvement import _classify_correction_direction
 
     for rule in brain._fired_rules:
         if not hasattr(rule, "domain_scores"):
@@ -128,8 +128,8 @@ def brain_correct(
 
     # Full enhancement pipeline
     try:
-        from gradata.enhancements.diff_engine import compute_diff
-        from gradata.enhancements.edit_classifier import classify_edits, summarize_edits
+        from .enhancements.diff_engine import compute_diff
+        from .enhancements.edit_classifier import classify_edits, summarize_edits
     except ImportError:
         data = {"draft_text": draft[:2000], "final_text": final[:2000],
                 "edit_distance": 0.0, "severity": "unknown", "outcome": "unknown",
@@ -146,7 +146,7 @@ def brain_correct(
         })
         return result
 
-    from gradata._scope import build_scope
+    from ._scope import build_scope
 
     diff = compute_diff(draft, final)
     classifications = classify_edits(diff)
@@ -157,7 +157,7 @@ def brain_correct(
 
     # PII redaction — runs AFTER extraction on full text, BEFORE storage
     try:
-        from gradata.safety import redact_pii_with_report
+        from .safety import redact_pii_with_report
         draft_redacted, _ = redact_pii_with_report(draft)
         final_redacted, _ = redact_pii_with_report(final)
     except ImportError:
@@ -166,7 +166,7 @@ def brain_correct(
     scope_obj = build_scope(context) if context else None
     scope_data = {}
     if scope_obj:
-        from gradata._scope import scope_to_dict
+        from ._scope import scope_to_dict
         scope_data = scope_to_dict(scope_obj)
 
     # Tag correction scope (default: domain)
@@ -181,7 +181,7 @@ def brain_correct(
     # `requires_review=True` and forced through the existing approval gate so it
     # cannot graduate to a RULE without an explicit promote action.
     try:
-        from gradata.security.correction_hash import build_provenance
+        from .security.correction_hash import build_provenance
         _prov_meta = build_provenance(draft, final, context)
     except Exception as _prov_err:  # pragma: no cover - defensive
         _log.debug("Provenance hash computation failed: %s", _prov_err)
@@ -201,7 +201,7 @@ def brain_correct(
     # (https://arxiv.org/abs/1908.07125).
     adversarial_hits: list[str] = []
     try:
-        from gradata.security.adversarial_blocklist import scan_correction
+        from .security.adversarial_blocklist import scan_correction
         adversarial_hits = scan_correction(draft, final)
     except Exception as _adv_err:  # pragma: no cover - defensive
         _log.debug("Adversarial-phrase scan failed: %s", _adv_err)
@@ -218,7 +218,7 @@ def brain_correct(
     # Uses already-redacted text so PII is never stored in what_wrong/why fields.
     structured_correction = None
     try:
-        from gradata.correction_detector import extract_structured_correction
+        from .correction_detector import extract_structured_correction
         structured_correction = extract_structured_correction(
             draft_redacted, final_redacted, context=str(context or ""),
         )
@@ -272,7 +272,7 @@ def brain_correct(
 
     # Auto-extract patterns
     try:
-        from gradata.enhancements.pattern_extractor import extract_patterns
+        from .enhancements.pattern_extractor import extract_patterns
         patterns = extract_patterns(classifications, scope=scope_obj)
         if patterns:
             event["patterns_extracted"] = len(patterns)
@@ -282,7 +282,7 @@ def brain_correct(
     # Observation dedup — suppress near-identical corrections inside a recent
     # session window so repeat corrections don't inflate fire_count/confidence.
     # See gradata/enhancements/dedup.py for MERGE-vs-DROP policy notes.
-    from gradata.enhancements.dedup import annotate_event_with_dedup
+    from .enhancements.dedup import annotate_event_with_dedup
     is_observation_dup = annotate_event_with_dedup(
         event, brain.db_path,
         draft=draft_redacted, final=final_redacted,
@@ -294,8 +294,8 @@ def brain_correct(
     try:
         from datetime import date as _date
 
-        from gradata._types import Lesson, LessonState
-        from gradata.enhancements.self_improvement import (
+        from ._types import Lesson, LessonState
+        from .enhancements.self_improvement import (
             INITIAL_CONFIDENCE,
             format_lessons,
             parse_lessons,
@@ -328,7 +328,7 @@ def brain_correct(
                         # 2. Keyword templates (fallback)
                         # 3. LLM refinement (when connected)
                         try:
-                            from gradata.enhancements.behavioral_extractor import (
+                            from .enhancements.behavioral_extractor import (
                                 extract_instruction,
                             )
                             behavioral_desc = extract_instruction(
@@ -336,10 +336,10 @@ def brain_correct(
                             )
                             if not behavioral_desc:
                                 # Fallback to keyword templates
-                                from gradata.enhancements.edit_classifier import (
+                                from .enhancements.edit_classifier import (
                                     extract_behavioral_instruction,
                                 )
-                                from gradata.enhancements.instruction_cache import InstructionCache
+                                from .enhancements.instruction_cache import InstructionCache
                                 if not isinstance(brain._instruction_cache, InstructionCache):
                                     brain._instruction_cache = InstructionCache(
                                         lessons_path.parent / "instruction_cache.json"
@@ -356,7 +356,7 @@ def brain_correct(
                 else:
                     desc = f"Corrected {cat.lower()} ({diff.severity})"
 
-                from gradata.enhancements.similarity import best_similarity
+                from .enhancements.similarity import best_similarity
 
                 best_match, best_sim = None, 0.0
                 for existing_l in existing_lessons:
@@ -367,7 +367,7 @@ def brain_correct(
                         best_sim = sim
                         best_match = existing_l
 
-                from gradata._config import get_similarity_threshold
+                from ._config import get_similarity_threshold
                 sim_threshold = get_similarity_threshold(cat)
                 if best_match and best_sim >= sim_threshold:
                     if dry_run:
@@ -393,8 +393,8 @@ def brain_correct(
                         _log.debug("Provenance emit failed: %s", e)
                     # Causal chain: correction reinforces existing rule
                     try:
-                        from gradata.enhancements.causal_chains import CausalChain, CausalRelation
-                        from gradata.enhancements.meta_rules import _lesson_id
+                        from .enhancements.causal_chains import CausalChain, CausalRelation
+                        from .enhancements.meta_rules import _lesson_id
                         if not hasattr(brain, "_causal_chain"):
                             brain._causal_chain = CausalChain()  # type: ignore[attr-defined]
                         correction_id = str(event.get("id", ""))
@@ -445,8 +445,8 @@ def brain_correct(
                     event["lessons_created"] = 1
                     # Causal chain: correction creates new rule
                     try:
-                        from gradata.enhancements.causal_chains import CausalChain, CausalRelation
-                        from gradata.enhancements.meta_rules import _lesson_id
+                        from .enhancements.causal_chains import CausalChain, CausalRelation
+                        from .enhancements.meta_rules import _lesson_id
                         if not hasattr(brain, "_causal_chain"):
                             brain._causal_chain = CausalChain()  # type: ignore[attr-defined]
                         correction_id = str(event.get("id", ""))
@@ -462,7 +462,7 @@ def brain_correct(
                     if approval_required:
                         event["approval_required"] = True
                         try:
-                            from gradata._db import get_connection
+                            from ._db import get_connection
                             with get_connection(brain.db_path) as conn:
                                 conn.execute(
                                     "INSERT INTO pending_approvals "
@@ -492,7 +492,7 @@ def brain_correct(
                     existing_lessons, correction_data, severity_data=severity_data,
                     salt=getattr(brain, "_brain_salt", ""))
 
-                from gradata._db import write_lessons_safe
+                from ._db import write_lessons_safe
                 write_lessons_safe(lessons_path, format_lessons(existing_lessons))
                 if "lessons_created" not in event:
                     event["lessons_updated"] = True
@@ -511,7 +511,7 @@ def brain_correct(
 
     # Self-healing: detect rule failures
     try:
-        from gradata.enhancements.self_healing import detect_rule_failure
+        from .enhancements.self_healing import detect_rule_failure
 
         all_lessons = brain._load_lessons()
         failure = detect_rule_failure(
@@ -540,7 +540,7 @@ def brain_correct(
                 and not getattr(brain, "_renter_mode", False)
             ):
                 try:
-                    from gradata.enhancements.self_healing import auto_heal_failures
+                    from .enhancements.self_healing import auto_heal_failures
 
                     heal_summary = auto_heal_failures(
                         brain,
@@ -581,7 +581,7 @@ def brain_correct(
     try:
         from datetime import date as _fts_date
 
-        from gradata._query import fts_index
+        from ._query import fts_index
         fts_index(source="corrections", file_type="correction",
                   text=f"{category or 'UNKNOWN'}: {summary or diff.severity} - {final_redacted[:500]}",
                   embed_date=_fts_date.today().isoformat(), ctx=brain.ctx)
@@ -613,7 +613,7 @@ def brain_correct(
     # Feed Q-router
     if agent_type:
         try:
-            from gradata.enhancements.pattern_integration import feed_q_router
+            from .enhancements.pattern_integration import feed_q_router
             feed_q_router(brain, diff.severity, agent_type=agent_type, task_type=task_type)
         except Exception as e:
             _log.debug("Q-router feed failed: %s", e)
@@ -631,7 +631,7 @@ def brain_correct(
         import hashlib as _hashlib
         import json
 
-        from gradata.security.correction_provenance import create_provenance_record
+        from .security.correction_provenance import create_provenance_record
         correction_hash = _hashlib.sha256(
             json.dumps([draft, final], separators=(",", ":")).encode()
         ).hexdigest()
@@ -673,7 +673,7 @@ def brain_end_session(
 ) -> dict:
     """Run full graduation sweep at end of session."""
     try:
-        from gradata.enhancements.self_improvement import (
+        from .enhancements.self_improvement import (
             format_lessons,
             graduate,
             parse_lessons,
@@ -736,7 +736,7 @@ def brain_end_session(
                 # / DB path is unavailable.
                 if new_state == "RULE":
                     try:
-                        from gradata.enhancements.rule_canary import promote_to_canary
+                        from .enhancements.rule_canary import promote_to_canary
                         promote_to_canary(
                             lesson.category, brain.session, db_path=brain.db_path,
                         )
@@ -761,7 +761,7 @@ def brain_end_session(
             try:
                 from datetime import UTC, datetime
 
-                from gradata._db import get_connection
+                from ._db import get_connection
                 now = datetime.now(UTC).isoformat()
                 with get_connection(brain.db_path) as conn:
                     for lesson, old_state, new_state in transitions:
@@ -778,8 +778,8 @@ def brain_end_session(
             try:
                 from datetime import UTC, datetime
 
-                from gradata.audit import write_provenance
-                from gradata.inspection import _make_rule_id
+                from .audit import write_provenance
+                from .inspection import _make_rule_id
                 now_prov = datetime.now(UTC).isoformat()
                 for lesson, _old_state, new_state in transitions:
                     if new_state in ("PATTERN", "RULE"):
@@ -808,7 +808,7 @@ def brain_end_session(
                 _log.debug("Provenance logging failed: %s", e)
 
         all_lessons = active + graduated
-        from gradata._db import write_lessons_safe
+        from ._db import write_lessons_safe
         if all_lessons:  # guard against wiping lessons file when all lessons are killed
             write_lessons_safe(lessons_path, format_lessons(all_lessons))
 
@@ -832,8 +832,8 @@ def brain_end_session(
         meta_rules_discovered = 0
         if not skip_meta_rules:
             try:
-                from gradata.enhancements.meta_rules import refresh_meta_rules
-                from gradata.enhancements.meta_rules_storage import load_meta_rules, save_meta_rules
+                from .enhancements.meta_rules import refresh_meta_rules
+                from .enhancements.meta_rules_storage import load_meta_rules, save_meta_rules
                 existing_metas = load_meta_rules(brain.db_path)
                 llm_key = getattr(brain, '_llm_key', None)
                 new_metas = refresh_meta_rules(
@@ -842,7 +842,7 @@ def brain_end_session(
                     **({'api_key': llm_key} if llm_key else {}))
                 if new_metas:
                     if any(l.parent_meta_rule_id for l in all_lessons):
-                        from gradata.enhancements.self_improvement import propagate_confidence
+                        from .enhancements.self_improvement import propagate_confidence
                         propagate_confidence(all_lessons, new_metas)
                         # Re-write lessons to persist propagated confidence
                         if all_lessons:
@@ -874,7 +874,7 @@ def brain_end_session(
                 _log.warning("Meta-rule discovery failed: %s", e)
 
         # Build graduated_rules detail list from transitions
-        from gradata.inspection import _make_rule_id
+        from .inspection import _make_rule_id
         graduated_rules = []
         for l, old_s, new_s in transitions:
             if new_s in ("PATTERN", "RULE"):
@@ -902,7 +902,7 @@ def brain_end_session(
         # back to INSTINCT-range confidence. Best-effort; never fails the
         # session close. See enhancements/rule_canary.py.
         try:
-            from gradata.enhancements.rule_canary import (
+            from .enhancements.rule_canary import (
                 CANARY_SESSIONS,
                 check_canary_health,
                 promote_to_active,
@@ -1023,8 +1023,8 @@ def _cloud_sync_session(
                 return
 
         # 2. Build TelemetryPayload from session data
-        from gradata.cloud.sync import CloudClient as SyncClient
-        from gradata.cloud.sync import CloudConfig, TelemetryPayload
+        from .cloud.sync import CloudClient as SyncClient
+        from .cloud.sync import CloudConfig, TelemetryPayload
 
         # Derive brain_id: use config value, or hash the brain directory path
         b_id = brain_id_from_config or hashlib.sha256(
@@ -1051,7 +1051,7 @@ def _cloud_sync_session(
         # Correction density: corrections per output (approximate from session)
         correction_density = 0.0
         try:
-            from gradata.enhancements.metrics import compute_metrics
+            from .enhancements.metrics import compute_metrics
 
             m = compute_metrics(db_path=brain.db_path, window=1)
             correction_density = float(m.get("correction_density", 0.0))
@@ -1061,7 +1061,7 @@ def _cloud_sync_session(
         # Blandness: compute from correction finals if available
         blandness_score = 0.0
         try:
-            from gradata.enhancements.metrics import compute_blandness
+            from .enhancements.metrics import compute_blandness
 
             finals = [
                 c.get("final", "") for c in session_corrections if c.get("final")
@@ -1126,7 +1126,7 @@ def _cloud_sync_session(
         if sync_mode == "full":
             # 4. Sync events/corrections via the full cloud client (opt-in only)
             try:
-                from gradata.cloud.client import CloudClient
+                from .cloud.client import CloudClient
 
                 cloud = CloudClient(
                     brain_dir=brain.dir,
@@ -1178,7 +1178,7 @@ def brain_auto_evolve(
     threshold: float = 7.0,
 ) -> dict:
     """Evaluate output and auto-generate corrections for failed dimensions."""
-    from gradata.contrib.patterns.evaluator import QUALITY_DIMENSIONS, default_evaluator, evaluate
+    from .contrib.patterns.evaluator import QUALITY_DIMENSIONS, default_evaluator, evaluate
 
     dims = dimensions or QUALITY_DIMENSIONS
     eval_fn = evaluator or default_evaluator
@@ -1264,7 +1264,7 @@ def brain_detect_implicit_feedback(
 def brain_export_rules(brain: Brain, *, min_state: str = "PATTERN", skill_name: str = "") -> str:
     """Export graduated brain rules as OpenSpace-compatible SKILL.md."""
     try:
-        from gradata.enhancements.self_improvement import parse_lessons
+        from .enhancements.self_improvement import parse_lessons
     except ImportError:
         return ""
 
@@ -1345,7 +1345,7 @@ def brain_export_rules(brain: Brain, *, min_state: str = "PATTERN", skill_name: 
 def brain_export_rules_json(brain: Brain, *, min_state: str = "PATTERN") -> list[dict]:
     """Export graduated rules as a flat, sorted JSON array."""
     try:
-        from gradata.enhancements.self_improvement import parse_lessons
+        from .enhancements.self_improvement import parse_lessons
     except ImportError:
         return []
     lessons_path = brain._find_lessons_path()
@@ -1453,7 +1453,7 @@ def _mann_kendall(data: list[int] | list[float]) -> tuple[str, float]:
     if len(data) < 3:
         return "no_trend", 1.0
 
-    from gradata._stats import trend_analysis
+    from ._stats import trend_analysis
     slope, p_value = trend_analysis([float(x) for x in data])
 
     trend = ("decreasing" if slope < 0 else "increasing") if p_value < 0.05 else "no_trend"
@@ -1482,7 +1482,7 @@ def brain_convergence(brain: Brain) -> dict:
              "edit_distance_per_session": [], "edit_distance_trend": "insufficient_data"}
 
     try:
-        from gradata._db import get_connection
+        from ._db import get_connection
         with get_connection(brain.db_path) as conn:
             rows = conn.execute(
                 "SELECT session, COUNT(*) as cnt FROM events "
@@ -1566,7 +1566,7 @@ def brain_convergence(brain: Brain) -> dict:
     else:
         ed_trend = "insufficient_data"
 
-    from gradata._stats import cusum_changepoints
+    from ._stats import cusum_changepoints
     raw_changepoints = cusum_changepoints(counts)
     changepoint_sessions = [sessions[i] for i in raw_changepoints if i < len(sessions)]
 
@@ -1648,8 +1648,8 @@ def brain_prove(brain: Brain) -> dict:
     try:
         lessons_path = brain._find_lessons_path()
         if lessons_path and lessons_path.is_file():
-            from gradata._types import LessonState
-            from gradata.enhancements.self_improvement import parse_lessons
+            from ._types import LessonState
+            from .enhancements.self_improvement import parse_lessons
             lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
             rule_count = sum(1 for l in lessons if l.state in (LessonState.PATTERN, LessonState.RULE))
     except Exception:
@@ -1729,12 +1729,12 @@ def brain_share(brain: Brain) -> dict:
     """
     from datetime import datetime
 
-    from gradata._types import LessonState
+    from ._types import LessonState
 
     lessons_path = brain._find_lessons_path()
     rules: list[dict] = []
     if lessons_path and lessons_path.is_file():
-        from gradata.enhancements.self_improvement import parse_lessons
+        from .enhancements.self_improvement import parse_lessons
         all_lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
         for lesson in all_lessons:
             if lesson.state in (LessonState.PATTERN, LessonState.RULE):
@@ -1775,9 +1775,9 @@ def brain_absorb(brain: Brain, package: dict) -> dict:
     """
     from datetime import date as _date
 
-    from gradata._types import CorrectionType, Lesson, LessonState
-    from gradata.enhancements.self_improvement import format_lessons, parse_lessons
-    from gradata.enhancements.similarity import best_similarity
+    from ._types import CorrectionType, Lesson, LessonState
+    from .enhancements.self_improvement import format_lessons, parse_lessons
+    from .enhancements.similarity import best_similarity
 
     INITIAL_CONFIDENCE = 0.40
 
