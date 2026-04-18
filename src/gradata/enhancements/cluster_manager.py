@@ -59,10 +59,6 @@ class ClusterConfig:
     max_time_gap_days: float = 7.0
     min_cluster_size: int = 2
 
-    @property
-    def max_time_gap_seconds(self) -> float:
-        return self.max_time_gap_days * 86400.0
-
 
 @dataclass
 class ClusterState:
@@ -214,7 +210,7 @@ class ClusterManager:
             # Temporal gating
             last_ts = state.last_timestamps.get(cluster_id, 0.0)
             time_gap = abs(timestamp - last_ts)
-            if time_gap > self.config.max_time_gap_seconds:
+            if time_gap > self.config.max_time_gap_days * 86400.0:
                 continue
 
             # Cosine similarity

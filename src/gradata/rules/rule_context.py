@@ -40,10 +40,6 @@ class GraduatedRule:
     def is_rule_tier(self) -> bool:
         return self.confidence >= 0.90
 
-    @property
-    def is_pattern_tier(self) -> bool:
-        return 0.60 <= self.confidence < 0.90
-
 
 def _rule_matches_domain(rule: GraduatedRule, domain_norm: str) -> bool:
     """Return True if ``rule`` is in-scope for ``domain_norm`` (already lowercased).
@@ -202,7 +198,7 @@ class RuleContext:
         return {
             "total_rules": len(rules),
             "rule_tier": sum(1 for r in rules if r.is_rule_tier),
-            "pattern_tier": sum(1 for r in rules if r.is_pattern_tier),
+            "pattern_tier": sum(1 for r in rules if 0.60 <= r.confidence < 0.90),
             "categories": dict(sorted(
                 {k: len(v) for k, v in self._by_category.items()}.items(),
                 key=lambda x: x[1], reverse=True
