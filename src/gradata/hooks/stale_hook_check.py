@@ -37,22 +37,6 @@ def _slug(text: str) -> str:
     return s[:60] or "rule"
 
 
-def _read_hash_from_hook(path: Path) -> str | None:
-    try:
-        text = path.read_text(encoding="utf-8")
-    except Exception:
-        return None
-    m = _HASH_LINE_RE.search(text)
-    return m.group(1) if m else None
-
-
-def _brain_root() -> Path:
-    override = env_str("GRADATA_BRAIN")
-    if override:
-        return Path(override)
-    return Path("brain")
-
-
 def _hook_dirs() -> list[Path]:
     pre = os.environ.get("GRADATA_HOOK_ROOT") or ".claude/hooks/pre-tool/generated"
     post = os.environ.get("GRADATA_HOOK_ROOT_POST") or ".claude/hooks/post-tool/generated"
@@ -67,7 +51,8 @@ def main() -> int:
     except Exception:
         pass
 
-    brain_root = _brain_root()
+    _override = env_str("GRADATA_BRAIN")
+    brain_root = Path(_override) if _override else Path("brain")
     lessons_by_slug: dict[str, str] = {}
     hooked_texts: list[str] = []
     _lf = brain_root / "lessons.md"
@@ -133,7 +118,13 @@ def main() -> int:
             continue
         for hook_path in sorted(d.glob("*.js")):
             slug = hook_path.stem
-            hook_hash = _read_hash_from_hook(hook_path)
+            try:
+                _hook_text = hook_path.read_text(encoding="utf-8")
+            except Exception:
+                hook_hash = None
+            else:
+                _hm = _HASH_LINE_RE.search(_hook_text)
+                hook_hash = _hm.group(1) if _hm else None
             if not hook_hash:
                 continue
             current_text = lessons_by_slug.get(slug)
