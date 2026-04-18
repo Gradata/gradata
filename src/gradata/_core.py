@@ -655,17 +655,6 @@ def brain_correct(
 # ── end_session() ──────────────────────────────────────────────────────
 
 
-def _graduation_message(old_state: str, lesson: Lesson) -> str:
-    """Generate a user-facing graduation notification message."""
-    if lesson.state.value == "PATTERN":
-        return (f"You've corrected this {lesson.fire_count} times — "
-                f"Gradata learned it: \"{lesson.description[:80]}\"")
-    elif lesson.state.value == "RULE":
-        return (f"Graduated to RULE: \"{lesson.description[:80]}\" — "
-                f"this correction is now permanent ({lesson.confidence:.0%} confidence)")
-    return f"Lesson updated: {lesson.description[:80]}"
-
-
 def brain_end_session(
     brain: Brain, *, session_corrections: list[dict] | None = None,
     session_type: str = "full", machine_mode: bool | None = None,
@@ -744,6 +733,14 @@ def brain_end_session(
                         _log.debug("promote_to_canary failed: %s", e)
                 # User-facing graduation notification
                 try:
+                    if lesson.state.value == "PATTERN":
+                        _gm_msg = (f"You've corrected this {lesson.fire_count} times — "
+                                   f"Gradata learned it: \"{lesson.description[:80]}\"")
+                    elif lesson.state.value == "RULE":
+                        _gm_msg = (f"Graduated to RULE: \"{lesson.description[:80]}\" — "
+                                   f"this correction is now permanent ({lesson.confidence:.0%} confidence)")
+                    else:
+                        _gm_msg = f"Lesson updated: {lesson.description[:80]}"
                     brain.bus.emit("lesson.graduated", {
                         "category": lesson.category,
                         "description": lesson.description[:100],
@@ -751,7 +748,7 @@ def brain_end_session(
                         "new_state": new_state,
                         "fire_count": lesson.fire_count,
                         "confidence": lesson.confidence,
-                        "message": _graduation_message(old_state, lesson),
+                        "message": _gm_msg,
                     })
                 except Exception as e:
                     _log.debug("lesson.graduated emit failed: %s", e)
