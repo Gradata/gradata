@@ -682,7 +682,15 @@ class GradataDaemon:
 
         # PID file
         if self._pid_file:
-            _write_pid_file(self._pid_file, actual_port, self._brain_dir, self._started_at)
+            self._pid_file.parent.mkdir(parents=True, exist_ok=True)
+            self._pid_file.write_text(json.dumps({
+                "port": actual_port,
+                "pid": os.getpid(),
+                "brain_dir": str(self._brain_dir),
+                "sdk_version": _gradata_version,
+                "started_at": self._started_at,
+            }, indent=2), encoding="utf-8")
+            logger.debug("PID file written: %s", self._pid_file)
 
         # SIGTERM handler
         _register_signal_handler(self)
@@ -811,26 +819,6 @@ class GradataDaemon:
 def _pick_port(brain_dir_str: str) -> int:
     """Deterministic port from brain_dir hash: hash % 16383 + 49152."""
     return abs(hash(brain_dir_str)) % 16383 + 49152
-
-
-# ── PID file ────────────────────────────────────────────────────────────
-
-def _write_pid_file(
-    pid_file: Path,
-    port: int,
-    brain_dir: Path,
-    started_at: str,
-) -> None:
-    pid_file.parent.mkdir(parents=True, exist_ok=True)
-    data = {
-        "port": port,
-        "pid": os.getpid(),
-        "brain_dir": str(brain_dir),
-        "sdk_version": _gradata_version,
-        "started_at": started_at,
-    }
-    pid_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    logger.debug("PID file written: %s", pid_file)
 
 
 # ── Signal handling ─────────────────────────────────────────────────────
