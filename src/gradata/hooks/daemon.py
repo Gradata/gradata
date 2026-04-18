@@ -46,20 +46,14 @@ _START_TIME = time.time()
 _MODULE_CACHE: dict[str, object] = {}
 
 
-def _get_hook_module(name: str) -> object | None:
-    """Dynamically import ``gradata.hooks.<name>`` and cache it."""
-    if name in _MODULE_CACHE:
-        return _MODULE_CACHE[name]
-    try:
-        mod = importlib.import_module(f"gradata.hooks.{name}")
-    except ImportError:
-        return None
-    _MODULE_CACHE[name] = mod
-    return mod
-
-
 def _run_hook(name: str, body: str) -> dict:
-    mod = _get_hook_module(name)
+    mod = _MODULE_CACHE.get(name)
+    if mod is None:
+        try:
+            mod = importlib.import_module(f"gradata.hooks.{name}")
+            _MODULE_CACHE[name] = mod
+        except ImportError:
+            mod = None
     if mod is None or not hasattr(mod, "main"):
         return {"error": f"unknown hook: {name}", "exit_code": 127}
 
