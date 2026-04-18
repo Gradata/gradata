@@ -50,6 +50,30 @@ def _build_memory(memory_type: str, content: str, metadata: dict | None, source:
     )
 
 
+def _decay_by_type(
+    store: MemoryStore,
+    memory_type: str,
+    max_age_days: int,
+    min_reinforcements: int,
+) -> list[str]:
+    if not isinstance(store, InMemoryStore):
+        raise NotImplementedError(
+            "decay() is only implemented for InMemoryStore. "
+            "Custom backends must implement their own pruning logic."
+        )
+    pruned: list[str] = []
+    for memory in list(store.all()):
+        if memory.memory_type != memory_type:
+            continue
+        if (
+            memory.age_days() > max_age_days
+            and memory.reinforcement_count < min_reinforcements
+        ):
+            store.delete(memory.id)
+            pruned.append(memory.id)
+    return pruned
+
+
 # ---------------------------------------------------------------------------
 # Core data class
 # ---------------------------------------------------------------------------
@@ -210,22 +234,7 @@ class EpisodicMemory:
 
     def decay(self, max_age_days: int = 30, min_reinforcements: int = 1) -> list[str]:
         """Remove stale, unreinforced episodic memories."""
-        if not isinstance(self._store, InMemoryStore):
-            raise NotImplementedError(
-                "decay() is only implemented for InMemoryStore. "
-                "Custom backends must implement their own pruning logic."
-            )
-        pruned: list[str] = []
-        for memory in list(self._store.all()):
-            if memory.memory_type != self.memory_type:
-                continue
-            if (
-                memory.age_days() > max_age_days
-                and memory.reinforcement_count < min_reinforcements
-            ):
-                self._store.delete(memory.id)
-                pruned.append(memory.id)
-        return pruned
+        return _decay_by_type(self._store, self.memory_type, max_age_days, min_reinforcements)
 
 
 # ---------------------------------------------------------------------------
@@ -317,22 +326,7 @@ class ProceduralMemory:
 
     def decay(self, max_age_days: int = 30, min_reinforcements: int = 1) -> list[str]:
         """Remove stale, unreinforced procedural patterns."""
-        if not isinstance(self._store, InMemoryStore):
-            raise NotImplementedError(
-                "decay() is only implemented for InMemoryStore. "
-                "Custom backends must implement their own pruning logic."
-            )
-        pruned: list[str] = []
-        for memory in list(self._store.all()):
-            if memory.memory_type != self.memory_type:
-                continue
-            if (
-                memory.age_days() > max_age_days
-                and memory.reinforcement_count < min_reinforcements
-            ):
-                self._store.delete(memory.id)
-                pruned.append(memory.id)
-        return pruned
+        return _decay_by_type(self._store, self.memory_type, max_age_days, min_reinforcements)
 
 
 # ---------------------------------------------------------------------------
