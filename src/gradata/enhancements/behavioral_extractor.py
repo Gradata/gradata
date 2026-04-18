@@ -614,40 +614,22 @@ class RecurringPattern:
     confidence: float
 
 
-def _extract_common_verbs(descriptions: list[str]) -> list[str]:
-    verb_prefixes = [
-        "use",
-        "remove",
-        "add",
-        "avoid",
-        "be",
-        "check",
-        "verify",
-        "include",
-        "exclude",
-        "always",
-        "never",
-        "ensure",
-        "keep",
-        "start",
-        "stop",
-        "replace",
-        "shorten",
-        "expand",
-    ]
-    counts: dict[str, int] = {}
-    for desc in descriptions:
-        words = desc.lower().split()
-        for word in words:
-            for prefix in verb_prefixes:
-                if word.startswith(prefix):
-                    counts[prefix] = counts.get(prefix, 0) + 1
-                    break
-    return sorted(counts, key=lambda k: counts[k], reverse=True)[:3]
+_VERB_PREFIXES = (
+    "use", "remove", "add", "avoid", "be", "check", "verify",
+    "include", "exclude", "always", "never", "ensure", "keep",
+    "start", "stop", "replace", "shorten", "expand",
+)
 
 
 def _synthesize_summary(category: str, descriptions: list[str]) -> str:
-    common_verbs = _extract_common_verbs(descriptions)
+    counts: dict[str, int] = {}
+    for desc in descriptions:
+        for word in desc.lower().split():
+            for prefix in _VERB_PREFIXES:
+                if word.startswith(prefix):
+                    counts[prefix] = counts.get(prefix, 0) + 1
+                    break
+    common_verbs = sorted(counts, key=lambda k: counts[k], reverse=True)[:3]
     verb_str = ", ".join(common_verbs[:2]) if common_verbs else "adjust"
     return (
         f"Recurring {category} pattern across {len(descriptions)} corrections: "
