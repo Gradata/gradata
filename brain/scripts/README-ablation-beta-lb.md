@@ -58,7 +58,7 @@ If lift is positive but graduation drop > 50%, tune `GRADATA_BETA_LB_THRESHOLD` 
 
 ## Scaling up
 
-The pilot is intentionally small (~10 tasks × 2 iters, ~20 synthetic lessons). For a rigorous replication, mirror `brain/scripts/ab_test_constitutional.py` — 4 models × multiple conditions × 16+ tasks × 3 iterations, using a real brain fixture (`--brain-fixture C:/Users/olive/SpritesWork/brain`). The v4 closer ran 432 trials; this pilot is 10–30. Treat pilot results as a direction signal, not a ship gate.
+The pilot is intentionally small (~10 tasks × 2 iters, ~20 synthetic lessons). For a rigorous replication, mirror `brain/scripts/ab_test_constitutional.py` — 4 models × multiple conditions × 16+ tasks × 3 iterations, using a real brain fixture (`--brain-fixture "$GRADATA_BRAIN"`). The v4 closer ran 432 trials; this pilot is 10–30. Treat pilot results as a direction signal, not a ship gate.
 
 ## Files
 

@@ -37,7 +37,7 @@ Usage
 
     # Against a real brain fixture instead of the synthetic seed:
     GRADATA_ABLATION_CONFIRM=1 python brain/scripts/ablation_beta_lb_gate.py \
-        --brain-fixture C:/Users/olive/SpritesWork/brain --tasks 5
+        --brain-fixture "$GRADATA_BRAIN" --tasks 5
 """
 
 from __future__ import annotations

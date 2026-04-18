@@ -7,12 +7,13 @@ category + scope, writes updated lessons.md with Path: lines.
 Usage:
     python migrate_tree_paths.py [brain_dir]
 
-    Defaults to C:/Users/olive/SpritesWork/brain if no arg given.
+    Defaults to $GRADATA_BRAIN or ./brain if no arg given.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -111,7 +112,7 @@ def migrate_lessons_file(lessons_path: Path) -> dict:
 
 
 def main():
-    brain_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("C:/Users/olive/SpritesWork/brain")
+    brain_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(os.environ.get("GRADATA_BRAIN", "./brain"))
     lessons_path = brain_dir / "lessons.md"
 
     if not lessons_path.exists():

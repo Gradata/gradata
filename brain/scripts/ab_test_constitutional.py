@@ -6,7 +6,7 @@ statements ("You value X — do Y") outperform imperative commands
 
 Pipeline
 --------
-1. Load lessons from Oliver's brain at ``C:/Users/olive/SpritesWork/brain``.
+1. Load lessons from a brain directory (``--brain-dir`` or ``$GRADATA_BRAIN``).
 2. For each test prompt, build a scoped rule set via ``apply_rules``.
 3. Generate TWO draft outputs using Ollama Gemma4:e4b:
       Version A — rules formatted as ``imperative`` (current default)
@@ -26,7 +26,7 @@ Usage
 
     # Full run (not executed in this commit):
     python brain/scripts/ab_test_constitutional.py \\
-        --brain-dir C:/Users/olive/SpritesWork/brain \\
+        --brain-dir "$GRADATA_BRAIN" \\
         --output .tmp/ab_test_results \\
         --model gemma4:e4b
 
@@ -40,6 +40,7 @@ import argparse
 import json
 import logging
 import math
+import os
 import random
 import re
 import sys
@@ -62,7 +63,7 @@ log = logging.getLogger("ab_test_constitutional")
 
 DEFAULT_MODEL = DEFAULT_OLLAMA_MODEL
 OLLAMA_URL = DEFAULT_OLLAMA_URL
-DEFAULT_BRAIN_DIR = r"C:/Users/olive/SpritesWork/brain"
+DEFAULT_BRAIN_DIR = os.environ.get("GRADATA_BRAIN", "./brain")
 DEFAULT_OUTPUT = ".tmp/ab_test_results"
 
 GEN_TIMEOUT_S = 120

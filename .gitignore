@@ -80,6 +80,10 @@ Leads/
 /brain/sessions/
 /brain/emails/
 
+# Private per-business scaffolds (Brand Nat pattern, never in public repo)
+/Sprites/
+/Hausgem/
+
 # Intermediates (disposable, never commit)
 .tmp/
 
