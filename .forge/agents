@@ -1,0 +1,35 @@
+# CARL Agents Domain — Gradata Agent Framework
+# ===========================================
+# Multi-agent specialization architecture. Defines agent boundaries,
+# handoff protocols, and orchestration rules.
+# Domain-specific agent roster: domain/carl/agents
+
+# ============================================================================
+# AGENT TYPES & CONTRACTS
+# ============================================================================
+
+AGENTS_RULE_0=AGENT TYPES & SCOPE: Five agent types with defined boundaries: (1) RESEARCH AGENT — external data sources, web search. Input: target+context. Output: structured research note. Cannot: draft, update CRM, make strategy calls. (2) DRAFT AGENT — written outputs (emails, scripts, messages, proposals). Input: research note + patterns + framework + history. Output: formatted draft. Cannot: research, update CRM, approve own output. (3) CRM AGENT — CRM reads/writes, deal stages, activities, notes, contacts. Input: action+outcome. Output: confirmed CRM state. Cannot: draft, research. (4) AUDIT AGENT — quality scoring, gate verification, pattern analysis, health checks. Input: any output. Output: score+gaps+recommendations. Cannot: fix what it finds (separation of concerns). Must be independent — never audits own work. (5) ORCHESTRATOR — main session. Routes inputs, spawns agents, handles user interaction. Never does work a specialized agent should do. Domain-specific agent tools: domain/carl/agents.
+
+AGENTS_RULE_1=AGENT CONTRACTS: Input — every agent receives a structured brief: task_type, target_name+context, file paths to read, specific deliverable expected, quality rubric reference. Subagents also get: note template path, quality rules path, post-validation instructions. Output — every agent returns: deliverable, self_score (per quality-rubrics.md), confidence level, files_modified list, flags (anything unexpected). Orchestrator reviews flags before presenting.
+
+AGENTS_RULE_2=AGENT PIPELINES: Research→Draft: research output becomes draft input. Draft MUST NOT re-research — trusts the note. Insufficient research → draft returns "INSUFFICIENT RESEARCH: [what's missing]" to orchestrator. Draft→Audit: audit scores independently. Score < 7 → back to draft with feedback. Max 2 revision cycles — still < 7 after 2 → escalate with both draft and audit notes. Batch: 3+ independent tasks → orchestrator spawns parallel agents, collects results, presents summary. CRM agent handles all writes in batch after others complete.
+
+# ============================================================================
+# WHEN TO USE & COST
+# ============================================================================
+
+AGENTS_RULE_3=Use specialized agents when: (1) task has clear separation of research/draft/CRM/audit, (2) 3+ independent items can parallelize, (3) audit independence matters (wrap-up scoring), (4) CRM batch operations. Do NOT spawn agents for: single quick lookups, user-directed edits, conversational exchanges, tasks requiring real-time user feedback loops.
+
+AGENTS_RULE_4=AGENT COST CONTROL: Research agents hitting paid tools must batch queries. CRM agent uses batch execution. Never spawn 3 research agents each calling paid APIs — spawn 1 that batches all lookups. Maximum 5 subagents per session unless approved. Track agents_spawned_this_session. At 5 → warn: "Agent budget reached. Approve more?"
+
+# ============================================================================
+# HARD BOUNDARIES (protected — never retire)
+# ============================================================================
+
+AGENTS_RULE_5=HARD BOUNDARY: Research Agent prompt MUST NOT include instructions to draft, update CRM, or approve output. If research agent returns a draft → reject and re-spawn.
+
+AGENTS_RULE_6=HARD BOUNDARY: Draft Agent prompt MUST include research output as input. Draft agent MUST NOT have paid tool access. Needs more research → returns "INSUFFICIENT RESEARCH: [what's missing]".
+
+AGENTS_RULE_7=HARD BOUNDARY: Audit Agent MUST NOT receive draft agent's self-score. Scores independently. 2+ point divergence → flag for user.
+
+AGENTS_RULE_8=ENFORCEMENT LOG: Every subagent spawn logged with: agent_type, task_summary, input_contract, output_contract, boundary_violations detected. Log to brain/system-patterns.md Agent Execution Log section.

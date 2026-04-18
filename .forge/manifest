@@ -1,0 +1,203 @@
+# CARL Manifest
+# ==============
+# Controls which domains are active and how they're triggered.
+
+# ============================================================================
+# PRIORITY SYSTEM
+# ============================================================================
+# CRITICAL = always load, never compress (truth, data integrity, cost)
+# HIGH = load at session start (daily operations)
+# NORMAL = load on demand when task triggers (optimization, analytics)
+# Startup loads: CRITICAL + HIGH. NORMAL loads when relevant gate fires.
+# ============================================================================
+#
+# Format:
+#   DEVMODE=true|false                (debug output in responses)
+#   {DOMAIN}_STATE=active|inactive    (whether domain is enabled)
+#   {DOMAIN}_ALWAYS_ON=true|false     (load every prompt, no keyword matching)
+#   {DOMAIN}_RECALL=keyword1,keyword2 (triggers on-demand loading)
+#   {DOMAIN}_EXCLUDE=word1,word2      (skip domain if these words in prompt)
+#
+# Loading Logic:
+#   1. ALWAYS_ON=true domains load every prompt
+#   2. Other active domains load when recall keywords match user prompt
+#   3. Exclusions are checked before matching
+
+# ============================================================================
+# SHADOW MODE SYSTEM
+# ============================================================================
+# New rules can run in SHADOW mode: they make predictions but don't affect output.
+# After 3 sessions of shadow tracking, rules are promoted to ACTIVE or KILLED.
+# Format: {RULE}_MODE=ACTIVE|SHADOW|DORMANT
+# ACTIVE = affects output (default for existing rules)
+# SHADOW = tracks what WOULD have changed, doesn't affect output
+# DORMANT = disabled, not loaded
+# Promotion: 2/3 shadow predictions would have improved output → ACTIVE
+# Kill: 2/3 shadow predictions would have worsened output → KILLED
+# ============================================================================
+
+# ============================================================================
+# SETTINGS
+# ============================================================================
+DEVMODE=false
+
+# ============================================================================
+# SAFETY - Structural & operational protections (always loaded from .carl/safety)
+# ============================================================================
+SAFETY_STATE=active
+SAFETY_ALWAYS_ON=true
+SAFETY_FILE=.carl/safety
+SAFETY_PRIORITY=CRITICAL
+
+# ============================================================================
+# GLOBAL - Gradata universal rules (always loaded from .carl/global)
+# ============================================================================
+GLOBAL_STATE=active
+GLOBAL_ALWAYS_ON=true
+
+# ============================================================================
+# DOMAIN GLOBAL - Domain-specific universal rules (always loaded from domain/carl/global)
+# ============================================================================
+DOMAINGLOBAL_STATE=active
+DOMAINGLOBAL_ALWAYS_ON=true
+DOMAINGLOBAL_FILE=domain/carl/global
+
+# ============================================================================
+# CONTEXT - Dynamic bracket rules based on context window usage
+# ============================================================================
+CONTEXT_STATE=active
+CONTEXT_ALWAYS_ON=true
+
+# ============================================================================
+# COMMANDS - Star-commands like *dev, *review, *brief
+# Detected via *pattern matching, rules in commands file
+# ============================================================================
+COMMANDS_STATE=inactive
+
+# ============================================================================
+# DEMO-PREP - Automated demo prep workflow
+# Triggers on prospect names, demo mentions, pre-call briefing
+# Runs NotebookLM research, loads sales skills, generates deck outline
+# ============================================================================
+DEMOPREP_STATE=active
+DEMOPREP_ALWAYS_ON=false
+DEMOPREP_FILE=domain/carl/demo-prep
+DEMOPREP_RECALL=demo,demo prep,prospect,pre-call,brief,briefing,deck,slide deck,prep for,meeting with,call with,presenting to
+DEMOPREP_EXCLUDE=email,sequence,follow-up,drip
+
+# ============================================================================
+# PROSPECT-EMAIL - Automated prospect email workflow
+# Triggers on email drafting for prospects, inbound leads, follow-ups
+# Loads CCQ framework, queries NotebookLM, personalizes with research
+# ============================================================================
+PROSPECTEMAIL_STATE=active
+PROSPECTEMAIL_ALWAYS_ON=false
+PROSPECTEMAIL_FILE=domain/carl/prospect-email
+PROSPECTEMAIL_RECALL=email,write an email,draft email,follow-up,follow up,inbound,outreach,cold email,reply to,respond to,send to,email to,write to
+PROSPECTEMAIL_EXCLUDE=demo,deck,slide
+
+# ============================================================================
+# COLDCALL - Phone prospecting workflow
+# Triggers on cold calls, dialing, talk tracks, voicemail scripts
+# Loads call frameworks, pre-call research, objection handling
+# ============================================================================
+COLDCALL_STATE=active
+COLDCALL_ALWAYS_ON=false
+COLDCALL_FILE=domain/carl/coldcall
+COLDCALL_RECALL=cold call,call script,dial,talk track,phone,voicemail,calling,ring,cold calling,phone prospecting,call prep
+COLDCALL_EXCLUDE=email,demo,deck,follow-up
+
+# ============================================================================
+# LISTBUILD - Lead enrichment pipeline workflow
+# Triggers on CSV management, Prospeo/ZeroBounce/Instantly pipeline
+# Enforces folder conventions, credit tracking, deduplication
+# ============================================================================
+LISTBUILD_STATE=active
+LISTBUILD_ALWAYS_ON=false
+LISTBUILD_FILE=domain/carl/listbuild
+LISTBUILD_RECALL=list,CSV,leads,enrich,Prospeo,ZeroBounce,Instantly,Apify,scrape,commenters,upload,batch,sweep,pipeline,enrichment,lead list,build list
+LISTBUILD_EXCLUDE=demo,deck,email
+
+# ============================================================================
+# LINKEDIN - LinkedIn outreach workflow
+# Triggers on LinkedIn messages, connection requests, DMs, InMails
+# Covers copy, sequencing, and LinkedIn → Apollo handoff
+# ============================================================================
+LINKEDIN_STATE=active
+LINKEDIN_ALWAYS_ON=false
+LINKEDIN_FILE=domain/carl/linkedin
+LINKEDIN_RECALL=LinkedIn,connect,DM,InMail,connection request,LinkedIn message,LinkedIn outreach,LinkedIn connect
+LINKEDIN_EXCLUDE=email,demo,deck
+
+# ============================================================================
+# LOOP CORE — Critical guardrails (always on, data integrity)
+# ============================================================================
+LOOPCORE_STATE=active
+LOOPCORE_ALWAYS_ON=true
+LOOPCORE_FILE=domain/carl/loop-core
+
+# ============================================================================
+# LOOP ADVANCED — Optimization, analytics, meta-loop (recall-triggered)
+# ============================================================================
+LOOPADV_STATE=active
+LOOPADV_ALWAYS_ON=false
+LOOPADV_FILE=domain/carl/loop-advanced
+LOOPADV_RECALL=loop,sequence,touch,follow-up,what's due,check replies,what's working,pattern,learning loop,cadence,re-engage,nurture,next touch,due today,overdue,pipeline,deals,stale,what's next
+
+# ============================================================================
+# AGENTS - Multi-agent specialization architecture
+# Defines agent boundaries, handoff protocols, orchestration rules
+# Loaded when parallel work or specialized agent tasks are needed
+# ============================================================================
+AGENTS_STATE=active
+AGENTS_ALWAYS_ON=false
+AGENTS_FILE=.carl/agents
+AGENTS_DOMAIN_FILE=domain/carl/agents
+AGENTS_RECALL=agent,parallel,research agent,draft agent,crm agent,audit agent,batch,subagent,multi-agent,orchestrate,specialized
+
+# ============================================================================
+# SKILL CONTRACTS (inspired by oswalpalash/ontology)
+# ============================================================================
+# Each domain declares what data it reads and writes. This makes dependencies
+# explicit for SDK portability — any domain can be extracted as a standalone
+# skill because its data contract is declared, not implicit.
+#
+# Format:
+#   {DOMAIN}_READS=file1,file2,...
+#   {DOMAIN}_WRITES=file1,file2,...
+#   {DOMAIN}_REQUIRES=precondition1,precondition2,...
+#
+# PROSPECTEMAIL contract:
+PROSPECTEMAIL_READS=brain/prospects/*,brain/emails/PATTERNS.md,brain/personas/*,.claude/lessons.md
+PROSPECTEMAIL_WRITES=brain/prospects/*,brain/emails/PATTERNS.md
+PROSPECTEMAIL_REQUIRES=vault_note_exists_or_created,patterns_read,gate_complete
+
+# DEMOPREP contract:
+DEMOPREP_READS=brain/prospects/*,brain/emails/PATTERNS.md,brain/personas/*,.claude/lessons.md,docs/Demo Prep/*
+DEMOPREP_WRITES=brain/prospects/*,docs/Demo Prep/*
+DEMOPREP_REQUIRES=calendar_confirmed,vault_note_exists_or_created,gate_complete
+
+# LOOPCORE contract:
+LOOPCORE_READS=brain/prospects/*,brain/emails/PATTERNS.md
+LOOPCORE_WRITES=brain/prospects/*
+LOOPCORE_REQUIRES=prospect_notes_scanned
+
+# LOOPADV contract:
+LOOPADV_READS=brain/prospects/*,brain/emails/PATTERNS.md,brain/system-patterns.md,.claude/audit-log.md
+LOOPADV_WRITES=brain/prospects/*,brain/emails/PATTERNS.md,brain/system-patterns.md
+LOOPADV_REQUIRES=prospect_notes_scanned,outcomes_checked
+
+# COLDCALL contract:
+COLDCALL_READS=brain/prospects/*,brain/personas/*,.claude/lessons.md
+COLDCALL_WRITES=brain/prospects/*
+COLDCALL_REQUIRES=linkedin_visited,gate_complete
+
+# LINKEDIN contract:
+LINKEDIN_READS=brain/prospects/*,brain/personas/*,.claude/lessons.md
+LINKEDIN_WRITES=brain/prospects/*
+LINKEDIN_REQUIRES=profile_visited,gate_complete
+
+# LISTBUILD contract:
+LISTBUILD_READS=Leads/*,brain/prospects/*
+LISTBUILD_WRITES=Leads/*,brain/prospects/*
+LISTBUILD_REQUIRES=icp_criteria_loaded

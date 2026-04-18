@@ -94,6 +94,8 @@ sdk/research/_archived_v2_reference/
 graphify-out/
 **/graphify-out/
 src/gradata/graphify-out/
+.graphify_*
+
 
 # Junk files from cmd.exe redirect misparse (Windows agent output artifacts)
 # When subagents run Bash commands, cmd.exe interprets > in stdout as redirects

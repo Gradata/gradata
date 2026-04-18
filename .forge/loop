@@ -1,0 +1,318 @@
+# CARL Loop Domain
+# ============================
+# Universal closed-loop sales intelligence. Every sales activity (email, call, demo, proposal, close)
+# gets tagged, tracked, and fed back into the system. Loop makes every interaction smarter than the last.
+# Compacted 2026-03-19: 80 → 60 rules. Retired 4 (meta-description, interaction phrases,
+# gap scanner, complexity ceiling overlap). Merged 25 rules into 9 merged rules.
+
+# ============================================================================
+# PRE-ACTION: Query patterns before any activity
+# ============================================================================
+LOOP_RULE_0=Before ANY outbound activity (email, call prep, demo prep, proposal, follow-up), read brain/emails/PATTERNS.md. Check: (1) What angle/approach works best for this persona? (2) What tone gets results at this deal stage? (3) What framework converts for this scenario? (4) What approaches have FAILED for similar prospects? (5) What's the confidence level for each recommendation? Apply insights. If no data exists, use best judgment and tag carefully for future learning.
+LOOP_RULE_0_PRIORITY=CRITICAL
+
+LOOP_RULE_1=When choosing an approach for any follow-up touch, NEVER repeat the same angle that failed. Check the prospect's sequence history in brain/prospects/[Name].md. If Touch 1 used "case-study" and got no reply, Touch 2 must use a different angle. If a demo thread fell flat, don't lead with it next time. Repetition = ghosted. This is Loop's most important rule.
+LOOP_RULE_1_PRIORITY=CRITICAL
+
+LOOP_RULE_2=Angle rotation: maintain 70-80% volume on proven approaches (PATTERNS.md confidence [PROVEN] or [EMERGING] with strong early results), 20-30% on experimental angles. Before drafting, check if this prospect/persona has untested angles worth exploring. If all high-confidence angles have been tried, rotate to the next best experimental angle. Never burn all proven angles on the same prospect in sequence.
+LOOP_RULE_2_PRIORITY=HIGH
+
+# ============================================================================
+# DURING ACTION: Tag everything
+# ============================================================================
+LOOP_RULE_3=Every interaction MUST include a tag block in the prospect note BEFORE Oliver approves output. Email tags: type, channel, intent, tone, angle, framework, sequence_position, subject. Call tags: add opener, talk_track, duration, connected_with. Demo tags: add threads_shown, resonated, fell_flat, buying_signals, objections. Proposal tags: add pricing_tier, packaging, discount. No untagged activity leaves the system — if you skip tags, the learning loop breaks.
+LOOP_RULE_3_PRIORITY=CRITICAL
+
+LOOP_RULE_4=Tag taxonomy (use these values consistently): type: cold|warm|follow-up|inbound|re-engage|post-demo|proposal|referral|breakup|nurture. channel: email|call|linkedin|demo|meeting|proposal. intent: book-call|get-reply|nurture|close|discover|deliver-value|handle-objection|push-decision|get-referral. tone: direct|casual|consultative|formal|curious|empathetic. angle: [CLOSED SET — must use one of these. Add new angles to PATTERNS.md table BEFORE first use] direct|pain-point|case-study|competitor-pain|roi-calc|trigger-event|personal-connection|industry-trend|their-own-words|trial-results|white-label|breakup-referral|research-invite|time-savings|revenue-lift|cost-reduction|ad-automation|skill-offer|productivity|seo-automation|advisor-feedback|burnout|onboarding-support.
+LOOP_RULE_4_PRIORITY=CRITICAL
+
+# ============================================================================
+# POST-ACTION: Track outcomes
+# ============================================================================
+LOOP_RULE_5=At session startup, scan brain/prospects/ for any touch where outcome = "pending". Cross-reference Gmail for replies from that prospect. If reply found: update outcome (positive-reply, negative-reply, meeting-booked, deal-advanced), set reply_sentiment, record outcome_date. If no reply and next_touch date has passed: update outcome to "no-reply" and calculate next touch from cadence rules. For demos: check if deal stage changed in Pipedrive.
+LOOP_RULE_5_PRIORITY=CRITICAL
+
+LOOP_RULE_6=When a deal stage changes, update the prospect note AND mark which touch/activity triggered the stage change. This connects individual interaction performance to deal-level outcomes — the most valuable signal in Loop.
+LOOP_RULE_6_PRIORITY=HIGH
+
+LOOP_RULE_7=Reply classification: positive-reply (interested, asked question, agreed to next step), negative-reply (not interested, unsubscribe, wrong person), meeting-booked (calendar confirmed), deal-advanced (moved to next pipeline stage), objection-raised (specific objection surfaced), referral-given (referred to someone else), ghosted (3+ touches, zero engagement). Each classification feeds different pattern tables.
+LOOP_RULE_7_PRIORITY=HIGH
+
+# ============================================================================
+# LEARNING: Aggregate patterns
+# ============================================================================
+LOOP_RULE_8=At session wrap-up, if ANY prospect interaction happened, scan ALL prospect notes in brain/prospects/ and update brain/emails/PATTERNS.md tables. Recalculate reply rates, conversion rates, confidence levels. Add new negative patterns. Update cadence rules if data suggests different timing. Surface "what changed" — newly proven patterns, newly failing angles, confidence level changes.
+LOOP_RULE_8_PRIORITY=HIGH
+
+LOOP_RULE_9=Confidence tiers: <3 data points = [INSUFFICIENT] (never present as guidance). 3-9 = [HYPOTHESIS] (mention but caveat heavily). 10-25 = [EMERGING] (directional signal, use as guidance). 25-50 = [PROVEN] (statistically meaningful for large effects). 50-100 = [HIGH CONFIDENCE] (can detect moderate effects). 100+ = [DEFINITIVE] (safe for playbook-level rules). Always tell Oliver the confidence level AND sample size when recommending an approach.
+LOOP_RULE_9_PRIORITY=CRITICAL
+
+LOOP_RULE_10=Two data tiers tracked separately in PATTERNS.md: (1) COLD TIER — Instantly bulk data (Anna's + Oliver's campaigns). High volume, lower personalization. Useful for broad angle/persona insights. (2) PIPELINE TIER — Claude-written personalized touches for active deals. Lower volume but higher signal quality. These tiers have different benchmarks — don't compare cold bulk rates to warm pipeline rates.
+LOOP_RULE_10_PRIORITY=HIGH
+
+# ============================================================================
+# CADENCE: Automated touch scheduling
+# ============================================================================
+LOOP_RULE_11=Default cadences (override with PATTERNS.md data as it accumulates): Post-Demo: day 3, 5, 10, 14. Cold: day 0, 3, 6, 8(LinkedIn), 12, 16(breakup). Re-engage: day 7, 14, 30. Nurture (warm, no urgency): day 7, 21, 45. Proposal: day 3, 5, 10, 14. Trial: day 3, 7 (check-in), 14 (results review). NEVER follow up Day 1-2 after a meeting or proposal — reads desperate. Earliest follow-up is Day 3. Breakup emails are consistently the highest-reply touch (from Instantly data) — always include one.
+LOOP_RULE_11_PRIORITY=HIGH
+
+LOOP_RULE_12=When surfacing due touches at startup, group by urgency: OVERDUE (past next_touch), DUE TODAY, UPCOMING (next 3 days). For each, show: prospect name, company, deal stage, last touch summary, days since last touch, suggested approach (angle + tone from PATTERNS.md), and why. Format as a scannable table, not paragraphs.
+LOOP_RULE_12_PRIORITY=HIGH
+
+# ============================================================================
+# DEAL LIFECYCLE: Full-funnel tracking
+# ============================================================================
+LOOP_RULE_13=On deal close (won or lost), fill the Deal Outcome section. This is Loop's most valuable data — it retroactively validates or invalidates every touch in the sequence. For closed-won: deciding factor, what almost killed it, cycle length, final pricing, champion. For closed-lost: why, which objection won, what would be different, where the deal went off track. Immediately update PATTERNS.md deal velocity and objection tables.
+LOOP_RULE_13_PRIORITY=HIGH
+
+LOOP_RULE_14=Demo intelligence: after every demo, log which threads were shown AND in what order, what resonated (prospect leaned in, asked questions, said "cool"), what fell flat (silence, topic change, skepticism). Over time this tells you: "Agency owners engage most when you lead with SEO thread, not creative." "Founders care about copilot, not reporting." This data is as valuable as email reply rates.
+LOOP_RULE_14_PRIORITY=HIGH
+
+# ============================================================================
+# CROSS-CAMPAIGN INTELLIGENCE: Learn from Instantly too
+# ============================================================================
+LOOP_RULE_15=Instantly cold outreach data is tracked in PATTERNS.md under the COLD TIER. When Oliver says "pull data from Instantly" or "check campaign performance", query Instantly MCP tools, update the cold tier tables. Key insight: Anna's campaigns provide volume data (what angles/personas work at scale), Oliver's pipeline provides precision data (what converts to revenue). Both feed Loop.
+LOOP_RULE_15_PRIORITY=NORMAL
+
+LOOP_RULE_16=Key Instantly insights baked into Loop (from 82K+ emails): (1) Break-up email (Step 4) is the highest-reply touch. (2) Founder-to-founder framing gets warmer responses. (3) Research/curiosity angle generates most pipeline volume. (4) Pattern interrupt on Step 2 triggers curiosity replies. (5) Agency vertical is the best-performing segment (8.8% reply). (6) "Replace your agency" is dead (0.1%). (7) Short subject lines outperform.
+LOOP_RULE_16_PRIORITY=NORMAL
+
+# ============================================================================
+# GUARDS: Prevent bad data
+# ============================================================================
+LOOP_RULE_17=Never fabricate outcome data. If unknown whether an email got a reply, set outcome to "pending" and check Gmail. If Gmail returns nothing AND next_touch passed, set "no-reply". Bad data poisons the learning loop. Variables with <3 data points = [INSUFFICIENT], never present as guidance.
+LOOP_RULE_17_PRIORITY=CRITICAL
+
+LOOP_RULE_18=Track Oliver's interactions as the primary data source. Anna's Instantly campaign data is included in the COLD TIER for volume insights, but Loop's personalized pipeline learning is Oliver's style and approach. Don't mix the two tiers when calculating pipeline-tier patterns.
+LOOP_RULE_18_PRIORITY=HIGH
+
+LOOP_RULE_19=When presenting pattern insights, ALWAYS cite data: "Agency owners respond 40% to case-study angles (8/20 emails, [EMERGING])." Never present raw percentages without sample size and confidence level. If Oliver asks "what works?" and the answer is [HYPOTHESIS], say so.
+LOOP_RULE_19_PRIORITY=CRITICAL
+
+# ============================================================================
+# ENFORCEMENT: Critical data requirements
+# ============================================================================
+LOOP_RULE_20=If a prospect note has stage >= demo-scheduled and pipedrive_deal_id is empty, flag as CRITICAL at session startup. Do not draft follow-ups or proposals for this prospect until the deal ID is populated. This ensures CRM-to-brain bidirectional sync.
+LOOP_RULE_20_PRIORITY=CRITICAL
+
+LOOP_RULE_21=Angle values MUST come from the closed taxonomy in LOOP_RULE_4. If a draft requires a new angle not in the list, add it to PATTERNS.md's angle table FIRST (with 0 sent, 0 replies, [INSUFFICIENT] confidence), then use it. This prevents data fragmentation. Map legacy custom angles: "force-multiplier" → pain-point, "agency-scale" → revenue-lift, "build-plan" → trial-results, "media-buying-without-hiring" → ad-automation, "onboarding-support" → deliver-value (intent, not angle — reclassify).
+LOOP_RULE_21_PRIORITY=HIGH
+
+LOOP_RULE_22=At session startup, after scanning for due touches, run the Loop quick health check: (1) When was PATTERNS.md last updated? Flag if >3 sessions ago. (2) How many touches have outcome = "pending"? Flag if >5. (3) What % of active prospects have pipedrive_deal_id populated? Flag if <100% for stage >= demo-scheduled. Output: "Loop: [age] | [X pending] | [X/Y deal IDs] — [OK/ATTENTION/CRITICAL]"
+LOOP_RULE_22_PRIORITY=HIGH
+
+# ============================================================================
+# BLOAT PREVENTION: Keep the system lean (merged from 6 rules)
+# ============================================================================
+LOOP_RULE_23=SESSION FILE LIMITS: (1) loop-state.md must stay under 80 lines — trim completed research, collapse old "What Changed" into summary, archive resolved flags. It's a snapshot, not a history. (2) "What Changed" keeps only the LAST session's changes — previous go to daily notes. (3) Gmail Check List — only PENDING outcomes, remove resolved at wrap-up. (4) Research Backlog — only OPEN items, completed get one session grace then removed.
+LOOP_RULE_23_PRIORITY=HIGH
+
+LOOP_RULE_24=DATA FILE LIMITS: (1) PATTERNS.md max 300 lines — cold tier angles with 0 replies AND <100 sends after 90 days archive to "Retired Angles." Cross-Deal Insights max 10 bullets. (2) Prospect notes max 150 lines — 6+ touches summarize 1-3 into "Early Sequence Summary," keep last 3 full. Archived prospects (closed-lost or stale >30d at cold/qualified) move to brain/archive/. (3) brain/prospects/ max 20 active files. Session Notes/ keep last 7 days. (4) Startup token budget: loop-state + CARL + CLAUDE.md sufficient for most sessions. Load PATTERNS.md, prospect notes, gates.md only when needed. Never pre-load all prospect notes.
+LOOP_RULE_24_PRIORITY=HIGH
+
+# ============================================================================
+# SYSTEM LOOP: Self-optimizing components
+# ============================================================================
+LOOP_RULE_25=At wrap-up step 9, update brain/system-patterns.md with this session's data: (1) Which gates ran? Did they catch anything or get rubber-stamped? (2) Which lessons fired? Did they prevent a repeat mistake? (3) Which smoke checks passed/failed? (4) Audit scores for each dimension. (5) Did any wrap-up steps get skipped? (6) Did any tools fail and fallbacks trigger? (7) Did Oliver override any self-scores? Log all of it. This is Loop applied to the system.
+LOOP_RULE_25_PRIORITY=HIGH
+
+LOOP_RULE_26=System pattern retirement rules: (1) Gate STEP (not whole gate) rubber-stamped 20+ times with zero catches → flag step for removal, keep the gate. (2) Smoke check passing 20+ consecutive times → retire to monthly spot-check. (3) CARL LAZY domains: NEVER retire for being dormant — that's their design. Only flag if a domain LOADS (keyword matched) but rules never fire (loaded but useless). ALWAYS_ON domains track rule usage normally. (4) Lesson logged but same mistake recurs 3+ times → rule isn't working, redesign it. (5) Fallback option that works better than primary → swap them. (6) Changelog tracking: rapid rule addition = system forming (normal). Rule removal/modification = system maturing (healthy).
+LOOP_RULE_26_PRIORITY=HIGH
+
+LOOP_RULE_27=Every 5 sessions, run a system trend analysis from system-patterns.md: (1) Which audit dimensions are trending down? (2) Which gates are catching real problems vs dead weight? (3) Which lessons graduated vs which are stuck? (4) Are tool failures increasing? (5) Is calibration drift happening? Surface findings to Oliver as "System Loop Report" — 5 lines max.
+LOOP_RULE_27_PRIORITY=HIGH
+
+# ============================================================================
+# CROSS-WIRING: Components feed into each other bidirectionally (protected)
+# ============================================================================
+LOOP_RULE_28=Auditor → Gates. When post-session audit scores a dimension below 7, check if a gate covers that dimension. If yes, tighten the gate step (add a check, raise the bar). If no gate covers it, flag for new gate step creation. Track: auditor_to_gate_fires, improvements_made.
+LOOP_RULE_28_PRIORITY=NORMAL
+
+LOOP_RULE_29=Gates → Lessons. When a gate catches a real problem (not rubber-stamped), auto-generate a lesson in lessons.md if the problem pattern isn't already captured. Format: "[DATE] GATE-GENERATED: [gate name] caught [problem] → [rule]". Track: gate_to_lesson_fires, lessons_generated.
+LOOP_RULE_29_PRIORITY=NORMAL
+
+LOOP_RULE_30=Lessons → CARL Rules. When a lesson has prevented the same mistake 3+ times (tracked in system-patterns.md Lesson Effectiveness table), promote it to a CARL rule in the appropriate domain. Remove from lessons.md, add to domain file with comment "# Graduated from lesson [date]". Track: lesson_to_carl_fires, rules_created.
+LOOP_RULE_30_PRIORITY=NORMAL
+
+LOOP_RULE_31=Smoke Failures → Auto-Lessons. When any smoke check fails (thread matching, email format, deal ID, etc.), auto-generate a lesson if one doesn't already exist for that failure mode. The lesson includes the fix. Track: smoke_to_lesson_fires, lessons_generated.
+LOOP_RULE_31_PRIORITY=NORMAL
+
+LOOP_RULE_32=Rubric Drift → Auto-Tighten. When Oliver corrects a self-score by 2+ points on the same output type 3 times, auto-tighten that rubric dimension by 1 point in quality-rubrics.md. Track: drift_corrections, rubrics_tightened.
+LOOP_RULE_32_PRIORITY=NORMAL
+
+LOOP_RULE_33=Fallback Success → Auto-Reorder. When a fallback tool works on first try 5+ times while the primary fails, swap primary and fallback in fallback-chains.md. Track: reorder_fires, swaps_made.
+LOOP_RULE_33_PRIORITY=NORMAL
+
+LOOP_RULE_34=PATTERNS.md → Gates. When PATTERNS.md shows an angle with [PROVEN] failure rate >80% for a persona, add it to the Pre-Draft gate as a blocked angle for that persona. Prevent wasting touches on dead approaches. Track: pattern_to_gate_fires, angles_blocked.
+LOOP_RULE_34_PRIORITY=NORMAL
+
+# ============================================================================
+# META-LOOP: Track event connections and hooks (merged from 5 rules)
+# ============================================================================
+LOOP_RULE_35=EVENT CONNECTION TRACKING: Every event connection (hooks + rules 28-34) has tracking counters: fires (times triggered), value_produced (times output was useful — used by Oliver, prevented a mistake, improved a score). Update at wrap-up step 9 in system-patterns.md Event Connection Performance table. Health scoring: value_rate = value_produced / fires. Below 0.2 after 10+ fires → LOW VALUE, flag for review. Above 0.6 → HIGH VALUE, consider strengthening. Zero fires after 5 sessions → DORMANT, investigate.
+LOOP_RULE_35_PRIORITY=NORMAL
+
+LOOP_RULE_36=META-LOOP OPERATION: Runs every 5th session (aligned with system trend analysis). Produces "Connection Report" — 3 lines max: (1) highest-value event connection and why, (2) lowest-value connection and recommendation (tighten, loosen, or kill), (3) dormant connections to investigate. Self-tracking: after 3 meta-loop cycles (15 sessions), evaluate if recommendations improved system performance. No improvement → simplify to annual review. RECURSION CAP: maximum 3 layers (L1 sales, L2 system, L3 meta). No Layer 4. Complexity earns its keep or dies.
+LOOP_RULE_36_PRIORITY=NORMAL
+
+# ============================================================================
+# CONVERGENCE & COMPLEXITY (merged from 5 rules)
+# ============================================================================
+LOOP_RULE_37=CONVERGENCE & KILL SWITCHES: Kill switch: every optimization mechanism has a cycle counter. 5 consecutive cycles producing zero actionable changes → auto-disable to DORMANT. Oliver can re-enable. Convergence detection: system is converging when (a) audit scores 9+ for 3 sessions, (b) no new lessons for 3 sessions, (c) CARL rules stable for 3 sessions, (d) event connection value rates above 0.5 or dormant. When converging → reduce meta-loop to every 10 sessions. Maturity indicators tracked in system-patterns.md: sessions_since_last_new_lesson, sessions_since_last_rule_change, sessions_since_last_gate_catch, avg_audit_score_last_5, event_connection_dormancy_rate. 4/5 stable → system is mature.
+LOOP_RULE_37_PRIORITY=NORMAL
+
+LOOP_RULE_38=DIVERGENCE & COMPLEXITY BUDGET: Divergence: if a converged system shows audit score below 8, 3+ new lessons in one session, or 2+ smoke check failures → re-enable dormant optimizations, increase meta-loop to every 5 sessions. Complexity budget: max 10 event connections, max 5 meta-loop trackers, max 100 CARL behavioral rules. At 90% of any limit → trigger pruning, remove lowest value_rate first. Complexity is a finite resource.
+LOOP_RULE_38_PRIORITY=NORMAL
+
+# ============================================================================
+# PREDICTIVE PIPELINE (merged from 3 rules)
+# ============================================================================
+LOOP_RULE_39=DEAL HEALTH & CLOSE PROBABILITY: Health score (0-100) per active deal from: (a) days_in_stage vs avg, (b) touches_without_reply vs avg, (c) last_touch_recency, (d) objection_severity (none=1.0, soft=0.8, hard=0.6, budget=0.4), (e) engagement_signals (replied=+0.2, questions=+0.1, meeting=+0.3). Below 40 = AT RISK, surface proactively at startup for deals not already flagged overdue. Requires 10+ closed deals to calibrate; until then tag [UNCALIBRATED]. Close probability (15+ deals): probability = base_rate × stage_multiplier × recency × engagement. Weighted pipeline = sum(probability × deal_value). Until calibrated, note "[NEEDS 15+ CLOSED DEALS]".
+LOOP_RULE_39_PRIORITY=NORMAL
+
+# ============================================================================
+# SELF-EVOLVING PLAYBOOKS (merged from 3 rules)
+# ============================================================================
+LOOP_RULE_40=FRAMEWORK EFFECTIVENESS: Track per framework (CCQ, Gap Selling, JOLT, SPIN, Challenger): times_used, conversion_rate_by_persona, avg_deal_velocity. Every 5 sessions compare. Below 10% conversion after 10+ uses → flag for archival. Above 40% for a persona → auto-tag as DEFAULT in PATTERNS.md. Auto-update triggers: demo thread order closes faster → update defaults; tone+angle combo outperforms 2x → add as recommended; follow-up timing outperforms → override cadence. Dead detection: framework file not loaded in 20+ sessions AND no PATTERNS.md data → archive. Oliver confirms before deletion.
+LOOP_RULE_40_PRIORITY=NORMAL
+
+# ============================================================================
+# SIGNAL MONITORING (merged from 3 rules)
+# ============================================================================
+LOOP_RULE_41=SIGNAL MONITORING: Signal types in brain/signals.md: TRIGGER (funding, new role, expansion), INTENT (pricing page visit, demo request), COMPETITIVE (evaluating alternatives), SOCIAL (LinkedIn post about pain), MARKET (industry news). Each signal: source, prospect, date_detected, relevance_score, action_taken. At startup, scan for unprocessed signals — relevance > 7 gets immediate attention, others queue for next touch. Sources: Gmail auto-forwards from Google Alerts, Apollo job change alerts, Instantly reply sentiment, Calendly booking notifications.
+LOOP_RULE_41_PRIORITY=NORMAL
+
+# ============================================================================
+# COMPOUND EXPERIMENTS: Active hypothesis testing
+# ============================================================================
+LOOP_RULE_42=EXPERIMENT PROTOCOL (autoresearch-inspired): (1) ISOLATE — change exactly ONE variable per experiment. Name it explicitly: "subject line length" or "send timing" or "angle for [persona]." Changing two things = two experiments. (2) HYPOTHESIZE — write a 1-line prediction with a numeric threshold BEFORE executing: e.g. "Short subject lines (<5 words) will outperform long (>8 words) by 10%+ reply rate for agency owners." (3) REGISTER — log to brain/system-patterns.md Experiment Log before first send: DATE | EXP-[N] | variable | hypothesis | metric | threshold | STATUS: RUNNING. (4) RUN — execute over one campaign cycle. Minimum 5 data points per variant. Tag every touch with experiment name + variant per LOOP_RULE_3-4. (5) SCORE — binary decision only. KEEP if variant meets or exceeds the threshold. DISCARD if it doesn't. No "interesting but inconclusive" — threshold not met = discard. (6) RECORD — update Experiment Log: STATUS: KEEP [result] or STATUS: DISCARD [result]. KEEP results feed LOOP_RULE_40 (framework effectiveness) as confirmed data. DISCARD results feed PATTERNS.md as negative patterns with [EXPERIMENT] tag. At every 5th session, scan Experiment Log for trends. Maximum 3 concurrent experiments.
+LOOP_RULE_42_PRIORITY=HIGH
+
+# ============================================================================
+# BRAIN + NOTEBOOKLM: Mandatory institutional memory (tier system: .claude/skills/notebooklm/SKILL.md)
+# ============================================================================
+LOOP_RULE_43=Before ANY prospect interaction (email, call, demo, proposal), THREE mandatory checks in this order: (1) brain/prospects/[Name].md — read existing note, check what angles were tried, what worked, what failed. (2) brain/personas/[type].md — check persona-level patterns. (3) NotebookLM query — pull case studies, proof points, objection counters for this persona/industry. These are FREE and compound. Skipping them is like a doctor ignoring the patient's chart. If no prospect note exists, create one from the template BEFORE drafting.
+LOOP_RULE_43_PRIORITY=CRITICAL
+
+LOOP_RULE_44=PRE-FLIGHT BLOCKER: Before presenting ANY prospect-related output to Oliver, complete the pre-flight checklist (.claude/preflight.md). Show the verification block above the output. Every check must show PASS or TOOL FAILED (with explanation). No prospect output may bypass pre-flight. This is not a rule to follow — it's a gate that blocks. If you find yourself about to present output without pre-flight, STOP and run it first.
+LOOP_RULE_44_PRIORITY=CRITICAL
+
+# ============================================================================
+# WRAP-UP GATE: Mandatory steps cannot be skipped
+# ============================================================================
+LOOP_RULE_45=WRAP-UP GATE: When Oliver says "wrap up" or the session is ending, steps 1, 7, 8, 9, 9.5, 10 are NON-NEGOTIABLE. Execution order: PARALLEL BATCH [1 + 7 + 8] (daily notes, anti-bloat, and audit have no dependencies — run simultaneously) → THEN [9] system loop (needs audit scores from step 8) → THEN [9.5] git checkpoint (needs all file changes from 1+7+8+9 complete) → THEN [10] handoff (always last). Before writing loop-state.md (step 10), verify ALL mandatory steps completed. Show proof: "WRAP-UP GATE: [1] daily notes [x] | [7] anti-bloat [x] | [8] audit [x] scored [X/10] | [9] system loop [x] | [9.5] git [x] | [10] handoff [x]". If any show [ ] instead of [x], STOP and complete them before closing. Context pressure is not an excuse to skip the learning loop.
+LOOP_RULE_45_PRIORITY=CRITICAL
+
+# ============================================================================
+# PIPELINE-FIRST: Real deals before architecture when both are due
+# ============================================================================
+LOOP_RULE_46=PIPELINE-FIRST: When loop-state.md shows pipeline touches due today AND system/architecture work is planned, pipeline touches MUST complete first. No exceptions. Architecture work fills remaining session time. The system exists to close deals. Architecture that never touches real pipeline data is a hypothesis, not an improvement.
+LOOP_RULE_46_PRIORITY=CRITICAL
+
+# ============================================================================
+# SAME-SESSION TESTING: New rules must be applied before session closes
+# ============================================================================
+LOOP_RULE_47=SAME-SESSION TESTING: When a new process rule, gate, or automation is created during a session, it MUST be applied to the NEXT applicable output in that same session. If no applicable output remains, log it as [UNTESTED] in the audit. Rules that aren't tested on creation have zero credibility.
+LOOP_RULE_47_PRIORITY=HIGH
+
+# ============================================================================
+# CONFIDENCE DECAY: Patterns age out without reinforcement
+# ============================================================================
+LOOP_RULE_48=CONFIDENCE DECAY: Any pattern in PATTERNS.md older than 90 days without a reinforcing signal (new data point confirming it) automatically steps down one confidence tier. PROVEN → EMERGING. EMERGING → HYPOTHESIS. HYPOTHESIS → INSUFFICIENT. At every session wrap-up where PATTERNS.md is updated, check last_reinforced dates. If any pattern is 90+ days stale, apply the step-down, log to brain/system-patterns.md: "[DATE] DECAY: [pattern] stepped [OLD_TIER] → [NEW_TIER] — no reinforcing signal for [N] days." Decayed patterns can be re-promoted by new data points through normal confidence rules.
+LOOP_RULE_48_PRIORITY=HIGH
+
+# ============================================================================
+# DORMANCY RE-EVALUATION: Wake dormant event connections when context changes
+# ============================================================================
+LOOP_RULE_49=DORMANCY RE-EVALUATION TRIGGER: Event connections in DORMANT status get a mandatory review pass when ANY of these structural changes occur: (1) CLAUDE.md is modified, (2) a new tool is added, (3) a new hook is created, (4) a CARL domain is significantly modified. Check each dormant connection: given the structural change, is the trigger condition now more likely to fire? If yes, move back to ACTIVE with note in audit-log.md.
+LOOP_RULE_49_PRIORITY=NORMAL
+
+# ============================================================================
+# COLD DATASET FEEDBACK LOOP: Instantly outcomes feed framework confidence
+# ============================================================================
+LOOP_RULE_50=COLD DATASET FEEDBACK LOOP: Reply and no-reply outcomes from Instantly campaigns feed back into framework auto-selection confidence scores. Reply in cold tier → increment framework confidence for matching persona. No reply across 5+ sends to same persona type → decrement. At wrap-up where Instantly data is reviewed, update cold tier framework scores in PATTERNS.md and log to system-patterns.md.
+LOOP_RULE_50_PRIORITY=HIGH
+
+# ============================================================================
+# CONVERGENCE CAPABILITY REVIEW: Surface gaps when system is stable
+# ============================================================================
+LOOP_RULE_51=CONVERGENCE CAPABILITY REVIEW: When all 5 convergence indicators (LOOP_RULE_37) are stable, produce a capability gap analysis: (1) STRENGTHS: what the system handles well, (2) MANUAL GAPS: activities still handled manually, (3) CAPABILITY EXPANSIONS: 3 suggestions ranked by leverage. Write to .claude/review-queue.md. Only generate once per convergence event.
+LOOP_RULE_51_PRIORITY=NORMAL
+
+# ============================================================================
+# DATA COMPACTION: Merge similar patterns, compress stale data
+# ============================================================================
+LOOP_RULE_52=DATA COMPACTION: At wrap-up step 7 (anti-bloat), run compaction on PATTERNS.md: (1) Angles with identical persona + similar reply rates (within 5%) merge into one entry with combined sample size. (2) Framework effectiveness entries unchanged for 10+ sessions compress to one-line summaries. (3) Cross-Deal Insights older than 60 days without reinforcement archive to "Historical Insights." (4) Cadence data matching the default (LOOP_RULE_11) exactly gets removed — only overrides persist. Goal: PATTERNS.md stays under 300 lines.
+LOOP_RULE_52_PRIORITY=NORMAL
+
+# ============================================================================
+# CARL COMPACTION: Rule density management
+# ============================================================================
+LOOP_RULE_53=CARL COMPACTION PROTOCOL: When total CARL behavioral rule count approaches 100, trigger a compaction review. COUNTING METHOD: Only count rules in behavioral domains (loop, agents, coldcall, context, demo-prep, global, linkedin, listbuild, prospect-email). EXCLUDE .carl/commands (star-command shortcuts) and .carl/example-custom-domain (template file) — these are NOT behavioral rules and do not count toward the ceiling. Report format always: "Behavioral rules: [N] / 100 ceiling [status] | loop: [N] | [domain]: [N] | ... | Star-commands: [N] (excluded) | Templates: [N] (excluded)". Identify compaction candidates: (a) hasn't fired in 20 sessions, (b) overlaps >50% with another rule, (c) specific instance of a general rule, (d) written by learning loop >60 days ago and never Oliver-confirmed. Propose merges and graduations. Oliver approves all changes. Log to system-evolution.md. HARD FLOOR: never below 40 rules. Target distribution: Tier 1 hard constraints (10-15), Tier 2 process (20-30), Tier 3 learning (15-20), Tier 4 domain (10-15) = 55-80 total.
+LOOP_RULE_53_PRIORITY=HIGH
+
+# ============================================================================
+# VAULT DECAY: Prospect notes, personas, and objections age out
+# ============================================================================
+LOOP_RULE_54=VAULT DECAY — PROSPECT NOTES: At wrap-up step 7, check brain/prospects/ for notes older than 90 days (last_touch or file modification) with no active Pipedrive deal. Move to brain/archive/prospects/. Log: "[DATE] VAULT DECAY: [prospect] archived — [N] days, no active deal." Archived notes remain in PATTERNS.md aggregates permanently — only the file moves.
+LOOP_RULE_54_PRIORITY=HIGH
+
+LOOP_RULE_55=VAULT DECAY — PERSONA CONFIDENCE: At wrap-up step 7, check brain/personas/ for pattern entries with no reinforcing signal in 60 days. Step down one confidence tier per decay rules. Log to system-patterns.md. New interactions re-promote through normal confidence rules.
+LOOP_RULE_55_PRIORITY=HIGH
+
+LOOP_RULE_56=VAULT DECAY — OBJECTION STALENESS: At wrap-up step 7, check brain/objections/ for entries older than 120 days with no recurrence. Flag as [STALE]. Stale objections excluded from research gate queries by default — still exist but don't surface unless explicitly searched. Recurrence removes the flag.
+LOOP_RULE_56_PRIORITY=NORMAL
+
+# ============================================================================
+# LESSON ARCHIVE COMPACTION: Retired lessons that CARL replaced
+# ============================================================================
+LOOP_RULE_57=LESSON ARCHIVE COMPACTION: Every 30 sessions, scan lessons-archive.md for graduated lessons whose CARL rule has been active 30+ sessions without modification. Move to lessons-archive-retired.md. lessons-archive.md is the active search target; retired file is cold storage.
+LOOP_RULE_57_PRIORITY=NORMAL
+
+# ============================================================================
+# WEEKLY VAULT HEALTH METRIC: Track vault growth patterns
+# ============================================================================
+LOOP_RULE_58=WEEKLY VAULT HEALTH METRIC: At weekly pattern scan (Monday session or every 5th session), count in brain/: active prospects, archived prospects, personas, objections, competitors. Log to system-patterns.md Vault Health section. Flag >20% WoW growth or any category at 0. Format: "VAULT: [X] prospects ([Y] archived) | [X] personas | [X] objections | [X] competitors — [HEALTHY/GROWTH ALERT/EMPTY ALERT]"
+LOOP_RULE_58_PRIORITY=NORMAL
+
+# ============================================================================
+# MICRO-REFLECTION: Lightweight integration check on every system addition
+# ============================================================================
+LOOP_RULE_59=MICRO-REFLECTION TRIGGER: Every time something new is added to the system (CARL rule, lesson, gate step, file, hook), run a 60-second reflection BEFORE committing: (1) Does this conflict with anything existing? (2) Does this make any existing rule redundant? If yes, propose removing it in the same commit. (3) Does this unlock any new capability? Log to .claude/micro-reflections.md. If a conflict IS found, resolve before adding. If a redundancy IS found, remove in the same change.
+LOOP_RULE_59_PRIORITY=HIGH
+
+# ============================================================================
+# PASSIVE PATTERN DETECTION: Modular compounding engine at every wrap-up
+# ============================================================================
+# Six independent categories. Each fires only when its trigger condition is met.
+# Each writes to a dedicated section in brain/emails/PATTERNS.md under its category header.
+# If nothing changed in a category, skip silently. If a threshold is breached,
+# prepend "BRAIN ALERT:" so DELTA_SCAN surfaces it at next session start.
+# No category depends on another. All run silently unless thresholds are breached.
+#
+LOOP_RULE_60=PASSIVE_PATTERN_RULE — CATEGORY 1 (PROSPECT WORK): Trigger: any prospect note was read, email drafted, LinkedIn message sent, or call logged this session. Compound: (a) reply rates by angle — recalculate from brain/prospects/ and update PATTERNS.md Angle Performance table. (b) Touch sequence performance — which touch position (1st, 2nd, 3rd+) gets the most replies. (c) Stage conversion — track which activities precede stage changes. (d) Ghosted candidate detection — any prospect with 3+ consecutive no-reply outcomes → auto-add #ghosted-candidate tag to brain note, surface: "PASSIVE: [prospect] tagged #ghosted-candidate — [N] consecutive no-replies." (e) Angle underperformance — any angle with 5+ attempts and <20% reply rate → tag UNDERPERFORMING in PATTERNS.md, surface: "PASSIVE: [angle] underperforming — [X]% over [N] attempts." (f) Segment outperformance — if any ICP segment (agency, DTC, PE rollup, franchise, solo consultant) reply rate is 2x+ the monthly average → note in PATTERNS.md Cross-Deal Insights, surface: "PASSIVE: [segment] outperforming — [X]% vs [Y]% average." Write findings to PATTERNS.md under "## Passive: Prospect Work".
+LOOP_RULE_60_PRIORITY=HIGH
+
+LOOP_RULE_60B=PASSIVE_PATTERN_RULE — CATEGORY 2 (RULE CHANGES): Trigger: any CARL rule was added, merged, deleted, or modified this session. Compound: (a) total behavioral rule count trend — log current count per domain to PATTERNS.md, flag if behavioral total crosses 100 (ceiling per LOOP_RULE_53) or any single domain crosses 70. Exclude .carl/commands and .carl/example-custom-domain from count. (b) Domain distribution — track % of behavioral rules per domain, flag if any domain holds >50% of total behavioral rules. (c) Conflict rate — track how many new rules triggered a conflict check (per LOOP_RULE_59) and how many conflicts were found. (d) Merge success rate — when rules are merged, track whether the merged rule fires as often as the originals combined. Write findings to PATTERNS.md under "## Passive: Rule Changes".
+LOOP_RULE_60B_PRIORITY=HIGH
+
+LOOP_RULE_60C=PASSIVE_PATTERN_RULE — CATEGORY 3 (LESSONS): Trigger: any lesson was added, promoted, graduated, or had its provisional counter decremented this session. Compound: (a) Provisional counter trends — average sessions-to-confirmation, flag lessons stuck at same counter for 5+ sessions. (b) Lesson promotion rate — % of provisional lessons that reach [CONFIRMED] vs those that get rewritten or killed. (c) Domain generation — which categories (LEADS, DRAFTING, PROCESS, CRM, etc.) are generating the most new lessons this month, flag if one category generates 3x+ the average. Write findings to PATTERNS.md under "## Passive: Lessons".
+LOOP_RULE_60C_PRIORITY=HIGH
+
+LOOP_RULE_60D=PASSIVE_PATTERN_RULE — CATEGORY 4 (HEALTH AUDIT): Trigger: step 6 (health audit) ran this session. Compound: (a) Health score over time — log pass rates by category (files, vault, MCPs, credits, process, data, learning) to PATTERNS.md, track 5-session rolling average per category. (b) Consistent underscoring — flag any category scoring below 80% pass rate for 3+ consecutive sessions. (c) MCP reliability — track which MCPs fail most often, flag any MCP down 2+ sessions in a row. Write findings to PATTERNS.md under "## Passive: Health Audit".
+LOOP_RULE_60D_PRIORITY=HIGH
+
+LOOP_RULE_60E=PASSIVE_PATTERN_RULE — CATEGORY 5 (WRAP COMPLIANCE): Trigger: every session, always runs. Compound: (a) Step skip tracking — log which wrap-up steps (0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9.5, 10) ran vs skipped this session. (b) Internal vs external catch — track whether skips were caught by the agent (self-corrected) or by Oliver (external correction). Flag: "BRAIN ALERT: Step [N] skipped 2+ sessions in a row — investigate root cause." (c) Skip pattern detection — if the same step is skipped in 3+ of the last 5 sessions, surface as systemic issue. Write findings to PATTERNS.md under "## Passive: Wrap Compliance".
+LOOP_RULE_60E_PRIORITY=HIGH
+
+LOOP_RULE_60F=PASSIVE_PATTERN_RULE — CATEGORY 6 (SYSTEM CHANGES): Trigger: any files reorganized, paths updated, folder structure modified, or scripts changed this session. Compound: (a) Path integrity — after any file move/rename, verify all references to that path in CLAUDE.md, SKILL.md, loop-state.md, and lessons.md still resolve. Flag broken references as "BRAIN ALERT: [file] references stale path [old_path]." (b) File reference accuracy — count how many files are referenced in loop-state.md vs actually exist on disk, flag drift >10%. (c) Structural drift — track folder structure changes over time, flag if active/ subdirectory count changes by >30% in a single session. Write findings to PATTERNS.md under "## Passive: System Changes".
+LOOP_RULE_60F_PRIORITY=HIGH
+
+# ============================================================================
+# WEEKLY DIGEST: Automated performance brief on first session of each week
+# ============================================================================
+LOOP_RULE_61=WEEKLY_DIGEST_RULE: On the FIRST session of each week (Monday, or first session if Monday was skipped), BEFORE any other startup output, generate a 10-line weekly brief from brain/prospects/, brain/emails/PATTERNS.md, and Pipedrive data: (1) Total touches sent last 7 days (email + call + LinkedIn). (2) Reply rate last 7 days vs prior 7 days (up/down arrow + delta). (3) Top performing angle this week (highest reply rate, min 3 sends). (4) Worst performing angle this week (lowest reply rate, min 3 sends). (5) Pipeline movement — deal stage changes this week (who moved where). (6) Most overdue item — single most urgent prospect/task past due. Format as a compact block: "📊 WEEKLY DIGEST [date range]\n1. Touches: [N] (email [N], call [N], LinkedIn [N])\n2. Reply rate: [X]% (↑/↓ [delta]% vs prior week)\n3. Best angle: [angle] — [X]% ([N] sends)\n4. Worst angle: [angle] — [X]% ([N] sends)\n5. Pipeline: [summary of stage changes]\n6. Most overdue: [prospect] — [N] days past due\n---" This displays AFTER BRAIN ALERTs but BEFORE the regular session status block. If insufficient data for any line, show "[insufficient data]" — never skip the line.
+LOOP_RULE_61_PRIORITY=HIGH
+
+LOOP_RULE_62=FOLLOW-UP EXIT CONDITION: Stop following up on a prospect when ANY of these conditions are met: (1) 5 consecutive no-replies across different angles — log break-up email sent with date, (2) prospect says "not interested" or equivalent explicit rejection — log rejection reason, (3) deal marked closed-lost in Pipedrive — no further touches without restart signal from Oliver. After exit: update prospect file stage to closed-lost or dormant, remove from Follow-Up Tracker, log final disposition in brain/prospects/[Name].md. Re-engagement only if prospect initiates contact or Oliver explicitly reactivates.
+LOOP_RULE_62_PRIORITY=HIGH
