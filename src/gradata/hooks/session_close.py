@@ -88,34 +88,6 @@ def _run_tree_consolidation(brain_dir: str) -> None:
         pass
 
 
-def _run_pipeline(brain_dir: str, data: dict) -> None:
-    """Run the 3-phase rule pipeline (freshness, fusion, synthesis, hooks)."""
-    try:
-        from pathlib import Path
-
-        from ..enhancements.rule_pipeline import run_rule_pipeline
-
-        lessons_path = Path(brain_dir) / "lessons.md"
-        db_path = Path(brain_dir) / "system.db"
-        if not lessons_path.is_file():
-            return
-        current_session = int(data.get("session_number") or 0)
-        result = run_rule_pipeline(
-            lessons_path=lessons_path,
-            db_path=db_path,
-            current_session=current_session,
-        )
-        if result.graduated or result.meta_rules_created or result.hooks_promoted:
-            import logging
-            logging.getLogger(__name__).info(
-                "Pipeline: %d graduated, %d meta-rules, %d hooks",
-                len(result.graduated), len(result.meta_rules_created),
-                len(result.hooks_promoted),
-            )
-    except Exception:
-        pass
-
-
 def _flush_retain_queue(brain_dir: str) -> None:
     """Flush any events queued via the RetainOrchestrator batch path.
 
@@ -144,7 +116,26 @@ def main(data: dict) -> dict | None:
 
     _emit_session_end(brain_dir)
     _run_graduation(brain_dir)
-    _run_pipeline(brain_dir, data)
+    try:
+        from pathlib import Path
+
+        from ..enhancements.rule_pipeline import run_rule_pipeline
+        _rp_lp = Path(brain_dir) / "lessons.md"
+        if _rp_lp.is_file():
+            _rp_result = run_rule_pipeline(
+                lessons_path=_rp_lp,
+                db_path=Path(brain_dir) / "system.db",
+                current_session=int(data.get("session_number") or 0),
+            )
+            if _rp_result.graduated or _rp_result.meta_rules_created or _rp_result.hooks_promoted:
+                import logging
+                logging.getLogger(__name__).info(
+                    "Pipeline: %d graduated, %d meta-rules, %d hooks",
+                    len(_rp_result.graduated), len(_rp_result.meta_rules_created),
+                    len(_rp_result.hooks_promoted),
+                )
+    except Exception:
+        pass
     _run_tree_consolidation(brain_dir)
     _flush_retain_queue(brain_dir)
     return None
