@@ -17,11 +17,11 @@ Package layout
 _confidence.py  — constants, FSRS math, parse/format, update_confidence
 _graduation.py  — _passes_beta_lb_gate, graduate
 """
+from __future__ import annotations
 
 # Re-export everything that was previously importable from the flat module.
 # All of these imports MUST keep working:
 #   from gradata.enhancements.self_improvement import X
-
 # Lesson and LessonState are imported into _confidence.py from gradata._types;
 # they are accessible as self_improvement.Lesson etc. via the namespace, but
 # callers that do `from gradata.enhancements.self_improvement import Lesson`

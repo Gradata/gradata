@@ -368,20 +368,12 @@ def get_current_session() -> int:
 
 
 def _detect_session(ctx: BrainContext | None = None) -> int:
-    """Detect current session number from event data.
+    """Detect current session number from the events table.
 
-    Args:
-        ctx: Optional BrainContext. Falls back to module globals if None.
-
-    Strategy (most reliable first):
-    1. Query MAX(session) from events table (works for any brain)
-    2. Read loop-state.md if it exists (backward compat with legacy runtime)
-    3. Return 0 as fallback
+    Returns MAX(session) from events, or 0 if unavailable.
     """
     db_path = ctx.db_path if ctx else _p.DB_PATH
-    brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
 
-    # Strategy 1: DB query — works for any brain with events
     try:
         with contextlib.closing(sqlite3.connect(str(db_path))) as conn:
             row = conn.execute(
@@ -391,18 +383,6 @@ def _detect_session(ctx: BrainContext | None = None) -> int:
                 return int(row[0])
     except Exception:
         pass
-
-    # Strategy 2: loop-state.md (backward compat)
-    import re
-    loop_state = brain_dir / "loop-state.md"
-    if loop_state.exists():
-        try:
-            text = loop_state.read_text(encoding="utf-8")
-            m = re.search(r"Session\s+(\d+)", text)
-            if m:
-                return int(m.group(1))
-        except Exception:
-            pass
 
     return 0
 

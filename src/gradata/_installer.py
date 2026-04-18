@@ -130,6 +130,8 @@ def _run_bootstrap(target_dir: Path, manifest: dict) -> list[dict]:
                 capture_output=True,
                 text=True,
                 timeout=60,
+                encoding="utf-8",
+                errors="replace",
             )
             if result.returncode == 0:
                 results.append({"step": name, "status": "ok"})

@@ -476,6 +476,8 @@ def self_test(
             capture_output=True,
             text=True,
             timeout=5,
+            encoding="utf-8",
+            errors="replace",
         )
         return proc.returncode == 2
     except (subprocess.TimeoutExpired, FileNotFoundError):

@@ -239,8 +239,6 @@ def test_pre_compact_saves_snapshot(tmp_path):
 
     lessons = tmp_path / "lessons.md"
     lessons.write_text("[2026-04-01] [RULE:0.92] PROCESS: Plan first\n# header\n")
-    loop_state = tmp_path / "loop-state.md"
-    loop_state.write_text("## Session 42\n")
 
     if hasattr(os, "getuid"):
         uid = os.getuid()
@@ -261,7 +259,8 @@ def test_pre_compact_saves_snapshot(tmp_path):
     assert "State saved" in result["result"]
     assert snapshot_path.exists()
     data = json.loads(snapshot_path.read_text())
-    assert data["session"] == 42
+    assert data["compact_type"] == "auto"
+    assert data["lesson_count"] >= 1
     snapshot_path.unlink(missing_ok=True)
 
 
@@ -361,9 +360,6 @@ from gradata.hooks.session_persist import main as persist_main
 
 
 def test_session_persist_writes_handoff(brain_dir):
-    loop_state = brain_dir / "loop-state.md"
-    loop_state.write_text("## Session 99\n")
-
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(brain_dir)}), \
          patch("gradata.hooks.session_persist._get_modified_files", return_value=["src/foo.py"]):
             result = persist_main({})
@@ -371,11 +367,11 @@ def test_session_persist_writes_handoff(brain_dir):
     assert result is None  # Silent
     persist_dir = brain_dir / "sessions" / "persist"
     assert persist_dir.exists()
-    files = list(persist_dir.glob("session-*.json"))
-    assert len(files) == 1
-    data = json.loads(files[0].read_text())
-    assert data["session"] == 99
+    latest = persist_dir / "latest.json"
+    assert latest.exists()
+    data = json.loads(latest.read_text())
     assert "src/foo.py" in data["modified_files"]
+    assert data["file_count"] == 1
 
 
 def test_session_persist_no_brain():
