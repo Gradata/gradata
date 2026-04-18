@@ -699,7 +699,28 @@ def try_generate(
 
     Returns a GenerationResult describing the outcome.
     """
-    result = _compute_generation(candidate, positive_example=positive_example)
+    if candidate.enforcement != EnforcementType.HOOK:
+        result = GenerationResult(installed=False, reason="candidate is not a hook (advisory / not deterministic)")
+    else:
+        _rendered = render_hook(candidate)
+        if _rendered is None:
+            result = GenerationResult(installed=False, reason=f"render skipped: template '{candidate.hook_template}' not implemented or missing pattern")
+        else:
+            _ok = True
+            if candidate.hook_template not in _TEMPLATES_SKIP_SELFTEST:
+                _pos = positive_example or _synthesize_positive(candidate)
+                if candidate.hook_template in _BASH_TEMPLATES:
+                    _tn, _tk = "Bash", "command"
+                elif candidate.hook_template in _WRITE_PATH_TEMPLATES:
+                    _tn, _tk = "Write", "file_path"
+                else:
+                    _tn, _tk = "Write", "content"
+                if not self_test(_rendered, positive=_pos, tool_name=_tn, tool_input_key=_tk):
+                    result = GenerationResult(installed=False, reason=f"self-test did not block positive example: {_pos!r}")
+                    _ok = False
+            if _ok:
+                _path = install_hook(_slug(candidate.rule_description), _rendered, template=candidate.hook_template)
+                result = GenerationResult(installed=True, reason=f"installed at {_path}", hook_path=_path)
     if brain is not None:
         try:
             if result.installed:
@@ -720,52 +741,3 @@ def try_generate(
     return result
 
 
-def _compute_generation(
-    candidate: HookCandidate,
-    *,
-    positive_example: str | None = None,
-) -> GenerationResult:
-    """Pure generation logic (no side-effect logging).  Split from try_generate
-    so outcome events are emitted in one place."""
-    if candidate.enforcement != EnforcementType.HOOK:
-        return GenerationResult(
-            installed=False,
-            reason="candidate is not a hook (advisory / not deterministic)",
-        )
-
-    rendered = render_hook(candidate)
-    if rendered is None:
-        return GenerationResult(
-            installed=False,
-            reason=f"render skipped: template '{candidate.hook_template}' not implemented or missing pattern",
-        )
-
-    if candidate.hook_template not in _TEMPLATES_SKIP_SELFTEST:
-        positive = positive_example or _synthesize_positive(candidate)
-
-        if candidate.hook_template in _BASH_TEMPLATES:
-            tool_name = "Bash"
-            tool_input_key = "command"
-        elif candidate.hook_template in _WRITE_PATH_TEMPLATES:
-            tool_name = "Write"
-            tool_input_key = "file_path"
-        else:
-            tool_name = "Write"
-            tool_input_key = "content"
-
-        if not self_test(rendered, positive=positive, tool_name=tool_name, tool_input_key=tool_input_key):
-            return GenerationResult(
-                installed=False,
-                reason=f"self-test did not block positive example: {positive!r}",
-            )
-
-    path = install_hook(
-        _slug(candidate.rule_description),
-        rendered,
-        template=candidate.hook_template,
-    )
-    return GenerationResult(
-        installed=True,
-        reason=f"installed at {path}",
-        hook_path=path,
-    )
