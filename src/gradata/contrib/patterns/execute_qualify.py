@@ -33,8 +33,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-
-from gradata.contrib.patterns.task_escalation import TaskOutcome, TaskStatus
+from typing import Any
 
 __all__ = [
     "ExecuteQualifyLoop",
@@ -45,7 +44,123 @@ __all__ = [
     "QualifierFn",
     "QualifyResult",
     "QualifyScore",
+    "TaskOutcome",
+    "TaskStatus",
+    "format_outcome",
+    "is_actionable",
+    "report_outcome",
+    "requires_human",
 ]
+
+
+class TaskStatus(Enum):
+    """Four-level task execution outcome."""
+    DONE = "done"
+    DONE_WITH_CONCERNS = "done_with_concerns"
+    NEEDS_CONTEXT = "needs_context"
+    BLOCKED = "blocked"
+
+
+@dataclass
+class TaskOutcome:
+    """Structured outcome from task execution."""
+    status: TaskStatus
+    task_id: str = ""
+    description: str = ""
+    concerns: list[str] = field(default_factory=list)
+    missing_context: list[str] = field(default_factory=list)
+    blockers: list[str] = field(default_factory=list)
+    evidence: str = ""
+    files_modified: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+def report_outcome(
+    status: TaskStatus,
+    description: str = "",
+    task_id: str = "",
+    concerns: list[str] | None = None,
+    missing_context: list[str] | None = None,
+    blockers: list[str] | None = None,
+    evidence: str = "",
+    files_modified: list[str] | None = None,
+) -> TaskOutcome:
+    """Create a structured task outcome with validation.
+
+    DONE_WITH_CONCERNS requires concerns; NEEDS_CONTEXT requires missing_context;
+    BLOCKED requires blockers.
+    """
+    concerns = concerns or []
+    missing_context = missing_context or []
+    blockers = blockers or []
+    files_modified = files_modified or []
+
+    if status == TaskStatus.DONE_WITH_CONCERNS and not concerns:
+        raise ValueError(
+            "DONE_WITH_CONCERNS requires at least one concern. "
+            "Use DONE if there are no concerns."
+        )
+    if status == TaskStatus.NEEDS_CONTEXT and not missing_context:
+        raise ValueError(
+            "NEEDS_CONTEXT requires at least one missing_context item. "
+            "Specify what information is needed."
+        )
+    if status == TaskStatus.BLOCKED and not blockers:
+        raise ValueError(
+            "BLOCKED requires at least one blocker. "
+            "Specify what prevents progress."
+        )
+
+    return TaskOutcome(
+        status=status,
+        task_id=task_id,
+        description=description,
+        concerns=concerns,
+        missing_context=missing_context,
+        blockers=blockers,
+        evidence=evidence,
+        files_modified=files_modified,
+    )
+
+
+def is_actionable(outcome: TaskOutcome) -> bool:
+    """Only DONE and DONE_WITH_CONCERNS allow continuing."""
+    return outcome.status in (TaskStatus.DONE, TaskStatus.DONE_WITH_CONCERNS)
+
+
+def requires_human(outcome: TaskOutcome) -> bool:
+    """Everything except DONE needs human review."""
+    return outcome.status != TaskStatus.DONE
+
+
+def format_outcome(outcome: TaskOutcome) -> str:
+    """Format a task outcome as a structured text block."""
+    status_emoji = {
+        TaskStatus.DONE: "PASS",
+        TaskStatus.DONE_WITH_CONCERNS: "WARN",
+        TaskStatus.NEEDS_CONTEXT: "PAUSE",
+        TaskStatus.BLOCKED: "STOP",
+    }
+    lines = [f"[{status_emoji[outcome.status]}] {outcome.status.value}"]
+    if outcome.task_id:
+        lines.append(f"  Task: {outcome.task_id}")
+    if outcome.description:
+        lines.append(f"  What: {outcome.description}")
+    if outcome.concerns:
+        lines.append("  Concerns:")
+        for c in outcome.concerns:
+            lines.append(f"    - {c}")
+    if outcome.missing_context:
+        lines.append("  Missing context:")
+        for m in outcome.missing_context:
+            lines.append(f"    - {m}")
+    if outcome.blockers:
+        lines.append("  Blockers:")
+        for b in outcome.blockers:
+            lines.append(f"    - {b}")
+    if outcome.evidence:
+        lines.append(f"  Evidence: {outcome.evidence}")
+    return "\n".join(lines)
 
 
 class QualifyScore(Enum):
