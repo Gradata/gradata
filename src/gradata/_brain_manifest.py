@@ -37,25 +37,6 @@ from ._manifest_quality import (
 from ._stats import trend_analysis as _trend_analysis
 
 
-def _lesson_distribution(ctx: "_p.BrainContext | None" = None) -> dict[str, int]:
-    """Count lessons by state from lessons.md."""
-    dist: dict[str, int] = {}
-    lessons_file = ctx.lessons_file if ctx else _p.LESSONS_FILE
-    try:
-        if lessons_file.exists():
-            text = lessons_file.read_text(encoding="utf-8")
-            for state in ("INSTINCT", "PATTERN", "RULE", "UNTESTABLE"):
-                count = len(re.findall(
-                    rf"^\[20\d{{2}}-\d{{2}}-\d{{2}}\]\s+\[{state}",
-                    text, re.MULTILINE
-                ))
-                if count > 0:
-                    dist[state] = count
-    except Exception:
-        pass
-    return dist
-
-
 def _correction_rate_trend(ctx: "_p.BrainContext | None" = None, window: int = 10) -> dict | None:
     """Compare current CRO window to baseline window."""
     try:
@@ -291,7 +272,20 @@ def _quality_metrics(ctx: "_p.BrainContext | None" = None) -> dict:
     except Exception:
         pass
 
-    result["lesson_distribution"] = _lesson_distribution(ctx=ctx)
+    result["lesson_distribution"] = {}
+    _ld_lf = ctx.lessons_file if ctx else _p.LESSONS_FILE
+    try:
+        if _ld_lf.exists():
+            _ld_text = _ld_lf.read_text(encoding="utf-8")
+            for _ld_state in ("INSTINCT", "PATTERN", "RULE", "UNTESTABLE"):
+                _ld_count = len(re.findall(
+                    rf"^\[20\d{{2}}-\d{{2}}-\d{{2}}\]\s+\[{_ld_state}",
+                    _ld_text, re.MULTILINE,
+                ))
+                if _ld_count > 0:
+                    result["lesson_distribution"][_ld_state] = _ld_count
+    except Exception:
+        pass
 
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
