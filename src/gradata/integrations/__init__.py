@@ -14,21 +14,3 @@
     Adapter modules (anthropic_adapter, openai_adapter, langchain_adapter,
     crewai_adapter) emit their own ``DeprecationWarning`` on import.
 """
-
-import importlib as _importlib
-
-# Short-name aliases: gradata.integrations.openai -> gradata.integrations.openai_adapter
-_ADAPTER_ALIASES = {
-    "openai": "openai_adapter",
-    "anthropic": "anthropic_adapter",
-    "langchain": "langchain_adapter",
-    "crewai": "crewai_adapter",
-}
-
-
-def __getattr__(name: str):
-    """Lazy-load integration adapters with short-name aliases."""
-    target = _ADAPTER_ALIASES.get(name)
-    if target is not None:
-        return _importlib.import_module(f".{target}", __package__)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
