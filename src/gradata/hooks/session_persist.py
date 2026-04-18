@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,22 +15,6 @@ HOOK_META = {
     "profile": Profile.STRICT,
     "timeout": 10000,
 }
-
-
-def _get_session_number(brain_dir: Path) -> int | None:
-    loop_state = brain_dir / "loop-state.md"
-    if not loop_state.is_file():
-        return None
-    try:
-        text = loop_state.read_text(encoding="utf-8")
-        for line in text.splitlines():
-            if "session" in line.lower():
-                nums = re.findall(r"\d+", line)
-                if nums:
-                    return int(nums[0])
-    except Exception:
-        pass
-    return None
 
 
 def _get_modified_files() -> list[str]:
@@ -67,7 +50,7 @@ def _get_modified_files() -> list[str]:
     return list(dict.fromkeys(files))
 
 
-def main(data: dict) -> dict | None:
+def main(_data: dict) -> dict | None:
     try:
         brain_dir_str = resolve_brain_dir()
         if not brain_dir_str:
@@ -77,18 +60,16 @@ def main(data: dict) -> dict | None:
         persist_dir = brain_dir / "sessions" / "persist"
         persist_dir.mkdir(parents=True, exist_ok=True)
 
-        session = _get_session_number(brain_dir)
         modified = _get_modified_files()
+        now = datetime.now(UTC)
 
         handoff = {
-            "timestamp": datetime.now(UTC).isoformat(),
-            "session": session,
+            "timestamp": now.isoformat(),
             "modified_files": modified[:50],
             "file_count": len(modified),
         }
 
-        filename = f"session-{session}.json" if session else "session-unknown.json"
-        out_path = persist_dir / filename
+        out_path = persist_dir / "latest.json"
         out_path.write_text(json.dumps(handoff, indent=2), encoding="utf-8")
     except Exception:
         pass

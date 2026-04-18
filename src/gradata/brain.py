@@ -211,7 +211,7 @@ class Brain(BrainInspectionMixin):
 
     @property
     def session(self) -> int:
-        """Current session number (from event log or loop-state.md)."""
+        """Current session number (from event log)."""
         try:
             from gradata._events import get_current_session
 

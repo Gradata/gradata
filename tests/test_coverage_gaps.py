@@ -258,20 +258,6 @@ class TestEventsModule:
         assert len(trend) >= 2
         assert all("session" in t and "data" in t for t in trend)
 
-    def test_detect_session_from_loop_state(self, tmp_path):
-        brain = _init_brain(tmp_path)
-        # Write a loop-state.md with a session number
-        loop_state = brain.dir / "loop-state.md"
-        loop_state.write_text("# Loop State\n\nSession 42 — ongoing.\n", encoding="utf-8")
-
-        import gradata._paths as _p
-        import gradata._events as _ev
-        _ev.BRAIN_DIR = _p.BRAIN_DIR
-
-        from gradata._events import _detect_session
-        session = _detect_session()
-        assert session == 42
-
     def test_emit_valid_from_valid_until(self, tmp_path):
         brain = _init_brain(tmp_path)
         from gradata._events import emit
@@ -837,13 +823,6 @@ class TestOnboard:
         assert brain.dir.exists()
         captured = capsys.readouterr()
         assert "GEMINI_API_KEY" in captured.out
-
-    def test_onboard_creates_loop_state(self, tmp_path):
-        brain = _init_brain(tmp_path)
-        loop_state = brain.dir / "loop-state.md"
-        assert loop_state.exists()
-        content = loop_state.read_text(encoding="utf-8")
-        assert "Session" in content or "Loop State" in content
 
     def test_onboard_creates_version_file(self, tmp_path):
         brain = _init_brain(tmp_path)
