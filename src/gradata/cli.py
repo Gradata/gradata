@@ -26,20 +26,20 @@ import logging
 import sys
 from pathlib import Path
 
-from gradata._env import env_str
+from ._env import env_str
 
 _log = logging.getLogger("gradata.cli")
 
 
 def _get_brain(args):
     """Resolve brain directory from args or environment."""
-    from gradata import Brain
+    from . import Brain
     brain_dir = getattr(args, "brain_dir", None) or Path.cwd()
     return Brain(brain_dir)
 
 
 def cmd_init(args):
-    from gradata import Brain, _telemetry
+    from . import Brain, _telemetry
 
     kwargs = {}
     if args.domain:
@@ -125,7 +125,7 @@ def cmd_stats(args):
 
 def cmd_audit(args):
     try:
-        from gradata._data_flow_audit import run_audit
+        from ._data_flow_audit import run_audit
         report = run_audit()
         if args.json:
             print(json.dumps(report, indent=2))
@@ -149,7 +149,7 @@ def cmd_export(args):
     """
     target = getattr(args, "target", None)
     if target:
-        from gradata.enhancements.rule_export import export_rules
+        from .enhancements.rule_export import export_rules
         brain_root = _resolve_brain_root(args)
         # Prefer the canonical lessons path the rest of the SDK uses, rather
         # than hardcoding brain_root/"lessons.md" inside the exporter.
@@ -190,7 +190,7 @@ def cmd_context(args):
 
 def cmd_validate(args):
     brain = _get_brain(args)
-    from gradata._validator import print_report, validate_brain
+    from ._validator import print_report, validate_brain
     manifest_path = Path(args.manifest) if args.manifest else brain.dir / "brain.manifest.json"
     report = validate_brain(manifest_path)
     if args.json:
@@ -202,7 +202,7 @@ def cmd_validate(args):
 
 
 def cmd_doctor(args):
-    from gradata._doctor import diagnose, print_diagnosis
+    from ._doctor import diagnose, print_diagnosis
     brain_dir = getattr(args, "brain_dir", None)
     report = diagnose(brain_dir=brain_dir)
     if getattr(args, "json", False):
@@ -214,7 +214,7 @@ def cmd_doctor(args):
 
 
 def cmd_install(args):
-    from gradata._installer import install, list_installed
+    from ._installer import install, list_installed
 
     if args.list:
         brains = list_installed()
@@ -242,7 +242,7 @@ def cmd_health(args):
         try:
             from gradata_cloud.scoring.reports import format_health_report, generate_health_report
         except ImportError:
-            from gradata.enhancements.reporting import format_health_report, generate_health_report
+            from .enhancements.reporting import format_health_report, generate_health_report
     except ImportError:
         print("Health reports require the reporting module. Cloud features require the Gradata cloud service (coming soon).")
         sys.exit(1)
@@ -268,7 +268,7 @@ def cmd_report(args):
                 generate_rule_audit,
             )
         except ImportError:
-            from gradata.enhancements.reporting import (
+            from .enhancements.reporting import (
                 export_session_csv,
                 format_health_report,
                 generate_health_report,
@@ -292,7 +292,7 @@ def cmd_report(args):
 
 def cmd_watch(args):
     """Watch a directory for file changes and emit CORRECTION events."""
-    from gradata.sidecar.watcher import FileWatcher
+    from .sidecar.watcher import FileWatcher
 
     watch_dir = Path(args.dir).resolve()
     brain_path = Path(args.brain).resolve() if args.brain else Path.cwd().resolve()
@@ -369,7 +369,7 @@ def cmd_diagnose(args):
     lessons_path = brain.dir / "lessons.md"
     if lessons_path.exists():
         try:
-            from gradata.enhancements.self_improvement import parse_lessons
+            from .enhancements.self_improvement import parse_lessons
             lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
             states = Counter(lesson.state.value for lesson in lessons)
             print(f"Lessons: {len(lessons)}")
@@ -690,7 +690,7 @@ def _resolve_brain_root(args):
 
 def cmd_rule_add(args):
     """Fast-track a user-declared rule. Writes at RULE tier conf=1.0, tries to install a hook."""
-    from gradata.enhancements import rule_to_hook
+    from .enhancements import rule_to_hook
 
     text = " ".join(args.text).strip() if isinstance(args.text, list) else str(args.text).strip()
     if not text:
@@ -732,7 +732,7 @@ def cmd_rule_add(args):
     # Route through Brain.add_rule — the canonical parse/format pipeline.
     # Brain() works whether or not system.db exists (run_migrations no-ops
     # on a missing db), so we don't need a second hand-rolled write path.
-    from gradata import Brain as _Brain
+    from . import Brain as _Brain
 
     add_result = _Brain(brain_root).add_rule(
         description=description, category=category, state="RULE", confidence=1.0,
@@ -753,7 +753,7 @@ def cmd_rule_list(args):
     import os
     import re as _re
 
-    from gradata.enhancements.rule_to_hook import _slug
+    from .enhancements.rule_to_hook import _slug
 
     brain_root = _resolve_brain_root(args)
     lessons_file = brain_root / "lessons.md"
@@ -838,7 +838,7 @@ def cmd_rule_remove(args):
 
     # Reuse the canonical slug impl — single source of truth with cmd_rule_list
     # and the graduation pipeline.
-    from gradata.enhancements.rule_to_hook import _slug
+    from .enhancements.rule_to_hook import _slug
 
     slug = args.slug.strip()
     if not slug:
@@ -947,8 +947,8 @@ def cmd_rule_remove(args):
     # rule cannot immediately re-promote.
     if removed_file or touched_lesson:
         try:
-            from gradata import _events
-            from gradata.enhancements.rule_to_hook import (
+            from . import _events
+            from .enhancements.rule_to_hook import (
                 HOOK_DEMOTED,
                 RULE_PATCH_REVERTED,
             )
@@ -998,13 +998,13 @@ def cmd_hooks(args):
     """Manage Claude Code hook integration."""
     action = args.action
     if action == "install":
-        from gradata.hooks.claude_code import install_hook
+        from .hooks.claude_code import install_hook
         install_hook(profile=getattr(args, "profile", "standard"))
     elif action == "uninstall":
-        from gradata.hooks.claude_code import uninstall_hook
+        from .hooks.claude_code import uninstall_hook
         uninstall_hook()
     elif action == "status":
-        from gradata.hooks.claude_code import hook_status
+        from .hooks.claude_code import hook_status
         hook_status()
 
 
