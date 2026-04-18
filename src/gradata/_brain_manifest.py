@@ -6,7 +6,6 @@ Portable -- uses _paths instead of hardcoded paths.
 
 Functions promoted from brain shim (S39+):
 - _quality_metrics(): date-prefix regex for accurate lesson counting
-- _behavioral_contract(): counts CARL rules (any brain with CARL)
 - generate_manifest(): DB session cross-check, full paths/bootstrap/api_requirements
 - validate_manifest(): checks for "paths" key
 - write_manifest(): convenience writer
@@ -354,33 +353,6 @@ def _quality_metrics(ctx: "_p.BrainContext | None" = None) -> dict:
     return result
 
 
-def _behavioral_contract(ctx: "_p.BrainContext | None" = None) -> dict:
-    """Count CARL rules. Works for any brain with CARL directory structure."""
-    result = {"safety_rules": 0, "global_rules": 0, "domain_rules": 0, "total": 0}
-    working_dir = ctx.working_dir if ctx else _p.WORKING_DIR
-    carl_dir = working_dir / ".carl"
-    if carl_dir.exists():
-        for f in carl_dir.iterdir():
-            if f.is_file() and not f.name.startswith("."):
-                text = f.read_text(encoding="utf-8", errors="replace")
-                count = len(re.findall(r"_RULE_\d+=", text))
-                if "safety" in f.name.lower():
-                    result["safety_rules"] = count
-                elif "global" in f.name.lower():
-                    result["global_rules"] = count
-                result["total"] += count
-
-    domain_carl = working_dir / "domain" / "carl"
-    if domain_carl.exists():
-        for f in domain_carl.iterdir():
-            if f.is_file():
-                text = f.read_text(encoding="utf-8", errors="replace")
-                count = len(re.findall(r"_RULE_\d+=", text))
-                result["domain_rules"] += count
-                result["total"] += count
-    return result
-
-
 def _memory_composition(ctx: "_p.BrainContext | None" = None) -> dict:
     result = {"episodic": 0, "semantic": 0, "procedural": 0, "strategic": 0}
     mappings = {
@@ -474,7 +446,25 @@ def generate_manifest(*, domain: str = "General", ctx: "_p.BrainContext | None" 
     quality = _quality_metrics(ctx=ctx)
     memory = _memory_composition(ctx=ctx)
     rag = _rag_status(ctx=ctx)
-    contract = _behavioral_contract(ctx=ctx)
+    contract = {"safety_rules": 0, "global_rules": 0, "domain_rules": 0, "total": 0}
+    _bc_wd = ctx.working_dir if ctx else _p.WORKING_DIR
+    _bc_carl = _bc_wd / ".carl"
+    if _bc_carl.exists():
+        for _bc_f in _bc_carl.iterdir():
+            if _bc_f.is_file() and not _bc_f.name.startswith("."):
+                _bc_count = len(re.findall(r"_RULE_\d+=", _bc_f.read_text(encoding="utf-8", errors="replace")))
+                if "safety" in _bc_f.name.lower():
+                    contract["safety_rules"] = _bc_count
+                elif "global" in _bc_f.name.lower():
+                    contract["global_rules"] = _bc_count
+                contract["total"] += _bc_count
+    _bc_dcarl = _bc_wd / "domain" / "carl"
+    if _bc_dcarl.exists():
+        for _bc_f in _bc_dcarl.iterdir():
+            if _bc_f.is_file():
+                _bc_count = len(re.findall(r"_RULE_\d+=", _bc_f.read_text(encoding="utf-8", errors="replace")))
+                contract["domain_rules"] += _bc_count
+                contract["total"] += _bc_count
     try:
         from ._tag_taxonomy import get_taxonomy_summary
         _tt_summary = get_taxonomy_summary()
