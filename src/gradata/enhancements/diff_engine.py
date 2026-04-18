@@ -232,24 +232,6 @@ def _load_default_embedder() -> Embedder | None:
     return _embed
 
 
-def _cosine_distance(a: Sequence[float], b: Sequence[float]) -> float:
-    """Cosine distance in [0.0, 2.0]. 0=identical, 1=orthogonal, 2=opposite.
-
-    We clamp to [0.0, 1.0] downstream for blending so polarity flips saturate
-    at the same magnitude as "completely unrelated" — the blended distance is
-    a severity proxy, not a similarity score.
-    """
-    import math
-
-    dot = sum(x * y for x, y in zip(a, b, strict=False))
-    norm_a = math.sqrt(sum(x * x for x in a))
-    norm_b = math.sqrt(sum(x * x for x in b))
-    if norm_a == 0 or norm_b == 0:
-        return 0.0
-    similarity = dot / (norm_a * norm_b)
-    return 1.0 - similarity
-
-
 def compute_semantic_distance(
     before: str,
     after: str,
@@ -281,7 +263,12 @@ def compute_semantic_distance(
         return None
     if len(vecs) < 2:
         return None
-    cos_dist = _cosine_distance(vecs[0], vecs[1])
+    import math
+    _a, _b = vecs[0], vecs[1]
+    _dot = sum(x * y for x, y in zip(_a, _b, strict=False))
+    _na = math.sqrt(sum(x * x for x in _a))
+    _nb = math.sqrt(sum(x * x for x in _b))
+    cos_dist = 0.0 if _na == 0 or _nb == 0 else 1.0 - _dot / (_na * _nb)
     # Clamp to [0, 1] — cosine distance can range [0, 2] but we use it as a
     # severity proxy blended with [0, 1] Levenshtein.
     return round(max(0.0, min(1.0, cos_dist)), 6)
