@@ -144,7 +144,10 @@ def rank_rules(
         _rec = _recency_score(rule.get("last_session", 0), current_session)
         _fire = _fire_count_score(rule.get("fire_count", 0))
         _base = 0.30 * _scope + 0.25 * _confidence + 0.20 * _ctx + 0.15 * _rec + 0.10 * _fire
-        score = max(0.0, min(1.0, _base + _effectiveness_bonus(rule, effectiveness)))
+        _eb = 0.0
+        if effectiveness and (_info := effectiveness.get(rule.get("id") or rule.get("description", ""))):
+            _eb = 0.10 if _info.get("effective") else -0.10
+        score = max(0.0, min(1.0, _base + _eb))
         scored.append((score, rule))
 
     scored.sort(key=lambda pair: pair[0], reverse=True)
@@ -200,16 +203,3 @@ def _fire_count_score(fire_count: int) -> float:
     return min(1.0, math.log1p(fire_count) / 5.0)
 
 
-def _effectiveness_bonus(
-    rule: dict[str, Any],
-    effectiveness: dict[str, dict[str, Any]] | None,
-) -> float:
-    if not effectiveness:
-        return 0.0
-    rule_id = rule.get("id") or rule.get("description", "")
-    info = effectiveness.get(rule_id)
-    if info is None:
-        return 0.0
-    if info.get("effective"):
-        return 0.10
-    return -0.10
