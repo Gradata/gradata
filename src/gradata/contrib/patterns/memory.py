@@ -11,11 +11,13 @@ from typing import Protocol, runtime_checkable
 # Constants
 # ---------------------------------------------------------------------------
 
-VALID_TYPES: frozenset[str] = frozenset({
-    "episodic",     # What happened (interactions, outcomes)
-    "semantic",     # What is true (facts, knowledge)
-    "procedural",   # How to do things (workflows, patterns)
-})
+VALID_TYPES: frozenset[str] = frozenset(
+    {
+        "episodic",  # What happened (interactions, outcomes)
+        "semantic",  # What is true (facts, knowledge)
+        "procedural",  # How to do things (workflows, patterns)
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -65,10 +67,7 @@ def _decay_by_type(
     for memory in list(store.all()):
         if memory.memory_type != memory_type:
             continue
-        if (
-            memory.age_days() > max_age_days
-            and memory.reinforcement_count < min_reinforcements
-        ):
+        if memory.age_days() > max_age_days and memory.reinforcement_count < min_reinforcements:
             store.delete(memory.id)
             pruned.append(memory.id)
     return pruned
@@ -94,8 +93,7 @@ class Memory:
     def __post_init__(self) -> None:
         if self.memory_type not in VALID_TYPES:
             raise ValueError(
-                f"Invalid memory_type {self.memory_type!r}. "
-                f"Must be one of: {sorted(VALID_TYPES)}"
+                f"Invalid memory_type {self.memory_type!r}. Must be one of: {sorted(VALID_TYPES)}"
             )
         if not self.content:
             raise ValueError("Memory content must not be empty.")
@@ -360,10 +358,7 @@ class MemoryManager:
             return self.semantic.store(content, metadata)
         if memory_type == "procedural":
             return self.procedural.store(content, metadata)
-        raise ValueError(
-            f"Unknown memory_type {memory_type!r}. "
-            f"Valid types: {sorted(VALID_TYPES)}"
-        )
+        raise ValueError(f"Unknown memory_type {memory_type!r}. Valid types: {sorted(VALID_TYPES)}")
 
     def retrieve(
         self,
@@ -393,10 +388,7 @@ class MemoryManager:
             )
         pruned: list[str] = []
         for memory in list(self._store.all()):
-            if (
-                memory.age_days() > max_age_days
-                and memory.reinforcement_count < min_reinforcements
-            ):
+            if memory.age_days() > max_age_days and memory.reinforcement_count < min_reinforcements:
                 self._store.delete(memory.id)
                 pruned.append(memory.id)
         return pruned
@@ -422,9 +414,7 @@ class MemoryManager:
             by_type[m.memory_type] = by_type.get(m.memory_type, 0) + 1
 
         avg_reinforcements = (
-            round(sum(m.reinforcement_count for m in all_memories) / total, 2)
-            if total > 0
-            else 0.0
+            round(sum(m.reinforcement_count for m in all_memories) / total, 2) if total > 0 else 0.0
         )
 
         created_timestamps = [m.created for m in all_memories]
@@ -472,7 +462,6 @@ _SCOPE_PATH_RULES: list[tuple[str, str]] = [
     (r"^competitors/", "project"),
     (r"^icp-research", "project"),
     (r"^learnings/", "project"),
-
     # USER scope (personal, never shared)
     (r"^metrics/", "user"),
     (r"^loop-state\.md$", "user"),
@@ -480,7 +469,6 @@ _SCOPE_PATH_RULES: list[tuple[str, str]] = [
     (r"^self-model\.md$", "user"),
     (r"^audits/", "user"),
     (r"^evals/", "user"),
-
     # LOCAL scope (deployment-specific)
     (r"^prospects/", "local"),
     (r"^pipeline/", "local"),
