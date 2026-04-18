@@ -125,25 +125,6 @@ class RuleSource:
 
     # -- loading ----------------------------------------------------------
 
-    def _load_from_brain(self) -> list[_ScoredLesson]:
-        if self._brain_path is None:
-            return []
-        path = self._brain_path / "lessons.md"
-        if not path.is_file():
-            return []
-        try:
-            from ..enhancements.self_improvement import parse_lessons
-        except ImportError:  # pragma: no cover
-            _log.debug("parse_lessons unavailable; returning no rules")
-            return []
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError as exc:  # pragma: no cover - filesystem edge
-            _log.warning("Could not read %s: %s", path, exc)
-            return []
-        parsed = parse_lessons(text)
-        return [_lesson_to_scored(lesson) for lesson in parsed]
-
     def load(self) -> list[_ScoredLesson]:
         """Return eligible lessons (RULE/PATTERN only, above min_confidence)."""
         if self._static_lessons is not None:
@@ -166,7 +147,18 @@ class RuleSource:
                     confidence=_lfd_conf,
                 ))
         else:
-            lessons = self._load_from_brain()
+            lessons = []
+            if self._brain_path is not None:
+                _lfb_path = self._brain_path / "lessons.md"
+                if _lfb_path.is_file():
+                    try:
+                        from ..enhancements.self_improvement import parse_lessons
+                        lessons = [
+                            _lesson_to_scored(_l)
+                            for _l in parse_lessons(_lfb_path.read_text(encoding="utf-8"))
+                        ]
+                    except (ImportError, OSError) as _lfb_exc:
+                        _log.debug("Could not load brain lessons (%s)", _lfb_exc)
         return [
             l for l in lessons
             if l.state in ("RULE", "PATTERN") and l.confidence >= self.min_confidence
