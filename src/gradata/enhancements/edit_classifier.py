@@ -419,15 +419,6 @@ _EXTRACTION_TIMEOUT = 12.0  # seconds
 _provider_instance = None
 
 
-def _get_llm_provider():
-    """Get or create the LLM provider for extraction."""
-    global _provider_instance
-    if _provider_instance is None:
-        from .llm_provider import get_provider
-        _provider_instance = get_provider()
-    return _provider_instance
-
-
 def _call_llm_for_instruction(
     diff: DiffResult, classification: EditClassification,
 ) -> str | None:
@@ -452,8 +443,11 @@ def _call_llm_for_instruction(
     )
 
     try:
-        provider = _get_llm_provider()
-        text = provider.complete(prompt, max_tokens=100, timeout=_EXTRACTION_TIMEOUT)
+        global _provider_instance
+        if _provider_instance is None:
+            from .llm_provider import get_provider
+            _provider_instance = get_provider()
+        text = _provider_instance.complete(prompt, max_tokens=100, timeout=_EXTRACTION_TIMEOUT)
         if text and 5 < len(text) < 200:
             return text
     except Exception as e:
