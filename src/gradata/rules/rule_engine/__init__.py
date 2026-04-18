@@ -14,23 +14,13 @@ without modification.
 
 from ._engine import (
     DEFAULT_TTL_SESSIONS,
-    _ELIGIBLE_STATES,
     _make_rule_id,
-    _tier_label,
     apply_rules,
     apply_rules_with_tree,
     AppliedRule,
     demote_stale_rules,
 )
 from ._formatting import (
-    _CONSTITUTIONAL_VALUE_MAP,
-    _DEFAULT_PERMUTATION_SAMPLES,
-    _EXAMPLE_MAX_CHARS,
-    _IMPERATIVE_PREFIXES,
-    _ORDERING_CACHE,
-    _ORDERING_CACHE_MAX,
-    _category_entropy,
-    _deduplicate_rules,
     _ordering_entropy,
     _rule_set_hash,
     capture_example_from_correction,
@@ -42,11 +32,6 @@ from ._formatting import (
     merge_related_rules,
 )
 from ._scoring import (
-    _CT_BOOST,
-    _STATE_PRIORITY,
-    _TASK_TYPE_PATTERNS,
-    _TEAM_SIGNALS,
-    _UNIVERSAL_SIGNALS,
     _beta_ppf_05,
     _difficulty_from_lesson,
     beta_domain_reliability,
@@ -58,22 +43,12 @@ from ._scoring import (
 )
 
 __all__ = [
-    # models
     "AppliedRule",
-    # engine
     "DEFAULT_TTL_SESSIONS",
-    "_ELIGIBLE_STATES",
     "_make_rule_id",
-    "_tier_label",
     "apply_rules",
     "apply_rules_with_tree",
     "demote_stale_rules",
-    # scoring
-    "_CT_BOOST",
-    "_STATE_PRIORITY",
-    "_TASK_TYPE_PATTERNS",
-    "_TEAM_SIGNALS",
-    "_UNIVERSAL_SIGNALS",
     "_beta_ppf_05",
     "_difficulty_from_lesson",
     "beta_domain_reliability",
@@ -82,15 +57,6 @@ __all__ = [
     "detect_task_type",
     "effective_confidence",
     "is_rule_disabled_for_domain",
-    # formatting
-    "_CONSTITUTIONAL_VALUE_MAP",
-    "_DEFAULT_PERMUTATION_SAMPLES",
-    "_EXAMPLE_MAX_CHARS",
-    "_IMPERATIVE_PREFIXES",
-    "_ORDERING_CACHE",
-    "_ORDERING_CACHE_MAX",
-    "_category_entropy",
-    "_deduplicate_rules",
     "_ordering_entropy",
     "_rule_set_hash",
     "capture_example_from_correction",
