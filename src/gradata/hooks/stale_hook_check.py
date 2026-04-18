@@ -46,84 +46,6 @@ def _read_hash_from_hook(path: Path) -> str | None:
     return m.group(1) if m else None
 
 
-def _parse_lessons(brain_root: Path) -> tuple[dict[str, str], list[str]]:
-    """Parse lessons.md via the canonical parser.
-
-    Returns:
-      (by_slug, hooked_texts) where:
-        by_slug maps slug -> cleaned rule_text for ALL RULE-tier lessons.
-        hooked_texts is the list of cleaned rule_texts for [hooked] lessons,
-        in file order — used for fuzzy re-pairing when slugs have drifted.
-
-    Uses parse_lessons() so legacy "[RULE:conf] [hooked] CATEGORY: desc" rows
-    and categories containing slashes (e.g. "DRAFTING/FORMAT") are recognised
-    the same way the main pipeline does. Also scans the raw file once for
-    the line-level legacy "[hooked]" marker position that parse_lessons drops.
-    """
-    lessons_file = brain_root / "lessons.md"
-    by_slug: dict[str, str] = {}
-    hooked: list[str] = []
-    if not lessons_file.exists():
-        return by_slug, hooked
-    try:
-        content = lessons_file.read_text(encoding="utf-8")
-    except Exception:
-        return by_slug, hooked
-
-    # Pre-compute which cleaned descriptions were marked with the legacy
-    # "[hooked]" token (between state-bracket and category) — parse_lessons
-    # doesn't preserve this, so we scan lines directly.
-    legacy_hooked_descs: set[str] = set()
-    for line in content.splitlines():
-        m = _LESSON_RE.match(line.strip())
-        if not m:
-            continue
-        desc = m.group("desc").strip()
-        # Detect if this row had the legacy token position.
-        if re.search(r"\[RULE:[\d.]+\]\s+\[hooked\]\s+", line):
-            clean = desc[len("[hooked] "):] if desc.startswith("[hooked] ") else desc
-            legacy_hooked_descs.add(clean)
-
-    try:
-        from ..enhancements.self_improvement import parse_lessons
-    except Exception:
-        parse_lessons = None  # type: ignore[assignment]
-
-    if parse_lessons is not None:
-        try:
-            lessons = parse_lessons(content)
-        except Exception:
-            lessons = []
-        for lesson in lessons:
-            state = getattr(lesson, "state", None)
-            state_value = getattr(state, "value", state)
-            if str(state_value).upper() != "RULE":
-                continue
-            desc = (getattr(lesson, "description", "") or "").strip()
-            modern_hooked = desc.startswith("[hooked] ")
-            clean = desc[len("[hooked] "):] if modern_hooked else desc
-            by_slug[_slug(clean)] = clean
-            if modern_hooked or clean in legacy_hooked_descs:
-                hooked.append(clean)
-        return by_slug, hooked
-
-    # Fallback: parser unavailable — use the regex directly (preserves
-    # legacy behaviour for minimal embeddings without the full SDK).
-    for line in content.splitlines():
-        m = _LESSON_RE.match(line.strip())
-        if not m:
-            continue
-        desc = m.group("desc").strip()
-        is_hooked = desc.startswith("[hooked] ") or re.search(
-            r"\[RULE:[\d.]+\]\s+\[hooked\]\s+", line
-        )
-        clean = desc[len("[hooked] "):] if desc.startswith("[hooked] ") else desc
-        by_slug[_slug(clean)] = clean
-        if is_hooked:
-            hooked.append(clean)
-    return by_slug, hooked
-
-
 def _brain_root() -> Path:
     override = env_str("GRADATA_BRAIN")
     if override:
@@ -146,7 +68,51 @@ def main() -> int:
         pass
 
     brain_root = _brain_root()
-    lessons_by_slug, hooked_texts = _parse_lessons(brain_root)
+    lessons_by_slug: dict[str, str] = {}
+    hooked_texts: list[str] = []
+    _lf = brain_root / "lessons.md"
+    if _lf.exists():
+        try:
+            _content = _lf.read_text(encoding="utf-8")
+        except Exception:
+            _content = ""
+        if _content:
+            _legacy: set[str] = set()
+            for _line in _content.splitlines():
+                _m = _LESSON_RE.match(_line.strip())
+                if _m and re.search(r"\[RULE:[\d.]+\]\s+\[hooked\]\s+", _line):
+                    _d = _m.group("desc").strip()
+                    _legacy.add(_d[len("[hooked] "):] if _d.startswith("[hooked] ") else _d)
+            try:
+                from ..enhancements.self_improvement import parse_lessons as _pl
+            except Exception:
+                _pl = None  # type: ignore[assignment]
+            if _pl is not None:
+                try:
+                    _lessons = _pl(_content)
+                except Exception:
+                    _lessons = []
+                for _lesson in _lessons:
+                    _sv = getattr(getattr(_lesson, "state", None), "value", getattr(_lesson, "state", None))
+                    if str(_sv).upper() != "RULE":
+                        continue
+                    _desc = (getattr(_lesson, "description", "") or "").strip()
+                    _modern = _desc.startswith("[hooked] ")
+                    _clean = _desc[len("[hooked] "):] if _modern else _desc
+                    lessons_by_slug[_slug(_clean)] = _clean
+                    if _modern or _clean in _legacy:
+                        hooked_texts.append(_clean)
+            else:
+                for _line in _content.splitlines():
+                    _m = _LESSON_RE.match(_line.strip())
+                    if not _m:
+                        continue
+                    _desc = _m.group("desc").strip()
+                    _is_hooked = _desc.startswith("[hooked] ") or re.search(r"\[RULE:[\d.]+\]\s+\[hooked\]\s+", _line)
+                    _clean = _desc[len("[hooked] "):] if _desc.startswith("[hooked] ") else _desc
+                    lessons_by_slug[_slug(_clean)] = _clean
+                    if _is_hooked:
+                        hooked_texts.append(_clean)
 
     # Slugs of lessons that are already matched by an exact-slug hook — these
     # should not be re-used for fuzzy orphan pairing.
