@@ -95,25 +95,6 @@ def _check_brain_dir():
     }
 
 
-def _resolve_brain_path():
-    """Find brain directory from env or _paths module."""
-    brain_dir = os.environ.get("BRAIN_DIR")
-    if brain_dir:
-        return Path(brain_dir)
-    try:
-        from ._paths import DB_PATH, resolve_brain_dir
-        # If DB_PATH points to a real system.db, use its parent
-        if DB_PATH.exists():
-            return DB_PATH.parent
-        # Otherwise fall back to resolve_brain_dir (which uses cwd)
-        d = resolve_brain_dir()
-        if d and (d / "system.db").exists():
-            return d
-    except Exception:
-        pass
-    return None
-
-
 def _skip(name: str) -> dict:
     return {"name": name, "status": "skip", "detail": "no brain dir resolved"}
 
@@ -210,7 +191,24 @@ def diagnose(brain_dir: str | Path | None = None) -> dict:
         }
     """
     # Resolve brain path
-    brain_path = Path(brain_dir).resolve() if brain_dir else _resolve_brain_path()
+    if brain_dir:
+        brain_path = Path(brain_dir).resolve()
+    else:
+        _rbp_env = os.environ.get("BRAIN_DIR")
+        if _rbp_env:
+            brain_path = Path(_rbp_env)
+        else:
+            brain_path = None
+            try:
+                from ._paths import DB_PATH, resolve_brain_dir
+                if DB_PATH.exists():
+                    brain_path = DB_PATH.parent
+                else:
+                    _rbp_d = resolve_brain_dir()
+                    if _rbp_d and (_rbp_d / "system.db").exists():
+                        brain_path = _rbp_d
+            except Exception:
+                pass
 
     checks = [
         _check_python_version(),
