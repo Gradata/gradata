@@ -230,9 +230,21 @@ class Mem0Adapter:
             logger.warning("Mem0Adapter.reconcile failed: %s", exc)
             return {}
 
-        remote_ids = _extract_all_ids(raw)
+        if raw is None:
+            _items: list = []
+        elif isinstance(raw, dict):
+            _r = raw.get("results")
+            _items = _r if isinstance(_r, list) else []
+        elif isinstance(raw, list):
+            _items = raw
+        else:
+            _items = []
+        remote_set = {
+            _item["id"]
+            for _item in _items
+            if isinstance(_item, dict) and isinstance(_item.get("id"), str)
+        }
         local_ids = set(gradata_memory_ids or [])
-        remote_set = set(remote_ids)
 
         return {
             "only_local": sorted(local_ids - remote_set),
@@ -240,28 +252,3 @@ class Mem0Adapter:
             "remote_count": len(remote_set),
         }
 
-
-# ----------------------------------------------------------------------
-# Response-shape helpers (Mem0 SDK returns slightly different shapes
-# across versions; isolate the parsing in one place)
-# ----------------------------------------------------------------------
-
-
-def _extract_all_ids(raw: Any) -> list[str]:
-    """Pull every ``id`` out of a ``client.get_all()`` response."""
-    if raw is None:
-        return []
-    if isinstance(raw, dict):
-        items = raw.get("results")
-        if not isinstance(items, list):
-            return []
-    elif isinstance(raw, list):
-        items = raw
-    else:
-        return []
-
-    ids: list[str] = []
-    for item in items:
-        if isinstance(item, dict) and isinstance(item.get("id"), str):
-            ids.append(item["id"])
-    return ids
