@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from gradata.hooks._base import resolve_brain_dir, run_hook
-from gradata.hooks._profiles import Profile
+from ._base import resolve_brain_dir, run_hook
+from ._profiles import Profile
 
 HOOK_META = {
     "event": "Stop",
@@ -14,8 +14,8 @@ HOOK_META = {
 
 def _emit_session_end(brain_dir: str) -> None:
     try:
-        from gradata._events import emit
-        from gradata._paths import BrainContext
+        from .._events import emit
+        from .._paths import BrainContext
 
         ctx = BrainContext.from_brain_dir(brain_dir)
         emit("SESSION_END", source="hook:session_close", data={}, ctx=ctx)
@@ -27,7 +27,7 @@ def _run_graduation(brain_dir: str) -> None:
     try:
         from pathlib import Path
 
-        from gradata.enhancements.self_improvement import format_lessons, graduate, parse_lessons
+        from ..enhancements.self_improvement import format_lessons, graduate, parse_lessons
 
         lessons_path = Path(brain_dir) / "lessons.md"
         if not lessons_path.is_file():
@@ -47,8 +47,8 @@ def _run_tree_consolidation(brain_dir: str) -> None:
     try:
         from pathlib import Path
 
-        from gradata.enhancements.self_improvement import format_lessons, parse_lessons
-        from gradata.rules.rule_tree import RuleTree
+        from ..enhancements.self_improvement import format_lessons, parse_lessons
+        from ..rules.rule_tree import RuleTree
 
         lessons_path = Path(brain_dir) / "lessons.md"
         if not lessons_path.is_file():
@@ -93,7 +93,7 @@ def _run_pipeline(brain_dir: str, data: dict) -> None:
     try:
         from pathlib import Path
 
-        from gradata.enhancements.rule_pipeline import run_rule_pipeline
+        from ..enhancements.rule_pipeline import run_rule_pipeline
 
         lessons_path = Path(brain_dir) / "lessons.md"
         db_path = Path(brain_dir) / "system.db"
@@ -125,7 +125,7 @@ def _flush_retain_queue(brain_dir: str) -> None:
     lost if the process is torn down immediately after.
     """
     try:
-        from gradata._events import flush_retain
+        from .._events import flush_retain
         result = flush_retain(brain_dir)
         if result.get("written"):
             import logging
