@@ -252,51 +252,6 @@ def _tokenize(text: str) -> list[str]:
     return re.findall(r"[a-z0-9]+", text.lower())
 
 
-def _extract_affected(action: str, context: dict[str, Any] | None) -> list[str]:
-    """Heuristically identify entities affected by the action.
-
-    Checks ``context["target"]``, ``context["targets"]``, and
-    ``context["affected"]`` (in that priority order).  Falls back to
-    extracting quoted or bracketed spans from the action string itself.
-
-    Args:
-        action: Raw action string.
-        context: Optional caller-supplied metadata.
-
-    Returns:
-        Deduplicated list of affected entity strings.
-    """
-    import re
-
-    affected: list[str] = []
-
-    if context:
-        for key in ("target", "targets", "affected", "resource", "entity"):
-            val = context.get(key)
-            if val is None:
-                continue
-            if isinstance(val, list):
-                affected.extend(str(v) for v in val)
-            else:
-                affected.append(str(val))
-
-    if not affected:
-        # Extract quoted strings or angle-bracket tokens from action text.
-        quoted = re.findall(r'["\']([^"\']+)["\']', action)
-        bracketed = re.findall(r"<([^>]+)>", action)
-        affected = quoted + bracketed
-
-    # Deduplicate while preserving order.
-    seen: set[str] = set()
-    unique: list[str] = []
-    for item in affected:
-        if item not in seen:
-            seen.add(item)
-            unique.append(item)
-
-    return unique
-
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -335,8 +290,27 @@ def assess_risk(
         ``RiskAssessment`` with tier, reason, affected entities, and
         reversibility flag.
     """
+    import re as _re
+
     tokens = _tokenize(action)
-    affected = _extract_affected(action, context)
+    _affected_raw: list[str] = []
+    if context:
+        for _k in ("target", "targets", "affected", "resource", "entity"):
+            _val = context.get(_k)
+            if _val is None:
+                continue
+            if isinstance(_val, list):
+                _affected_raw.extend(str(v) for v in _val)
+            else:
+                _affected_raw.append(str(_val))
+    if not _affected_raw:
+        _affected_raw = _re.findall(r'["\']([^"\']+)["\']', action) + _re.findall(r"<([^>]+)>", action)
+    _seen: set[str] = set()
+    affected: list[str] = []
+    for _item in _affected_raw:
+        if _item not in _seen:
+            _seen.add(_item)
+            affected.append(_item)
 
     # Honour explicit caller override first.
     if context:
