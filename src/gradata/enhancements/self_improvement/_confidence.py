@@ -526,25 +526,17 @@ _BAYESIAN_BLEND_MIN_OBS = 5
 _BAYESIAN_BLEND_MAX_OBS = 20
 
 
-def _bayesian_blend_weight(total_observations: int) -> float:
-    """Return weight for Bayesian component [0.0, 0.7]."""
-    if total_observations < _BAYESIAN_BLEND_MIN_OBS:
-        return 0.0
-    if total_observations >= _BAYESIAN_BLEND_MAX_OBS:
-        return 0.7
-    return (
-        0.7
-        * (total_observations - _BAYESIAN_BLEND_MIN_OBS)
-        / (_BAYESIAN_BLEND_MAX_OBS - _BAYESIAN_BLEND_MIN_OBS)
-    )
-
-
 def _bayesian_confidence(lesson: Lesson) -> float:
     """Compute blended confidence from beta posterior + FSRS."""
     from ..._stats import beta_posterior
 
     total_obs = int(lesson.alpha + lesson.beta_param - 2)
-    blend_w = _bayesian_blend_weight(total_obs)
+    if total_obs < _BAYESIAN_BLEND_MIN_OBS:
+        blend_w = 0.0
+    elif total_obs >= _BAYESIAN_BLEND_MAX_OBS:
+        blend_w = 0.7
+    else:
+        blend_w = 0.7 * (total_obs - _BAYESIAN_BLEND_MIN_OBS) / (_BAYESIAN_BLEND_MAX_OBS - _BAYESIAN_BLEND_MIN_OBS)
 
     if blend_w == 0.0:
         return lesson.confidence
