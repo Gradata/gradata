@@ -22,11 +22,8 @@ from datetime import UTC, datetime
 from . import _paths as _p
 from ._db import get_connection
 from ._manifest_helpers import (
-    _count_events,
-    _get_tables,
     _sdk_capabilities,
     _session_window,
-    _tag_taxonomy,
 )
 from ._manifest_quality import (
     _categories_extinct,
@@ -451,7 +448,15 @@ def generate_manifest(*, domain: str = "General", ctx: "_p.BrainContext | None" 
             if _phase in _vt.upper():
                 version_info["maturity_phase"] = _phase
                 break
-    events = _count_events(ctx=ctx)
+    events: dict = {"total": 0, "by_type": {}}
+    try:
+        _ce_conn = get_connection(ctx.db_path if ctx else _p.DB_PATH)
+        for _ce_row in _ce_conn.execute("SELECT type, COUNT(*) as cnt FROM events GROUP BY type").fetchall():
+            events["by_type"][_ce_row["type"]] = _ce_row["cnt"]
+            events["total"] += _ce_row["cnt"]
+        _ce_conn.close()
+    except Exception:
+        pass
 
     # Cross-check session count: prefer DB max if higher than VERSION.md
     try:
@@ -470,7 +475,17 @@ def generate_manifest(*, domain: str = "General", ctx: "_p.BrainContext | None" 
     memory = _memory_composition(ctx=ctx)
     rag = _rag_status(ctx=ctx)
     contract = _behavioral_contract(ctx=ctx)
-    tables = _get_tables(ctx=ctx)
+    try:
+        from ._tag_taxonomy import get_taxonomy_summary
+        _tt_summary = get_taxonomy_summary()
+    except ImportError:
+        _tt_summary = {}
+    try:
+        _gt_conn = get_connection(ctx.db_path if ctx else _p.DB_PATH)
+        tables = [_r[0] for _r in _gt_conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()]
+        _gt_conn.close()
+    except Exception:
+        tables = []
 
     manifest = {
         "schema_version": "1.0.0",
@@ -492,7 +507,7 @@ def generate_manifest(*, domain: str = "General", ctx: "_p.BrainContext | None" 
         },
         "rag": rag,
         "behavioral_contract": contract,
-        "tag_taxonomy": _tag_taxonomy(),
+        "tag_taxonomy": _tt_summary,
         "paths": {
             "brain_dir": "$BRAIN_DIR",
             "domain_dir": "$DOMAIN_DIR",

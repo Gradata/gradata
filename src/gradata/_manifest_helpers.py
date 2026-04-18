@@ -5,9 +5,6 @@ Shared constants and utility functions for manifest generation.
 Split from _brain_manifest.py for file size compliance (<500 lines).
 """
 
-from . import _paths as _p
-from ._db import get_connection
-
 # ── Severity constants (single source of truth) ───────────────────────
 LOW_SEVERITY = frozenset({"as-is", "minor"})
 
@@ -18,32 +15,6 @@ def _session_window(conn, window: int = 20) -> tuple[int, int]:
         "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
     ).fetchone()[0] or 0
     return max_session, max(1, max_session - window + 1)
-
-
-def _count_events(ctx: "_p.BrainContext | None" = None) -> dict:
-    result = {"total": 0, "by_type": {}}
-    try:
-        db = ctx.db_path if ctx else _p.DB_PATH
-        conn = get_connection(db)
-        rows = conn.execute("SELECT type, COUNT(*) as cnt FROM events GROUP BY type").fetchall()
-        for row in rows:
-            result["by_type"][row["type"]] = row["cnt"]
-            result["total"] += row["cnt"]
-        conn.close()
-    except Exception:
-        pass
-    return result
-
-
-def _get_tables(ctx: "_p.BrainContext | None" = None) -> list[str]:
-    try:
-        db = ctx.db_path if ctx else _p.DB_PATH
-        conn = get_connection(db)
-        rows = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()
-        conn.close()
-        return [r[0] for r in rows]
-    except Exception:
-        return []
 
 
 def _sdk_capabilities() -> dict:
@@ -113,9 +84,3 @@ def _sdk_capabilities() -> dict:
     }
 
 
-def _tag_taxonomy() -> dict:
-    try:
-        from ._tag_taxonomy import get_taxonomy_summary
-        return get_taxonomy_summary()
-    except ImportError:
-        return {}
