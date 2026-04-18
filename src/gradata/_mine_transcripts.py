@@ -98,14 +98,40 @@ def _iter_jsonl(path: Path):
         return
 
 
+_NOISE_PREFIXES = (
+    "<system-reminder",
+    "<command-message",
+    "<command-name",
+    "<local-command-stdout",
+    "<observed_from_primary_session",
+    "<progress_summary",
+    "<bash-stdout",
+    "<bash-stderr",
+)
+
+_NOISE_SUBSTRINGS = (
+    "<scheduled-task",
+    "<observed_from_primary_session",
+    "progress summary checkpoint",
+    "caveat: the messages below were generated",
+)
+
+
 def _mine_session(path: Path) -> list[dict]:
     events: list[dict] = []
+    # Skip entire claude-mem observer project — every event is a wrapped
+    # echo of another session's traffic, not a real user correction.
+    if "claude-mem-observer" in path.parent.name:
+        return events
     for msg in _iter_jsonl(path):
         text = _extract_user_text(msg)
         if not text:
             continue
-        lowered = text[:200].lower()
-        if "<scheduled-task" in lowered or text.startswith("<system-reminder"):
+        stripped = text.lstrip()
+        if stripped.startswith(_NOISE_PREFIXES):
+            continue
+        lowered = text[:400].lower()
+        if any(marker in lowered for marker in _NOISE_SUBSTRINGS):
             continue
         signals = _detect_signals(text)
         if not signals:
