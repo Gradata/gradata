@@ -18,22 +18,6 @@ HOOK_META = {
 }
 
 
-def _get_session_number(brain_dir: Path) -> int | None:
-    loop_state = brain_dir / "loop-state.md"
-    if not loop_state.is_file():
-        return None
-    try:
-        text = loop_state.read_text(encoding="utf-8")
-        for line in text.splitlines():
-            if "session" in line.lower():
-                nums = re.findall(r"\d+", line)
-                if nums:
-                    return int(nums[0])
-    except Exception:
-        pass
-    return None
-
-
 def _get_modified_files() -> list[str]:
     """Get files modified + untracked in current session via git."""
     cwd = os.environ.get("CLAUDE_PROJECT_DIR", ".")
@@ -77,7 +61,18 @@ def main(data: dict) -> dict | None:
         persist_dir = brain_dir / "sessions" / "persist"
         persist_dir.mkdir(parents=True, exist_ok=True)
 
-        session = _get_session_number(brain_dir)
+        session: int | None = None
+        _ls = brain_dir / "loop-state.md"
+        if _ls.is_file():
+            try:
+                for _line in _ls.read_text(encoding="utf-8").splitlines():
+                    if "session" in _line.lower():
+                        _nums = re.findall(r"\d+", _line)
+                        if _nums:
+                            session = int(_nums[0])
+                            break
+            except Exception:
+                pass
         modified = _get_modified_files()
 
         handoff = {
