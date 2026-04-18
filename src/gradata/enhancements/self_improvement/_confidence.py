@@ -578,9 +578,10 @@ def _classify_correction_direction(
 
     try:
         from ..contradiction_detector import (
-            _check_negation,
-            _check_opposite_sentiment,
-            _check_polarity,
+            _ACTION_OPPOSITES,
+            _POLARITY_PAIRS,
+            _SENTIMENT_OPPOSITES,
+            _check_pair_list,
             _extract_topic_words,
             _normalize,
         )
@@ -599,9 +600,9 @@ def _classify_correction_direction(
         return "UNKNOWN"
 
     # Check for contradiction signals
-    polarity = _check_polarity(corr_norm, lesson_norm)
-    negation = _check_negation(corr_norm, lesson_norm)
-    sentiment = _check_opposite_sentiment(corr_norm, lesson_norm)
+    polarity = _check_pair_list(corr_norm, lesson_norm, _POLARITY_PAIRS, 0.9)
+    negation = _check_pair_list(corr_norm, lesson_norm, _ACTION_OPPOSITES, 0.85)
+    sentiment = _check_pair_list(corr_norm, lesson_norm, _SENTIMENT_OPPOSITES, 0.7)
 
     max_contradiction = max(polarity, negation, sentiment)
 

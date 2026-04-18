@@ -133,16 +133,3 @@ def _check_pair_list(
     return 0.0
 
 
-def _check_polarity(new_norm: str, existing_norm: str) -> float:
-    """Check for polarity contradictions (always vs never)."""
-    return _check_pair_list(new_norm, existing_norm, _POLARITY_PAIRS, 0.9)
-
-
-def _check_negation(new_norm: str, existing_norm: str) -> float:
-    """Check for action negation (use vs avoid/don't use)."""
-    return _check_pair_list(new_norm, existing_norm, _ACTION_OPPOSITES, 0.85)
-
-
-def _check_opposite_sentiment(new_norm: str, existing_norm: str) -> float:
-    """Check for opposite sentiment on overlapping topics."""
-    return _check_pair_list(new_norm, existing_norm, _SENTIMENT_OPPOSITES, 0.7)
