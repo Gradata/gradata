@@ -20,45 +20,6 @@ from __future__ import annotations
 from pathlib import Path
 
 
-def _parse_rules(
-    brain_root: Path, *, lessons_path: Path | None = None
-) -> list[tuple[str, str]]:
-    """Return [(category, description), ...] for every RULE-tier lesson.
-
-    Delegates to the canonical lessons.md parser in self_improvement.py.
-
-    If ``lessons_path`` is provided, it's used directly (letting callers plug in
-    the canonical ``brain._find_lessons_path()`` result). Otherwise falls back
-    to ``brain_root / "lessons.md"`` for back-compat with the library signature.
-    """
-    import re as _re
-
-    from .self_improvement import parse_lessons
-
-    lessons_file = lessons_path if lessons_path is not None else brain_root / "lessons.md"
-    if not lessons_file.exists():
-        return []
-    # Legacy lessons.md files may carry a "[hooked]" marker between the
-    # state bracket and the category. The canonical parser doesn't know about
-    # it, so strip it before parsing (it's internal state, not rule text).
-    # New code records the same state in ``lesson.metadata.how_enforced``.
-    raw = lessons_file.read_text(encoding="utf-8")
-    raw = _re.sub(r"(\[\w+:[\d.]+\])\s+\[hooked\]\s+", r"\1 ", raw)
-    lessons = parse_lessons(raw)
-    out: list[tuple[str, str]] = []
-    for lesson in lessons:
-        # Only RULE-tier
-        state = getattr(lesson, "state", None)
-        state_value = getattr(state, "value", state)
-        if str(state_value).upper() != "RULE":
-            continue
-        category = getattr(lesson, "category", "") or ""
-        description = getattr(lesson, "description", "") or ""
-        description = _re.sub(r"^\[hooked\]\s*", "", description.strip())
-        out.append((category, description))
-    return out
-
-
 def _format_cursor(rules: list[tuple[str, str]]) -> str:
     if not rules:
         return "# No graduated rules yet\n"
@@ -165,5 +126,17 @@ def export_rules(
     """
     if target not in _FORMATTERS:
         raise ValueError(f"unknown target: {target}. Supported: {list(_FORMATTERS)}")
-    rules = _parse_rules(Path(brain_root), lessons_path=lessons_path)
+    import re as _re
+    from .self_improvement import parse_lessons
+    _lf = lessons_path if lessons_path is not None else Path(brain_root) / "lessons.md"
+    rules: list[tuple[str, str]] = []
+    if _lf.exists():
+        _raw = _re.sub(r"(\[\w+:[\d.]+\])\s+\[hooked\]\s+", r"\1 ",
+                       _lf.read_text(encoding="utf-8"))
+        for _lesson in parse_lessons(_raw):
+            _sv = getattr(getattr(_lesson, "state", None), "value", getattr(_lesson, "state", None))
+            if str(_sv).upper() != "RULE":
+                continue
+            _desc = _re.sub(r"^\[hooked\]\s*", "", (getattr(_lesson, "description", "") or "").strip())
+            rules.append((getattr(_lesson, "category", "") or "", _desc))
     return _FORMATTERS[target](rules)
