@@ -16,7 +16,9 @@ Trigger event types (any new row since last_close_ts fires the waterfall):
     CORRECTION, LESSON_CHANGE, RULE_FAILURE, IMPLICIT_FEEDBACK,
     OUTPUT_ACCEPTED, AGENT_OUTCOME, RULE_PATCHED
 
-On first run (no stamp file) we run once to bootstrap, then stamp.
+On first run (no stamp file) we wait until any trigger row exists and
+then run the waterfall against the full event history; the stamp file
+is written only after a successful pass.
 """
 from __future__ import annotations
 
@@ -65,17 +67,21 @@ def _write_stamp(brain_dir: Path, ts: str) -> None:
         (brain_dir / STAMP_FILE).write_text(ts, encoding="utf-8")
 
 
-def _has_new_triggers(brain_dir: Path, since: str | None) -> bool:
-    """True iff any TRIGGER_TYPES event rows exist after ``since``."""
+def _has_new_triggers(brain_dir: Path, since: str | None, until: str) -> bool:
+    """True iff any TRIGGER_TYPES event rows exist in ``(since, until]``.
+
+    Bounding the query on ``until`` prevents the later stamp write from
+    falsely marking rows that arrive mid-waterfall as processed.
+    """
     db = brain_dir / "system.db"
     if not db.is_file():
         return False
     placeholders = ",".join("?" * len(TRIGGER_TYPES))
-    sql = f"SELECT 1 FROM events WHERE type IN ({placeholders})"
-    params: tuple = TRIGGER_TYPES
+    sql = f"SELECT 1 FROM events WHERE type IN ({placeholders}) AND ts <= ?"
+    params: tuple = (*TRIGGER_TYPES, until)
     if since:
         sql += " AND ts > ?"
-        params = (*TRIGGER_TYPES, since)
+        params = (*params, since)
     sql += " LIMIT 1"
     try:
         with sqlite3.connect(db) as conn:
@@ -184,14 +190,15 @@ def main(data: dict) -> dict | None:
 
     # Gate the heavy waterfall on "did anything interesting happen?"
     last_ts = _read_stamp(brain_dir)
-    if not _has_new_triggers(brain_dir, last_ts):
+    upper_bound = datetime.now(UTC).isoformat()
+    if not _has_new_triggers(brain_dir, last_ts, upper_bound):
         return None
 
     _run_graduation(brain_dir_str)
     _run_pipeline(brain_dir_str, data)
     _run_tree_consolidation(brain_dir_str)
 
-    _write_stamp(brain_dir, datetime.now(UTC).isoformat())
+    _write_stamp(brain_dir, upper_bound)
     return None
 
 

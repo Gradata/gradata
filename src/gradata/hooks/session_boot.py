@@ -56,20 +56,26 @@ def main(_data: dict) -> dict | None:
 
     try:
         from gradata._events import emit
+        from gradata._file_lock import platform_lock
         from gradata._paths import BrainContext
 
-        session = _next_session(db_path)
-        ctx = BrainContext.from_brain_dir(brain_dir)
-        emit(
-            "SESSION_BOOT",
-            source="hook:session_boot",
-            data={
-                "session": session,
-                "ts": datetime.now(UTC).isoformat(),
-            },
-            ctx=ctx,
-            session=session,
-        )
+        # Serialize allocation + emit so concurrent launches never collide on
+        # the same MAX(session) value and produce duplicate session numbers.
+        lock_path = Path(brain_dir) / ".session_boot.lock"
+        lock_path.touch(exist_ok=True)
+        with open(lock_path, "r+b") as lock_fh, platform_lock(lock_fh, timeout=5.0):
+            session = _next_session(db_path)
+            ctx = BrainContext.from_brain_dir(brain_dir)
+            emit(
+                "SESSION_BOOT",
+                source="hook:session_boot",
+                data={
+                    "session": session,
+                    "ts": datetime.now(UTC).isoformat(),
+                },
+                ctx=ctx,
+                session=session,
+            )
     except Exception as e:
         _log.debug("session_boot skipped: %s", e)
     return None

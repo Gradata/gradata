@@ -360,7 +360,7 @@ def test_session_close_fires_on_correction(tmp_path):
     db = tmp_path / "system.db"
     with sqlite3.connect(db) as conn:
         conn.execute("CREATE TABLE events (id INTEGER PRIMARY KEY, ts TEXT, type TEXT)")
-        conn.execute("INSERT INTO events (ts, type) VALUES ('2099-01-01T00:00:00Z', 'CORRECTION')")
+        conn.execute("INSERT INTO events (ts, type) VALUES ('2000-01-01T00:00:00Z', 'CORRECTION')")
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
         with patch("gradata.hooks.session_close._run_graduation") as mock_grad:
             with patch("gradata.hooks.session_close._run_pipeline") as mock_pipe:

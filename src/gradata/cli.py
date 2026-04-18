@@ -32,11 +32,16 @@ _log = logging.getLogger("gradata.cli")
 
 
 def _get_brain(args):
-    """Resolve brain directory from args, GRADATA_BRAIN env, or CWD fallback."""
+    """Resolve brain directory with env-first precedence.
+
+    Order matches _resolve_brain_root: GRADATA_BRAIN > --brain-dir > CWD.
+    Keeping both helpers aligned prevents mixed resolution when env var
+    and CLI flag are both set (tests exercise exactly this).
+    """
     from gradata import Brain
     brain_dir = (
-        getattr(args, "brain_dir", None)
-        or env_str("GRADATA_BRAIN")
+        env_str("GRADATA_BRAIN")
+        or getattr(args, "brain_dir", None)
         or Path.cwd()
     )
     return Brain(brain_dir)

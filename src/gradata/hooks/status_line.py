@@ -20,14 +20,15 @@ wedges the status bar.
 from __future__ import annotations
 
 import contextlib
-import os
 import sqlite3
 import sys
 from pathlib import Path
 
+from gradata.hooks._base import resolve_brain_dir
+
 
 def _brain_dir() -> Path | None:
-    raw = os.environ.get("GRADATA_BRAIN_DIR")
+    raw = resolve_brain_dir()
     if raw:
         p = Path(raw)
         return p if p.is_dir() else None
