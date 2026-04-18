@@ -6,13 +6,9 @@ Split from _brain_manifest.py for file size compliance (<500 lines).
 """
 
 import re
-from typing import TYPE_CHECKING
 
 import gradata._paths as _p
 from gradata._db import get_connection
-
-if TYPE_CHECKING:
-    from gradata._paths import BrainContext
 
 # ── Severity constants (single source of truth) ───────────────────────
 LOW_SEVERITY = frozenset({"as-is", "minor"})
@@ -27,7 +23,7 @@ def _session_window(conn, window: int = 20) -> tuple[int, int]:
     return max_session, max(1, max_session - window + 1)
 
 
-def _read_version(ctx: "BrainContext | None" = None) -> dict:
+def _read_version(ctx: "_p.BrainContext | None" = None) -> dict:
     result = {"version": "unknown", "sessions_trained": 0, "maturity_phase": "INFANT"}
     brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
     vfile = brain_dir / "VERSION.md"
@@ -47,7 +43,7 @@ def _read_version(ctx: "BrainContext | None" = None) -> dict:
     return result
 
 
-def _count_events(ctx: "BrainContext | None" = None) -> dict:
+def _count_events(ctx: "_p.BrainContext | None" = None) -> dict:
     result = {"total": 0, "by_type": {}}
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
@@ -62,7 +58,7 @@ def _count_events(ctx: "BrainContext | None" = None) -> dict:
     return result
 
 
-def _get_tables(ctx: "BrainContext | None" = None) -> list[str]:
+def _get_tables(ctx: "_p.BrainContext | None" = None) -> list[str]:
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = get_connection(db)

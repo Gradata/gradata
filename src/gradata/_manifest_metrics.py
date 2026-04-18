@@ -8,7 +8,6 @@ Split from _brain_manifest.py for file size compliance (<500 lines).
 import re
 import statistics
 from datetime import datetime
-from typing import TYPE_CHECKING
 
 import gradata._paths as _p
 from gradata._db import get_connection
@@ -26,11 +25,8 @@ from gradata._manifest_quality import (
 )
 from gradata._stats import trend_analysis as _trend_analysis
 
-if TYPE_CHECKING:
-    from gradata._paths import BrainContext
 
-
-def _lesson_distribution(ctx: "BrainContext | None" = None) -> dict[str, int]:
+def _lesson_distribution(ctx: "_p.BrainContext | None" = None) -> dict[str, int]:
     """Count lessons by state from lessons.md."""
     dist: dict[str, int] = {}
     lessons_file = ctx.lessons_file if ctx else _p.LESSONS_FILE
@@ -49,7 +45,7 @@ def _lesson_distribution(ctx: "BrainContext | None" = None) -> dict[str, int]:
     return dist
 
 
-def _correction_rate_trend(ctx: "BrainContext | None" = None, window: int = 10) -> dict | None:
+def _correction_rate_trend(ctx: "_p.BrainContext | None" = None, window: int = 10) -> dict | None:
     """Compare current CRO window to baseline window."""
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
@@ -89,7 +85,7 @@ def _correction_rate_trend(ctx: "BrainContext | None" = None, window: int = 10) 
         return None
 
 
-def _temporal_provenance(ctx: "BrainContext | None" = None) -> dict:
+def _temporal_provenance(ctx: "_p.BrainContext | None" = None) -> dict:
     """Measure temporal authenticity of brain training via 3rd-party signals.
 
     Checks that the brain's correction/learning history correlates with
@@ -194,7 +190,7 @@ def _temporal_provenance(ctx: "BrainContext | None" = None) -> dict:
     return result
 
 
-def _outcome_correlation(ctx: "BrainContext | None" = None, window: int = 20) -> dict | None:
+def _outcome_correlation(ctx: "_p.BrainContext | None" = None, window: int = 20) -> dict | None:
     """Correlate compound score trend with user-reported outcome metrics.
 
     Users log external KPIs via OUTCOME_METRIC events (e.g., draft-to-approval
@@ -247,7 +243,7 @@ def _outcome_correlation(ctx: "BrainContext | None" = None, window: int = 20) ->
         return None
 
 
-def _quality_metrics(ctx: "BrainContext | None" = None) -> dict:
+def _quality_metrics(ctx: "_p.BrainContext | None" = None) -> dict:
     """Compute quality metrics from events.
 
     Uses date-prefix regex for lesson counting to avoid matching format
@@ -379,7 +375,7 @@ def _quality_metrics(ctx: "BrainContext | None" = None) -> dict:
     return result
 
 
-def _behavioral_contract(ctx: "BrainContext | None" = None) -> dict:
+def _behavioral_contract(ctx: "_p.BrainContext | None" = None) -> dict:
     """Count CARL rules. Works for any brain with CARL directory structure.
 
     Looks for .carl/ relative to WORKING_DIR and domain/carl/ for domain rules.
@@ -410,7 +406,7 @@ def _behavioral_contract(ctx: "BrainContext | None" = None) -> dict:
     return result
 
 
-def _memory_composition(ctx: "BrainContext | None" = None) -> dict:
+def _memory_composition(ctx: "_p.BrainContext | None" = None) -> dict:
     result = {"episodic": 0, "semantic": 0, "procedural": 0, "strategic": 0}
     mappings = {
         "episodic": ["sessions", "metrics", "pipeline", "demos"],
@@ -427,7 +423,7 @@ def _memory_composition(ctx: "BrainContext | None" = None) -> dict:
     return result
 
 
-def _rag_status(ctx: "BrainContext | None" = None) -> dict:
+def _rag_status(ctx: "_p.BrainContext | None" = None) -> dict:
     """RAG status. Chunks counted from SQLite brain_embeddings table."""
     result = {
         "active": False, "provider": "unknown", "model": "unknown",

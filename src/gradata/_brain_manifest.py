@@ -21,7 +21,6 @@ Split into 4 files for maintainability (<500 lines each):
 
 import json
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 
 import gradata._paths as _p
 from gradata._db import get_connection
@@ -41,11 +40,9 @@ from gradata._manifest_metrics import (
     _rag_status,
 )
 
-if TYPE_CHECKING:
-    from gradata._paths import BrainContext
 
 
-def generate_manifest(*, domain: str = "General", ctx: "BrainContext | None" = None) -> dict:
+def generate_manifest(*, domain: str = "General", ctx: "_p.BrainContext | None" = None) -> dict:
     """Generate the complete brain manifest.
 
     Includes DB session cross-check, behavioral_contract, full paths,
@@ -165,7 +162,7 @@ def generate_manifest(*, domain: str = "General", ctx: "BrainContext | None" = N
     return manifest
 
 
-def write_manifest(manifest: dict | None = None, ctx: "BrainContext | None" = None):
+def write_manifest(manifest: dict | None = None, ctx: "_p.BrainContext | None" = None):
     """Write manifest to brain/brain.manifest.json."""
     if manifest is None:
         manifest = generate_manifest(ctx=ctx)
@@ -181,7 +178,7 @@ def write_manifest(manifest: dict | None = None, ctx: "BrainContext | None" = No
 MANIFEST_PATH = _p.BRAIN_DIR / "brain.manifest.json"
 
 
-def validate_manifest(ctx: "BrainContext | None" = None) -> list[str]:
+def validate_manifest(ctx: "_p.BrainContext | None" = None) -> list[str]:
     """Validate existing manifest against current state."""
     brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
     manifest_path = brain_dir / "brain.manifest.json"

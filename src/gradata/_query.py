@@ -9,7 +9,6 @@ import contextlib
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import gradata._paths as _p
 from gradata._config import (
@@ -29,9 +28,6 @@ from gradata._config import (
     SKIP_DIRS,
     SKIP_FILES,
 )
-
-if TYPE_CHECKING:
-    from gradata._paths import BrainContext
 
 # ── FTS5 Full-Text Search ────────────────────────────────────────────────
 
@@ -53,7 +49,7 @@ def _ensure_fts_table(conn: sqlite3.Connection):
 
 
 def fts_index(source: str, file_type: str, text: str, embed_date: str = "",
-              ctx: "BrainContext | None" = None):
+              ctx: "_p.BrainContext | None" = None):
     db = ctx.db_path if ctx else _p.DB_PATH
     conn = sqlite3.connect(str(db))
     _ensure_fts_table(conn)
@@ -70,7 +66,7 @@ def fts_index(source: str, file_type: str, text: str, embed_date: str = "",
     conn.close()
 
 
-def fts_index_batch(docs: list[dict], ctx: "BrainContext | None" = None):
+def fts_index_batch(docs: list[dict], ctx: "_p.BrainContext | None" = None):
     db = ctx.db_path if ctx else _p.DB_PATH
     conn = sqlite3.connect(str(db))
     _ensure_fts_table(conn)
@@ -88,7 +84,7 @@ def fts_index_batch(docs: list[dict], ctx: "BrainContext | None" = None):
     conn.close()
 
 
-def fts_rebuild(ctx: "BrainContext | None" = None):
+def fts_rebuild(ctx: "_p.BrainContext | None" = None):
     db = ctx.db_path if ctx else _p.DB_PATH
     conn = sqlite3.connect(str(db))
     with contextlib.suppress(Exception):
@@ -138,7 +134,7 @@ def fts_rebuild(ctx: "BrainContext | None" = None):
 
 
 def fts_search(query_text: str, file_type: str | None = None, top_k: int = 10,
-               ctx: "BrainContext | None" = None) -> list[dict]:
+               ctx: "_p.BrainContext | None" = None) -> list[dict]:
     db = ctx.db_path if ctx else _p.DB_PATH
     conn = sqlite3.connect(str(db))
     _ensure_fts_table(conn)
@@ -265,7 +261,7 @@ def brain_search(
     query: str, file_type: str | None = None, domain: str = "default",
     top_k: int = DEFAULT_TOP_K, threshold: float = SIMILARITY_THRESHOLD,
     use_recency: bool = True, memory_type: str | None = None,
-    mode: str | None = None, ctx: "BrainContext | None" = None,
+    mode: str | None = None, ctx: "_p.BrainContext | None" = None,
 ) -> list[dict]:
     """Search the brain using FTS5.
 
