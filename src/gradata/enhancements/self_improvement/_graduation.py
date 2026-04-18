@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import logging
 
-from gradata._types import (
+from ..._types import (
     Lesson,
     LessonState,
     RuleMetadata,
     transition,
 )
-from gradata.enhancements.self_improvement._confidence import (
+from ._confidence import (
     _GRADUATION_DEDUP_THRESHOLD,
     KILL_LIMITS,
     MACHINE_KILL_LIMITS,
@@ -75,7 +75,7 @@ def _passes_beta_lb_gate(lesson: Lesson) -> bool:
 
     alpha = getattr(lesson, "alpha", 1.0)
     beta_param = getattr(lesson, "beta_param", 1.0)
-    from gradata.rules.rule_engine import _beta_ppf_05
+    from ...rules.rule_engine import _beta_ppf_05
 
     return _beta_ppf_05(alpha, beta_param) >= threshold
 
@@ -111,7 +111,7 @@ def graduate(
     """
     # Compute effective thresholds (salted or default)
     if salt:
-        from gradata.security.brain_salt import salt_threshold
+        from ...security.brain_salt import salt_threshold
 
         eff_pattern_threshold = salt_threshold(PATTERN_THRESHOLD, salt, "PATTERN")
         eff_rule_threshold = salt_threshold(RULE_THRESHOLD, salt, "RULE")
@@ -225,7 +225,7 @@ def graduate(
             # TODO: At 5,000+ rules, pre-compute TF-IDF vectors for existing_rules
             # outside the lesson loop to avoid redundant tokenization (O(n*m) → O(n+m)).
             try:
-                from gradata.enhancements.similarity import semantic_similarity
+                from ..similarity import semantic_similarity
 
                 for existing in existing_rules:
                     sim = semantic_similarity(lesson.description, existing.description)
@@ -260,7 +260,7 @@ def graduate(
             # too heavily on word order and won't generalize to rephrased corrections.
             if not blocked:
                 try:
-                    from gradata.enhancements.similarity import semantic_similarity
+                    from ..similarity import semantic_similarity
 
                     words = lesson.description.split()
                     if len(words) >= 4:
@@ -282,7 +282,7 @@ def graduate(
 
             # Refine rule wording before graduation
             try:
-                from gradata.contrib.patterns.tree_of_thoughts import evaluate_rule_candidates
+                from ...contrib.patterns.tree_of_thoughts import evaluate_rule_candidates
 
                 result = evaluate_rule_candidates(lesson.description, existing_rule_descs)
                 if result.best.content and result.best.score > 0.3:
@@ -298,7 +298,7 @@ def graduate(
             # Never raises out of graduate() — any failure falls back to
             # soft prompt injection silently.
             try:
-                from gradata.enhancements import rule_to_hook
+                from .. import rule_to_hook
 
                 desc = lesson.description or ""
                 if desc and not is_hook_enforced(lesson):
