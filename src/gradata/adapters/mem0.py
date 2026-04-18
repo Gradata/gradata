@@ -190,7 +190,27 @@ class Mem0Adapter:
             )
             return []
 
-        return _normalise_search_results(raw)
+        if raw is None:
+            return []
+        if isinstance(raw, dict):
+            _items = raw.get("results")
+            if not isinstance(_items, list):
+                return []
+        elif isinstance(raw, list):
+            _items = raw
+        else:
+            return []
+        _out: list[dict[str, Any]] = []
+        for _item in _items:
+            if not isinstance(_item, dict):
+                continue
+            _meta = _item.get("metadata") or {}
+            _out.append({
+                "text": _item.get("memory") or _item.get("text") or _item.get("content") or "",
+                "metadata": _meta if isinstance(_meta, dict) else {},
+                "score": _item.get("score"),
+            })
+        return _out
 
     def reconcile(
         self,
@@ -225,43 +245,6 @@ class Mem0Adapter:
 # Response-shape helpers (Mem0 SDK returns slightly different shapes
 # across versions; isolate the parsing in one place)
 # ----------------------------------------------------------------------
-
-
-def _normalise_search_results(raw: Any) -> list[dict[str, Any]]:
-    """Coerce Mem0 search output into ``list[{text, metadata, score}]``."""
-    if raw is None:
-        return []
-
-    # mem0ai >=0.1 wraps results in {"results": [...]}
-    if isinstance(raw, dict):
-        items = raw.get("results")
-        if not isinstance(items, list):
-            return []
-    elif isinstance(raw, list):
-        items = raw
-    else:
-        return []
-
-    out: list[dict[str, Any]] = []
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        # Mem0 uses "memory" for the text in most versions; fall back to
-        # "text" and "content" for older / alternative shapes.
-        text = (
-            item.get("memory")
-            or item.get("text")
-            or item.get("content")
-            or ""
-        )
-        metadata = item.get("metadata") or {}
-        score = item.get("score")
-        out.append({
-            "text": text,
-            "metadata": metadata if isinstance(metadata, dict) else {},
-            "score": score,
-        })
-    return out
 
 
 def _extract_all_ids(raw: Any) -> list[str]:
