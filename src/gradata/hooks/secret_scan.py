@@ -31,16 +31,6 @@ SECRET_PATTERNS = [
 ]
 
 
-def _scan_content(content: str) -> list[dict]:
-    """Scan a string for secret patterns. Returns list of findings."""
-    findings = []
-    for name, pattern in SECRET_PATTERNS:
-        matches = pattern.findall(content)
-        if matches:
-            findings.extend({"name": name, "preview": "***REDACTED***"} for _ in matches)
-    return findings
-
-
 def main(data: dict) -> dict | None:
     tool_input = data.get("tool_input", {})
     if not isinstance(tool_input, dict):
@@ -63,7 +53,10 @@ def main(data: dict) -> dict | None:
 
     findings = []
     for text in contents_to_scan:
-        findings.extend(_scan_content(text))
+        for _sc_name, _sc_pat in SECRET_PATTERNS:
+            _sc_m = _sc_pat.findall(text)
+            if _sc_m:
+                findings.extend({"name": _sc_name, "preview": "***REDACTED***"} for _ in _sc_m)
 
     if findings:
         file_path = tool_input.get("file_path", "unknown")
