@@ -137,23 +137,6 @@ def _clear_pid() -> None:
         PID_FILE.unlink()
 
 
-def _running_pid() -> int | None:
-    if not PID_FILE.is_file():
-        return None
-    try:
-        pid = int(PID_FILE.read_text(encoding="utf-8").strip())
-    except (OSError, ValueError):
-        return None
-    # Liveness check via HTTP since PSUtil isn't a dep
-    import urllib.error
-    import urllib.request
-    try:
-        with urllib.request.urlopen(f"http://{HOST}:{PORT}/health", timeout=0.5):
-            return pid
-    except (urllib.error.URLError, OSError):
-        return None
-
-
 def run_foreground() -> None:
     server = HTTPServer((HOST, PORT), _Handler)
     _write_pid()
@@ -182,7 +165,20 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.status:
-        pid = _running_pid()
+        pid: int | None = None
+        if PID_FILE.is_file():
+            try:
+                pid = int(PID_FILE.read_text(encoding="utf-8").strip())
+            except (OSError, ValueError):
+                pid = None
+            if pid is not None:
+                import urllib.error
+                import urllib.request
+                try:
+                    with urllib.request.urlopen(f"http://{HOST}:{PORT}/health", timeout=0.5):
+                        pass
+                except (urllib.error.URLError, OSError):
+                    pid = None
         print(json.dumps({"running": pid is not None, "pid": pid, "port": PORT}))
         return 0
     if args.stop:
