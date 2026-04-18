@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import re
 
-from gradata._types import (
+from ..._types import (
     CorrectionType,
     Lesson,
     LessonState,
@@ -431,7 +431,7 @@ def parse_lessons(text: str) -> list[Lesson]:
 
                 try:
                     _md_dict = _json_md.loads(meta_line[len("Metadata:") :].strip())
-                    from gradata._types import RuleMetadata as _RM
+                    from ..._types import RuleMetadata as _RM
 
                     metadata_obj = _RM(
                         **{k: v for k, v in _md_dict.items() if k in _RM.__dataclass_fields__}
@@ -541,7 +541,7 @@ def _bayesian_blend_weight(total_observations: int) -> float:
 
 def _bayesian_confidence(lesson: Lesson) -> float:
     """Compute blended confidence from beta posterior + FSRS."""
-    from gradata._stats import beta_posterior
+    from ..._stats import beta_posterior
 
     total_obs = int(lesson.alpha + lesson.beta_param - 2)
     blend_w = _bayesian_blend_weight(total_obs)
@@ -577,7 +577,7 @@ def _classify_correction_direction(
         return "UNKNOWN"
 
     try:
-        from gradata.enhancements.contradiction_detector import (
+        from ..contradiction_detector import (
             _check_negation,
             _check_opposite_sentiment,
             _check_polarity,
@@ -944,7 +944,7 @@ def update_confidence(
     # full graduate() which would kill newly-flagged UNTESTABLE lessons)
     # Use salted thresholds consistent with graduate()
     if salt:
-        from gradata.security.brain_salt import salt_threshold
+        from ...security.brain_salt import salt_threshold
 
         _uc_pattern_thr = salt_threshold(PATTERN_THRESHOLD, salt, "PATTERN")
         _uc_rule_thr = salt_threshold(RULE_THRESHOLD, salt, "RULE")
@@ -1201,12 +1201,12 @@ def __getattr__(name: str):  # type: ignore[return]
     _CLUSTER_NAMES = {"RuleCluster", "detect_contradictions", "cluster_rules", "promote_instinct_clusters"}
 
     if name in _PIPELINE_NAMES:
-        from gradata.enhancements import rule_pipeline
+        from .. import rule_pipeline
         return getattr(rule_pipeline, name)
     if name in _CAUSAL_NAMES:
-        from gradata.enhancements import causal_chains
+        from .. import causal_chains
         return getattr(causal_chains, name)
     if name in _CLUSTER_NAMES:
-        from gradata.enhancements import clustering
+        from .. import clustering
         return getattr(clustering, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
