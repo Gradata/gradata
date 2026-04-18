@@ -136,22 +136,6 @@ def _classify(text: str, table: list[tuple[str, list[str]]]) -> str:
     return ""
 
 
-def _classify_audience(title: str) -> str:
-    """Classify a job title string into an audience tier.
-
-    Args:
-        title: Raw job title from a prospect record.
-
-    Returns:
-        One of "c_suite", "vp", "director", "manager", "ic", or "" if the
-        input is blank.
-    """
-    if not title.strip():
-        return ""
-    result = _classify(title, _AUDIENCE_KEYWORDS)
-    return result if result else "ic"
-
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -198,7 +182,7 @@ def build_scope(context: dict[str, Any]) -> RuleScope:
     if not raw_title:
         raw_title = task
 
-    audience: str = _classify_audience(raw_title)
+    audience: str = (_classify(raw_title, _AUDIENCE_KEYWORDS) or "ic") if raw_title.strip() else ""
 
     # ── channel ──────────────────────────────────────────────────────────────
     channel_raw = context.get("channel", "")
