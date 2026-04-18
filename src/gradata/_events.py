@@ -45,13 +45,12 @@ def _locked_append_many(path: Path, lines: list[str]) -> None:
     if not lines:
         return
     encoded = b"".join(line.encode("utf-8") for line in lines)
-    with open(path, "ab") as fh:
-        with platform_lock(fh):
-            fh.seek(0, 2)  # seek to end before writing
-            fh.write(encoded)
-            fh.flush()
-            if sys.platform == "win32":
-                os.fsync(fh.fileno())
+    with open(path, "ab") as fh, platform_lock(fh):
+        fh.seek(0, 2)  # seek to end before writing
+        fh.write(encoded)
+        fh.flush()
+        if sys.platform == "win32":
+            os.fsync(fh.fileno())
 
 
 def _locked_append(path: Path, line: str) -> None:
