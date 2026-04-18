@@ -104,18 +104,6 @@ def _escape_js_full(text: str) -> str:
     return escaped
 
 
-def _escape_js_template(text: str) -> str:
-    """Light escaping for text already through json.dumps().
-
-    json.dumps() handles backslash, double-quote, control characters.
-    This layer removes backtick / template-literal injections and
-    </script> breakouts which json.dumps() does not touch.
-    """
-    text = _TEMPLATE_LITERAL_RE.sub("", text)
-    text = re.sub(r"<\s*/\s*script\s*>", "", text, flags=re.IGNORECASE)
-    return text
-
-
 # ---------------------------------------------------------------------------
 # LLM prompt neutralization
 # ---------------------------------------------------------------------------
@@ -160,18 +148,6 @@ _PROMPT_INJECTION_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 _FILTER_PLACEHOLDER = "[FILTERED]"
 
 
-def _neutralize_llm_prompt(text: str) -> str:
-    """Replace detected prompt-injection markers with ``[FILTERED]``.
-
-    Preserves the rest of the text so legitimate surrounding content is not
-    lost.  Each replaced match is replaced in-place.
-    """
-    result = text
-    for _name, pattern in _PROMPT_INJECTION_PATTERNS:
-        result = pattern.sub(_FILTER_PLACEHOLDER, result)
-    return result
-
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -202,9 +178,12 @@ def sanitize_lesson_content(text: str, context: SanitizeContext) -> str:
     if context == "js":
         return _escape_js_full(text)
     if context == "js_template":
-        return _escape_js_template(text)
+        text = _TEMPLATE_LITERAL_RE.sub("", text)
+        return re.sub(r"<\s*/\s*script\s*>", "", text, flags=re.IGNORECASE)
     if context == "llm_prompt":
-        return _neutralize_llm_prompt(text)
+        for _name, pattern in _PROMPT_INJECTION_PATTERNS:
+            text = pattern.sub(_FILTER_PLACEHOLDER, text)
+        return text
 
     # Unknown context: return as-is but log so we notice gaps.
     import logging
