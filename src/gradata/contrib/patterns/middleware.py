@@ -51,8 +51,6 @@ __all__ = [
 class MiddlewareError(Exception):
     """Raised when middleware chain has configuration errors."""
 
-    pass
-
 
 @dataclass
 class MiddlewareContext:
