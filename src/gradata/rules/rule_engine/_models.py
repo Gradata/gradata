@@ -7,8 +7,10 @@ Defines :class:`AppliedRule` — the output unit of the rule engine.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from gradata._types import Lesson
+if TYPE_CHECKING:
+    from gradata._types import Lesson
 
 
 @dataclass

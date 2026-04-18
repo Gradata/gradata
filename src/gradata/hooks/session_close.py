@@ -20,6 +20,7 @@ On first run (no stamp file) we run once to bootstrap, then stamp.
 """
 from __future__ import annotations
 
+import contextlib
 import logging
 import sqlite3
 from datetime import UTC, datetime
@@ -60,10 +61,8 @@ def _read_stamp(brain_dir: Path) -> str | None:
 
 
 def _write_stamp(brain_dir: Path, ts: str) -> None:
-    try:
+    with contextlib.suppress(OSError):
         (brain_dir / STAMP_FILE).write_text(ts, encoding="utf-8")
-    except OSError:
-        pass
 
 
 def _has_new_triggers(brain_dir: Path, since: str | None) -> bool:

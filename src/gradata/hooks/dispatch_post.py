@@ -68,7 +68,7 @@ def main(data: dict) -> dict | None:
         out = _invoke(module_name, data)
         if not out:
             continue
-        if "result" in out and out["result"]:
+        if out.get("result"):
             result_parts.append(str(out["result"]))
         for k, v in out.items():
             if k != "result":
