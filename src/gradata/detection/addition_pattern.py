@@ -87,50 +87,6 @@ _TEXT_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 ]
 
 
-def _classify_python_addition(added_text: str) -> str:
-    """Use stdlib ast to classify what was added in a Python file."""
-    # Try parsing the added text as a module body
-    try:
-        tree = ast.parse(added_text)
-    except SyntaxError:
-        # Fall back to regex for partial snippets
-        if re.search(r"(?:^|\n)\s*(?:import |from .+ import )", added_text):
-            return "import"
-        if re.search(r":\s*\w+", added_text):
-            return "type_annotation"
-        if re.search(r'""".*?"""|\'\'\'.*?\'\'\'', added_text, re.DOTALL):
-            return "docstring"
-        if re.search(r"#\s", added_text):
-            return "comment"
-        return "other"
-
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            return "import"
-        if isinstance(node, ast.AnnAssign):
-            return "type_annotation"
-        if isinstance(node, ast.FunctionDef):
-            # Check for return annotation
-            if node.returns is not None:
-                return "return_type"
-            # Check for docstring
-            if (node.body and isinstance(node.body[0], ast.Expr)
-                    and isinstance(node.body[0].value, ast.Constant)
-                    and isinstance(node.body[0].value.value, str)):
-                return "docstring"
-        if (isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
-                and isinstance(node.value.value, str)):
-            return "docstring"
-        if isinstance(node, ast.Assert):
-            return "assertion"
-
-    # Fallback: check for decorator patterns in raw text
-    if re.search(r"(?:^|\n)\s*@\w+", added_text):
-        return "decorator"
-
-    return "other"
-
-
 def classify_addition(old: str, new: str, file_ext: str) -> tuple[str, str]:
     """Return (category, structural_type) fingerprint for the addition.
 
@@ -148,8 +104,47 @@ def classify_addition(old: str, new: str, file_ext: str) -> tuple[str, str]:
 
     # Python: use AST
     if ext in (".py", ".pyi"):
-        structural_type = _classify_python_addition(added_text)
-        return (category, structural_type)
+        _stype = "other"
+        try:
+            _tree = ast.parse(added_text)
+        except SyntaxError:
+            _tree = None
+            if re.search(r"(?:^|\n)\s*(?:import |from .+ import )", added_text):
+                _stype = "import"
+            elif re.search(r":\s*\w+", added_text):
+                _stype = "type_annotation"
+            elif re.search(r'""".*?"""|\'\'\'.*?\'\'\'', added_text, re.DOTALL):
+                _stype = "docstring"
+            elif re.search(r"#\s", added_text):
+                _stype = "comment"
+        if _tree is not None:
+            for _node in ast.walk(_tree):
+                if isinstance(_node, (ast.Import, ast.ImportFrom)):
+                    _stype = "import"
+                    break
+                if isinstance(_node, ast.AnnAssign):
+                    _stype = "type_annotation"
+                    break
+                if isinstance(_node, ast.FunctionDef):
+                    if _node.returns is not None:
+                        _stype = "return_type"
+                        break
+                    if (_node.body and isinstance(_node.body[0], ast.Expr)
+                            and isinstance(_node.body[0].value, ast.Constant)
+                            and isinstance(_node.body[0].value.value, str)):
+                        _stype = "docstring"
+                        break
+                if (isinstance(_node, ast.Expr) and isinstance(_node.value, ast.Constant)
+                        and isinstance(_node.value.value, str)):
+                    _stype = "docstring"
+                    break
+                if isinstance(_node, ast.Assert):
+                    _stype = "assertion"
+                    break
+            else:
+                if re.search(r"(?:^|\n)\s*@\w+", added_text):
+                    _stype = "decorator"
+        return (category, _stype)
 
     # Markdown / text files
     if ext in (".md", ".txt", ".rst"):
