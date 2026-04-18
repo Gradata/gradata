@@ -84,6 +84,9 @@ Leads/
 /Sprites/
 /Hausgem/
 
+# Private sales/ops automation (CARL) — personal names, emails, pipeline IDs
+/.forge/
+
 # Intermediates (disposable, never commit)
 .tmp/
 
