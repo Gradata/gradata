@@ -384,7 +384,11 @@ class FileWatcher:
         emitted: dict = {}
         emitted = self._try_emit_via_brain(event_data, event_tags, change)
         if not emitted:
-            emitted = self._try_emit_via_module(event_data, event_tags)
+            try:
+                from .. import _events as _tem_events
+                emitted = _tem_events.emit("CORRECTION", _SOURCE, event_data, event_tags) or {}
+            except Exception as _tem_exc:
+                logger.debug("Module-level _events.emit failed: %s", _tem_exc)
         if not emitted:
             emitted = self._emit_fallback_json(change, event_data)
 
@@ -488,27 +492,6 @@ class FileWatcher:
             return brain.emit("CORRECTION", _SOURCE, data, tags) or {}
         except Exception as exc:
             logger.debug("Brain emit failed: %s", exc)
-            return {}
-
-    def _try_emit_via_module(self, data: dict, tags: list[str]) -> dict:
-        """Attempt to emit via the module-level ``_events.emit()`` function.
-
-        This path works even without a Brain instance, as long as
-        ``BRAIN_DIR`` is set (env var or default cwd).
-
-        Args:
-            data: Event payload dict.
-            tags: Event tag list.
-
-        Returns:
-            Event dict on success, empty dict on failure.
-        """
-        try:
-            from .. import _events
-
-            return _events.emit("CORRECTION", _SOURCE, data, tags) or {}
-        except Exception as exc:
-            logger.debug("Module-level _events.emit failed: %s", exc)
             return {}
 
     def _emit_fallback_json(self, change: FileChange, data: dict) -> dict:
