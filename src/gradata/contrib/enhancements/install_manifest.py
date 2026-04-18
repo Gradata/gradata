@@ -48,15 +48,17 @@ __all__ = [
 
 class ModuleCost(Enum):
     """Resource cost tag for modules."""
-    LIGHT = "light"       # Minimal resource usage
-    MEDIUM = "medium"     # Moderate resource usage
-    HEAVY = "heavy"       # Significant resource usage
+
+    LIGHT = "light"  # Minimal resource usage
+    MEDIUM = "medium"  # Moderate resource usage
+    HEAVY = "heavy"  # Significant resource usage
 
 
 class ModuleStability(Enum):
     """Stability tag for modules."""
-    STABLE = "stable"     # Production-ready
-    BETA = "beta"         # Functional but evolving
+
+    STABLE = "stable"  # Production-ready
+    BETA = "beta"  # Functional but evolving
     EXPERIMENTAL = "experimental"  # Use with caution
 
 
@@ -75,6 +77,7 @@ class Module:
         stability: Stability tag.
         default_install: Whether to include in default installs.
     """
+
     id: str
     name: str
     description: str = ""
@@ -95,6 +98,7 @@ class Profile:
         description: What this profile is for.
         modules: Module IDs included in this profile.
     """
+
     name: str
     description: str = ""
     modules: list[str] = field(default_factory=list)
@@ -110,6 +114,7 @@ class InstallPlan:
         dependencies_added: Modules added automatically via dependencies.
         estimated_cost: Aggregate cost estimate.
     """
+
     profile: str = ""
     modules: list[Module] = field(default_factory=list)
     dependencies_added: list[str] = field(default_factory=list)
@@ -126,6 +131,7 @@ class InstallState:
 
     Enables idempotent installs — only apply changes since last install.
     """
+
     schema_version: int = 1
     installed_modules: list[str] = field(default_factory=list)
     profile: str = ""
@@ -168,10 +174,18 @@ DEFAULT_MODULES: list[Module] = [
         description="15 base agentic patterns (pipeline, RAG, reflection, etc.)",
         kind="pattern",
         components=[
-            "patterns.pipeline", "patterns.rag", "patterns.reflection",
-            "patterns.orchestrator", "patterns.parallel", "patterns.memory",
-            "patterns.guardrails", "patterns.human_loop", "patterns.scope",
-            "patterns.sub_agents", "patterns.evaluator", "patterns.tools",
+            "patterns.pipeline",
+            "patterns.rag",
+            "patterns.reflection",
+            "patterns.orchestrator",
+            "patterns.parallel",
+            "patterns.memory",
+            "patterns.guardrails",
+            "patterns.human_loop",
+            "patterns.scope",
+            "patterns.sub_agents",
+            "patterns.evaluator",
+            "patterns.tools",
         ],
         cost=ModuleCost.LIGHT,
         stability=ModuleStability.STABLE,
@@ -183,8 +197,9 @@ DEFAULT_MODULES: list[Module] = [
         description="Context brackets, reconciliation, task escalation, execute/qualify loop.",
         kind="pattern",
         components=[
-            "patterns.context_brackets", "patterns.reconciliation",
-            "patterns.task_escalation", "patterns.execute_qualify",
+            "patterns.context_brackets",
+            "patterns.reconciliation",
+            "patterns.execute_qualify",
         ],
         cost=ModuleCost.LIGHT,
         stability=ModuleStability.STABLE,
@@ -206,8 +221,10 @@ DEFAULT_MODULES: list[Module] = [
         description="INSTINCT->PATTERN->RULE graduation with severity-weighted confidence.",
         kind="enhancement",
         components=[
-            "enhancements.self_improvement", "enhancements.correction_tracking",
-            "enhancements.edit_classifier", "enhancements.pattern_extractor",
+            "enhancements.self_improvement",
+            "enhancements.correction_tracking",
+            "enhancements.edit_classifier",
+            "enhancements.pattern_extractor",
         ],
         dependencies=["quality-gates"],
         cost=ModuleCost.MEDIUM,
@@ -273,8 +290,10 @@ DEFAULT_MODULES: list[Module] = [
         description="HMAC signing, contradiction detection, rule verification.",
         kind="enhancement",
         components=[
-            "enhancements.rule_integrity", "enhancements.contradiction_detector",
-            "enhancements.rule_conflicts", "enhancements.rule_canary",
+            "enhancements.rule_integrity",
+            "enhancements.contradiction_detector",
+            "enhancements.rule_conflicts",
+            "enhancements.rule_canary",
         ],
         dependencies=["learning-pipeline"],
         cost=ModuleCost.MEDIUM,
@@ -297,8 +316,10 @@ DEFAULT_MODULES: list[Module] = [
         description="Adapters for Anthropic, OpenAI, LangChain, CrewAI.",
         kind="integration",
         components=[
-            "integrations.anthropic_adapter", "integrations.openai_adapter",
-            "integrations.langchain_adapter", "integrations.crewai_adapter",
+            "integrations.anthropic_adapter",
+            "integrations.openai_adapter",
+            "integrations.langchain_adapter",
+            "integrations.crewai_adapter",
         ],
         cost=ModuleCost.LIGHT,
         stability=ModuleStability.STABLE,
@@ -316,8 +337,13 @@ DEFAULT_PROFILES: list[Profile] = [
         name="standard",
         description="Recommended. Core + learning pipeline + behavioral engine + context management.",
         modules=[
-            "core-patterns", "context-management", "quality-gates",
-            "learning-pipeline", "behavioral-engine", "truth-protocol", "agent-modes",
+            "core-patterns",
+            "context-management",
+            "quality-gates",
+            "learning-pipeline",
+            "behavioral-engine",
+            "truth-protocol",
+            "agent-modes",
         ],
     ),
     Profile(
@@ -329,9 +355,16 @@ DEFAULT_PROFILES: list[Profile] = [
         name="research",
         description="Full pipeline + RL router + observation hooks for research.",
         modules=[
-            "core-patterns", "context-management", "quality-gates",
-            "learning-pipeline", "behavioral-engine", "truth-protocol", "agent-modes",
-            "observation-hooks", "q-learning-router", "meta-rules",
+            "core-patterns",
+            "context-management",
+            "quality-gates",
+            "learning-pipeline",
+            "behavioral-engine",
+            "truth-protocol",
+            "agent-modes",
+            "observation-hooks",
+            "q-learning-router",
+            "meta-rules",
             "rule-integrity",
         ],
     ),
@@ -341,6 +374,7 @@ DEFAULT_PROFILES: list[Profile] = [
 # ---------------------------------------------------------------------------
 # InstallManifest
 # ---------------------------------------------------------------------------
+
 
 class InstallManifest:
     """Registry of modules and profiles for selective installation.
@@ -357,16 +391,15 @@ class InstallManifest:
         self._modules: dict[str, Module] = {}
         self._profiles: dict[str, Profile] = {}
 
-        for m in (modules or []):
+        for m in modules or []:
             self._modules[m.id] = m
-        for p in (profiles or []):
+        for p in profiles or []:
             self._profiles[p.name] = p
 
     @classmethod
     def default(cls) -> InstallManifest:
         """Create a manifest with default modules and profiles."""
         return cls(modules=DEFAULT_MODULES, profiles=DEFAULT_PROFILES)
-
 
     @property
     def available_modules(self) -> list[Module]:
@@ -404,8 +437,7 @@ class InstallManifest:
                 return
             if mid in visiting:
                 raise ValueError(
-                    f"Circular dependency detected: {mid} is already "
-                    f"in the resolution chain"
+                    f"Circular dependency detected: {mid} is already in the resolution chain"
                 )
             visiting.add(mid)
             module = self._modules.get(mid)

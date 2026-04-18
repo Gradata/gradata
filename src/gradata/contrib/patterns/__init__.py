@@ -88,12 +88,12 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "Delegation": (".sub_agents", "Delegation"),
     "DelegationResult": (".sub_agents", "DelegationResult"),
     "orchestrate": (".sub_agents", "orchestrate"),
-    # Task escalation
-    "TaskOutcome": (".task_escalation", "TaskOutcome"),
-    "TaskStatus": (".task_escalation", "TaskStatus"),
-    "is_actionable": (".task_escalation", "is_actionable"),
-    "report_outcome": (".task_escalation", "report_outcome"),
-    "requires_human": (".task_escalation", "requires_human"),
+    # Task escalation (moved to execute_qualify)
+    "TaskOutcome": (".execute_qualify", "TaskOutcome"),
+    "TaskStatus": (".execute_qualify", "TaskStatus"),
+    "is_actionable": (".execute_qualify", "is_actionable"),
+    "report_outcome": (".execute_qualify", "report_outcome"),
+    "requires_human": (".execute_qualify", "requires_human"),
 }
 
 __all__ = list(_LAZY_IMPORTS.keys())
@@ -102,6 +102,7 @@ __all__ = list(_LAZY_IMPORTS.keys())
 def __getattr__(name: str):
     if name in _LAZY_IMPORTS:
         import importlib
+
         rel_module, attr = _LAZY_IMPORTS[name]
         mod = importlib.import_module(rel_module, __package__)
         return getattr(mod, attr)

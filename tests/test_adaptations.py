@@ -171,10 +171,13 @@ class TestReconciliation:
 
     def test_drift(self):
         plan = [PlanItem(id="AC-1", description="Store in localStorage")]
-        actuals = [ActualResult(
-            plan_id="AC-1", achieved=True,
-            deviation="Stored in cookie instead of localStorage",
-        )]
+        actuals = [
+            ActualResult(
+                plan_id="AC-1",
+                achieved=True,
+                deviation="Stored in cookie instead of localStorage",
+            )
+        ]
         summary = Reconciler().reconcile(plan, actuals)
         assert summary.overall_score == DeviationScore.DRIFT
         assert summary.drift_count == 1
@@ -219,28 +222,37 @@ class TestReconciliation:
 
     def test_root_cause_intent(self):
         plan = [PlanItem(id="AC-1", description="X")]
-        actuals = [ActualResult(
-            plan_id="AC-1", achieved=False,
-            evidence="requirements changed, wrong goal",
-        )]
+        actuals = [
+            ActualResult(
+                plan_id="AC-1",
+                achieved=False,
+                evidence="requirements changed, wrong goal",
+            )
+        ]
         summary = Reconciler().reconcile(plan, actuals)
         assert summary.deviations[0].classification == "intent"
 
     def test_root_cause_spec(self):
         plan = [PlanItem(id="AC-1", description="X")]
-        actuals = [ActualResult(
-            plan_id="AC-1", achieved=False,
-            evidence="acceptance criteria wrong, spec incorrect",
-        )]
+        actuals = [
+            ActualResult(
+                plan_id="AC-1",
+                achieved=False,
+                evidence="acceptance criteria wrong, spec incorrect",
+            )
+        ]
         summary = Reconciler().reconcile(plan, actuals)
         assert summary.deviations[0].classification == "spec"
 
     def test_root_cause_code_default(self):
         plan = [PlanItem(id="AC-1", description="X")]
-        actuals = [ActualResult(
-            plan_id="AC-1", achieved=False,
-            evidence="off by one error",
-        )]
+        actuals = [
+            ActualResult(
+                plan_id="AC-1",
+                achieved=False,
+                evidence="off by one error",
+            )
+        ]
         summary = Reconciler().reconcile(plan, actuals)
         assert summary.deviations[0].classification == "code"
 
@@ -249,7 +261,7 @@ class TestReconciliation:
 # 3. Task Escalation
 # ---------------------------------------------------------------------------
 
-from gradata.contrib.patterns.task_escalation import (
+from gradata.contrib.patterns.execute_qualify import (
     TaskOutcome,
     TaskStatus,
     format_outcome,
@@ -475,7 +487,8 @@ class TestCARLPriorities:
 
     def test_legacy_string_constraints(self):
         contract = BehavioralContract(
-            name="test", domain="test",
+            name="test",
+            domain="test",
             constraints=["plain string"],
         )
         prioritized = contract.get_prioritized()
@@ -484,7 +497,8 @@ class TestCARLPriorities:
 
     def test_must_rules(self):
         contract = BehavioralContract(
-            name="test", domain="test",
+            name="test",
+            domain="test",
             constraints=[
                 PrioritizedConstraint("Must rule", RulePriority.MUST),
                 PrioritizedConstraint("Should rule", RulePriority.SHOULD),
@@ -503,56 +517,68 @@ class TestCARLPriorities:
 
     def test_registry_prioritized_lookup(self):
         registry = ContractRegistry()
-        registry.register(BehavioralContract(
-            name="deploy-rules", domain="devops",
-            trigger_keywords=["deploy"],
-            constraints=[
-                PrioritizedConstraint("No Friday deploys", RulePriority.MUST),
-                PrioritizedConstraint("Use blue-green", RulePriority.SHOULD),
-            ],
-        ))
+        registry.register(
+            BehavioralContract(
+                name="deploy-rules",
+                domain="devops",
+                trigger_keywords=["deploy"],
+                constraints=[
+                    PrioritizedConstraint("No Friday deploys", RulePriority.MUST),
+                    PrioritizedConstraint("Use blue-green", RulePriority.SHOULD),
+                ],
+            )
+        )
         constraints = registry.get_prioritized_constraints("deploy to prod")
         assert len(constraints) == 2
         assert constraints[0].priority == RulePriority.MUST
 
     def test_registry_min_priority_filter(self):
         registry = ContractRegistry()
-        registry.register(BehavioralContract(
-            name="test", domain="test",
-            trigger_keywords=["test"],
-            constraints=[
-                PrioritizedConstraint("Must", RulePriority.MUST),
-                PrioritizedConstraint("Should", RulePriority.SHOULD),
-                PrioritizedConstraint("May", RulePriority.MAY),
-            ],
-        ))
+        registry.register(
+            BehavioralContract(
+                name="test",
+                domain="test",
+                trigger_keywords=["test"],
+                constraints=[
+                    PrioritizedConstraint("Must", RulePriority.MUST),
+                    PrioritizedConstraint("Should", RulePriority.SHOULD),
+                    PrioritizedConstraint("May", RulePriority.MAY),
+                ],
+            )
+        )
         must_only = registry.get_prioritized_constraints("test", min_priority=RulePriority.MUST)
         assert all(c.priority == RulePriority.MUST for c in must_only)
 
     def test_registry_stats_includes_priorities(self):
         registry = ContractRegistry()
-        registry.register(BehavioralContract(
-            name="test", domain="test",
-            trigger_keywords=["x"],
-            constraints=[
-                PrioritizedConstraint("A", RulePriority.MUST),
-                PrioritizedConstraint("B", RulePriority.MAY),
-            ],
-        ))
+        registry.register(
+            BehavioralContract(
+                name="test",
+                domain="test",
+                trigger_keywords=["x"],
+                constraints=[
+                    PrioritizedConstraint("A", RulePriority.MUST),
+                    PrioritizedConstraint("B", RulePriority.MAY),
+                ],
+            )
+        )
         stats = registry.stats()
         assert stats["constraints_by_priority"]["must"] == 1
         assert stats["constraints_by_priority"]["may"] == 1
 
     def test_format_constraints_prompt(self):
         registry = ContractRegistry()
-        registry.register(BehavioralContract(
-            name="test", domain="test",
-            trigger_keywords=["deploy"],
-            constraints=[
-                PrioritizedConstraint("No Friday", RulePriority.MUST, rationale="Outages"),
-                PrioritizedConstraint("Blue-green", RulePriority.SHOULD),
-            ],
-        ))
+        registry.register(
+            BehavioralContract(
+                name="test",
+                domain="test",
+                trigger_keywords=["deploy"],
+                constraints=[
+                    PrioritizedConstraint("No Friday", RulePriority.MUST, rationale="Outages"),
+                    PrioritizedConstraint("Blue-green", RulePriority.SHOULD),
+                ],
+            )
+        )
         prompt = registry.format_constraints_prompt("deploy now")
         assert "<behavioral-directives>" in prompt
         assert "MUST" in prompt
@@ -561,33 +587,42 @@ class TestCARLPriorities:
 
     def test_backward_compat_get_constraints(self):
         registry = ContractRegistry()
-        registry.register(BehavioralContract(
-            name="test", domain="test",
-            trigger_keywords=["build"],
-            constraints=["Run linter first"],
-        ))
+        registry.register(
+            BehavioralContract(
+                name="test",
+                domain="test",
+                trigger_keywords=["build"],
+                constraints=["Run linter first"],
+            )
+        )
         constraints = registry.get_constraints("build the app")
         assert "Run linter first" in constraints
 
     def test_has_blocking_violations(self):
         registry = ContractRegistry()
-        registry.register(BehavioralContract(
-            name="test", domain="test",
-            trigger_keywords=["deploy"],
-            constraints=[
-                PrioritizedConstraint("No Friday", RulePriority.MUST),
-            ],
-        ))
+        registry.register(
+            BehavioralContract(
+                name="test",
+                domain="test",
+                trigger_keywords=["deploy"],
+                constraints=[
+                    PrioritizedConstraint("No Friday", RulePriority.MUST),
+                ],
+            )
+        )
         assert registry.has_blocking_violations("deploy now") is True
         assert registry.has_blocking_violations("unrelated") is False
 
     def test_empty_prompt_no_match(self):
         registry = ContractRegistry()
-        registry.register(BehavioralContract(
-            name="test", domain="test",
-            trigger_keywords=["deploy"],
-            constraints=[PrioritizedConstraint("X", RulePriority.MUST)],
-        ))
+        registry.register(
+            BehavioralContract(
+                name="test",
+                domain="test",
+                trigger_keywords=["deploy"],
+                constraints=[PrioritizedConstraint("X", RulePriority.MUST)],
+            )
+        )
         assert registry.format_constraints_prompt("unrelated") == ""
 
 
@@ -875,7 +910,8 @@ class TestInstallManifest:
 
     def test_module_properties(self):
         m = Module(
-            id="test", name="Test",
+            id="test",
+            name="Test",
             cost=ModuleCost.HEAVY,
             stability=ModuleStability.EXPERIMENTAL,
         )
@@ -1024,10 +1060,14 @@ class TestMemoryTaxonomy:
         assert sp2.confidence > 0.3
 
     def test_classify_memory_type(self):
-        assert classify_memory_type("will likely affect future tasks") == MemoryType.PREDICTED_IMPACT
+        assert (
+            classify_memory_type("will likely affect future tasks") == MemoryType.PREDICTED_IMPACT
+        )
         assert classify_memory_type("tends to prefer casual tone") == MemoryType.BRAIN_PROFILE
         assert classify_memory_type("fact: user likes Python") == MemoryType.ATOMIC_FACT
-        assert classify_memory_type("across brains, shared pattern") == MemoryType.CROSS_BRAIN_PROFILE
+        assert (
+            classify_memory_type("across brains, shared pattern") == MemoryType.CROSS_BRAIN_PROFILE
+        )
         assert classify_memory_type("User corrected the email") == MemoryType.CORRECTION_NARRATIVE
 
     def test_evidence_ids(self):
@@ -1090,10 +1130,12 @@ class TestClusterManager:
         assert state.cluster_count == 2
 
     def test_temporal_gating(self):
-        mgr = ClusterManager(ClusterConfig(
-            similarity_threshold=0.5,
-            max_time_gap_days=1.0,
-        ))
+        mgr = ClusterManager(
+            ClusterConfig(
+                similarity_threshold=0.5,
+                max_time_gap_days=1.0,
+            )
+        )
         state = ClusterState()
         mgr.assign(state, "item_1", [1.0, 0.0, 0.0], 1000.0)
         # Item 2 is similar but too far in time (2 days later)
@@ -1127,10 +1169,12 @@ class TestClusterManager:
         assert set(items) == {"a", "b"}
 
     def test_get_stable_clusters(self):
-        mgr = ClusterManager(ClusterConfig(
-            similarity_threshold=0.5,
-            min_cluster_size=2,
-        ))
+        mgr = ClusterManager(
+            ClusterConfig(
+                similarity_threshold=0.5,
+                min_cluster_size=2,
+            )
+        )
         state = ClusterState()
         mgr.assign(state, "a", [1.0, 0.0], 1000.0)
         mgr.assign(state, "b", [0.9, 0.1], 1001.0)
@@ -1447,10 +1491,17 @@ class TestManifestCapabilities:
         modules = caps["modules"]
         # All 11 adapted modules should be detected
         expected = [
-            "context_brackets", "reconciliation", "task_escalation",
-            "execute_qualify", "q_learning_router", "observation_hooks",
-            "install_manifest", "memory_taxonomy", "cluster_manager",
-            "lesson_discriminator", "behavioral_engine", "learning_pipeline",
+            "context_brackets",
+            "reconciliation",
+            "execute_qualify",
+            "q_learning_router",
+            "observation_hooks",
+            "install_manifest",
+            "memory_taxonomy",
+            "cluster_manager",
+            "lesson_discriminator",
+            "behavioral_engine",
+            "learning_pipeline",
         ]
         for name in expected:
             assert name in modules, f"Missing module: {name}"
@@ -1491,11 +1542,13 @@ class TestEvalBenchmark:
 
     def test_single_high_value_case(self):
         bench = LearningBenchmark()
-        bench.add_case(BenchmarkCase(
-            correction_text="Major rewrite",
-            severity="rewrite",
-            expected_high_value=True,
-        ))
+        bench.add_case(
+            BenchmarkCase(
+                correction_text="Major rewrite",
+                severity="rewrite",
+                expected_high_value=True,
+            )
+        )
         result = bench.run()
         assert result.total_cases == 1
 
@@ -1509,12 +1562,18 @@ class TestEvalBenchmark:
 
     def test_benchmark_discriminator_scores(self):
         bench = LearningBenchmark()
-        bench.add_case(BenchmarkCase(
-            severity="rewrite", expected_high_value=True,
-        ))
-        bench.add_case(BenchmarkCase(
-            severity="trivial", expected_high_value=False,
-        ))
+        bench.add_case(
+            BenchmarkCase(
+                severity="rewrite",
+                expected_high_value=True,
+            )
+        )
+        bench.add_case(
+            BenchmarkCase(
+                severity="trivial",
+                expected_high_value=False,
+            )
+        )
         result = bench.run()
         assert result.graduation_accuracy > 0.0
 
@@ -1526,10 +1585,12 @@ class TestEvalBenchmark:
 
     def test_case_count(self):
         bench = LearningBenchmark()
-        bench.add_cases([
-            BenchmarkCase(severity="minor"),
-            BenchmarkCase(severity="major"),
-        ])
+        bench.add_cases(
+            [
+                BenchmarkCase(severity="minor"),
+                BenchmarkCase(severity="major"),
+            ]
+        )
         assert bench.case_count == 2
 
 
@@ -1548,6 +1609,7 @@ class TestRouterWarmstart:
     def test_warmstart_empty_db(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             import sqlite3
+
             db_path = Path(tmpdir) / "system.db"
             conn = sqlite3.connect(str(db_path))
             conn.execute("""
@@ -1564,6 +1626,7 @@ class TestRouterWarmstart:
     def test_warmstart_with_corrections(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             import sqlite3
+
             db_path = Path(tmpdir) / "system.db"
             conn = sqlite3.connect(str(db_path))
             conn.execute("""
@@ -1574,13 +1637,23 @@ class TestRouterWarmstart:
                 )
             """)
             # Insert test correction events
-            for i, (sev, cat) in enumerate([
-                ("moderate", "TONE"), ("major", "CONTENT"),
-                ("trivial", "STYLE"), ("rewrite", "ACCURACY"),
-            ]):
+            for i, (sev, cat) in enumerate(
+                [
+                    ("moderate", "TONE"),
+                    ("major", "CONTENT"),
+                    ("trivial", "STYLE"),
+                    ("rewrite", "ACCURACY"),
+                ]
+            ):
                 conn.execute(
                     "INSERT INTO events (type, source, data_json, session, ts) VALUES (?, ?, ?, ?, ?)",
-                    ("CORRECTION", "test", json.dumps({"severity": sev, "category": cat}), i+1, "2026-01-01"),
+                    (
+                        "CORRECTION",
+                        "test",
+                        json.dumps({"severity": sev, "category": cat}),
+                        i + 1,
+                        "2026-01-01",
+                    ),
                 )
             conn.commit()
             conn.close()
@@ -1592,6 +1665,7 @@ class TestRouterWarmstart:
     def test_warmstart_saves_router(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             import sqlite3
+
             db_path = Path(tmpdir) / "system.db"
             router_path = Path(tmpdir) / "q_router.json"
             conn = sqlite3.connect(str(db_path))
@@ -1704,9 +1778,7 @@ class TestBrainCorrectPipeline:
                 final="version B",
             )
             pipeline = event.get("pipeline", {})
-            assert pipeline.get("context_bracket") in (
-                "fresh", "moderate", "deep", "critical"
-            )
+            assert pipeline.get("context_bracket") in ("fresh", "moderate", "deep", "critical")
 
     def test_correct_pipeline_processing_time(self):
         """Pipeline should report processing time."""
@@ -1801,11 +1873,13 @@ class TestBugFix_CircularDependency:
     """BUG 6: InstallManifest silently accepts circular deps."""
 
     def test_circular_dependency_detected(self):
-        manifest = InstallManifest(modules=[
-            Module(id="a", name="A", dependencies=["b"]),
-            Module(id="b", name="B", dependencies=["c"]),
-            Module(id="c", name="C", dependencies=["a"]),
-        ])
+        manifest = InstallManifest(
+            modules=[
+                Module(id="a", name="A", dependencies=["b"]),
+                Module(id="b", name="B", dependencies=["c"]),
+                Module(id="c", name="C", dependencies=["a"]),
+            ]
+        )
         with pytest.raises(ValueError, match="[Cc]ircular"):
             manifest.resolve_dependencies(["a"])
 
@@ -1833,14 +1907,19 @@ class TestBugFix_RouterVersionComparison:
             filepath = Path(tmpdir) / "router.json"
             # Write a version 10.0.0 file (string "10.0.0" < "2.0.0")
             import json as _json
-            filepath.write_text(_json.dumps({
-                "version": "10.0.0",
-                "q_table": {"test": [0.5, 0.5]},
-                "epsilon": 0.1,
-                "update_count": 100,
-                "stats": {},
-                "config": {"agents": ["a", "b"]},
-            }))
+
+            filepath.write_text(
+                _json.dumps(
+                    {
+                        "version": "10.0.0",
+                        "q_table": {"test": [0.5, 0.5]},
+                        "epsilon": 0.1,
+                        "update_count": 100,
+                        "stats": {},
+                        "config": {"agents": ["a", "b"]},
+                    }
+                )
+            )
             router = QLearningRouter()
             assert router.load(filepath) is True
             assert router.update_count == 100
@@ -1986,18 +2065,22 @@ class TestMiddlewareChain:
 
         class MW1(Middleware):
             name = "mw1"
+
             def before(self, ctx):
                 order.append("mw1_before")
                 return ctx
+
             def after(self, ctx):
                 order.append("mw1_after")
                 return ctx
 
         class MW2(Middleware):
             name = "mw2"
+
             def before(self, ctx):
                 order.append("mw2_before")
                 return ctx
+
             def after(self, ctx):
                 order.append("mw2_after")
                 return ctx
@@ -2012,6 +2095,7 @@ class TestMiddlewareChain:
     def test_halt_stops_chain(self):
         class Halter(Middleware):
             name = "halter"
+
             def before(self, ctx):
                 ctx.halted = True
                 ctx.halt_reason = "blocked"
@@ -2019,6 +2103,7 @@ class TestMiddlewareChain:
 
         class NeverReached(Middleware):
             name = "unreachable"
+
             def before(self, ctx):
                 raise AssertionError("Should not be called")
 
@@ -2037,6 +2122,7 @@ class TestMiddlewareChain:
     def test_after_anchor_positioning(self):
         class First(Middleware):
             name = "first"
+
         class Second(Middleware):
             name = "second"
             after_middleware = "first"
@@ -2049,6 +2135,7 @@ class TestMiddlewareChain:
     def test_before_anchor_positioning(self):
         class First(Middleware):
             name = "first"
+
         class Inserted(Middleware):
             name = "inserted"
             before_middleware = "first"
@@ -2061,6 +2148,7 @@ class TestMiddlewareChain:
     def test_duplicate_name_raises(self):
         class MW(Middleware):
             name = "dup"
+
         chain = MiddlewareChain()
         chain.add(MW())
         with pytest.raises(MiddlewareError, match="already registered"):
@@ -2070,6 +2158,7 @@ class TestMiddlewareChain:
         class MW(Middleware):
             name = "orphan"
             after_middleware = "nonexistent"
+
         chain = MiddlewareChain()
         with pytest.raises(MiddlewareError, match="not registered"):
             chain.add(MW())
@@ -2079,6 +2168,7 @@ class TestMiddlewareChain:
             name = "confused"
             after_middleware = "a"
             before_middleware = "b"
+
         chain = MiddlewareChain()
         with pytest.raises(MiddlewareError, match="cannot specify both"):
             chain.add(MW())
@@ -2086,6 +2176,7 @@ class TestMiddlewareChain:
     def test_remove(self):
         class MW(Middleware):
             name = "removable"
+
         chain = MiddlewareChain()
         chain.add(MW())
         assert chain.count == 1
@@ -2096,6 +2187,7 @@ class TestMiddlewareChain:
     def test_get(self):
         class MW(Middleware):
             name = "findme"
+
         chain = MiddlewareChain()
         chain.add(MW())
         assert chain.get("findme") is not None
@@ -2104,6 +2196,7 @@ class TestMiddlewareChain:
     def test_error_handling(self):
         class Faulty(Middleware):
             name = "faulty"
+
             def before(self, ctx):
                 raise RuntimeError("oops")
 
@@ -2122,6 +2215,7 @@ class TestMiddlewareChain:
     def test_metadata_pass_through(self):
         class Tagger(Middleware):
             name = "tagger"
+
             def before(self, ctx):
                 ctx.metadata["tagged"] = True
                 return ctx
@@ -2150,19 +2244,23 @@ from gradata.hooks.auto_correct import (
 
 class TestAutoCorrectHook:
     def test_edit_captured(self):
-        inp = json.dumps({
-            "tool_name": "Edit",
-            "input": {"old_string": "Dear Sir,", "new_string": "Hey,"},
-        })
+        inp = json.dumps(
+            {
+                "tool_name": "Edit",
+                "input": {"old_string": "Dear Sir,", "new_string": "Hey,"},
+            }
+        )
         result = process_hook_input(inp)
         # May or may not capture depending on brain availability
         assert "captured" in result
 
     def test_no_diff_skipped(self):
-        inp = json.dumps({
-            "tool_name": "Edit",
-            "input": {"old_string": "same", "new_string": "same"},
-        })
+        inp = json.dumps(
+            {
+                "tool_name": "Edit",
+                "input": {"old_string": "same", "new_string": "same"},
+            }
+        )
         result = process_hook_input(inp)
         assert result["captured"] is False
 
@@ -2260,8 +2358,12 @@ class TestManifestNewModules:
         caps = _sdk_capabilities()
         modules = caps["modules"]
         expected = [
-            "loop_detection", "middleware_chain", "git_backfill",
-            "auto_correct_hook", "reporting", "quality_monitoring",
+            "loop_detection",
+            "middleware_chain",
+            "git_backfill",
+            "auto_correct_hook",
+            "reporting",
+            "quality_monitoring",
         ]
         for name in expected:
             assert name in modules, f"Missing: {name}"
@@ -2293,12 +2395,16 @@ class TestBrainBriefing:
         assert "Brain Rules" in md
 
     def test_briefing_with_rules(self):
-        b = BrainBriefing(rules=[
-            BriefingRule(category="TONE", description="Use casual voice",
-                        confidence=0.92, state="RULE"),
-            BriefingRule(category="STYLE", description="No em dashes",
-                        confidence=0.70, state="PATTERN"),
-        ])
+        b = BrainBriefing(
+            rules=[
+                BriefingRule(
+                    category="TONE", description="Use casual voice", confidence=0.92, state="RULE"
+                ),
+                BriefingRule(
+                    category="STYLE", description="No em dashes", confidence=0.70, state="PATTERN"
+                ),
+            ]
+        )
         assert b.has_content
         assert b.rule_count == 2
         md = b.to_markdown()
@@ -2313,10 +2419,12 @@ class TestBrainBriefing:
         assert "As an AI" in md
 
     def test_briefing_with_health(self):
-        b = BrainBriefing(brain_health={
-            "compound_score": 72.3,
-            "correction_rate": 0.004,
-        })
+        b = BrainBriefing(
+            brain_health={
+                "compound_score": 72.3,
+                "correction_rate": 0.004,
+            }
+        )
         # Health metrics removed from compact format (rules-only briefing)
         # Verify briefing still generates without error
         md = b.to_markdown()
@@ -2337,6 +2445,7 @@ class TestBrainBriefing:
 
     def test_brain_briefing_method(self):
         from gradata.brain import Brain
+
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             brain = Brain.init(tmpdir, domain="Test")
             md = brain.briefing()
@@ -2344,6 +2453,7 @@ class TestBrainBriefing:
 
     def test_brain_briefing_returns_string(self):
         from gradata.brain import Brain
+
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             brain = Brain.init(tmpdir, domain="Test")
             result = brain.briefing()
@@ -2413,9 +2523,13 @@ class TestAntiPatterns:
     def test_add_custom_pattern(self):
         d = AntiPatternDetector(include_defaults=False)
         assert d.pattern_count == 0
-        d.add_pattern(AntiPattern(
-            name="custom", category="test", pattern="bad word",
-        ))
+        d.add_pattern(
+            AntiPattern(
+                name="custom",
+                category="test",
+                pattern="bad word",
+            )
+        )
         assert d.pattern_count == 1
         results = d.check("this has a bad word in it")
         assert len(results) == 1
@@ -2434,13 +2548,15 @@ class TestAntiPatterns:
                 assert r.replacement_hint != ""
 
 
-
 # ===========================================================================
 # Tree of Thoughts
 # ===========================================================================
 
 from gradata.contrib.patterns.tree_of_thoughts import (
-    Thought, ToTResult, explore, evaluate_rule_candidates,
+    Thought,
+    ToTResult,
+    explore,
+    evaluate_rule_candidates,
 )
 
 
@@ -2454,6 +2570,7 @@ class TestTreeOfThoughts:
     def test_explore_basic(self):
         def scorer(c):
             return (0.8 if "good" in c else 0.3, "test")
+
         result = explore(["good rule", "bad rule"], scorer, max_depth=1)
         assert isinstance(result, ToTResult)
         assert result.best.score == 0.8
@@ -2462,7 +2579,10 @@ class TestTreeOfThoughts:
     def test_explore_with_depth(self):
         def scorer(c):
             return (min(1.0, len(c) / 20), "length-based")
-        result = explore(["a good long candidate", "another good option"], scorer, max_depth=2, min_score=0.3)
+
+        result = explore(
+            ["a good long candidate", "another good option"], scorer, max_depth=2, min_score=0.3
+        )
         assert result.total_explored > 2
         assert result.depth == 2
 

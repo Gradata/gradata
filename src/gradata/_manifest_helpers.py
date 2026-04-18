@@ -11,9 +11,12 @@ LOW_SEVERITY = frozenset({"as-is", "minor"})
 
 def _session_window(conn, window: int = 20) -> tuple[int, int]:
     """Return (max_session, min_session) for a recent window. Shared helper."""
-    max_session = conn.execute(
-        "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
-    ).fetchone()[0] or 0
+    max_session = (
+        conn.execute("SELECT MAX(session) FROM events WHERE typeof(session)='integer'").fetchone()[
+            0
+        ]
+        or 0
+    )
     return max_session, max(1, max_session - window + 1)
 
 
@@ -29,7 +32,6 @@ def _sdk_capabilities() -> dict:
     _paul_modules = [
         ("context_brackets", "gradata.contrib.patterns.context_brackets", "ChristopherKahler/paul"),
         ("reconciliation", "gradata.contrib.patterns.reconciliation", "ChristopherKahler/paul"),
-        ("task_escalation", "gradata.contrib.patterns.task_escalation", "ChristopherKahler/paul"),
         ("execute_qualify", "gradata.contrib.patterns.execute_qualify", "ChristopherKahler/paul"),
     ]
     # Adapted from ruflo
@@ -65,10 +67,21 @@ def _sdk_capabilities() -> dict:
         ("git_backfill", "gradata.enhancements.git_backfill", "gradata"),
         ("auto_correct_hook", "gradata.hooks.auto_correct", "gradata"),
         ("reporting", "gradata.enhancements.reporting", "fest.build-inspired+gradata"),
-        ("quality_monitoring", "gradata.enhancements.quality_monitoring", "jarvis-inspired+gradata"),
+        (
+            "quality_monitoring",
+            "gradata.enhancements.quality_monitoring",
+            "jarvis-inspired+gradata",
+        ),
     ]
 
-    all_modules = _paul_modules + _ruflo_modules + _deerflow_modules + _ecc_modules + _everos_modules + _core_modules
+    all_modules = (
+        _paul_modules
+        + _ruflo_modules
+        + _deerflow_modules
+        + _ecc_modules
+        + _everos_modules
+        + _core_modules
+    )
 
     for name, module_path, source in all_modules:
         try:
@@ -82,5 +95,3 @@ def _sdk_capabilities() -> dict:
         "available": sum(1 for c in capabilities.values() if c["available"]),
         "modules": capabilities,
     }
-
-
