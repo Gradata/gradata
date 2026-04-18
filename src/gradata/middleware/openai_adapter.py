@@ -41,27 +41,6 @@ def _require_openai() -> None:
         ) from exc
 
 
-def _inject_into_messages(messages: list[Any], block: str) -> list[Any]:
-    """Return a new messages list with rules folded into the system message.
-
-    If a leading system message with string content exists, its content is
-    extended with the block. In every other case (no system message, or a
-    system message whose content is a structured multimodal list) a fresh
-    system message is prepended so the original payload is preserved.
-    """
-    out = [dict(m) if isinstance(m, dict) else m for m in messages]
-    head = out[0] if out else None
-    if (
-        isinstance(head, dict)
-        and head.get("role") == "system"
-        and isinstance(head.get("content"), (str, type(None)))
-    ):
-        head["content"] = inject_into_system(head.get("content"), block)
-    else:
-        out.insert(0, {"role": "system", "content": block})
-    return out
-
-
 class OpenAIMiddleware:
     """Wraps an OpenAI client with Gradata rule injection + enforcement."""
 
@@ -103,9 +82,15 @@ class _CompletionsProxy:
     def create(self, *args: Any, **kwargs: Any) -> Any:
         block = build_brain_rules_block(self._mw._source)
         if block:
-            kwargs["messages"] = _inject_into_messages(
-                kwargs.get("messages") or [], block,
-            )
+            _iim_msgs = kwargs.get("messages") or []
+            _iim_out = [dict(_m) if isinstance(_m, dict) else _m for _m in _iim_msgs]
+            _iim_head = _iim_out[0] if _iim_out else None
+            if (isinstance(_iim_head, dict) and _iim_head.get("role") == "system"
+                    and isinstance(_iim_head.get("content"), (str, type(None)))):
+                _iim_head["content"] = inject_into_system(_iim_head.get("content"), block)
+            else:
+                _iim_out.insert(0, {"role": "system", "content": block})
+            kwargs["messages"] = _iim_out
 
         response = self._mw._orig_chat.completions.create(*args, **kwargs)
         _parts: list[str] = []
