@@ -96,7 +96,34 @@ def rank_rules(
     thompson_on = os.environ.get(_THOMPSON_ENV, "").strip() in ("1", "true", "True")
 
     # Build BM25 context-score map once per call.
-    bm25_scores = _bm25_context_scores(rules, task_type, context_keywords)
+    bm25_scores: list[float] | None = None
+    if _BM25_AVAILABLE and bm25s is not None:
+        _qt: list[str] = []
+        if task_type:
+            _qt.append(str(task_type))
+        if context_keywords:
+            _qt.extend(str(k) for k in context_keywords)
+        if _qt:
+            _corpus: list[str] = []
+            for _r in rules:
+                _tags = _r.get("tags", "")
+                if isinstance(_tags, (list, tuple)):
+                    _tags = " ".join(str(t) for t in _tags)
+                _doc = " ".join(str(_r.get(f, "")) for f in ("category", "description"))
+                _corpus.append(f"{_doc} {_tags}".strip())
+            if any(_corpus):
+                try:
+                    _retr = bm25s.BM25()
+                    _retr.index(bm25s.tokenize(_corpus, stopwords="en", show_progress=False), show_progress=False)
+                    _qtok = bm25s.tokenize([" ".join(_qt)], stopwords="en", show_progress=False)
+                    _ids, _scs = _retr.retrieve(_qtok, k=len(_corpus), show_progress=False)
+                    _max = max((float(s) for s in _scs[0]), default=0.0)
+                    bm25_scores = [0.0] * len(_corpus)
+                    for _j in range(len(_ids[0])):
+                        bm25_scores[int(_ids[0][_j])] = float(_scs[0][_j]) / _max if _max > 0 else 0.0
+                except Exception as _exc:  # pragma: no cover - defensive
+                    _log.debug("bm25 scoring failed (%s) — falling back to keyword scorer", _exc)
+                    bm25_scores = None
 
     # Deterministic-per-session RNG for Thompson.
     rng = random.Random(session_seed) if session_seed is not None else random.Random()
@@ -139,72 +166,6 @@ def _scope_match(category: str, task_type: str | None) -> float:
     if cat in tt or tt in cat:
         return 0.7
     return 0.5
-
-
-def _bm25_context_scores(
-    rules: list[dict[str, Any]],
-    task_type: str | None,
-    keywords: list[str] | None,
-) -> list[float] | None:
-    """Return normalized BM25 scores aligned to *rules*, or None if unavailable.
-
-    The corpus for each rule is ``category + description + tags``. The query is
-    ``task_type + keywords``. Returns None when bm25s isn't installed or when
-    there's no query to run — callers fall back to the keyword scorer.
-    """
-    if not _BM25_AVAILABLE or bm25s is None:
-        return None
-    query_terms: list[str] = []
-    if task_type:
-        query_terms.append(str(task_type))
-    if keywords:
-        query_terms.extend(str(k) for k in keywords)
-    if not query_terms:
-        return None
-
-    corpus: list[str] = []
-    for rule in rules:
-        tags = rule.get("tags", "")
-        if isinstance(tags, (list, tuple)):
-            tags = " ".join(str(t) for t in tags)
-        doc = " ".join(
-            str(rule.get(field, ""))
-            for field in ("category", "description")
-        )
-        corpus.append(f"{doc} {tags}".strip())
-
-    # BM25 wants at least one non-empty doc.
-    if not any(corpus):
-        return None
-
-    try:
-        retriever = bm25s.BM25()
-        corpus_tokens = bm25s.tokenize(corpus, stopwords="en", show_progress=False)
-        retriever.index(corpus_tokens, show_progress=False)
-        query_tokens = bm25s.tokenize(
-            [" ".join(query_terms)], stopwords="en", show_progress=False,
-        )
-        doc_ids, scores = retriever.retrieve(
-            query_tokens, k=len(corpus), show_progress=False,
-        )
-    except Exception as exc:  # pragma: no cover - defensive; bm25s is fiddly
-        _log.debug("bm25 scoring failed (%s) — falling back to keyword scorer", exc)
-        return None
-
-    # Map returned (doc_id, score) pairs back to the input order.
-    aligned = [0.0] * len(corpus)
-    row_ids = doc_ids[0]
-    row_scores = scores[0]
-    max_score = 0.0
-    for j in range(len(row_ids)):
-        s = float(row_scores[j])
-        if s > max_score:
-            max_score = s
-    for j in range(len(row_ids)):
-        doc_idx = int(row_ids[j])
-        raw = float(row_scores[j])
-        aligned[doc_idx] = raw / max_score if max_score > 0 else 0.0
-    return aligned
 
 
 def _context_component(
