@@ -41,28 +41,6 @@ class GraduatedRule:
         return self.confidence >= 0.90
 
 
-def _rule_matches_domain(rule: GraduatedRule, domain_norm: str) -> bool:
-    """Return True if ``rule`` is in-scope for ``domain_norm`` (already lowercased).
-
-    STRICT matching (council verdict 4/4). Match rules (OR):
-      1. ``rule.scope["domain"]`` equals ``domain_norm`` (case-insensitive).
-      2. ``rule.scope["applies_to"]`` equals ``domain_norm`` or starts with
-         ``f"{domain_norm}:"``.
-
-    ``rule.category`` is deliberately ignored. Categories are taxonomy
-    labels (STYLE, TONE, SECURITY), not domains. Legacy rules with no
-    ``scope.domain`` set must be migrated via
-    ``scripts/migrate_legacy_scopes.py``.
-    """
-    if not domain_norm:
-        return True
-    scope = rule.scope or {}
-    if str(scope.get("domain", "")).strip().lower() == domain_norm:
-        return True
-    applies = str(scope.get("applies_to", "")).strip().lower()
-    return applies == domain_norm or applies.startswith(f"{domain_norm}:")
-
-
 class RuleContext:
     """Singleton registry of graduated rules that all patterns query.
 
@@ -136,7 +114,14 @@ class RuleContext:
 
         if domain:
             d_norm = domain.strip().lower()
-            candidates = [r for r in candidates if _rule_matches_domain(r, d_norm)]
+            if d_norm:
+                def _matches(r: GraduatedRule) -> bool:
+                    scope = r.scope or {}
+                    if str(scope.get("domain", "")).strip().lower() == d_norm:
+                        return True
+                    applies = str(scope.get("applies_to", "")).strip().lower()
+                    return applies == d_norm or applies.startswith(f"{d_norm}:")
+                candidates = [r for r in candidates if _matches(r)]
 
         if min_confidence > 0:
             candidates = [r for r in candidates if r.confidence >= min_confidence]
