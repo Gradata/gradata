@@ -46,27 +46,6 @@ def _require_anthropic() -> None:
         ) from exc
 
 
-def _extract_text(response: Any) -> str:
-    """Best-effort extraction of the assistant text from an Anthropic response.
-
-    Anthropic responses expose ``content`` either as a plain string (older
-    SDKs, dict-shaped responses) or as a list of typed content blocks.
-    """
-    content = _get(response, "content")
-    if not content:
-        return ""
-    if isinstance(content, str):
-        return content
-    parts: list[str] = []
-    for block in content:
-        if _get(block, "type") != "text":
-            continue
-        text = _get(block, "text")
-        if text:
-            parts.append(str(text))
-    return "\n".join(parts)
-
-
 class AnthropicMiddleware:
     """Wraps an Anthropic client with Gradata rule injection + enforcement."""
 
@@ -113,7 +92,20 @@ class _MessagesProxy:
 
         response = self._mw._orig_messages.create(*args, **kwargs)
 
-        text = _extract_text(response)
+        _content = _get(response, "content")
+        if not _content:
+            text = ""
+        elif isinstance(_content, str):
+            text = _content
+        else:
+            _parts: list[str] = []
+            for _blk in _content:
+                if _get(_blk, "type") != "text":
+                    continue
+                _t = _get(_blk, "text")
+                if _t:
+                    _parts.append(str(_t))
+            text = "\n".join(_parts)
         if text:
             check_output(self._mw._source, text, strict=self._mw._strict)
         return response

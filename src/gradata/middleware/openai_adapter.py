@@ -41,20 +41,6 @@ def _require_openai() -> None:
         ) from exc
 
 
-def _extract_text(response: Any) -> str:
-    """Best-effort text extraction from an OpenAI chat.completions response."""
-    choices = _get(response, "choices") or []
-    parts: list[str] = []
-    for choice in choices:
-        message = _get(choice, "message")
-        if message is None:
-            continue
-        content = _get(message, "content")
-        if content:
-            parts.append(str(content))
-    return "\n".join(parts)
-
-
 def _inject_into_messages(messages: list[Any], block: str) -> list[Any]:
     """Return a new messages list with rules folded into the system message.
 
@@ -122,7 +108,15 @@ class _CompletionsProxy:
             )
 
         response = self._mw._orig_chat.completions.create(*args, **kwargs)
-        text = _extract_text(response)
+        _parts: list[str] = []
+        for _choice in (_get(response, "choices") or []):
+            _msg = _get(_choice, "message")
+            if _msg is None:
+                continue
+            _c = _get(_msg, "content")
+            if _c:
+                _parts.append(str(_c))
+        text = "\n".join(_parts)
         if text:
             check_output(self._mw._source, text, strict=self._mw._strict)
         return response
