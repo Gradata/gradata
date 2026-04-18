@@ -161,34 +161,6 @@ def _classify_severity(edit_distance: float) -> str:
     return _SEVERITY_DISCARDED
 
 
-def _build_unified_diff(old: str, new: str, path: str, max_lines: int = 50) -> str:
-    """Produce a truncated unified diff string.
-
-    Args:
-        old: Original content.
-        new: Modified content.
-        path: File path label for the diff header.
-        max_lines: Maximum number of diff lines to include.
-
-    Returns:
-        Unified diff as a string, truncated with a notice if needed.
-    """
-    old_lines = old.splitlines(keepends=True)
-    new_lines = new.splitlines(keepends=True)
-    diff_lines = list(
-        difflib.unified_diff(
-            old_lines,
-            new_lines,
-            fromfile=f"a/{Path(path).name}",
-            tofile=f"b/{Path(path).name}",
-            lineterm="",
-        )
-    )
-    if len(diff_lines) > max_lines:
-        diff_lines = [*diff_lines[:max_lines], f"\n... diff truncated at {max_lines} lines ..."]
-    return "\n".join(diff_lines)
-
-
 # ---------------------------------------------------------------------------
 # Core class
 # ---------------------------------------------------------------------------
@@ -383,9 +355,16 @@ class FileWatcher:
 
         # Build the event payload
         watched = self._watched.get(change.path)
-        diff_text = _build_unified_diff(
-            change.old_content, change.new_content, change.path
-        )
+        _bud_lines = list(difflib.unified_diff(
+            change.old_content.splitlines(keepends=True),
+            change.new_content.splitlines(keepends=True),
+            fromfile=f"a/{Path(change.path).name}",
+            tofile=f"b/{Path(change.path).name}",
+            lineterm="",
+        ))
+        if len(_bud_lines) > 50:
+            _bud_lines = [*_bud_lines[:50], "\n... diff truncated at 50 lines ..."]
+        diff_text = "\n".join(_bud_lines)
         event_data: dict = {
             "path": change.path,
             "output_type": watched.output_type if watched else "",
