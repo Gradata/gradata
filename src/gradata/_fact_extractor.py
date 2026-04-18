@@ -20,21 +20,16 @@ _DEFAULT_FACT_TYPES = (
     "pain_point", "budget", "timeline",
 )
 
-def _load_fact_types() -> tuple:
-    """Load fact types from brain config or use defaults."""
-    config_path = _p.BRAIN_DIR / "taxonomy.json" if hasattr(_p, 'BRAIN_DIR') and _p.BRAIN_DIR else None
-    if config_path and config_path.exists():
-        try:
-            with open(config_path, encoding="utf-8") as f:
-                config = json.load(f)
-            extra = config.get("fact_types", [])
-            if extra:
-                return tuple(set(_DEFAULT_FACT_TYPES) | set(extra))
-        except Exception:
-            pass
-    return _DEFAULT_FACT_TYPES
-
-VALID_FACT_TYPES = _load_fact_types()
+VALID_FACT_TYPES: tuple = _DEFAULT_FACT_TYPES
+_lft_path = _p.BRAIN_DIR / "taxonomy.json" if hasattr(_p, "BRAIN_DIR") and _p.BRAIN_DIR else None
+if _lft_path and _lft_path.exists():
+    try:
+        with open(_lft_path, encoding="utf-8") as _lft_f:
+            _lft_extra = json.load(_lft_f).get("fact_types", [])
+        if _lft_extra:
+            VALID_FACT_TYPES = tuple(set(_DEFAULT_FACT_TYPES) | set(_lft_extra))
+    except Exception:
+        pass
 MIN_FACT_LENGTH = 3
 CONF_EXPLICIT = 0.9
 CONF_INFERRED = 0.6
