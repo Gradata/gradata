@@ -519,22 +519,6 @@ def _sanitize_toml_value(val: str) -> str:
     return val.replace("\n", "").replace("\r", "").replace("[", "").replace("]", "").replace('"', "").replace("\\", "").strip()
 
 
-def _check_config_permissions(config_path: Path) -> None:
-    """Finding 4: warn if config file is world-readable (Unix only)."""
-    import os
-    import stat
-    try:
-        st = os.stat(config_path)
-        # Check if group or others have any permissions
-        if st.st_mode & (stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH):
-            print(
-                f"  WARNING: {config_path} has overly permissive permissions "
-                f"({oct(st.st_mode & 0o777)}). Run: chmod 600 {config_path}"
-            )
-    except (OSError, AttributeError):
-        pass  # Windows or permission check not available
-
-
 def cmd_login(args):
     """Device authentication flow: connect SDK to app.gradata.ai."""
     import json as _json
@@ -648,8 +632,16 @@ def cmd_login(args):
             print("  Connected! Your brain will sync to app.gradata.ai")
             print(f"  Config saved to {config_path}")
 
-            # Finding 4: check permissions on startup
-            _check_config_permissions(config_path)
+            # Finding 4: warn if config file is world-readable (Unix only)
+            import stat as _ccp_stat
+            try:
+                _ccp_st = os.stat(config_path)
+                if _ccp_st.st_mode & (_ccp_stat.S_IRGRP | _ccp_stat.S_IWGRP
+                                      | _ccp_stat.S_IROTH | _ccp_stat.S_IWOTH):
+                    print(f"  WARNING: {config_path} has overly permissive permissions "
+                          f"({oct(_ccp_st.st_mode & 0o777)}). Run: chmod 600 {config_path}")
+            except (OSError, AttributeError):
+                pass
             return
 
         if status == "expired":
