@@ -18,9 +18,9 @@ import re
 import statistics
 from datetime import UTC, datetime
 
-import gradata._paths as _p
-from gradata._db import get_connection
-from gradata._manifest_helpers import (
+from . import _paths as _p
+from ._db import get_connection
+from ._manifest_helpers import (
     _count_events,
     _get_tables,
     _read_version,
@@ -28,7 +28,7 @@ from gradata._manifest_helpers import (
     _session_window,
     _tag_taxonomy,
 )
-from gradata._manifest_quality import (
+from ._manifest_quality import (
     _categories_extinct,
     _compound_score,
     _compute_fda,
@@ -39,7 +39,7 @@ from gradata._manifest_quality import (
     _severity_ratio,
     _transfer_score,
 )
-from gradata._stats import trend_analysis as _trend_analysis
+from ._stats import trend_analysis as _trend_analysis
 
 
 def _lesson_distribution(ctx: "_p.BrainContext | None" = None) -> dict[str, int]:
@@ -397,7 +397,7 @@ def _rag_status(ctx: "_p.BrainContext | None" = None) -> dict:
         "fts5_enabled": True,
     }
     try:
-        from gradata._config import EMBEDDING_DIMS, EMBEDDING_MODEL, EMBEDDING_PROVIDER, RAG_ACTIVE
+        from ._config import EMBEDDING_DIMS, EMBEDDING_MODEL, EMBEDDING_PROVIDER, RAG_ACTIVE
         result["active"] = RAG_ACTIVE
         result["provider"] = EMBEDDING_PROVIDER
         result["model"] = EMBEDDING_MODEL
