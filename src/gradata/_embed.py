@@ -166,19 +166,12 @@ def get_gemini_client():
 _local_model = None
 
 
-def _get_local_model():
-    """Load sentence-transformers model for local embedding generation."""
+def embed_texts_local(texts: list[str]) -> list[list[float]]:
     global _local_model
     if _local_model is None:
         from sentence_transformers import SentenceTransformer
-
         _local_model = SentenceTransformer(LOCAL_MODEL)
-    return _local_model
-
-
-def embed_texts_local(texts: list[str]) -> list[list[float]]:
-    model = _get_local_model()
-    embeddings = model.encode(texts)
+    embeddings = _local_model.encode(texts)
     return [e.tolist() for e in embeddings]
 
 
