@@ -30,19 +30,6 @@ from pathlib import Path
 DEFAULT_BRAINS_DIR = Path.home() / ".gradata" / "brains"
 
 
-def _extract_manifest(archive_path: Path) -> dict | None:
-    """Extract and parse manifest from archive without full extraction."""
-    try:
-        with zipfile.ZipFile(archive_path, "r") as zf:
-            if "manifest.json" not in zf.namelist():
-                return None
-            raw = zf.read("manifest.json").decode("utf-8")
-            return json.loads(raw)
-    except (zipfile.BadZipFile, json.JSONDecodeError) as e:
-        print(f"ERROR: Cannot read archive: {e}")
-        return None
-
-
 def _safe_extract(zf: zipfile.ZipFile, target_dir: Path) -> None:
     """Extract zip with Zip Slip protection — rejects paths that escape target_dir."""
     target_resolved = str(target_dir.resolve())
@@ -99,7 +86,13 @@ def install(archive_path: Path, target_dir: Path | None = None, dry_run: bool = 
     report = {"status": "pending", "steps": []}
 
     # Step 1: Extract manifest
-    manifest = _extract_manifest(archive_path)
+    manifest: dict | None = None
+    try:
+        with zipfile.ZipFile(archive_path, "r") as _em_zf:
+            if "manifest.json" in _em_zf.namelist():
+                manifest = json.loads(_em_zf.read("manifest.json").decode("utf-8"))
+    except (zipfile.BadZipFile, json.JSONDecodeError) as _em_e:
+        print(f"ERROR: Cannot read archive: {_em_e}")
     if not manifest:
         report["status"] = "failed"
         report["error"] = "Cannot read manifest from archive"
