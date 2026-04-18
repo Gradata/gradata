@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-from gradata._types import Lesson, LessonState
+from .._types import Lesson, LessonState
 
 _log = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ def _patterns_to_graduated_lessons(
     are lifted directly to RULE state for synthesis.
     """
     try:
-        from gradata.enhancements.meta_rules_storage import (  # type: ignore[import]
+        from ..enhancements.meta_rules_storage import (  # type: ignore[import]
             query_graduation_candidates,
         )
     except ImportError:
@@ -268,7 +268,7 @@ def run_rule_pipeline(
     Returns:
         PipelineResult with all changes made.
     """
-    from gradata.enhancements.self_improvement import (
+    from ..enhancements.self_improvement import (
         MIN_APPLICATIONS_FOR_PATTERN,
         MIN_APPLICATIONS_FOR_RULE,
         PATTERN_THRESHOLD,
@@ -291,7 +291,7 @@ def run_rule_pipeline(
 
     # Compute freshness for all graduated rules
     try:
-        from gradata.enhancements.freshness import (  # type: ignore[import]
+        from ..enhancements.freshness import (  # type: ignore[import]
             Trend,
             compute_trend,
         )
@@ -314,7 +314,7 @@ def run_rule_pipeline(
 
     # Rank rules using retrieval fusion if available
     try:
-        from gradata.enhancements.retrieval_fusion import (  # type: ignore[import]
+        from ..enhancements.retrieval_fusion import (  # type: ignore[import]
             ScoredRule,
             apply_correction_boost,
             reciprocal_rank_fusion,
@@ -345,7 +345,7 @@ def run_rule_pipeline(
     # ── Phase 1.5: Self-observation (consume SELF_REVIEW_VIOLATION events) ──
     # Must run after Phase 1 so all_lessons is already populated for dedup.
     try:
-        from gradata._db import get_connection
+        from .._db import get_connection
         if db_path.is_file():
             conn = get_connection(db_path)
             rows = conn.execute(
@@ -374,7 +374,7 @@ def run_rule_pipeline(
                     continue
                 from datetime import date as _date
 
-                from gradata._types import Lesson as _Lesson
+                from .._types import Lesson as _Lesson
                 candidate = _Lesson(
                     date=_date.today().isoformat(),
                     state=LessonState.INSTINCT,
@@ -424,10 +424,10 @@ def run_rule_pipeline(
 
     # Synthesize meta-rules from graduated rules
     try:
-        from gradata.enhancements.meta_rules import (
+        from ..enhancements.meta_rules import (
             synthesize_meta_rules_agentic,  # type: ignore[import]
         )
-        from gradata.enhancements.meta_rules_storage import (  # type: ignore[import]
+        from ..enhancements.meta_rules_storage import (  # type: ignore[import]
             load_meta_rules,
             save_meta_rules,
         )
@@ -459,7 +459,7 @@ def run_rule_pipeline(
 
     # Hook promotion for newly graduated RULE-state lessons
     try:
-        from gradata.enhancements.rule_to_hook import classify_rule, promote  # type: ignore[import]
+        from ..enhancements.rule_to_hook import classify_rule, promote  # type: ignore[import]
 
         for lesson in all_lessons:
             if lesson.state.name == "RULE" and lesson.confidence >= RULE_THRESHOLD:
@@ -481,7 +481,7 @@ def run_rule_pipeline(
 
     # Disposition updates from this session's corrections
     try:
-        from gradata.enhancements.behavioral_engine import (
+        from ..enhancements.behavioral_engine import (
             DispositionTracker,  # type: ignore[import]
         )
 
@@ -575,7 +575,7 @@ def build_knowledge_graph(lessons_path: Path, db_path: Path) -> dict:
     Returns:
         Dict with keys: nodes, clusters, causal_links, contradictions, cross_domain, stats.
     """
-    from gradata.enhancements.self_improvement import parse_lessons
+    from ..enhancements.self_improvement import parse_lessons
 
     graph: dict = {
         "nodes": [],
@@ -612,7 +612,7 @@ def build_knowledge_graph(lessons_path: Path, db_path: Path) -> dict:
 
     # Clusters
     try:
-        from gradata.enhancements.clustering import cluster_rules  # type: ignore[import]
+        from ..enhancements.clustering import cluster_rules  # type: ignore[import]
         graph["clusters"] = [
             {
                 "cluster_id": c.cluster_id,
@@ -629,7 +629,7 @@ def build_knowledge_graph(lessons_path: Path, db_path: Path) -> dict:
 
     # Contradictions (across graduated rules)
     try:
-        from gradata.enhancements.clustering import detect_contradictions  # type: ignore[import]
+        from ..enhancements.clustering import detect_contradictions  # type: ignore[import]
         graduated = [l for l in lessons if l.state.name in ("RULE", "PATTERN")]
         graph["contradictions"] = [
             {"rule_a": a, "rule_b": b}
@@ -640,7 +640,7 @@ def build_knowledge_graph(lessons_path: Path, db_path: Path) -> dict:
 
     # Cross-domain candidates
     try:
-        from gradata.enhancements.meta_rules import (
+        from ..enhancements.meta_rules import (
             detect_cross_domain_candidates,  # type: ignore[import]
         )
         graph["cross_domain"] = detect_cross_domain_candidates(lessons)
@@ -783,8 +783,8 @@ CREATE TABLE IF NOT EXISTS rule_verifications (
 
 
 def ensure_table(db_path: Path) -> None:
-    from gradata._db import ensure_table as _ensure
-    from gradata._db import get_connection
+    from .._db import ensure_table as _ensure
+    from .._db import get_connection
     conn = get_connection(db_path)
     _ensure(conn, _CREATE_VERIFICATIONS_TABLE)
     conn.close()
