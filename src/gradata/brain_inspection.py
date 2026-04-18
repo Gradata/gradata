@@ -37,14 +37,14 @@ class BrainInspectionMixin:
 
     def rules(self, *, include_all: bool = False, category: str | None = None) -> list[dict]:
         """List graduated brain rules. See gradata.inspection.list_rules."""
-        from gradata.inspection import list_rules
+        from .inspection import list_rules
         return list_rules(db_path=self.db_path,
                           lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
                           include_all=include_all, category=category)
 
     def explain(self, rule_id: str) -> dict:
         """Trace a rule to its source corrections. See gradata.inspection.explain_rule."""
-        from gradata.inspection import explain_rule
+        from .inspection import explain_rule
         return explain_rule(db_path=self.db_path,
                             events_path=self.ctx.events_jsonl if hasattr(self.ctx, "events_jsonl") else self.dir / "events.jsonl",
                             rule_id=rule_id,
@@ -52,7 +52,7 @@ class BrainInspectionMixin:
 
     def trace(self, rule_id: str) -> dict:
         """Trace a rule's full provenance chain. See gradata.audit.trace_rule."""
-        from gradata.audit import trace_rule
+        from .audit import trace_rule
         return trace_rule(
             db_path=self.db_path,
             events_path=self.ctx.events_jsonl if hasattr(self.ctx, "events_jsonl") else self.dir / "events.jsonl",
@@ -62,7 +62,7 @@ class BrainInspectionMixin:
 
     def export_data(self, *, output_format: str = "json") -> str:
         """Export rules as JSON or YAML. See gradata.inspection.export_rules."""
-        from gradata.inspection import export_rules
+        from .inspection import export_rules
         return export_rules(db_path=self.db_path,
                             lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
                             output_format=output_format)
@@ -75,7 +75,7 @@ class BrainInspectionMixin:
         Silent during work — call at session end to review what graduated.
         Returns list of rule dicts with id, category, state, confidence, etc.
         """
-        from gradata.inspection import list_rules
+        from .inspection import list_rules
         return list_rules(
             db_path=self.db_path,
             lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
@@ -90,9 +90,9 @@ class BrainInspectionMixin:
         Returns:
             {"approved": True} on success, {"error": "..."} if not found.
         """
-        from gradata._db import write_lessons_safe
-        from gradata.enhancements.self_improvement import format_lessons
-        from gradata.inspection import _load_lessons_from_path, _make_rule_id
+        from ._db import write_lessons_safe
+        from .enhancements.self_improvement import format_lessons
+        from .inspection import _load_lessons_from_path, _make_rule_id
 
         lessons_path = self._find_lessons_path() or self.dir / "lessons.md"
         lessons = _load_lessons_from_path(lessons_path)
@@ -132,10 +132,10 @@ class BrainInspectionMixin:
             {"rejected": True, "demoted_from": old_state} on success,
             {"error": "..."} if not found.
         """
-        from gradata._db import write_lessons_safe
-        from gradata._types import LessonState
-        from gradata.enhancements.self_improvement import format_lessons
-        from gradata.inspection import _load_lessons_from_path, _make_rule_id
+        from ._db import write_lessons_safe
+        from ._types import LessonState
+        from .enhancements.self_improvement import format_lessons
+        from .inspection import _load_lessons_from_path, _make_rule_id
 
         lessons_path = self._find_lessons_path() or self.dir / "lessons.md"
         lessons = _load_lessons_from_path(lessons_path)
