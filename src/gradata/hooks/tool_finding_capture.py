@@ -1,6 +1,7 @@
 """PostToolUse hook: capture test findings and detect when user acts on them."""
 from __future__ import annotations
 
+import hashlib as _fp_hashlib
 import json
 import os
 import tempfile
@@ -16,32 +17,24 @@ HOOK_META = {
     "timeout": 5000,
 }
 
-def _findings_path() -> Path:
-    import hashlib
-
-    if hasattr(os, "getuid"):
-        uid = os.getuid()
-    else:
-        # Windows: use login name + pid for user isolation
-        try:
-            uid = os.getlogin()
-        except OSError:
-            uid = f"pid{os.getpid()}"
-    user_tmp = Path(tempfile.gettempdir()) / f"gradata-{uid}"
+# Per-user, per-project findings file (Windows-safe tempdir with fallback).
+if hasattr(os, "getuid"):
+    _fp_uid: str | int = os.getuid()
+else:
     try:
-        user_tmp.mkdir(parents=True, exist_ok=True)
+        _fp_uid = os.getlogin()
     except OSError:
-        # Permission denied or other OS error — fall back to plain tempdir
-        user_tmp = Path(tempfile.gettempdir())
-    # Namespace by project directory to prevent cross-project leakage
-    project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
-    if project_dir:
-        dir_hash = hashlib.md5(project_dir.encode()).hexdigest()[:8]
-        return user_tmp / f"findings-{dir_hash}.json"
-    return user_tmp / "findings.json"
-
-
-FINDINGS_FILE = _findings_path()
+        _fp_uid = f"pid{os.getpid()}"
+_fp_tmp = Path(tempfile.gettempdir()) / f"gradata-{_fp_uid}"
+try:
+    _fp_tmp.mkdir(parents=True, exist_ok=True)
+except OSError:
+    _fp_tmp = Path(tempfile.gettempdir())
+_fp_proj = os.environ.get("CLAUDE_PROJECT_DIR", "")
+FINDINGS_FILE = (
+    _fp_tmp / f"findings-{_fp_hashlib.md5(_fp_proj.encode()).hexdigest()[:8]}.json"
+    if _fp_proj else _fp_tmp / "findings.json"
+)
 
 # Refined patterns that indicate actual test failures
 TEST_FAILURE_INDICATORS = [
