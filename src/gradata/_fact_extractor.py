@@ -77,34 +77,6 @@ def _parse_frontmatter(text):
     return fm
 
 
-def _get_entity_names():
-    """Get entity names from brain directory (prospects, candidates, etc.)."""
-    names = set()
-    for dirname in ("prospects", "candidates", "customers", "entities"):
-        entity_dir = _p.BRAIN_DIR / dirname if hasattr(_p, 'BRAIN_DIR') and _p.BRAIN_DIR else None
-        if not entity_dir or not entity_dir.exists():
-            continue
-        for f in entity_dir.glob("*.md"):
-            if f.name.startswith("_"):
-                continue
-            stem = f.stem
-            parts = re.split(r"\s*[—–]\s*|\s+--\s+", stem, maxsplit=1)
-            if parts:
-                names.add(parts[0].strip())
-            try:
-                text = f.read_text(encoding="utf-8", errors="replace")
-                fm = _parse_frontmatter(text)
-                if fm.get("name"):
-                    names.add(fm["name"].strip())
-            except Exception:
-                pass
-    return names
-
-
-# Backward compat alias
-_get_prospect_names = _get_entity_names
-
-
 def _quality_gate(fact_type, fact_value):
     if not fact_value or len(fact_value.strip()) < MIN_FACT_LENGTH:
         return False
