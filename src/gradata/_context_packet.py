@@ -30,18 +30,6 @@ def _events_query(**kwargs):
     return eq(**kwargs)
 
 
-def _correction_rate(**kwargs):
-    from ._events import correction_rate
-
-    return correction_rate(**kwargs)
-
-
-def _detect_session():
-    from ._events import _detect_session as ds
-
-    return ds()
-
-
 def _safe_read(path: Path, limit_chars: int = 0) -> str:
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -252,7 +240,9 @@ def _load_audit_context(session: int, ctx: "BrainContext | None" = None) -> dict
     except Exception:
         pass
     with contextlib.suppress(Exception):
-        result["correction_rate"] = _correction_rate(last_n_sessions=5)
+        from ._events import correction_rate
+
+        result["correction_rate"] = correction_rate(last_n_sessions=5)
     return result
 
 
@@ -372,6 +362,8 @@ def build_packet(
 ) -> str:
     packet = {}
     if session is None:
+        from ._events import _detect_session
+
         session = _detect_session()
 
     if task_type in ("prospecting", "meeting_prep"):
