@@ -82,52 +82,6 @@ def _open_db(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
-def _session_densities(
-    conn: sqlite3.Connection,
-    min_session: int,
-) -> dict[int, float]:
-    """Compute per-session correction density for sessions >= min_session.
-
-    Density for a session = corrections / outputs.  Sessions with zero
-    outputs are assigned density 0.0 when they have corrections (worst
-    case assumed) or excluded entirely when they have neither.
-
-    Args:
-        conn: Open database connection.
-        min_session: Lower bound for session numbers (inclusive).
-
-    Returns:
-        Dict mapping session number to density value, ordered by session.
-    """
-    rows = conn.execute(
-        """
-        SELECT
-            session,
-            SUM(CASE WHEN type = 'CORRECTION' THEN 1 ELSE 0 END) AS corrections,
-            SUM(CASE WHEN type = 'OUTPUT'     THEN 1 ELSE 0 END) AS outputs
-        FROM events
-        WHERE session >= ?
-          AND type IN ('CORRECTION', 'OUTPUT')
-        GROUP BY session
-        ORDER BY session
-        """,
-        (min_session,),
-    ).fetchall()
-
-    densities: dict[int, float] = {}
-    for r in rows:
-        session = r["session"]
-        corrections = r["corrections"] or 0
-        outputs = r["outputs"] or 0
-        if outputs > 0:
-            densities[session] = corrections / outputs
-        elif corrections > 0:
-            # Corrections without outputs: density treated as 1.0 (all bad)
-            densities[session] = 1.0
-        # Sessions with neither event type are omitted
-    return densities
-
-
 def _split_half_trend(values: list[float]) -> tuple[str, float]:
     """Detect trend direction by comparing the first and second halves.
 
@@ -328,7 +282,27 @@ def compute_correction_profile(
         )
 
         # --- Per-session densities ---
-        session_density_map = _session_densities(conn, min_session)
+        session_density_map: dict[int, float] = {}
+        for _r in conn.execute(
+            """
+            SELECT
+                session,
+                SUM(CASE WHEN type = 'CORRECTION' THEN 1 ELSE 0 END) AS corrections,
+                SUM(CASE WHEN type = 'OUTPUT'     THEN 1 ELSE 0 END) AS outputs
+            FROM events
+            WHERE session >= ?
+              AND type IN ('CORRECTION', 'OUTPUT')
+            GROUP BY session
+            ORDER BY session
+            """,
+            (min_session,),
+        ).fetchall():
+            _c = _r["corrections"] or 0
+            _o = _r["outputs"] or 0
+            if _o > 0:
+                session_density_map[_r["session"]] = _c / _o
+            elif _c > 0:
+                session_density_map[_r["session"]] = 1.0
         density_per_session = [
             session_density_map[s]
             for s in sorted(session_density_map)
