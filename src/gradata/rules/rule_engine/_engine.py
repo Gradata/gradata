@@ -346,16 +346,6 @@ def apply_rules(
 
     # Step 4 — compute difficulty per rule
     # Step 5 — sort: state priority DESC, difficulty DESC, relevance DESC, confidence DESC
-    def _effective_conf(lesson: Lesson, domain: str) -> float:
-        if not domain:
-            return lesson.confidence
-        scores = lesson.domain_scores.get(domain, {})
-        return effective_confidence(
-            lesson.confidence,
-            scores.get("fires", 0),
-            scores.get("misfires", 0),
-        )
-
     scored.sort(
         key=lambda t: (
             _STATE_PRIORITY[t[0].state],
@@ -364,7 +354,11 @@ def apply_rules(
             if events
             else _difficulty_from_lesson(t[0]),
             t[1],
-            _effective_conf(t[0], current_domain),
+            effective_confidence(
+                t[0].confidence,
+                t[0].domain_scores.get(current_domain, {}).get("fires", 0),
+                t[0].domain_scores.get(current_domain, {}).get("misfires", 0),
+            ) if current_domain else t[0].confidence,
         ),
         reverse=True,
     )
