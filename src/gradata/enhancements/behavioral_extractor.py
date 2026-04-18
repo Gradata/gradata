@@ -621,22 +621,6 @@ _VERB_PREFIXES = (
 )
 
 
-def _synthesize_summary(category: str, descriptions: list[str]) -> str:
-    counts: dict[str, int] = {}
-    for desc in descriptions:
-        for word in desc.lower().split():
-            for prefix in _VERB_PREFIXES:
-                if word.startswith(prefix):
-                    counts[prefix] = counts.get(prefix, 0) + 1
-                    break
-    common_verbs = sorted(counts, key=lambda k: counts[k], reverse=True)[:3]
-    verb_str = ", ".join(common_verbs[:2]) if common_verbs else "adjust"
-    return (
-        f"Recurring {category} pattern across {len(descriptions)} corrections: "
-        f"consistently {verb_str} in this category"
-    )
-
-
 def detect_recurring_patterns(
     lessons: list[Lesson],
     min_corrections: int = 3,
@@ -659,12 +643,21 @@ def detect_recurring_patterns(
         total_fires = sum(l.fire_count for l in cat_lessons)
         confidence = min(0.95, 0.5 + 0.05 * len(cat_lessons) + 0.01 * total_fires)
 
+        _ss_counts: dict[str, int] = {}
+        for _ss_desc in descriptions:
+            for _ss_word in _ss_desc.lower().split():
+                for _ss_prefix in _VERB_PREFIXES:
+                    if _ss_word.startswith(_ss_prefix):
+                        _ss_counts[_ss_prefix] = _ss_counts.get(_ss_prefix, 0) + 1
+                        break
+        _ss_common = sorted(_ss_counts, key=lambda k: _ss_counts[k], reverse=True)[:2]
+        _ss_verb = ", ".join(_ss_common) if _ss_common else "adjust"
         patterns.append(
             RecurringPattern(
                 category=cat,
                 correction_count=len(cat_lessons),
                 descriptions=descriptions,
-                summary=_synthesize_summary(cat, descriptions),
+                summary=f"Recurring {cat} pattern across {len(descriptions)} corrections: consistently {_ss_verb} in this category",
                 confidence=round(confidence, 2),
             )
         )
