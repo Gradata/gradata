@@ -35,6 +35,21 @@ def _parse_iso(ts: str) -> datetime:
     return datetime.fromisoformat(normalised)
 
 
+def _build_memory(memory_type: str, content: str, metadata: dict | None, source: str) -> Memory:
+    now = _now_iso()
+    meta: dict = {"source": source}
+    if metadata:
+        meta.update(metadata)
+    return Memory(
+        id=str(uuid.uuid4()),
+        memory_type=memory_type,
+        content=content,
+        metadata=meta,
+        created=now,
+        last_accessed=now,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Core data class
 # ---------------------------------------------------------------------------
@@ -187,20 +202,7 @@ class EpisodicMemory:
         source: str = "agent",
     ) -> str:
         """Record an episodic event."""
-        now = _now_iso()
-        meta: dict = {"source": source}
-        if metadata:
-            meta.update(metadata)
-
-        memory = Memory(
-            id=str(uuid.uuid4()),
-            memory_type=self.memory_type,
-            content=content,
-            metadata=meta,
-            created=now,
-            last_accessed=now,
-        )
-        return self._store.store(memory)
+        return self._store.store(_build_memory(self.memory_type, content, metadata, source))
 
     def retrieve(self, query: str, limit: int = 10) -> list[Memory]:
         """Retrieve episodic memories matching ``query``."""
@@ -247,20 +249,7 @@ class SemanticMemory:
         source: str = "agent",
     ) -> str:
         """Record a semantic fact."""
-        now = _now_iso()
-        meta: dict = {"source": source}
-        if metadata:
-            meta.update(metadata)
-
-        memory = Memory(
-            id=str(uuid.uuid4()),
-            memory_type=self.memory_type,
-            content=content,
-            metadata=meta,
-            created=now,
-            last_accessed=now,
-        )
-        return self._store.store(memory)
+        return self._store.store(_build_memory(self.memory_type, content, metadata, source))
 
     def retrieve(self, query: str, limit: int = 10) -> list[Memory]:
         """Retrieve semantic facts matching ``query``."""
@@ -306,20 +295,7 @@ class ProceduralMemory:
         source: str = "agent",
     ) -> str:
         """Record a procedural pattern or workflow."""
-        now = _now_iso()
-        meta: dict = {"source": source}
-        if metadata:
-            meta.update(metadata)
-
-        memory = Memory(
-            id=str(uuid.uuid4()),
-            memory_type=self.memory_type,
-            content=content,
-            metadata=meta,
-            created=now,
-            last_accessed=now,
-        )
-        return self._store.store(memory)
+        return self._store.store(_build_memory(self.memory_type, content, metadata, source))
 
     def retrieve(self, query: str, limit: int = 10) -> list[Memory]:
         """Retrieve procedural patterns matching ``query``."""
