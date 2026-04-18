@@ -11,7 +11,9 @@ from __future__ import annotations
 import logging
 import os
 import re
+import sqlite3
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 
 from gradata._types import Lesson, LessonState
@@ -540,7 +542,6 @@ def run_rule_pipeline(
     # Rule verification for this session's corrections (best-effort, env-gated)
     if os.environ.get("GRADATA_RULE_VERIFIER") and corrections and db_path.is_file():
         try:
-            from gradata.enhancements.rule_verifier import log_verification, verify_rules
             applied_rules = [{"category": l.category, "description": l.description} for l in all_lessons]
             for correction in corrections:
                 output = correction.get("draft", "")
@@ -655,3 +656,172 @@ def build_knowledge_graph(lessons_path: Path, db_path: Path) -> dict:
     }
 
     return graph
+
+
+# ---------------------------------------------------------------------------
+# Rule verification (pre-execution filter + post-hoc output checker)
+# Merged from rule_verifier.py for consolidation.
+# ---------------------------------------------------------------------------
+
+TOOL_RULE_MATRIX: dict[str, list[str]] = {
+    "Write": ["DRAFTING", "ARCHITECTURE", "IP_PROTECTION", "ACCURACY"],
+    "Edit": ["DRAFTING", "ARCHITECTURE", "ACCURACY"],
+    "Bash": ["PROCESS", "VERIFICATION", "CONSTRAINT"],
+    "email_draft": ["DRAFTING", "COMMUNICATION", "POSITIONING", "PRICING"],
+    "demo_prep": ["DEMO_PREP", "ACCURACY", "PRESENTATION"],
+    "prospecting": ["LEADS", "CONSTRAINT", "DATA_INTEGRITY"],
+    "code": ["ARCHITECTURE", "THOROUGHNESS", "VERIFICATION"],
+}
+
+
+def should_verify(tool_type: str, rule_category: str) -> bool:
+    """Pre-execution gate: True if rule category is relevant for the tool."""
+    relevant = TOOL_RULE_MATRIX.get(tool_type)
+    if relevant is None:
+        return True
+    return rule_category.upper() in (c.upper() for c in relevant)
+
+
+def get_relevant_rules(tool_type: str, all_rules: list[dict]) -> list[dict]:
+    """Filter rules to those relevant for the tool/task per TOOL_RULE_MATRIX."""
+    return [
+        rule for rule in all_rules
+        if should_verify(tool_type, rule.get("category", "UNKNOWN"))
+    ]
+
+
+_PATTERNS: list[tuple[str, str, bool, str]] = [
+    ("em dash", r"\u2014|--", True, "contains em dash or double dash"),
+    ("em dashes", r"\u2014|--", True, "contains em dash or double dash"),
+    ("pricing", r"\$\d+", True, "contains dollar amount"),
+    ("dollar", r"\$\d+", True, "contains dollar amount"),
+    ("booking link", r"https?://\S+/\S+", False, "missing booking link"),
+    ("hyperlink", r"<a\s+href=", False, "missing HTML hyperlink"),
+    ("bold", r"\*\*[^*]+\*\*", True, "contains markdown bold"),
+    ("annual", r"\bannual\b|\byearly\b|\bper year\b", True, "references annual pricing"),
+    ("raw url", r"(?<!\")https?://\S+(?!\")", True, "contains raw URL (should be hyperlinked)"),
+]
+
+
+@dataclass
+class RuleVerification:
+    rule_category: str
+    rule_description: str
+    passed: bool
+    violation_detail: str = ""
+    output_snippet: str = ""
+
+
+def auto_detect_verification(rule_description: str) -> list[tuple[re.Pattern, bool, str]]:
+    """Scan rule description for checkable regex patterns."""
+    desc_lower = rule_description.lower()
+    checks = []
+    seen = set()
+    for keyword, pattern, absent, desc in _PATTERNS:
+        if keyword in desc_lower and pattern not in seen:
+            checks.append((re.compile(pattern, re.IGNORECASE), absent, desc))
+            seen.add(pattern)
+    return checks
+
+
+def verify_rules(
+    output: str,
+    applied_rules: list[dict],
+    context: dict | None = None,
+) -> list[RuleVerification]:
+    """Check output against applied rules; returns one RuleVerification per checkable rule."""
+    tool_type = (context or {}).get("tool_type", "")
+    if tool_type:
+        applied_rules = get_relevant_rules(tool_type, applied_rules)
+
+    results = []
+    for rule in applied_rules:
+        desc = rule.get("description", "")
+        cat = rule.get("category", "UNKNOWN")
+        checks = auto_detect_verification(desc)
+        if not checks:
+            continue
+        for regex, should_be_absent, violation_desc in checks:
+            match = regex.search(output)
+            if should_be_absent and match:
+                results.append(RuleVerification(
+                    rule_category=cat,
+                    rule_description=desc[:200],
+                    passed=False,
+                    violation_detail=violation_desc,
+                    output_snippet=output[max(0, match.start() - 30):match.end() + 30][:200],
+                ))
+            elif not should_be_absent and not match:
+                results.append(RuleVerification(
+                    rule_category=cat,
+                    rule_description=desc[:200],
+                    passed=False,
+                    violation_detail=violation_desc,
+                    output_snippet=output[:200],
+                ))
+            else:
+                results.append(RuleVerification(
+                    rule_category=cat,
+                    rule_description=desc[:200],
+                    passed=True,
+                ))
+    return results
+
+
+_CREATE_VERIFICATIONS_TABLE = """
+CREATE TABLE IF NOT EXISTS rule_verifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session INTEGER,
+    rule_category TEXT,
+    rule_description TEXT,
+    passed BOOLEAN,
+    violation_detail TEXT,
+    output_snippet TEXT,
+    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+)
+"""
+
+
+def ensure_table(db_path: Path) -> None:
+    from gradata._db import ensure_table as _ensure
+    from gradata._db import get_connection
+    conn = get_connection(db_path)
+    _ensure(conn, _CREATE_VERIFICATIONS_TABLE)
+    conn.close()
+
+
+def log_verification(
+    session: int,
+    results: list[RuleVerification],
+    db_path: Path,
+) -> None:
+    """Write verification results to SQLite."""
+    ensure_table(db_path)
+    now = datetime.now(UTC).isoformat()
+    with sqlite3.connect(str(db_path)) as conn:
+        for r in results:
+            conn.execute(
+                "INSERT INTO rule_verifications "
+                "(session, rule_category, rule_description, passed, violation_detail, output_snippet, timestamp) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (session, r.rule_category, r.rule_description, r.passed,
+                 r.violation_detail, r.output_snippet, now),
+            )
+
+
+def get_verification_stats(db_path: Path) -> dict:
+    """Return summary stats from the rule_verifications table."""
+    ensure_table(db_path)
+    with sqlite3.connect(str(db_path)) as conn:
+        total = conn.execute("SELECT COUNT(*) FROM rule_verifications").fetchone()[0]
+        passed = conn.execute("SELECT COUNT(*) FROM rule_verifications WHERE passed = 1").fetchone()[0]
+        violations = conn.execute(
+            "SELECT rule_category, COUNT(*) FROM rule_verifications "
+            "WHERE passed = 0 GROUP BY rule_category ORDER BY COUNT(*) DESC"
+        ).fetchall()
+    return {
+        "total_checks": total,
+        "passed": passed,
+        "pass_rate": passed / total if total > 0 else 1.0,
+        "violations_by_category": {cat: count for cat, count in violations},
+    }
