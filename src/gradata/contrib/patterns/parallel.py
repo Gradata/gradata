@@ -146,60 +146,6 @@ def _run_task(task: ParallelTask) -> TaskResult:
         )
 
 
-def _topological_waves(tasks: list[ParallelTask]) -> list[list[str]]:
-    """Sort *tasks* into dependency waves using Kahn's algorithm.
-
-    Each wave contains task IDs whose dependencies were fully satisfied
-    by all previous waves.  Tasks within the same wave are logically
-    independent of one another.
-
-    Args:
-        tasks: Tasks with optional ``depends_on`` edges.
-
-    Returns:
-        Ordered list of waves; each wave is a list of task IDs.
-
-    Raises:
-        ValueError: If the dependency graph contains a cycle.
-    """
-    task_map: dict[str, ParallelTask] = {t.id: t for t in tasks}
-    in_degree: dict[str, int] = {t.id: 0 for t in tasks}
-    dependents: dict[str, list[str]] = defaultdict(list)
-
-    for task in tasks:
-        for dep_id in task.depends_on:
-            if dep_id not in task_map:
-                raise ValueError(
-                    f"Task '{task.id}' declares dependency on unknown "
-                    f"task '{dep_id}'."
-                )
-            in_degree[task.id] += 1
-            dependents[dep_id].append(task.id)
-
-    waves: list[list[str]] = []
-    ready: list[str] = [tid for tid, deg in in_degree.items() if deg == 0]
-
-    while ready:
-        wave = sorted(ready)  # deterministic ordering within a wave
-        waves.append(wave)
-        next_ready: list[str] = []
-        for tid in wave:
-            for child in dependents[tid]:
-                in_degree[child] -= 1
-                if in_degree[child] == 0:
-                    next_ready.append(child)
-        ready = next_ready
-
-    scheduled = sum(len(w) for w in waves)
-    if scheduled != len(tasks):
-        unscheduled = [tid for tid in in_degree if in_degree[tid] > 0]
-        raise ValueError(
-            f"Dependency cycle detected. Tasks involved: {unscheduled}"
-        )
-
-    return waves
-
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -280,7 +226,34 @@ class DependencyGraph:
 
     def __init__(self, tasks: list[ParallelTask]) -> None:
         self._tasks: list[ParallelTask] = tasks
-        self._waves: list[list[str]] = _topological_waves(tasks)
+        _tmap: dict[str, ParallelTask] = {t.id: t for t in tasks}
+        _indeg: dict[str, int] = {t.id: 0 for t in tasks}
+        _deps: dict[str, list[str]] = defaultdict(list)
+        for _t in tasks:
+            for _dep in _t.depends_on:
+                if _dep not in _tmap:
+                    raise ValueError(
+                        f"Task '{_t.id}' declares dependency on unknown task '{_dep}'."
+                    )
+                _indeg[_t.id] += 1
+                _deps[_dep].append(_t.id)
+        _waves: list[list[str]] = []
+        _ready: list[str] = [_tid for _tid, _d in _indeg.items() if _d == 0]
+        while _ready:
+            _wave = sorted(_ready)
+            _waves.append(_wave)
+            _next: list[str] = []
+            for _tid in _wave:
+                for _child in _deps[_tid]:
+                    _indeg[_child] -= 1
+                    if _indeg[_child] == 0:
+                        _next.append(_child)
+            _ready = _next
+        if sum(len(_w) for _w in _waves) != len(tasks):
+            raise ValueError(
+                f"Dependency cycle detected. Tasks involved: {[_tid for _tid in _indeg if _indeg[_tid] > 0]}"
+            )
+        self._waves: list[list[str]] = _waves
         self._task_map: dict[str, ParallelTask] = {t.id: t for t in tasks}
 
     def run(self) -> ParallelResult:
