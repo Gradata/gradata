@@ -65,23 +65,6 @@ class CorrectionProfile:
 # ---------------------------------------------------------------------------
 
 
-def _open_db(db_path: Path) -> sqlite3.Connection:
-    """Open a brain database in read-only WAL mode.
-
-    Args:
-        db_path: Absolute path to ``system.db``.
-
-    Returns:
-        An open sqlite3 connection with ``row_factory`` set to
-        ``sqlite3.Row``.
-    """
-    conn = sqlite3.connect(str(db_path))
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=5000")
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
 def _split_half_trend(values: list[float]) -> tuple[str, float]:
     """Detect trend direction by comparing the first and second halves.
 
@@ -254,7 +237,10 @@ def compute_correction_profile(
         A populated CorrectionProfile.  All fields default to safe values
         (0, empty lists, "stable") when the database contains no events.
     """
-    conn = _open_db(db_path)
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    conn.row_factory = sqlite3.Row
 
     try:
         # --- Determine the session window ---
