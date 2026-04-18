@@ -263,27 +263,6 @@ def _transfer_score(ctx: "BrainContext | None" = None, window: int = 10) -> floa
         return None
 
 
-def _score_confidence(score: float, sessions: int) -> dict:
-    """Heuristic confidence interval that narrows with more data.
-
-    Margin = 30 / sqrt(sessions). At 5 sessions: +/-13.4. At 50: +/-4.2.
-    """
-    if sessions < 3:
-        return {
-            "score": round(score, 1),
-            "ci_low": 0.0,
-            "ci_high": 100.0,
-            "confidence": "insufficient_data",
-        }
-    margin = 30.0 / math.sqrt(max(1, sessions))
-    return {
-        "score": round(score, 1),
-        "ci_low": round(max(0.0, score - margin), 1),
-        "ci_high": round(min(100.0, score + margin), 1),
-        "confidence": "high" if sessions >= 50 else "medium" if sessions >= 20 else "low",
-    }
-
-
 def _counterfactual_percentile(
     score: float, sessions: int, ctx: "BrainContext | None" = None
 ) -> dict | None:

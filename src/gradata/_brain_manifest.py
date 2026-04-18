@@ -14,6 +14,7 @@ Functions promoted from brain shim (S39+):
 """
 
 import json
+import math
 import re
 import statistics
 from datetime import UTC, datetime
@@ -33,7 +34,6 @@ from ._manifest_quality import (
     _compute_fda,
     _counterfactual_percentile,
     _per_session_density,
-    _score_confidence,
     _severity_difficulty_weight,
     _severity_ratio,
     _transfer_score,
@@ -333,9 +333,22 @@ def _quality_metrics(ctx: "_p.BrainContext | None" = None) -> dict:
         transfer=transfer,
     )
 
-    result["score_confidence"] = _score_confidence(
-        result["compound_score"], sessions_trained
-    )
+    _sc_score = result["compound_score"]
+    if sessions_trained < 3:
+        result["score_confidence"] = {
+            "score": round(_sc_score, 1),
+            "ci_low": 0.0,
+            "ci_high": 100.0,
+            "confidence": "insufficient_data",
+        }
+    else:
+        _sc_margin = 30.0 / math.sqrt(max(1, sessions_trained))
+        result["score_confidence"] = {
+            "score": round(_sc_score, 1),
+            "ci_low": round(max(0.0, _sc_score - _sc_margin), 1),
+            "ci_high": round(min(100.0, _sc_score + _sc_margin), 1),
+            "confidence": "high" if sessions_trained >= 50 else "medium" if sessions_trained >= 20 else "low",
+        }
     result["outcome_correlation"] = _outcome_correlation(ctx=ctx)
     result["counterfactual"] = _counterfactual_percentile(
         result["compound_score"], sessions_trained, ctx=ctx
