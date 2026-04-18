@@ -41,19 +41,19 @@ if _log_level in ("DEBUG", "INFO", "WARNING", "ERROR"):
     )
     _logging.getLogger("gradata").setLevel(getattr(_logging, _log_level))
 
-from gradata._paths import BrainContext
-from gradata._scoped_brain import ScopedBrain
-from gradata._types import Lesson, LessonState, RuleTransferScope
-from gradata.brain import Brain
-from gradata.context_wrapper import brain_context
-from gradata.enhancements.self_improvement import (
+from ._paths import BrainContext
+from ._scoped_brain import ScopedBrain
+from ._types import Lesson, LessonState, RuleTransferScope
+from .brain import Brain
+from .context_wrapper import brain_context
+from .enhancements.self_improvement import (
     compute_learning_velocity,
     format_lessons,
     graduate,
     parse_lessons,
     update_confidence,
 )
-from gradata.exceptions import (
+from .exceptions import (
     BrainError,
     BrainNotFoundError,
     EmbeddingError,
@@ -62,8 +62,8 @@ from gradata.exceptions import (
     TaxonomyError,
     ValidationError,
 )
-from gradata.notifications import Notification
-from gradata.onboard import onboard
+from .notifications import Notification
+from .onboard import onboard
 
 __all__ = [
     # Core API
@@ -93,7 +93,7 @@ __all__ = [
 
 # ── Lazy pattern loading ──────────────────────────────────────────────
 # Patterns are NOT loaded at import time. Access via:
-#   from gradata.patterns import Pipeline, SmartRAG, Guard, etc.
+#   from .patterns import Pipeline, SmartRAG, Guard, etc.
 # Backward compat: `from gradata import Pipeline` still works via __getattr__.
 
 _PATTERN_IMPORTS: dict[str, tuple[str, str]] = {
