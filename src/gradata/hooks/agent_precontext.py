@@ -56,20 +56,6 @@ def _resolve_scope_domain(data: dict) -> str:
     return env
 
 
-def _infer_agent_type(data: dict) -> str:
-    tool_input = data.get("tool_input", {})
-    agent_type = tool_input.get("subagent_type", "")
-    if agent_type:
-        return agent_type
-
-    desc = tool_input.get("description", "") or tool_input.get("prompt", "")
-    desc_lower = desc.lower()
-    for scope, keywords in SCOPE_KEYWORDS.items():
-        if any(kw in desc_lower for kw in keywords):
-            return scope
-    return "general"
-
-
 def _resolve_agent_brain_dir() -> str | None:
     """Resolve brain dir for the precontext hook.
 
@@ -119,7 +105,14 @@ def main(data: dict) -> dict | None:
             except Exception:
                 pass  # Fall back to unfiltered on any import/runtime error
 
-        agent_type = _infer_agent_type(data)
+        _iat_ti = data.get("tool_input", {})
+        agent_type = _iat_ti.get("subagent_type", "")
+        if not agent_type:
+            _iat_desc = (_iat_ti.get("description", "") or _iat_ti.get("prompt", "")).lower()
+            agent_type = next(
+                (scope for scope, kws in SCOPE_KEYWORDS.items() if any(kw in _iat_desc for kw in kws)),
+                "general",
+            )
         keywords = list(SCOPE_KEYWORDS.get(agent_type.lower(), []))
         # Scope inference feeds the unified ranker as task_type + context_keywords.
         # BM25 picks up on category/description/tags overlap against these terms.
