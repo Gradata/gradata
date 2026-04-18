@@ -277,26 +277,20 @@ class DependencyGraph:
 
                 # Check whether any dependency failed; skip if so.
                 failed_deps = [
-                    dep for dep in task.depends_on
-                    if dep in results and not results[dep].success
+                    dep for dep in task.depends_on if dep in results and not results[dep].success
                 ]
                 if failed_deps:
                     results[tid] = TaskResult(
                         task_id=tid,
                         success=False,
                         output=None,
-                        error=(
-                            f"Skipped: upstream dependencies failed: "
-                            f"{failed_deps}"
-                        ),
+                        error=(f"Skipped: upstream dependencies failed: {failed_deps}"),
                     )
                     continue
 
                 # Forward upstream outputs into input_data.
                 if task.depends_on:
-                    upstream_outputs = {
-                        dep: results[dep].output for dep in task.depends_on
-                    }
+                    upstream_outputs = {dep: results[dep].output for dep in task.depends_on}
                     if len(upstream_outputs) == 1:
                         # Single parent: pass the value directly for ergonomics.
                         task.input_data = next(iter(upstream_outputs.values()))
@@ -305,9 +299,7 @@ class DependencyGraph:
 
                 results[tid] = _run_task(task)
 
-        total_duration_ms = round(
-            (time.monotonic() - graph_start) * 1000.0, 2
-        )
+        total_duration_ms = round((time.monotonic() - graph_start) * 1000.0, 2)
         all_succeeded = all(r.success for r in results.values())
 
         return ParallelResult(
@@ -361,8 +353,7 @@ def merge_results(
     valid_strategies = {"combine", "best_of", "synthesize"}
     if strategy not in valid_strategies:
         raise ValueError(
-            f"Unknown merge strategy '{strategy}'. "
-            f"Choose from: {sorted(valid_strategies)}"
+            f"Unknown merge strategy '{strategy}'. Choose from: {sorted(valid_strategies)}"
         )
 
     successful = [r for r in results if r.success]
