@@ -753,6 +753,66 @@ def cmd_rule_add(args):
         print(f"rule added as soft injection ({result.reason})")
 
 
+# Canonical starter rules — validated by the viral "7-line CLAUDE.md" carousel
+# (yashserai19/TECHBITS). Seeded at RULE tier so they inject immediately, no
+# correction loop required. Users still get learned rules on top.
+_SEVEN_STARTER_RULES: list[tuple[str, str]] = [
+    ("PATTERN",  "Follow existing patterns before introducing new abstractions"),
+    ("CODE",     "Keep diffs small and focused"),
+    ("PROCESS",  "Run the smallest relevant test or lint after each change"),
+    ("TRUTH",    "State clearly when a command cannot be run — never pretend it ran"),
+    ("PROCESS",  "State assumptions before implementing"),
+    ("PROCESS",  "Update docs, tests, and types when behavior changes"),
+    ("SECURITY", "Never expose secrets — no keys, tokens, or credentials in code or output"),
+]
+
+
+def cmd_seed(args):
+    """Pre-populate a brain with high-confidence starter rules.
+
+    Gives new brains instant value on Day 0 before the correction loop has fired.
+    Currently supports --7-lines (Claude Code 7-line CLAUDE.md starter).
+    """
+    from gradata import Brain as _Brain
+
+    brain_root = _resolve_brain_root(args)
+    brain_root.mkdir(parents=True, exist_ok=True)
+    brain = _Brain(brain_root)
+
+    if getattr(args, "seven_lines", False):
+        rules = _SEVEN_STARTER_RULES
+        label = "7-line CLAUDE.md starter"
+    else:
+        print("error: pick a seed set (e.g. --7-lines)", file=sys.stderr)
+        sys.exit(2)
+
+    added = 0
+    skipped = 0
+    for category, text in rules:
+        result = brain.add_rule(
+            description=text, category=category, state="RULE", confidence=1.0,
+        )
+        if result.get("added"):
+            added += 1
+        else:
+            skipped += 1
+
+    print(f"seeded {label}: {added} added, {skipped} already present")
+
+
+def cmd_mine(args):
+    """Backfill brain from Claude Code transcript archive (~/.claude/projects)."""
+    from gradata._mine_transcripts import run_mine
+
+    run_mine(
+        brain_root=_resolve_brain_root(args),
+        projects_root=Path(args.projects_root) if args.projects_root else None,
+        project=args.project,
+        commit=args.commit,
+        dry_run=args.dry_run,
+    )
+
+
 def cmd_rule_list(args):
     """List RULE-tier lessons and their hook status."""
     import os
@@ -1144,6 +1204,32 @@ def main():
     p_hooks.add_argument("--profile", choices=["minimal", "standard", "strict"],
                          default="standard", help="Hook profile tier (default: standard)")
 
+    # seed — pre-populate brain with high-confidence starter rules
+    p_seed = sub.add_parser(
+        "seed",
+        help="Seed brain with starter rules at RULE tier (instant Day-0 value)",
+    )
+    p_seed.add_argument(
+        "--7-lines",
+        dest="seven_lines",
+        action="store_true",
+        help="Seed the 7-line CLAUDE.md starter (patterns, diffs, tests, truth, assumptions, docs, secrets)",
+    )
+
+    # mine — backfill brain from Claude Code transcript archive
+    p_mine = sub.add_parser(
+        "mine",
+        help="Backfill brain from ~/.claude/projects transcript archive",
+    )
+    p_mine.add_argument("--commit", action="store_true",
+                        help="Append to live events.jsonl (default: shadow file only)")
+    p_mine.add_argument("--dry-run", action="store_true",
+                        help="Report counts only, write nothing")
+    p_mine.add_argument("--project", default=None,
+                        help="Only scan one project dir (default: all)")
+    p_mine.add_argument("--projects-root", default=None,
+                        help="Override transcript root (default: ~/.claude/projects)")
+
     # rule — user-declared rules (fast-track to RULE tier, try hook install)
     p_rule = sub.add_parser("rule", help="Manage user-declared rules")
     rule_sub = p_rule.add_subparsers(dest="rule_cmd", required=True)
@@ -1183,6 +1269,8 @@ def main():
     commands["logout"] = cmd_logout
     commands["hooks"] = cmd_hooks
     commands["rule"] = cmd_rule
+    commands["seed"] = cmd_seed
+    commands["mine"] = cmd_mine
 
     if args.command in commands:
         commands[args.command](args)

@@ -138,7 +138,13 @@ def _err(req_id: Any, code: int, message: str, data: Any = None) -> dict[str, An
 _TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "name": "brain_search",
-        "description": "Search the brain for relevant knowledge and context.",
+        "description": (
+            "Search the brain for relevant rules, patterns, and past corrections. "
+            "WHEN: Use BEFORE drafting emails, code, or docs to ground output in learned style and prior fixes. "
+            "Prefer this over brain_briefing for targeted lookups. "
+            "RETURNS: {hits: [{score, scope, text, confidence, state}]}. "
+            "EXAMPLE: brain_search({query: 'cold email tone for CTOs', top_k: 5})."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -154,7 +160,13 @@ _TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "brain_correct",
-        "description": "Log a correction: the user edited an AI draft into a final version.",
+        "description": (
+            "Log a correction where the user edited an AI draft into a final version. "
+            "WHEN: Call immediately after the user rewrites or revises AI output — this is the PRIMARY learning signal. "
+            "Edit distance and severity drive confidence graduation (INSTINCT→PATTERN→RULE). "
+            "RETURNS: {severity, edit_distance, category, event_id}. "
+            "EXAMPLE: brain_correct({draft: 'Hi John,', final: 'Hey John —'})."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -166,7 +178,13 @@ _TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "brain_log_output",
-        "description": "Log an AI-generated output for quality tracking.",
+        "description": (
+            "Log an AI-generated output (no correction yet) for quality tracking and trend analysis. "
+            "WHEN: Fire-and-forget after producing output the user hasn't edited — paired with brain_correct later if they do edit. "
+            "Use output_type to bucket (email, code, research, outreach). "
+            "RETURNS: {event_id, tracked: bool}. "
+            "EXAMPLE: brain_log_output({text: '...draft...', output_type: 'email', self_score: 7})."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -186,27 +204,53 @@ _TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "brain_manifest",
-        "description": "Generate and return the brain quality manifest.",
+        "description": (
+            "Generate the brain quality manifest: rule counts by tier, confidence distribution, graduation stats. "
+            "WHEN: Weekly/monthly audit of brain health. Use brain_health for a ready-made verdict instead. "
+            "RETURNS: markdown string with counts, graduated rules, top categories. "
+            "EXAMPLE: brain_manifest()."
+        ),
         "inputSchema": {"type": "object", "properties": {}},
     },
     {
         "name": "brain_health",
-        "description": "Return a brain health report.",
+        "description": (
+            "Return a human-readable brain health verdict with pass/warn/fail per subsystem. "
+            "WHEN: Session-start diagnostic or when brain behaviour feels off. Prefer over brain_manifest for quick reads. "
+            "RETURNS: markdown report with events count, corruption checks, graduation velocity, schema drift. "
+            "EXAMPLE: brain_health()."
+        ),
         "inputSchema": {"type": "object", "properties": {}},
     },
     {
         "name": "brain_pipeline_stats",
-        "description": "Return procedural memory pipeline statistics: stages, router, context bracket, clusters.",
+        "description": (
+            "Return procedural memory pipeline internals: stage throughputs, router Q-values, cluster counts. "
+            "WHEN: Performance debugging or tuning graduation thresholds. Developer-facing, not day-to-day. "
+            "RETURNS: {stages, router, context_bracket, clusters}. "
+            "EXAMPLE: brain_pipeline_stats()."
+        ),
         "inputSchema": {"type": "object", "properties": {}},
     },
     {
         "name": "brain_context_bracket",
-        "description": "Get current context degradation bracket (FRESH/MODERATE/DEEP/CRITICAL).",
+        "description": (
+            "Get current context-degradation bracket: FRESH / MODERATE / DEEP / CRITICAL. "
+            "WHEN: Call before long tool chains or multi-step work to decide whether to compact/reset. "
+            "CRITICAL means warn the user and suggest a fresh session. "
+            "RETURNS: {bracket, token_estimate, recommendation}. "
+            "EXAMPLE: brain_context_bracket()."
+        ),
         "inputSchema": {"type": "object", "properties": {}},
     },
     {
         "name": "brain_route_suggest",
-        "description": "Suggest the best agent for a task using the Q-Learning router.",
+        "description": (
+            "Suggest the best specialist agent for a task using the learned Q-Learning router. "
+            "WHEN: Before spawning a subagent, to pick the right persona based on past outcome rewards. "
+            "RETURNS: {agent, confidence, q_value, alternatives}. "
+            "EXAMPLE: brain_route_suggest({task: 'review security of auth handler'})."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -217,17 +261,33 @@ _TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "brain_capabilities",
-        "description": "List SDK capabilities with source attribution (which modules are active).",
+        "description": (
+            "List active SDK capabilities and which modules back them (diff_engine, quality_gates, router, etc.). "
+            "WHEN: Onboarding check — confirm the installed Gradata build has the features you're about to use. "
+            "RETURNS: {capabilities: [{name, module, version, enabled}]}. "
+            "EXAMPLE: brain_capabilities()."
+        ),
         "inputSchema": {"type": "object", "properties": {}},
     },
     {
         "name": "brain_benchmark",
-        "description": "Run the standard procedural memory quality benchmark.",
+        "description": (
+            "Run the procedural-memory quality benchmark against the current brain. "
+            "WHEN: CI/CD regression checks or after major rule ingestion. Slow — not for inline use. "
+            "RETURNS: {score, pass_rate, regression_deltas, by_category}. "
+            "EXAMPLE: brain_benchmark()."
+        ),
         "inputSchema": {"type": "object", "properties": {}},
     },
     {
         "name": "brain_briefing",
-        "description": "Generate a portable brain briefing (markdown) that any AI agent can consume.",
+        "description": (
+            "Generate a portable markdown briefing any AI agent can paste as context. "
+            "WHEN: Session start (one-shot context dump) or when handing off to another tool/agent. "
+            "Prefer brain_search for targeted lookups — briefings are comprehensive, not precise. "
+            "RETURNS: markdown string with graduated rules, meta-rules, active patterns, voice notes. "
+            "EXAMPLE: brain_briefing()."
+        ),
         "inputSchema": {"type": "object", "properties": {}},
     },
 ]
