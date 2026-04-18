@@ -222,7 +222,17 @@ class ClusterManager:
         # Decision: join existing or create new
         if best_cluster is not None and best_similarity >= self.config.similarity_threshold:
             # Update existing cluster
-            self._update_centroid(state, best_cluster, vector, timestamp)
+            _uc_old = state.centroids[best_cluster]
+            _uc_count = state.counts[best_cluster]
+            state.centroids[best_cluster] = [
+                (_uc_old[i] * _uc_count + vector[i]) / (_uc_count + 1)
+                for i in range(len(vector))
+            ]
+            state.counts[best_cluster] = _uc_count + 1
+            state.last_timestamps[best_cluster] = max(
+                state.last_timestamps.get(best_cluster, 0.0),
+                timestamp,
+            )
             state.assignments[item_id] = best_cluster
             return ClusterAssignment(
                 item_id=item_id,
@@ -246,33 +256,6 @@ class ClusterManager:
                 similarity=0.0,
                 cluster_size=1,
             )
-
-    def _update_centroid(
-        self,
-        state: ClusterState,
-        cluster_id: str,
-        vector: list[float],
-        timestamp: float,
-    ) -> None:
-        """Update cluster centroid using running average.
-
-        new_centroid = (old_centroid * count + vector) / (count + 1)
-        O(1) memory, no recomputation needed.
-        """
-        old_centroid = state.centroids[cluster_id]
-        count = state.counts[cluster_id]
-
-        new_centroid = [
-            (old_centroid[i] * count + vector[i]) / (count + 1)
-            for i in range(len(vector))
-        ]
-
-        state.centroids[cluster_id] = new_centroid
-        state.counts[cluster_id] = count + 1
-        state.last_timestamps[cluster_id] = max(
-            state.last_timestamps.get(cluster_id, 0.0),
-            timestamp,
-        )
 
     def get_cluster_items(
         self,
