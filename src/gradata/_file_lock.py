@@ -37,6 +37,7 @@ caller proceeds unlocked rather than dropping data.  This is intentional:
 advisory locks are best-effort for preventing interleaving, not for data
 integrity.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -49,14 +50,14 @@ from typing import IO
 # Helpers
 # ---------------------------------------------------------------------------
 
-_BACKOFF_START = 0.01   # seconds
-_BACKOFF_CAP   = 0.10   # seconds
-_BACKOFF_MULT  = 2.0
+_BACKOFF_START = 0.01  # seconds
+_BACKOFF_CAP = 0.10  # seconds
+_BACKOFF_MULT = 2.0
 
 
-def _backoff_intervals(start: float = _BACKOFF_START,
-                       cap: float = _BACKOFF_CAP,
-                       mult: float = _BACKOFF_MULT):
+def _backoff_intervals(
+    start: float = _BACKOFF_START, cap: float = _BACKOFF_CAP, mult: float = _BACKOFF_MULT
+):
     """Yield truncated exponential backoff intervals forever."""
     interval = start
     while True:
@@ -67,6 +68,7 @@ def _backoff_intervals(start: float = _BACKOFF_START,
 # ---------------------------------------------------------------------------
 # Windows implementation
 # ---------------------------------------------------------------------------
+
 
 def _lock_win32(fh: IO, timeout: float | None) -> bool:
     """Acquire msvcrt advisory lock on byte 0.
@@ -98,27 +100,17 @@ def _lock_win32(fh: IO, timeout: float | None) -> bool:
             pass
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            raise TimeoutError(
-                f"Could not acquire lock on {fh.name} within {timeout}s"
-            )
+            raise TimeoutError(f"Could not acquire lock on {fh.name} within {timeout}s")
         time.sleep(min(interval, remaining))
 
     # Unreachable, but satisfies type checker.
     raise TimeoutError(f"Could not acquire lock on {fh.name} within {timeout}s")  # pragma: no cover
 
 
-def _unlock_win32(fh: IO) -> None:
-    import msvcrt  # type: ignore[import]
-    fh.seek(0)
-    try:
-        msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
-    except OSError:
-        pass
-
-
 # ---------------------------------------------------------------------------
 # POSIX implementation
 # ---------------------------------------------------------------------------
+
 
 def _lock_posix(fh: IO, timeout: float | None) -> bool:
     """Acquire fcntl exclusive lock.
@@ -146,25 +138,16 @@ def _lock_posix(fh: IO, timeout: float | None) -> bool:
             pass
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            raise TimeoutError(
-                f"Could not acquire lock on {fh.name} within {timeout}s"
-            )
+            raise TimeoutError(f"Could not acquire lock on {fh.name} within {timeout}s")
         time.sleep(min(interval, remaining))
 
     raise TimeoutError(f"Could not acquire lock on {fh.name} within {timeout}s")  # pragma: no cover
 
 
-def _unlock_posix(fh: IO) -> None:
-    import fcntl  # type: ignore[import]
-    try:
-        fcntl.flock(fh, fcntl.LOCK_UN)
-    except OSError:
-        pass
-
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 @contextlib.contextmanager
 def platform_lock(fh: IO, *, timeout: float | None = None) -> Generator[None, None, None]:
@@ -192,16 +175,27 @@ def platform_lock(fh: IO, *, timeout: float | None = None) -> Generator[None, No
         Maximum seconds to wait for the lock.  ``None`` = wait forever.
     """
     if sys.platform == "win32":
+        import msvcrt  # type: ignore[import]
+
         locked = _lock_win32(fh, timeout)
         try:
             yield
         finally:
             if locked:
-                _unlock_win32(fh)
+                fh.seek(0)
+                try:
+                    msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+                except OSError:
+                    pass
     else:
+        import fcntl  # type: ignore[import]
+
         locked = _lock_posix(fh, timeout)
         try:
             yield
         finally:
             if locked:
-                _unlock_posix(fh)
+                try:
+                    fcntl.flock(fh, fcntl.LOCK_UN)
+                except OSError:
+                    pass
