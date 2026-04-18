@@ -660,21 +660,6 @@ class RetainOrchestrator:
 _ORCHESTRATORS: dict[str, RetainOrchestrator] = {}
 
 
-def get_retain_orchestrator(brain_dir: str | Path) -> RetainOrchestrator:
-    """Return a cached RetainOrchestrator keyed by brain_dir.
-
-    Use for batch scenarios (session_close, graduation sweeps) where we want
-    atomic multi-event flush with crash-recovery. For single-event writes,
-    use :func:`emit` directly -- it has INSERT OR IGNORE dedup built in.
-    """
-    key = str(brain_dir)
-    orch = _ORCHESTRATORS.get(key)
-    if orch is None:
-        orch = RetainOrchestrator(brain_dir)
-        _ORCHESTRATORS[key] = orch
-    return orch
-
-
 def flush_retain(brain_dir: str | Path) -> dict:
     """Flush any queued events for brain_dir. Safe to call when queue is empty."""
     orch = _ORCHESTRATORS.get(str(brain_dir))

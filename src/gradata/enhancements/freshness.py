@@ -97,10 +97,6 @@ class FreshnessInfo:
     trend: Trend = Trend.NEW
 
     @property
-    def is_stale(self) -> bool:
-        return self.trend == Trend.STALE
-
-    @property
     def staleness_penalty(self) -> float:
         """Retrieval ranking penalty for stale rules. 1.0 = no penalty."""
         if self.trend == Trend.STALE:
