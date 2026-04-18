@@ -288,7 +288,15 @@ def extract_correction_context(
     confidence = round(confidence, 2)
 
     # Extract implied changes
-    implied_changes = _extract_implied_changes(text)
+    implied_changes: list[str] = []
+    for _, _t in re.findall(r"don'?t\s+(use|include|add|write|say|put)\s+(.+?)(?:[.,;]|$)", text, re.IGNORECASE):
+        implied_changes.append(f"remove: {_t.strip()}")
+    for _, _o, _n in re.findall(r"(change|replace|update)\s+(.+?)\s+to\s+(.+?)(?:[.,;]|$)", text, re.IGNORECASE):
+        implied_changes.append(f"replace: '{_o.strip()}' -> '{_n.strip()}'")
+    for _adj in re.findall(r"make\s+(?:it|this)\s+(.+?)(?:[.,;]|$)", text, re.IGNORECASE):
+        implied_changes.append(f"adjust: {_adj.strip()}")
+    for _q in re.findall(r"too\s+(long|short|verbose|brief|formal|casual|aggressive|soft)", text, re.IGNORECASE):
+        implied_changes.append(f"degree: too {_q.strip()}")
 
     # If we have the assistant's draft, check for high-similarity edits
     if assistant_draft and _is_edited_version(text, assistant_draft):
@@ -302,52 +310,6 @@ def extract_correction_context(
         signal_details=sorted_details,
         implied_changes=implied_changes,
     )
-
-
-def _extract_implied_changes(text: str) -> list[str]:
-    """Extract what the user wants changed from correction text.
-
-    Returns a list of human-readable change descriptions.
-    """
-    changes: list[str] = []
-
-    # "don't use X" -> "remove X"
-    dont_match = re.findall(
-        r"don'?t\s+(use|include|add|write|say|put)\s+(.+?)(?:[.,;]|$)",
-        text,
-        re.IGNORECASE,
-    )
-    for _action, target in dont_match:
-        changes.append(f"remove: {target.strip()}")
-
-    # "change X to Y" -> "replace X with Y"
-    change_match = re.findall(
-        r"(change|replace|update)\s+(.+?)\s+to\s+(.+?)(?:[.,;]|$)",
-        text,
-        re.IGNORECASE,
-    )
-    for _, old, new in change_match:
-        changes.append(f"replace: '{old.strip()}' -> '{new.strip()}'")
-
-    # "make it X" -> "adjust: X"
-    make_match = re.findall(
-        r"make\s+(?:it|this)\s+(.+?)(?:[.,;]|$)",
-        text,
-        re.IGNORECASE,
-    )
-    for adjustment in make_match:
-        changes.append(f"adjust: {adjustment.strip()}")
-
-    # "too X" -> "reduce X" / "increase opposite"
-    too_match = re.findall(
-        r"too\s+(long|short|verbose|brief|formal|casual|aggressive|soft)",
-        text,
-        re.IGNORECASE,
-    )
-    for quality in too_match:
-        changes.append(f"degree: too {quality.strip()}")
-
-    return changes
 
 
 def _is_edited_version(user_text: str, assistant_text: str) -> bool:
