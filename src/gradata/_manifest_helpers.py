@@ -5,8 +5,6 @@ Shared constants and utility functions for manifest generation.
 Split from _brain_manifest.py for file size compliance (<500 lines).
 """
 
-import re
-
 from . import _paths as _p
 from ._db import get_connection
 
@@ -20,26 +18,6 @@ def _session_window(conn, window: int = 20) -> tuple[int, int]:
         "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
     ).fetchone()[0] or 0
     return max_session, max(1, max_session - window + 1)
-
-
-def _read_version(ctx: "_p.BrainContext | None" = None) -> dict:
-    result = {"version": "unknown", "sessions_trained": 0, "maturity_phase": "INFANT"}
-    brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
-    vfile = brain_dir / "VERSION.md"
-    if not vfile.exists():
-        return result
-    text = vfile.read_text(encoding="utf-8", errors="replace")
-    m = re.search(r"v(\d+\.\d+\.\d+)", text)
-    if m:
-        result["version"] = f"v{m.group(1)}"
-    m = re.search(r"[Ss]ession\s+(\d+)", text)
-    if m:
-        result["sessions_trained"] = int(m.group(1))
-    for phase in ("STABLE", "MATURE", "ADOLESCENT", "INFANT"):
-        if phase in text.upper():
-            result["maturity_phase"] = phase
-            break
-    return result
 
 
 def _count_events(ctx: "_p.BrainContext | None" = None) -> dict:

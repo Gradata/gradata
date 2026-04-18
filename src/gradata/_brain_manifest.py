@@ -23,7 +23,6 @@ from ._db import get_connection
 from ._manifest_helpers import (
     _count_events,
     _get_tables,
-    _read_version,
     _sdk_capabilities,
     _session_window,
     _tag_taxonomy,
@@ -424,7 +423,21 @@ def generate_manifest(*, domain: str = "General", ctx: "_p.BrainContext | None" 
     Args:
         domain: Domain label for the manifest metadata (default "General").
     """
-    version_info = _read_version(ctx=ctx)
+    version_info: dict = {"version": "unknown", "sessions_trained": 0, "maturity_phase": "INFANT"}
+    _bd = ctx.brain_dir if ctx else _p.BRAIN_DIR
+    _vf = _bd / "VERSION.md"
+    if _vf.exists():
+        _vt = _vf.read_text(encoding="utf-8", errors="replace")
+        _m = re.search(r"v(\d+\.\d+\.\d+)", _vt)
+        if _m:
+            version_info["version"] = f"v{_m.group(1)}"
+        _m = re.search(r"[Ss]ession\s+(\d+)", _vt)
+        if _m:
+            version_info["sessions_trained"] = int(_m.group(1))
+        for _phase in ("STABLE", "MATURE", "ADOLESCENT", "INFANT"):
+            if _phase in _vt.upper():
+                version_info["maturity_phase"] = _phase
+                break
     events = _count_events(ctx=ctx)
 
     # Cross-check session count: prefer DB max if higher than VERSION.md
