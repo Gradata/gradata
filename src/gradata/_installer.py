@@ -94,62 +94,6 @@ def _install_brain(archive_path: Path, target_dir: Path, manifest: dict) -> bool
     return True
 
 
-def _run_bootstrap(target_dir: Path, manifest: dict) -> list[dict]:
-    """Run bootstrap steps from manifest."""
-    results = []
-    bootstrap = manifest.get("bootstrap", [])
-
-    # Allowlist: only permit safe commands (python, uv) — no arbitrary shell execution
-    import re as _re
-    import shlex as _shlex
-    _ALLOWED_CMD = _re.compile(r"^(python3?|uv|pip)\s+[\w\s./\-]+$")
-
-    for step in bootstrap:
-        name = step.get("step", "unknown")
-        command = step.get("command")
-        required = step.get("required", False)
-
-        if not command:
-            results.append({"step": name, "status": "skipped", "note": "no command"})
-            continue
-
-        # Security: reject commands not in allowlist
-        if not _ALLOWED_CMD.match(command):
-            results.append({
-                "step": name, "status": "blocked",
-                "note": f"Command not in allowlist: {command[:80]}",
-            })
-            continue
-
-        # Run from target directory — NO shell=True
-        try:
-            result = subprocess.run(
-                _shlex.split(command),
-                shell=False,
-                cwd=str(target_dir / "brain" if (target_dir / "brain").exists() else target_dir),
-                capture_output=True,
-                text=True,
-                timeout=60,
-                encoding="utf-8",
-                errors="replace",
-            )
-            if result.returncode == 0:
-                results.append({"step": name, "status": "ok"})
-            else:
-                status = "FAIL" if required else "warn"
-                results.append({
-                    "step": name,
-                    "status": status,
-                    "error": result.stderr[:200] if result.stderr else "non-zero exit",
-                })
-        except subprocess.TimeoutExpired:
-            results.append({"step": name, "status": "timeout"})
-        except Exception as e:
-            results.append({"step": name, "status": "error", "error": str(e)[:200]})
-
-    return results
-
-
 def list_installed() -> list[dict]:
     """List all installed brains."""
     brains = []
@@ -250,7 +194,38 @@ def install(archive_path: Path, target_dir: Path | None = None, dry_run: bool = 
 
     # Step 5: Bootstrap
     print("Running bootstrap...")
-    bootstrap_results = _run_bootstrap(target_dir, manifest)
+    bootstrap_results: list[dict] = []
+    import re as _re
+    import shlex as _shlex
+    _allowed = _re.compile(r"^(python3?|uv|pip)\s+[\w\s./\-]+$")
+    for _step in manifest.get("bootstrap", []):
+        _name = _step.get("step", "unknown")
+        _cmd = _step.get("command")
+        _req = _step.get("required", False)
+        if not _cmd:
+            bootstrap_results.append({"step": _name, "status": "skipped", "note": "no command"})
+            continue
+        if not _allowed.match(_cmd):
+            bootstrap_results.append({"step": _name, "status": "blocked",
+                                      "note": f"Command not in allowlist: {_cmd[:80]}"})
+            continue
+        try:
+            _r = subprocess.run(
+                _shlex.split(_cmd), shell=False,
+                cwd=str(target_dir / "brain" if (target_dir / "brain").exists() else target_dir),
+                capture_output=True, text=True, timeout=60,
+                encoding="utf-8", errors="replace",
+            )
+            if _r.returncode == 0:
+                bootstrap_results.append({"step": _name, "status": "ok"})
+            else:
+                bootstrap_results.append({"step": _name,
+                                          "status": "FAIL" if _req else "warn",
+                                          "error": _r.stderr[:200] if _r.stderr else "non-zero exit"})
+        except subprocess.TimeoutExpired:
+            bootstrap_results.append({"step": _name, "status": "timeout"})
+        except Exception as _e:
+            bootstrap_results.append({"step": _name, "status": "error", "error": str(_e)[:200]})
     for br in bootstrap_results:
         status_icon = "+" if br["status"] == "ok" else "-"
         print(f"  [{status_icon}] {br['step']}: {br['status']}")
