@@ -30,19 +30,6 @@ from pathlib import Path
 DEFAULT_BRAINS_DIR = Path.home() / ".gradata" / "brains"
 
 
-def _safe_extract(zf: zipfile.ZipFile, target_dir: Path) -> None:
-    """Extract zip with Zip Slip protection — rejects paths that escape target_dir."""
-    target_resolved = str(target_dir.resolve())
-    for member in zf.infolist():
-        member_path = str((target_dir / member.filename).resolve())
-        if not member_path.startswith(target_resolved):
-            raise ValueError(
-                f"Zip Slip detected: {member.filename} would extract outside {target_dir}"
-            )
-    # All paths validated — safe to extract
-    zf.extractall(target_dir)
-
-
 def list_installed() -> list[dict]:
     """List all installed brains."""
     brains = []
@@ -146,7 +133,13 @@ def install(archive_path: Path, target_dir: Path | None = None, dry_run: bool = 
     print("Installing...")
     target_dir.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(archive_path, "r") as _ib_zf:
-        _safe_extract(_ib_zf, target_dir)
+        _se_resolved = str(target_dir.resolve())
+        for _se_m in _ib_zf.infolist():
+            if not str((target_dir / _se_m.filename).resolve()).startswith(_se_resolved):
+                raise ValueError(
+                    f"Zip Slip detected: {_se_m.filename} would extract outside {target_dir}"
+                )
+        _ib_zf.extractall(target_dir)
     (target_dir / ".install-meta.json").write_text(
         json.dumps({
             "installed_at": datetime.now(UTC).isoformat(),
