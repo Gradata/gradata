@@ -35,27 +35,6 @@ def _try_daemon(name: str, body: str, timeout: float = 5.0) -> dict | None:
         return None
 
 
-def _fallback_inline(name: str, body: str) -> int:
-    """Invoke the hook module directly, same as 'python -m gradata.hooks.<name>'."""
-    try:
-        mod = importlib.import_module(f"gradata.hooks.{name}")
-    except ImportError:
-        sys.stderr.write(f"unknown hook: {name}\n")
-        return 127
-    if not hasattr(mod, "main"):
-        sys.stderr.write(f"hook {name} has no main()\n")
-        return 127
-    try:
-        data = json.loads(body) if body else {}
-    except json.JSONDecodeError as exc:
-        sys.stderr.write(f"invalid JSON stdin: {exc}\n")
-        return 2
-    result = mod.main(data)
-    if isinstance(result, dict):
-        sys.stdout.write(json.dumps(result))
-    return 0
-
-
 def main() -> int:
     if len(sys.argv) < 2:
         sys.stderr.write("usage: python -m gradata.hooks.client <hook_name>\n")
@@ -69,7 +48,23 @@ def main() -> int:
         sys.stderr.write(resp.get("stderr", ""))
         return int(resp.get("exit_code", 0))
 
-    return _fallback_inline(name, body)
+    try:
+        _fi_mod = importlib.import_module(f"gradata.hooks.{name}")
+    except ImportError:
+        sys.stderr.write(f"unknown hook: {name}\n")
+        return 127
+    if not hasattr(_fi_mod, "main"):
+        sys.stderr.write(f"hook {name} has no main()\n")
+        return 127
+    try:
+        _fi_data = json.loads(body) if body else {}
+    except json.JSONDecodeError as exc:
+        sys.stderr.write(f"invalid JSON stdin: {exc}\n")
+        return 2
+    _fi_result = _fi_mod.main(_fi_data)
+    if isinstance(_fi_result, dict):
+        sys.stdout.write(json.dumps(_fi_result))
+    return 0
 
 
 if __name__ == "__main__":
