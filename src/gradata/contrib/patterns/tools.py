@@ -39,29 +39,6 @@ class ToolSpec:
 
 
 @dataclass
-class PlannedStep:
-    """A single step in an execution plan."""
-
-    tool: str          # tool name
-    purpose: str       # why this step is needed
-    params: dict[str, Any] = field(default_factory=dict)
-    depends_on: list[int] = field(default_factory=list)  # step indices
-
-
-@dataclass
-class ExecutionPlan:
-    """A plan of tool calls before execution."""
-
-    steps: list[PlannedStep]
-    task: str
-    reasoning: str = ""
-
-    @property
-    def tool_names(self) -> list[str]:
-        return [s.tool for s in self.steps]
-
-
-@dataclass
 class ToolResult:
     """Result of executing a tool."""
 
@@ -160,27 +137,6 @@ class ToolRegistry:
         return ToolResult(
             tool=name, success=False, error=last_error, retries=max_retries,
         )
-
-    def plan(self, task: str) -> ExecutionPlan:
-        """Generate a naive execution plan for a task.
-
-        This is a simple keyword-matching planner. Production brains
-        override this with LLM-based planning.
-        """
-        task_lower = task.lower()
-        steps: list[PlannedStep] = []
-
-        for tool in self._tools.values():
-            # Check if any keyword in the tool description matches the task
-            desc_words = set(tool.description.lower().split())
-            task_words = set(task_lower.split())
-            if desc_words & task_words:
-                steps.append(PlannedStep(
-                    tool=tool.name,
-                    purpose=f"Use {tool.name}: {tool.description}",
-                ))
-
-        return ExecutionPlan(steps=steps, task=task)
 
     def stats(self) -> dict[str, Any]:
         """Registry statistics."""
