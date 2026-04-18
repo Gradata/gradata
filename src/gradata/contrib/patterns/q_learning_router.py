@@ -329,7 +329,11 @@ class QLearningRouter:
             reward=reward,
             td_error=abs(td_error),
         )
-        self._add_to_replay(experience)
+        if len(self._replay_buffer) < self.config.replay_buffer_size:
+            self._replay_buffer.append(experience)
+        else:
+            self._replay_buffer[self._replay_idx] = experience
+            self._replay_idx = (self._replay_idx + 1) % self.config.replay_buffer_size
 
         # Decay epsilon
         self.epsilon = max(
@@ -501,14 +505,6 @@ class QLearningRouter:
         if total <= 0:
             return 0.0
         return round(max_q / total, 4)
-
-    def _add_to_replay(self, experience: Experience) -> None:
-        """Add experience to circular replay buffer."""
-        if len(self._replay_buffer) < self.config.replay_buffer_size:
-            self._replay_buffer.append(experience)
-        else:
-            self._replay_buffer[self._replay_idx] = experience
-            self._replay_idx = (self._replay_idx + 1) % self.config.replay_buffer_size
 
     def _replay(self, batch_size: int = 8) -> None:
         """Replay experiences from buffer with prioritized sampling.

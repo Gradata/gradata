@@ -496,33 +496,18 @@ class RetainOrchestrator:
         self.db_path = self.brain_dir / "system.db"
         self._cursor_path = self.brain_dir / ".event_cursor.json"
         self._pending: list[dict] = []
-        self._last_committed_key: str | None = self._load_cursor()
-
-    # ── cursor helpers ──────────────────────────────────────────────────
+        self._last_committed_key: str | None = None
+        if self._cursor_path.is_file():
+            try:
+                _data = json.loads(self._cursor_path.read_text(encoding="utf-8"))
+                self._last_committed_key = _data.get("last_committed_key")
+            except Exception:
+                pass
 
     @staticmethod
     def _event_key(event: dict) -> str:
         """Stable dedup key for an event: ts + type + source."""
         return f"{event.get('ts', '')}|{event.get('type', '')}|{event.get('source', '')}"
-
-    def _load_cursor(self) -> str | None:
-        if self._cursor_path.is_file():
-            try:
-                data = json.loads(self._cursor_path.read_text(encoding="utf-8"))
-                return data.get("last_committed_key")
-            except Exception:
-                pass
-        return None
-
-    def _save_cursor(self, key: str) -> None:
-        try:
-            self._cursor_path.write_text(
-                json.dumps({"last_committed_key": key}),
-                encoding="utf-8",
-            )
-            self._last_committed_key = key
-        except Exception as exc:
-            _log.warning("RetainOrchestrator: failed to save cursor: %s", exc)
 
     # ── public API ──────────────────────────────────────────────────────
 
@@ -628,7 +613,14 @@ class RetainOrchestrator:
 
             # Save cursor after successful JSONL write
             last_key = self._event_key(new_events[-1])
-            self._save_cursor(last_key)
+            try:
+                self._cursor_path.write_text(
+                    json.dumps({"last_committed_key": last_key}),
+                    encoding="utf-8",
+                )
+                self._last_committed_key = last_key
+            except Exception as exc:
+                _log.warning("RetainOrchestrator: failed to save cursor: %s", exc)
 
             result["phases"]["write"] = {"events_written": result["written"]}
 
