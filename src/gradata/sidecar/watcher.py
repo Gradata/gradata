@@ -107,26 +107,6 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
 
 
-def _classify_severity(edit_distance: float) -> str:
-    """Map edit distance to severity label (aligned with diff_engine 5-label scale).
-
-    Args:
-        edit_distance: Normalised edit distance in ``[0.0, 1.0]``.
-
-    Returns:
-        One of ``"as-is"``, ``"minor"``, ``"moderate"``, ``"major"``, ``"discarded"``.
-    """
-    if edit_distance < 0.02:
-        return _SEVERITY_AS_IS
-    if edit_distance < 0.10:
-        return _SEVERITY_MINOR
-    if edit_distance < 0.40:
-        return _SEVERITY_MODERATE
-    if edit_distance < 0.80:
-        return _SEVERITY_MAJOR
-    return _SEVERITY_DISCARDED
-
-
 # ---------------------------------------------------------------------------
 # Core class
 # ---------------------------------------------------------------------------
@@ -276,7 +256,13 @@ class FileWatcher:
             ) if ast_severity_enabled() and language_supported(path=resolved) else None
         except Exception:
             _as_sev = None
-        severity = _as_sev or _classify_severity(edit_distance)
+        severity = _as_sev or (
+            _SEVERITY_AS_IS if edit_distance < 0.02
+            else _SEVERITY_MINOR if edit_distance < 0.10
+            else _SEVERITY_MODERATE if edit_distance < 0.40
+            else _SEVERITY_MAJOR if edit_distance < 0.80
+            else _SEVERITY_DISCARDED
+        )
         return FileChange(
             path=resolved,
             old_content=watched.original_content,
