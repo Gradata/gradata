@@ -125,23 +125,6 @@ class AgentProfile:
 
 
 @dataclass
-class AgentOutcome:
-    """Record of a single agent output evaluation."""
-
-    agent_type: str
-    outcome: str           # "approved" | "edited" | "rejected"
-    edits: str | None      # What was changed (if edited)
-    output_preview: str    # First 200 chars of agent output
-    session: int = 0
-    timestamp: str = ""
-    patterns_extracted: list[str] = field(default_factory=list)
-
-    def __post_init__(self) -> None:
-        if not self.timestamp:
-            self.timestamp = _now()
-
-
-@dataclass
 class DeterministicRule:
     """A graduated RULE compiled into an enforceable check function.
 
@@ -384,24 +367,16 @@ class AgentGraduationTracker:
             profile.consecutive_rejections += 1
 
         # Log outcome (append-only)
-        outcome_record = AgentOutcome(
-            agent_type=agent_type,
-            outcome=outcome,
-            edits=edits,
-            output_preview=output_preview[:200],
-            session=session,
-            patterns_extracted=patterns or [],
-        )
         outcomes_path = self._agent_dir(agent_type) / "outcomes.jsonl"
         with open(outcomes_path, "a", encoding="utf-8") as f:
             f.write(json.dumps({
-                "agent_type": outcome_record.agent_type,
-                "outcome": outcome_record.outcome,
-                "edits": outcome_record.edits,
-                "output_preview": outcome_record.output_preview,
-                "session": outcome_record.session,
-                "timestamp": outcome_record.timestamp,
-                "patterns_extracted": outcome_record.patterns_extracted,
+                "agent_type": agent_type,
+                "outcome": outcome,
+                "edits": edits,
+                "output_preview": output_preview[:200],
+                "session": session,
+                "timestamp": _now(),
+                "patterns_extracted": patterns or [],
             }) + "\n")
 
         # Extract lessons from edits (corrections feed agent graduation)
