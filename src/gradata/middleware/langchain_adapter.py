@@ -118,19 +118,13 @@ class LangChainCallback(_BaseCallbackHandler):  # type: ignore[misc,valid-type]
     # -- enforcement ------------------------------------------------------
 
     def on_llm_end(self, response: Any, **kwargs: Any) -> None:
-        text = _extract_llm_text(response)
+        _elt_parts: list[str] = []
+        for _elt_batch in _get(response, "generations") or []:
+            for _elt_gen in _elt_batch:
+                _elt_t = _get(_elt_gen, "text")
+                if _elt_t:
+                    _elt_parts.append(str(_elt_t))
+        text = "\n".join(_elt_parts)
         if not text:
             return
         check_output(self._source, text, strict=self._strict)
-
-
-def _extract_llm_text(response: Any) -> str:
-    """Best-effort text extraction from a LangChain ``LLMResult``."""
-    generations = _get(response, "generations") or []
-    parts: list[str] = []
-    for batch in generations:
-        for gen in batch:
-            text = _get(gen, "text")
-            if text:
-                parts.append(str(text))
-    return "\n".join(parts)
