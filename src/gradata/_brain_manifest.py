@@ -370,32 +370,6 @@ def _memory_composition(ctx: "_p.BrainContext | None" = None) -> dict:
     return result
 
 
-def _rag_status(ctx: "_p.BrainContext | None" = None) -> dict:
-    """RAG status. Chunks counted from SQLite brain_embeddings table."""
-    result = {
-        "active": False, "provider": "unknown", "model": "unknown",
-        "dimensions": 0, "chunks_indexed": 0,
-        "fts5_enabled": True,
-    }
-    try:
-        from ._config import EMBEDDING_DIMS, EMBEDDING_MODEL, EMBEDDING_PROVIDER, RAG_ACTIVE
-        result["active"] = RAG_ACTIVE
-        result["provider"] = EMBEDDING_PROVIDER
-        result["model"] = EMBEDDING_MODEL
-        result["dimensions"] = EMBEDDING_DIMS
-    except Exception:
-        pass
-    try:
-        db = ctx.db_path if ctx else _p.DB_PATH
-        conn = get_connection(db)
-        row = conn.execute("SELECT COUNT(*) FROM brain_embeddings").fetchone()
-        result["chunks_indexed"] = row[0] if row else 0
-        conn.close()
-    except Exception:
-        pass
-    return result
-
-
 def generate_manifest(*, domain: str = "General", ctx: "_p.BrainContext | None" = None) -> dict:
     """Generate the complete brain manifest.
 
@@ -445,7 +419,23 @@ def generate_manifest(*, domain: str = "General", ctx: "_p.BrainContext | None" 
 
     quality = _quality_metrics(ctx=ctx)
     memory = _memory_composition(ctx=ctx)
-    rag = _rag_status(ctx=ctx)
+    rag = {"active": False, "provider": "unknown", "model": "unknown",
+           "dimensions": 0, "chunks_indexed": 0, "fts5_enabled": True}
+    try:
+        from ._config import EMBEDDING_DIMS, EMBEDDING_MODEL, EMBEDDING_PROVIDER, RAG_ACTIVE
+        rag["active"] = RAG_ACTIVE
+        rag["provider"] = EMBEDDING_PROVIDER
+        rag["model"] = EMBEDDING_MODEL
+        rag["dimensions"] = EMBEDDING_DIMS
+    except Exception:
+        pass
+    try:
+        _rs_conn = get_connection(ctx.db_path if ctx else _p.DB_PATH)
+        _rs_row = _rs_conn.execute("SELECT COUNT(*) FROM brain_embeddings").fetchone()
+        rag["chunks_indexed"] = _rs_row[0] if _rs_row else 0
+        _rs_conn.close()
+    except Exception:
+        pass
     contract = {"safety_rules": 0, "global_rules": 0, "domain_rules": 0, "total": 0}
     _bc_wd = ctx.working_dir if ctx else _p.WORKING_DIR
     _bc_carl = _bc_wd / ".carl"
