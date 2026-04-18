@@ -275,23 +275,6 @@ def sign_and_store(
     return sig
 
 
-def _load_signature(ctx: BrainContext, category: str) -> str:
-    """Load a single signature for one category from system.db.
-
-    More efficient than load_signatures() when only one category is needed.
-
-    Returns:
-        Hex signature string, or empty string if not found.
-    """
-    _ensure_table(ctx)
-    with sqlite3.connect(str(ctx.db_path)) as conn:
-        row = conn.execute(
-            "SELECT signature FROM rule_signatures WHERE category = ?",
-            (category.upper(),),
-        ).fetchone()
-        return row[0] if row else ""
-
-
 def verify_from_db(
     ctx: BrainContext, rule_text: str, category: str, confidence: float
 ) -> bool:
@@ -307,5 +290,11 @@ def verify_from_db(
     """
     if not _get_secret_key():
         return True
-    stored_sig = _load_signature(ctx, category)
+    _ensure_table(ctx)
+    with sqlite3.connect(str(ctx.db_path)) as _ls_conn:
+        _ls_row = _ls_conn.execute(
+            "SELECT signature FROM rule_signatures WHERE category = ?",
+            (category.upper(),),
+        ).fetchone()
+        stored_sig = _ls_row[0] if _ls_row else ""
     return verify_rule(rule_text, category, confidence, stored_sig)
