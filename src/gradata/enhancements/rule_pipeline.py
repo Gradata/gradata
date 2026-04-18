@@ -38,15 +38,6 @@ class PipelineResult:
     patterns_lifted: int = 0
 
 
-def _normalize_pattern_description(text: str) -> str:
-    """Strip noise prefixes so dedup across pipeline runs catches duplicates."""
-    text = text.strip()
-    for prefix in ("User corrected: ", "[AUTO] "):
-        if text.startswith(prefix):
-            text = text[len(prefix):]
-    return text
-
-
 def _patterns_to_graduated_lessons(
     db_path: Path,
     current_session: int,
@@ -85,7 +76,10 @@ def _patterns_to_graduated_lessons(
         # Drop evaluator-generated noise -- not real user corrections
         if raw.startswith("[AUTO]"):
             continue
-        desc = _normalize_pattern_description(raw)
+        desc = raw.strip()
+        for _npd_pfx in ("User corrected: ", "[AUTO] "):
+            if desc.startswith(_npd_pfx):
+                desc = desc[len(_npd_pfx):]
         if not desc:
             continue
         category = (row.get("category") or "GENERAL").upper()

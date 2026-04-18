@@ -12,22 +12,14 @@ HOOK_META = {
 }
 
 
-def _infer_agent_type(data: dict) -> str:
-    tool_input = data.get("tool_input", {})
-    return (
-        tool_input.get("subagent_type", "")
-        or tool_input.get("type", "")
-        or "general"
-    )
-
-
 def main(data: dict) -> dict | None:
     try:
         brain_dir = resolve_brain_dir()
         if not brain_dir:
             return None
 
-        agent_type = _infer_agent_type(data)
+        _ti = data.get("tool_input", {})
+        agent_type = _ti.get("subagent_type", "") or _ti.get("type", "") or "general"
         output = data.get("tool_output", "") or ""
         if isinstance(output, dict):
             output = str(output)
