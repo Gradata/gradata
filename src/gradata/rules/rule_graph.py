@@ -181,11 +181,9 @@ def detect_relationship(rule_a: dict, rule_b: dict) -> RuleRelationType | None:
     if cat_a and cat_b and cat_a == cat_b:
         _hc_a, _hc_b = _normalize(desc_a), _normalize(desc_b)
         if any(
-            (p in _hc_a and n in _hc_b) or (n in _hc_a and p in _hc_b)
-            for p, n in _POLARITY_PAIRS
+            (p in _hc_a and n in _hc_b) or (n in _hc_a and p in _hc_b) for p, n in _POLARITY_PAIRS
         ) or any(
-            (a in _hc_a and o in _hc_b) or (o in _hc_a and a in _hc_b)
-            for a, o in _ACTION_OPPOSITES
+            (a in _hc_a and o in _hc_b) or (o in _hc_a and a in _hc_b) for a, o in _ACTION_OPPOSITES
         ):
             return RuleRelationType.CONTRADICTS
 

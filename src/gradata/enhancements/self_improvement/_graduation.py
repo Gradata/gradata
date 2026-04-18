@@ -31,7 +31,6 @@ from ._confidence import (
 _log = logging.getLogger(__name__)
 
 
-
 # ---------------------------------------------------------------------------
 # Graduation
 # ---------------------------------------------------------------------------
@@ -349,5 +348,3 @@ def graduate(
     active = [l for l in lessons if l.state in (LessonState.INSTINCT, LessonState.PATTERN)]
     graduated = [l for l in lessons if l.state not in (LessonState.INSTINCT, LessonState.PATTERN)]
     return active, graduated
-
-

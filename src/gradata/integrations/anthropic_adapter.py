@@ -58,9 +58,7 @@ def patch_anthropic(client: Any, brain_dir: str | Path = "./brain") -> Any:
                 "",
             )
             if isinstance(user_msg, list):
-                user_msg = " ".join(
-                    b.get("text", "") for b in user_msg if isinstance(b, dict)
-                )
+                user_msg = " ".join(b.get("text", "") for b in user_msg if isinstance(b, dict))
             rules = brain.apply_brain_rules("general", {"task": str(user_msg)[:100]})
 
             if rules:

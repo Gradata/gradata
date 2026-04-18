@@ -88,10 +88,6 @@ class CrewAIGuard:
         if not violations:
             return True, output
         if self._strict:
-            message = "; ".join(
-                f"{v.pattern_name}: {v.rule_description}" for v in violations
-            )
+            message = "; ".join(f"{v.pattern_name}: {v.rule_description}" for v in violations)
             return False, f"Gradata rule violation(s): {message}"
         return True, output
-
-
