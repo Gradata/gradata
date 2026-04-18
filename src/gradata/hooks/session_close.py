@@ -88,27 +88,6 @@ def _run_tree_consolidation(brain_dir: str) -> None:
         pass
 
 
-def _flush_retain_queue(brain_dir: str) -> None:
-    """Flush any events queued via the RetainOrchestrator batch path.
-
-    Most emits go through the synchronous (dedup-safe) ``emit()``; callers
-    that chose the batch path leave events in ``_pending`` until a flush
-    point. Session close is the last-chance flush so no queued events are
-    lost if the process is torn down immediately after.
-    """
-    try:
-        from .._events import flush_retain
-        result = flush_retain(brain_dir)
-        if result.get("written"):
-            import logging
-            logging.getLogger(__name__).info(
-                "RetainOrchestrator: flushed %d events at session close",
-                result["written"],
-            )
-    except Exception:
-        pass
-
-
 def main(data: dict) -> dict | None:
     brain_dir = resolve_brain_dir()
     if not brain_dir:
@@ -137,7 +116,17 @@ def main(data: dict) -> dict | None:
     except Exception:
         pass
     _run_tree_consolidation(brain_dir)
-    _flush_retain_queue(brain_dir)
+    try:
+        from .._events import flush_retain
+        _frq_result = flush_retain(brain_dir)
+        if _frq_result.get("written"):
+            import logging
+            logging.getLogger(__name__).info(
+                "RetainOrchestrator: flushed %d events at session close",
+                _frq_result["written"],
+            )
+    except Exception:
+        pass
     return None
 
 
