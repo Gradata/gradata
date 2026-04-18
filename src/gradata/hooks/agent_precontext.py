@@ -70,21 +70,6 @@ def _infer_agent_type(data: dict) -> str:
     return "general"
 
 
-def _lesson_to_rule_dict(lesson) -> dict:
-    """Adapter: Lesson -> rank_rules dict (carries alpha/beta for Thompson)."""
-    return {
-        "id": getattr(lesson, "description", ""),
-        "description": getattr(lesson, "description", ""),
-        "category": getattr(lesson, "category", ""),
-        "confidence": float(getattr(lesson, "confidence", 0.5)),
-        "fire_count": int(getattr(lesson, "fire_count", 0)),
-        "last_session": 0,
-        "alpha": float(getattr(lesson, "alpha", 1.0)),
-        "beta_param": float(getattr(lesson, "beta_param", 1.0)),
-        "_lesson": lesson,
-    }
-
-
 def _resolve_agent_brain_dir() -> str | None:
     """Resolve brain dir for the precontext hook.
 
@@ -138,7 +123,17 @@ def main(data: dict) -> dict | None:
         keywords = list(SCOPE_KEYWORDS.get(agent_type.lower(), []))
         # Scope inference feeds the unified ranker as task_type + context_keywords.
         # BM25 picks up on category/description/tags overlap against these terms.
-        rule_dicts = [_lesson_to_rule_dict(lesson) for lesson in filtered]
+        rule_dicts = [{
+            "id": getattr(_l, "description", ""),
+            "description": getattr(_l, "description", ""),
+            "category": getattr(_l, "category", ""),
+            "confidence": float(getattr(_l, "confidence", 0.5)),
+            "fire_count": int(getattr(_l, "fire_count", 0)),
+            "last_session": 0,
+            "alpha": float(getattr(_l, "alpha", 1.0)),
+            "beta_param": float(getattr(_l, "beta_param", 1.0)),
+            "_lesson": _l,
+        } for _l in filtered]
 
         session_seed = data.get("session_number") or data.get("session_id")
         if isinstance(session_seed, str):
