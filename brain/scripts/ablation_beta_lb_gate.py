@@ -12,8 +12,8 @@ Measures the effect of the Beta lower-bound promotion gate (PR #86,
    injected.
 
 This is a **pilot** (~5 tasks, 2 iterations, ~20 synthetic lessons) — NOT
-the full v4 replication. Oliver runs it manually when he wants a signal,
-then decides whether to default the gate on or to scale up.
+the full v4 replication. Run it manually when you want a signal,
+then decide whether to default the gate on or to scale up.
 
 Design mirrors:
 - ``brain/scripts/ab_test_constitutional.py`` — A/B scaffolding + judge loop

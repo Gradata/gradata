@@ -643,7 +643,7 @@ def _render_markdown(
     lines.append("## Methodology")
     lines.append("")
     lines.append(
-        "For each test prompt we (1) load graduated lessons from Oliver's brain, "
+        "For each test prompt we (1) load graduated lessons from the configured brain, "
         "(2) select up to 6 scope-matched rules via `apply_rules`, (3) generate two "
         "drafts with Ollama Gemma4:e4b where the only difference is how rules are "
         "formatted (`imperative` vs `constitutional`), and (4) ask a separate "
@@ -741,9 +741,9 @@ def _render_markdown(
         "is the load-bearing result; aggregate win-rate is a narrative number."
     )
     lines.append(
-        "- **Rule pool is Oliver-specific.** Results reflect Oliver's lessons.md, "
-        "not a generic rule base — constitutional framing may work differently "
-        "for rules with different category distributions."
+        "- **Rule pool is brain-specific.** Results reflect the configured "
+        "lessons.md, not a generic rule base — constitutional framing may work "
+        "differently for rules with different category distributions."
     )
     lines.append(
         "- **Judge rubric is thin.** We give a 3-line rubric for each dimension. "
