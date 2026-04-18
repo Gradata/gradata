@@ -122,25 +122,6 @@ def _read_file(path: str | Path) -> str | None:
         return None
 
 
-def _ast_severity_or_none(before: str, after: str, path: str) -> str | None:
-    """Optional AST shunt: engages only when the flag is set and the file
-    is a supported language. Returns ``None`` on any miss so the caller
-    falls back to the edit-distance classifier. Never raises.
-    """
-    try:
-        from ..enhancements.ast_severity import (
-            ast_severity_enabled,
-            classify_ast_severity,
-            language_supported,
-        )
-
-        if not (ast_severity_enabled() and language_supported(path=path)):
-            return None
-        return classify_ast_severity(before, after)
-    except Exception:
-        return None
-
-
 def _classify_severity(edit_distance: float) -> str:
     """Map edit distance to severity label (aligned with diff_engine 5-label scale).
 
@@ -298,9 +279,18 @@ class FileWatcher:
         else:
             _ned_ratio = difflib.SequenceMatcher(None, _ned_old, current_content).ratio()
         edit_distance = round(1.0 - _ned_ratio, 4)
-        severity = _ast_severity_or_none(
-            watched.original_content, current_content, resolved
-        ) or _classify_severity(edit_distance)
+        try:
+            from ..enhancements.ast_severity import (
+                ast_severity_enabled,
+                classify_ast_severity,
+                language_supported,
+            )
+            _as_sev = classify_ast_severity(
+                watched.original_content, current_content,
+            ) if ast_severity_enabled() and language_supported(path=resolved) else None
+        except Exception:
+            _as_sev = None
+        severity = _as_sev or _classify_severity(edit_distance)
         return FileChange(
             path=resolved,
             old_content=watched.original_content,
