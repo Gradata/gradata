@@ -44,6 +44,4 @@ def require_https(url: str, label: str = "URL") -> None:
     if parsed.scheme == "http":
         host = (parsed.hostname or "").lower()
         if host not in _LOCAL_HOSTS:
-            raise ValueError(
-                f"{label} must use HTTPS for non-local hosts, got: {url!r}"
-            )
+            raise ValueError(f"{label} must use HTTPS for non-local hosts, got: {url!r}")
