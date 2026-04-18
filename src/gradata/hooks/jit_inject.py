@@ -108,45 +108,6 @@ def _float_env(name: str, default: float) -> float:
         return default
 
 
-def _bm25_scores_for_draft(
-    candidates: list[tuple[Lesson, str, str]],
-    draft_text: str,
-) -> list[float] | None:
-    """Return BM25 scores (normalized to [0,1]) aligned to candidates, or None.
-
-    candidates is ``[(lesson, category, description), ...]``. Returns None when
-    bm25s isn't installed or scoring fails — callers fall back to Jaccard.
-    """
-    if not _BM25_AVAILABLE or bm25s is None or not candidates:
-        return None
-    corpus = [f"{cat} {desc}".strip() for _, cat, desc in candidates]
-    if not any(corpus):
-        return None
-    try:
-        retriever = bm25s.BM25()
-        corpus_tokens = bm25s.tokenize(corpus, stopwords="en", show_progress=False)
-        retriever.index(corpus_tokens, show_progress=False)
-        query_tokens = bm25s.tokenize(
-            [draft_text], stopwords="en", show_progress=False,
-        )
-        doc_ids, scores = retriever.retrieve(
-            query_tokens, k=len(corpus), show_progress=False,
-        )
-    except Exception as exc:  # pragma: no cover - defensive
-        _log.debug("bm25 scoring failed (%s) — falling back to Jaccard", exc)
-        return None
-
-    aligned = [0.0] * len(corpus)
-    row_ids = doc_ids[0]
-    row_scores = scores[0]
-    max_score = max((float(s) for s in row_scores), default=0.0)
-    if max_score <= 0:
-        return None
-    for j in range(len(row_ids)):
-        aligned[int(row_ids[j])] = float(row_scores[j]) / max_score
-    return aligned
-
-
 def rank_rules_for_draft(
     lessons: list[Lesson],
     draft_text: str,
@@ -185,10 +146,23 @@ def rank_rules_for_draft(
     if not candidates:
         return []
 
-    bm25_scores = _bm25_scores_for_draft(
-        [(lesson, cat, desc) for lesson, cat, desc, _ in candidates],
-        draft_text,
-    )
+    bm25_scores: list[float] | None = None
+    if _BM25_AVAILABLE and bm25s is not None and candidates:
+        _corpus = [f"{cat} {desc}".strip() for _, cat, desc, _ in candidates]
+        if any(_corpus):
+            try:
+                _retr = bm25s.BM25()
+                _retr.index(bm25s.tokenize(_corpus, stopwords="en", show_progress=False), show_progress=False)
+                _qt = bm25s.tokenize([draft_text], stopwords="en", show_progress=False)
+                _ids, _scores = _retr.retrieve(_qt, k=len(_corpus), show_progress=False)
+                _max = max((float(s) for s in _scores[0]), default=0.0)
+                if _max > 0:
+                    bm25_scores = [0.0] * len(_corpus)
+                    for _j in range(len(_ids[0])):
+                        bm25_scores[int(_ids[0][_j])] = float(_scores[0][_j]) / _max
+            except Exception as _exc:  # pragma: no cover - defensive
+                _log.debug("bm25 scoring failed (%s) — falling back to Jaccard", _exc)
+                bm25_scores = None
 
     scored: list[tuple[Lesson, float]] = []
     for idx, (lesson, category, description, conf) in enumerate(candidates):
