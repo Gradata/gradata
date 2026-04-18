@@ -289,25 +289,6 @@ def export_briefing(
 _lessons_cache: dict = {"path": None, "mtime": 0.0, "count": 0}
 
 
-def _count_active_lessons(brain_dir: Path) -> int:
-    """Count active lessons with mtime cache (skips re-parse if file unchanged)."""
-    lessons_path = brain_dir / "lessons.md"
-    if not lessons_path.is_file():
-        return 0
-    mtime = lessons_path.stat().st_mtime
-    if _lessons_cache["path"] == str(lessons_path) and _lessons_cache["mtime"] == mtime:
-        return _lessons_cache["count"]
-    try:
-        from .._core import _filter_lessons_by_state
-        from .self_improvement import parse_lessons
-        lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
-        count = len(_filter_lessons_by_state(lessons, min_state="INSTINCT"))
-        _lessons_cache.update({"path": str(lessons_path), "mtime": mtime, "count": count})
-        return count
-    except Exception:
-        return 0
-
-
 @dataclass
 class HealthReport:
     """Brain health assessment."""
@@ -337,7 +318,18 @@ def generate_health_report(db_path=None, ctx=None) -> HealthReport:
     try:
         brain_dir = Path(db_path).parent if db_path else (Path(ctx.brain_dir) if ctx else None)
         if brain_dir:
-            report.lessons_active = _count_active_lessons(brain_dir)
+            _cal_lp = brain_dir / "lessons.md"
+            if _cal_lp.is_file():
+                _cal_mt = _cal_lp.stat().st_mtime
+                if _lessons_cache["path"] == str(_cal_lp) and _lessons_cache["mtime"] == _cal_mt:
+                    report.lessons_active = _lessons_cache["count"]
+                else:
+                    from .._core import _filter_lessons_by_state
+                    from .self_improvement import parse_lessons
+                    _cal_ls = parse_lessons(_cal_lp.read_text(encoding="utf-8"))
+                    _cal_c = len(_filter_lessons_by_state(_cal_ls, min_state="INSTINCT"))
+                    _lessons_cache.update({"path": str(_cal_lp), "mtime": _cal_mt, "count": _cal_c})
+                    report.lessons_active = _cal_c
     except Exception:
         pass  # Non-critical — lessons count is informational
 
