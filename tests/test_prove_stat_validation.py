@@ -9,12 +9,12 @@ counts, non-normal, heteroskedastic, heavy-tied).
 Methodology: rather than block on access to multi-user real data, we
 validate statistically via Monte Carlo simulation where ground truth is
 known by construction (no-trend vs. real-trend). This is complementary
-to — and arguably stronger than — an observational multi-user study,
+to -- and arguably stronger than -- an observational multi-user study,
 because it measures the test's properties directly:
 
-- **Type I error rate** — rejection rate under H0 (no trend). Should ≈ α.
-- **Power** — rejection rate under H1 (real trend). Should be high.
-- **Robustness** — both properties hold across normal, heavy-tailed,
+- **Type I error rate** -- rejection rate under H0 (no trend). Should be ~= alpha.
+- **Power** -- rejection rate under H1 (real trend). Should be high.
+- **Robustness** -- both properties hold across normal, heavy-tailed,
   skewed, and tie-heavy distributions.
 
 An observational multi-user study remains valuable for external-validity
@@ -39,27 +39,27 @@ SHORT_N = 10       # power-growth comparison
 
 
 def _rejection_rate(series_factory, n_trials: int = N_TRIALS) -> float:
-    """Fraction of runs where Mann-Kendall rejects H0 at α=0.05."""
+    """Fraction of runs where Mann-Kendall rejects H0 at alpha=0.05."""
     reject = 0
     for i in range(n_trials):
-        rng = random.Random(1000 + i)  # noqa: S311 — deterministic test RNG
+        rng = random.Random(1000 + i)  # noqa: S311 -- deterministic test RNG
         _, p = trend_analysis(series_factory(rng))
         if p < ALPHA:
             reject += 1
     return reject / n_trials
 
 
-# ───────────────── Type I error (H0 true: no trend) ─────────────────
+# ---------------- Type I error (H0 true: no trend) ----------------
 
 
 def test_type_i_normal_noise():
-    """IID normal noise → rejection rate ≈ α."""
+    """IID normal noise -> rejection rate ~= alpha."""
     rate = _rejection_rate(lambda rng: [rng.gauss(0, 1) for _ in range(SERIES_LEN)])
-    assert 0.02 <= rate <= 0.09, f"Type I too far from α: {rate:.3f}"
+    assert 0.02 <= rate <= 0.09, f"Type I too far from alpha: {rate:.3f}"
 
 
 def test_type_i_integer_counts():
-    """Poisson-ish integer counts (realistic correction data) → ≈ α."""
+    """Poisson-ish integer counts (realistic correction data) -> ~= alpha."""
     weights = [8, 6, 5, 4, 3, 2, 2, 1, 1, 1, 1]
 
     def gen(rng):
@@ -70,7 +70,7 @@ def test_type_i_integer_counts():
 
 
 def test_type_i_heavy_tailed():
-    """Laplace(0, 1) noise (difference of i.i.d. Exp(1)) — Mann-Kendall is nonparametric."""
+    """Laplace(0, 1) noise (difference of i.i.d. Exp(1)) -- Mann-Kendall is nonparametric."""
     rate = _rejection_rate(
         lambda rng: [rng.expovariate(1) - rng.expovariate(1) for _ in range(SERIES_LEN)],
     )
@@ -78,18 +78,18 @@ def test_type_i_heavy_tailed():
 
 
 def test_type_i_skewed():
-    """Right-skewed (exponential) noise, no trend → ≈ α."""
+    """Right-skewed (exponential) noise, no trend -> ~= alpha."""
     rate = _rejection_rate(
         lambda rng: [rng.expovariate(1) for _ in range(SERIES_LEN)],
     )
     assert 0.02 <= rate <= 0.09, f"Type I skewed: {rate:.3f}"
 
 
-# ───────────────── Power (H1 true: genuine downtrend) ─────────────────
+# ---------------- Power (H1 true: genuine downtrend) ----------------
 
 
 def test_power_downward_trend():
-    """Real downtrend (−0.3/session + gaussian noise) → high detection."""
+    """Real downtrend (-0.3/session + gaussian noise) -> high detection."""
     rate = _rejection_rate(
         lambda rng: [max(0.0, 10 - 0.3 * i + rng.gauss(0, 1)) for i in range(SERIES_LEN)],
     )
@@ -99,7 +99,7 @@ def test_power_downward_trend():
 def test_power_grows_with_n():
     """Power should grow (not merely not-shrink) as sample size grows at fixed effect.
 
-    Weak effect (slope=-0.15, σ=1.5); expect a meaningful gap between n=10 and n=30.
+    Weak effect (slope=-0.15, sigma=1.5); expect a meaningful gap between n=10 and n=30.
     Bound of +0.10 is well above one standard error (~0.035 at 400 trials) so a
     seed-dependent single-trial flip cannot fail this.
     """
@@ -114,26 +114,26 @@ def test_power_grows_with_n():
     )
 
 
-# ───────────────── Robustness & edge cases ─────────────────
+# ---------------- Robustness & edge cases ----------------
 
 
 @pytest.mark.parametrize("n", [0, 1])
 def test_degenerate_lengths_safe(n):
-    """n<2 returns the no-signal default — never crashes."""
+    """n<2 returns the no-signal default -- never crashes."""
     slope, p = trend_analysis([1.0] * n)
     assert p == pytest.approx(1.0)
     assert slope == pytest.approx(0.0)
 
 
 def test_all_ties_returns_no_signal():
-    """Constant series: tie adjustment drives p→1.0."""
+    """Constant series: tie adjustment drives p -> 1.0."""
     slope, p = trend_analysis([3.0] * 20)
     assert slope == pytest.approx(0.0)
     assert p == pytest.approx(1.0)
 
 
 def test_heavy_ties_does_not_false_positive():
-    """Many-ties integer data (common in [0,3]) still respects α.
+    """Many-ties integer data (common in [0,3]) still respects alpha.
 
     Tight bound matching the other Type I tests: tie-correction in
     trend_analysis must actually work, not just approximately work.
@@ -159,7 +159,8 @@ def test_fifty_element_cap_is_applied():
 def test_brain_prove_interprets_trend_results_correctly(tmp_path):
     """End-to-end: brain_prove must read p_value (not slope) for the 'strong'
     gate and handle the 'converging' trend string. Regression guard for the
-    consumer of trend_analysis."""
+    consumer of trend_analysis. brain_efficiency is patched so the test is
+    decoupled from its implementation details."""
     from unittest.mock import patch
 
     from gradata.brain import Brain
@@ -179,7 +180,17 @@ def test_brain_prove_interprets_trend_results_correctly(tmp_path):
         "edit_distance_per_session": [],
         "edit_distance_trend": "insufficient_data",
     }
-    with patch.object(brain, "_get_convergence", return_value=conv):
+    efficiency = {
+        "effort_ratio": 0.3,
+        "corrections_initial": 10.0,
+        "corrections_recent": 2.3,
+        "total_corrections": sum(cps),
+        "total_sessions": 10,
+    }
+    with (
+        patch.object(brain, "_get_convergence", return_value=conv),
+        patch("gradata._core.brain_efficiency", return_value=efficiency),
+    ):
         result = brain.prove()
     assert result["proven"] is True
     assert result["confidence_level"] == "strong"
