@@ -116,7 +116,11 @@ class LoopDetector:
         Returns:
             LoopAction indicating whether to proceed, warn, or stop.
         """
-        call_hash = self._hash_call(tool_name, arguments)
+        _raw = json.dumps(
+            {"name": tool_name, "args": _normalize_args(arguments or {})},
+            sort_keys=True, separators=(",", ":"),
+        )
+        call_hash = hashlib.md5(_raw.encode()).hexdigest()
         self._window.append(call_hash)
 
         # Count occurrences of this hash in the window
@@ -182,21 +186,6 @@ class LoopDetector:
             "window_fill": len(self._window),
             "most_repeated_tool": most_repeated,
         }
-
-    @staticmethod
-    def _hash_call(tool_name: str, arguments: dict[str, Any] | None) -> str:
-        """Hash a tool call for deterministic comparison.
-
-        Normalizes by sorting argument keys and using consistent
-        JSON serialization. Adapted from deer-flow's MD5 approach.
-        """
-        normalized = {
-            "name": tool_name,
-            "args": _normalize_args(arguments or {}),
-        }
-        raw = json.dumps(normalized, sort_keys=True, separators=(",", ":"))
-        return hashlib.md5(raw.encode()).hexdigest()
-
 
 def _normalize_args(args: dict[str, Any]) -> dict[str, Any]:
     """Recursively normalize arguments for consistent hashing.
