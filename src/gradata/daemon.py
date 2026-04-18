@@ -610,7 +610,18 @@ class GradataDaemon:
         self._started_at = datetime.now(UTC).isoformat()
 
         # Session counter: pick up from DB
-        self._session_counter = self._init_session_counter()
+        _isc_db = self._brain.db_path
+        self._session_counter = 1
+        if _isc_db.exists():
+            try:
+                _isc_conn = sqlite3.connect(str(_isc_db))
+                _isc_row = _isc_conn.execute(
+                    "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
+                ).fetchone()
+                _isc_conn.close()
+                self._session_counter = (_isc_row[0] if _isc_row and _isc_row[0] is not None else 0) + 1
+            except Exception:
+                logger.debug("Could not read session counter from DB", exc_info=True)
 
         # Idle auto-shutdown
         self._idle_timer: threading.Timer | None = None
@@ -630,24 +641,6 @@ class GradataDaemon:
         self._sessions[session_id] = num
         self._session_counter += 1
         return num
-
-    # ── Session counter init ────────────────────────────────────────────
-
-    def _init_session_counter(self) -> int:
-        db_path = self._brain.db_path
-        if not db_path.exists():
-            return 1
-        try:
-            conn = sqlite3.connect(str(db_path))
-            row = conn.execute(
-                "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
-            ).fetchone()
-            conn.close()
-            max_session = row[0] if row and row[0] is not None else 0
-            return max_session + 1
-        except Exception:
-            logger.debug("Could not read session counter from DB", exc_info=True)
-            return 1
 
     # ── Idle timer ──────────────────────────────────────────────────────
 
