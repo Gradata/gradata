@@ -6,7 +6,7 @@ emits CORRECTION events.  No external dependencies; stdlib only.
 
 Usage::
 
-    from gradata.sidecar import FileWatcher
+    from gradata.sidecar.watcher import FileWatcher
 
     watcher = FileWatcher("/path/to/watch", brain_db="/path/to/brain")
     watcher.track("/path/to/watch/email.html", content, output_type="email")
@@ -17,9 +17,3 @@ Usage::
     # Blocking poll loop (Ctrl-C to stop)
     watcher.poll(interval=2.0)
 """
-
-from __future__ import annotations
-
-from gradata.sidecar.watcher import FileChange, FileWatcher, WatchedFile
-
-__all__ = ["FileChange", "FileWatcher", "WatchedFile"]
