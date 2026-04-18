@@ -40,20 +40,20 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from socketserver import ThreadingMixIn
 
-import gradata
-from gradata._scope import RuleScope
-from gradata._types import LessonState
-from gradata._workers import WorkerPool
-from gradata.detection.addition_pattern import AdditionTracker, classify_addition, is_addition
-from gradata.detection.correction_conflict import (
+from . import __version__ as _gradata_version
+from ._scope import RuleScope
+from ._types import LessonState
+from ._workers import WorkerPool
+from .detection.addition_pattern import AdditionTracker, classify_addition, is_addition
+from .detection.correction_conflict import (
     ConflictTracker,
     detect_conflict,
     extract_diff_tokens,
     tokenize,
 )
-from gradata.detection.mode_classifier import classify_mode
-from gradata.enhancements.self_improvement import parse_lessons
-from gradata.rules.rule_engine import apply_rules, format_rules_for_prompt
+from .detection.mode_classifier import classify_mode
+from .enhancements.self_improvement import parse_lessons
+from .rules.rule_engine import apply_rules, format_rules_for_prompt
 
 logger = logging.getLogger("gradata.daemon")
 
@@ -164,7 +164,7 @@ class _Handler(BaseHTTPRequestHandler):
         uptime = time.monotonic() - d._started_mono
         self._send_json({
             "status": "ok",
-            "sdk_version": gradata.__version__,
+            "sdk_version": _gradata_version,
             "brain_dir": str(d._brain.dir),
             "uptime_seconds": round(uptime, 2),
             "active_sessions": len(d._sessions),
@@ -598,7 +598,7 @@ class GradataDaemon:
         port: int = 0,
         pid_file: str | Path | None = None,
     ) -> None:
-        from gradata import Brain
+        from . import Brain
 
         self._brain_dir = Path(brain_dir).resolve()
         self._brain = Brain(self._brain_dir)
@@ -774,7 +774,7 @@ class GradataDaemon:
             except Exception as e:
                 logger.exception("telemetry: failed to load lessons: %s", e)
             payload = json.dumps({
-                "sdk_version": gradata.__version__,
+                "sdk_version": _gradata_version,
                 "rules_count": rules_count,
                 "lessons_count": lessons_count,
                 "os": platform.system().lower(),
@@ -833,7 +833,7 @@ def _write_pid_file(
         "port": port,
         "pid": os.getpid(),
         "brain_dir": str(brain_dir),
-        "sdk_version": gradata.__version__,
+        "sdk_version": _gradata_version,
         "started_at": started_at,
     }
     pid_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
