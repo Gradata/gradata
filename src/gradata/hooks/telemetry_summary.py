@@ -20,20 +20,6 @@ from pathlib import Path
 from ._base import resolve_brain_dir
 
 
-def _load(path: Path, tail: int) -> list[dict]:
-    if not path.is_file():
-        return []
-    with path.open("r", encoding="utf-8") as fh:
-        lines = fh.readlines()
-    rows: list[dict] = []
-    for line in lines[-tail:]:
-        try:
-            rows.append(json.loads(line))
-        except (json.JSONDecodeError, ValueError):
-            continue
-    return rows
-
-
 def _format_bytes(n: int) -> str:
     if n < 1024:
         return f"{n}B"
@@ -99,7 +85,14 @@ def main(argv: list[str] | None = None) -> int:
             print("(no telemetry file to truncate)")
         return 0
 
-    rows = _load(log_path, args.tail)
+    rows: list[dict] = []
+    if log_path.is_file():
+        with log_path.open("r", encoding="utf-8") as _ld_fh:
+            for _ld_line in _ld_fh.readlines()[-args.tail:]:
+                try:
+                    rows.append(json.loads(_ld_line))
+                except (json.JSONDecodeError, ValueError):
+                    continue
     print(summarize(rows))
     return 0
 
