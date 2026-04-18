@@ -494,5 +494,6 @@ def test_status_line_counts_rules_and_patterns(tmp_path, capsys):
         encoding="utf-8",
     )
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
-        status_main()
+        rc = status_main()
+    assert rc == 0
     assert capsys.readouterr().out.strip() == "s42 | 2R 1P"
