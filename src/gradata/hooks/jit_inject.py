@@ -181,27 +181,6 @@ def rank_rules_for_draft(
     return scored[:k]
 
 
-def _emit_event(brain_dir: str, payload: dict) -> None:
-    """Append a JIT_INJECTION event to events.jsonl. Silent on failure.
-
-    We write directly instead of going through Brain() because hooks run
-    as short-lived subprocesses and a full Brain init is ~100 ms of
-    overhead we'd pay on every user prompt.
-    """
-    try:
-        events_path = Path(brain_dir) / "events.jsonl"
-        line = json.dumps({
-            "type": "JIT_INJECTION",
-            "ts": time.time(),
-            **payload,
-        }, ensure_ascii=False)
-        with events_path.open("a", encoding="utf-8") as f:
-            f.write(line + "\n")
-    except OSError:
-        # Telemetry must never break the hook contract.
-        pass
-
-
 def main(data: dict) -> dict | None:
     if not _jit_enabled():
         return None
@@ -246,13 +225,16 @@ def main(data: dict) -> dict | None:
         min_similarity=min_sim,
     )
 
-    _emit_event(brain_dir, {
-        "draft_len": len(message),
-        "candidates": len(lessons),
-        "injected": len(ranked),
-        "k": k,
-        "min_similarity": min_sim,
-    })
+    try:
+        _ee_line = json.dumps({
+            "type": "JIT_INJECTION", "ts": time.time(),
+            "draft_len": len(message), "candidates": len(lessons),
+            "injected": len(ranked), "k": k, "min_similarity": min_sim,
+        }, ensure_ascii=False)
+        with (Path(brain_dir) / "events.jsonl").open("a", encoding="utf-8") as _ee_f:
+            _ee_f.write(_ee_line + "\n")
+    except OSError:
+        pass
 
     if not ranked:
         return None
