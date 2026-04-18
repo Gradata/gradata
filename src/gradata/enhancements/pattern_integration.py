@@ -563,7 +563,7 @@ def loop_threshold_adjustment() -> dict[str, int]:
     count = len(process_rules)
     if count >= 10:
         return {"warn": 2, "stop": 3}
-    elif count >= 5:
+    if count >= 5:
         return {"warn": 2, "stop": 4}
     return {"warn": 3, "stop": 5}
 

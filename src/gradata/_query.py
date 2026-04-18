@@ -222,9 +222,9 @@ def compute_recency_weight(embed_date: str) -> float:
 def classify_confidence(score: float) -> str:
     if score >= CONFIDENCE_HIGH:
         return "high"
-    elif score >= CONFIDENCE_MED:
+    if score >= CONFIDENCE_MED:
         return "medium"
-    elif score >= CONFIDENCE_LOW:
+    if score >= CONFIDENCE_LOW:
         return "low"
     return "below_threshold"
 

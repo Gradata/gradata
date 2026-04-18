@@ -205,7 +205,7 @@ def graduate(
                 except ValueError:
                     pass
                 continue
-            elif lesson.state in (LessonState.INSTINCT, LessonState.PATTERN):
+            if lesson.state in (LessonState.INSTINCT, LessonState.PATTERN):
                 lesson.state = LessonState.UNTESTABLE
                 lesson.kill_reason = f"moved_to_untestable: {lesson.sessions_since_fire} sessions without firing (limit: {kill_limit})"
                 continue

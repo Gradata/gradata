@@ -149,9 +149,9 @@ def _eval_single_condition(condition: str, context: dict) -> bool:
 
             if op == "=":
                 return str(actual) == expected
-            elif op == "!=":
+            if op == "!=":
                 return str(actual) != expected
-            elif op in (">=", "<="):
+            if op in (">=", "<="):
                 try:
                     actual_num = float(actual)
                     expected_num = float(expected)
@@ -159,8 +159,7 @@ def _eval_single_condition(condition: str, context: dict) -> bool:
                     return False
                 if op == ">=":
                     return actual_num >= expected_num
-                else:
-                    return actual_num <= expected_num
+                return actual_num <= expected_num
     return False
 
 

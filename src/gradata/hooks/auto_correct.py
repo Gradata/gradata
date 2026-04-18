@@ -57,8 +57,7 @@ def _get_brain():
     try:
         if brain_path.exists():
             return Brain(brain_dir)
-        else:
-            return Brain.init(brain_dir, domain="General")
+        return Brain.init(brain_dir, domain="General")
     except Exception:
         return None
 
@@ -174,12 +173,11 @@ def _build_progress(brain, event: dict) -> str:
 
     if confidence >= 0.90:
         return f"Learned. {total_rules} rules active."
-    elif confidence >= 0.60:
+    if confidence >= 0.60:
         steps_left = max(1, round((0.90 - confidence) / 0.08))
         return f"Learned. {steps_left} more to lock in. {total_rules} rules active."
-    else:
-        steps_left = max(1, round((0.60 - confidence) / 0.08))
-        return f"Noted. {steps_left} more corrections to activate."
+    steps_left = max(1, round((0.60 - confidence) / 0.08))
+    return f"Noted. {steps_left} more corrections to activate."
 
 
 def generate_hook_config(brain_dir: str | None = None) -> dict:

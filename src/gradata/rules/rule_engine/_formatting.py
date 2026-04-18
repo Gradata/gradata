@@ -405,9 +405,8 @@ def format_rules_styled(
         for rule in rules:
             lines.append(format_rule_constitutional(rule.lesson.category, rule.lesson.description))
         return "\n".join(lines)
-    else:
-        # Default imperative format
-        return "\n".join(rule.instruction for rule in rules)
+    # Default imperative format
+    return "\n".join(rule.instruction for rule in rules)
 
 
 # ---------------------------------------------------------------------------

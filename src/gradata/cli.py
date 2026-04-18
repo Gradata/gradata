@@ -649,7 +649,6 @@ def cmd_login(args):
             sys.exit(1)
 
         # status == "pending" — keep polling
-        pass
 
     print("  Timed out waiting for confirmation. Run `gradata login` again.")
     sys.exit(1)

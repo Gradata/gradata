@@ -409,7 +409,7 @@ class MemoryManager:
         all_memories = self._store.all()
         total = len(all_memories)
 
-        by_type: dict[str, int] = {t: 0 for t in sorted(VALID_TYPES)}
+        by_type: dict[str, int] = dict.fromkeys(sorted(VALID_TYPES), 0)
         for m in all_memories:
             by_type[m.memory_type] = by_type.get(m.memory_type, 0) + 1
 

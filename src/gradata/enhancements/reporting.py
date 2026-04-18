@@ -59,7 +59,7 @@ class BriefingRule:
     def priority(self) -> str:
         if self.state == "RULE":
             return "MUST"
-        elif self.state == "PATTERN":
+        if self.state == "PATTERN":
             return "SHOULD"
         return "MAY"
 

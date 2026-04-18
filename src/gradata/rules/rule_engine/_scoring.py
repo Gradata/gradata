@@ -219,12 +219,11 @@ def compute_scope_weight(
     if rule_tt and query_tt and rule_tt == query_tt:
         # Exact match bonus
         return min(1.0, base * 1.5)
-    elif not rule_tt:
+    if not rule_tt:
         # Wildcard: slightly penalise generic rules
         return base * 0.8
-    else:
-        # Partial or mismatch: use base score
-        return base
+    # Partial or mismatch: use base score
+    return base
 
 
 # ---------------------------------------------------------------------------

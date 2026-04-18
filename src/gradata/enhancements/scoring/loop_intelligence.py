@@ -257,20 +257,19 @@ def log_outcome(
             "logged": f"outcome:{outcome} | {prospect} | {prep_type} | {days}d",
             "linked_to_prep": True,
         }
-    else:
-        cursor = conn.execute(
-            """INSERT INTO prep_outcomes
+    cursor = conn.execute(
+        """INSERT INTO prep_outcomes
                (date, prospect, prep_type, prep_level, outcome, days_to_outcome, claude_assisted, timestamp)
                VALUES (?, ?, ?, 0, ?, ?, 1, ?)""",
-            (today, prospect, prep_type, outcome, days, datetime.now(UTC).isoformat()),
-        )
-        conn.commit()
-        conn.close()
-        return {
-            "id": cursor.lastrowid,
-            "logged": f"outcome:{outcome} | {prospect} | {prep_type} | {days}d",
-            "linked_to_prep": False,
-        }
+        (today, prospect, prep_type, outcome, days, datetime.now(UTC).isoformat()),
+    )
+    conn.commit()
+    conn.close()
+    return {
+        "id": cursor.lastrowid,
+        "logged": f"outcome:{outcome} | {prospect} | {prep_type} | {days}d",
+        "linked_to_prep": False,
+    }
 
 
 def detect_manual(

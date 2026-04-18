@@ -1033,12 +1033,11 @@ def get_maturity_phase(total_sessions: int) -> str:
     """
     if total_sessions < 50:
         return "INFANT"
-    elif total_sessions < 100:
+    if total_sessions < 100:
         return "ADOLESCENT"
-    elif total_sessions < 200:
+    if total_sessions < 200:
         return "MATURE"
-    else:
-        return "STABLE"
+    return "STABLE"
 
 
 # ---------------------------------------------------------------------------

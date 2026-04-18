@@ -244,21 +244,20 @@ class ClusterManager:
                 similarity=best_similarity,
                 cluster_size=state.counts[best_cluster],
             )
-        else:
-            # Create new cluster
-            cluster_id = f"cluster_{state.next_cluster_idx}"
-            state.next_cluster_idx += 1
-            state.centroids[cluster_id] = list(vector)
-            state.counts[cluster_id] = 1
-            state.last_timestamps[cluster_id] = timestamp
-            state.assignments[item_id] = cluster_id
-            return ClusterAssignment(
-                item_id=item_id,
-                cluster_id=cluster_id,
-                is_new=True,
-                similarity=0.0,
-                cluster_size=1,
-            )
+        # Create new cluster
+        cluster_id = f"cluster_{state.next_cluster_idx}"
+        state.next_cluster_idx += 1
+        state.centroids[cluster_id] = list(vector)
+        state.counts[cluster_id] = 1
+        state.last_timestamps[cluster_id] = timestamp
+        state.assignments[item_id] = cluster_id
+        return ClusterAssignment(
+            item_id=item_id,
+            cluster_id=cluster_id,
+            is_new=True,
+            similarity=0.0,
+            cluster_size=1,
+        )
 
     def get_cluster_items(
         self,

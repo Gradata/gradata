@@ -260,7 +260,7 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
             results = brain.search(query, top_k=top_k)
             return {"content": [{"type": "text", "text": json.dumps(results, ensure_ascii=False)}]}
 
-        elif tool_name == "brain_correct":
+        if tool_name == "brain_correct":
             draft = arguments.get("draft", "")
             final = arguments.get("final", "")
             result = brain.correct(draft, final)
@@ -277,7 +277,7 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
             }
             return {"content": [{"type": "text", "text": json.dumps(summary, ensure_ascii=False)}]}
 
-        elif tool_name == "brain_log_output":
+        if tool_name == "brain_log_output":
             text = arguments.get("text", "")
             output_type = arguments.get("output_type", "general")
             self_score = arguments.get("self_score")
@@ -289,22 +289,22 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
             }
             return {"content": [{"type": "text", "text": json.dumps(safe, ensure_ascii=False)}]}
 
-        elif tool_name == "brain_manifest":
+        if tool_name == "brain_manifest":
             manifest = brain.manifest()
             return {"content": [{"type": "text", "text": json.dumps(manifest, ensure_ascii=False)}]}
 
-        elif tool_name == "brain_health":
+        if tool_name == "brain_health":
             health = brain.health()
             return {"content": [{"type": "text", "text": json.dumps(health, ensure_ascii=False)}]}
 
-        elif tool_name == "brain_pipeline_stats":
+        if tool_name == "brain_pipeline_stats":
             if hasattr(brain, "_learning_pipeline") and brain._learning_pipeline:
                 stats = brain._learning_pipeline.stats()
             else:
                 stats = {"error": "Learning pipeline not initialized"}
             return {"content": [{"type": "text", "text": json.dumps(stats, ensure_ascii=False)}]}
 
-        elif tool_name == "brain_context_bracket":
+        if tool_name == "brain_context_bracket":
             if hasattr(brain, "_learning_pipeline") and brain._learning_pipeline:
                 tracker = brain._learning_pipeline._context_tracker
                 if tracker:
@@ -322,7 +322,7 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
                 "content": [{"type": "text", "text": json.dumps(bracket_info, ensure_ascii=False)}]
             }
 
-        elif tool_name == "brain_route_suggest":
+        if tool_name == "brain_route_suggest":
             task = arguments.get("task", "")
             if hasattr(brain, "_learning_pipeline") and brain._learning_pipeline:
                 router = brain._learning_pipeline._router
@@ -342,7 +342,7 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
                 "content": [{"type": "text", "text": json.dumps(route_info, ensure_ascii=False)}]
             }
 
-        elif tool_name == "brain_capabilities":
+        if tool_name == "brain_capabilities":
             try:
                 from ._brain_manifest import _sdk_capabilities
 
@@ -351,7 +351,7 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
                 caps = {"error": "Manifest module not available"}
             return {"content": [{"type": "text", "text": json.dumps(caps, ensure_ascii=False)}]}
 
-        elif tool_name == "brain_benchmark":
+        if tool_name == "brain_benchmark":
             try:
                 import dataclasses
 

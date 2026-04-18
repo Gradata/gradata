@@ -79,10 +79,9 @@ def compute_trend(
 
     if ratio > 1.5:
         return Trend.STRENGTHENING
-    elif ratio < 0.5:
+    if ratio < 0.5:
         return Trend.WEAKENING
-    else:
-        return Trend.STABLE
+    return Trend.STABLE
 
 
 @dataclass
@@ -98,9 +97,9 @@ class FreshnessInfo:
         """Retrieval ranking penalty for stale rules. 1.0 = no penalty."""
         if self.trend == Trend.STALE:
             return 0.5  # 50% penalty
-        elif self.trend == Trend.WEAKENING:
+        if self.trend == Trend.WEAKENING:
             return 0.8  # 20% penalty
-        elif self.trend == Trend.STRENGTHENING:
+        if self.trend == Trend.STRENGTHENING:
             return 1.2  # 20% boost
         return 1.0
 

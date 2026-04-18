@@ -173,12 +173,11 @@ def get_bracket(remaining_ratio: float) -> ContextBracket:
 
     if remaining_ratio >= 0.70:
         return ContextBracket.FRESH
-    elif remaining_ratio >= 0.40:
+    if remaining_ratio >= 0.40:
         return ContextBracket.MODERATE
-    elif remaining_ratio >= 0.20:
+    if remaining_ratio >= 0.20:
         return ContextBracket.DEEP
-    else:
-        return ContextBracket.CRITICAL
+    return ContextBracket.CRITICAL
 
 
 def get_bracket_guidance(bracket: ContextBracket) -> BracketConfig:
