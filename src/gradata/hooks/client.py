@@ -19,22 +19,6 @@ import urllib.request
 from .daemon import HOST, PORT
 
 
-def _try_daemon(name: str, body: str, timeout: float = 5.0) -> dict | None:
-    """POST the hook payload to the running daemon. Returns None on failure."""
-    data = body.encode("utf-8")
-    req = urllib.request.Request(
-        f"http://{HOST}:{PORT}/hook/{name}",
-        data=data,
-        method="POST",
-        headers={"Content-Type": "application/json"},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, urllib.error.HTTPError, OSError, json.JSONDecodeError):
-        return None
-
-
 def main() -> int:
     if len(sys.argv) < 2:
         sys.stderr.write("usage: python -m gradata.hooks.client <hook_name>\n")
@@ -42,7 +26,18 @@ def main() -> int:
     name = sys.argv[1]
     body = sys.stdin.read() if not sys.stdin.isatty() else ""
 
-    resp = _try_daemon(name, body)
+    _td_req = urllib.request.Request(
+        f"http://{HOST}:{PORT}/hook/{name}",
+        data=body.encode("utf-8"),
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    resp: dict | None = None
+    try:
+        with urllib.request.urlopen(_td_req, timeout=5.0) as _td_r:
+            resp = json.loads(_td_r.read().decode("utf-8"))
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError, json.JSONDecodeError):
+        resp = None
     if resp is not None:
         sys.stdout.write(resp.get("stdout", ""))
         sys.stderr.write(resp.get("stderr", ""))
