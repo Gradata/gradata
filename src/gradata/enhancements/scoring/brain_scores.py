@@ -101,9 +101,7 @@ def _fallback_brain_scores(
         conn.row_factory = sqlite3.Row
 
         # Determine session window
-        max_row = conn.execute(
-            "SELECT COALESCE(MAX(session), 0) FROM events"
-        ).fetchone()
+        max_row = conn.execute("SELECT COALESCE(MAX(session), 0) FROM events").fetchone()
         max_session: int = int(max_row[0]) if max_row else 0
         min_session = max(0, max_session - (last_n_sessions - 1))
 
@@ -122,9 +120,7 @@ def _fallback_brain_scores(
         gate_sessions = int(gate_sessions_row[0]) if gate_sessions_row else 0
 
         if total_sessions > 0:
-            system_health = round(
-                min(100.0, (gate_sessions / total_sessions) * 100.0), 1
-            )
+            system_health = round(min(100.0, (gate_sessions / total_sessions) * 100.0), 1)
 
         # --- AI quality: inverse of correction density ---
         totals = conn.execute(
@@ -229,12 +225,11 @@ def compute_brain_scores(
     # Primary path: delegate to the authoritative implementation
     try:
         from ... import _events as _events
+
         _fn = getattr(_events, "compute_brain_scores", None)
         if _fn is None:
             raise AttributeError("compute_brain_scores not available")
-        raw: dict = _fn(
-            last_n_prospect_sessions=last_n_prospect_sessions
-        )
+        raw: dict = _fn(last_n_prospect_sessions=last_n_prospect_sessions)
         return _reshape(raw)
 
     except Exception:
