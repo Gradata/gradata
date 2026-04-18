@@ -103,18 +103,21 @@ def rank_rules(
 
     scored: list[tuple[float, dict[str, Any]]] = []
     for idx, rule in enumerate(rules):
-        score = _score_rule(
-            rule,
-            idx=idx,
-            current_session=current_session,
-            task_type=task_type,
-            context_keywords=context_keywords,
-            effectiveness=effectiveness,
-            bm25_scores=bm25_scores,
-            wiki_boost=wiki_boost,
-            thompson=thompson_on,
-            rng=rng,
-        )
+        _scope = _scope_match(rule.get("category", ""), task_type)
+        if thompson_on:
+            _a = max(float(rule.get("alpha", 1.0) or 1.0), 1e-3)
+            _b = max(float(rule.get("beta_param", 1.0) or 1.0), 1e-3)
+            _confidence = rng.betavariate(_a, _b)
+        else:
+            _confidence = float(rule.get("confidence", 0.5))
+        _ctx = _context_component(rule, idx=idx, keywords=context_keywords, bm25_scores=bm25_scores)
+        if wiki_boost:
+            _rid = rule.get("id") or rule.get("description", "")
+            _ctx = min(1.0, _ctx + wiki_boost.get(_rid, 0.0))
+        _rec = _recency_score(rule.get("last_session", 0), current_session)
+        _fire = _fire_count_score(rule.get("fire_count", 0))
+        _base = 0.30 * _scope + 0.25 * _confidence + 0.20 * _ctx + 0.15 * _rec + 0.10 * _fire
+        score = max(0.0, min(1.0, _base + _effectiveness_bonus(rule, effectiveness)))
         scored.append((score, rule))
 
     scored.sort(key=lambda pair: pair[0], reverse=True)
@@ -124,47 +127,6 @@ def rank_rules(
 # ------------------------------------------------------------------
 # Internal scoring helpers
 # ------------------------------------------------------------------
-
-
-def _score_rule(
-    rule: dict[str, Any],
-    *,
-    idx: int,
-    current_session: int,
-    task_type: str | None,
-    context_keywords: list[str] | None,
-    effectiveness: dict[str, dict[str, Any]] | None,
-    bm25_scores: list[float] | None,
-    wiki_boost: dict[str, float] | None,
-    thompson: bool,
-    rng: random.Random,
-) -> float:
-    scope = _scope_match(rule.get("category", ""), task_type)
-
-    if thompson:
-        alpha = float(rule.get("alpha", 1.0) or 1.0)
-        beta_param = float(rule.get("beta_param", 1.0) or 1.0)
-        # Guard against non-positive params (Beta is undefined).
-        alpha = max(alpha, 1e-3)
-        beta_param = max(beta_param, 1e-3)
-        confidence = rng.betavariate(alpha, beta_param)
-    else:
-        confidence = float(rule.get("confidence", 0.5))
-
-    context = _context_component(
-        rule, idx=idx, keywords=context_keywords, bm25_scores=bm25_scores,
-    )
-    if wiki_boost:
-        rule_id = rule.get("id") or rule.get("description", "")
-        boost = wiki_boost.get(rule_id, 0.0)
-        context = min(1.0, context + boost)
-
-    recency = _recency_score(rule.get("last_session", 0), current_session)
-    fire = _fire_count_score(rule.get("fire_count", 0))
-
-    base = 0.30 * scope + 0.25 * confidence + 0.20 * context + 0.15 * recency + 0.10 * fire
-    bonus = _effectiveness_bonus(rule, effectiveness)
-    return max(0.0, min(1.0, base + bonus))
 
 
 def _scope_match(category: str, task_type: str | None) -> float:
