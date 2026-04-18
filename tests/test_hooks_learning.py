@@ -1,11 +1,11 @@
 """Tests for core learning loop hooks."""
-import json
 import os
 from pathlib import Path
 from unittest.mock import patch
 
 from gradata.enhancements.self_improvement import parse_lessons
-from gradata.hooks.inject_brain_rules import main as inject_main, _score
+from gradata.hooks.inject_brain_rules import _score
+from gradata.hooks.inject_brain_rules import main as inject_main
 from gradata.hooks.session_close import main as close_main
 
 
@@ -379,3 +379,120 @@ def test_session_close_no_brain(tmp_path):
         with patch("gradata.hooks._base.Path.home", return_value=fake_home):
             result = close_main({})
     assert result is None
+
+
+# --- session_boot ---------------------------------------------------------
+
+def _seed_events_db(db_path: Path) -> None:
+    import sqlite3
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "CREATE TABLE events (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "ts TEXT NOT NULL, session INTEGER, type TEXT NOT NULL, "
+            "source TEXT, data_json TEXT, tags_json TEXT, "
+            "valid_from TEXT, valid_until TEXT, scope TEXT DEFAULT 'local')"
+        )
+
+
+def test_session_boot_hook_meta_only_fires_on_startup():
+    """Regression guard: matcher='startup' prevents compact/resume double-bumps."""
+    from gradata.hooks.session_boot import HOOK_META
+    assert HOOK_META["event"] == "SessionStart"
+    assert HOOK_META["matcher"] == "startup"
+
+
+def test_session_boot_next_session_fresh_db(tmp_path):
+    from gradata.hooks.session_boot import _next_session
+    db = tmp_path / "system.db"
+    _seed_events_db(db)
+    assert _next_session(db) == 1
+
+
+def test_session_boot_next_session_increments_high_water(tmp_path):
+    import sqlite3
+
+    from gradata.hooks.session_boot import _next_session
+    db = tmp_path / "system.db"
+    _seed_events_db(db)
+    with sqlite3.connect(db) as conn:
+        for s in (3, 7, 5):
+            conn.execute(
+                "INSERT INTO events (ts, session, type, source) "
+                "VALUES ('2026-01-01T00:00:00Z', ?, 'X', 'test')", (s,),
+            )
+    assert _next_session(db) == 8
+
+
+def test_session_boot_next_session_missing_db_returns_one(tmp_path):
+    from gradata.hooks.session_boot import _next_session
+    # Nonexistent DB path — connect() creates it empty, table missing → fallback.
+    assert _next_session(tmp_path / "missing.db") == 1
+
+
+def test_session_boot_main_emits_session_boot_event(tmp_path):
+    from gradata.hooks.session_boot import main as boot_main
+    db = tmp_path / "system.db"
+    _seed_events_db(db)
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+        boot_main({})
+    import sqlite3
+    with sqlite3.connect(db) as conn:
+        row = conn.execute(
+            "SELECT session, type, source FROM events WHERE type='SESSION_BOOT'"
+        ).fetchone()
+    assert row is not None
+    assert row[0] == 1                      # first session
+    assert row[2] == "hook:session_boot"
+
+
+def test_session_boot_main_no_db_noop(tmp_path):
+    """Missing system.db means brain isn't initialized — hook must no-op."""
+    from gradata.hooks.session_boot import main as boot_main
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+        result = boot_main({})
+    assert result is None
+    assert not (tmp_path / ".session_boot.lock").is_file()
+
+
+# --- status_line ----------------------------------------------------------
+
+def test_status_line_no_brain_fallback(tmp_path, capsys):
+    from gradata.hooks.status_line import main as status_main
+    fake_home = tmp_path / "fakehome"
+    fake_home.mkdir()
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": "", "BRAIN_DIR": ""}), \
+         patch("gradata.hooks._base.Path.home", return_value=fake_home):
+        rc = status_main()
+    assert rc == 0
+    assert capsys.readouterr().out.strip() == "gradata: no brain"
+
+
+def test_status_line_zero_when_brain_empty(tmp_path, capsys):
+    from gradata.hooks.status_line import main as status_main
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+        rc = status_main()
+    assert rc == 0
+    assert capsys.readouterr().out.strip() == "s0 | 0R 0P"
+
+
+def test_status_line_counts_rules_and_patterns(tmp_path, capsys):
+    import sqlite3
+
+    from gradata.hooks.status_line import main as status_main
+    db = tmp_path / "system.db"
+    _seed_events_db(db)
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "INSERT INTO events (ts, session, type, source) "
+            "VALUES ('2026-01-01T00:00:00Z', 42, 'X', 'test')"
+        )
+    (tmp_path / "lessons.md").write_text(
+        "[2026-04-01] [RULE:0.92] A: one\n"
+        "[2026-04-01] [RULE:0.88] B: two\n"
+        "[2026-04-01] [PATTERN:0.65] C: three\n"
+        "[2026-04-01] [INSTINCT:0.35] D: four\n",
+        encoding="utf-8",
+    )
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+        status_main()
+    assert capsys.readouterr().out.strip() == "s42 | 2R 1P"
