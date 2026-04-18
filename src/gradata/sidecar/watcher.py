@@ -122,32 +122,6 @@ def _read_file(path: str | Path) -> str | None:
         return None
 
 
-def _normalise_edit_distance(old: str, new: str) -> float:
-    """Compute a normalised edit distance in ``[0.0, 1.0]``.
-
-    Uses ``difflib.SequenceMatcher`` which is O(n*m) but acceptable for
-    files up to ~100 KB.  For very large files we fall back to a cheaper
-    line-level ratio.
-
-    Args:
-        old: Original (AI-generated) content.
-        new: Edited (user-saved) content.
-
-    Returns:
-        ``0.0`` if identical, approaching ``1.0`` as content diverges.
-    """
-    # SequenceMatcher ratio is similarity [0, 1].  We invert it.
-    threshold_chars = 50_000
-    if len(old) + len(new) > threshold_chars:
-        # Line-level diff for large files — faster, still meaningful
-        old_lines = old.splitlines()
-        new_lines = new.splitlines()
-        ratio = difflib.SequenceMatcher(None, old_lines, new_lines).ratio()
-    else:
-        ratio = difflib.SequenceMatcher(None, old, new).ratio()
-    return round(1.0 - ratio, 4)
-
-
 def _ast_severity_or_none(before: str, after: str, path: str) -> str | None:
     """Optional AST shunt: engages only when the flag is set and the file
     is a supported language. Returns ``None`` on any miss so the caller
@@ -346,9 +320,12 @@ class FileWatcher:
             )
             return None
 
-        edit_distance = _normalise_edit_distance(
-            watched.original_content, current_content
-        )
+        _ned_old = watched.original_content
+        if len(_ned_old) + len(current_content) > 50_000:
+            _ned_ratio = difflib.SequenceMatcher(None, _ned_old.splitlines(), current_content.splitlines()).ratio()
+        else:
+            _ned_ratio = difflib.SequenceMatcher(None, _ned_old, current_content).ratio()
+        edit_distance = round(1.0 - _ned_ratio, 4)
         severity = _ast_severity_or_none(
             watched.original_content, current_content, resolved
         ) or _classify_severity(edit_distance)
