@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from gradata.enhancements.self_improvement import parse_lessons
 from gradata.hooks.inject_brain_rules import _score
 from gradata.hooks.inject_brain_rules import main as inject_main
@@ -401,32 +403,31 @@ def test_session_boot_hook_meta_only_fires_on_startup():
     assert HOOK_META["matcher"] == "startup"
 
 
-def test_session_boot_next_session_fresh_db(tmp_path):
-    from gradata.hooks.session_boot import _next_session
-    db = tmp_path / "system.db"
-    _seed_events_db(db)
-    assert _next_session(db) == 1
-
-
-def test_session_boot_next_session_increments_high_water(tmp_path):
+@pytest.mark.parametrize(
+    ("case", "seeded_sessions", "db_name", "expected"),
+    [
+        ("fresh_db",          (),          "system.db",  1),   # no rows → 0+1
+        ("high_water_skew",   (3, 7, 5),   "system.db",  8),   # MAX=7 → 7+1
+        ("missing_db",        None,        "missing.db", 1),   # table absent → fallback
+    ],
+)
+def test_session_boot_next_session_boundaries(tmp_path, case, seeded_sessions, db_name, expected):
+    """Covers the _next_session boundary cases: empty, high-water, and missing DB."""
     import sqlite3
 
     from gradata.hooks.session_boot import _next_session
-    db = tmp_path / "system.db"
-    _seed_events_db(db)
-    with sqlite3.connect(db) as conn:
-        for s in (3, 7, 5):
-            conn.execute(
-                "INSERT INTO events (ts, session, type, source) "
-                "VALUES ('2026-01-01T00:00:00Z', ?, 'X', 'test')", (s,),
-            )
-    assert _next_session(db) == 8
 
-
-def test_session_boot_next_session_missing_db_returns_one(tmp_path):
-    from gradata.hooks.session_boot import _next_session
-    # Nonexistent DB path — connect() creates it empty, table missing → fallback.
-    assert _next_session(tmp_path / "missing.db") == 1
+    db = tmp_path / db_name
+    if seeded_sessions is not None:
+        _seed_events_db(db)
+        if seeded_sessions:
+            with sqlite3.connect(db) as conn:
+                for s in seeded_sessions:
+                    conn.execute(
+                        "INSERT INTO events (ts, session, type, source) "
+                        "VALUES ('2026-01-01T00:00:00Z', ?, 'X', 'test')", (s,),
+                    )
+    assert _next_session(db) == expected, f"case={case}"
 
 
 def test_session_boot_main_emits_session_boot_event(tmp_path):
