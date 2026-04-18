@@ -33,7 +33,6 @@ from ..._events import emit as _emit_event_fn
 _ACTIVITY_TYPES: set[str] = {
     "email_sent", "email_received", "call", "meeting", "deal_stage_change",
 }
-_SOURCES: set[str] = {"claude_assisted", "manual", "instantly"}
 _PREP_TYPES: set[str] = {"research", "personalization", "cheat_sheet", "email_draft"}
 _OUTCOMES: set[str] = {"reply", "no_reply", "meeting_booked", "deal_advanced", "closed"}
 _POSITIVE_OUTCOMES: set[str] = {

@@ -79,16 +79,6 @@ def _escape_xml(text: str) -> str:
 # JS / JSON string escaping
 # ---------------------------------------------------------------------------
 
-# Characters that break out of a JS double-quoted string and are NOT already
-# handled by json.dumps().  json.dumps() handles \, ", \n, \r, \t, \0 — so
-# the residual risk is backtick (template literal injection) and </script> tag.
-_JS_BREAKOUT_RE = re.compile(
-    r"`"           # template literal delimiter
-    r"|<\s*/\s*script\s*>"  # </script> tag to break out of <script> blocks
-    ,
-    re.IGNORECASE,
-)
-
 # Full JS escaping for text NOT already through json.dumps()
 _JS_FULL_ESCAPE_TABLE = str.maketrans(
     {

@@ -10,22 +10,6 @@ import re
 from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
-# Intent categories
-# ---------------------------------------------------------------------------
-
-INTENTS = [
-    "factual_correction",
-    "compliance",
-    "formatting",
-    "clarity",
-    "conciseness",
-    "completeness",
-    "tone_shift",
-    "preference",
-    "unknown",
-]
-
-# ---------------------------------------------------------------------------
 # Regex heuristics (layer 1)
 # ---------------------------------------------------------------------------
 

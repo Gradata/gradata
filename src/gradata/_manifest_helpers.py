@@ -12,7 +12,6 @@ from ._db import get_connection
 
 # ── Severity constants (single source of truth) ───────────────────────
 LOW_SEVERITY = frozenset({"as-is", "minor"})
-HIGH_SEVERITY = frozenset({"moderate", "major", "discarded"})
 
 
 def _session_window(conn, window: int = 20) -> tuple[int, int]:

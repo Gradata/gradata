@@ -33,7 +33,6 @@ _log = logging.getLogger(__name__)
 
 # Tier constants (Rosch 1978: subordinate / basic / superordinate)
 TIER_SUPER_META = 2  # Super-meta-rule: emerges from 3+ meta-rules
-TIER_UNIVERSAL = 3  # Universal principle: emerges from 3+ super-meta-rules
 
 
 @dataclass
