@@ -40,22 +40,6 @@ def _is_false_positive(text: str) -> bool:
     return any(fp.search(text) for fp in FALSE_POSITIVES)
 
 
-def _detect_failure(output: str) -> list[str]:
-    if not output:
-        return []
-    signals = []
-    for pattern in ERROR_PATTERNS:
-        match = pattern.search(output)
-        if match:
-            # Check context around match for false positives
-            start = max(0, match.start() - 50)
-            end = min(len(output), match.end() + 50)
-            context = output[start:end]
-            if not _is_false_positive(context):
-                signals.append(match.group())
-    return signals
-
-
 def main(data: dict) -> dict | None:
     try:
         output = data.get("tool_output", "") or ""
@@ -64,7 +48,13 @@ def main(data: dict) -> dict | None:
         if not output:
             return None
 
-        signals = _detect_failure(output)
+        signals: list[str] = []
+        for _df_pat in ERROR_PATTERNS:
+            _df_m = _df_pat.search(output)
+            if _df_m and not _is_false_positive(
+                output[max(0, _df_m.start() - 50):min(len(output), _df_m.end() + 50)]
+            ):
+                signals.append(_df_m.group())
         if not signals:
             return None
 
