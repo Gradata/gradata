@@ -50,6 +50,7 @@ __all__ = [
 
 class MiddlewareError(Exception):
     """Raised when middleware chain has configuration errors."""
+
     pass
 
 
@@ -68,6 +69,7 @@ class MiddlewareContext:
         metadata: Middleware-contributed metadata.
         errors: Errors collected during chain execution.
     """
+
     operation: str = ""
     data: dict[str, Any] = field(default_factory=dict)
     result: Any = None
@@ -88,8 +90,9 @@ class Middleware:
         before_middleware: Name of middleware this should precede.
         If neither is set, middleware is appended to the end.
     """
+
     name: str = "unnamed"
-    after_middleware: str = ""   # Insert after this middleware
+    after_middleware: str = ""  # Insert after this middleware
     before_middleware: str = ""  # Insert before this middleware
 
     def before(self, ctx: MiddlewareContext) -> MiddlewareContext:
@@ -148,9 +151,7 @@ class MiddlewareChain:
             MiddlewareError: If anchors reference unknown or circular deps.
         """
         if middleware.name in self._name_index:
-            raise MiddlewareError(
-                f"Middleware '{middleware.name}' already registered"
-            )
+            raise MiddlewareError(f"Middleware '{middleware.name}' already registered")
 
         if middleware.after_middleware and middleware.before_middleware:
             raise MiddlewareError(
@@ -263,6 +264,4 @@ class MiddlewareChain:
 
     def _rebuild_index(self) -> None:
         """Rebuild the name-to-index mapping."""
-        self._name_index = {
-            mw.name: i for i, mw in enumerate(self._middlewares)
-        }
+        self._name_index = {mw.name: i for i, mw in enumerate(self._middlewares)}

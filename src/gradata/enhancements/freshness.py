@@ -3,6 +3,7 @@
 Adapted from Hindsight's observation freshness model, but session-count-based
 instead of calendar-based, and severity-weighted.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -55,11 +56,7 @@ def compute_trend(
 
     recent = [e for e in correction_sessions if e.get("session", 0) > recent_cutoff]
     old = [e for e in correction_sessions if e.get("session", 0) <= old_cutoff]
-    middle = [
-        e
-        for e in correction_sessions
-        if old_cutoff < e.get("session", 0) <= recent_cutoff
-    ]
+    middle = [e for e in correction_sessions if old_cutoff < e.get("session", 0) <= recent_cutoff]
 
     if not recent:
         return Trend.STALE

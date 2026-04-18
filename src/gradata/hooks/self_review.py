@@ -3,6 +3,7 @@
 After Write/Edit tool calls, checks if the output respects mandatory
 rules. Logs violations for the learning pipeline without blocking execution.
 """
+
 from __future__ import annotations
 
 import logging
@@ -24,9 +25,7 @@ HOOK_META = {
 _REVIEWED_TOOLS = frozenset({"Write", "Edit", "MultiEdit"})
 
 # Regex to pull the banned token out of "never use/do/create/add/include <X>"
-_NEVER_RE = re.compile(
-    r"never\s+(?:use|do|create|add|include)\s+(.+)", re.I
-)
+_NEVER_RE = re.compile(r"never\s+(?:use|do|create|add|include)\s+(.+)", re.I)
 
 # Process-level cache: (brain_dir, mtime) → parsed mandatory rules
 _rules_cache: dict[tuple[str, float], list[dict]] = {}
@@ -50,9 +49,7 @@ def _load_mandatory_rules(brain_dir: str) -> list[dict]:
         result = [
             {"description": l.description, "category": l.category}
             for l in lessons
-            if l.state == LessonState.RULE
-            and l.confidence >= 0.90
-            and l.fire_count >= 10
+            if l.state == LessonState.RULE and l.confidence >= 0.90 and l.fire_count >= 10
         ]
         _rules_cache.clear()
         _rules_cache[cache_key] = result
