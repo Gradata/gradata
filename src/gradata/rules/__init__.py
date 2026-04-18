@@ -9,19 +9,11 @@ lessons become active rules that shape agent behavior.
 - scope: Task classification for context-appropriate rule injection
 """
 
-from gradata.rules.rule_context import GraduatedRule, get_rule_context
-from gradata.rules.rule_engine import apply_rules, format_rules_for_prompt
-from gradata.rules.rule_tracker import RuleApplication, log_application
-from gradata.rules.scope import AudienceTier, TaskType, classify_scope
+from gradata.rules.rule_tracker import RuleApplication
+from gradata.rules.scope import AudienceTier, TaskType
 
 __all__ = [
     "AudienceTier",
-    "GraduatedRule",
     "RuleApplication",
     "TaskType",
-    "apply_rules",
-    "classify_scope",
-    "format_rules_for_prompt",
-    "get_rule_context",
-    "log_application",
 ]
