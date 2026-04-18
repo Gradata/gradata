@@ -95,7 +95,6 @@ _STRUCTURE_MARKERS = re.compile(
 )
 
 
-
 def _word_set(text: str) -> set[str]:
     """Extract lowercase words from text."""
     return set(re.findall(r"\b[a-z]+\b", text.lower()))

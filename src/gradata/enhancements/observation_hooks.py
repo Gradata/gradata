@@ -137,7 +137,6 @@ def observe_tool_use(
     )
 
 
-
 class ObservationStore:
     """Append-only JSONL store for observations, scoped by project.
 

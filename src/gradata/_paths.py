@@ -175,6 +175,5 @@ def set_brain_dir(brain_dir: str | Path, working_dir: str | Path | None = None):
     _current_context = BrainContext.from_brain_dir(brain_dir, working_dir)
 
 
-
 # Module-level default context (None until set_brain_dir() is called)
 _current_context: BrainContext | None = None

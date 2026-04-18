@@ -156,7 +156,6 @@ def beta_posterior(successes: int, trials: int, prior_alpha: float = 1.0, prior_
     }
 
 
-
 # ============================================================================
 # 2. WILSON CONFIDENCE INTERVALS
 # ============================================================================

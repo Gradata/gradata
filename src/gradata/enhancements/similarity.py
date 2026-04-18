@@ -70,7 +70,6 @@ def _cosine(v1: dict[str, float], v2: dict[str, float]) -> float:
     return dot / (mag1 * mag2)
 
 
-
 # ---------------------------------------------------------------------------
 # Synonym expansion (boosts recall for paraphrases)
 # ---------------------------------------------------------------------------
@@ -150,7 +149,6 @@ def semantic_similarity(text1: str, text2: str) -> float:
 
 _OLLAMA_BASE: str | None = None
 _EMBED_MODEL: str = "nomic-embed-text"
-
 
 
 def _get_embedding(text: str) -> list[float] | None:

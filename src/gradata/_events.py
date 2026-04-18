@@ -212,7 +212,6 @@ def emit(event_type: str, source: str, data: dict | None = None, tags: list | No
     return event
 
 
-
 def emit_gate_result(gate_name: str, result: str, sources_checked: list | None = None, detail: str = "") -> dict:
     sources = sources_checked or []
     return emit("GATE_RESULT", "gate:execution", {
@@ -419,7 +418,6 @@ def _detect_session(ctx: BrainContext | None = None) -> int:
 
 
 # ── Brain-quality functions (promoted from brain shim) ────────────────
-
 
 
 def find_contradictions(event_type: str | None = None, tag_prefix: str | None = None) -> list:

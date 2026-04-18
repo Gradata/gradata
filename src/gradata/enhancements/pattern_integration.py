@@ -503,7 +503,6 @@ def topic_boosts_from_rules() -> dict[str, float]:
     return {cat: round(1.0 + (count / total) * 0.5, 2) for cat, count in categories.items()}
 
 
-
 # ---------------------------------------------------------------------------
 # 20. Middleware — graduation middleware wraps operations
 # ---------------------------------------------------------------------------

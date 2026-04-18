@@ -74,7 +74,6 @@ def capture_correction() -> None:
         _log.debug("Hook capture failed: %s", e)
 
 
-
 # ---------------------------------------------------------------------------
 # CLI entry point (called by Claude Code hook)
 # ---------------------------------------------------------------------------

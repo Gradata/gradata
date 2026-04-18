@@ -206,7 +206,6 @@ def reciprocal_rank_fusion(ranked_lists: list[list[dict]], k: int = 60) -> list[
     return output
 
 
-
 def compute_recency_weight(embed_date: str) -> float:
     try:
         doc_date = datetime.strptime(embed_date, "%Y-%m-%d")

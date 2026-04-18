@@ -210,8 +210,6 @@ def extract_from_file(filepath):
     return facts
 
 
-
-
 def query_facts(prospect=None, fact_type=None, min_confidence=0.0,
                 ctx: "BrainContext | None" = None):
     conn = _get_db(ctx)
@@ -231,8 +229,6 @@ def query_facts(prospect=None, fact_type=None, min_confidence=0.0,
     rows = conn.execute(sql, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
-
-
 
 
 def get_stats(ctx: BrainContext | None = None):
