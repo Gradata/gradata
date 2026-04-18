@@ -1,21 +1,28 @@
 """Statistical validation of brain.prove()'s trend test (issue #8).
 
-Issue #8 asked for multi-user validation of a "paired t-test". Correction:
-brain.prove() uses **Mann-Kendall** (_stats.trend_analysis), a non-parametric
-rank-based test that is more robust than a paired t-test for this kind of
-data (integer counts, non-normal, heteroskedastic, heavy-tied).
+Issue #8 asked for multi-user validation of a claimed "paired t-test".
+Correction: brain.prove() actually uses **Mann-Kendall**
+(_stats.trend_analysis), a non-parametric rank-based test that is more
+robust than a paired t-test for this kind of data (integer correction
+counts, non-normal, heteroskedastic, heavy-tied).
 
-Rather than blocking on real multi-user data, this module validates the test
-via Monte Carlo simulation on synthetic distributions. Ground truth is known
-by construction (no-trend vs. real-trend), so we can measure:
+Methodology: rather than block on access to multi-user real data, we
+validate statistically via Monte Carlo simulation where ground truth is
+known by construction (no-trend vs. real-trend). This is complementary
+to — and arguably stronger than — an observational multi-user study,
+because it measures the test's properties directly:
 
 - **Type I error rate** — rejection rate under H0 (no trend). Should ≈ α.
 - **Power** — rejection rate under H1 (real trend). Should be high.
 - **Robustness** — both properties hold across normal, heavy-tailed,
   skewed, and tie-heavy distributions.
 
-Assertions use generous tolerances since this is probabilistic; seeds are
-fixed for determinism.
+An observational multi-user study remains valuable for external-validity
+checks (does real correction data actually look like these synthetic
+distributions?); that is left as follow-up work when such data exists.
+
+Seeds are fixed for determinism; bounds are set well outside the 99% CI
+for n=400 Monte Carlo trials at p=0.05 to avoid flake.
 """
 from __future__ import annotations
 
@@ -26,8 +33,9 @@ import pytest
 from gradata._stats import trend_analysis
 
 ALPHA = 0.05
-N_TRIALS = 400     # 95% CI for p=0.05 at n=400 ≈ [0.031, 0.077]
+N_TRIALS = 400     # bounds below are conservative (~99.9% CI) to avoid flake
 SERIES_LEN = 30    # realistic session count
+SHORT_N = 10       # power-growth comparison
 
 
 def _rejection_rate(series_factory, n_trials: int = N_TRIALS) -> float:
@@ -62,7 +70,7 @@ def test_type_i_integer_counts():
 
 
 def test_type_i_heavy_tailed():
-    """Laplace-ish noise still respects α — Mann-Kendall is nonparametric."""
+    """Laplace(0, 1) noise (difference of i.i.d. Exp(1)) — Mann-Kendall is nonparametric."""
     rate = _rejection_rate(
         lambda rng: [rng.expovariate(1) - rng.expovariate(1) for _ in range(SERIES_LEN)],
     )
@@ -89,13 +97,21 @@ def test_power_downward_trend():
 
 
 def test_power_grows_with_n():
-    """Power should not decrease as sample size grows (same effect size)."""
+    """Power should grow (not merely not-shrink) as sample size grows at fixed effect.
+
+    Weak effect (slope=-0.15, σ=1.5); expect a meaningful gap between n=10 and n=30.
+    Bound of +0.10 is well above one standard error (~0.035 at 400 trials) so a
+    seed-dependent single-trial flip cannot fail this.
+    """
     def factory(n):
         return lambda rng: [max(0.0, 10 - 0.15 * i + rng.gauss(0, 1.5)) for i in range(n)]
 
-    p_short = _rejection_rate(factory(10), n_trials=200)
-    p_long = _rejection_rate(factory(30), n_trials=200)
-    assert p_long >= p_short, f"Power shrank: n=10 {p_short:.2f} > n=30 {p_long:.2f}"
+    p_short = _rejection_rate(factory(SHORT_N))
+    p_long = _rejection_rate(factory(SERIES_LEN))
+    assert p_long >= p_short + 0.10, (
+        f"Power should grow substantially with n: "
+        f"n={SHORT_N} {p_short:.3f}, n={SERIES_LEN} {p_long:.3f}"
+    )
 
 
 # ───────────────── Robustness & edge cases ─────────────────
@@ -117,8 +133,54 @@ def test_all_ties_returns_no_signal():
 
 
 def test_heavy_ties_does_not_false_positive():
-    """Many-ties integer data (common in [0,3]) doesn't inflate Type I past tolerance."""
+    """Many-ties integer data (common in [0,3]) still respects α.
+
+    Tight bound matching the other Type I tests: tie-correction in
+    trend_analysis must actually work, not just approximately work.
+    """
     rate = _rejection_rate(
         lambda rng: [float(rng.randint(0, 3)) for _ in range(SERIES_LEN)],
     )
-    assert rate <= 0.12, f"Ties inflated Type I: {rate:.3f}"
+    assert 0.02 <= rate <= 0.10, f"Ties broke Type I control: {rate:.3f}"
+
+
+def test_fifty_element_cap_is_applied():
+    """trend_analysis caps input at last 50 elements; results for n=100 and n=200
+    on an identical tail must be equal."""
+    tail = [float(i) for i in range(50)]
+    prefix_a = [0.0] * 50
+    prefix_b = [0.0] * 150
+    slope_a, p_a = trend_analysis(prefix_a + tail)
+    slope_b, p_b = trend_analysis(prefix_b + tail)
+    assert slope_a == slope_b
+    assert p_a == p_b
+
+
+def test_brain_prove_interprets_trend_results_correctly(tmp_path):
+    """End-to-end: brain_prove must read p_value (not slope) for the 'strong'
+    gate and handle the 'converging' trend string. Regression guard for the
+    consumer of trend_analysis."""
+    from unittest.mock import patch
+
+    from gradata.brain import Brain
+
+    brain = Brain(str(tmp_path))
+    # p_value = 0.02 (< 0.05 strong threshold) + converging + effort_ratio < 0.7
+    cps = [10, 10, 10, 8, 6, 5, 4, 3, 2, 2]
+    conv = {
+        "sessions": list(range(1, 11)),
+        "corrections_per_session": cps,
+        "trend": "converging",
+        "p_value": 0.02,
+        "changepoints": [],
+        "by_category": {},
+        "total_corrections": sum(cps),
+        "total_sessions": 10,
+        "edit_distance_per_session": [],
+        "edit_distance_trend": "insufficient_data",
+    }
+    with patch.object(brain, "_get_convergence", return_value=conv):
+        result = brain.prove()
+    assert result["proven"] is True
+    assert result["confidence_level"] == "strong"
+    assert result["evidence"]["p_value"] == 0.02
