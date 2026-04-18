@@ -57,7 +57,28 @@ class CrewAIGuard:
         self._strict = strict
 
     def __call__(self, output: Any) -> tuple[bool, Any]:
-        text = _coerce_text(output)
+        if output is None:
+            text = ""
+        elif isinstance(output, str):
+            text = output
+        else:
+            text = ""
+            for key in _OUTPUT_TEXT_KEYS:
+                val = getattr(output, key, None)
+                if isinstance(val, str):
+                    text = val
+                    break
+            else:
+                if isinstance(output, dict):
+                    for key in _OUTPUT_TEXT_KEYS:
+                        val = output.get(key)
+                        if isinstance(val, str):
+                            text = val
+                            break
+                    else:
+                        text = str(output)
+                else:
+                    text = str(output)
         if not text:
             return True, output
         try:
@@ -74,25 +95,3 @@ class CrewAIGuard:
         return True, output
 
 
-def _coerce_text(output: Any) -> str:
-    """Best-effort text extraction for CrewAI agent outputs.
-
-    Preserves explicitly empty string fields (``raw=""``, ``output=""``, ...)
-    so the guard's empty-output fast path still applies instead of falling
-    through to ``str(output)`` and producing an object repr.
-    """
-    if output is None:
-        return ""
-    if isinstance(output, str):
-        return output
-    # Prefer attribute lookup first (typed CrewAI outputs), then dict lookup.
-    for key in _OUTPUT_TEXT_KEYS:
-        val = getattr(output, key, None)
-        if isinstance(val, str):
-            return val
-    if isinstance(output, dict):
-        for key in _OUTPUT_TEXT_KEYS:
-            val = output.get(key)
-            if isinstance(val, str):
-                return val
-    return str(output)
