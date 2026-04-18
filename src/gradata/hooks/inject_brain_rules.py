@@ -64,28 +64,6 @@ def _score(lesson) -> float:
     return 0.4 * state_bonus + 0.3 * conf_norm + 0.3 * conf
 
 
-def _lesson_to_rule_dict(lesson) -> dict:
-    """Flatten a Lesson object (or dict) into the shape rank_rules expects.
-
-    Carries Beta posterior fields (alpha / beta_param) through so Thompson
-    sampling works when ``GRADATA_THOMPSON_RANKING=1``.
-    """
-    if isinstance(lesson, dict):
-        return dict(lesson)
-    return {
-        "id": getattr(lesson, "description", ""),
-        "description": getattr(lesson, "description", ""),
-        "category": getattr(lesson, "category", ""),
-        "confidence": float(getattr(lesson, "confidence", 0.5)),
-        "fire_count": int(getattr(lesson, "fire_count", 0)),
-        "last_session": 0,  # not tracked on Lesson — recency degrades gracefully
-        "alpha": float(getattr(lesson, "alpha", 1.0)),
-        "beta_param": float(getattr(lesson, "beta_param", 1.0)),
-        "state": lesson.state.name if hasattr(lesson, "state") else "PATTERN",
-        "_lesson": lesson,  # stash original for output formatting
-    }
-
-
 def main(data: dict) -> dict | None:
     if parse_lessons is None:
         return None
@@ -155,7 +133,20 @@ def main(data: dict) -> dict | None:
     # become a wiki_boost signal (+0.3 on context component) rather than a
     # hard pre-filter, so BM25 + Thompson can still surface strong cross-
     # category matches when the wiki miss-matches.
-    rule_dicts = [_lesson_to_rule_dict(lesson) for lesson in filtered]
+    rule_dicts = [
+        dict(_l) if isinstance(_l, dict) else {
+            "id": getattr(_l, "description", ""),
+            "description": getattr(_l, "description", ""),
+            "category": getattr(_l, "category", ""),
+            "confidence": float(getattr(_l, "confidence", 0.5)),
+            "fire_count": int(getattr(_l, "fire_count", 0)),
+            "last_session": 0,
+            "alpha": float(getattr(_l, "alpha", 1.0)),
+            "beta_param": float(getattr(_l, "beta_param", 1.0)),
+            "state": _l.state.name if hasattr(_l, "state") else "PATTERN",
+            "_lesson": _l,
+        } for _l in filtered
+    ]
     wiki_boost: dict[str, float] = {}
     if wiki_cats:
         for rd in rule_dicts:
