@@ -99,17 +99,6 @@ _CREATE_IDX_LAST_SESSION = (
 )
 
 
-def _normalize_text(text: str) -> str:
-    """Canonical form used for fingerprinting.
-
-    Lowercase, trim, collapse whitespace, drop trailing punctuation.
-    """
-    if not text:
-        return ""
-    s = _WS_RE.sub(" ", text.strip().lower())
-    return _TRAILING_PUNCT_RE.sub("", s).strip()
-
-
 def _normalize_category(category: str | None) -> str:
     return (category or "UNKNOWN").strip().upper() or "UNKNOWN"
 
@@ -123,7 +112,8 @@ def observation_fingerprint(text: str, category: str | None = None) -> str:
     design, since the same phrase can mean different things in different
     categories.
     """
-    payload = f"{_normalize_category(category)}|{_normalize_text(text)}".encode()
+    _nt = _TRAILING_PUNCT_RE.sub("", _WS_RE.sub(" ", text.strip().lower())).strip() if text else ""
+    payload = f"{_normalize_category(category)}|{_nt}".encode()
     return hashlib.sha1(payload).hexdigest()
 
 
