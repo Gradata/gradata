@@ -805,57 +805,32 @@ def llm_synthesize_rules(
             )
             calls_made += 1
 
-            parsed = _parse_synthesis_response(raw, descriptions)
-            results.extend(parsed)
+            _text = raw.strip()
+            if _text.startswith("```"):
+                _text = "\n".join(_l for _l in _text.split("\n") if not _l.strip().startswith("```"))
+            try:
+                _data = json.loads(_text)
+            except json.JSONDecodeError:
+                _log.debug("Failed to parse LLM synthesis response as JSON")
+                _data = []
+            if not isinstance(_data, list):
+                _data = [_data]
+            for _item in _data:
+                if not isinstance(_item, dict):
+                    continue
+                _directive = _item.get("directive", "")
+                if not _directive:
+                    continue
+                _conf = max(0.0, min(1.0, float(_item.get("confidence", 0.8))))
+                results.append({
+                    "directive": _directive,
+                    "source_lessons": list(descriptions),
+                    "confidence": _conf,
+                })
 
         except Exception as exc:
             _log.debug("LLM synthesis failed for category %s: %s", category, exc)
             continue
-
-    return results
-
-
-def _parse_synthesis_response(
-    raw: str,
-    source_descriptions: list[str],
-) -> list[dict]:
-    """Parse LLM JSON response into structured dicts.
-
-    Returns:
-        List of ``{"directive": str, "source_lessons": list[str], "confidence": float}``.
-    """
-    text = raw.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        lines = [line for line in lines if not line.strip().startswith("```")]
-        text = "\n".join(lines)
-
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        _log.debug("Failed to parse LLM synthesis response as JSON")
-        return []
-
-    if not isinstance(data, list):
-        data = [data]
-
-    results = []
-    for item in data:
-        if not isinstance(item, dict):
-            continue
-        directive = item.get("directive", "")
-        if not directive:
-            continue
-        confidence = float(item.get("confidence", 0.8))
-        confidence = max(0.0, min(1.0, confidence))
-
-        results.append(
-            {
-                "directive": directive,
-                "source_lessons": list(source_descriptions),
-                "confidence": confidence,
-            }
-        )
 
     return results
 
