@@ -23,32 +23,25 @@ TASK_KEYWORDS = {
 }
 
 
-def _get_prospect_names(ctx: "BrainContext | None" = None) -> dict[str, str]:
-    names = {}
-    prospects_dir = ctx.prospects_dir if ctx else _p.PROSPECTS_DIR
-    if not prospects_dir.exists():
-        return names
-    for f in prospects_dir.glob("*.md"):
-        if f.name.startswith("_"):
-            continue
-        stem = f.stem
-        parts = re.split(r"(?:\s*[—–]\s*|\s*--\s*|\s+-\s+)", stem, maxsplit=1)
-        full_name = parts[0].strip()
-        company = parts[1].strip() if len(parts) > 1 else ""
-        names[full_name.lower()] = full_name
-        name_parts = full_name.split()
-        if len(name_parts) >= 2:
-            names[name_parts[0].lower()] = full_name
-            names[name_parts[-1].lower()] = full_name
-        if company:
-            names[company.lower()] = full_name
-    return names
-
-
 def extract_entities(message: str, ctx: "BrainContext | None" = None) -> dict:
     result: dict[str, str | None] = {"prospect": None, "task_type": None, "topic": None}
     msg_lower = message.lower()
-    prospect_map = _get_prospect_names(ctx=ctx)
+    prospect_map: dict[str, str] = {}
+    _gpn_dir = ctx.prospects_dir if ctx else _p.PROSPECTS_DIR
+    if _gpn_dir.exists():
+        for _gpn_f in _gpn_dir.glob("*.md"):
+            if _gpn_f.name.startswith("_"):
+                continue
+            _gpn_parts = re.split(r"(?:\s*[—–]\s*|\s*--\s*|\s+-\s+)", _gpn_f.stem, maxsplit=1)
+            _gpn_full = _gpn_parts[0].strip()
+            _gpn_co = _gpn_parts[1].strip() if len(_gpn_parts) > 1 else ""
+            prospect_map[_gpn_full.lower()] = _gpn_full
+            _gpn_np = _gpn_full.split()
+            if len(_gpn_np) >= 2:
+                prospect_map[_gpn_np[0].lower()] = _gpn_full
+                prospect_map[_gpn_np[-1].lower()] = _gpn_full
+            if _gpn_co:
+                prospect_map[_gpn_co.lower()] = _gpn_full
     for key in sorted(prospect_map.keys(), key=len, reverse=True):
         if key in msg_lower and len(key) > 2:
             result["prospect"] = prospect_map[key]
