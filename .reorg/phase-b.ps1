@@ -62,6 +62,32 @@ if (-not $SkipChecks) {
 
 Say "=== Phase B starting ($(if ($DryRun){'DRY-RUN'}else{'LIVE'})) ===" 'Cyan'
 
+# ── 0. Normalize scaffold casing (lowercase on disk -> TitleCase) ───
+# Windows filesystem is case-insensitive, so Phase A may have created
+# gradata/ sprites/ hausgem/ regardless of what the code wrote. Fix via
+# two-step rename (intermediate name), required because direct casing
+# rename is a no-op on case-insensitive volumes.
+function Normalize-Case($lower, $title) {
+    $lp = Join-Path $WS $lower
+    $tp = Join-Path $WS $title
+    if (-not (Test-Path $lp)) { return }
+    # Already correct on a case-sensitive query?
+    $actual = (Get-ChildItem $WS -Force | Where-Object { $_.Name -ieq $title }).Name
+    if ($actual -ceq $title) { Say "case ok: $title" 'DarkGray'; return }
+    if ($DryRun) { Say "DRY-RUN case-fix: $lower -> $title" 'Cyan'; return }
+    $tmp = Join-Path $WS "__case_$title"
+    Say "case-fix: $lower -> $title" 'Green'
+    Rename-Item -LiteralPath $lp -NewName "__case_$title" -Force
+    Rename-Item -LiteralPath $tmp -NewName $title -Force
+}
+Normalize-Case 'gradata' 'Gradata'
+Normalize-Case 'sprites' 'Sprites'
+Normalize-Case 'hausgem' 'Hausgem'
+
+# ── 0b. Relocate misplaced gradata/Leads/ -> Sprites/Leads/ ─────────
+# Leads are private sales data; belong in Sprites/ not Gradata/
+Do-Move (Join-Path $WS 'Gradata\Leads') (Join-Path $WS 'Sprites\Leads')
+
 # ── 1. Delete stale Desktop/Gradata (9d-old main clone) ─────────────
 Do-Delete (Join-Path $DESKTOP 'Gradata')
 
