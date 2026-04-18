@@ -101,10 +101,24 @@ class _Handler(BaseHTTPRequestHandler):
     # ── Routing ─────────────────────────────────────────────────────────
 
     def do_GET(self) -> None:
-        if self.path == "/health":
-            self._handle_health()
-        else:
+        if self.path != "/health":
             self._not_found()
+            return
+        self.daemon._reset_idle_timer()
+        d = self.daemon
+        with d._brain_lock:
+            _hh_lessons = d._brain._load_lessons()
+            _hh_rules = sum(1 for _l in _hh_lessons if _l.state.name == "RULE")
+            _hh_count = len(_hh_lessons)
+        self._send_json({
+            "status": "ok",
+            "sdk_version": _gradata_version,
+            "brain_dir": str(d._brain.dir),
+            "uptime_seconds": round(time.monotonic() - d._started_mono, 2),
+            "active_sessions": len(d._sessions),
+            "rules_count": _hh_rules,
+            "lessons_count": _hh_count,
+        })
 
     def do_POST(self) -> None:
         routes: dict[str, object] = {
@@ -150,27 +164,6 @@ class _Handler(BaseHTTPRequestHandler):
         self._send_json({"error": "not found"}, 404)
 
     # ── Endpoint handlers ───────────────────────────────────────────────
-
-    def _handle_health(self) -> None:
-        self.daemon._reset_idle_timer()
-        d = self.daemon
-        with d._brain_lock:
-            lessons = d._brain._load_lessons()
-            rules_count = sum(
-                1 for lesson in lessons if lesson.state.name == "RULE"
-            )
-            lessons_count = len(lessons)
-
-        uptime = time.monotonic() - d._started_mono
-        self._send_json({
-            "status": "ok",
-            "sdk_version": _gradata_version,
-            "brain_dir": str(d._brain.dir),
-            "uptime_seconds": round(uptime, 2),
-            "active_sessions": len(d._sessions),
-            "rules_count": rules_count,
-            "lessons_count": lessons_count,
-        })
 
     def _handle_apply_rules(self) -> None:
         self.daemon._reset_idle_timer()
