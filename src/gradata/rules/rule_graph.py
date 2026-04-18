@@ -148,21 +148,6 @@ def _normalize(text: str) -> str:
     return re.sub(r"[^\w\s]", " ", text.lower()).strip()
 
 
-def _extract_keywords(text: str) -> set[str]:
-    """Extract meaningful keywords, skipping stopwords."""
-    words = set(_normalize(text).split())
-    return words - _STOPWORDS
-
-
-def _keyword_overlap(desc_a: str, desc_b: str) -> float:
-    """Fraction of shared keywords (Jaccard similarity)."""
-    kw_a = _extract_keywords(desc_a)
-    kw_b = _extract_keywords(desc_b)
-    if not kw_a or not kw_b:
-        return 0.0
-    return len(kw_a & kw_b) / len(kw_a | kw_b)
-
-
 # ---------------------------------------------------------------------------
 # Relationship detection
 # ---------------------------------------------------------------------------
@@ -205,8 +190,11 @@ def detect_relationship(rule_a: dict, rule_b: dict) -> RuleRelationType | None:
             return RuleRelationType.CONTRADICTS
 
     # 3. Reinforcement (same category + keyword overlap > 50%)
-    if cat_a and cat_b and cat_a == cat_b and _keyword_overlap(desc_a, desc_b) > 0.5:
-        return RuleRelationType.REINFORCES
+    if cat_a and cat_b and cat_a == cat_b:
+        _ko_a = set(_normalize(desc_a).split()) - _STOPWORDS
+        _ko_b = set(_normalize(desc_b).split()) - _STOPWORDS
+        if _ko_a and _ko_b and len(_ko_a & _ko_b) / len(_ko_a | _ko_b) > 0.5:
+            return RuleRelationType.REINFORCES
 
     return None
 
