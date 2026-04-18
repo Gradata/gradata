@@ -32,9 +32,13 @@ _log = logging.getLogger("gradata.cli")
 
 
 def _get_brain(args):
-    """Resolve brain directory from args or environment."""
+    """Resolve brain directory from args, GRADATA_BRAIN env, or CWD fallback."""
     from gradata import Brain
-    brain_dir = getattr(args, "brain_dir", None) or Path.cwd()
+    brain_dir = (
+        getattr(args, "brain_dir", None)
+        or env_str("GRADATA_BRAIN")
+        or Path.cwd()
+    )
     return Brain(brain_dir)
 
 
