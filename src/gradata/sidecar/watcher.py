@@ -107,21 +107,6 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
 
 
-def _read_file(path: str | Path) -> str | None:
-    """Read a file, returning ``None`` on any I/O error.
-
-    Args:
-        path: File to read.
-
-    Returns:
-        File contents as a string, or ``None`` if the file cannot be read.
-    """
-    try:
-        return Path(path).read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return None
-
-
 def _classify_severity(edit_distance: float) -> str:
     """Map edit distance to severity label (aligned with diff_engine 5-label scale).
 
@@ -253,8 +238,9 @@ class FileWatcher:
         if watched is None:
             return None
 
-        current_content = _read_file(resolved)
-        if current_content is None:
+        try:
+            current_content = Path(resolved).read_text(encoding="utf-8", errors="replace")
+        except OSError:
             logger.warning("Cannot read tracked file: %s", resolved)
             return None
 
