@@ -180,37 +180,6 @@ class WorkerPool:
         finally:
             conn.close()
 
-    def _claim_one(self, conn: sqlite3.Connection) -> Job | None:
-        """Atomically claim one pending job. BEGIN IMMEDIATE prevents races."""
-        now = self._clock.now()
-        conn.execute("BEGIN IMMEDIATE")
-        try:
-            row = conn.execute(
-                "SELECT id, type, payload_json, created_at "
-                "FROM worker_jobs WHERE status = 'pending' "
-                "ORDER BY id LIMIT 1"
-            ).fetchone()
-            if row is None:
-                conn.execute("COMMIT")
-                return None
-            conn.execute(
-                "UPDATE worker_jobs SET status='running', started_at=? WHERE id=?",
-                (now, row["id"]),
-            )
-            conn.execute("COMMIT")
-        except Exception:
-            conn.execute("ROLLBACK")
-            raise
-
-        try:
-            payload = json.loads(row["payload_json"]) if row["payload_json"] else {}
-        except json.JSONDecodeError:
-            payload = {}
-        return Job(
-            id=int(row["id"]), type=str(row["type"]),
-            payload=payload, created_at=float(row["created_at"]),
-        )
-
     def _finalize(
         self, conn: sqlite3.Connection, job_id: int, *, error: str | None = None,
     ) -> None:
@@ -229,9 +198,33 @@ class WorkerPool:
         """Claim + run one pending job. Returns True if one was processed."""
         conn = get_connection(self._db_path)
         try:
-            job = self._claim_one(conn)
-            if job is None:
-                return False
+            # Atomically claim one pending job. BEGIN IMMEDIATE prevents races.
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                _co_row = conn.execute(
+                    "SELECT id, type, payload_json, created_at "
+                    "FROM worker_jobs WHERE status = 'pending' "
+                    "ORDER BY id LIMIT 1"
+                ).fetchone()
+                if _co_row is None:
+                    conn.execute("COMMIT")
+                    return False
+                conn.execute(
+                    "UPDATE worker_jobs SET status='running', started_at=? WHERE id=?",
+                    (self._clock.now(), _co_row["id"]),
+                )
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+            try:
+                _co_payload = json.loads(_co_row["payload_json"]) if _co_row["payload_json"] else {}
+            except json.JSONDecodeError:
+                _co_payload = {}
+            job = Job(
+                id=int(_co_row["id"]), type=str(_co_row["type"]),
+                payload=_co_payload, created_at=float(_co_row["created_at"]),
+            )
             with self._lock:
                 handler = self._handlers.get(job.type)
             if handler is None:
