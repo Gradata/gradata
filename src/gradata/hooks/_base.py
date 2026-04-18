@@ -13,10 +13,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from ..brain import Brain
 import sys
 from pathlib import Path
 
@@ -68,21 +64,6 @@ def extract_message(data: dict) -> str | None:
         return None
     msg = msg.strip()
     return msg if msg else None
-
-
-def get_brain() -> Brain | None:
-    """Get a Brain instance from resolved brain dir, or None on failure."""
-    try:
-        from ..brain import Brain
-    except ImportError:
-        return None
-    brain_dir = resolve_brain_dir()
-    if not brain_dir:
-        return None
-    try:
-        return Brain(brain_dir)
-    except Exception:
-        return None
 
 
 def _record_telemetry(meta: dict, hook_name: str, payload: str | None) -> None:

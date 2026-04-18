@@ -101,16 +101,6 @@ for _rp in ROSCH_PARENTS:
     _SUB_TO_PARENT[_rp] = _rp
 
 
-def parent_category(category: str) -> str | None:
-    """Return the Rosch superordinate parent for a category, or None."""
-    return _SUB_TO_PARENT.get(category.upper())
-
-
-def subordinates_of(parent: str) -> set[str]:
-    """Return the set of subordinate categories under a Rosch parent."""
-    return set(ROSCH_HIERARCHY.get(parent.upper(), set()))
-
-
 # ── Domain-Specific Defaults (Sales) ──────────────────────────────────
 # These ship as defaults because sales is the first domain.
 # Other domains override via brain_dir/taxonomy.json.
