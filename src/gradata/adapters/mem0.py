@@ -86,9 +86,7 @@ class Mem0Adapter:
             ) from exc
 
         if not api_key:
-            raise ValueError(
-                "Mem0Adapter requires an api_key when no client is supplied"
-            )
+            raise ValueError("Mem0Adapter requires an api_key when no client is supplied")
         self._client = MemoryClient(api_key=api_key)
 
     # ------------------------------------------------------------------
@@ -176,18 +174,12 @@ class Mem0Adapter:
         except TypeError:
             # Older mem0ai versions don't accept `filters` kwarg.
             try:
-                raw = self._client.search(
-                    query, user_id=self.user_id, limit=k
-                )
+                raw = self._client.search(query, user_id=self.user_id, limit=k)
             except Exception as exc:
-                logger.warning(
-                    "Mem0Adapter.pull_memory_for_context failed: %s", exc
-                )
+                logger.warning("Mem0Adapter.pull_memory_for_context failed: %s", exc)
                 return []
         except Exception as exc:
-            logger.warning(
-                "Mem0Adapter.pull_memory_for_context failed: %s", exc
-            )
+            logger.warning("Mem0Adapter.pull_memory_for_context failed: %s", exc)
             return []
 
         if raw is None:
@@ -205,11 +197,13 @@ class Mem0Adapter:
             if not isinstance(_item, dict):
                 continue
             _meta = _item.get("metadata") or {}
-            _out.append({
-                "text": _item.get("memory") or _item.get("text") or _item.get("content") or "",
-                "metadata": _meta if isinstance(_meta, dict) else {},
-                "score": _item.get("score"),
-            })
+            _out.append(
+                {
+                    "text": _item.get("memory") or _item.get("text") or _item.get("content") or "",
+                    "metadata": _meta if isinstance(_meta, dict) else {},
+                    "score": _item.get("score"),
+                }
+            )
         return _out
 
     def reconcile(
@@ -251,4 +245,3 @@ class Mem0Adapter:
             "only_remote": sorted(remote_set - local_ids),
             "remote_count": len(remote_set),
         }
-
