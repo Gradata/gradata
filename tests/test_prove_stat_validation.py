@@ -42,7 +42,7 @@ def _rejection_rate(series_factory, n_trials: int = N_TRIALS) -> float:
     """Fraction of runs where Mann-Kendall rejects H0 at α=0.05."""
     reject = 0
     for i in range(n_trials):
-        rng = random.Random(1000 + i)
+        rng = random.Random(1000 + i)  # noqa: S311 — deterministic test RNG
         _, p = trend_analysis(series_factory(rng))
         if p < ALPHA:
             reject += 1
@@ -121,14 +121,14 @@ def test_power_grows_with_n():
 def test_degenerate_lengths_safe(n):
     """n<2 returns the no-signal default — never crashes."""
     slope, p = trend_analysis([1.0] * n)
-    assert p == 1.0
-    assert slope == 0.0
+    assert p == pytest.approx(1.0)
+    assert slope == pytest.approx(0.0)
 
 
 def test_all_ties_returns_no_signal():
     """Constant series: tie adjustment drives p→1.0."""
     slope, p = trend_analysis([3.0] * 20)
-    assert slope == 0.0
+    assert slope == pytest.approx(0.0)
     assert p == pytest.approx(1.0)
 
 
