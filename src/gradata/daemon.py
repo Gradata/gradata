@@ -692,8 +692,16 @@ class GradataDaemon:
             }, indent=2), encoding="utf-8")
             logger.debug("PID file written: %s", self._pid_file)
 
-        # SIGTERM handler
-        _register_signal_handler(self)
+        # SIGTERM handler — not available on Windows; signal.signal() also
+        # raises ValueError on non-main threads (e.g. tests running daemon in bg).
+        def _sig_handler(signum: int, _frame: object) -> None:
+            logger.info("Received signal %d, shutting down.", signum)
+            self.stop()
+        if hasattr(signal, "SIGTERM"):
+            try:
+                signal.signal(signal.SIGTERM, _sig_handler)
+            except ValueError:
+                logger.debug("Cannot register SIGTERM handler (not main thread)")
 
         # Start idle timer
         self._reset_idle_timer()
@@ -819,24 +827,6 @@ class GradataDaemon:
 def _pick_port(brain_dir_str: str) -> int:
     """Deterministic port from brain_dir hash: hash % 16383 + 49152."""
     return abs(hash(brain_dir_str)) % 16383 + 49152
-
-
-# ── Signal handling ─────────────────────────────────────────────────────
-
-def _register_signal_handler(daemon: GradataDaemon) -> None:
-    """Register SIGTERM to cleanly shut down the daemon."""
-    def _handler(signum: int, _frame: object) -> None:
-        logger.info("Received signal %d, shutting down.", signum)
-        daemon.stop()
-
-    # SIGTERM is not available on Windows — guard it.
-    # signal.signal() also raises ValueError when called from a non-main thread
-    # (e.g. when tests start the daemon in a background thread).
-    if hasattr(signal, "SIGTERM"):
-        try:
-            signal.signal(signal.SIGTERM, _handler)
-        except ValueError:
-            logger.debug("Cannot register SIGTERM handler (not main thread)")
 
 
 # ── CLI entrypoint ──────────────────────────────────────────────────────
