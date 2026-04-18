@@ -1,101 +1,126 @@
-# Dependencies
+# ============================================================================
+# Dependencies / Node
+# ============================================================================
 node_modules/
-
-# Environment and credentials
-.env
-*.env
-.env.*
-.mcp.json
-*.key
-*.pem
-credentials.json
-client_secret*.json
-token.json
-
-# OneDrive temp files
-~$*
-gradata-plugin/
-
-# Orphans from PR #76 cloud split — dirs removed from repo, remain on disk
-/cloud/
-/sdk/
-
-# OS files
-Thumbs.db
-Desktop.ini
-.DS_Store
-
-# Obsidian workspace (user-specific)
-.obsidian/
-
-# Auto-generated (regenerated each session)
-.vectorstore/
-brain.manifest.json
-system.db
-*.db-wal
-*.sqlite
-*.jsonl
-__pycache__/
-*.pyc
-vendor/
-
-# Internal session handoff memory (never ships in the public repo)
-memory/
-.claude-flow
-autoresearch-results.tsv
-
-# Build artifacts (regenerate on deploy)
-.next/
-sdk/website-next/.next/
-sdk/website-next/node_modules/
-
-# Test coverage artifacts
-.coverage
-
-# Local session handoff notes
-sessions/
-
-# User config (personal, not part of SDK)
-CLAUDE.md
-domain/
-.carl/
-.claude/
-skills/
-.opencli/
-.vscode/
-.claude-octopus/
-.agentignore
-.claudeignore
 package.json
 package-lock.json
 # Exception: npm packages we intentionally ship
 !gradata-install/package.json
 !packages/npm/package.json
 !packages/**/package.json
+# npm package build artifacts (sources tracked, outputs ignored)
+packages/npm/node_modules/
+packages/npm/dist/
+packages/*/node_modules/
+packages/*/dist/
 
-# Sales data (private, never in public repo)
-Leads/
+# ============================================================================
+# Python
+# ============================================================================
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+vendor/
+
+# ============================================================================
+# Environment / Secrets — never commit
+# ============================================================================
+.env
+.env.*
+.env.local
+.env.*.local
+*.env
+.mcp.json
+*.key
+*.pem
+*.secret
+credentials*
+credentials.json
+client_secret*.json
+token.json
+
+# ============================================================================
+# OS / Editor / IDE
+# ============================================================================
+Thumbs.db
+Desktop.ini
+.DS_Store
+~$*
+.idea/
+.vscode/
+.obsidian/
+
+# ============================================================================
+# Claude / agent tooling (user config, not shipped)
+# ============================================================================
+CLAUDE.md
+AGENTS.md
+FEATURES.md
+.claude/
+.claude-flow/data/
+.claude-flow/logs/
+.claude-flow
+.claude-octopus/
+.agents/
+.agentignore
+.claudeignore
+.carl/
+.codex/
+.opencli/
+.gstack/
+.gitnexus
+.superpowers/
+skills/
+domain/
+design-system/
+
+# ============================================================================
+# Auto-generated runtime data (regenerated each session)
+# ============================================================================
+.vectorstore/
+brain.manifest.json
+system.db
+*.db
+*.db-wal
+*.sqlite
+*.jsonl
+memory/
+autoresearch-results.tsv
+
+# ============================================================================
+# Private business scaffolds (Brand Nat pattern, never in public repo)
+# ============================================================================
+/Sprites/
+/Hausgem/
 /brain/
 /brain/prospects/
 /brain/sessions/
 /brain/emails/
-
-# Private per-business scaffolds (Brand Nat pattern, never in public repo)
-/Sprites/
-/Hausgem/
+Leads/
 
 # Private sales/ops automation (CARL) — personal names, emails, pipeline IDs
 /.forge/
 
-# Intermediates (disposable, never commit)
+# Personal one-shot reorg tooling (contains hardcoded user paths)
+/.reorg/
+
+# Sales exports — should live in brain/leads, never in the SDK repo
+apollo-leads-*.csv
+
+# ============================================================================
+# Intermediates / caches (disposable)
+# ============================================================================
 .tmp/
-
-# Archived research (not for public repo)
-sdk/research/_archived_v2_reference/
-
-# Cache directories
-.pytest_cache/
-.ruff_cache/
+site/
+_site/
+test-brain/
 
 # Graphify knowledge-graph cache (third-party tool output, regenerable)
 graphify-out/
@@ -103,9 +128,77 @@ graphify-out/
 src/gradata/graphify-out/
 .graphify_*
 
+# Build artifacts (regenerate on deploy)
+.next/
+sdk/website-next/.next/
+sdk/website-next/node_modules/
 
+# Orphans from PR #76 cloud split — dirs removed from repo, remain on disk
+/cloud/
+/sdk/
+
+# ============================================================================
+# Internal docs — not part of public SDK
+# ============================================================================
+SPEC.md
+AUDIT.md
+GATE0-PROOF.md
+.planning/
+sessions/
+docs/superpowers/
+docs/audit-history/
+docs/audit-reports/
+docs/Session Notes/
+docs/Exports/
+docs/content/
+docs/cloud/
+docs/provisional-patent-draft.md
+docs/META_LEARNING.md
+docs/STRESS_TEST_PROTOCOL.md
+docs/GRADATA-LAUNCH-STRATEGY.md
+docs/GTM-Execution-Plan.md
+docs/gradata-marketing-strategy.md
+docs/gradata-comparison-table.md
+docs/ablation-experiment-s93.md
+docs/ARCHITECTURE.md
+docs/north-star-research.md
+docs/study-protocol.md
+docs/launch-post.md
+docs/public-launch-narrative.md
+docs/RELEASE-*-DRAFT.md
+
+# Archived research (not for public repo)
+sdk/research/_archived_v2_reference/
+
+# ============================================================================
+# Scripts — SDK entry points only
+# ============================================================================
+scripts/*
+!scripts/publish-npm.sh
+!scripts/migrate_legacy_scopes.py
+!cloud/scripts/
+
+# Development-only dirs (not shipped)
+website/
+website-next/
+onboarding/
+templates/
+!src/gradata/hooks/templates/
+research/
+!docs/research/
+
+# Plugin assets (user-specific)
+gradata-plugin/
+
+# Railway config for the cloud API now lives in the private
+# gradata-cloud repo at cloud/railway.toml — the root-level copy
+# here is a stale leftover from before the split.
+/railway.toml
+
+# ============================================================================
 # Junk files from cmd.exe redirect misparse (Windows agent output artifacts)
 # When subagents run Bash commands, cmd.exe interprets > in stdout as redirects
+# ============================================================================
 $null
 GateResult
 None
@@ -113,117 +206,3 @@ Path
 Graph
 bool
 dict[str
-site/
-_site/
-__pycache__/
-*.pyc
-*.egg-info/
-dist/
-build/
-.vectorstore/
-
-# Sensitive files — never commit to public repo
-system.db
-brain.manifest.json
-*.db
-SPEC.md
-AUDIT.md
-GATE0-PROOF.md
-.planning/
-
-# Internal docs — implementation plans, audit reports, session notes (contain algorithm details)
-docs/superpowers/
-docs/audit-history/
-docs/audit-reports/
-docs/Session Notes/
-docs/Exports/
-docs/provisional-patent-draft.md
-docs/META_LEARNING.md
-docs/STRESS_TEST_PROTOCOL.md
-docs/GRADATA-LAUNCH-STRATEGY.md
-docs/GTM-Execution-Plan.md
-docs/gradata-marketing-strategy.md
-docs/ablation-experiment-s93.md
-docs/ARCHITECTURE.md
-docs/north-star-research.md
-
-# Internal dev tooling — not part of SDK
-CLAUDE.md
-FEATURES.md
-.claude/
-docs/GTM-Execution-Plan.md
-docs/gradata-comparison-table.md
-
-# npm package build artifacts (sources tracked, outputs ignored)
-packages/npm/node_modules/
-packages/npm/dist/
-packages/*/node_modules/
-packages/*/dist/
-
-# Secrets
-.env
-.env.*
-*.secret
-credentials*
-
-# Virtual environments
-.venv/
-venv/
-
-# IDE / editor
-.idea/
-.vscode/
-
-# Node
-node_modules/
-
-# Development artifacts (not shipped)
-test-brain/
-website/
-website-next/
-onboarding/
-templates/
-!src/gradata/hooks/templates/
-# examples/ — included for open source hygiene
-research/
-!docs/research/
-scripts/*
-!scripts/publish-npm.sh
-!cloud/scripts/
-!scripts/migrate_legacy_scopes.py
-docs/cloud/
-docs/study-protocol.md
-
-
-# Codex local configuration
-.codex/
-
-# Claude Flow runtime data
-.claude-flow/data/
-.claude-flow/logs/
-.agents/
-AGENTS.md
-design-system/
-
-# Environment variables
-.env
-.env.local
-.env.*.local
-.gstack/
-.gitnexus
-.superpowers/
-
-# Pre-launch marketing drafts (private — live in vault instead)
-docs/content/
-docs/launch-post.md
-docs/public-launch-narrative.md
-docs/RELEASE-*-DRAFT.md
-
-# Railway config for the cloud API now lives in the private
-# gradata-cloud repo at cloud/railway.toml — the root-level copy
-# here is a stale leftover from before the split.
-/railway.toml
-
-# Sales exports — should live in brain/leads, never in the SDK repo.
-apollo-leads-*.csv
-
