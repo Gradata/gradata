@@ -86,46 +86,6 @@ def _lesson_to_rule_dict(lesson) -> dict:
     }
 
 
-def _wiki_categories(context: str) -> set[str]:
-    """Query qmd for rule wiki pages matching context, return matched categories.
-
-    Searches brain wiki for pages whose path matches rule-{category}.md.
-    Returns empty set on any failure so caller falls back to brute-force.
-    """
-    if not context:
-        return set()
-    # On Windows, qmd is an npm bash script — Python can't exec .CMD wrappers
-    # directly, so we route through Git Bash. On Unix, qmd runs natively.
-    if sys.platform == "win32":
-        git_bash = shutil.which("bash", path="C:/Program Files/Git/bin")
-        if git_bash:
-            cmd = [git_bash, "-c", f'qmd search "{context}" -c brain -n 10']
-        else:
-            return set()  # no bash = no qmd on Windows
-    else:
-        cmd = ["qmd", "search", context, "-c", "brain", "-n", "10"]
-    try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=2, encoding="utf-8",
-        )
-        if proc.returncode != 0:
-            return set()
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
-        return set()
-
-    categories: set[str] = set()
-    for line in proc.stdout.splitlines():
-        # qmd paths: qmd://brain/wiki/concepts/rule-code.md:N
-        if "wiki/concepts/rule-" in line:
-            try:
-                segment = line.split("wiki/concepts/rule-")[1]
-                cat = segment.split(".md")[0].upper().replace("-", "_")
-                categories.add(cat)
-            except (IndexError, ValueError):
-                continue
-    return categories
-
-
 def main(data: dict) -> dict | None:
     if parse_lessons is None:
         return None
@@ -170,7 +130,26 @@ def main(data: dict) -> dict | None:
         or data.get("task_type", "")
         or Path.cwd().name
     )
-    wiki_cats = _wiki_categories(context)
+    wiki_cats: set[str] = set()
+    if context:
+        if sys.platform == "win32":
+            _gb = shutil.which("bash", path="C:/Program Files/Git/bin")
+            _cmd = [_gb, "-c", f'qmd search "{context}" -c brain -n 10'] if _gb else None
+        else:
+            _cmd = ["qmd", "search", context, "-c", "brain", "-n", "10"]
+        if _cmd:
+            try:
+                _proc = subprocess.run(_cmd, capture_output=True, text=True, timeout=2, encoding="utf-8")
+                if _proc.returncode == 0:
+                    for _line in _proc.stdout.splitlines():
+                        if "wiki/concepts/rule-" in _line:
+                            try:
+                                _seg = _line.split("wiki/concepts/rule-")[1]
+                                wiki_cats.add(_seg.split(".md")[0].upper().replace("-", "_"))
+                            except (IndexError, ValueError):
+                                continue
+            except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+                pass
 
     # Route everything through the unified rule_ranker. Wiki-matched categories
     # become a wiki_boost signal (+0.3 on context component) rather than a
