@@ -35,7 +35,6 @@ _log = logging.getLogger(__name__)
 # Import canonical factual-token regex from edit_classifier.
 from gradata.enhancements.edit_classifier import _FACTUAL_RE
 
-
 # ---------------------------------------------------------------------------
 # Archetype Taxonomy (12 correction types)
 # ---------------------------------------------------------------------------

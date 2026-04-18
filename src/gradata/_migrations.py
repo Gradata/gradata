@@ -6,7 +6,7 @@ import contextlib
 import sqlite3
 from pathlib import Path
 
-from gradata._db import get_connection
+from ._db import get_connection
 
 _BASE_TABLES: list[str] = [
     """CREATE TABLE IF NOT EXISTS events (

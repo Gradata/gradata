@@ -22,7 +22,7 @@ _log = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from gradata.events_bus import EventBus
+    from .events_bus import EventBus
 
 
 @dataclass

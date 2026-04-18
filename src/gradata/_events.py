@@ -18,11 +18,11 @@ from typing import TYPE_CHECKING
 
 # IMPORTANT: Use module reference (not value import) so set_brain_dir() updates propagate.
 # `from X import Y` copies the value at import time — subsequent set_brain_dir() won't update it.
-import gradata._paths as _p
-from gradata._file_lock import platform_lock
+from . import _paths as _p
+from ._file_lock import platform_lock
 
 if TYPE_CHECKING:
-    from gradata._paths import BrainContext
+    from ._paths import BrainContext
 
 _log = logging.getLogger("gradata.events")
 
@@ -66,13 +66,12 @@ def _locked_append_many(path: Path, lines: list[str]) -> None:
     if not lines:
         return
     encoded = b"".join(line.encode("utf-8") for line in lines)
-    with open(path, "ab") as fh:
-        with platform_lock(fh):
-            fh.seek(0, 2)  # seek to end before writing
-            fh.write(encoded)
-            fh.flush()
-            if sys.platform == "win32":
-                os.fsync(fh.fileno())
+    with open(path, "ab") as fh, platform_lock(fh):
+        fh.seek(0, 2)  # seek to end before writing
+        fh.write(encoded)
+        fh.flush()
+        if sys.platform == "win32":
+            os.fsync(fh.fileno())
 
 
 def _locked_append(path: Path, line: str) -> None:
@@ -147,7 +146,7 @@ def emit(event_type: str, source: str, data: dict | None = None, tags: list | No
 
     enriched_tags = tags or []
     try:
-        from gradata._tag_taxonomy import enrich_tags, validate_tags
+        from ._tag_taxonomy import enrich_tags, validate_tags
         enriched_tags = enrich_tags(enriched_tags, event_type, data or {})
         issues = validate_tags(enriched_tags, event_type)
         if issues:
@@ -203,7 +202,7 @@ def emit(event_type: str, source: str, data: dict | None = None, tags: list | No
         _log.error("SQLite write failed: %s", e)
 
     if not jsonl_ok and not sqlite_ok:
-        from gradata.exceptions import EventPersistenceError
+        from .exceptions import EventPersistenceError
         raise EventPersistenceError(
             f"Event {event_type} failed to persist to BOTH JSONL and SQLite. "
             "Learning data lost. Check file permissions and disk space."
@@ -642,7 +641,7 @@ class RetainOrchestrator:
         manifest_updated = False
         try:
             try:
-                from gradata._brain_manifest import update_manifest  # type: ignore[import]
+                from ._brain_manifest import update_manifest  # type: ignore[import]
                 update_manifest(self.brain_dir)
                 manifest_updated = True
             except (ImportError, Exception):

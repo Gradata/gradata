@@ -11,33 +11,33 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import gradata._paths as _p
+from . import _paths as _p
 
 if TYPE_CHECKING:
-    from gradata._paths import BrainContext
+    from ._paths import BrainContext
 
 
 # Lazy imports
 def _fts_search(query_text: str, **kwargs):
-    from gradata._query import fts_search
+    from ._query import fts_search
 
     return fts_search(query_text, **kwargs)
 
 
 def _events_query(**kwargs):
-    from gradata._events import query as eq
+    from ._events import query as eq
 
     return eq(**kwargs)
 
 
 def _correction_rate(**kwargs):
-    from gradata._events import correction_rate
+    from ._events import correction_rate
 
     return correction_rate(**kwargs)
 
 
 def _detect_session():
-    from gradata._events import _detect_session as ds
+    from ._events import _detect_session as ds
 
     return ds()
 
@@ -129,7 +129,7 @@ def _load_prospect_context(prospect_name: str, ctx: "BrainContext | None" = None
     except Exception:
         pass
     try:
-        from gradata._fact_extractor import query_facts
+        from ._fact_extractor import query_facts
 
         facts = query_facts(prospect=prospect_name)
         if facts:

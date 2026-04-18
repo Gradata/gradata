@@ -264,7 +264,7 @@ class Brain(BrainInspectionMixin):
 
     def _budget_op(self, fn_name: str, *args):
         """Run a budget operation with connection management."""
-        from gradata import _db
+        from . import _db
 
         conn = _db.get_connection(self.db_path)
         _db.ensure_credit_budgets(conn)
@@ -414,7 +414,7 @@ class Brain(BrainInspectionMixin):
         # Activation telemetry — fires once per machine, only if opted in.
         # Guarded so a telemetry bug can never break the learning loop.
         try:
-            from gradata import _telemetry
+            from . import _telemetry
 
             _telemetry.send_once("first_correction_captured")
             # If this correction produced a graduation, mark it too. The

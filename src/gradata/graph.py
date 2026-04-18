@@ -10,7 +10,7 @@ merge into meta-rules.
 
 Usage::
 
-    from gradata.graph import build_learning_graph, GraphNode, GraphEdge, to_json
+    from .graph import build_learning_graph, GraphNode, GraphEdge, to_json
 
     nodes, edges = build_learning_graph(lessons, meta_rules)
     graph_json = to_json(nodes, edges)
@@ -23,7 +23,7 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from gradata._types import Lesson, LessonState
+from ._types import Lesson, LessonState
 
 # ---------------------------------------------------------------------------
 # Data Model

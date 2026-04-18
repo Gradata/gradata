@@ -4,7 +4,7 @@ Learning Context Wrapper — One-line behavioral adaptation for any LLM call.
 Inspired by: Letta's Learning SDK (wraps any LLM call with memory).
 
 Usage:
-    from gradata import brain_context
+    from . import brain_context
 
     with brain_context("./my-brain"):
         response = openai.chat.completions.create(
@@ -68,7 +68,7 @@ def brain_context(
         # After context exits, call correct() if user edited
         ctx.correct(original_response, user_edited_version)
     """
-    from gradata.brain import Brain
+    from .brain import Brain
 
     try:
         brain = Brain(brain_dir)

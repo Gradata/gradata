@@ -16,8 +16,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import gradata._paths as _p
-from gradata._config import (
+from . import _paths as _p
+from ._config import (
     API_KEY_ENV_VAR,
     EMBEDDING_DIMS,
     EMBEDDING_MODEL,
@@ -31,7 +31,7 @@ from gradata._config import (
 )
 
 if TYPE_CHECKING:
-    from gradata._paths import BrainContext
+    from ._paths import BrainContext
 
 
 def get_file_hash(path: Path) -> str:

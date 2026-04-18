@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from gradata._db import get_connection
+from ._db import get_connection
 
 logger = logging.getLogger("gradata.workers")
 

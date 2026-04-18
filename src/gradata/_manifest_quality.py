@@ -10,13 +10,13 @@ import re
 import statistics
 from typing import TYPE_CHECKING
 
-import gradata._paths as _p
-from gradata._db import get_connection
-from gradata._manifest_helpers import LOW_SEVERITY, _session_window
-from gradata._stats import trend_analysis as _trend_analysis
+from . import _paths as _p
+from ._db import get_connection
+from ._manifest_helpers import LOW_SEVERITY, _session_window
+from ._stats import trend_analysis as _trend_analysis
 
 if TYPE_CHECKING:
-    from gradata._paths import BrainContext
+    from ._paths import BrainContext
 
 
 def _compute_fda(ctx: "BrainContext | None" = None, window: int = 20) -> float | None:

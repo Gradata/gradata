@@ -678,7 +678,6 @@ def cmd_logout(args):
 
 def _resolve_brain_root(args):
     """Figure out where brain lives. Prefer env override for tests, then --brain-dir arg, then default."""
-    import os
     override = env_str("GRADATA_BRAIN")
     if override:
         return Path(override)

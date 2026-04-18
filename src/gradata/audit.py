@@ -42,7 +42,7 @@ def write_provenance(
         timestamp: ISO timestamp of the graduation.
         user_context: Optional context string (e.g. task type, working dir).
     """
-    from gradata._db import get_connection
+    from ._db import get_connection
 
     try:
         with get_connection(db_path) as conn:
@@ -167,7 +167,7 @@ def trace_rule(
         Dict with keys: rule_id, rule, provenance, corrections, transitions.
         Returns {"error": "..."} if rule_id not found in lessons.
     """
-    from gradata.inspection import _lesson_to_dict, _load_lessons_from_path, _make_rule_id
+    from .inspection import _lesson_to_dict, _load_lessons_from_path, _make_rule_id
 
     lessons = _load_lessons_from_path(lessons_path)
 

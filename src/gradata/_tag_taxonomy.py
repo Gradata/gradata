@@ -12,7 +12,7 @@ The SDK ships with sales defaults because that's the first domain.
 import json
 import re
 
-import gradata._paths as _p
+from . import _paths as _p
 
 # ── Domain-Agnostic Core Tags (always present) ────────────────────────
 # These tags apply to ALL domains — they describe the brain's learning

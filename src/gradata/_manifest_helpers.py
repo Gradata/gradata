@@ -7,8 +7,8 @@ Split from _brain_manifest.py for file size compliance (<500 lines).
 
 import re
 
-import gradata._paths as _p
-from gradata._db import get_connection
+from . import _paths as _p
+from ._db import get_connection
 
 # ── Severity constants (single source of truth) ───────────────────────
 LOW_SEVERITY = frozenset({"as-is", "minor"})
@@ -138,7 +138,7 @@ def _sdk_capabilities() -> dict:
 
 def _tag_taxonomy() -> dict:
     try:
-        from gradata._tag_taxonomy import get_taxonomy_summary
+        from ._tag_taxonomy import get_taxonomy_summary
         return get_taxonomy_summary()
     except ImportError:
         return {}

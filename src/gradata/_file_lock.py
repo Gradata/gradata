@@ -3,7 +3,7 @@ Advisory exclusive file locking — cross-platform context manager.
 
 Usage::
 
-    from gradata._file_lock import platform_lock
+    from ._file_lock import platform_lock
 
     with open(path, "ab") as fh:
         with platform_lock(fh, timeout=5.0):
@@ -42,8 +42,8 @@ from __future__ import annotations
 import contextlib
 import sys
 import time
-from typing import Generator, IO
-
+from collections.abc import Generator
+from typing import IO
 
 # ---------------------------------------------------------------------------
 # Helpers

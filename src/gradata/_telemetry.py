@@ -245,7 +245,7 @@ def _endpoint() -> str:
 
 def _sdk_version() -> str:
     try:
-        from gradata import __version__
+        from . import __version__
 
         return str(__version__)
     except Exception:

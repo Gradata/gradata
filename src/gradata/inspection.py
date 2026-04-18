@@ -14,15 +14,15 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
-from gradata._types import ELIGIBLE_STATES, Lesson
-from gradata.rules.rule_engine import _make_rule_id
+from ._types import ELIGIBLE_STATES, Lesson
+from .rules.rule_engine import _make_rule_id
 
 _log = logging.getLogger(__name__)
 
 
 def _load_lessons_from_path(lessons_path: Path | str) -> list[Lesson]:
     """Read and parse lessons.md from a file path."""
-    from gradata.enhancements.self_improvement import parse_lessons
+    from .enhancements.self_improvement import parse_lessons
 
     p = Path(lessons_path)
     if not p.is_file():

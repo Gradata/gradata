@@ -21,6 +21,17 @@ _graduation.py  — _passes_beta_lb_gate, graduate
 # All of these imports MUST keep working:
 #   from gradata.enhancements.self_improvement import X
 
+# Lesson and LessonState are imported into _confidence.py from gradata._types;
+# they are accessible as self_improvement.Lesson etc. via the namespace, but
+# callers that do `from gradata.enhancements.self_improvement import Lesson`
+# need them explicitly re-exported here.
+from ..._types import (
+    CorrectionType,
+    Lesson,
+    LessonState,
+    RuleMetadata,
+    transition,
+)
 from ._confidence import (
     ACCEPTANCE_BONUS,
     CATEGORY_SESSION_MAP,
@@ -64,18 +75,6 @@ from ._confidence import (
 from ._graduation import (
     _passes_beta_lb_gate,
     graduate,
-)
-
-# Lesson and LessonState are imported into _confidence.py from gradata._types;
-# they are accessible as self_improvement.Lesson etc. via the namespace, but
-# callers that do `from gradata.enhancements.self_improvement import Lesson`
-# need them explicitly re-exported here.
-from ..._types import (
-    CorrectionType,
-    Lesson,
-    LessonState,
-    RuleMetadata,
-    transition,
 )
 
 # Backward-compat lazy re-exports (symbols moved to other focused modules).

@@ -11,7 +11,7 @@ They can be called directly from Python or wired into any MCP transport.
 
 Usage::
 
-    from gradata.mcp_tools import correct, recall, manifest
+    from .mcp_tools import correct, recall, manifest
 
     # Log a correction
     result = correct("AI draft text", "User-edited final", category="DRAFTING")
@@ -29,8 +29,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from gradata._types import ELIGIBLE_STATES, Lesson, LessonState
-from gradata.enhancements.diff_engine import compute_diff
+from ._types import ELIGIBLE_STATES, Lesson, LessonState
+from .enhancements.diff_engine import compute_diff
 
 # ---------------------------------------------------------------------------
 # Tool 1: correct -- Log a correction
@@ -91,7 +91,7 @@ def correct(
     lesson_created = False
     try:
         if brain_dir is not None:
-            from gradata.brain import Brain
+            from .brain import Brain
 
             brain = Brain(brain_dir)
             brain.correct(draft, final, applies_to=applies_to)
@@ -246,7 +246,7 @@ def _load_lessons(lessons_path: str | Path | None = None) -> list[Lesson]:
     else:
         # Try default paths
         try:
-            import gradata._paths as _p
+            from . import _paths as _p
             path = _p.LESSONS_FILE
         except Exception:
             return []
@@ -255,7 +255,7 @@ def _load_lessons(lessons_path: str | Path | None = None) -> list[Lesson]:
         return []
 
     try:
-        from gradata.enhancements.self_improvement import parse_lessons
+        from .enhancements.self_improvement import parse_lessons
         return parse_lessons(path.read_text(encoding="utf-8"))
     except Exception:
         return []
@@ -267,7 +267,7 @@ def _load_meta_rules(meta_rules_path: str | Path | None = None) -> list[dict]:
         path = Path(meta_rules_path)
     else:
         try:
-            import gradata._paths as _p
+            from . import _paths as _p
             path = _p.BRAIN_DIR / "meta-rules.json"
         except Exception:
             return []
@@ -344,7 +344,7 @@ def manifest(
 
     # Try to get full manifest from brain (supplement, don't override file-based counts)
     try:
-        from gradata._brain_manifest import generate_manifest
+        from ._brain_manifest import generate_manifest
         full_manifest = generate_manifest()
         quality = full_manifest.get("quality", {})
         metadata = full_manifest.get("metadata", {})
@@ -416,8 +416,8 @@ def export_skill(
     Returns:
         Dict with skill_dir, skill_id, rules_count, and SKILL.md preview.
     """
-    from gradata._paths import BRAIN_DIR
-    from gradata.brain import Brain
+    from ._paths import BRAIN_DIR
+    from .brain import Brain
 
     bd = Path(brain_dir) if brain_dir else BRAIN_DIR
     if not bd or not bd.exists():

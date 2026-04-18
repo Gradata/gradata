@@ -11,8 +11,8 @@ import re
 import sqlite3
 from pathlib import Path
 
-import gradata._paths as _p
-from gradata._paths import BrainContext
+from . import _paths as _p
+from ._paths import BrainContext
 
 # Constants — domain-specific fact types can be extended via brain config
 _DEFAULT_FACT_TYPES = (

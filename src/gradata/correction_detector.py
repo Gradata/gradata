@@ -9,7 +9,7 @@ signals in user messages to auto-capture learning events.
 
 Usage::
 
-    from gradata.correction_detector import detect_correction, extract_correction_context
+    from .correction_detector import detect_correction, extract_correction_context
 
     is_corr, confidence = detect_correction("No, don't use em dashes in emails")
     # (True, 0.92)

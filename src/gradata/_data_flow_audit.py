@@ -8,8 +8,8 @@ import json
 import sqlite3
 from datetime import datetime
 
-import gradata._paths as _p
-from gradata._paths import BrainContext
+from . import _paths as _p
+from ._paths import BrainContext
 
 CHECKS = []
 

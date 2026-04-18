@@ -10,8 +10,8 @@ import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-import gradata._paths as _p
-from gradata._paths import BrainContext
+from . import _paths as _p
+from ._paths import BrainContext
 
 
 def _VAULT_DIR(): return _p.BRAIN_DIR / "vault"
@@ -212,7 +212,7 @@ def export_brain(include_prospects: bool = True, domain_only: bool = False,
 
     now = datetime.now(UTC)
     try:
-        from gradata._brain_manifest import generate_manifest
+        from ._brain_manifest import generate_manifest
         manifest = generate_manifest(ctx=ctx)
         manifest["export"] = {
             "exported_at": now.isoformat(),

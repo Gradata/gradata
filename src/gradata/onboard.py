@@ -7,7 +7,7 @@ Supports two modes:
 
 Usage:
     # Interactive (CLI)
-    from gradata.onboard import onboard
+    from .onboard import onboard
     brain = onboard("./my-brain")
 
     # Non-interactive (programmatic)
@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from gradata.brain import Brain
+    from .brain import Brain
 
 
 # ── Schema: SQLite tables created for every new brain ──────────────────
@@ -290,7 +290,7 @@ def onboard(
     """
     if interactive is None:
         interactive = _is_interactive()
-    from gradata.brain import Brain
+    from .brain import Brain
 
     brain_dir = Path(path).resolve()
 
@@ -450,9 +450,9 @@ def onboard(
     # ── Write seed rules from workflow discovery ────────────────────────
     if seed_rules:
         try:
-            from gradata._db import write_lessons_safe
-            from gradata._types import Lesson, LessonState
-            from gradata.enhancements.self_improvement import format_lessons
+            from ._db import write_lessons_safe
+            from ._types import Lesson, LessonState
+            from .enhancements.self_improvement import format_lessons
             lessons_path = brain_dir / "lessons.md"
             today = datetime.now(UTC).strftime("%Y-%m-%d")
             lessons = []

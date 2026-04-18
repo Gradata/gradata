@@ -16,7 +16,6 @@ from gradata._types import Lesson, LessonState, RuleTransferScope
 
 from ._engine import AppliedRule
 
-
 # ---------------------------------------------------------------------------
 # Deduplication and Merging
 # ---------------------------------------------------------------------------

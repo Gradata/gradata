@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 # The import is guarded so the module stays usable even if the brain package
 # has missing optional dependencies at collection time.
 try:
-    from gradata.brain import Brain
+    from .brain import Brain
 except Exception:
     Brain = None  # type: ignore[assignment,misc]
 
@@ -372,7 +372,7 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
 
         elif tool_name == "brain_capabilities":
             try:
-                from gradata._brain_manifest import _sdk_capabilities
+                from ._brain_manifest import _sdk_capabilities
                 caps = _sdk_capabilities()
             except ImportError:
                 caps = {"error": "Manifest module not available"}
@@ -386,7 +386,7 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
             try:
                 import dataclasses
 
-                from gradata.contrib.enhancements.eval_benchmark import run_standard_benchmark
+                from .contrib.enhancements.eval_benchmark import run_standard_benchmark
                 result = run_standard_benchmark()
                 result_dict = dataclasses.asdict(result)
                 # Remove individual case details for MCP response size

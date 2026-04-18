@@ -15,11 +15,10 @@ Key management (priority order):
 from __future__ import annotations
 
 import hashlib
-import os
 import secrets
 from pathlib import Path
 
-from gradata._env import env_str
+from ._env import env_str
 
 _SALT_FILE = "system.db.salt"
 _ENC_FILE = "system.db.enc"

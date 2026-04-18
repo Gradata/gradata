@@ -33,8 +33,8 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from gradata._types import Lesson
-    from gradata.brain import Brain
+    from ._types import Lesson
+    from .brain import Brain
 
 logger = logging.getLogger(__name__)
 
@@ -181,8 +181,8 @@ class ScopedBrain:
 
         # Pull the full injection string then rebuild from filtered lessons.
         # We re-run the same ranking logic scoped to the filtered lesson set.
-        from gradata._scope import build_scope
-        from gradata.rules.rule_engine import (
+        from ._scope import build_scope
+        from .rules.rule_engine import (
             apply_rules,
             format_rules_for_prompt,
         )
@@ -193,7 +193,7 @@ class ScopedBrain:
 
         query_scope = build_scope({"domain": self._domain, "task": task or self._domain})
         try:
-            from gradata.rules.rule_engine import apply_rules_with_tree
+            from .rules.rule_engine import apply_rules_with_tree
 
             applied = apply_rules_with_tree(scoped_lessons, query_scope, max_rules=max_rules)
         except Exception:

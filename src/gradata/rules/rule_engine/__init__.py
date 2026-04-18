@@ -14,10 +14,10 @@ without modification.
 
 from ._engine import (
     DEFAULT_TTL_SESSIONS,
+    AppliedRule,
     _make_rule_id,
     apply_rules,
     apply_rules_with_tree,
-    AppliedRule,
     demote_stale_rules,
 )
 from ._formatting import (
@@ -43,27 +43,27 @@ from ._scoring import (
 )
 
 __all__ = [
-    "AppliedRule",
     "DEFAULT_TTL_SESSIONS",
-    "_make_rule_id",
-    "apply_rules",
-    "apply_rules_with_tree",
-    "demote_stale_rules",
+    "AppliedRule",
     "_beta_ppf_05",
     "_difficulty_from_lesson",
-    "beta_domain_reliability",
-    "compute_rule_difficulty",
-    "compute_scope_weight",
-    "detect_task_type",
-    "effective_confidence",
-    "is_rule_disabled_for_domain",
+    "_make_rule_id",
     "_ordering_entropy",
     "_rule_set_hash",
+    "apply_rules",
+    "apply_rules_with_tree",
+    "beta_domain_reliability",
     "capture_example_from_correction",
     "choose_entropy_ordering",
     "clear_ordering_cache",
+    "compute_rule_difficulty",
+    "compute_scope_weight",
+    "demote_stale_rules",
+    "detect_task_type",
+    "effective_confidence",
     "format_rule_constitutional",
     "format_rules_for_prompt",
     "format_rules_styled",
+    "is_rule_disabled_for_domain",
     "merge_related_rules",
 ]

@@ -6,8 +6,8 @@ creation, WAL mode configuration, and file locking.
 
 Usage::
 
-    from gradata._db import get_connection, ensure_tables
-    from gradata._db import lessons_lock
+    from ._db import get_connection, ensure_tables
+    from ._db import lessons_lock
 
     conn = get_connection(db_path)
     ensure_tables(conn)  # creates all standard tables

@@ -2,7 +2,7 @@
 Gradata Doctor — Environment and brain health diagnostics.
 
 Usage:
-    from gradata._doctor import diagnose, print_diagnosis
+    from ._doctor import diagnose, print_diagnosis
     report = diagnose()
     print_diagnosis(report)
 
@@ -101,7 +101,7 @@ def _resolve_brain_path():
     if brain_dir:
         return Path(brain_dir)
     try:
-        from gradata._paths import DB_PATH, resolve_brain_dir
+        from ._paths import DB_PATH, resolve_brain_dir
         # If DB_PATH points to a real system.db, use its parent
         if DB_PATH.exists():
             return DB_PATH.parent

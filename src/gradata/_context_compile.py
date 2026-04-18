@@ -8,10 +8,10 @@ returns formatted context injection.
 import re
 from typing import TYPE_CHECKING
 
-import gradata._paths as _p
+from . import _paths as _p
 
 if TYPE_CHECKING:
-    from gradata._paths import BrainContext
+    from ._paths import BrainContext
 
 # Task detection keywords
 TASK_KEYWORDS = {
@@ -78,7 +78,7 @@ def compile_context(
 
     if not entities["prospect"] and not entities["task_type"]:
         try:
-            from gradata._query import brain_search
+            from ._query import brain_search
 
             results = brain_search(message[:100], top_k=2, mode="keyword")
             if results and results[0].get("score", 0) > 0.3:
@@ -93,7 +93,7 @@ def compile_context(
         return ""
 
     try:
-        from gradata._context_packet import build_packet
+        from ._context_packet import build_packet
 
         packet = build_packet(
             prospect=entities["prospect"],
