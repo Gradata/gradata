@@ -411,4 +411,3 @@ def compute_density(corrections: int = 0, outputs: int = 0, **kwargs) -> float:
     if outputs <= 0:
         return 0.0
     return round(corrections / outputs, 6)
-

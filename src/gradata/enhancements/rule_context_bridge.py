@@ -158,4 +158,3 @@ def on_graduation_event(event: dict) -> None:
     ))
 
     logger.debug("RuleContext: published %s [%s:%.2f]", category, new_state, confidence)
-
