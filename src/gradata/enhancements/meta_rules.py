@@ -605,18 +605,6 @@ def _resolve_llm_credentials() -> tuple[str, str, str]:
     return "", "", model
 
 
-def _build_principle_prompt(rules: list[Lesson], category: str) -> str:
-    bullets = "\n".join(f"- {r.description}" for r in rules[:10] if r.description)
-    return (
-        f'Given these {min(len(rules), 10)} user corrections related to "{category}":\n'
-        f"{bullets}\n\n"
-        "Write ONE actionable behavioral principle (1-2 sentences) that captures the pattern.\n"
-        'Format: "When [context], [do X] instead of [Y]."\n'
-        "Do not list individual words. Focus on the behavioral change.\n"
-        "Return ONLY the principle, no preamble."
-    )
-
-
 def _try_llm_principle(rules: list[Lesson], category: str) -> str | None:
     """Best-effort LLM synthesis of ONE behavioral principle for a rule group.
 
@@ -653,8 +641,17 @@ def _try_llm_principle(rules: list[Lesson], category: str) -> str | None:
         import urllib.error
         import urllib.request
         _url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        _bpp_bullets = "\n".join(f"- {r.description}" for r in rules[:10] if r.description)
+        _bpp_text = (
+            f'Given these {min(len(rules), 10)} user corrections related to "{category}":\n'
+            f"{_bpp_bullets}\n\n"
+            "Write ONE actionable behavioral principle (1-2 sentences) that captures the pattern.\n"
+            'Format: "When [context], [do X] instead of [Y]."\n'
+            "Do not list individual words. Focus on the behavioral change.\n"
+            "Return ONLY the principle, no preamble."
+        )
         _payload = json.dumps({
-            "contents": [{"parts": [{"text": _build_principle_prompt(rules, category)}]}],
+            "contents": [{"parts": [{"text": _bpp_text}]}],
             "generationConfig": {"maxOutputTokens": 200, "temperature": 0.3},
         }).encode()
         try:
