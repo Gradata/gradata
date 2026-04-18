@@ -576,31 +576,6 @@ def _synthesize_positive(candidate: HookCandidate) -> str:
     return f"x{p}y"
 
 
-def _log_outcome(brain, source: str, candidate: HookCandidate, result: GenerationResult) -> None:
-    """Emit a RULE_TO_HOOK_INSTALLED/_FAILED event when a brain is provided.
-
-    Never raises — logging failures must not break graduation.
-    """
-    if brain is None:
-        return
-    try:
-        if result.installed:
-            brain.emit("RULE_TO_HOOK_INSTALLED", source, {
-                "slug": result.hook_path.stem if result.hook_path else "",
-                "rule_text": candidate.rule_description,
-                "template": candidate.hook_template,
-                "hook_path": str(result.hook_path) if result.hook_path else None,
-            })
-        else:
-            brain.emit("RULE_TO_HOOK_FAILED", source, {
-                "rule_text": candidate.rule_description,
-                "template": candidate.hook_template,
-                "reason": result.reason,
-            })
-    except Exception:
-        pass  # never fail graduation on a logging error
-
-
 def promote(
     description: str,
     confidence: float,
@@ -725,7 +700,23 @@ def try_generate(
     Returns a GenerationResult describing the outcome.
     """
     result = _compute_generation(candidate, positive_example=positive_example)
-    _log_outcome(brain, source, candidate, result)
+    if brain is not None:
+        try:
+            if result.installed:
+                brain.emit("RULE_TO_HOOK_INSTALLED", source, {
+                    "slug": result.hook_path.stem if result.hook_path else "",
+                    "rule_text": candidate.rule_description,
+                    "template": candidate.hook_template,
+                    "hook_path": str(result.hook_path) if result.hook_path else None,
+                })
+            else:
+                brain.emit("RULE_TO_HOOK_FAILED", source, {
+                    "rule_text": candidate.rule_description,
+                    "template": candidate.hook_template,
+                    "reason": result.reason,
+                })
+        except Exception:
+            pass
     return result
 
 
