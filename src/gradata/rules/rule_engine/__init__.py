@@ -21,7 +21,6 @@ from ._engine import (
     apply_rules_with_tree,
     AppliedRule,
     demote_stale_rules,
-    filter_by_scope,
 )
 from ._formatting import (
     _CONSTITUTIONAL_VALUE_MAP,
@@ -51,13 +50,11 @@ from ._scoring import (
     _beta_ppf_05,
     _difficulty_from_lesson,
     beta_domain_reliability,
-    classify_transfer_scope,
     compute_rule_difficulty,
     compute_scope_weight,
     detect_task_type,
     effective_confidence,
     is_rule_disabled_for_domain,
-    validate_assumptions,
 )
 
 __all__ = [
@@ -71,7 +68,6 @@ __all__ = [
     "apply_rules",
     "apply_rules_with_tree",
     "demote_stale_rules",
-    "filter_by_scope",
     # scoring
     "_CT_BOOST",
     "_STATE_PRIORITY",
@@ -81,13 +77,11 @@ __all__ = [
     "_beta_ppf_05",
     "_difficulty_from_lesson",
     "beta_domain_reliability",
-    "classify_transfer_scope",
     "compute_rule_difficulty",
     "compute_scope_weight",
     "detect_task_type",
     "effective_confidence",
     "is_rule_disabled_for_domain",
-    "validate_assumptions",
     # formatting
     "_CONSTITUTIONAL_VALUE_MAP",
     "_DEFAULT_PERMUTATION_SAMPLES",
