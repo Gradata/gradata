@@ -374,49 +374,24 @@ def register_task_type(
 
 
 # ---------------------------------------------------------------------------
-# Classification helpers
-# ---------------------------------------------------------------------------
-
-def _detect_task_type(query_lower: str) -> str:
-    """Return the name of the first matching TaskType, or ``"general"``."""
-    for task_type in _REGISTERED_TASK_TYPES:
-        for keyword in task_type.keywords:
-            if keyword in query_lower:
-                return task_type.name
-    return "general"
-
-
-def _detect_audience(query_lower: str) -> AudienceTier:
-    """Return the most specific AudienceTier found in the query."""
-    for tier, keywords in _AUDIENCE_KEYWORDS.items():
-        for kw in keywords:
-            if kw in query_lower:
-                return tier
-    return AudienceTier.UNKNOWN
-
-
-# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
 def classify_scope(query: str) -> tuple[str, AudienceTier]:
     """Classify a raw query into a task type name and an audience tier.
 
-    Args:
-        query: The raw user request in any case.
-
-    Returns:
-        A ``(task_type_name, audience_tier)`` tuple.  ``task_type_name`` is
-        ``"general"`` when no registered keyword matches.  ``audience_tier``
-        is ``AudienceTier.UNKNOWN`` when no audience signal is detected.
-
-    Example::
-
-        task, audience = classify_scope("prepare for the upcoming meeting")
-        # task == "meeting_prep"
-        # audience == AudienceTier.STAKEHOLDER  (or UNKNOWN if no role keyword)
+    Returns ``"general"`` and ``AudienceTier.UNKNOWN`` when no registered
+    keyword / audience signal is detected.
     """
     lower = query.lower()
-    task_name = _detect_task_type(lower)
-    audience = _detect_audience(lower)
+    task_name = "general"
+    for _tt in _REGISTERED_TASK_TYPES:
+        if any(kw in lower for kw in _tt.keywords):
+            task_name = _tt.name
+            break
+    audience = AudienceTier.UNKNOWN
+    for _at, _aks in _AUDIENCE_KEYWORDS.items():
+        if any(kw in lower for kw in _aks):
+            audience = _at
+            break
     return task_name, audience
