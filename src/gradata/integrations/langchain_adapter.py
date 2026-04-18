@@ -6,7 +6,7 @@
 
     For callback-based injection (recommended)::
 
-        from gradata.middleware import LangChainCallback
+        from ..middleware import LangChainCallback
         llm = ChatOpenAI(callbacks=[LangChainCallback(brain_path="./brain")])
 
     :class:`~gradata.middleware.langchain_adapter.LangChainCallback` injects
@@ -53,7 +53,7 @@ class BrainMemory:
     output_key: str = "output"
 
     def __init__(self, brain_dir: str | Path = "./brain") -> None:
-        from gradata.brain import Brain
+        from ..brain import Brain
 
         self.brain = Brain(brain_dir)
         self._messages: list[dict] = []

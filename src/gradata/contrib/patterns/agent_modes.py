@@ -8,7 +8,7 @@ variable; when unset it defaults to GODMODE for backward compatibility.
 
 Usage::
 
-    from gradata.contrib.patterns.agent_modes import (
+    from .agent_modes import (
         AgentMode, ModeConfig, get_mode, get_current_mode,
         format_mode_prompt, check_permission, auto_select_mode,
     )

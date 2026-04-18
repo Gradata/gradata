@@ -2,7 +2,7 @@
 Gradata — Procedural memory for AI agents.
 
 Quick start:
-    from gradata import Brain
+    from . import Brain
     brain = Brain.init("./my-brain")
 
     # Core correction loop (builds procedural memory)

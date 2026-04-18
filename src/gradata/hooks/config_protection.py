@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import os
 
-from gradata.hooks._base import run_hook
-from gradata.hooks._profiles import Profile
+from ._base import run_hook
+from ._profiles import Profile
 
 HOOK_META = {
     "event": "PreToolUse",

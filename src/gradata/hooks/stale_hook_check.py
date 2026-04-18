@@ -17,7 +17,7 @@ import shlex
 import sys
 from pathlib import Path
 
-from gradata._env import env_str
+from .._env import env_str
 
 _HASH_LINE_RE = re.compile(r"^\s*\*\s*Source hash:\s*([0-9a-f]{12})", re.MULTILINE)
 # Kept for legacy pattern detection only. All RULE-tier lesson shapes go
@@ -85,7 +85,7 @@ def _parse_lessons(brain_root: Path) -> tuple[dict[str, str], list[str]]:
             legacy_hooked_descs.add(clean)
 
     try:
-        from gradata.enhancements.self_improvement import parse_lessons
+        from ..enhancements.self_improvement import parse_lessons
     except Exception:
         parse_lessons = None  # type: ignore[assignment]
 

@@ -9,8 +9,8 @@ import logging
 import re
 from pathlib import Path
 
-from gradata.hooks._base import resolve_brain_dir, run_hook
-from gradata.hooks._profiles import Profile
+from ._base import resolve_brain_dir, run_hook
+from ._profiles import Profile
 
 _log = logging.getLogger(__name__)
 
@@ -35,8 +35,8 @@ _rules_cache: dict[tuple[str, float], list[dict]] = {}
 def _load_mandatory_rules(brain_dir: str) -> list[dict]:
     """Load RULE-tier mandatory lessons, cached by file mtime."""
     try:
-        from gradata._types import LessonState
-        from gradata.enhancements.self_improvement import parse_lessons
+        from .._types import LessonState
+        from ..enhancements.self_improvement import parse_lessons
 
         lessons_path = Path(brain_dir) / "lessons.md"
         if not lessons_path.is_file():
@@ -105,8 +105,8 @@ def _check_rule_compliance(
 def _log_violations(brain_dir: str, violations: list[dict]) -> None:
     """Emit SELF_REVIEW_VIOLATION events so the learning pipeline can record them."""
     try:
-        from gradata._events import emit
-        from gradata._paths import BrainContext
+        from .._events import emit
+        from .._paths import BrainContext
 
         ctx = BrainContext.from_brain_dir(brain_dir)
         for v in violations:

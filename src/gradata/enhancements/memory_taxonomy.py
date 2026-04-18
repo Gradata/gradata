@@ -16,7 +16,7 @@ rule application ("this lesson will matter when X happens").
 
 Usage::
 
-    from gradata.enhancements.memory_taxonomy import (
+    from .memory_taxonomy import (
         MemoryType, CorrectionNarrative, AtomicFact,
         PredictedImpact, BrainProfile, CrossBrainProfile,
         classify_memory_type,

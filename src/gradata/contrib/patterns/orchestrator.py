@@ -35,7 +35,7 @@ The 15 base patterns
 
 Example::
 
-    from gradata.contrib.patterns.orchestrator import classify_request
+    from .orchestrator import classify_request
 
     result = classify_request("review this pull request")
     print(result.intent)            # code_review
@@ -50,7 +50,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from gradata.rules.scope import (
+from ...rules.scope import (
     AudienceTier,
     classify_scope,
 )
@@ -275,7 +275,7 @@ def register_intent_pattern(
 
     Example::
 
-        from gradata.contrib.patterns.orchestrator import (
+        from .orchestrator import (
             register_intent_pattern,
             PATTERN_REFLECTION,
             PATTERN_VALIDATION,
@@ -443,7 +443,7 @@ def register_route_rules(
 
     Example::
 
-        from gradata.contrib.patterns.orchestrator import register_route_rules
+        from .orchestrator import register_route_rules
 
         register_route_rules([
             (["research", "enrich", "qualify"], "prospector"),

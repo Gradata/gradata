@@ -28,14 +28,14 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from gradata.hooks._base import extract_message, resolve_brain_dir, run_hook
-from gradata.hooks._profiles import Profile
+from ._base import extract_message, resolve_brain_dir, run_hook
+from ._profiles import Profile
 
 if TYPE_CHECKING:
-    from gradata._types import Lesson
+    from .._types import Lesson
 
 try:
-    from gradata.enhancements.self_improvement import is_hook_enforced, parse_lessons
+    from ..enhancements.self_improvement import is_hook_enforced, parse_lessons
 except ImportError:
     parse_lessons = None  # type: ignore[assignment]
     is_hook_enforced = None  # type: ignore[assignment]

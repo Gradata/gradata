@@ -12,7 +12,7 @@ Install the optional extra::
 Usage::
 
     import os
-    from gradata.adapters.mem0 import Mem0Adapter
+    from .mem0 import Mem0Adapter
 
     adapter = Mem0Adapter(
         api_key=os.environ["MEM0_API_KEY"],

@@ -24,7 +24,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from gradata._events import emit as _emit_event_fn
+from ..._events import emit as _emit_event_fn
 
 # ═══════════════════════════════════════════════════════════════════
 # Registries (domain-agnostic defaults, override via register_*)

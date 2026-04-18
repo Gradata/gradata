@@ -20,11 +20,11 @@ import json
 import os
 from pathlib import Path
 
-from gradata.hooks._base import resolve_brain_dir, run_hook
-from gradata.hooks._profiles import Profile
+from ._base import resolve_brain_dir, run_hook
+from ._profiles import Profile
 
 try:
-    from gradata.enhancements.self_improvement import is_hook_enforced, parse_lessons
+    from ..enhancements.self_improvement import is_hook_enforced, parse_lessons
 except ImportError:
     parse_lessons = None
     is_hook_enforced = None  # type: ignore[assignment]

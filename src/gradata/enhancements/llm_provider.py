@@ -15,8 +15,8 @@ import logging
 import os
 from abc import ABC, abstractmethod
 
-from gradata._env import env_str
-from gradata._http import require_https
+from .._env import env_str
+from .._http import require_https
 
 _log = logging.getLogger(__name__)
 

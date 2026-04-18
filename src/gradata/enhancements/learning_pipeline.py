@@ -16,7 +16,7 @@ as the single entry point after a correction is captured.
 
 Usage::
 
-    from gradata.enhancements.learning_pipeline import LearningPipeline
+    from .learning_pipeline import LearningPipeline
 
     pipeline = LearningPipeline(brain_dir=Path("./my-brain"))
     result = pipeline.process_correction(
@@ -136,7 +136,7 @@ class LearningPipeline:
         # Stage 1: Observation capture
         self._observer = None
         try:
-            from gradata.enhancements.observation_hooks import ObservationStore
+            from .observation_hooks import ObservationStore
             obs_dir = observation_dir or (self.brain_dir / "observations" if self.brain_dir else None)
             if obs_dir:
                 self._observer = ObservationStore(base_dir=obs_dir)
@@ -147,7 +147,7 @@ class LearningPipeline:
         self._cluster_mgr = None
         self._cluster_state = None
         try:
-            from gradata.enhancements.cluster_manager import (
+            from .cluster_manager import (
                 ClusterConfig,
                 ClusterManager,
                 ClusterState,
@@ -167,7 +167,7 @@ class LearningPipeline:
         # Stage 3: Discriminator
         self._discriminator = None
         try:
-            from gradata.enhancements.lesson_discriminator import LessonDiscriminator
+            from .lesson_discriminator import LessonDiscriminator
             self._discriminator = LessonDiscriminator(discriminator_config)
         except ImportError:
             pass
@@ -175,7 +175,7 @@ class LearningPipeline:
         # Stage 4: Memory taxonomy
         self._memory_taxonomy = None
         try:
-            from gradata.enhancements.memory_taxonomy import classify_memory_type
+            from .memory_taxonomy import classify_memory_type
             self._memory_taxonomy = classify_memory_type
         except ImportError:
             pass
@@ -183,7 +183,7 @@ class LearningPipeline:
         # Stage 5: Q-Learning Router
         self._router = None
         try:
-            from gradata.contrib.patterns.q_learning_router import QLearningRouter
+            from ..contrib.patterns.q_learning_router import QLearningRouter
             self._router = QLearningRouter()
             if router_path:
                 self._router.load(router_path)
@@ -197,7 +197,7 @@ class LearningPipeline:
         # Stage 6: Context tracking
         self._context_tracker = None
         try:
-            from gradata.contrib.patterns.context_brackets import ContextTracker
+            from ..contrib.patterns.context_brackets import ContextTracker
             self._context_tracker = ContextTracker(max_tokens=200_000)
         except ImportError:
             pass
@@ -249,7 +249,7 @@ class LearningPipeline:
         # ── Stage 1: Observe ──────────────────────────────────────────
         if self._observer:
             try:
-                from gradata.enhancements.observation_hooks import observe_tool_use
+                from .observation_hooks import observe_tool_use
                 obs = observe_tool_use(
                     tool_name="brain.correct",
                     input_data=f"severity={severity} category={category}",
@@ -381,7 +381,7 @@ class LearningPipeline:
             stats["stages_available"].append("observe")
         if self._cluster_mgr and self._cluster_state:
             stats["stages_available"].append("cluster")
-            from gradata.enhancements.cluster_manager import ClusterManager
+            from .cluster_manager import ClusterManager
             stats["cluster"] = ClusterManager().stats(self._cluster_state)
         if self._discriminator:
             stats["stages_available"].append("discriminate")

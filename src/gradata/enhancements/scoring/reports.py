@@ -211,7 +211,7 @@ def export_session_csv(db_path: Path, output: io.StringIO | None = None) -> str:
 
 def generate_metrics_report(db_path: Path, window: int = 20) -> str:
     """Generate rolling metrics report as formatted text."""
-    from gradata.enhancements.metrics import compute_metrics, format_metrics
+    from ..metrics import compute_metrics, format_metrics
     m = compute_metrics(db_path, window)
     return format_metrics(m)
 

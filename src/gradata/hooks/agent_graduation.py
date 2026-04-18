@@ -1,8 +1,8 @@
 """PostToolUse hook: emit AGENT_OUTCOME event after Agent tool completes."""
 from __future__ import annotations
 
-from gradata.hooks._base import resolve_brain_dir, run_hook
-from gradata.hooks._profiles import Profile
+from ._base import resolve_brain_dir, run_hook
+from ._profiles import Profile
 
 HOOK_META = {
     "event": "PostToolUse",
@@ -33,8 +33,8 @@ def main(data: dict) -> dict | None:
             output = str(output)
         preview = output[:200] if output else ""
 
-        from gradata._events import emit
-        from gradata._paths import BrainContext
+        from .._events import emit
+        from .._paths import BrainContext
         ctx = BrainContext.from_brain_dir(brain_dir)
         emit(
             "AGENT_OUTCOME",

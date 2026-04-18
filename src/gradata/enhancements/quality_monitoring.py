@@ -11,7 +11,7 @@ Two concerns, one module:
 
 Usage::
 
-    from gradata.enhancements.quality_monitoring import (
+    from .quality_monitoring import (
         AntiPatternDetector, Detection, DEFAULT_ANTI_PATTERNS,
         detect_failures, format_alerts, Alert,
     )
@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from gradata.enhancements.metrics import MetricsWindow
+    from .metrics import MetricsWindow
 
 __all__ = [
     "BLANDNESS_THRESHOLD",

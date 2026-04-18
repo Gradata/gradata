@@ -27,8 +27,8 @@ import sqlite3
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from gradata._types import RuleTransferScope
-from gradata.enhancements.meta_rules import TIER_SUPER_META, MetaRule, SuperMetaRule
+from .._types import RuleTransferScope
+from .meta_rules import TIER_SUPER_META, MetaRule, SuperMetaRule
 
 if TYPE_CHECKING:
     from pathlib import Path

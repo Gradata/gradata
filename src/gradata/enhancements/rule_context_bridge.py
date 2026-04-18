@@ -34,7 +34,7 @@ def bootstrap_rule_context(
 
     Call once at Brain.__init__() or session start hook.
     """
-    from gradata.rules.rule_context import GraduatedRule, get_rule_context
+    from ..rules.rule_context import GraduatedRule, get_rule_context
 
     ctx = get_rule_context()
     count = 0
@@ -42,7 +42,7 @@ def bootstrap_rule_context(
     # Load from lessons.md
     if lessons_path and lessons_path.is_file():
         try:
-            from gradata.enhancements.self_improvement import parse_lessons
+            from .self_improvement import parse_lessons
             text = lessons_path.read_text(encoding="utf-8")
             lessons = parse_lessons(text)
 
@@ -126,7 +126,7 @@ def on_graduation_event(event: dict) -> None:
 
     Register with: events.register_trigger("LESSON_CHANGE", on_graduation_event)
     """
-    from gradata.rules.rule_context import GraduatedRule, get_rule_context
+    from ..rules.rule_context import GraduatedRule, get_rule_context
 
     data = event.get("data_json", event.get("data", {}))
     if isinstance(data, str):

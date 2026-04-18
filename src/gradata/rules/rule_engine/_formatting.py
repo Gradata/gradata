@@ -12,8 +12,7 @@ import random
 import secrets
 from collections import defaultdict
 
-from gradata._types import Lesson, LessonState, RuleTransferScope
-
+from ..._types import Lesson, LessonState, RuleTransferScope
 from ._engine import AppliedRule
 
 # ---------------------------------------------------------------------------

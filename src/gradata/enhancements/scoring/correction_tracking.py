@@ -447,7 +447,7 @@ def compute_density(db_path: Path | None = None, window: int = 20) -> float:
     Convenience shortcut for ``compute_correction_profile(...).correction_rate``.
     """
     if db_path is None:
-        from gradata._paths import resolve_brain_dir
+        from ..._paths import resolve_brain_dir
         db_path = resolve_brain_dir() / "system.db"
     profile = compute_correction_profile(db_path=db_path, window=window)
     return profile.correction_rate

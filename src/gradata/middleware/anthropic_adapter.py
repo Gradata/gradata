@@ -8,7 +8,7 @@ patterns.
 Usage::
 
     from anthropic import Anthropic
-    from gradata.middleware import wrap_anthropic
+    from . import wrap_anthropic
 
     client = wrap_anthropic(Anthropic(), brain_path="./brain")
     resp = client.messages.create(
@@ -27,7 +27,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from gradata.middleware._core import (
+from ._core import (
     RuleSource,
     _get,
     build_brain_rules_block,

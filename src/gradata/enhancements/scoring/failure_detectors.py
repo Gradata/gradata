@@ -23,7 +23,7 @@ Individual detectors (also importable):
 from dataclasses import dataclass, field
 from typing import Any
 
-from gradata.enhancements.metrics import MetricsWindow
+from ..metrics import MetricsWindow
 
 # ---------------------------------------------------------------------------
 # Data model

@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from gradata._types import Lesson
+    from .._types import Lesson
 
 _log = logging.getLogger(__name__)
 

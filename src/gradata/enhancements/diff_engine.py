@@ -7,7 +7,7 @@ installing the ``embeddings`` extra (``pip install gradata[embeddings]``).
 
 Usage::
 
-    from gradata.enhancements.diff_engine import compute_diff
+    from .diff_engine import compute_diff
 
     result = compute_diff(draft, final)
     print(result.severity)          # "minor"

@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from gradata._types import Lesson, LessonState
+from .._types import Lesson, LessonState
 
 
 @dataclass

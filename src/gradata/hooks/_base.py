@@ -1,8 +1,8 @@
 """Shared hook protocol for Gradata SDK hooks.
 
 Every hook module follows this pattern:
-    from gradata.hooks._base import run_hook
-    from gradata.hooks._profiles import Profile
+    from ._base import run_hook
+    from ._profiles import Profile
 
     HOOK_META = {"event": "PreToolUse", "matcher": "Write", "profile": Profile.STANDARD, ...}
     def main(data: dict) -> dict | None: ...
@@ -16,11 +16,11 @@ import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from gradata.brain import Brain
+    from ..brain import Brain
 import sys
 from pathlib import Path
 
-from gradata.hooks._profiles import Profile
+from ._profiles import Profile
 
 _log = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ def extract_message(data: dict) -> str | None:
 def get_brain() -> Brain | None:
     """Get a Brain instance from resolved brain dir, or None on failure."""
     try:
-        from gradata.brain import Brain
+        from ..brain import Brain
     except ImportError:
         return None
     brain_dir = resolve_brain_dir()

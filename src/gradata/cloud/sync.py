@@ -24,7 +24,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-from gradata._http import require_https
+from .._http import require_https
 
 log = logging.getLogger(__name__)
 

@@ -5,9 +5,9 @@ patterns/ never imports from enhancements/.
 Pure logic, no external dependencies.
 
 Usage:
-    from gradata.contrib.patterns import Pipeline, Stage
-    from gradata.contrib.patterns import SmartRAG, NaiveRAG
-    from gradata.contrib.patterns import InputGuard, OutputGuard
+    from . import Pipeline, Stage
+    from . import SmartRAG, NaiveRAG
+    from . import InputGuard, OutputGuard
 """
 
 # Lazy-load all pattern modules — nothing imported at module load time.

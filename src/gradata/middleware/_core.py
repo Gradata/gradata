@@ -14,11 +14,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from gradata._env import env_str
-from gradata.enhancements.rule_to_hook import DeterminismCheck, classify_rule
+from .._env import env_str
+from ..enhancements.rule_to_hook import DeterminismCheck, classify_rule
 
 if TYPE_CHECKING:  # pragma: no cover
-    from gradata._types import Lesson
+    from .._types import Lesson
 
 _log = logging.getLogger(__name__)
 
@@ -132,7 +132,7 @@ class RuleSource:
         if not path.is_file():
             return []
         try:
-            from gradata.enhancements.self_improvement import parse_lessons
+            from ..enhancements.self_improvement import parse_lessons
         except ImportError:  # pragma: no cover
             _log.debug("parse_lessons unavailable; returning no rules")
             return []

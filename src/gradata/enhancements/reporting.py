@@ -13,7 +13,7 @@ Just a file the agent reads.
 
 Usage::
 
-    from gradata.enhancements.reporting import (
+    from .reporting import (
         BrainBriefing, generate_briefing, export_briefing,
     )
 
@@ -164,7 +164,7 @@ def generate_briefing(
         try:
             from gradata_cloud.graduation.self_improvement import parse_lessons
         except ImportError:
-            from gradata.enhancements.self_improvement import parse_lessons
+            from .self_improvement import parse_lessons
 
         # Find lessons file
         lessons_path = None
@@ -210,7 +210,7 @@ def generate_briefing(
 
     # Extract quality metrics
     try:
-        from gradata._brain_manifest import _quality_metrics
+        from .._brain_manifest import _quality_metrics
         ctx = brain.ctx if hasattr(brain, 'ctx') else None
         quality = _quality_metrics(ctx=ctx)
         briefing.brain_health = {
@@ -235,7 +235,7 @@ def generate_briefing(
 
     # Add anti-patterns from the negative rule library
     try:
-        from gradata.enhancements.quality_monitoring import DEFAULT_ANTI_PATTERNS
+        from .quality_monitoring import DEFAULT_ANTI_PATTERNS
         briefing.anti_patterns = list(DEFAULT_ANTI_PATTERNS)
     except ImportError:
         pass
@@ -298,8 +298,8 @@ def _count_active_lessons(brain_dir: Path) -> int:
     if _lessons_cache["path"] == str(lessons_path) and _lessons_cache["mtime"] == mtime:
         return _lessons_cache["count"]
     try:
-        from gradata._core import _filter_lessons_by_state
-        from gradata.enhancements.self_improvement import parse_lessons
+        from .._core import _filter_lessons_by_state
+        from .self_improvement import parse_lessons
         lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
         count = len(_filter_lessons_by_state(lessons, min_state="INSTINCT"))
         _lessons_cache.update({"path": str(lessons_path), "mtime": mtime, "count": count})

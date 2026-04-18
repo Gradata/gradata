@@ -7,7 +7,7 @@ primitives.  ``guarded()`` wires them around any callable.
 
 Usage::
 
-    from gradata.contrib.patterns.guardrails import (
+    from .guardrails import (
         Guard, InputGuard, OutputGuard, guarded,
         pii_detector, injection_detector, scope_validator,
         banned_phrases, destructive_action,
@@ -621,7 +621,7 @@ def guards_from_graduated_rules() -> list[Guard]:
     that checks output for common API key patterns.
     """
     try:
-        from gradata.rules.rule_context import get_rule_context
+        from ...rules.rule_context import get_rule_context
     except ImportError:
         return []
 

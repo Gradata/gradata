@@ -13,12 +13,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from gradata.events_bus import EventBus
-    from gradata.rules.rule_graph import RuleGraph
+    from ...events_bus import EventBus
+    from ..rule_graph import RuleGraph
 
-from gradata._scope import RuleScope
-from gradata._types import ELIGIBLE_STATES, Lesson, LessonState
-from gradata.security.score_obfuscation import truncate_score
+from ..._scope import RuleScope
+from ..._types import ELIGIBLE_STATES, Lesson, LessonState
+from ...security.score_obfuscation import truncate_score
 
 
 @dataclass
@@ -270,7 +270,7 @@ def apply_rules(
                             / max(1, scores.get("fires", 1)),
                         },
                     )
-                from gradata.rules.rule_tracker import log_suppression
+                from ..rule_tracker import log_suppression
 
                 log_suppression(
                     rule_id=_make_rule_id(lesson),
@@ -302,7 +302,7 @@ def apply_rules(
         if relevance >= 0.4:
             scored.append((lesson, relevance))
         elif _ctx:
-            from gradata.rules.rule_tracker import log_suppression
+            from ..rule_tracker import log_suppression
 
             log_suppression(
                 rule_id=_make_rule_id(lesson),
@@ -334,7 +334,7 @@ def apply_rules(
                     reason,
                 )
                 if _ctx:
-                    from gradata.rules.rule_tracker import log_suppression
+                    from ..rule_tracker import log_suppression
 
                     log_suppression(
                         rule_id=_make_rule_id(lesson),
@@ -385,7 +385,7 @@ def apply_rules(
                 filtered_scored.append((lesson, relevance))
                 selected_ids.add(rule_id)
             elif _ctx:
-                from gradata.rules.rule_tracker import log_suppression
+                from ..rule_tracker import log_suppression
 
                 log_suppression(
                     rule_id=rule_id,
@@ -430,7 +430,7 @@ def apply_rules_with_tree(
 
     Falls back to flat scoring if no lessons have paths.
     """
-    from gradata.rules.rule_tree import RuleTree
+    from ..rule_tree import RuleTree
 
     # Check if any lessons have paths
     has_paths = any(l.path for l in lessons)

@@ -15,7 +15,7 @@ This is architecturally cleaner than a flat hooks list because:
 
 Usage::
 
-    from gradata.contrib.patterns.middleware import (
+    from .middleware import (
         Middleware, MiddlewareChain, MiddlewareContext,
     )
 

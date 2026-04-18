@@ -14,12 +14,12 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from gradata.hooks._base import resolve_brain_dir, run_hook
-from gradata.hooks._profiles import Profile
-from gradata.rules.rule_ranker import rank_rules
+from ..rules.rule_ranker import rank_rules
+from ._base import resolve_brain_dir, run_hook
+from ._profiles import Profile
 
 try:
-    from gradata.enhancements.self_improvement import parse_lessons
+    from ..enhancements.self_improvement import parse_lessons
 except ImportError:
     parse_lessons = None
 
@@ -126,7 +126,7 @@ def main(data: dict) -> dict | None:
         scope_domain = _resolve_scope_domain(data)
         if scope_domain:
             try:
-                from gradata._scoped_brain import filter_lessons_by_domain
+                from .._scoped_brain import filter_lessons_by_domain
 
                 scoped = filter_lessons_by_domain(filtered, scope_domain)
                 if scoped:

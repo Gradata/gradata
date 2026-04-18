@@ -6,7 +6,7 @@
 
     For output enforcement (recommended)::
 
-        from gradata.middleware import CrewAIGuard
+        from ..middleware import CrewAIGuard
         agent = Agent(role="Writer", guardrails=[CrewAIGuard(brain_path="./brain")])
 
     :class:`~gradata.middleware.crewai_adapter.CrewAIGuard` enforces RULE-tier
@@ -47,7 +47,7 @@ class BrainCrewMemory:
     """
 
     def __init__(self, brain_dir: str | Path = "./brain") -> None:
-        from gradata.brain import Brain
+        from ..brain import Brain
 
         self.brain = Brain(brain_dir)
 

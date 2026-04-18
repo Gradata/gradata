@@ -13,7 +13,7 @@ to ensure no patterns are missed.
 
 Usage::
 
-    from gradata.enhancements.observation_hooks import (
+    from .observation_hooks import (
         ObservationStore, Observation, ProjectDetector,
         observe_tool_use, get_project_id,
     )

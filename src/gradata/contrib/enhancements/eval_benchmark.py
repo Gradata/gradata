@@ -10,7 +10,7 @@ Three benchmark dimensions:
 
 Usage::
 
-    from gradata.contrib.enhancements.eval_benchmark import (
+    from .eval_benchmark import (
         LearningBenchmark, BenchmarkResult, BenchmarkCase,
     )
 
@@ -159,15 +159,15 @@ class LearningBenchmark:
         """
         # Import discriminator
         try:
-            from gradata.enhancements.lesson_discriminator import LessonDiscriminator
+            from ...enhancements.lesson_discriminator import LessonDiscriminator
             discriminator = LessonDiscriminator()
         except ImportError:
             discriminator = None
 
         # Import edit classifier for category detection
         try:
-            from gradata.enhancements.diff_engine import compute_diff
-            from gradata.enhancements.edit_classifier import classify_edits
+            from ...enhancements.diff_engine import compute_diff
+            from ...enhancements.edit_classifier import classify_edits
             has_classifier = True
         except ImportError:
             has_classifier = False

@@ -14,10 +14,10 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from gradata._types import CorrectionType, Lesson, LessonState
+from .._types import CorrectionType, Lesson, LessonState
 
 if TYPE_CHECKING:
-    from gradata.enhancements.edit_classifier import EditClassification
+    from .edit_classifier import EditClassification
 
 INITIAL_CONFIDENCE = 0.40  # Aligned with self_improvement.py (authoritative)
 _STOPWORDS = frozenset({

@@ -22,7 +22,7 @@ from typing import Any
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-from gradata._http import require_https
+from .._http import require_https
 
 logger = logging.getLogger("gradata.cloud")
 

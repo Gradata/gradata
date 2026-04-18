@@ -7,9 +7,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from gradata._env import env_str
-from gradata.hooks._base import should_run
-from gradata.hooks._profiles import Profile
+from .._env import env_str
+from ._base import should_run
+from ._profiles import Profile
 
 _log = logging.getLogger(__name__)
 

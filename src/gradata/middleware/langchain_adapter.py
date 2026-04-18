@@ -9,7 +9,7 @@ Provides :class:`LangChainCallback`, a ``BaseCallbackHandler`` that:
 Usage::
 
     from langchain_openai import ChatOpenAI
-    from gradata.middleware import LangChainCallback
+    from . import LangChainCallback
 
     llm = ChatOpenAI(callbacks=[LangChainCallback(brain_path="./brain")])
     llm.invoke("Write a short greeting")
@@ -28,7 +28,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from gradata.middleware._core import (
+from ._core import (
     RuleSource,
     _get,
     build_brain_rules_block,

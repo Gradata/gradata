@@ -27,13 +27,13 @@ from enum import Enum, auto
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from gradata._types import Lesson
-    from gradata.enhancements.edit_classifier import EditClassification
+    from .._types import Lesson
+    from .edit_classifier import EditClassification
 
 _log = logging.getLogger(__name__)
 
 # Import canonical factual-token regex from edit_classifier.
-from gradata.enhancements.edit_classifier import _FACTUAL_RE
+from .edit_classifier import _FACTUAL_RE
 
 # ---------------------------------------------------------------------------
 # Archetype Taxonomy (12 correction types)

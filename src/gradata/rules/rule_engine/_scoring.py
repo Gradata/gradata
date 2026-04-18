@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import json
 
-from gradata._scope import RuleScope, scope_matches
-from gradata._types import CorrectionType, Lesson, LessonState, RuleTransferScope
+from ..._scope import RuleScope, scope_matches
+from ..._types import CorrectionType, Lesson, LessonState, RuleTransferScope
 
 # ---------------------------------------------------------------------------
 # State Priority

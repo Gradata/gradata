@@ -7,7 +7,7 @@ and returns the CrewAI-expected ``(valid, result_or_error)`` tuple.
 Usage::
 
     from crewai import Agent
-    from gradata.middleware import CrewAIGuard
+    from . import CrewAIGuard
 
     guard = CrewAIGuard(brain_path="./brain")
     agent = Agent(
@@ -27,7 +27,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from gradata.middleware._core import (
+from ._core import (
     RuleSource,
     RuleViolation,
     check_output,

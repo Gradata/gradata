@@ -4,8 +4,8 @@
     ``gradata.integrations`` is deprecated and will be removed in v0.8.0.
     The canonical adapters now live in ``gradata.middleware``::
 
-        from gradata.middleware import wrap_anthropic, wrap_openai
-        from gradata.middleware import LangChainCallback, CrewAIGuard
+        from ..middleware import wrap_anthropic, wrap_openai
+        from ..middleware import LangChainCallback, CrewAIGuard
 
     ``gradata.integrations.embeddings`` and
     ``gradata.integrations.session_history`` are NOT deprecated — those

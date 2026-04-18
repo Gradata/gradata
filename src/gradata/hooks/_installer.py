@@ -13,7 +13,7 @@ from pathlib import Path
 
 _log = logging.getLogger(__name__)
 
-from gradata.hooks._profiles import Profile
+from ._profiles import Profile
 
 # ---------------------------------------------------------------------------
 # Hook registry: (module, event, matcher, profile, timeout, description)
@@ -142,7 +142,7 @@ def install(profile: str = "standard") -> None:
 
     # Activation telemetry — fires once per machine, only if opted in.
     try:
-        from gradata import _telemetry
+        from .. import _telemetry
 
         _telemetry.send_once("first_hook_installed")
     except Exception:

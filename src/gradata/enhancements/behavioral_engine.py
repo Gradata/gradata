@@ -12,7 +12,7 @@ constraints are warnings, MAY constraints are suggestions.
 
 Usage::
 
-    from gradata.enhancements.behavioral_engine import (
+    from .behavioral_engine import (
         Directive, DirectiveRegistry, RulePriority,
         PrioritizedConstraint,
     )

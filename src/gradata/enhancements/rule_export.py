@@ -9,7 +9,7 @@ Supported targets:
 - continue  -> .continue/rules/gradata-rules.md (Continue.dev rules)
 
 Usage (library):
-    from gradata.enhancements.rule_export import export_rules
+    from .rule_export import export_rules
     text = export_rules(brain_root, target="cursor")
 
 Usage (CLI):
@@ -33,7 +33,7 @@ def _parse_rules(
     """
     import re as _re
 
-    from gradata.enhancements.self_improvement import parse_lessons
+    from .self_improvement import parse_lessons
 
     lessons_file = lessons_path if lessons_path is not None else brain_root / "lessons.md"
     if not lessons_file.exists():

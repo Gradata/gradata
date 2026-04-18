@@ -4,7 +4,7 @@
     ``gradata.integrations.anthropic_adapter`` is deprecated and will be
     removed in v0.8.0.  Use ``gradata.middleware.anthropic_adapter`` instead::
 
-        from gradata.middleware import wrap_anthropic
+        from ..middleware import wrap_anthropic
         client = wrap_anthropic(Anthropic(), brain_path="./brain")
 
     ``wrap_anthropic`` returns an ``AnthropicMiddleware`` wrapper (richer rule
@@ -38,7 +38,7 @@ def patch_anthropic(client: Any, brain_dir: str | Path = "./brain") -> Any:
     .. deprecated::
         Use :func:`gradata.middleware.wrap_anthropic` instead.
     """
-    from gradata.brain import Brain
+    from ..brain import Brain
 
     try:
         brain = Brain(brain_dir)

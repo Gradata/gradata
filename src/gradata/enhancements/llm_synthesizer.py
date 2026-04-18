@@ -22,11 +22,11 @@ import urllib.error
 import urllib.request
 from typing import TYPE_CHECKING
 
-from gradata._env import env_str
-from gradata._http import require_https
+from .._env import env_str
+from .._http import require_https
 
 if TYPE_CHECKING:
-    from gradata._types import Lesson
+    from .._types import Lesson
 
 log = logging.getLogger(__name__)
 
@@ -81,7 +81,7 @@ def synthesise_principle_llm(
     # Build bullet list of lesson descriptions
     # Sanitize each description before embedding in the LLM prompt to neutralize
     # prompt-injection attempts that may have bypassed the ingest blocklist.
-    from gradata.enhancements._sanitize import sanitize_lesson_content
+    from ._sanitize import sanitize_lesson_content
 
     bullets = []
     for lesson in lessons[:10]:  # Cap at 10 to limit prompt size

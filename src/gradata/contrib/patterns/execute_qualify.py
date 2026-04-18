@@ -14,7 +14,7 @@ The key insight: never trust memory. Always re-read files after execution.
 
 Usage::
 
-    from gradata.contrib.patterns.execute_qualify import (
+    from .execute_qualify import (
         ExecuteQualifyLoop, QualifyResult, FailureClassification,
     )
 

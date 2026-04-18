@@ -235,7 +235,7 @@ def evaluate_success_conditions(db_path: Path, window: int = 20) -> SuccessRepor
 
         # 6. Output not becoming bland (from metrics module)
         try:
-            from gradata.enhancements.metrics import compute_metrics
+            from ..metrics import compute_metrics
             m = compute_metrics(db_path, window)
             blandness = m.get("blandness_score", 0.0) if isinstance(m, dict) else getattr(m, "blandness_score", 0.0)
             bland_ok = blandness < 0.70

@@ -12,7 +12,7 @@ into the fire_count / confidence pipeline.
 
 Public API
 ----------
-    from gradata.enhancements.dedup import (
+    from .dedup import (
         observation_fingerprint,
         is_duplicate,
         register_observation,
@@ -72,7 +72,7 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
-from gradata._db import ensure_table, get_connection
+from .._db import ensure_table, get_connection
 
 _log = logging.getLogger(__name__)
 

@@ -228,8 +228,7 @@ def compute_brain_scores(
     """
     # Primary path: delegate to the authoritative implementation
     try:
-        import gradata._events as _events
-
+        from ... import _events as _events
         _fn = getattr(_events, "compute_brain_scores", None)
         if _fn is None:
             raise AttributeError("compute_brain_scores not available")

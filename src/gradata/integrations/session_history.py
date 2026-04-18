@@ -8,7 +8,7 @@ prevented the mistake). A rule that was corrected is *not effective*
 (the agent still made the mistake despite the rule).
 
 Usage:
-    from gradata.integrations.session_history import SessionHistory
+    from .session_history import SessionHistory
 
     sh = SessionHistory()
     sh.subscribe_to_bus(bus)  # auto-wires to event bus

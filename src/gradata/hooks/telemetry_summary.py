@@ -17,7 +17,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from gradata.hooks._base import resolve_brain_dir
+from ._base import resolve_brain_dir
 
 
 def _load(path: Path, tail: int) -> list[dict]:

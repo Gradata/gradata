@@ -7,7 +7,7 @@ learning from day one.
 
 Usage::
 
-    from gradata.enhancements.git_backfill import backfill_from_git
+    from .git_backfill import backfill_from_git
 
     stats = backfill_from_git(
         brain=brain,

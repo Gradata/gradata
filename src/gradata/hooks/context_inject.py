@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import os
 
-from gradata.hooks._base import extract_message, resolve_brain_dir, run_hook
-from gradata.hooks._profiles import Profile
+from ._base import extract_message, resolve_brain_dir, run_hook
+from ._profiles import Profile
 
 HOOK_META = {
     "event": "UserPromptSubmit",
@@ -38,7 +38,7 @@ def main(data: dict) -> dict | None:
             return None
 
         try:
-            from gradata.brain import Brain
+            from ..brain import Brain
             brain = Brain(brain_dir)
             results = brain.search(message, top_k=3)
         except Exception:

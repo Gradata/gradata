@@ -25,7 +25,7 @@ Stdlib only — no third-party dependencies.
 
 Example
 -------
-    from gradata.contrib.patterns.evaluator import (
+    from .evaluator import (
         evaluate_optimize_loop,
         QUALITY_DIMENSIONS,
     )
@@ -477,7 +477,7 @@ def dimensions_from_graduated_rules(task_type: str = "") -> list[EvalDimension]:
     that penalizes outputs containing em dashes.
     """
     try:
-        from gradata.rules.rule_context import get_rule_context
+        from ...rules.rule_context import get_rule_context
     except ImportError:
         return []
 

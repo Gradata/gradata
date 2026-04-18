@@ -8,8 +8,8 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
-from gradata.hooks._base import resolve_brain_dir, run_hook
-from gradata.hooks._profiles import Profile
+from ._base import resolve_brain_dir, run_hook
+from ._profiles import Profile
 
 HOOK_META = {
     "event": "Stop",

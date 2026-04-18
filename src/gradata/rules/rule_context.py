@@ -9,7 +9,7 @@ Does NOT import from enhancements/ — graduation pushes data IN via the bridge.
 
 Usage:
     # Any pattern can query:
-    from gradata.rules.rule_context import get_rule_context
+    from .rule_context import get_rule_context
     ctx = get_rule_context()
     tone_rules = ctx.query(category="TONE")
 

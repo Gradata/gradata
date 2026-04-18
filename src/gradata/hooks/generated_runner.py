@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sys
 
-from gradata.hooks._generated_runner_core import run_generated_hooks
+from ._generated_runner_core import run_generated_hooks
 
 
 def main() -> int:

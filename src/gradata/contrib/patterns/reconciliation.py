@@ -9,7 +9,7 @@ and produces structured summaries.
 
 Usage::
 
-    from gradata.contrib.patterns.reconciliation import (
+    from .reconciliation import (
         Reconciler, PlanItem, ActualResult,
         DeviationScore, ReconciliationSummary,
     )

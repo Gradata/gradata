@@ -7,7 +7,7 @@ Q-table so it doesn't start cold.
 
 Usage::
 
-    from gradata.enhancements.router_warmstart import warm_start_router
+    from .router_warmstart import warm_start_router
 
     router = warm_start_router(
         db_path=Path("brain/system.db"),
@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from gradata.contrib.patterns.q_learning_router import QLearningRouter
+    from ..contrib.patterns.q_learning_router import QLearningRouter
 
 _log = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ def warm_start_router(
     Returns:
         A pre-trained QLearningRouter instance.
     """
-    from gradata.contrib.patterns.q_learning_router import QLearningRouter, RouterConfig
+    from ..contrib.patterns.q_learning_router import QLearningRouter, RouterConfig
 
     router = QLearningRouter(RouterConfig(
         epsilon_start=0.5,  # Less exploration since we have data

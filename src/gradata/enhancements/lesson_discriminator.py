@@ -13,7 +13,7 @@ the same confidence threshold pattern.
 
 Usage::
 
-    from gradata.enhancements.lesson_discriminator import (
+    from .lesson_discriminator import (
         LessonDiscriminator, DiscriminatorConfig,
         DiscriminatorVerdict, ImportanceSignal,
     )

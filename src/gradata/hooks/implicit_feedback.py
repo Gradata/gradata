@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 import re
 
-from gradata.hooks._base import extract_message, resolve_brain_dir, run_hook
-from gradata.hooks._profiles import Profile
+from ._base import extract_message, resolve_brain_dir, run_hook
+from ._profiles import Profile
 
 _log = logging.getLogger(__name__)
 
@@ -98,8 +98,8 @@ def main(data: dict) -> dict | None:
 
         if brain_dir:
             try:
-                from gradata._events import emit
-                from gradata._paths import BrainContext
+                from .._events import emit
+                from .._paths import BrainContext
 
                 ctx = BrainContext.from_brain_dir(brain_dir)
                 emit(

@@ -33,8 +33,8 @@ import json
 import os
 from pathlib import Path
 
-from gradata.hooks._base import run_hook
-from gradata.hooks._profiles import Profile
+from ._base import run_hook
+from ._profiles import Profile
 
 HOOK_META = {
     "event": "PostToolUse",
@@ -47,7 +47,7 @@ HOOK_META = {
 def _get_brain():
     """Get or auto-initialize a brain instance."""
     try:
-        from gradata.brain import Brain
+        from ..brain import Brain
     except ImportError:
         return None
 
@@ -138,7 +138,7 @@ def _build_progress(brain, event: dict) -> str:
     No jargon. No decimals. Just: how close is this to becoming a rule?
     """
     try:
-        from gradata.enhancements.self_improvement import parse_lessons
+        from ..enhancements.self_improvement import parse_lessons
     except ImportError:
         return ""
 

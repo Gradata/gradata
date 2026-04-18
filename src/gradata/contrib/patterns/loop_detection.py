@@ -13,7 +13,7 @@ making it resistant to argument reordering.
 
 Usage::
 
-    from gradata.contrib.patterns.loop_detection import (
+    from .loop_detection import (
         LoopDetector, LoopAction, LoopEvent,
     )
 

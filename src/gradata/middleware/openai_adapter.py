@@ -8,7 +8,7 @@ response optionally checked against RULE-tier regex patterns.
 Usage::
 
     from openai import OpenAI
-    from gradata.middleware import wrap_openai
+    from . import wrap_openai
 
     client = wrap_openai(OpenAI(), brain_path="./brain")
     resp = client.chat.completions.create(
@@ -22,7 +22,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from gradata.middleware._core import (
+from ._core import (
     RuleSource,
     _get,
     build_brain_rules_block,

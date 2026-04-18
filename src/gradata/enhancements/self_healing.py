@@ -17,9 +17,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from gradata._scope import RuleScope
-    from gradata._types import Lesson
-    from gradata.brain import Brain
+    from .._scope import RuleScope
+    from .._types import Lesson
+    from ..brain import Brain
 
 # Only RULE state with confidence >= this threshold triggers self-healing.
 # This is intentionally lower than RULE_THRESHOLD (0.90): self-healing must
@@ -54,7 +54,7 @@ def detect_rule_failure(
     Returns:
         Dict with failure details if a covering rule was found, None otherwise.
     """
-    from gradata._types import LessonState
+    from .._types import LessonState
 
     cat = correction_category.upper()
     candidates = [
@@ -144,7 +144,7 @@ def retroactive_test(
 
     # Check if the delta is relevant to the correction
     # Use both TF-IDF similarity and simple word-stem overlap for short texts
-    from gradata.enhancements.similarity import best_similarity
+    from .similarity import best_similarity
 
     sim = best_similarity(delta_text, correction_description)
 
@@ -267,7 +267,7 @@ def _find_centroid(descriptions: list[str]) -> str:
     if len(descriptions) <= 1:
         return descriptions[0] if descriptions else ""
 
-    from gradata.enhancements.similarity import best_similarity
+    from .similarity import best_similarity
 
     best_desc, best_avg = descriptions[0], 0.0
     for desc in descriptions:
@@ -295,7 +295,7 @@ def check_nudge_threshold(
         {"should_nudge": bool, "correction_count": int, "centroid_description": str,
          "proposed_lesson": dict | None, ...}
     """
-    from gradata._types import LessonState
+    from .._types import LessonState
 
     cat = category.upper()
 
@@ -349,7 +349,7 @@ def check_nudge_threshold(
     )
 
     # Propose an INSTINCT lesson with pending_approval
-    from gradata.enhancements.self_improvement import INITIAL_CONFIDENCE
+    from .self_improvement import INITIAL_CONFIDENCE
 
     proposed = {
         "state": "INSTINCT",

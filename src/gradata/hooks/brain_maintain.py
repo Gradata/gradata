@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gradata.hooks._base import resolve_brain_dir, run_hook
-from gradata.hooks._profiles import Profile
+from ._base import resolve_brain_dir, run_hook
+from ._profiles import Profile
 
 HOOK_META = {
     "event": "Stop",
@@ -16,7 +16,7 @@ HOOK_META = {
 def _rebuild_fts(brain_dir: str, ctx=None) -> None:
     """Rebuild FTS index from brain content files."""
     try:
-        from gradata._query import fts_index
+        from .._query import fts_index
         brain_path = Path(brain_dir)
 
         # Index lessons.md
@@ -41,7 +41,7 @@ def _rebuild_fts(brain_dir: str, ctx=None) -> None:
 def _generate_manifest(ctx=None) -> None:
     """Generate brain manifest for quality tracking."""
     try:
-        from gradata._brain_manifest import generate_manifest, write_manifest
+        from .._brain_manifest import generate_manifest, write_manifest
         manifest = generate_manifest(ctx=ctx)
         write_manifest(manifest, ctx=ctx)
     except Exception:
@@ -54,7 +54,7 @@ def main(data: dict) -> dict | None:
         if not brain_dir:
             return None
 
-        from gradata._paths import BrainContext
+        from .._paths import BrainContext
         ctx = BrainContext.from_brain_dir(brain_dir)
 
         _rebuild_fts(brain_dir, ctx=ctx)

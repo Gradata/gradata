@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from gradata._paths import BrainContext
+    from .._paths import BrainContext
 
 logger = logging.getLogger("gradata.rule_integrity")
 

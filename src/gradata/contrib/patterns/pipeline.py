@@ -10,7 +10,7 @@ internals.  Callers wire logging/event emission externally if desired.
 
 Usage::
 
-    from gradata.contrib.patterns.pipeline import Pipeline, Stage, GateResult, gate
+    from .pipeline import Pipeline, Stage, GateResult, gate
 
     def research(query: str) -> dict:
         return {"findings": f"Research on {query}"}

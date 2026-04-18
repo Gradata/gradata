@@ -15,7 +15,7 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from gradata._scope import RuleScope, scope_to_dict
+from .._scope import RuleScope, scope_to_dict
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -57,7 +57,7 @@ def log_application(
         tags.append("outcome:contradicted")
 
     try:
-        from gradata._events import emit
+        from .._events import emit
 
         return emit("RULE_APPLICATION", source, data, tags, session)
     except Exception as e:
@@ -93,7 +93,7 @@ def log_suppression(
         ctx: Optional BrainContext.
         session: Optional session number.
     """
-    from gradata._events import emit
+    from .._events import emit
 
     data = {
         "rule_id": rule_id,
@@ -108,7 +108,7 @@ def log_suppression(
 def get_session_applications(db_path: Path, session: int) -> list[dict]:
     """All RULE_APPLICATION events for a given session."""
     try:
-        from gradata._events import query
+        from .._events import query
 
         events = query(event_type="RULE_APPLICATION", session=session, limit=500)
         return [
@@ -144,7 +144,7 @@ class RuleApplication:
 def get_rule_history(db_path: Path, rule_id: str, limit: int = 20) -> list[dict]:
     """Recent RULE_APPLICATION events for a specific rule."""
     try:
-        from gradata._events import query
+        from .._events import query
 
         events = query(event_type="RULE_APPLICATION", limit=500)
         matching = [e for e in events if e.get("data", {}).get("rule_id") == rule_id]

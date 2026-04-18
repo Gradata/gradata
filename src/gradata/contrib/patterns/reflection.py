@@ -8,7 +8,7 @@ required criteria pass or the cycle budget is exhausted.
 
 Typical usage::
 
-    from gradata.contrib.patterns.reflection import (
+    from .reflection import (
         reflect,
         EMAIL_CHECKLIST,
         CriterionScore,
@@ -521,7 +521,7 @@ def criteria_from_graduated_rules(task_type: str = "") -> list[Criterion]:
     that checks whether the output uses casual tone.
     """
     try:
-        from gradata.rules.rule_context import get_rule_context
+        from ...rules.rule_context import get_rule_context
     except ImportError:
         return []
 

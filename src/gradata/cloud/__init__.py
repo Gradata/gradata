@@ -19,7 +19,7 @@ Cloud mode (Gradata platform):
   - Adaptive retrieval optimization
 
 Usage:
-    from gradata import Brain
+    from .. import Brain
 
     brain = Brain("./my-brain")
     brain.connect_cloud(api_key="pk_...")  # or set GRADATA_API_KEY env var

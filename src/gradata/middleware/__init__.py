@@ -8,7 +8,7 @@ and enforce RULE-tier patterns on outputs.
 Quick start:
 
     from anthropic import Anthropic
-    from gradata.middleware import wrap_anthropic
+    from . import wrap_anthropic
 
     client = wrap_anthropic(Anthropic(), brain_path="./brain")
     # All client.messages.create(...) calls now get rules injected.
@@ -32,7 +32,7 @@ with the install hint.
 
 from __future__ import annotations
 
-from gradata.middleware._core import (
+from ._core import (
     RuleSource,
     RuleViolation,
     build_brain_rules_block,

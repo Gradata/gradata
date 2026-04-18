@@ -21,9 +21,9 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from gradata._env import env_str
-from gradata._http import require_https
-from gradata._types import Lesson, LessonState, RuleTransferScope
+from .._env import env_str
+from .._http import require_https
+from .._types import Lesson, LessonState, RuleTransferScope
 
 _log = logging.getLogger(__name__)
 
@@ -578,7 +578,7 @@ def parse_lessons_from_markdown(text: str) -> list[Lesson]:
     .. deprecated:: 0.1.0
         Use ``gradata.enhancements.self_improvement.parse_lessons`` directly.
     """
-    from gradata.enhancements.self_improvement import parse_lessons
+    from .self_improvement import parse_lessons
 
     return parse_lessons(text)
 
@@ -670,7 +670,7 @@ def _try_llm_principle(rules: list[Lesson], category: str) -> str | None:
     b = env_str("GRADATA_LLM_BASE")
     if k and b:
         try:
-            from gradata.enhancements.llm_synthesizer import synthesise_principle_llm
+            from .llm_synthesizer import synthesise_principle_llm
 
             return synthesise_principle_llm(
                 lessons=rules,
@@ -716,7 +716,7 @@ def _call_llm_for_synthesis(
     # Sanitize descriptions before embedding in the LLM prompt. Neutralizes
     # prompt-injection attempts that may have bypassed the ingest-gate blocklist
     # (e.g. rephrased or context-shifted injections).
-    from gradata.enhancements._sanitize import sanitize_lesson_content
+    from ._sanitize import sanitize_lesson_content
 
     safe_descriptions = [sanitize_lesson_content(d, "llm_prompt") for d in descriptions]
     bullet_text = "\n".join(f"- {d}" for d in safe_descriptions)
@@ -1111,8 +1111,7 @@ def __getattr__(name: str):
         "ensure_meta_table",
     }
     if name in _STORAGE_NAMES:
-        import gradata.enhancements.meta_rules_storage as _storage
-
+        from . import meta_rules_storage as _storage
         obj = getattr(_storage, "ensure_table" if name == "ensure_meta_table" else name)
         globals()[name] = obj
         return obj

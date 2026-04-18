@@ -20,8 +20,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from gradata.enhancements.diff_engine import DiffResult
-    from gradata.enhancements.instruction_cache import InstructionCache
+    from .diff_engine import DiffResult
+    from .instruction_cache import InstructionCache
 
 
 @dataclass
@@ -448,7 +448,7 @@ def _get_llm_provider():
     """Get or create the LLM provider for extraction."""
     global _provider_instance
     if _provider_instance is None:
-        from gradata.enhancements.llm_provider import get_provider
+        from .llm_provider import get_provider
         _provider_instance = get_provider()
     return _provider_instance
 
@@ -498,7 +498,7 @@ def extract_behavioral_instruction(
 
     Resolution order: cache hit -> template match -> LLM extraction -> None.
     """
-    from gradata.enhancements.instruction_cache import InstructionCache
+    from .instruction_cache import InstructionCache
 
     added_match = re.search(r"added:\s*([^)]+)", classification.description.lower())
     cut_match = re.search(r"cut:\s*([^);]+)", classification.description.lower())

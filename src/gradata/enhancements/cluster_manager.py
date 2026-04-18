@@ -15,7 +15,7 @@ Key design from EverOS:
 
 Usage::
 
-    from gradata.enhancements.cluster_manager import (
+    from .cluster_manager import (
         ClusterManager, ClusterConfig, ClusterState, ClusterAssignment,
     )
 
@@ -136,7 +136,7 @@ class ClusterAssignment:
 # Math utilities (shared implementation in _math.py)
 # ---------------------------------------------------------------------------
 
-from gradata._stats import cosine_similarity
+from .._stats import cosine_similarity
 
 # ---------------------------------------------------------------------------
 # Cluster Manager

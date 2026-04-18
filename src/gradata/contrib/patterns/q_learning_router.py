@@ -14,7 +14,7 @@ Key adaptations for Gradata:
 
 Usage::
 
-    from gradata.contrib.patterns.q_learning_router import (
+    from .q_learning_router import (
         QLearningRouter, RouterConfig, RouteDecision,
     )
 

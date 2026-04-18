@@ -11,7 +11,7 @@ without any domain configuration.
 
 Example::
 
-    from gradata.rules.scope import classify_scope
+    from .scope import classify_scope
 
     task, audience = classify_scope("prepare for the upcoming meeting")
     print(task)      # TaskType.MEETING_PREP
@@ -353,7 +353,7 @@ def register_task_type(
 
     Example::
 
-        from gradata.rules.scope import register_task_type
+        from .scope import register_task_type
 
         register_task_type(
             name="policy_review",

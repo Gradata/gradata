@@ -10,7 +10,7 @@ Each module has cost/stability tags for informed decisions.
 
 Usage::
 
-    from gradata.contrib.enhancements.install_manifest import (
+    from .install_manifest import (
         InstallManifest, Module, Profile, InstallState,
         ModuleCost, ModuleStability,
     )

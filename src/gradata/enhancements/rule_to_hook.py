@@ -41,7 +41,7 @@ PROMOTION_REVERSAL_LOOKBACK_DAYS = 30
 def _resolve_events_path() -> Path | None:
     """Best-effort events.jsonl resolution (None when no brain is configured)."""
     try:
-        from gradata import _paths as _p
+        from .. import _paths as _p
         p = Path(_p.EVENTS_JSONL)
         return p if p.is_file() else None
     except Exception:
@@ -152,7 +152,7 @@ def _passes_empirical_gate(lesson) -> tuple[bool, str]:
         )
     # Derive the rule_id the same way rule_engine does.
     try:
-        from gradata.rules.rule_engine import _make_rule_id
+        from ..rules.rule_engine import _make_rule_id
         rule_id = _make_rule_id(lesson)
     except Exception:
         rule_id = ""
@@ -377,7 +377,7 @@ def render_hook(candidate: HookCandidate) -> str | None:
         # Sanitize before embedding in JS.  json.dumps() handles backslash and
         # double-quote but NOT backtick (template-literal injection) or
         # </script>-style breakouts.  Apply js_template escaping after dumps.
-        from gradata.enhancements._sanitize import sanitize_lesson_content
+        from ._sanitize import sanitize_lesson_content
 
         # Neutralize prompt-injection markers in the text that will surface to
         # the LLM via the mandatory-directive wrapper.

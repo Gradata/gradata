@@ -4,7 +4,7 @@
     ``gradata.integrations.openai_adapter`` is deprecated and will be
     removed in v0.8.0.  Use ``gradata.middleware.openai_adapter`` instead::
 
-        from gradata.middleware import wrap_openai
+        from ..middleware import wrap_openai
         client = wrap_openai(OpenAI(), brain_path="./brain")
 
     ``wrap_openai`` returns an ``OpenAIMiddleware`` proxy with richer rule
@@ -38,7 +38,7 @@ def patch_openai(client: Any, brain_dir: str | Path = "./brain") -> Any:
     .. deprecated::
         Use :func:`gradata.middleware.wrap_openai` instead.
     """
-    from gradata.brain import Brain
+    from ..brain import Brain
 
     try:
         brain = Brain(brain_dir)

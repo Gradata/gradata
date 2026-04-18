@@ -34,7 +34,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from gradata.enhancements.self_improvement import (
+from ..self_improvement import (
     PATTERN_THRESHOLD,
     Lesson,
     LessonState,

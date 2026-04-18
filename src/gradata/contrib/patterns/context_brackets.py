@@ -9,7 +9,7 @@ context rot by making degradation explicit and prescriptive.
 
 Usage::
 
-    from gradata.contrib.patterns.context_brackets import (
+    from .context_brackets import (
         ContextBracket, BracketConfig, get_bracket,
         get_bracket_guidance, estimate_remaining_capacity,
     )

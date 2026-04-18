@@ -17,19 +17,19 @@ import sys
 
 def install_hook(profile: str = "standard") -> None:
     """Add Gradata hooks to Claude Code settings."""
-    from gradata.hooks._installer import install
+    from ._installer import install
     install(profile)
 
 
 def uninstall_hook() -> None:
     """Remove Gradata hooks from Claude Code settings."""
-    from gradata.hooks._installer import uninstall
+    from ._installer import uninstall
     uninstall()
 
 
 def hook_status() -> None:
     """Check if Gradata hooks are installed."""
-    from gradata.hooks._installer import status
+    from ._installer import status
     status()
 
 
@@ -60,13 +60,13 @@ def capture_correction() -> None:
     if not old_string or not new_string or old_string == new_string:
         return
 
-    from gradata.hooks._base import resolve_brain_dir
+    from ._base import resolve_brain_dir
     brain_dir = resolve_brain_dir()
     if not brain_dir:
         return
 
     try:
-        from gradata import Brain
+        from .. import Brain
         brain = Brain(brain_dir)
         brain.correct(draft=old_string, final=new_string, category="CODE")
         _log.debug("Captured correction from Claude Code hook")

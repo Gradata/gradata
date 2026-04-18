@@ -16,7 +16,7 @@ import sys
 import urllib.error
 import urllib.request
 
-from gradata.hooks.daemon import HOST, PORT
+from .daemon import HOST, PORT
 
 
 def _try_daemon(name: str, body: str, timeout: float = 5.0) -> dict | None:

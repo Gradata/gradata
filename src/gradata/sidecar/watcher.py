@@ -154,7 +154,7 @@ def _ast_severity_or_none(before: str, after: str, path: str) -> str | None:
     falls back to the edit-distance classifier. Never raises.
     """
     try:
-        from gradata.enhancements.ast_severity import (
+        from ..enhancements.ast_severity import (
             ast_severity_enabled,
             classify_ast_severity,
             language_supported,
@@ -519,7 +519,7 @@ class FileWatcher:
         if self._brain_db is None:
             return {}
         try:
-            from gradata.brain import Brain
+            from ..brain import Brain
 
             brain = Brain(self._brain_db)
 
@@ -548,7 +548,7 @@ class FileWatcher:
             Event dict on success, empty dict on failure.
         """
         try:
-            from gradata import _events
+            from .. import _events
 
             return _events.emit("CORRECTION", _SOURCE, data, tags) or {}
         except Exception as exc:

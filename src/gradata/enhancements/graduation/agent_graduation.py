@@ -52,7 +52,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 # Import graduation constants from self_improvement (same research-backed values)
-from gradata.enhancements.self_improvement import (
+from ..self_improvement import (
     ACCEPTANCE_BONUS,
     MIN_APPLICATIONS_FOR_PATTERN,
     MIN_APPLICATIONS_FOR_RULE,

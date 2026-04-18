@@ -8,7 +8,7 @@ auto-rolled back to INSTINCT confidence.
 SQLite table: rule_canary (category PK, status, start_session, correction_count)
 
 Usage:
-    from gradata.enhancements.rule_canary import (
+    from .rule_canary import (
         promote_to_canary, check_canary_health, rollback_rule, get_canary_rules,
     )
 """
@@ -213,7 +213,7 @@ def rollback_rule(rule_category: str, reason: str, db_path: Path | None = None) 
 
         # Emit RULE_ROLLBACK event
         try:
-            from gradata._events import emit
+            from .._events import emit
             emit(
                 "RULE_ROLLBACK",
                 "rule_canary:rollback_rule",
@@ -247,7 +247,7 @@ def promote_to_active(rule_category: str, db_path: Path | None = None) -> None:
 
         # Emit CANARY_PROMOTED event
         try:
-            from gradata._events import emit
+            from .._events import emit
             emit(
                 "CANARY_PROMOTED",
                 "rule_canary:promote_to_active",

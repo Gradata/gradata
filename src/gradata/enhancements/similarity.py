@@ -12,7 +12,7 @@ Two modes:
 
 Public API::
 
-    from gradata.enhancements.similarity import semantic_similarity
+    from .similarity import semantic_similarity
     score = semantic_similarity("make it warmer", "add empathy")  # 0.0-1.0
 """
 

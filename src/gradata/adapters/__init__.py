@@ -70,6 +70,6 @@ class MemoryAdapter(Protocol):
         ...
 
 
-from gradata.adapters.mem0 import Mem0Adapter
+from .mem0 import Mem0Adapter
 
 __all__ = ["Mem0Adapter", "MemoryAdapter"]
