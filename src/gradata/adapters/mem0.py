@@ -136,7 +136,23 @@ class Mem0Adapter:
             logger.warning("Mem0Adapter.push_correction failed: %s", exc)
             return None
 
-        return _extract_memory_id(response)
+        if response is None:
+            return None
+        if isinstance(response, str):
+            return response
+        if isinstance(response, dict):
+            if isinstance(response.get("id"), str):
+                return response["id"]
+            _results = response.get("results")
+            if isinstance(_results, list) and _results:
+                _first = _results[0]
+                if isinstance(_first, dict) and isinstance(_first.get("id"), str):
+                    return _first["id"]
+        if isinstance(response, list) and response:
+            _first = response[0]
+            if isinstance(_first, dict) and isinstance(_first.get("id"), str):
+                return _first["id"]
+        return None
 
     def pull_memory_for_context(
         self,
@@ -209,35 +225,6 @@ class Mem0Adapter:
 # Response-shape helpers (Mem0 SDK returns slightly different shapes
 # across versions; isolate the parsing in one place)
 # ----------------------------------------------------------------------
-
-
-def _extract_memory_id(response: Any) -> str | None:
-    """Best-effort: pluck a memory id out of whatever ``client.add()``
-    returned.
-
-    Handles all observed Mem0 shapes:
-      - ``{"id": "..."}``
-      - ``{"results": [{"id": "..."}, ...]}``
-      - ``[{"id": "..."}, ...]``
-      - ``"..."`` (plain id)
-    """
-    if response is None:
-        return None
-    if isinstance(response, str):
-        return response
-    if isinstance(response, dict):
-        if "id" in response and isinstance(response["id"], str):
-            return response["id"]
-        results = response.get("results")
-        if isinstance(results, list) and results:
-            first = results[0]
-            if isinstance(first, dict) and isinstance(first.get("id"), str):
-                return first["id"]
-    if isinstance(response, list) and response:
-        first = response[0]
-        if isinstance(first, dict) and isinstance(first.get("id"), str):
-            return first["id"]
-    return None
 
 
 def _normalise_search_results(raw: Any) -> list[dict[str, Any]]:
