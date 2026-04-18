@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from gradata._events import emit as _emit_event_fn
+from gradata._tenant import tenant_for
 
 # ═══════════════════════════════════════════════════════════════════
 # Registries (domain-agnostic defaults, override via register_*)
@@ -103,7 +104,8 @@ def _init_tables(conn: sqlite3.Connection) -> None:
             source       TEXT DEFAULT 'claude_assisted',
             prep_level   INTEGER DEFAULT 0,
             session      INTEGER,
-            timestamp    TEXT
+            timestamp    TEXT,
+            tenant_id    TEXT
         );
         CREATE TABLE IF NOT EXISTS prep_outcomes (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -115,7 +117,8 @@ def _init_tables(conn: sqlite3.Connection) -> None:
             days_to_outcome INTEGER,
             claude_assisted INTEGER DEFAULT 1,
             session         INTEGER,
-            timestamp       TEXT
+            timestamp       TEXT,
+            tenant_id       TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_activity_log_date ON activity_log(date);
         CREATE INDEX IF NOT EXISTS idx_activity_log_source ON activity_log(source);
@@ -128,6 +131,8 @@ def _init_tables(conn: sqlite3.Connection) -> None:
         for col in ("session", "timestamp"):
             with contextlib.suppress(sqlite3.OperationalError):
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT DEFAULT NULL")
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN tenant_id TEXT")
 
 
 def log_activity(
@@ -146,14 +151,15 @@ def log_activity(
     today = date or datetime.now(UTC).strftime("%Y-%m-%d")
     now = datetime.now(UTC).isoformat()
 
+    _tid = tenant_for(Path(db_path).parent)
     conn = _get_db(db_path)
     _init_tables(conn)
 
     cursor = conn.execute(
         """INSERT INTO activity_log
-           (date, type, prospect, company, detail, source, prep_level, session, timestamp)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (today, activity_type, prospect, company, detail, source, prep_level, session, now),
+           (date, type, prospect, company, detail, source, prep_level, session, timestamp, tenant_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (today, activity_type, prospect, company, detail, source, prep_level, session, now, _tid),
     )
     conn.commit()
     row_id = cursor.lastrowid
@@ -198,14 +204,15 @@ def log_prep(
     today = date or datetime.now(UTC).strftime("%Y-%m-%d")
     now = datetime.now(UTC).isoformat()
 
+    _tid = tenant_for(Path(db_path).parent)
     conn = _get_db(db_path)
     _init_tables(conn)
 
     cursor = conn.execute(
         """INSERT INTO prep_outcomes
-           (date, prospect, prep_type, prep_level, claude_assisted, session, timestamp)
-           VALUES (?, ?, ?, ?, 1, ?, ?)""",
-        (today, prospect, prep_type, prep_level, session, now),
+           (date, prospect, prep_type, prep_level, claude_assisted, session, timestamp, tenant_id)
+           VALUES (?, ?, ?, ?, 1, ?, ?, ?)""",
+        (today, prospect, prep_type, prep_level, session, now, _tid),
     )
     conn.commit()
     row_id = cursor.lastrowid
@@ -228,14 +235,16 @@ def log_outcome(
     """Link an outcome to the most recent unresolved prep for this prospect+type."""
     today = date or datetime.now(UTC).strftime("%Y-%m-%d")
 
+    _tid = tenant_for(Path(db_path).parent)
     conn = _get_db(db_path)
     _init_tables(conn)
 
     row = conn.execute(
         """SELECT id, date FROM prep_outcomes
            WHERE prospect = ? AND prep_type = ? AND outcome IS NULL
+             AND (tenant_id = ? OR tenant_id IS NULL)
            ORDER BY date DESC, id DESC LIMIT 1""",
-        (prospect, prep_type),
+        (prospect, prep_type, _tid),
     ).fetchone()
 
     if row:
@@ -248,8 +257,9 @@ def log_outcome(
                 pass
 
         conn.execute(
-            "UPDATE prep_outcomes SET outcome = ?, days_to_outcome = ? WHERE id = ?",
-            (outcome, days, row["id"]),
+            "UPDATE prep_outcomes SET outcome = ?, days_to_outcome = ? "
+            "WHERE id = ? AND (tenant_id = ? OR tenant_id IS NULL)",
+            (outcome, days, row["id"], _tid),
         )
         conn.commit()
         conn.close()
@@ -261,9 +271,9 @@ def log_outcome(
     else:
         cursor = conn.execute(
             """INSERT INTO prep_outcomes
-               (date, prospect, prep_type, prep_level, outcome, days_to_outcome, claude_assisted, timestamp)
-               VALUES (?, ?, ?, 0, ?, ?, 1, ?)""",
-            (today, prospect, prep_type, outcome, days, datetime.now(UTC).isoformat()),
+               (date, prospect, prep_type, prep_level, outcome, days_to_outcome, claude_assisted, timestamp, tenant_id)
+               VALUES (?, ?, ?, 0, ?, ?, 1, ?, ?)""",
+            (today, prospect, prep_type, outcome, days, datetime.now(UTC).isoformat(), _tid),
         )
         conn.commit()
         conn.close()

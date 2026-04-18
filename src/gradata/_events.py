@@ -11,7 +11,6 @@ import json
 import logging
 import os
 import sqlite3
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -21,6 +20,7 @@ from typing import TYPE_CHECKING
 import gradata._paths as _p
 from gradata._file_lock import platform_lock
 from gradata._platform import detect_platform_source
+from gradata._tenant import tenant_for
 
 if TYPE_CHECKING:
     from gradata._paths import BrainContext
@@ -49,7 +49,7 @@ def _locked_append_many(path: Path, lines: list[str]) -> None:
         fh.seek(0, 2)  # seek to end before writing
         fh.write(encoded)
         fh.flush()
-        if sys.platform == "win32":
+        with contextlib.suppress(OSError):
             os.fsync(fh.fileno())
 
 
@@ -72,21 +72,23 @@ def _ensure_table(conn: sqlite3.Connection):
             tags_json TEXT,
             valid_from TEXT,
             valid_until TEXT,
-            scope TEXT DEFAULT 'local'
+            scope TEXT DEFAULT 'local',
+            tenant_id TEXT,
+            schema_version INTEGER DEFAULT 1
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_session ON events(session)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_type ON events(type)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_session_type ON events(session, type)")
-    # Dedup guard: (ts, type, source) uniquely identifies an event for the
-    # purposes of retry-safe idempotent writes. RetainOrchestrator also uses
-    # this key in its cursor, so the constraint and the orchestrator stay in
-    # lockstep. Pre-existing duplicate rows (if any) are preserved -- the
-    # index is created with IF NOT EXISTS on a fresh key set.
+    # Dedup guard keyed by (tenant_id, ts, type, source). Tenant scoping
+    # prevents cross-tenant collisions after multi-tenant rollout while
+    # preserving retry-safe idempotent writes within a tenant.
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("DROP INDEX IF EXISTS idx_events_dedup")
     with contextlib.suppress(sqlite3.OperationalError):
         conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedup "
-            "ON events(ts, type, source)"
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedup_tenant "
+            "ON events(tenant_id, ts, type, source)"
         )
     with contextlib.suppress(sqlite3.OperationalError):
         conn.execute("ALTER TABLE events ADD COLUMN valid_from TEXT")
@@ -94,6 +96,12 @@ def _ensure_table(conn: sqlite3.Connection):
         conn.execute("ALTER TABLE events ADD COLUMN valid_until TEXT")
     with contextlib.suppress(sqlite3.OperationalError):
         conn.execute("ALTER TABLE events ADD COLUMN scope TEXT DEFAULT 'local'")
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("ALTER TABLE events ADD COLUMN tenant_id TEXT")
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("ALTER TABLE events ADD COLUMN schema_version INTEGER DEFAULT 1")
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_events_tenant ON events(tenant_id)")
     conn.commit()
 
 
@@ -161,18 +169,20 @@ def emit(event_type: str, source: str, data: dict | None = None, tags: list | No
             # event was already persisted (same dedup key), the INSERT is a
             # no-op -- we then look up the pre-existing row's id so callers
             # that depend on `event["id"]` still get the real rowid.
+            _tid = tenant_for(db_path.parent)
             cursor = conn.execute(
-                "INSERT OR IGNORE INTO events (ts, session, type, source, data_json, tags_json, valid_from, valid_until) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO events "
+                "(ts, session, type, source, data_json, tags_json, valid_from, valid_until, tenant_id, schema_version) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
                 (ts, session, event_type, source, json.dumps(data or {}),
-                 json.dumps(enriched_tags), valid_from, valid_until),
+                 json.dumps(enriched_tags), valid_from, valid_until, _tid),
             )
             if cursor.rowcount == 1:
                 event["id"] = cursor.lastrowid
             else:
                 existing = conn.execute(
-                    "SELECT id FROM events WHERE ts=? AND type=? AND source=?",
-                    (ts, event_type, source),
+                    "SELECT id FROM events WHERE tenant_id=? AND ts=? AND type=? AND source=?",
+                    (_tid, ts, event_type, source),
                 ).fetchone()
                 event["id"] = existing[0] if existing else None
             conn.commit()
@@ -564,12 +574,13 @@ class RetainOrchestrator:
                     with contextlib.closing(sqlite3.connect(str(self.db_path))) as conn:
                         _ensure_table(conn)
                         conn.execute("PRAGMA busy_timeout=5000")
+                        _tid = tenant_for(self.brain_dir)
                         for event in new_events:
                             conn.execute(
                                 "INSERT OR IGNORE INTO events "
                                 "(ts, session, type, source, data_json, tags_json, "
-                                " valid_from, valid_until) "
-                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                                " valid_from, valid_until, tenant_id, schema_version) "
+                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
                                 (
                                     event.get("ts", ""),
                                     event.get("session"),
@@ -579,6 +590,7 @@ class RetainOrchestrator:
                                     json.dumps(event.get("tags", []), default=str),
                                     event.get("valid_from"),
                                     event.get("valid_until"),
+                                    _tid,
                                 ),
                             )
                         conn.commit()

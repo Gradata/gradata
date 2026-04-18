@@ -1,3 +1,4 @@
+# barrel re-export module — names are the public API
 """
 Procedural Memory — INSTINCT → PATTERN → RULE graduation pipeline.
 ===================================================================
@@ -77,6 +78,9 @@ from gradata.enhancements.self_improvement._graduation import (
     graduate,
 )
 
+# Explicit re-exports for public consumption via
+# from gradata.enhancements.self_improvement import X. Listed here so
+# linters do not flag the module-level imports above as unused.
 __all__ = [
     "ACCEPTANCE_BONUS",
     "CATEGORY_SESSION_MAP",

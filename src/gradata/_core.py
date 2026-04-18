@@ -462,16 +462,23 @@ def brain_correct(
                     if approval_required:
                         event["approval_required"] = True
                         try:
+                            import contextlib as _ctx_mod
+                            import sqlite3 as _sqlite3_mod
+
                             from gradata._db import get_connection
+                            from gradata._tenant import tenant_for as _tenant_for
+                            _tid = _tenant_for(brain.dir)
                             with get_connection(brain.db_path) as conn:
+                                with _ctx_mod.suppress(_sqlite3_mod.OperationalError):
+                                    conn.execute("ALTER TABLE pending_approvals ADD COLUMN tenant_id TEXT")
                                 conn.execute(
                                     "INSERT INTO pending_approvals "
                                     "(lesson_category, lesson_description, draft_text, final_text, "
-                                    "severity, correction_event_id, agent_type, created_at) "
-                                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                                    "severity, correction_event_id, agent_type, created_at, tenant_id) "
+                                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                                     (cat, desc[:500], draft_redacted[:2000], final_redacted[:2000],
                                      diff.severity, correction_id, agent_type or "",
-                                     _date.today().isoformat()))
+                                     _date.today().isoformat(), _tid))
                         except Exception as e:
                             _log.debug("pending_approvals insert failed: %s", e)
                     _log.info("New lesson: [INSTINCT:%.2f] %s", init_conf, cat)
@@ -759,18 +766,24 @@ def brain_end_session(
         # Persist lineage (table created by _migrations.py)
         if transitions and brain.db_path.is_file():
             try:
+                import contextlib as _ctx_mod2
+                import sqlite3 as _sqlite3_mod2
                 from datetime import UTC, datetime
 
                 from gradata._db import get_connection
+                from gradata._tenant import tenant_for as _tenant_for
                 now = datetime.now(UTC).isoformat()
+                _tid = _tenant_for(brain.dir)
                 with get_connection(brain.db_path) as conn:
+                    with _ctx_mod2.suppress(_sqlite3_mod2.OperationalError):
+                        conn.execute("ALTER TABLE lesson_transitions ADD COLUMN tenant_id TEXT")
                     for lesson, old_state, new_state in transitions:
                         conn.execute(
                             "INSERT INTO lesson_transitions "
                             "(lesson_desc, category, old_state, new_state, confidence, "
-                            "fire_count, session, transitioned_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                            "fire_count, session, transitioned_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                             (lesson.description[:100], lesson.category, old_state, new_state,
-                             lesson.confidence, lesson.fire_count, None, now))
+                             lesson.confidence, lesson.fire_count, None, now, _tid))
             except Exception as e:
                 _log.debug("Lineage logging failed: %s", e)
 
