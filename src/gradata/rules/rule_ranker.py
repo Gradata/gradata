@@ -141,7 +141,8 @@ def rank_rules(
         if wiki_boost:
             _rid = rule.get("id") or rule.get("description", "")
             _ctx = min(1.0, _ctx + wiki_boost.get(_rid, 0.0))
-        _rec = _recency_score(rule.get("last_session", 0), current_session)
+        _ls = rule.get("last_session", 0)
+        _rec = 1.0 / (1.0 + max(0, current_session - _ls) * 0.1) if current_session > 0 and _ls > 0 else 0.5
         _fire = _fire_count_score(rule.get("fire_count", 0))
         _base = 0.30 * _scope + 0.25 * _confidence + 0.20 * _ctx + 0.15 * _rec + 0.10 * _fire
         _eb = 0.0
@@ -181,22 +182,10 @@ def _context_component(
     """Context relevance: BM25 normalized score when available, keyword fallback otherwise."""
     if bm25_scores is not None and 0 <= idx < len(bm25_scores):
         return bm25_scores[idx]
-    return _keyword_context_relevance(rule.get("description", ""), keywords)
-
-
-def _keyword_context_relevance(description: str, keywords: list[str] | None) -> float:
     if not keywords:
-        return 0.5  # neutral when no context provided
-    desc_lower = description.lower()
-    hits = sum(1 for kw in keywords if kw.lower() in desc_lower)
-    return hits / len(keywords)
-
-
-def _recency_score(last_session: int, current_session: int) -> float:
-    if current_session <= 0 or last_session <= 0:
-        return 0.5  # neutral when session info unavailable
-    sessions_ago = max(0, current_session - last_session)
-    return 1.0 / (1.0 + sessions_ago * 0.1)
+        return 0.5
+    _dl = rule.get("description", "").lower()
+    return sum(1 for kw in keywords if kw.lower() in _dl) / len(keywords)
 
 
 def _fire_count_score(fire_count: int) -> float:

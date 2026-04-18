@@ -243,22 +243,18 @@ def _endpoint() -> str:
     return os.environ.get(ENV_ENDPOINT, "").strip() or DEFAULT_ENDPOINT
 
 
-def _sdk_version() -> str:
-    try:
-        from . import __version__
-
-        return str(__version__)
-    except Exception:
-        return "unknown"
-
-
 def _build_payload(event: str) -> dict[str, str]:
     """Exact wire format. No extra fields, ever."""
+    try:
+        from . import __version__
+        _ver = str(__version__)
+    except Exception:
+        _ver = "unknown"
     return {
         "event": event,
         "user_id": anonymous_user_id(),
         "ts": datetime.now(UTC).isoformat(),
-        "sdk_version": _sdk_version(),
+        "sdk_version": _ver,
     }
 
 
