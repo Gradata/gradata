@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from gradata.enhancements.rule_verifier import (
+from gradata.enhancements.rule_pipeline import (
     RuleVerification,
     auto_detect_verification,
     ensure_table,
@@ -30,6 +30,7 @@ from gradata.enhancements.rule_verifier import (
 # ===========================================================================
 # auto_detect_verification
 # ===========================================================================
+
 
 class TestAutoDetectVerification:
     """auto_detect_verification() scans rule descriptions for checkable patterns."""
@@ -80,6 +81,7 @@ class TestAutoDetectVerification:
 # ===========================================================================
 # verify_rules
 # ===========================================================================
+
 
 class TestVerifyRules:
     """verify_rules() checks AI output against applied rules."""
@@ -178,11 +180,10 @@ class TestVerifyRules:
 # RuleVerification dataclass
 # ===========================================================================
 
+
 class TestRuleVerification:
     def test_defaults(self):
-        rv = RuleVerification(
-            rule_category="TEST", rule_description="desc", passed=True
-        )
+        rv = RuleVerification(rule_category="TEST", rule_description="desc", passed=True)
         assert rv.violation_detail == ""
         assert rv.output_snippet == ""
 
@@ -201,6 +202,7 @@ class TestRuleVerification:
 # ===========================================================================
 # SQLite persistence
 # ===========================================================================
+
 
 class TestVerificationPersistence:
     """log_verification() and get_verification_stats() SQLite roundtrip."""
@@ -226,7 +228,9 @@ class TestVerificationPersistence:
             assert stats["violations_by_category"]["DRAFTING"] == 1
             assert stats["violations_by_category"]["PRICING"] == 1
         finally:
-            import gc; gc.collect()  # release SQLite connections on Windows
+            import gc
+
+            gc.collect()  # release SQLite connections on Windows
             db_path.unlink(missing_ok=True)
 
     def test_empty_db_stats(self):
@@ -240,7 +244,9 @@ class TestVerificationPersistence:
             assert stats["pass_rate"] == 1.0
             assert stats["violations_by_category"] == {}
         finally:
-            import gc; gc.collect()
+            import gc
+
+            gc.collect()
             db_path.unlink(missing_ok=True)
 
     def test_multiple_sessions(self):
@@ -256,5 +262,7 @@ class TestVerificationPersistence:
             assert stats["total_checks"] == 2
             assert stats["passed"] == 1
         finally:
-            import gc; gc.collect()
+            import gc
+
+            gc.collect()
             db_path.unlink(missing_ok=True)

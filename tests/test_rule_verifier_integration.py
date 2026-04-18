@@ -17,7 +17,7 @@ import pytest
 
 from gradata._types import Lesson, LessonState
 from gradata.enhancements.rule_pipeline import run_rule_pipeline
-from gradata.enhancements.rule_verifier import ensure_table, get_verification_stats
+from gradata.enhancements.rule_pipeline import ensure_table, get_verification_stats
 from gradata.enhancements.self_improvement import format_lessons
 
 
@@ -89,9 +89,7 @@ class TestRuleVerifierIntegration:
         )
 
         stats = get_verification_stats(db_path)
-        assert stats["total_checks"] >= 1, (
-            "Expected at least one verification row to be written"
-        )
+        assert stats["total_checks"] >= 1, "Expected at least one verification row to be written"
         assert stats["passed"] < stats["total_checks"], (
             "Expected at least one violation (em dash in draft)"
         )
