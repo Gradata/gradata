@@ -426,18 +426,6 @@ def onboard(
     if not embed_manifest.exists():
         embed_manifest.write_text("{}", encoding="utf-8")
 
-    # loop-state.md — starting state
-    loop_state = brain_dir / "loop-state.md"
-    if not loop_state.exists():
-        loop_state.write_text(
-            "<!-- memory_type: episodic -->\n"
-            f"# Loop State — {name}\n\n"
-            "## Status\nBrain initialized. No sessions yet.\n\n"
-            "## Next Steps\n- Start your first work session\n- Add knowledge files to the brain\n"
-            "- Run `gradata embed` to index your content\n",
-            encoding="utf-8",
-        )
-
     # VERSION.md
     version_file = brain_dir / "VERSION.md"
     if not version_file.exists():

@@ -42,8 +42,8 @@ from __future__ import annotations
 import contextlib
 import sys
 import time
-from typing import Generator, IO
-
+from collections.abc import Generator
+from typing import IO
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -110,10 +110,8 @@ def _lock_win32(fh: IO, timeout: float | None) -> bool:
 def _unlock_win32(fh: IO) -> None:
     import msvcrt  # type: ignore[import]
     fh.seek(0)
-    try:
+    with contextlib.suppress(OSError):
         msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
-    except OSError:
-        pass
 
 
 # ---------------------------------------------------------------------------
@@ -156,10 +154,8 @@ def _lock_posix(fh: IO, timeout: float | None) -> bool:
 
 def _unlock_posix(fh: IO) -> None:
     import fcntl  # type: ignore[import]
-    try:
+    with contextlib.suppress(OSError):
         fcntl.flock(fh, fcntl.LOCK_UN)
-    except OSError:
-        pass
 
 
 # ---------------------------------------------------------------------------

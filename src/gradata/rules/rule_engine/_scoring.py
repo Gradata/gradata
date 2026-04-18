@@ -8,13 +8,9 @@ to rank and filter lessons before injection.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
 
 from gradata._scope import RuleScope, scope_matches
 from gradata._types import CorrectionType, Lesson, LessonState, RuleTransferScope
-
-if TYPE_CHECKING:
-    pass
 
 # ---------------------------------------------------------------------------
 # State Priority

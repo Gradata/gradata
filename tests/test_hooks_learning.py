@@ -342,13 +342,34 @@ def test_inject_respects_applies_when_never_when(tmp_path):
     assert "Never chat in code sessions" in allowed["result"]
 
 
-def test_session_close_emits_event(tmp_path):
+def test_session_close_skips_when_no_triggers(tmp_path):
+    """With no brain DB / no trigger events, the heavy waterfall must not fire."""
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
-        with patch("gradata.hooks.session_close._emit_session_end") as mock_emit:
-            with patch("gradata.hooks.session_close._run_graduation") as mock_grad:
-                close_main({})
-    mock_emit.assert_called_once_with(str(tmp_path))
+        with patch("gradata.hooks.session_close._run_graduation") as mock_grad:
+            with patch("gradata.hooks.session_close._run_pipeline") as mock_pipe:
+                with patch("gradata.hooks.session_close._flush_retain_queue") as mock_flush:
+                    close_main({})
+    mock_flush.assert_called_once_with(str(tmp_path))
+    mock_grad.assert_not_called()
+    mock_pipe.assert_not_called()
+
+
+def test_session_close_fires_on_correction(tmp_path):
+    """When a CORRECTION event exists after the stamp, the waterfall must run."""
+    import sqlite3
+    db = tmp_path / "system.db"
+    with sqlite3.connect(db) as conn:
+        conn.execute("CREATE TABLE events (id INTEGER PRIMARY KEY, ts TEXT, type TEXT)")
+        conn.execute("INSERT INTO events (ts, type) VALUES ('2000-01-01T00:00:00Z', 'CORRECTION')")
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+        with patch("gradata.hooks.session_close._run_graduation") as mock_grad:
+            with patch("gradata.hooks.session_close._run_pipeline") as mock_pipe:
+                with patch("gradata.hooks.session_close._flush_retain_queue") as mock_flush:
+                    close_main({})
+    mock_flush.assert_called_once_with(str(tmp_path))
     mock_grad.assert_called_once_with(str(tmp_path))
+    mock_pipe.assert_called_once()
+    assert (tmp_path / ".last_close_ts").is_file()
 
 
 def test_session_close_no_brain(tmp_path):

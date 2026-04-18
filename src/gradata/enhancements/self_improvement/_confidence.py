@@ -17,7 +17,6 @@ from gradata._types import (
     CorrectionType,
     Lesson,
     LessonState,
-    RuleMetadata,
     transition,
 )
 

@@ -12,10 +12,11 @@ All public symbols remain importable from this package, so existing callers
 (``from gradata.rules.rule_engine import apply_rules``) continue to work
 without modification.
 """
+from __future__ import annotations
 
 from ._engine import (
-    DEFAULT_TTL_SESSIONS,
     _ELIGIBLE_STATES,
+    DEFAULT_TTL_SESSIONS,
     _make_rule_id,
     _tier_label,
     apply_rules,
@@ -62,49 +63,49 @@ from ._scoring import (
 )
 
 __all__ = [
-    # models
-    "AppliedRule",
     # engine
     "DEFAULT_TTL_SESSIONS",
-    "_ELIGIBLE_STATES",
-    "_make_rule_id",
-    "_tier_label",
-    "apply_rules",
-    "apply_rules_with_tree",
-    "demote_stale_rules",
-    "filter_by_scope",
-    # scoring
-    "_CT_BOOST",
-    "_STATE_PRIORITY",
-    "_TASK_TYPE_PATTERNS",
-    "_TEAM_SIGNALS",
-    "_UNIVERSAL_SIGNALS",
-    "_beta_ppf_05",
-    "_difficulty_from_lesson",
-    "beta_domain_reliability",
-    "classify_transfer_scope",
-    "compute_rule_difficulty",
-    "compute_scope_weight",
-    "detect_task_type",
-    "effective_confidence",
-    "is_rule_disabled_for_domain",
-    "validate_assumptions",
     # formatting
     "_CONSTITUTIONAL_VALUE_MAP",
+    # scoring
+    "_CT_BOOST",
     "_DEFAULT_PERMUTATION_SAMPLES",
+    "_ELIGIBLE_STATES",
     "_EXAMPLE_MAX_CHARS",
     "_IMPERATIVE_PREFIXES",
     "_ORDERING_CACHE",
     "_ORDERING_CACHE_MAX",
+    "_STATE_PRIORITY",
+    "_TASK_TYPE_PATTERNS",
+    "_TEAM_SIGNALS",
+    "_UNIVERSAL_SIGNALS",
+    # models
+    "AppliedRule",
+    "_beta_ppf_05",
     "_category_entropy",
     "_deduplicate_rules",
+    "_difficulty_from_lesson",
+    "_make_rule_id",
     "_ordering_entropy",
     "_rule_set_hash",
+    "_tier_label",
+    "apply_rules",
+    "apply_rules_with_tree",
+    "beta_domain_reliability",
     "capture_example_from_correction",
     "choose_entropy_ordering",
+    "classify_transfer_scope",
     "clear_ordering_cache",
+    "compute_rule_difficulty",
+    "compute_scope_weight",
+    "demote_stale_rules",
+    "detect_task_type",
+    "effective_confidence",
+    "filter_by_scope",
     "format_rule_constitutional",
     "format_rules_for_prompt",
     "format_rules_styled",
+    "is_rule_disabled_for_domain",
     "merge_related_rules",
+    "validate_assumptions",
 ]

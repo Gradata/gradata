@@ -4,7 +4,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -20,23 +19,6 @@ HOOK_META = {
 }
 
 
-def _get_session_number(brain_dir: Path) -> int | None:
-    loop_state = brain_dir / "loop-state.md"
-    if not loop_state.is_file():
-        return None
-    try:
-        text = loop_state.read_text(encoding="utf-8")
-        for line in text.splitlines():
-            if "session" in line.lower():
-                # Extract number from lines like "Session: 97" or "## Session 97"
-                nums = re.findall(r"\d+", line)
-                if nums:
-                    return int(nums[0])
-    except Exception:
-        pass
-    return None
-
-
 def main(data: dict) -> dict | None:
     try:
         brain_dir_str = resolve_brain_dir()
@@ -44,12 +26,10 @@ def main(data: dict) -> dict | None:
             return None
         brain_dir = Path(brain_dir_str)
 
-        session = _get_session_number(brain_dir)
         compact_type = data.get("type", "unknown") if data else "unknown"
 
         snapshot = {
             "timestamp": datetime.now(UTC).isoformat(),
-            "session": session,
             "compact_type": compact_type,
             "brain_dir": str(brain_dir),
         }
