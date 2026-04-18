@@ -30,23 +30,6 @@ from pathlib import Path
 DEFAULT_BRAINS_DIR = Path.home() / ".gradata" / "brains"
 
 
-def _check_compatibility(manifest: dict) -> list[str]:
-    """Check if the brain is compatible with this system."""
-    issues = []
-    compat = manifest.get("compatibility", {})
-
-    # Python version
-    req_python = compat.get("python", ">=3.11")
-    current = f"{sys.version_info.major}.{sys.version_info.minor}"
-    min_version = req_python.replace(">=", "").replace(">", "")
-    if current < min_version:
-        issues.append(f"Python {req_python} required, have {current}")
-
-    # No external vector store dependency required
-
-    return issues
-
-
 def _extract_manifest(archive_path: Path) -> dict | None:
     """Extract and parse manifest from archive without full extraction."""
     try:
@@ -130,7 +113,11 @@ def install(archive_path: Path, target_dir: Path | None = None, dry_run: bool = 
     print(f"Rules: {manifest.get('behavioral_contract', {}).get('total', '?')}")
 
     # Step 2: Check compatibility
-    compat_issues = _check_compatibility(manifest)
+    compat_issues: list[str] = []
+    _cc_req = manifest.get("compatibility", {}).get("python", ">=3.11")
+    _cc_cur = f"{sys.version_info.major}.{sys.version_info.minor}"
+    if _cc_cur < _cc_req.replace(">=", "").replace(">", ""):
+        compat_issues.append(f"Python {_cc_req} required, have {_cc_cur}")
     if compat_issues:
         for issue in compat_issues:
             print(f"  COMPAT: {issue}")
