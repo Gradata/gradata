@@ -370,41 +370,6 @@ def combine_distances(
     return round(max(0.0, min(1.0, blended)), 6)
 
 
-def _compression_distance(a: str, b: str) -> float:
-    """Compute normalized compression distance (NCD) using zlib (LZ77).
-
-    NCD captures block operations (paragraph moves, section restructuring)
-    that character-level edit distance misses. Highly correlated with
-    actual human editing effort (Devatine & Abraham, Dec 2024, arXiv:2412.17321).
-
-    Formula: NCD(a, b) = (C(ab) - min(C(a), C(b))) / max(C(a), C(b))
-    where C(x) is the compressed length of x.
-
-    Returns a value in [0.0, 1.0]. 0.0 = identical, 1.0 = completely different.
-    """
-    if not a and not b:
-        return 0.0
-    if not a or not b:
-        return 1.0
-
-    a_bytes = a.encode("utf-8")
-    b_bytes = b.encode("utf-8")
-    ab_bytes = a_bytes + b_bytes
-
-    ca = len(zlib.compress(a_bytes, level=9))
-    cb = len(zlib.compress(b_bytes, level=9))
-    cab = len(zlib.compress(ab_bytes, level=9))
-
-    min_c = min(ca, cb)
-    max_c = max(ca, cb)
-
-    if max_c == 0:
-        return 0.0
-
-    ncd = (cab - min_c) / max_c
-    return round(max(0.0, min(1.0, ncd)), 6)
-
-
 def compute_diff(
     draft: str,
     final: str,
@@ -469,7 +434,18 @@ def compute_diff(
     # primary with edit_distance as tiebreaker.
     MIN_COMPRESSION_LENGTH = 200
     if len(draft) + len(final) >= MIN_COMPRESSION_LENGTH:
-        compression_dist = _compression_distance(draft, final)
+        if not draft and not final:
+            compression_dist = 0.0
+        elif not draft or not final:
+            compression_dist = 1.0
+        else:
+            _ab = draft.encode("utf-8") + final.encode("utf-8")
+            _ca = len(zlib.compress(draft.encode("utf-8"), level=9))
+            _cb = len(zlib.compress(final.encode("utf-8"), level=9))
+            _cab = len(zlib.compress(_ab, level=9))
+            _maxc = max(_ca, _cb)
+            _ncd = (_cab - min(_ca, _cb)) / _maxc if _maxc else 0.0
+            compression_dist = round(max(0.0, min(1.0, _ncd)), 6)
     else:
         compression_dist = edit_distance  # NCD unreliable on short texts
 
