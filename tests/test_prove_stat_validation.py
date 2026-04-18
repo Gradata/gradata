@@ -27,6 +27,7 @@ for n=400 Monte Carlo trials at p=0.05 to avoid flake.
 from __future__ import annotations
 
 import random
+from collections.abc import Callable
 
 import pytest
 
@@ -62,7 +63,7 @@ def test_type_i_integer_counts():
     """Poisson-ish integer counts (realistic correction data) -> ~= alpha."""
     weights = [8, 6, 5, 4, 3, 2, 2, 1, 1, 1, 1]
 
-    def gen(rng):
+    def gen(rng: random.Random) -> list[int]:
         return [rng.choices(range(11), weights=weights)[0] for _ in range(SERIES_LEN)]
 
     rate = _rejection_rate(gen)
@@ -103,7 +104,7 @@ def test_power_grows_with_n():
     Bound of +0.10 is well above one standard error (~0.035 at 400 trials) so a
     seed-dependent single-trial flip cannot fail this.
     """
-    def factory(n):
+    def factory(n: int) -> Callable[[random.Random], list[float]]:
         return lambda rng: [max(0.0, 10 - 0.15 * i + rng.gauss(0, 1.5)) for i in range(n)]
 
     p_short = _rejection_rate(factory(SHORT_N))
@@ -145,15 +146,18 @@ def test_heavy_ties_does_not_false_positive():
 
 
 def test_fifty_element_cap_is_applied():
-    """trend_analysis caps input at last 50 elements; results for n=100 and n=200
-    on an identical tail must be equal."""
-    tail = [float(i) for i in range(50)]
-    prefix_a = [0.0] * 50
-    prefix_b = [0.0] * 150
-    slope_a, p_a = trend_analysis(prefix_a + tail)
-    slope_b, p_b = trend_analysis(prefix_b + tail)
-    assert slope_a == pytest.approx(slope_b)
-    assert p_a == pytest.approx(p_b)
+    """trend_analysis caps input at LAST 50 elements.
+
+    Use a prefix with a strong DOWN-trend that differs from the tail's
+    up-trend. If the cap were broken (kept first-50 or middle), the
+    prefix+tail result would not match the tail-only result.
+    """
+    tail = [float(i) for i in range(50)]                  # up-trend 0..49
+    heavy_down_prefix = [float(100 - i) for i in range(50)]  # down-trend 100..51
+    slope_tail, p_tail = trend_analysis(tail)
+    slope_combined, p_combined = trend_analysis(heavy_down_prefix + tail)
+    assert slope_tail == pytest.approx(slope_combined)
+    assert p_tail == pytest.approx(p_combined)
 
 
 def test_brain_prove_interprets_trend_results_correctly(tmp_path):
