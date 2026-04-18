@@ -31,16 +31,6 @@ from ._core import (
 )
 
 
-def _require_openai() -> None:
-    try:
-        import openai  # noqa: F401
-    except ImportError as exc:  # pragma: no cover - import guard
-        raise ImportError(
-            "OpenAIMiddleware requires the 'openai' package. "
-            "Install with: pip install openai"
-        ) from exc
-
-
 class OpenAIMiddleware:
     """Wraps an OpenAI client with Gradata rule injection + enforcement."""
 
@@ -52,7 +42,13 @@ class OpenAIMiddleware:
         source: RuleSource | None = None,
         strict: bool = False,
     ) -> None:
-        _require_openai()
+        try:
+            import openai  # noqa: F401
+        except ImportError as _ro_exc:  # pragma: no cover - import guard
+            raise ImportError(
+                "OpenAIMiddleware requires the 'openai' package. "
+                "Install with: pip install openai"
+            ) from _ro_exc
         self._client = client
         self._source = source or RuleSource(brain_path=brain_path)
         self._strict = strict

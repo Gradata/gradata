@@ -36,16 +36,6 @@ from ._core import (
 )
 
 
-def _require_anthropic() -> None:
-    try:
-        import anthropic  # noqa: F401
-    except ImportError as exc:  # pragma: no cover - import guard
-        raise ImportError(
-            "AnthropicMiddleware requires the 'anthropic' package. "
-            "Install with: pip install anthropic"
-        ) from exc
-
-
 class AnthropicMiddleware:
     """Wraps an Anthropic client with Gradata rule injection + enforcement."""
 
@@ -57,7 +47,13 @@ class AnthropicMiddleware:
         source: RuleSource | None = None,
         strict: bool = False,
     ) -> None:
-        _require_anthropic()
+        try:
+            import anthropic  # noqa: F401
+        except ImportError as _ra_exc:  # pragma: no cover - import guard
+            raise ImportError(
+                "AnthropicMiddleware requires the 'anthropic' package. "
+                "Install with: pip install anthropic"
+            ) from _ra_exc
         self._client = client
         self._source = source or RuleSource(brain_path=brain_path)
         self._strict = strict
