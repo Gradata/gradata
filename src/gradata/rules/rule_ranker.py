@@ -130,7 +130,12 @@ def rank_rules(
 
     scored: list[tuple[float, dict[str, Any]]] = []
     for idx, rule in enumerate(rules):
-        _scope = _scope_match(rule.get("category", ""), task_type)
+        if task_type is None:
+            _scope = 0.5
+        else:
+            _cat = rule.get("category", "").upper()
+            _tt = task_type.upper()
+            _scope = 1.0 if _cat == _tt else (0.7 if _cat in _tt or _tt in _cat else 0.5)
         if thompson_on:
             _a = max(float(rule.get("alpha", 1.0) or 1.0), 1e-3)
             _b = max(float(rule.get("beta_param", 1.0) or 1.0), 1e-3)
@@ -158,18 +163,6 @@ def rank_rules(
 # ------------------------------------------------------------------
 # Internal scoring helpers
 # ------------------------------------------------------------------
-
-
-def _scope_match(category: str, task_type: str | None) -> float:
-    if task_type is None:
-        return 0.5
-    cat = category.upper()
-    tt = task_type.upper()
-    if cat == tt:
-        return 1.0
-    if cat in tt or tt in cat:
-        return 0.7
-    return 0.5
 
 
 def _context_component(

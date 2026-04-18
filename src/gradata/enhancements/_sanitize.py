@@ -94,16 +94,6 @@ _JS_FULL_ESCAPE_TABLE = str.maketrans(
 _TEMPLATE_LITERAL_RE = re.compile(r"`|\$\{")
 
 
-def _escape_js_full(text: str) -> str:
-    """Escape text for embedding in a JS double-quoted string literal."""
-    escaped = text.translate(_JS_FULL_ESCAPE_TABLE)
-    # Remove backticks and template-literal injection sequences
-    escaped = _TEMPLATE_LITERAL_RE.sub("", escaped)
-    # Remove </script> breakout
-    escaped = re.sub(r"<\s*/\s*script\s*>", "", escaped, flags=re.IGNORECASE)
-    return escaped
-
-
 # ---------------------------------------------------------------------------
 # LLM prompt neutralization
 # ---------------------------------------------------------------------------
@@ -176,7 +166,8 @@ def sanitize_lesson_content(text: str, context: SanitizeContext) -> str:
     if context == "xml":
         return _escape_xml(text)
     if context == "js":
-        return _escape_js_full(text)
+        _ejs = _TEMPLATE_LITERAL_RE.sub("", text.translate(_JS_FULL_ESCAPE_TABLE))
+        return re.sub(r"<\s*/\s*script\s*>", "", _ejs, flags=re.IGNORECASE)
     if context == "js_template":
         text = _TEMPLATE_LITERAL_RE.sub("", text)
         return re.sub(r"<\s*/\s*script\s*>", "", text, flags=re.IGNORECASE)
