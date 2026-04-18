@@ -85,7 +85,12 @@ def correct(
 
     # Auto-detect category from content if not provided
     if category is None:
-        category = _auto_detect_category(draft, final, diff.severity)
+        _adc_combined = (draft + " " + final).lower()
+        category = next(
+            (cat for cat, signals in _CATEGORY_SIGNALS
+             if any(s in _adc_combined for s in signals)),
+            "DRAFTING",
+        )
 
     # Store as event if brain is available
     lesson_created = False
@@ -121,20 +126,6 @@ _CATEGORY_SIGNALS: list[tuple[str, tuple[str, ...]]] = [
     ("PROCESS", ("step", "order", "first", "before", "after",
                  "verify", "check", "validate", "workflow")),
 ]
-
-
-def _auto_detect_category(draft: str, final: str, severity: str) -> str:
-    """Heuristic category detection from diff content.
-
-    Categories match the Gradata lesson taxonomy:
-    DRAFTING, ACCURACY, FORMATTING, PROCESS, TONE, COMPLIANCE, UNKNOWN.
-    """
-    del severity  # reserved for future heuristics
-    combined = (draft + " " + final).lower()
-    for category, signals in _CATEGORY_SIGNALS:
-        if any(s in combined for s in signals):
-            return category
-    return "DRAFTING"
 
 
 # ---------------------------------------------------------------------------
