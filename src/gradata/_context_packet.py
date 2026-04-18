@@ -58,25 +58,6 @@ def _safe_read_lines(path: Path, max_lines: int) -> str:
         return ""
 
 
-def _fuzzy_match_prospect(name: str, ctx: "BrainContext | None" = None) -> Path | None:
-    prospects_dir = ctx.prospects_dir if ctx else _p.PROSPECTS_DIR
-    if not prospects_dir.exists():
-        return None
-    name_lower = name.lower()
-    candidates = [c for c in prospects_dir.glob("*.md") if c.name != "_TEMPLATE.md"]
-    for c in candidates:
-        if c.stem.lower().startswith(name_lower):
-            return c
-    for c in candidates:
-        if name_lower in c.stem.lower():
-            return c
-    first_name = name_lower.split()[0] if name_lower.split() else name_lower
-    for c in candidates:
-        if c.stem.lower().startswith(first_name):
-            return c
-    return None
-
-
 def _load_user_scope(ctx: "BrainContext | None" = None) -> dict:
     result = {"voice_summary": "", "recent_corrections": [], "frameworks": ""}
     domain_dir = ctx.domain_dir if ctx else _p.DOMAIN_DIR
@@ -109,7 +90,17 @@ def _load_prospect_context(prospect_name: str, ctx: "BrainContext | None" = None
         "company": "",
         "persona": "",
     }
-    prospect_file = _fuzzy_match_prospect(prospect_name, ctx=ctx)
+    _fmp_dir = ctx.prospects_dir if ctx else _p.PROSPECTS_DIR
+    prospect_file: Path | None = None
+    if _fmp_dir.exists():
+        _fmp_lo = prospect_name.lower()
+        _fmp_cs = [c for c in _fmp_dir.glob("*.md") if c.name != "_TEMPLATE.md"]
+        _fmp_first = _fmp_lo.split()[0] if _fmp_lo.split() else _fmp_lo
+        prospect_file = (
+            next((c for c in _fmp_cs if c.stem.lower().startswith(_fmp_lo)), None)
+            or next((c for c in _fmp_cs if _fmp_lo in c.stem.lower()), None)
+            or next((c for c in _fmp_cs if c.stem.lower().startswith(_fmp_first)), None)
+        )
     if prospect_file:
         raw = _safe_read(prospect_file, limit_chars=300)
         result["file_content"] = raw
