@@ -87,17 +87,6 @@ _PII_PATTERNS = [
 ]
 
 
-def _redact_pii(text: str) -> str:
-    """Redact PII patterns from text before storage.
-
-    Replaces emails, API keys, tokens, passwords, and private keys
-    with placeholder tags. Not exhaustive, but catches common patterns.
-    """
-    for pattern, replacement in _PII_PATTERNS:
-        text = pattern.sub(replacement, text)
-    return text
-
-
 def observe_tool_use(
     tool_name: str,
     input_data: Any = None,
@@ -130,7 +119,8 @@ def observe_tool_use(
         if data is None:
             return ""
         text = str(data) if not isinstance(data, str) else data
-        text = _redact_pii(text)
+        for _rp_pat, _rp_rep in _PII_PATTERNS:
+            text = _rp_pat.sub(_rp_rep, text)
         if len(text) > max_summary_len:
             return text[:max_summary_len] + "..."
         return text
