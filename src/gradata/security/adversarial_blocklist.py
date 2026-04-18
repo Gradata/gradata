@@ -79,8 +79,7 @@ ADVERSARIAL_PHRASES: tuple[str, ...] = (
 
 _COMPILED_PATTERN: re.Pattern[str] = re.compile(
     "|".join(
-        r"\s+".join(re.escape(tok) for tok in phrase.split())
-        for phrase in ADVERSARIAL_PHRASES
+        r"\s+".join(re.escape(tok) for tok in phrase.split()) for phrase in ADVERSARIAL_PHRASES
     ),
     re.IGNORECASE,
 )

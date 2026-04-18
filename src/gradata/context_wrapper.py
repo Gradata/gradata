@@ -159,7 +159,6 @@ class BrainContextState:
 
         return "\n\n".join(parts)
 
-
     def capture_response(self, response: str) -> None:
         """Capture the AI's response for tracking.
 
