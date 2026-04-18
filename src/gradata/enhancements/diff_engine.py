@@ -159,65 +159,6 @@ def adjust_severity_by_semantics(
 # ---------------------------------------------------------------------------
 
 
-def _analyze_line_opcodes(
-    draft_lines: list[str],
-    final_lines: list[str],
-) -> tuple[list[ChangedSection], dict[str, int]]:
-    """Walk line-level SequenceMatcher opcodes once and return sections + stats.
-
-    Combines extraction of :class:`ChangedSection` blocks with per-line
-    added/removed/changed counts so we only build the matcher once per diff.
-
-    Args:
-        draft_lines: Lines from the original draft (without newlines).
-        final_lines: Lines from the final version (without newlines).
-
-    Returns:
-        ``(changed_sections, summary_stats)`` where ``summary_stats`` has
-        keys ``lines_added``, ``lines_removed``, ``lines_changed``.
-    """
-    matcher = difflib.SequenceMatcher(None, draft_lines, final_lines, autojunk=False)
-    sections: list[ChangedSection] = []
-    added = removed = changed = 0
-
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag == "equal":
-            continue
-
-        sections.append(ChangedSection(
-            start_line=j1,
-            end_line=j2,
-            old_text="\n".join(draft_lines[i1:i2]),
-            new_text="\n".join(final_lines[j1:j2]),
-        ))
-
-        old_count = i2 - i1
-        new_count = j2 - j1
-        if tag == "insert":
-            added += new_count
-        elif tag == "delete":
-            removed += old_count
-        elif tag == "replace":
-            shared = min(old_count, new_count)
-            changed += shared
-            if new_count > old_count:
-                added += new_count - old_count
-            elif old_count > new_count:
-                removed += old_count - new_count
-
-    stats = {
-        "lines_added": added,
-        "lines_removed": removed,
-        "lines_changed": changed,
-    }
-    return sections, stats
-
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
-
 # ---------------------------------------------------------------------------
 # Semantic distance (opt-in)
 # ---------------------------------------------------------------------------
@@ -449,7 +390,31 @@ def compute_diff(
     else:
         compression_dist = edit_distance  # NCD unreliable on short texts
 
-    changed_sections, summary_stats = _analyze_line_opcodes(draft_lines, final_lines)
+    _matcher = difflib.SequenceMatcher(None, draft_lines, final_lines, autojunk=False)
+    changed_sections: list[ChangedSection] = []
+    _added = _removed = _changed = 0
+    for _tag, _i1, _i2, _j1, _j2 in _matcher.get_opcodes():
+        if _tag == "equal":
+            continue
+        changed_sections.append(ChangedSection(
+            start_line=_j1,
+            end_line=_j2,
+            old_text="\n".join(draft_lines[_i1:_i2]),
+            new_text="\n".join(final_lines[_j1:_j2]),
+        ))
+        _oc = _i2 - _i1
+        _nc = _j2 - _j1
+        if _tag == "insert":
+            _added += _nc
+        elif _tag == "delete":
+            _removed += _oc
+        elif _tag == "replace":
+            _changed += min(_oc, _nc)
+            if _nc > _oc:
+                _added += _nc - _oc
+            elif _oc > _nc:
+                _removed += _oc - _nc
+    summary_stats = {"lines_added": _added, "lines_removed": _removed, "lines_changed": _changed}
 
     # Optional semantic distance + blended severity (b009dc0).
     semantic_dist: float | None = None
