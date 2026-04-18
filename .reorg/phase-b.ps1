@@ -108,8 +108,10 @@ $sdkItems = @(
     'src', 'tests', 'docs', 'examples',
     'pyproject.toml', 'uv.lock', 'README.md', 'CHANGELOG.md',
     'LICENSE', 'CODE_OF_CONDUCT.md', 'CONTRIBUTING.md', 'SECURITY.md', 'CREDITS.md',
-    'mkdocs.yml', 'Dockerfile', 'docker-compose.yml',
+    'AGENTS.md',
+    'mkdocs.yml', 'Dockerfile', 'docker-compose.yml', '.dockerignore',
     'packages', 'gradata-install', 'gradata-plugin',
+    'package.json', 'package-lock.json',
     'website-next', 'design-system', 'hooks'
 )
 foreach ($item in $sdkItems) {
