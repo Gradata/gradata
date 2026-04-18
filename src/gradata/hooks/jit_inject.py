@@ -88,22 +88,12 @@ def _jit_enabled() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
-def _int_env(name: str, default: int) -> int:
+def _num_env(name: str, default, cast):
     raw = os.environ.get(name, "").strip()
     if not raw:
         return default
     try:
-        return max(0, int(raw))
-    except ValueError:
-        return default
-
-
-def _float_env(name: str, default: float) -> float:
-    raw = os.environ.get(name, "").strip()
-    if not raw:
-        return default
-    try:
-        return float(raw)
+        return cast(raw)
     except ValueError:
         return default
 
@@ -213,9 +203,9 @@ def main(data: dict) -> dict | None:
     if not lessons:
         return None
 
-    k = _int_env("GRADATA_JIT_MAX_RULES", DEFAULT_MAX_RULES)
-    min_conf = _float_env("GRADATA_JIT_MIN_CONFIDENCE", DEFAULT_MIN_CONFIDENCE)
-    min_sim = _float_env("GRADATA_JIT_MIN_SIMILARITY", DEFAULT_MIN_SIMILARITY)
+    k = max(0, _num_env("GRADATA_JIT_MAX_RULES", DEFAULT_MAX_RULES, int))
+    min_conf = _num_env("GRADATA_JIT_MIN_CONFIDENCE", DEFAULT_MIN_CONFIDENCE, float)
+    min_sim = _num_env("GRADATA_JIT_MIN_SIMILARITY", DEFAULT_MIN_SIMILARITY, float)
 
     ranked = rank_rules_for_draft(
         lessons,
