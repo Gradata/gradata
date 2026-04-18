@@ -617,31 +617,6 @@ def _build_principle_prompt(rules: list[Lesson], category: str) -> str:
     )
 
 
-def _call_gemma_native(prompt: str, creds: str, model: str, timeout: float = 15.0) -> str | None:
-    """Call Google's native Gemma API (the OpenAI-compat endpoint rejects AQ. keys)."""
-    import urllib.error
-    import urllib.request
-
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    payload = json.dumps({
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": 200, "temperature": 0.3},
-    }).encode()
-    headers = {"Content-Type": "application/json", "x-goog-api-key": creds}
-    try:
-        req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = json.loads(resp.read().decode())
-        text = body["candidates"][0]["content"]["parts"][0]["text"].strip()
-        if 15 <= len(text) <= 500:
-            return text
-        return None
-    except (urllib.error.URLError, urllib.error.HTTPError, OSError, KeyError,
-            json.JSONDecodeError, IndexError) as exc:
-        _log.debug("Gemma native call failed: %s", exc)
-        return None
-
-
 def _try_llm_principle(rules: list[Lesson], category: str) -> str | None:
     """Best-effort LLM synthesis of ONE behavioral principle for a rule group.
 
@@ -675,7 +650,27 @@ def _try_llm_principle(rules: list[Lesson], category: str) -> str | None:
     g = env_str("GRADATA_GEMMA_API_KEY")
     if g:
         model = env_str("GRADATA_GEMMA_MODEL", _GEMMA_DEFAULT_MODEL)
-        return _call_gemma_native(_build_principle_prompt(rules, category), g, model)
+        import urllib.error
+        import urllib.request
+        _url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        _payload = json.dumps({
+            "contents": [{"parts": [{"text": _build_principle_prompt(rules, category)}]}],
+            "generationConfig": {"maxOutputTokens": 200, "temperature": 0.3},
+        }).encode()
+        try:
+            _req = urllib.request.Request(
+                _url, data=_payload,
+                headers={"Content-Type": "application/json", "x-goog-api-key": g},
+                method="POST",
+            )
+            with urllib.request.urlopen(_req, timeout=15.0) as _resp:
+                _body = json.loads(_resp.read().decode())
+            _text = _body["candidates"][0]["content"]["parts"][0]["text"].strip()
+            return _text if 15 <= len(_text) <= 500 else None
+        except (urllib.error.URLError, urllib.error.HTTPError, OSError, KeyError,
+                json.JSONDecodeError, IndexError) as exc:
+            _log.debug("Gemma native call failed: %s", exc)
+            return None
 
     return None
 
