@@ -43,15 +43,15 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from gradata._types import Lesson
+    from ._types import Lesson
 
 logger = logging.getLogger("gradata")
 
 
 import contextlib
 
-from gradata._env import env_str
-from gradata.brain_inspection import BrainInspectionMixin
+from ._env import env_str
+from .brain_inspection import BrainInspectionMixin
 
 
 class Brain(BrainInspectionMixin):
@@ -65,7 +65,7 @@ class Brain(BrainInspectionMixin):
     ):
         self.dir = Path(brain_dir).resolve()
         if not self.dir.exists():
-            from gradata.exceptions import BrainNotFoundError
+            from .exceptions import BrainNotFoundError
 
             raise BrainNotFoundError(f"Brain directory not found: {self.dir}")
 
@@ -76,7 +76,7 @@ class Brain(BrainInspectionMixin):
         # Encryption at rest (optional: pip install gradata[encrypted])
         self._encryption_key = None
         if encryption_key or env_str("GRADATA_ENCRYPTION_KEY"):
-            from gradata._encryption import open_encrypted_db, resolve_encryption_key
+            from ._encryption import open_encrypted_db, resolve_encryption_key
 
             self._encryption_key = resolve_encryption_key(encryption_key)
             if self._encryption_key:
@@ -90,18 +90,18 @@ class Brain(BrainInspectionMixin):
         self._convergence_session: int | None = None
 
         # Rule cache (Pattern 2: session-scoped, invalidated on correct())
-        from gradata.rules.cache import RuleCache
+        from .rules.cache import RuleCache
 
         self._rule_cache = RuleCache()
 
-        from gradata.rules.rule_graph import RuleGraph
+        from .rules.rule_graph import RuleGraph
 
         self._rule_graph = RuleGraph(self.dir / "rule_graph.json")
 
         logger.debug("Brain init: %s (db=%s)", self.dir, self.db_path)
 
         # Build immutable context for this brain instance (DI path)
-        from gradata._paths import BrainContext, set_brain_dir
+        from ._paths import BrainContext, set_brain_dir
 
         self.ctx = BrainContext.from_brain_dir(self.dir, working_dir)
 
@@ -110,32 +110,32 @@ class Brain(BrainInspectionMixin):
 
         # Reload taxonomy and config from brain dir (if taxonomy.json exists)
         try:
-            from gradata._tag_taxonomy import reload_taxonomy
+            from ._tag_taxonomy import reload_taxonomy
 
             reload_taxonomy()
         except ImportError:
             pass
         try:
-            from gradata._config import reload_config
+            from ._config import reload_config
 
             reload_config(self.dir)
         except ImportError:
             pass
 
         # Apply any pending schema migrations
-        from gradata._migrations import run_migrations
+        from ._migrations import run_migrations
 
         run_migrations(self.db_path)
 
         # Initialize pattern registries (lazy — ImportError safe)
         try:
-            from gradata.enhancements.behavioral_engine import DirectiveRegistry
+            from .enhancements.behavioral_engine import DirectiveRegistry
 
             self.contracts = DirectiveRegistry()
         except ImportError:
             self.contracts = None  # type: ignore[assignment]
         try:
-            from gradata.contrib.patterns.tools import ToolRegistry
+            from .contrib.patterns.tools import ToolRegistry
 
             self.tools = ToolRegistry()
         except ImportError:
@@ -145,14 +145,14 @@ class Brain(BrainInspectionMixin):
         # Procedural memory pipeline (observe→cluster→discriminate→route→bracket)
         self._learning_pipeline = None
         try:
-            from gradata.enhancements.learning_pipeline import LearningPipeline
+            from .enhancements.learning_pipeline import LearningPipeline
 
             self._learning_pipeline = LearningPipeline(brain_dir=self.dir)
 
             # Warm-start the Q-Learning router from historical corrections
             if self._learning_pipeline._router and self.db_path.exists():
                 try:
-                    from gradata.enhancements.router_warmstart import warm_start_router
+                    from .enhancements.router_warmstart import warm_start_router
 
                     warm_router = warm_start_router(
                         db_path=self.db_path,
@@ -166,7 +166,7 @@ class Brain(BrainInspectionMixin):
 
         # Bootstrap RuleContext — makes graduated rules available to all patterns
         try:
-            from gradata.enhancements.rule_context_bridge import bootstrap_rule_context
+            from .enhancements.rule_context_bridge import bootstrap_rule_context
 
             lessons_path = self._find_lessons_path()
             bootstrap_rule_context(
@@ -177,19 +177,19 @@ class Brain(BrainInspectionMixin):
             pass  # Bridge not available (minimal install)
 
         # Event bus for reactive nervous system
-        from gradata.events_bus import EventBus
+        from .events_bus import EventBus
 
         self.bus = EventBus()
 
         # Register built-in nervous system subscribers (lazy, never block init)
         try:
-            from gradata.integrations.embeddings import subscribe_to_bus as _embed_sub
+            from .integrations.embeddings import subscribe_to_bus as _embed_sub
 
             _embed_sub(self.bus)
         except ImportError:
             pass
         try:
-            from gradata.integrations.session_history import SessionHistory as _SH
+            from .integrations.session_history import SessionHistory as _SH
 
             self._session_history = _SH()
             self._session_history.subscribe_to_bus(self.bus)
@@ -197,7 +197,7 @@ class Brain(BrainInspectionMixin):
             pass
 
         # Query budget — sliding-window rate limiter
-        from gradata.security.query_budget import QueryBudget
+        from .security.query_budget import QueryBudget
 
         self._query_budget = QueryBudget()
 
@@ -205,7 +205,7 @@ class Brain(BrainInspectionMixin):
         self._cloud = None
 
         # Per-brain salt for non-deterministic graduation thresholds
-        from gradata.security.brain_salt import load_or_create_salt
+        from .security.brain_salt import load_or_create_salt
 
         self._brain_salt = load_or_create_salt(self.dir)
 
@@ -213,7 +213,7 @@ class Brain(BrainInspectionMixin):
     def session(self) -> int:
         """Current session number (from event log or loop-state.md)."""
         try:
-            from gradata._events import get_current_session
+            from ._events import get_current_session
 
             return get_current_session()
         except Exception:
@@ -244,7 +244,7 @@ class Brain(BrainInspectionMixin):
         Returns:
             Brain instance pointing at the new directory.
         """
-        from gradata.onboard import onboard
+        from .onboard import onboard
 
         if interactive is None:
             # If caller provided key args, skip the wizard
@@ -317,7 +317,7 @@ class Brain(BrainInspectionMixin):
 
     def _load_lessons(self, create: bool = False):
         """Load and parse lessons from lessons.md. Returns list or empty list."""
-        from gradata.enhancements.self_improvement import parse_lessons
+        from .enhancements.self_improvement import parse_lessons
 
         path = self._find_lessons_path(create=create)
         if not path or not path.is_file():
@@ -337,7 +337,7 @@ class Brain(BrainInspectionMixin):
             results = brain.memory.retrieve("API patterns")
         """
         if not hasattr(self, "_memory_manager"):
-            from gradata.contrib.patterns.memory import MemoryManager
+            from .contrib.patterns.memory import MemoryManager
 
             self._memory_manager = MemoryManager()
         return self._memory_manager
@@ -345,7 +345,7 @@ class Brain(BrainInspectionMixin):
     def close(self):
         """Cleanup: re-encrypt database if encryption is enabled."""
         if self._encryption_key:
-            from gradata._encryption import close_encrypted_db
+            from ._encryption import close_encrypted_db
 
             close_encrypted_db(self.dir, self._encryption_key)
 
@@ -393,7 +393,7 @@ class Brain(BrainInspectionMixin):
         when the brain is in renter mode.
         """
         self._rule_cache.invalidate()  # Correction invalidates cached rules
-        from gradata._core import brain_correct
+        from ._core import brain_correct
 
         result = brain_correct(
             self,
@@ -467,9 +467,9 @@ class Brain(BrainInspectionMixin):
         self, category: str, old_description: str, new_description: str, reason: str = ""
     ) -> dict:
         """Rewrite a rule's description. Preserves confidence/metadata. Emits RULE_PATCHED event."""
-        from gradata._db import write_lessons_safe
-        from gradata.enhancements.self_healing import apply_patch
-        from gradata.enhancements.self_improvement import format_lessons, parse_lessons
+        from ._db import write_lessons_safe
+        from .enhancements.self_healing import apply_patch
+        from .enhancements.self_improvement import format_lessons, parse_lessons
 
         # Only patch the brain-local lessons file — never external fallbacks
         lessons_path = self.dir / "lessons.md"
@@ -486,7 +486,7 @@ class Brain(BrainInspectionMixin):
 
         # Re-sign the patched rule so HMAC verification stays valid
         try:
-            from gradata.enhancements.rule_integrity import sign_and_store
+            from .enhancements.rule_integrity import sign_and_store
 
             sign_and_store(self.ctx, new_description, category, patched.confidence)
         except ImportError:
@@ -536,7 +536,7 @@ class Brain(BrainInspectionMixin):
             Summary dict with ``examined``, ``patched``, ``skipped``,
             ``patches`` (applied), and ``skipped_reasons``.
         """
-        from gradata.enhancements.self_healing import auto_heal_failures
+        from .enhancements.self_healing import auto_heal_failures
 
         result = auto_heal_failures(
             self, failure_events=failure_events, max_patches=max_patches
@@ -591,9 +591,9 @@ class Brain(BrainInspectionMixin):
         """
         from datetime import date
 
-        from gradata._db import lessons_lock
-        from gradata._types import Lesson, LessonState
-        from gradata.enhancements.self_improvement import format_lessons, parse_lessons
+        from ._db import lessons_lock
+        from ._types import Lesson, LessonState
+        from .enhancements.self_improvement import format_lessons, parse_lessons
 
         description = (description or "").strip()
         # Canonicalize category casing so callers passing "drafting" and
@@ -705,7 +705,7 @@ class Brain(BrainInspectionMixin):
         skip_meta_rules: bool = False,
     ) -> dict:
         """Run full graduation sweep at end of session."""
-        from gradata._core import brain_end_session
+        from ._core import brain_end_session
 
         return brain_end_session(
             self,
@@ -725,7 +725,7 @@ class Brain(BrainInspectionMixin):
         threshold: float = 7.0,
     ) -> dict:
         """Evaluate output and auto-generate corrections for failed dimensions."""
-        from gradata._core import brain_auto_evolve
+        from ._core import brain_auto_evolve
 
         return brain_auto_evolve(
             self,
@@ -739,13 +739,13 @@ class Brain(BrainInspectionMixin):
 
     def detect_implicit_feedback(self, user_message: str, session: int | None = None) -> dict:
         """Detect implicit behavioral feedback in user prompts."""
-        from gradata._core import brain_detect_implicit_feedback
+        from ._core import brain_detect_implicit_feedback
 
         return brain_detect_implicit_feedback(self, user_message, session=session)
 
     def convergence(self) -> dict:
         """Get corrections-per-session convergence data."""
-        from gradata._core import brain_convergence
+        from ._core import brain_convergence
 
         return brain_convergence(self)
 
@@ -753,7 +753,7 @@ class Brain(BrainInspectionMixin):
         """Get cached convergence data (one DB query per session)."""
         if self._convergence_cache is not None and self._convergence_session == self.session:
             return self._convergence_cache
-        from gradata._core import brain_convergence
+        from ._core import brain_convergence
 
         self._convergence_cache = brain_convergence(self)
         self._convergence_session = self.session
@@ -765,7 +765,7 @@ class Brain(BrainInspectionMixin):
         Returns effort_ratio (ratio of current vs initial correction rate).
         Pass estimate_time=True for approximate time-saved estimates.
         """
-        from gradata._core import brain_efficiency
+        from ._core import brain_efficiency
 
         return brain_efficiency(self, estimate_time=estimate_time)
 
@@ -775,7 +775,7 @@ class Brain(BrainInspectionMixin):
         Returns a proof document showing whether and how strongly the brain
         has learned from corrections. Used for marketplace trust verification.
         """
-        from gradata._core import brain_prove
+        from ._core import brain_prove
 
         return brain_prove(self)
 
@@ -785,7 +785,7 @@ class Brain(BrainInspectionMixin):
         Only includes PATTERN and RULE state lessons — proven behavioral
         rules that have survived the graduation pipeline.
         """
-        from gradata._core import brain_share
+        from ._core import brain_share
 
         return brain_share(self)
 
@@ -795,7 +795,7 @@ class Brain(BrainInspectionMixin):
         Rules enter as INSTINCT — this brain must validate them through
         its own correction cycle before they graduate.
         """
-        from gradata._core import brain_absorb
+        from ._core import brain_absorb
 
         return brain_absorb(self, package)
 
@@ -848,11 +848,11 @@ class Brain(BrainInspectionMixin):
         # Pulling rules from cloud would allow a compromised server to inject
         # malicious instructions into AI prompts → remote code execution.
         try:
-            from gradata.enhancements.self_improvement import parse_lessons
+            from .enhancements.self_improvement import parse_lessons
         except ImportError:
             return ""
-        from gradata._scope import build_scope
-        from gradata.rules.rule_engine import apply_rules, format_rules_for_prompt
+        from ._scope import build_scope
+        from .rules.rule_engine import apply_rules, format_rules_for_prompt
 
         ctx = dict(context or {})
         ctx.setdefault("task", task)
@@ -864,7 +864,7 @@ class Brain(BrainInspectionMixin):
         scope = build_scope(ctx)
 
         # Check rule cache first (Pattern 2: skip re-ranking if scope unchanged)
-        from gradata.rules.cache import RuleCache
+        from .rules.cache import RuleCache
 
         cache_key = RuleCache.make_key(scope.task_type, scope.domain, scope.audience)
         cached = self._rule_cache.get(cache_key)
@@ -878,7 +878,7 @@ class Brain(BrainInspectionMixin):
         # events for observers (notifications, session-history, embeddings).
         _bus = getattr(self, "bus", None)
         try:
-            from gradata.rules.rule_engine import apply_rules_with_tree
+            from .rules.rule_engine import apply_rules_with_tree
 
             applied = apply_rules_with_tree(
                 lessons, scope, max_rules=max_rules, event_bus=_bus,
@@ -967,7 +967,7 @@ class Brain(BrainInspectionMixin):
             prompt = code_brain.inject("refactor the parser")
             code_brain.correct("old draft", "new draft")  # tagged applies_to="code"
         """
-        from gradata._scoped_brain import ScopedBrain
+        from ._scoped_brain import ScopedBrain
 
         return ScopedBrain(self, domain)
 
@@ -1003,11 +1003,11 @@ class Brain(BrainInspectionMixin):
             brain.forget("all tone")       # everything in TONE category
         """
         try:
-            from gradata.enhancements.self_improvement import format_lessons, parse_lessons
+            from .enhancements.self_improvement import format_lessons, parse_lessons
         except ImportError:
             return {"rolled_back": False, "error": "enhancements not installed"}
-        from gradata._db import write_lessons_safe
-        from gradata._types import LessonState
+        from ._db import write_lessons_safe
+        from ._types import LessonState
 
         lessons_path = self._find_lessons_path()
         if not lessons_path or not lessons_path.is_file():
@@ -1088,10 +1088,10 @@ class Brain(BrainInspectionMixin):
     ) -> dict:
         """Disable a specific lesson by setting its state to KILLED."""
         try:
-            from gradata.enhancements.self_improvement import format_lessons, parse_lessons
+            from .enhancements.self_improvement import format_lessons, parse_lessons
         except ImportError:
             return {"rolled_back": False, "error": "enhancements not installed"}
-        from gradata._types import LessonState
+        from ._types import LessonState
 
         lessons_path = self._find_lessons_path()
         if not lessons_path or not lessons_path.is_file():
@@ -1117,7 +1117,7 @@ class Brain(BrainInspectionMixin):
             return {"rolled_back": False, "error": "lesson not found"}
         old_state, old_conf = target.state.value, target.confidence
         target.state, target.confidence = LessonState.KILLED, 0.0
-        from gradata._db import write_lessons_safe
+        from ._db import write_lessons_safe
 
         write_lessons_safe(lessons_path, format_lessons(lessons))
         try:
@@ -1177,8 +1177,8 @@ class Brain(BrainInspectionMixin):
         """Shared logic for approve/reject: look up pending, mutate lesson, resolve."""
         import sqlite3
 
-        from gradata._db import get_connection, lessons_lock
-        from gradata.enhancements.self_improvement import format_lessons, parse_lessons
+        from ._db import get_connection, lessons_lock
+        from .enhancements.self_improvement import format_lessons, parse_lessons
 
         conn = get_connection(self.db_path)
         conn.row_factory = sqlite3.Row
@@ -1208,7 +1208,7 @@ class Brain(BrainInspectionMixin):
                     matched = True
                     break
             if matched:
-                from gradata._db import write_lessons_safe
+                from ._db import write_lessons_safe
 
                 write_lessons_safe(lessons_path, format_lessons(lessons))
 
@@ -1233,7 +1233,7 @@ class Brain(BrainInspectionMixin):
         try:
             import sqlite3
 
-            from gradata._db import get_connection
+            from ._db import get_connection
 
             conn = get_connection(self.db_path)
             conn.row_factory = sqlite3.Row
@@ -1248,7 +1248,7 @@ class Brain(BrainInspectionMixin):
 
     def approve_lesson(self, approval_id: int) -> dict:
         """Approve a pending lesson — sets confidence to INITIAL and enters graduation pipeline."""
-        from gradata.enhancements.self_improvement import INITIAL_CONFIDENCE
+        from .enhancements.self_improvement import INITIAL_CONFIDENCE
 
         def _approve(lesson):
             lesson.confidence = INITIAL_CONFIDENCE
@@ -1275,7 +1275,7 @@ class Brain(BrainInspectionMixin):
 
     def reject_lesson(self, approval_id: int, reason: str = "") -> dict:
         """Reject a pending lesson — kills it with reason."""
-        from gradata._types import LessonState
+        from ._types import LessonState
 
         def _reject(lesson):
             lesson.state = LessonState.KILLED
@@ -1304,7 +1304,7 @@ class Brain(BrainInspectionMixin):
 
     def agent_profile(self, agent_type: str) -> dict:
         """Get the skill evolution profile for an agent type."""
-        from gradata._types import LessonState
+        from ._types import LessonState
 
         lessons = self._load_lessons()
         agent_lessons = [l for l in lessons if l.agent_type == agent_type]
@@ -1343,13 +1343,13 @@ class Brain(BrainInspectionMixin):
 
     def export_rules(self, min_state: str = "PATTERN", skill_name: str = "") -> str:
         """Export graduated brain rules as OpenSpace-compatible SKILL.md."""
-        from gradata._core import brain_export_rules
+        from ._core import brain_export_rules
 
         return brain_export_rules(self, min_state=min_state, skill_name=skill_name)
 
     def export_rules_json(self, min_state: str = "PATTERN") -> list[dict]:
         """Export graduated rules as a flat, sorted JSON array."""
-        from gradata._core import brain_export_rules_json
+        from ._core import brain_export_rules_json
 
         return brain_export_rules_json(self, min_state=min_state)
 
@@ -1357,7 +1357,7 @@ class Brain(BrainInspectionMixin):
         self, output_dir: str | None = None, min_state: str = "PATTERN", skill_name: str = ""
     ) -> Path:
         """Export graduated rules as a full skill directory."""
-        from gradata._core import brain_export_skill
+        from ._core import brain_export_skill
 
         return brain_export_skill(
             self, output_dir=output_dir, min_state=min_state, skill_name=skill_name
@@ -1365,7 +1365,7 @@ class Brain(BrainInspectionMixin):
 
     def export_skills(self, output_dir: str | None = None, min_state: str = "PATTERN") -> list[str]:
         """Export graduated rules as per-category SKILL.md files."""
-        from gradata._core import brain_export_skills
+        from ._core import brain_export_skills
 
         return brain_export_skills(self, output_dir=output_dir, min_state=min_state)
 
@@ -1389,7 +1389,7 @@ class Brain(BrainInspectionMixin):
             brain.on_notification(my_slack_handler)     # custom handler
             brain.on_notification(lambda n: print(n.message))
         """
-        from gradata.notifications import cli_handler, subscribe
+        from .notifications import cli_handler, subscribe
 
         subscribe(self.bus, callback or cli_handler)
 
@@ -1404,7 +1404,7 @@ class Brain(BrainInspectionMixin):
         session: int | None = None,
     ) -> dict:
         """Emit an event to the brain's event log."""
-        from gradata._events import emit
+        from ._events import emit
 
         return emit(event_type, source, data or {}, tags or [], session or 0, ctx=self.ctx)
 
@@ -1417,7 +1417,7 @@ class Brain(BrainInspectionMixin):
     ) -> list[dict]:
         """Query events from the brain's event log."""
         try:
-            from gradata._events import query
+            from ._events import query
 
             return query(
                 event_type=event_type,
@@ -1432,7 +1432,7 @@ class Brain(BrainInspectionMixin):
     def get_facts(self, prospect: str | None = None, fact_type: str | None = None) -> list[dict]:
         """Query structured facts from the brain."""
         try:
-            from gradata._fact_extractor import query_facts
+            from ._fact_extractor import query_facts
 
             return query_facts(prospect=prospect, fact_type=fact_type, ctx=self.ctx)
         except ImportError:
@@ -1441,7 +1441,7 @@ class Brain(BrainInspectionMixin):
     def observe(self, messages: list[dict], user_id: str = "default") -> list[dict]:
         """Extract facts from a conversation without requiring corrections."""
         try:
-            from gradata.enhancements.memory_extraction import MemoryExtractor
+            from .enhancements.memory_extraction import MemoryExtractor
         except ImportError:
             return []
         extractor = MemoryExtractor()
@@ -1500,7 +1500,7 @@ class Brain(BrainInspectionMixin):
         if mode == "events":
             return self._search_events(query, top_k)
         try:
-            from gradata._query import brain_search
+            from ._query import brain_search
 
             results = brain_search(query, file_type=file_type, top_k=top_k, mode=mode, ctx=self.ctx)
         except ImportError:
@@ -1537,7 +1537,7 @@ class Brain(BrainInspectionMixin):
     def _search_events(self, query: str, top_k: int = 5) -> list[dict]:
         """Search over event history."""
         try:
-            from gradata._query import brain_search
+            from ._query import brain_search
 
             return brain_search(query, file_type="event", top_k=top_k, ctx=self.ctx)
         except ImportError:
@@ -1570,7 +1570,7 @@ class Brain(BrainInspectionMixin):
     def embed(self, full: bool = False) -> int:
         """Embed brain files into SQLite. Returns chunks embedded."""
         try:
-            from gradata._embed import main as embed_main
+            from ._embed import main as embed_main
 
             return embed_main(brain_dir=self.dir, full=full)
         except ImportError as e:
@@ -1583,7 +1583,7 @@ class Brain(BrainInspectionMixin):
     def manifest(self) -> dict:
         """Generate brain.manifest.json and return it."""
         try:
-            from gradata._brain_manifest import generate_manifest, write_manifest
+            from ._brain_manifest import generate_manifest, write_manifest
 
             m = generate_manifest(ctx=self.ctx)
             # Embed prove() data so the manifest is a complete quality certificate
@@ -1604,7 +1604,7 @@ class Brain(BrainInspectionMixin):
     def export(self, output_path: str | None = None, mode: str = "full") -> Path:
         """Export brain as a shareable archive."""
         try:
-            from gradata._export_brain import export_brain
+            from ._export_brain import export_brain
 
             return export_brain(
                 include_prospects=(mode != "no-prospects"),
@@ -1623,7 +1623,7 @@ class Brain(BrainInspectionMixin):
         Returns:
             Nested dict representing the tree structure.
         """
-        from gradata.rules.rule_tree import RuleTree
+        from .rules.rule_tree import RuleTree
 
         lessons = self._load_lessons()
         tree = RuleTree(lessons)
@@ -1639,7 +1639,7 @@ class Brain(BrainInspectionMixin):
         Returns:
             Path to the exported file/directory.
         """
-        from gradata.rules.rule_tree import RuleTree, export_tree_json, export_tree_obsidian
+        from .rules.rule_tree import RuleTree, export_tree_json, export_tree_obsidian
 
         lessons = self._load_lessons()
         tree = RuleTree(lessons)
@@ -1657,7 +1657,7 @@ class Brain(BrainInspectionMixin):
     def context_for(self, message: str) -> str:
         """Compile relevant context for a user message."""
         try:
-            from gradata._context_compile import compile_context
+            from ._context_compile import compile_context
 
             return compile_context(message, ctx=self.ctx)
         except ImportError:
@@ -1696,7 +1696,7 @@ class Brain(BrainInspectionMixin):
     def briefing(self, output_dir: str | Path = ".") -> str:
         """Generate a brain briefing and return as markdown."""
         try:
-            from gradata.enhancements.reporting import generate_briefing
+            from .enhancements.reporting import generate_briefing
 
             return generate_briefing(self).to_markdown()
         except ImportError:
@@ -1714,7 +1714,7 @@ class Brain(BrainInspectionMixin):
             cross_domain, stats.
         """
         try:
-            from gradata.enhancements.rule_pipeline import build_knowledge_graph
+            from .enhancements.rule_pipeline import build_knowledge_graph
 
             lessons_path = self._find_lessons_path()
             if not lessons_path:
@@ -1746,7 +1746,7 @@ class Brain(BrainInspectionMixin):
     ) -> dict:
         """Bootstrap this brain from git history."""
         try:
-            from gradata.enhancements.git_backfill import backfill_from_git
+            from .enhancements.git_backfill import backfill_from_git
 
             return backfill_from_git(
                 brain=self,
@@ -1765,7 +1765,7 @@ class Brain(BrainInspectionMixin):
         try:
             import dataclasses
 
-            from gradata.enhancements.reporting import generate_health_report
+            from .enhancements.reporting import generate_health_report
 
             return dataclasses.asdict(generate_health_report(self.db_path))
         except ImportError:
@@ -1789,11 +1789,11 @@ class Brain(BrainInspectionMixin):
         session: int | None = None,
     ) -> dict | None:
         """Log a RULE_APPLICATION event."""
-        from gradata.rules.rule_tracker import log_application
+        from .rules.rule_tracker import log_application
 
         if session is None:
             try:
-                from gradata._events import get_current_session
+                from ._events import get_current_session
 
                 session = get_current_session()
             except Exception as e:
@@ -1811,7 +1811,7 @@ class Brain(BrainInspectionMixin):
         self, name: str, keywords: list[str], domain_hint: str = "", *, prepend: bool = False
     ) -> None:
         """Register a custom task type in the global scope classifier."""
-        from gradata.rules.scope import register_task_type as _register
+        from .rules.scope import register_task_type as _register
 
         _register(name, keywords, domain_hint, prepend=prepend)
 
@@ -1821,7 +1821,7 @@ class Brain(BrainInspectionMixin):
 
     def guard(self, text: str, direction: str = "input") -> dict:
         """Run guardrail checks on text. See gradata.contrib.patterns.guardrails."""
-        from gradata.contrib.patterns.guardrails import (
+        from .contrib.patterns.guardrails import (
             InputGuard,
             OutputGuard,
             banned_phrases,
@@ -1848,8 +1848,8 @@ class Brain(BrainInspectionMixin):
         self, draft: str, checklist=None, evaluator=None, refiner=None, max_cycles: int = 3
     ) -> dict:
         """Run reflection loop. See gradata.contrib.patterns.reflection."""
-        from gradata.contrib.patterns.reflection import EMAIL_CHECKLIST, default_evaluator
-        from gradata.contrib.patterns.reflection import reflect as _reflect
+        from .contrib.patterns.reflection import EMAIL_CHECKLIST, default_evaluator
+        from .contrib.patterns.reflection import reflect as _reflect
 
         result = _reflect(
             output=draft,
@@ -1874,13 +1874,13 @@ class Brain(BrainInspectionMixin):
 
     def pipeline(self, *stages):
         """Create a Pipeline. See gradata.contrib.patterns.pipeline."""
-        from gradata.contrib.patterns.pipeline import Pipeline
+        from .contrib.patterns.pipeline import Pipeline
 
         return Pipeline(*stages)
 
     def run(self, tasks: list[str] | str, worker: Callable, *, max_concurrent: int = 3) -> dict:
         """Execute task(s) through orchestrator. See gradata.contrib.patterns.orchestrator."""
-        from gradata.contrib.patterns.orchestrator import execute_orchestrated
+        from .contrib.patterns.orchestrator import execute_orchestrated
 
         if isinstance(tasks, str):
             tasks = [tasks]
