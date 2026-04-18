@@ -154,22 +154,6 @@ def _extract_keywords(text: str) -> set[str]:
     return words - _STOPWORDS
 
 
-def _has_contradiction(desc_a: str, desc_b: str) -> bool:
-    """Check if two descriptions contradict each other."""
-    norm_a = _normalize(desc_a)
-    norm_b = _normalize(desc_b)
-
-    for pos, neg in _POLARITY_PAIRS:
-        if (pos in norm_a and neg in norm_b) or (neg in norm_a and pos in norm_b):
-            return True
-
-    for action, opposite in _ACTION_OPPOSITES:
-        if (action in norm_a and opposite in norm_b) or (opposite in norm_a and action in norm_b):
-            return True
-
-    return False
-
-
 def _keyword_overlap(desc_a: str, desc_b: str) -> float:
     """Fraction of shared keywords (Jaccard similarity)."""
     kw_a = _extract_keywords(desc_a)
@@ -209,8 +193,16 @@ def detect_relationship(rule_a: dict, rule_b: dict) -> RuleRelationType | None:
             return RuleRelationType.GENERALIZES
 
     # 2. Contradiction detection (same category required)
-    if cat_a and cat_b and cat_a == cat_b and _has_contradiction(desc_a, desc_b):
-        return RuleRelationType.CONTRADICTS
+    if cat_a and cat_b and cat_a == cat_b:
+        _hc_a, _hc_b = _normalize(desc_a), _normalize(desc_b)
+        if any(
+            (p in _hc_a and n in _hc_b) or (n in _hc_a and p in _hc_b)
+            for p, n in _POLARITY_PAIRS
+        ) or any(
+            (a in _hc_a and o in _hc_b) or (o in _hc_a and a in _hc_b)
+            for a, o in _ACTION_OPPOSITES
+        ):
+            return RuleRelationType.CONTRADICTS
 
     # 3. Reinforcement (same category + keyword overlap > 50%)
     if cat_a and cat_b and cat_a == cat_b and _keyword_overlap(desc_a, desc_b) > 0.5:
