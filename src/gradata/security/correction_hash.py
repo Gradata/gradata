@@ -65,24 +65,6 @@ _SOURCE_ALIASES: dict[str, str] = {
 }
 
 
-def _canonicalize_source_context(source_context: Any) -> str:
-    """Turn ``source_context`` into a stable, hash-friendly string.
-
-    Accepts ``None``, ``str``, ``dict``, or any JSON-serializable value.
-    The output is deterministic for equal inputs so the provenance hash is
-    reproducible across runs and machines.
-    """
-    if source_context is None:
-        return ""
-    if isinstance(source_context, str):
-        return source_context
-    try:
-        return json.dumps(source_context, sort_keys=True, separators=(",", ":"),
-                          default=str)
-    except (TypeError, ValueError):
-        return str(source_context)
-
-
 def compute_correction_hash(
     before_text: str,
     after_text: str,
@@ -107,7 +89,15 @@ def compute_correction_hash(
     """
     before = before_text or ""
     after = after_text or ""
-    ctx_repr = _canonicalize_source_context(source_context)
+    if source_context is None:
+        ctx_repr = ""
+    elif isinstance(source_context, str):
+        ctx_repr = source_context
+    else:
+        try:
+            ctx_repr = json.dumps(source_context, sort_keys=True, separators=(",", ":"), default=str)
+        except (TypeError, ValueError):
+            ctx_repr = str(source_context)
     # Length-prefixed concatenation so "ab"+"c" and "a"+"bc" hash differently.
     payload = (
         f"{len(before)}:{before}\x00"
