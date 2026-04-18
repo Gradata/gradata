@@ -248,7 +248,7 @@ def scope_matches(rule_scope: RuleScope, query_scope: RuleScope) -> float:
     # "this rule does not constrain this dimension".  Defaults are:
     #   domain, task_type, audience, channel → "" (empty string)
     #   stakes → "normal"  (the neutral, unconstrained value)
-    _defaults = {f: v for f, v in asdict(RuleScope()).items()}
+    _defaults = dict(asdict(RuleScope()).items())
 
     scored: list[float] = []
     for field_name in fields:
@@ -305,7 +305,7 @@ def scope_from_dict(data: dict[str, str]) -> RuleScope:
         RuleScope(domain='sales', task_type='', audience='',
                   channel='', stakes='high')
     """
-    valid_fields = {f for f in RuleScope.__dataclass_fields__}  # type: ignore[attr-defined]
+    valid_fields = set(RuleScope.__dataclass_fields__)  # type: ignore[attr-defined]
     # Coerce int fields that were stringified by scope_to_dict
     _INT_FIELDS = {"max_idle_sessions", "created_session"}
     filtered = {}

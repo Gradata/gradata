@@ -240,7 +240,7 @@ def backfill_from_git(
         max_commits=max_commits,
     )
 
-    stats.commits_scanned = len(set(d["commit"] for d in diffs))
+    stats.commits_scanned = len({d["commit"] for d in diffs})
     stats.files_analyzed = len(diffs)
 
     for diff in diffs:

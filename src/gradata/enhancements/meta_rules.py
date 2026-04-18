@@ -238,7 +238,7 @@ def merge_into_meta(
     _log.info("Meta-rule synthesis requires Gradata Cloud")
     lesson_ids = [_lesson_id(l) for l in rules]
     mid = _meta_id(lesson_ids)
-    categories = sorted(set(l.category for l in rules))
+    categories = sorted({l.category for l in rules})
     avg_conf = min(1.0, round(sum(l.confidence for l in rules) / len(rules), 2)) if rules else 0.0
     return MetaRule(
         id=mid,
@@ -979,7 +979,7 @@ def synthesize_meta_rules_agentic(
             continue
 
         avg_conf = round(sum(r.confidence for r in rules) / len(rules), 4)
-        categories = sorted(set(r.category for r in rules))
+        categories = sorted({r.category for r in rules})
         descriptions = [r.description for r in rules]
 
         # Prefer LLM-synthesized behavioral principle when credentials available.

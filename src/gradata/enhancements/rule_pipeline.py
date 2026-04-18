@@ -817,5 +817,5 @@ def get_verification_stats(db_path: Path) -> dict:
         "total_checks": total,
         "passed": passed,
         "pass_rate": passed / total if total > 0 else 1.0,
-        "violations_by_category": {cat: count for cat, count in violations},
+        "violations_by_category": dict(violations),
     }
