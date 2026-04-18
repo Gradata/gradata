@@ -45,33 +45,6 @@ def _similarity(a: str, b: str) -> float:
     return SequenceMatcher(None, na, nb).ratio()
 
 
-def _find_similar(target_path: str, project_root: str) -> list[tuple[str, float]]:
-    if not _normalize(target_path):
-        return []
-
-    similar = []
-    root = Path(project_root)
-
-    for watched in WATCHED_DIRS:
-        watched_dir = root / watched
-        if not watched_dir.exists():
-            continue
-        try:
-            for f in watched_dir.rglob("*.py"):
-                if f.name.startswith("__"):
-                    continue
-                sim = _similarity(target_path, f.name)
-                if sim > SIMILARITY_THRESHOLD:
-                    rel = str(f.relative_to(root))
-                    similar.append((rel, sim))
-        except Exception as exc:
-            _log.debug("Error scanning %s: %s", watched, exc)
-            continue
-
-    similar.sort(key=lambda x: x[1], reverse=True)
-    return similar[:5]
-
-
 def _in_watched_dir(file_path: str) -> bool:
     path_normalized = file_path.replace("\\", "/")
     return any(d in path_normalized for d in WATCHED_DIRS)
@@ -109,7 +82,25 @@ def main(data: dict) -> dict | None:
         if not project_root:
             return None
 
-        similar = _find_similar(file_path, project_root)
+        similar: list[tuple[str, float]] = []
+        if _normalize(file_path):
+            _root = Path(project_root)
+            for _w in WATCHED_DIRS:
+                _wd = _root / _w
+                if not _wd.exists():
+                    continue
+                try:
+                    for _f in _wd.rglob("*.py"):
+                        if _f.name.startswith("__"):
+                            continue
+                        _sim = _similarity(file_path, _f.name)
+                        if _sim > SIMILARITY_THRESHOLD:
+                            similar.append((str(_f.relative_to(_root)), _sim))
+                except Exception as exc:
+                    _log.debug("Error scanning %s: %s", _w, exc)
+                    continue
+            similar.sort(key=lambda x: x[1], reverse=True)
+            similar = similar[:5]
         if not similar:
             return None
 
