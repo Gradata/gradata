@@ -453,24 +453,6 @@ EMAIL_CHECKLIST = CritiqueChecklist(
         weight=0.5,
     ),
 )
-"""Pre-built checklist for outbound sales email critique.
-
-Criteria
---------
-``has_subject`` (required, weight 1.5)
-    Checks for a ``Subject:`` header.
-``has_cta`` (required, weight 2.0)
-    Checks for a recognisable call-to-action phrase.
-``appropriate_length`` (required, weight 1.0)
-    Checks the email is under 200 words.
-``no_jargon`` (optional, weight 0.5)
-    Checks for absence of common jargon tokens.
-"""
-
-
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
