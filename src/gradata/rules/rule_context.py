@@ -115,13 +115,12 @@ class RuleContext:
         if domain:
             d_norm = domain.strip().lower()
             if d_norm:
-                def _matches(r: GraduatedRule) -> bool:
-                    scope = r.scope or {}
-                    if str(scope.get("domain", "")).strip().lower() == d_norm:
-                        return True
-                    applies = str(scope.get("applies_to", "")).strip().lower()
-                    return applies == d_norm or applies.startswith(f"{d_norm}:")
-                candidates = [r for r in candidates if _matches(r)]
+                candidates = [
+                    r for r in candidates
+                    if str((r.scope or {}).get("domain", "")).strip().lower() == d_norm
+                    or (_ap := str((r.scope or {}).get("applies_to", "")).strip().lower()) == d_norm
+                    or _ap.startswith(f"{d_norm}:")
+                ]
 
         if min_confidence > 0:
             candidates = [r for r in candidates if r.confidence >= min_confidence]

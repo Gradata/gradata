@@ -198,13 +198,6 @@ def _extract_topic(sentences: list[str]) -> str:
     return " ".join(words).rstrip(".,;:") if words else "content"
 
 
-def _find_sentence_containing(text: str, word: str) -> str:
-    for sent in _split_sentences(text):
-        if word.lower() in sent.lower():
-            return sent
-    return text[:100]
-
-
 def _to_imperative(sentence: str) -> str:
     """Convert a sentence to imperative mood.
 
@@ -285,7 +278,11 @@ def detect_archetype(
         and not re.search(r"\b" + re.escape(w) + r"\b", draft_lower)
     ]
     if new_constraints:
-        constraint_sent = _find_sentence_containing(final, new_constraints[0])
+        _cw_lower = new_constraints[0].lower()
+        constraint_sent = next(
+            (s for s in _split_sentences(final) if _cw_lower in s.lower()),
+            final[:100],
+        )
         return ArchetypeMatch(
             Archetype.CONSTRAINT_ADDITION,
             0.85,
