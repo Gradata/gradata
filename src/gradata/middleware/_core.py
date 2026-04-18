@@ -12,13 +12,10 @@ import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from .._env import env_str
 from ..enhancements.rule_to_hook import DeterminismCheck, classify_rule
-
-if TYPE_CHECKING:  # pragma: no cover
-    from .._types import Lesson
 
 _log = logging.getLogger(__name__)
 
@@ -154,7 +151,12 @@ class RuleSource:
                     try:
                         from ..enhancements.self_improvement import parse_lessons
                         lessons = [
-                            _lesson_to_scored(_l)
+                            _ScoredLesson(
+                                category=_l.category,
+                                description=_l.description,
+                                state=_l.state.name if hasattr(_l.state, "name") else str(_l.state),
+                                confidence=_clamp_confidence(float(_l.confidence)),
+                            )
                             for _l in parse_lessons(_lfb_path.read_text(encoding="utf-8"))
                         ]
                     except (ImportError, OSError) as _lfb_exc:
@@ -205,16 +207,6 @@ class RuleSource:
             pattern, name = spec
             out.append((lesson, pattern, name))
         return out
-
-
-def _lesson_to_scored(lesson: Lesson) -> _ScoredLesson:
-    state_name = lesson.state.name if hasattr(lesson.state, "name") else str(lesson.state)
-    return _ScoredLesson(
-        category=lesson.category,
-        description=lesson.description,
-        state=state_name,
-        confidence=_clamp_confidence(float(lesson.confidence)),
-    )
 
 
 # ---------------------------------------------------------------------------
