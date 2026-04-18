@@ -29,32 +29,6 @@ def _format_cursor(rules: list[tuple[str, str]]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _format_grouped_markdown(title: str, rules: list[tuple[str, str]]) -> str:
-    """Render rules as a markdown doc with a title, intro, and ``## CATEGORY``
-    sections of bullet points. Shared body for AGENTS.md / Codex / Cline /
-    Continue.dev exports — they all consume the same schema (markdown
-    appended to a system prompt), only the H1 title and output path differ.
-    """
-    if not rules:
-        return f"# {title}\n\nNo graduated rules yet.\n"
-    by_cat: dict[str, list[str]] = {}
-    for cat, desc in rules:
-        by_cat.setdefault(cat, []).append(desc)
-    lines = [
-        f"# {title}",
-        "",
-        "Graduated rules learned from corrections. Follow these in every response.",
-        "",
-    ]
-    for cat in sorted(by_cat):
-        lines.append(f"## {cat}")
-        lines.append("")
-        for desc in by_cat[cat]:
-            lines.append(f"- {desc}")
-        lines.append("")
-    return "\n".join(lines) + "\n"
-
-
 def _format_aider(rules: list[tuple[str, str]]) -> str:
     """Emit a YAML block intended for `.aider.conf.yml`.
 
@@ -92,7 +66,19 @@ _GROUPED_MARKDOWN_TITLES = {
 
 def _make_grouped_formatter(title: str):
     def _fmt(rules: list[tuple[str, str]]) -> str:
-        return _format_grouped_markdown(title, rules)
+        if not rules:
+            return f"# {title}\n\nNo graduated rules yet.\n"
+        _by_cat: dict[str, list[str]] = {}
+        for _cat, _desc in rules:
+            _by_cat.setdefault(_cat, []).append(_desc)
+        _lines = [f"# {title}", "", "Graduated rules learned from corrections. Follow these in every response.", ""]
+        for _cat in sorted(_by_cat):
+            _lines.append(f"## {_cat}")
+            _lines.append("")
+            for _desc in _by_cat[_cat]:
+                _lines.append(f"- {_desc}")
+            _lines.append("")
+        return "\n".join(_lines) + "\n"
     return _fmt
 
 
