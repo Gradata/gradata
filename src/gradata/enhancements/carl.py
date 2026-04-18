@@ -1,21 +1,5 @@
-"""Backward-compatibility shim — all code moved to behavioral_engine.py."""
+"""Backward-compatibility shim — all code moved to behavioral_engine.py.
 
-from gradata.enhancements.behavioral_engine import (
-    BehavioralContract,
-    ConstraintViolation,
-    ContractRegistry,
-    Directive,
-    DirectiveRegistry,
-    PrioritizedConstraint,
-    RulePriority,
-)
-
-__all__ = [
-    "BehavioralContract",
-    "ConstraintViolation",
-    "ContractRegistry",
-    "Directive",
-    "DirectiveRegistry",
-    "PrioritizedConstraint",
-    "RulePriority",
-]
+Retained as an importable module for the test_all_enhancements_importable
+spec contract. No re-exports: callers should import from behavioral_engine.
+"""
