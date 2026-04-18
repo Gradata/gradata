@@ -73,27 +73,6 @@ def _safe_extract(zf: zipfile.ZipFile, target_dir: Path) -> None:
     zf.extractall(target_dir)
 
 
-def _install_brain(archive_path: Path, target_dir: Path, manifest: dict) -> bool:
-    """Extract brain archive to target directory."""
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    with zipfile.ZipFile(archive_path, "r") as zf:
-        _safe_extract(zf, target_dir)
-
-    # Write install metadata
-    install_meta = {
-        "installed_at": datetime.now(UTC).isoformat(),
-        "source_archive": str(archive_path),
-        "brain_version": manifest.get("metadata", {}).get("brain_version"),
-        "domain": manifest.get("metadata", {}).get("domain"),
-        "trust_verified": True,
-    }
-    meta_path = target_dir / ".install-meta.json"
-    meta_path.write_text(json.dumps(install_meta, indent=2), encoding="utf-8")
-
-    return True
-
-
 def list_installed() -> list[dict]:
     """List all installed brains."""
     brains = []
@@ -185,11 +164,19 @@ def install(archive_path: Path, target_dir: Path | None = None, dry_run: bool = 
 
     # Step 4: Install
     print("Installing...")
-    success = _install_brain(archive_path, target_dir, manifest)
-    if not success:
-        report["status"] = "failed"
-        report["error"] = "Installation failed"
-        return report
+    target_dir.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(archive_path, "r") as _ib_zf:
+        _safe_extract(_ib_zf, target_dir)
+    (target_dir / ".install-meta.json").write_text(
+        json.dumps({
+            "installed_at": datetime.now(UTC).isoformat(),
+            "source_archive": str(archive_path),
+            "brain_version": manifest.get("metadata", {}).get("brain_version"),
+            "domain": manifest.get("metadata", {}).get("domain"),
+            "trust_verified": True,
+        }, indent=2),
+        encoding="utf-8",
+    )
     report["steps"].append({"step": "install", "status": "ok"})
 
     # Step 5: Bootstrap
