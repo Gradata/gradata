@@ -10,8 +10,8 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-import gradata._paths as _p
-from gradata._config import (
+from . import _paths as _p
+from ._config import (
     CONFIDENCE_HIGH,
     CONFIDENCE_LOW,
     CONFIDENCE_MED,
