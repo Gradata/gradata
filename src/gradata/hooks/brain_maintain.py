@@ -13,31 +13,6 @@ HOOK_META = {
 }
 
 
-def _rebuild_fts(brain_dir: str, ctx=None) -> None:
-    """Rebuild FTS index from brain content files."""
-    try:
-        from .._query import fts_index
-        brain_path = Path(brain_dir)
-
-        # Index lessons.md
-        lessons = brain_path / "lessons.md"
-        if lessons.is_file():
-            text = lessons.read_text(encoding="utf-8")
-            fts_index("lessons.md", "markdown", text, ctx=ctx)
-
-        # Index any .md files in brain root
-        for md_file in brain_path.glob("*.md"):
-            if md_file.name == "lessons.md":
-                continue
-            try:
-                text = md_file.read_text(encoding="utf-8")
-                fts_index(md_file.name, "markdown", text, ctx=ctx)
-            except Exception:
-                continue
-    except Exception:
-        pass
-
-
 def _generate_manifest(ctx=None) -> None:
     """Generate brain manifest for quality tracking."""
     try:
@@ -57,7 +32,21 @@ def main(data: dict) -> dict | None:
         from .._paths import BrainContext
         ctx = BrainContext.from_brain_dir(brain_dir)
 
-        _rebuild_fts(brain_dir, ctx=ctx)
+        try:
+            from .._query import fts_index
+            _bp = Path(brain_dir)
+            _lf = _bp / "lessons.md"
+            if _lf.is_file():
+                fts_index("lessons.md", "markdown", _lf.read_text(encoding="utf-8"), ctx=ctx)
+            for _md in _bp.glob("*.md"):
+                if _md.name == "lessons.md":
+                    continue
+                try:
+                    fts_index(_md.name, "markdown", _md.read_text(encoding="utf-8"), ctx=ctx)
+                except Exception:
+                    continue
+        except Exception:
+            pass
         _generate_manifest(ctx=ctx)
     except Exception:
         pass
