@@ -20,12 +20,33 @@ from typing import TYPE_CHECKING
 # `from X import Y` copies the value at import time — subsequent set_brain_dir() won't update it.
 import gradata._paths as _p
 from gradata._file_lock import platform_lock
-from gradata._platform import detect_platform_source
 
 if TYPE_CHECKING:
     from gradata._paths import BrainContext
 
 _log = logging.getLogger("gradata.events")
+
+# IDE / agent surfaces before generic SDK presence so an IDE that also
+# exports an API key still attributes to the IDE.
+_PLATFORM_ENV_CHECKS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("claude-code", ("CLAUDECODE", "CLAUDE_CODE")),
+    ("cursor", ("CURSOR", "CURSOR_TRACE_ID")),
+    ("windsurf", ("WINDSURF", "WINDSURF_SESSION_ID")),
+    ("mcp-server", ("GRADATA_MCP_SERVER",)),
+    ("anthropic-sdk", ("ANTHROPIC_API_KEY",)),
+    ("openai-sdk", ("OPENAI_API_KEY",)),
+)
+
+
+def detect_platform_source() -> str:
+    """Return a short platform identifier for the current runtime."""
+    override = os.environ.get("GRADATA_PLATFORM_SOURCE", "").strip()
+    if override:
+        return override
+    for label, env_vars in _PLATFORM_ENV_CHECKS:
+        if any(os.environ.get(var) for var in env_vars):
+            return label
+    return "raw-python"
 
 
 def _locked_append_many(path: Path, lines: list[str]) -> None:
