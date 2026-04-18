@@ -172,10 +172,10 @@ def adjust_severity_by_semantics(
 # is a principled cheap proxy for preference strength.
 #
 # We *blend* rather than replace: Levenshtein captures small stylistic surface
-# edits (Oliver's signature habits), semantic distance captures meaning
+# edits (a user's signature habits), semantic distance captures meaning
 # shifts (actual correction). Default weights: 0.3·lev + 0.7·semantic, chosen
 # to put majority weight on meaning while still surfacing high-volume surface
-# edits that Oliver does care about. Weights are configurable per-call.
+# edits that users may care about. Weights are configurable per-call.
 #
 # Performance: a single `sentence-transformers` call (all-MiniLM-L6-v2,
 # 22M params, 384-dim) is ~5-15 ms on CPU for a correction pair. Callers
