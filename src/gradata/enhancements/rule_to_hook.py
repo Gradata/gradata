@@ -739,5 +739,3 @@ def try_generate(
         except Exception:
             pass
     return result
-
-

@@ -145,5 +145,3 @@ class ToolRegistry:
             "with_handlers": len(self._handlers),
             "categories": self.categories(),
         }
-
-

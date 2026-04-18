@@ -158,5 +158,3 @@ def format_metrics(m) -> str:
         f"({'generic' if blandness > 0.7 else 'varied'})",
     ]
     return "\n".join(lines)
-
-

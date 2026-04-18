@@ -218,5 +218,3 @@ def verify_claims(output: str) -> TruthVerdict:
         ))
 
     return verdict
-
-

@@ -183,5 +183,3 @@ def _context_component(
 
 def _fire_count_score(fire_count: int) -> float:
     return min(1.0, math.log1p(fire_count) / 5.0)
-
-

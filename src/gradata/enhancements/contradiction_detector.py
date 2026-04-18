@@ -131,5 +131,3 @@ def _check_pair_list(
         ):
             return clamped
     return 0.0
-
-
