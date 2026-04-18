@@ -13,16 +13,6 @@ HOOK_META = {
 }
 
 
-def _generate_manifest(ctx=None) -> None:
-    """Generate brain manifest for quality tracking."""
-    try:
-        from .._brain_manifest import generate_manifest, write_manifest
-        manifest = generate_manifest(ctx=ctx)
-        write_manifest(manifest, ctx=ctx)
-    except Exception:
-        pass
-
-
 def main(data: dict) -> dict | None:
     try:
         brain_dir = resolve_brain_dir()
@@ -47,7 +37,11 @@ def main(data: dict) -> dict | None:
                     continue
         except Exception:
             pass
-        _generate_manifest(ctx=ctx)
+        try:
+            from .._brain_manifest import generate_manifest, write_manifest
+            write_manifest(generate_manifest(ctx=ctx), ctx=ctx)
+        except Exception:
+            pass
     except Exception:
         pass
     return None
