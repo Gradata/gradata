@@ -347,23 +347,6 @@ def _quality_metrics(ctx: "_p.BrainContext | None" = None) -> dict:
     return result
 
 
-def _memory_composition(ctx: "_p.BrainContext | None" = None) -> dict:
-    result = {"episodic": 0, "semantic": 0, "procedural": 0, "strategic": 0}
-    mappings = {
-        "episodic": ["sessions", "metrics", "pipeline", "demos"],
-        "semantic": ["prospects", "personas", "competitors", "objections"],
-        "procedural": ["emails", "messages", "templates"],
-        "strategic": ["learnings", "vault"],
-    }
-    brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
-    for mem_type, dirs in mappings.items():
-        for d in dirs:
-            dp = brain_dir / d
-            if dp.exists():
-                result[mem_type] += len(list(dp.glob("*.md")))
-    return result
-
-
 def generate_manifest(*, domain: str = "General", ctx: "_p.BrainContext | None" = None) -> dict:
     """Generate the complete brain manifest.
 
@@ -412,7 +395,18 @@ def generate_manifest(*, domain: str = "General", ctx: "_p.BrainContext | None" 
         pass
 
     quality = _quality_metrics(ctx=ctx)
-    memory = _memory_composition(ctx=ctx)
+    memory = {"episodic": 0, "semantic": 0, "procedural": 0, "strategic": 0}
+    _mc_bd = ctx.brain_dir if ctx else _p.BRAIN_DIR
+    for _mc_type, _mc_dirs in {
+        "episodic": ["sessions", "metrics", "pipeline", "demos"],
+        "semantic": ["prospects", "personas", "competitors", "objections"],
+        "procedural": ["emails", "messages", "templates"],
+        "strategic": ["learnings", "vault"],
+    }.items():
+        for _mc_d in _mc_dirs:
+            _mc_dp = _mc_bd / _mc_d
+            if _mc_dp.exists():
+                memory[_mc_type] += len(list(_mc_dp.glob("*.md")))
     rag = {"active": False, "provider": "unknown", "model": "unknown",
            "dimensions": 0, "chunks_indexed": 0, "fts5_enabled": True}
     try:
