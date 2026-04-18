@@ -218,7 +218,15 @@ class CritiqueChecklist:
             for c in self._criteria
             if c.required
         )
-        overall_score = _weighted_average(self._criteria, scores)
+        _weight_map = {c.name: c.weight for c in self._criteria}
+        _total_weight = 0.0
+        _weighted_sum = 0.0
+        for _name, _cs in scores.items():
+            if _cs.score is not None:
+                _w = _weight_map.get(_name, 1.0)
+                _weighted_sum += _cs.score * _w
+                _total_weight += _w
+        overall_score = round(_weighted_sum / _total_weight, 2) if _total_weight > 0.0 else 0.0
 
         return CritiqueResult(
             scores=scores,
@@ -469,41 +477,6 @@ Criteria
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
-
-
-def _weighted_average(
-    criteria: tuple[Criterion, ...],
-    scores: dict[str, CriterionScore],
-) -> float:
-    """Compute the weighted average of all numeric scores.
-
-    Criteria whose :class:`CriterionScore` has ``score=None`` are
-    excluded from both the numerator and the denominator, so their
-    absence never drags the average down.
-
-    Args:
-        criteria: Ordered criteria from the checklist (used to look
-            up weights).
-        scores: Mapping of criterion name to its evaluated score.
-
-    Returns:
-        Weighted average in [0.0, 10.0], or ``0.0`` when no numeric
-        scores are present.
-    """
-    weight_map = {c.name: c.weight for c in criteria}
-    total_weight = 0.0
-    weighted_sum = 0.0
-
-    for name, cs in scores.items():
-        if cs.score is not None:
-            w = weight_map.get(name, 1.0)
-            weighted_sum += cs.score * w
-            total_weight += w
-
-    if total_weight == 0.0:
-        return 0.0
-
-    return round(weighted_sum / total_weight, 2)
 
 
 # ---------------------------------------------------------------------------
