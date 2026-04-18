@@ -335,9 +335,7 @@ def evaluate(
     else:
         verdict = _VERDICT_MAJOR_REVISION
 
-    regression = (
-        previous_result is not None and average < previous_result.average
-    )
+    regression = previous_result is not None and average < previous_result.average
 
     if regression and previous_result is not None:
         logger.warning(
@@ -400,13 +398,9 @@ def evaluate_optimize_loop(
             is less than 1.
     """
     if not (0.0 < threshold <= 10.0):
-        raise ValueError(
-            f"threshold must be in (0, 10]; got {threshold!r}."
-        )
+        raise ValueError(f"threshold must be in (0, 10]; got {threshold!r}.")
     if max_iterations < 1:
-        raise ValueError(
-            f"max_iterations must be >= 1; got {max_iterations!r}."
-        )
+        raise ValueError(f"max_iterations must be >= 1; got {max_iterations!r}.")
 
     iteration_results: list[EvalResult] = []
     current_output: Any = None
@@ -486,9 +480,11 @@ def dimensions_from_graduated_rules(task_type: str = "") -> list[EvalDimension]:
 
     dims = []
     for rule in rules:
-        dims.append(EvalDimension(
-            name=f"rule_{rule.category.lower()}_{len(dims)}",
-            weight=rule.confidence,
-            description=f"Check: {rule.principle}",
-        ))
+        dims.append(
+            EvalDimension(
+                name=f"rule_{rule.category.lower()}_{len(dims)}",
+                weight=rule.confidence,
+                description=f"Check: {rule.principle}",
+            )
+        )
     return dims
