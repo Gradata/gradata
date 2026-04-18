@@ -262,23 +262,6 @@ def review_rule_failures(
 NUDGE_THRESHOLD = 3  # Corrections before nudging
 
 
-def _find_centroid(descriptions: list[str]) -> str:
-    """Find the most representative description (highest avg similarity to others)."""
-    if len(descriptions) <= 1:
-        return descriptions[0] if descriptions else ""
-
-    from .similarity import best_similarity
-
-    best_desc, best_avg = descriptions[0], 0.0
-    for desc in descriptions:
-        avg_sim = sum(best_similarity(desc, other) for other in descriptions if other != desc)
-        avg_sim /= max(len(descriptions) - 1, 1)
-        if avg_sim > best_avg:
-            best_avg = avg_sim
-            best_desc = desc
-    return best_desc
-
-
 def check_nudge_threshold(
     correction_events: list[dict],
     lessons: list[Lesson],
@@ -344,9 +327,19 @@ def check_nudge_threshold(
         for e in cat_corrections
     ]
     descriptions = [d for d in descriptions if d]
-    centroid = (
-        _find_centroid(descriptions) if descriptions else f"Repeated {cat.lower()} corrections"
-    )
+    if not descriptions:
+        centroid = f"Repeated {cat.lower()} corrections"
+    elif len(descriptions) == 1:
+        centroid = descriptions[0]
+    else:
+        from .similarity import best_similarity
+        _fc_best, _fc_avg = descriptions[0], 0.0
+        for _fc_desc in descriptions:
+            _fc_s = sum(best_similarity(_fc_desc, _fc_o) for _fc_o in descriptions if _fc_o != _fc_desc)
+            _fc_s /= max(len(descriptions) - 1, 1)
+            if _fc_s > _fc_avg:
+                _fc_avg, _fc_best = _fc_s, _fc_desc
+        centroid = _fc_best
 
     # Propose an INSTINCT lesson with pending_approval
     from .self_improvement import INITIAL_CONFIDENCE
