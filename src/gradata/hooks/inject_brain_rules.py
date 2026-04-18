@@ -13,23 +13,23 @@ import subprocess
 import sys
 from pathlib import Path
 
-from gradata.hooks._base import resolve_brain_dir, run_hook
-from gradata.hooks._profiles import Profile
-from gradata.rules.rule_ranker import rank_rules
+from ._base import resolve_brain_dir, run_hook
+from ._profiles import Profile
+from ..rules.rule_ranker import rank_rules
 
 try:
-    from gradata.enhancements.self_improvement import is_hook_enforced, parse_lessons
+    from ..enhancements.self_improvement import is_hook_enforced, parse_lessons
 except ImportError:
     parse_lessons = None
     is_hook_enforced = None  # type: ignore[assignment]
 
 try:
-    from gradata.enhancements.meta_rules import (
+    from ..enhancements.meta_rules import (
         INJECTABLE_META_SOURCES,
         _lesson_id,
         format_meta_rules_for_prompt,
     )
-    from gradata.enhancements.meta_rules_storage import load_meta_rules
+    from ..enhancements.meta_rules_storage import load_meta_rules
 except ImportError:
     format_meta_rules_for_prompt = None  # type: ignore[assignment]
     load_meta_rules = None  # type: ignore[assignment]
@@ -231,7 +231,7 @@ def main(data: dict) -> dict | None:
     # Sanitize lesson/rule text before embedding in XML.
     # A lesson containing "</brain-rules>" would terminate the block early and
     # allow injection of arbitrary content into the agent context.
-    from gradata.enhancements._sanitize import sanitize_lesson_content
+    from ..enhancements._sanitize import sanitize_lesson_content
 
     # Mutex: pre-compute categories that already have an injectable meta-rule.
     # When a meta-rule covers a category, suppress the cluster for that category
@@ -260,7 +260,7 @@ def main(data: dict) -> dict | None:
     cluster_injected_ids: set[str] = set()
     cluster_lines: list[str] = []
     try:
-        from gradata.enhancements.clustering import cluster_rules
+        from ..enhancements.clustering import cluster_rules
         clusters = cluster_rules(filtered, min_cluster_size=3)
         for cluster in clusters:
             if cluster.category in meta_covered_categories:
@@ -329,7 +329,7 @@ def main(data: dict) -> dict | None:
     # Inject disposition (behavioral tendencies evolved from corrections)
     disposition_block = ""
     try:
-        from gradata.enhancements.behavioral_engine import DispositionTracker
+        from ..enhancements.behavioral_engine import DispositionTracker
         tracker = DispositionTracker()
         # Load disposition from brain dir if persisted
         disp_path = Path(brain_dir) / "disposition.json"
