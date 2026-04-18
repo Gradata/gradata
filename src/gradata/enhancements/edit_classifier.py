@@ -413,31 +413,6 @@ _INSTRUCTION_TEMPLATES: dict[str, str] = {
 }
 
 
-def _match_template(classification: EditClassification) -> str | None:
-    desc_lower = classification.description.lower()
-
-    for keyword in ("casualized", "formalized", "softened", "strengthened"):
-        if keyword in desc_lower:
-            return _INSTRUCTION_TEMPLATES.get(keyword)
-
-    if "reordered" in desc_lower or "reformatted" in desc_lower:
-        return _INSTRUCTION_TEMPLATES.get("reordered")
-
-    added_match = re.search(r"added:\s*([^)]+)", desc_lower)
-    if added_match:
-        added_words = [w.strip() for w in added_match.group(1).split(",")]
-        # Try multi-word keys (sorted for consistency)
-        for n in range(min(len(added_words), 4), 0, -1):
-            key = ",".join(sorted(added_words[:n]))
-            if key in _INSTRUCTION_TEMPLATES:
-                return _INSTRUCTION_TEMPLATES[key]
-        for word in added_words:
-            if word in _INSTRUCTION_TEMPLATES:
-                return _INSTRUCTION_TEMPLATES[word]
-
-    return None
-
-
 _EXTRACTION_TIMEOUT = 12.0  # seconds
 
 # Cached provider instance — created on first LLM call
@@ -500,8 +475,9 @@ def extract_behavioral_instruction(
     """
     from .instruction_cache import InstructionCache
 
-    added_match = re.search(r"added:\s*([^)]+)", classification.description.lower())
-    cut_match = re.search(r"cut:\s*([^);]+)", classification.description.lower())
+    _mt_desc = classification.description.lower()
+    added_match = re.search(r"added:\s*([^)]+)", _mt_desc)
+    cut_match = re.search(r"cut:\s*([^);]+)", _mt_desc)
     added_words = [w.strip() for w in added_match.group(1).split(",")] if added_match else []
     removed_words = [w.strip() for w in cut_match.group(1).split(",")] if cut_match else []
     cache_key = InstructionCache.make_key(classification.category, added_words, removed_words)
@@ -511,7 +487,24 @@ def extract_behavioral_instruction(
         if cached:
             return cached
 
-    template = _match_template(classification)
+    template: str | None = None
+    for _mt_kw in ("casualized", "formalized", "softened", "strengthened"):
+        if _mt_kw in _mt_desc:
+            template = _INSTRUCTION_TEMPLATES.get(_mt_kw)
+            break
+    if template is None and ("reordered" in _mt_desc or "reformatted" in _mt_desc):
+        template = _INSTRUCTION_TEMPLATES.get("reordered")
+    if template is None and added_words:
+        for _mt_n in range(min(len(added_words), 4), 0, -1):
+            _mt_key = ",".join(sorted(added_words[:_mt_n]))
+            if _mt_key in _INSTRUCTION_TEMPLATES:
+                template = _INSTRUCTION_TEMPLATES[_mt_key]
+                break
+        if template is None:
+            for _mt_w in added_words:
+                if _mt_w in _INSTRUCTION_TEMPLATES:
+                    template = _INSTRUCTION_TEMPLATES[_mt_w]
+                    break
     if template:
         if cache:
             cache.put(cache_key, template)
