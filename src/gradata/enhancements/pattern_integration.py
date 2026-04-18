@@ -8,7 +8,7 @@ This is the FORWARD direction of the bidirectional cycle:
   (the BACKWARD direction is handled by rule_context.py adapters in each pattern)
 
 Usage:
-    from gradata.enhancements.pattern_integration import (
+    from ..enhancements.pattern_integration import (
         process_reflection_result,
         process_guardrail_result,
         process_loop_event,
@@ -24,9 +24,9 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from gradata.brain import Brain
-    from gradata.contrib.patterns.guardrails import GuardedResult
-    from gradata.contrib.patterns.reflection import ReflectionResult
+    from ..brain import Brain
+    from ..contrib.patterns.guardrails import GuardedResult
+    from ..contrib.patterns.reflection import ReflectionResult
 
 logger = logging.getLogger("gradata")
 
@@ -38,8 +38,8 @@ def _mutate_lessons(brain: Brain, mutator_fn) -> bool:
     so concurrent callers can't read stale state and overwrite each other.
     Returns True if mutation succeeded, False if lessons file not found.
     """
-    from gradata._db import lessons_lock
-    from gradata.enhancements.self_improvement import format_lessons, parse_lessons
+    from .._db import lessons_lock
+    from ..enhancements.self_improvement import format_lessons, parse_lessons
 
     lessons_path = brain._find_lessons_path()
     if not lessons_path or not lessons_path.is_file():
@@ -66,7 +66,7 @@ def process_reflection_result(
     - Converged with score >= 8.0 → boost lessons in matching category
     - Not converged → treat as implicit correction signal
     """
-    from gradata.enhancements.self_improvement import ACCEPTANCE_BONUS, update_confidence
+    from ..enhancements.self_improvement import ACCEPTANCE_BONUS, update_confidence
 
     if not result.critiques:
         return {"processed": False}
@@ -112,7 +112,7 @@ def process_guardrail_result(
 
     Each failed guard maps to a lesson category and applies a penalty.
     """
-    from gradata.enhancements.self_improvement import update_confidence
+    from ..enhancements.self_improvement import update_confidence
 
     failed_checks = []
     for check in list(result.input_checks or []) + list(result.output_checks or []):
@@ -166,7 +166,7 @@ def feed_q_router(
 
     try:
         reward = router.reward_from_severity(severity)
-        from gradata.contrib.patterns.q_learning_router import RouteDecision
+        from ..contrib.patterns.q_learning_router import RouteDecision
         decision = RouteDecision(
             agent=agent_type or "default",
             state_hash=str(hash(task_type) & 0xFFFFFFFF),
@@ -193,7 +193,7 @@ def process_loop_event(
 
     Loops indicate missing or wrong process rules.
     """
-    from gradata.enhancements.self_improvement import update_confidence
+    from ..enhancements.self_improvement import update_confidence
 
     if action not in ("WARN", "STOP"):
         return {"processed": False}
@@ -228,7 +228,7 @@ def process_parallel_failures(
     if not failed_tasks or total_tasks == 0:
         return {"processed": False}
 
-    from gradata.enhancements.self_improvement import update_confidence
+    from ..enhancements.self_improvement import update_confidence
 
     failure_rate = len(failed_tasks) / total_tasks
     severity = "major" if failure_rate > 0.5 else "moderate" if failure_rate > 0.2 else "minor"
@@ -259,7 +259,7 @@ def process_escalation(
     if status != "DONE_WITH_CONCERNS" or not concerns:
         return {"processed": False}
 
-    from gradata.enhancements.self_improvement import update_confidence
+    from ..enhancements.self_improvement import update_confidence
 
     def _apply(lessons):
         for concern in concerns:
@@ -292,7 +292,7 @@ def gates_from_graduated_rules() -> list[dict]:
     can convert into Stage objects with gate functions.
     """
     try:
-        from gradata.rules.rule_context import get_rule_context
+        from ..rules.rule_context import get_rule_context
     except ImportError:
         return []
 
@@ -312,7 +312,7 @@ def routing_adjustments() -> dict[str, float]:
     Categories with high density should get extra validation/reflection.
     """
     try:
-        from gradata.rules.rule_context import get_rule_context
+        from ..rules.rule_context import get_rule_context
     except ImportError:
         return {}
 
@@ -333,7 +333,7 @@ def importance_categories() -> set[str]:
     Memory systems should prioritize reinforcing memories in these categories.
     """
     try:
-        from gradata.rules.rule_context import get_rule_context
+        from ..rules.rule_context import get_rule_context
     except ImportError:
         return set()
 
@@ -352,7 +352,7 @@ def delegation_criteria_for_agent(agent_type: str) -> list[str]:
     These should be added to delegation success_criteria.
     """
     try:
-        from gradata.rules.rule_context import get_rule_context
+        from ..rules.rule_context import get_rule_context
     except ImportError:
         return []
 
@@ -371,7 +371,7 @@ def suggested_mode_override() -> str | None:
     Returns "SAFE" if overall correction density > 0.3, else None (no override).
     """
     try:
-        from gradata.rules.rule_context import get_rule_context
+        from ..rules.rule_context import get_rule_context
     except ImportError:
         return None
 
@@ -404,7 +404,7 @@ def register_brain_tools(brain: Brain) -> int:
         return 0
 
     try:
-        from gradata.contrib.patterns.tools import ToolSpec
+        from ..contrib.patterns.tools import ToolSpec
     except ImportError:
         return 0
 
@@ -471,7 +471,7 @@ def scope_confidence_boost(category: str) -> float:
     Returns 0.0-0.5 boost value.
     """
     try:
-        from gradata.rules.rule_context import get_rule_context
+        from ..rules.rule_context import get_rule_context
     except ImportError:
         return 0.0
 
@@ -490,7 +490,7 @@ def topic_boosts_from_rules() -> dict[str, float]:
     Categories with graduated rules get boosted relevance in search.
     """
     try:
-        from gradata.rules.rule_context import get_rule_context
+        from ..rules.rule_context import get_rule_context
     except ImportError:
         return {}
 
@@ -514,8 +514,8 @@ def create_graduation_middleware():
     Returns a Middleware instance (or None if patterns unavailable).
     """
     try:
-        from gradata.contrib.patterns.middleware import Middleware, MiddlewareContext
-        from gradata.rules.rule_context import get_rule_context
+        from ..contrib.patterns.middleware import Middleware, MiddlewareContext
+        from ..rules.rule_context import get_rule_context
     except ImportError:
         return None
 
@@ -551,7 +551,7 @@ def loop_threshold_adjustment() -> dict[str, int]:
     More PROCESS rules = stricter loop detection (lower thresholds).
     """
     try:
-        from gradata.rules.rule_context import get_rule_context
+        from ..rules.rule_context import get_rule_context
     except ImportError:
         return {"warn": 3, "stop": 5}
 
@@ -580,7 +580,7 @@ def strict_categories_from_rules() -> set[str]:
     from a proven rule is DRIFT, not just GAP.
     """
     try:
-        from gradata.rules.rule_context import get_rule_context
+        from ..rules.rule_context import get_rule_context
     except ImportError:
         return set()
 
