@@ -77,26 +77,6 @@ def _save_findings(findings: list[dict]) -> None:
         pass
 
 
-def _extract_failed_files(output: str) -> list[str]:
-    """Extract file paths from test failure output."""
-    files = []
-    for line in output.splitlines():
-        line = line.strip()
-        if "FAILED" in line and "::" in line:
-            # pytest format: FAILED tests/test_foo.py::test_bar
-            parts = line.split("FAILED")[-1].strip()
-            file_part = parts.split("::")[0].strip()
-            if file_part:
-                files.append(file_part)
-        elif line.startswith("E") and "File" in line and ".py" in line:
-            # Traceback format: E   File "foo.py", line 10
-            start = line.find('"')
-            end = line.find('"', start + 1)
-            if start != -1 and end != -1:
-                files.append(line[start + 1:end])
-    return files
-
-
 def _has_test_failure(output: str) -> bool:
     return any(indicator in output for indicator in TEST_FAILURE_INDICATORS)
 
@@ -110,7 +90,18 @@ def main(data: dict) -> dict | None:
             output = str(output)
 
         if tool_name == "Bash" and _has_test_failure(output):
-            failed_files = _extract_failed_files(output)
+            failed_files: list[str] = []
+            for _eff_l in output.splitlines():
+                _eff_l = _eff_l.strip()
+                if "FAILED" in _eff_l and "::" in _eff_l:
+                    _eff_p = _eff_l.split("FAILED")[-1].strip().split("::")[0].strip()
+                    if _eff_p:
+                        failed_files.append(_eff_p)
+                elif _eff_l.startswith("E") and "File" in _eff_l and ".py" in _eff_l:
+                    _eff_s = _eff_l.find('"')
+                    _eff_e = _eff_l.find('"', _eff_s + 1)
+                    if _eff_s != -1 and _eff_e != -1:
+                        failed_files.append(_eff_l[_eff_s + 1:_eff_e])
             if failed_files:
                 findings = _load_findings()
                 findings.append({
