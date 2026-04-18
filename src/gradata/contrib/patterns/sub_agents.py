@@ -73,33 +73,6 @@ class OrchestratedResult:
     qa_passed: bool = True
 
 
-def _topological_waves(delegations: list[Delegation]) -> list[list[Delegation]]:
-    """Sort delegations into execution waves based on dependencies.
-
-    Returns a list of waves where each wave contains delegations
-    that can run in parallel (all dependencies satisfied by prior waves).
-    """
-    completed: set[str] = set()
-    remaining = list(delegations)
-    waves: list[list[Delegation]] = []
-
-    while remaining:
-        wave = [
-            d for d in remaining
-            if all(dep in completed for dep in d.depends_on)
-        ]
-        if not wave:
-            # Circular dependency — break by taking first remaining
-            wave = [remaining[0]]
-
-        waves.append(wave)
-        for d in wave:
-            completed.add(d.id)
-        remaining = [d for d in remaining if d.id not in completed]
-
-    return waves
-
-
 def orchestrate(
     delegations: list[Delegation],
     handlers: dict[str, Callable] | None = None,
@@ -122,7 +95,17 @@ def orchestrate(
         OrchestratedResult with all delegation results and synthesized output.
     """
     handlers = handlers or {}
-    waves = _topological_waves(delegations)
+    _completed: set[str] = set()
+    _remaining = list(delegations)
+    waves: list[list[Delegation]] = []
+    while _remaining:
+        _wave = [_d for _d in _remaining if all(_dep in _completed for _dep in _d.depends_on)]
+        if not _wave:
+            _wave = [_remaining[0]]
+        waves.append(_wave)
+        for _d in _wave:
+            _completed.add(_d.id)
+        _remaining = [_d for _d in _remaining if _d.id not in _completed]
     execution_order: list[list[str]] = []
     results: list[DelegationResult] = []
     context: dict[str, Any] = {}  # delegation_id -> output
