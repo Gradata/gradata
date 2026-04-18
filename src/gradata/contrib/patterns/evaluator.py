@@ -176,12 +176,6 @@ QUALITY_DIMENSIONS: list[EvalDimension] = [
         description="Is the output appropriately concise without sacrificing quality?",
     ),
 ]
-"""Generic quality dimensions suitable for any text-producing task.
-
-Callers may extend this list or replace it entirely for domain-specific
-scoring.  The ``weight`` values follow a 2-1.5-2-1-0.5 profile that
-prioritises alignment and accuracy over stylistic concerns.
-"""
 
 
 # ---------------------------------------------------------------------------

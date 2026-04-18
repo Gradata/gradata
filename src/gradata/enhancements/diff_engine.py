@@ -155,11 +155,6 @@ def adjust_severity_by_semantics(
 
 
 # ---------------------------------------------------------------------------
-# Section extraction
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
 # Semantic distance (opt-in)
 # ---------------------------------------------------------------------------
 #
@@ -218,8 +213,7 @@ def _load_default_embedder() -> Embedder | None:
         model = SentenceTransformer(_DEFAULT_EMBEDDER_MODEL)
     except Exception as exc:  # pragma: no cover - env/network failure
         _default_embedder_unavailable = True
-        _log.debug("Default embedder load failed (%s); semantic distance disabled.",
-                   exc)
+        _log.debug("Default embedder load failed (%s); semantic distance disabled.", exc)
         return None
 
     def _embed(texts: Sequence[str]) -> Sequence[Sequence[float]]:
@@ -264,6 +258,7 @@ def compute_semantic_distance(
     if len(vecs) < 2:
         return None
     import math
+
     _a, _b = vecs[0], vecs[1]
     _dot = sum(x * y for x, y in zip(_a, _b, strict=False))
     _na = math.sqrt(sum(x * x for x in _a))
@@ -383,12 +378,14 @@ def compute_diff(
     for _tag, _i1, _i2, _j1, _j2 in _matcher.get_opcodes():
         if _tag == "equal":
             continue
-        changed_sections.append(ChangedSection(
-            start_line=_j1,
-            end_line=_j2,
-            old_text="\n".join(draft_lines[_i1:_i2]),
-            new_text="\n".join(final_lines[_j1:_j2]),
-        ))
+        changed_sections.append(
+            ChangedSection(
+                start_line=_j1,
+                end_line=_j2,
+                old_text="\n".join(draft_lines[_i1:_i2]),
+                new_text="\n".join(final_lines[_j1:_j2]),
+            )
+        )
         _oc = _i2 - _i1
         _nc = _j2 - _j1
         if _tag == "insert":
@@ -412,14 +409,14 @@ def compute_diff(
     # Severity: prefer blended when semantic is available, else surface logic.
     # Surface logic: compression distance for long texts, edit_distance for short.
     surface_for_severity = (
-        compression_dist
-        if len(draft) + len(final) >= MIN_COMPRESSION_LENGTH
-        else edit_distance
+        compression_dist if len(draft) + len(final) >= MIN_COMPRESSION_LENGTH else edit_distance
     )
     if semantic_dist is not None:
         blended = combine_distances(
-            surface_for_severity, semantic_dist,
-            surface_weight=surface_weight, semantic_weight=semantic_weight,
+            surface_for_severity,
+            semantic_dist,
+            surface_weight=surface_weight,
+            semantic_weight=semantic_weight,
         )
         severity = _classify_severity(blended)
     else:
