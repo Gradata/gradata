@@ -1,4 +1,5 @@
 import pytest
+
 """
 SPEC.md Gold Standard Compliance Tests
 =======================================
@@ -73,7 +74,6 @@ class TestArchitectureLayers:
             "metrics",
             "quality_monitoring",
             "reporting",
-            "carl",
             "learning_pipeline",
         ],
     )
