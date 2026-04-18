@@ -144,40 +144,29 @@ class RuleSource:
         parsed = parse_lessons(text)
         return [_lesson_to_scored(lesson) for lesson in parsed]
 
-    def _load_from_dicts(self) -> list[_ScoredLesson]:
-        out: list[_ScoredLesson] = []
-        for lesson in self._static_lessons or []:
-            state = str(lesson.get("state") or lesson.get("status") or "").upper()
-            raw_conf = lesson.get("confidence", 0.0)
-            try:
-                conf = _clamp_confidence(float(raw_conf) if raw_conf is not None else 0.0)
-            except (TypeError, ValueError):
-                # Malformed caller-supplied lessons (e.g. confidence="high")
-                # must not abort the whole injection/enforcement path.
-                _log.debug(
-                    "Skipping lesson with non-numeric confidence %r", raw_conf,
-                )
-                continue
-            category = str(lesson.get("category", "") or "")
-            description = str(lesson.get("description", "") or "")
-            if not description:
-                continue
-            out.append(
-                _ScoredLesson(
-                    category=category,
-                    description=description,
-                    state=state,
-                    confidence=conf,
-                )
-            )
-        return out
-
     def load(self) -> list[_ScoredLesson]:
         """Return eligible lessons (RULE/PATTERN only, above min_confidence)."""
-        lessons = (
-            self._load_from_dicts() if self._static_lessons is not None
-            else self._load_from_brain()
-        )
+        if self._static_lessons is not None:
+            lessons: list[_ScoredLesson] = []
+            for _lfd in self._static_lessons:
+                _lfd_state = str(_lfd.get("state") or _lfd.get("status") or "").upper()
+                _lfd_raw = _lfd.get("confidence", 0.0)
+                try:
+                    _lfd_conf = _clamp_confidence(float(_lfd_raw) if _lfd_raw is not None else 0.0)
+                except (TypeError, ValueError):
+                    _log.debug("Skipping lesson with non-numeric confidence %r", _lfd_raw)
+                    continue
+                _lfd_desc = str(_lfd.get("description", "") or "")
+                if not _lfd_desc:
+                    continue
+                lessons.append(_ScoredLesson(
+                    category=str(_lfd.get("category", "") or ""),
+                    description=_lfd_desc,
+                    state=_lfd_state,
+                    confidence=_lfd_conf,
+                ))
+        else:
+            lessons = self._load_from_brain()
         return [
             l for l in lessons
             if l.state in ("RULE", "PATTERN") and l.confidence >= self.min_confidence
