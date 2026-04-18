@@ -77,23 +77,13 @@ ADVERSARIAL_PHRASES: tuple[str, ...] = (
 )
 
 
-def _build_pattern(phrases: tuple[str, ...]) -> re.Pattern[str]:
-    """Compile phrases into a single case-insensitive regex.
-
-    Internal whitespace in each phrase is replaced with ``\\s+`` so
-    ``"ignore   previous\\ninstructions"`` still matches
-    ``"ignore previous instructions"``.
-    """
-    alternatives: list[str] = []
-    for phrase in phrases:
-        tokens = phrase.split()
-        escaped = r"\s+".join(re.escape(tok) for tok in tokens)
-        alternatives.append(escaped)
-    pattern = "|".join(alternatives)
-    return re.compile(pattern, re.IGNORECASE)
-
-
-_COMPILED_PATTERN: re.Pattern[str] = _build_pattern(ADVERSARIAL_PHRASES)
+_COMPILED_PATTERN: re.Pattern[str] = re.compile(
+    "|".join(
+        r"\s+".join(re.escape(tok) for tok in phrase.split())
+        for phrase in ADVERSARIAL_PHRASES
+    ),
+    re.IGNORECASE,
+)
 
 
 def scan_for_adversarial_phrases(text: str) -> list[str]:
