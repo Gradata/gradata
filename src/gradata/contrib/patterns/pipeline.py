@@ -1,7 +1,5 @@
-"""Sequential assembly-line pipeline with per-stage quality gates.
-
-Stages run in order with typed I/O; gate failures trigger retry up to
-``max_retries`` before the pipeline halts. Pure stdlib, no I/O.
+"""Sequential pipeline with per-stage quality gates. Typed I/O; gate failures
+retry up to ``max_retries`` before halting. Pure stdlib, no I/O.
 """
 
 from __future__ import annotations

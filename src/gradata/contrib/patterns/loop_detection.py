@@ -1,7 +1,6 @@
 """Detect agent infinite loops via sliding-window tool-call hashing.
-
-Adapted from deer-flow (bytedance/deer-flow). Progressive intervention:
-3 repeats WARN, 5 repeats STOP. Hashes normalized (tool_name, sorted_args).
+Adapted from bytedance/deer-flow. 3 repeats WARN, 5 repeats STOP.
+Hash: normalized (tool_name, sorted_args).
 """
 
 from __future__ import annotations

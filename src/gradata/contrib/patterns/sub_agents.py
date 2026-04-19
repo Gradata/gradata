@@ -1,7 +1,6 @@
-"""Sub-Agent Orchestrator — structured delegation with typed contracts:
-decompose task → delegations (typed I/O + success criteria) → execute
-parallel/sequential → synthesise. Portable layer under ``brain/scripts/spawn.py``
-(routing/agent defs stay brain-side). Layer 0 pattern: domain-agnostic.
+"""Sub-agent orchestrator — typed delegation: decompose → delegations (typed
+I/O + success criteria) → parallel/sequential exec → synthesise. Portable
+layer under ``brain/scripts/spawn.py``. Layer 0, domain-agnostic.
 """
 
 from __future__ import annotations

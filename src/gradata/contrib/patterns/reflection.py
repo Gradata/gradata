@@ -1,7 +1,5 @@
-"""Self-critique Generate-Critique-Refine loop (stdlib only).
-
-Repeatedly critiques an output against a structured checklist and refines
-it until all required criteria pass or the cycle budget is exhausted.
+"""Self-critique Generate-Critique-Refine loop (stdlib only). Critiques an
+output against a checklist and refines until criteria pass or budget runs out.
 """
 
 from __future__ import annotations
