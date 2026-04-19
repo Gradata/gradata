@@ -18,7 +18,7 @@ def test_agent_precontext_injects_rules(tmp_path):
         "[2026-04-01] [RULE:0.92] PROCESS: Always plan first\n"
         "[2026-04-01] [PATTERN:0.65] CODE: Use type hints\n"
     )
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+    with patch.dict(os.environ, {"BRAIN_DIR": str(tmp_path), "GRADATA_BRAIN_DIR": str(tmp_path)}):
         result = precontext_main({
             "tool_name": "Agent",
             "tool_input": {"subagent_type": "general", "prompt": "do stuff"},
@@ -28,12 +28,17 @@ def test_agent_precontext_injects_rules(tmp_path):
     assert "Always plan first" in result["result"]
 
 
-def test_agent_precontext_no_brain():
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": "/nonexistent/path/xyz"}):
-        result = precontext_main({
-            "tool_name": "Agent",
-            "tool_input": {"subagent_type": "general"},
-        })
+def test_agent_precontext_no_brain(monkeypatch):
+    monkeypatch.setenv("BRAIN_DIR", "/nonexistent/path/xyz")
+    monkeypatch.setenv("GRADATA_BRAIN_DIR", "/nonexistent/path/xyz")
+    monkeypatch.setattr(
+        "gradata.hooks.agent_precontext.resolve_brain_dir",
+        lambda: None,
+    )
+    result = precontext_main({
+        "tool_name": "Agent",
+        "tool_input": {"subagent_type": "general"},
+    })
     assert result is None
 
 
@@ -43,7 +48,7 @@ def test_agent_precontext_scope_matching(tmp_path):
         "[2026-04-01] [RULE:0.92] SALES: Always check pipeline first\n"
         "[2026-04-01] [RULE:0.91] CODE: Write tests before code\n"
     )
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
+    with patch.dict(os.environ, {"BRAIN_DIR": str(tmp_path), "GRADATA_BRAIN_DIR": str(tmp_path)}):
         result = precontext_main({
             "tool_name": "Agent",
             "tool_input": {"description": "research the sales pipeline"},
