@@ -1,7 +1,5 @@
-"""Anthropic Integration — DEPRECATED (removed in v0.8.0). Use
-``gradata.middleware.wrap_anthropic`` for richer rule enforcement via
-:class:`~gradata.middleware._core.RuleSource`; pin to gradata<0.8 for the
-legacy in-place patch.
+"""DEPRECATED (removed v0.8.0). Use ``gradata.middleware.wrap_anthropic`` for
+richer enforcement via :class:`.RuleSource`; pin gradata<0.8 for legacy patch.
 """
 
 from __future__ import annotations

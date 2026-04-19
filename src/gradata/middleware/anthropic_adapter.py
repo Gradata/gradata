@@ -1,7 +1,5 @@
-"""Wraps anthropic.Anthropic() so messages.create() gets rule-injection + output check.
-
-Mutates only the ``system`` kwarg inbound and inspects the response outbound;
-messages shape is preserved. See wrap_anthropic(client, brain_path=...).
+"""Wraps anthropic.Anthropic() — messages.create() gets rule injection +
+output check. Mutates only ``system`` kwarg; messages shape preserved.
 """
 
 from __future__ import annotations

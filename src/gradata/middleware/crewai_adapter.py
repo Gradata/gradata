@@ -1,7 +1,5 @@
-"""CrewAIGuard callable for CrewAI agent ``guardrails=[...]`` lists.
-
-Runs on agent output, returns CrewAI-expected ``(valid, result_or_error)``.
-No hard dep on crewai — tests can exercise it with a plain call.
+"""CrewAIGuard callable for agent ``guardrails=[...]``. Returns the expected
+``(valid, result_or_error)``. No hard dep on crewai.
 """
 
 from __future__ import annotations

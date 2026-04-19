@@ -1,7 +1,6 @@
-"""OpenAI SDK middleware adapter — ``wrap_openai(client, brain_path)``
-prepends Gradata rules as a system message on every
-``client.chat.completions.create(...)`` and optionally checks responses
-against RULE-tier regex patterns.
+"""OpenAI middleware — ``wrap_openai(client, brain_path)`` prepends rules as
+a system message on chat.completions.create and checks responses against
+RULE-tier regex patterns.
 """
 
 from __future__ import annotations
