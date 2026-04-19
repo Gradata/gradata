@@ -1,6 +1,5 @@
-"""Opt-in anonymous SDK activation telemetry. Sends ``{event, sha256(machine_id), ISO-ts,
-sdk_version}`` for named events; never lesson/correction content. Default OFF (config.toml);
-``GRADATA_TELEMETRY=0`` kill-switch. At most once per machine per install."""
+"""Opt-in anonymous SDK telemetry — ``{event, sha256(machine_id), ISO-ts, sdk_version}`` only, never
+content. Default OFF; ``GRADATA_TELEMETRY=0`` kill-switch. At most once per machine per install."""
 
 from __future__ import annotations
 

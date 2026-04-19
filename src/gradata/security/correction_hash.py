@@ -1,6 +1,5 @@
-"""Correction content-provenance hashing + source-context classification.
-SHA-256 canonical ``(before, after, source_context)`` (auth: ``correction_provenance``).
-Untrusted → ``requires_review``; graduation needs ``approval_required``. Vs A1 injection."""
+"""Correction content-provenance hashing + source-context classification. SHA-256 canonical
+``(before, after, source_context)``; untrusted→``requires_review`` blocks graduation."""
 
 from __future__ import annotations
 

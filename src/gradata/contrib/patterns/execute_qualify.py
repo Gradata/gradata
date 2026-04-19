@@ -1,6 +1,5 @@
-"""Execute-then-verify loop with root-cause retry routing. execute→status→qualify
-(fresh files vs spec)→score PASS/GAP/DRIFT→classify (intent/spec/code)→retry up to
-max_attempts. Adapted from paul (ChristopherKahler/paul) checkpoints.md + apply-phase.md."""
+"""Execute-then-verify loop with root-cause retry routing: execute→qualify (fresh files vs spec)
+→score PASS/GAP/DRIFT→classify (intent/spec/code)→retry up to max_attempts."""
 
 from __future__ import annotations
 
