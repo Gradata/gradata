@@ -1,6 +1,5 @@
-"""LangChain BaseCallbackHandler: injects <brain-rules> on prompt start and validates
-output against RULE regexes on llm_end. For stricter control prefer
-gradata.middleware.OpenAIMiddleware around the underlying client."""
+"""LangChain BaseCallbackHandler: injects <brain-rules> on prompt start and validates output
+against RULE regexes on llm_end. For stricter control prefer ``OpenAIMiddleware`` around clients."""
 
 from __future__ import annotations
 

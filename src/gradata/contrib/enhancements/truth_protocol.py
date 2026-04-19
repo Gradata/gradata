@@ -1,6 +1,5 @@
-"""Evidence-based output validation (stdlib-only). ``verify_*``→``TruthVerdict``; banned-
-phrase regex; ``numbers_without_source`` flags bare percentages lacking a citation;
-``verify_mutations`` requires ``|`` or ``->``."""
+"""Evidence-based output validation (stdlib). ``verify_*``→``TruthVerdict``; banned-phrase regex;
+``numbers_without_source`` flags bare percentages; ``verify_mutations`` requires ``|`` or ``->``."""
 
 from __future__ import annotations
 

@@ -1,6 +1,5 @@
-"""HTTPS-at-the-boundary enforcement. Call ``require_https(url)`` before any
-``urllib.request.Request`` or third-party client call. Stdlib only; localhost/loopback
-exempted so local LLM servers (Ollama/vLLM/LM Studio) work."""
+"""HTTPS-at-the-boundary enforcement. Call ``require_https(url)`` before any urllib/client call.
+Stdlib only; localhost/loopback exempted so local LLM servers (Ollama/vLLM/LM Studio) work."""
 
 from __future__ import annotations
 
