@@ -1,7 +1,5 @@
-"""Router Warm-Start — bootstrap Q-Learning router from vault data: load
-existing correction events, compute severity-based reward signals, and
-pre-train the Q-table so it doesn't start cold.
-Entry: ``warm_start_router(db_path, router_path)``.
+"""Bootstrap Q-Learning router from vault data: load correction events,
+compute severity rewards, pre-train Q-table. Entry: ``warm_start_router``.
 """
 
 from __future__ import annotations

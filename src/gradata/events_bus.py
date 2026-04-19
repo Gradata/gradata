@@ -1,7 +1,6 @@
-"""Lightweight in-memory pub/sub — NOT persisted. ``EventBus.emit()``
-notifies in-memory subscribers (embeddings, session_history); ``brain.emit()``
-/ ``_events.emit()`` writes to events.jsonl + system.db. Both fire in
-``brain_correct()`` / ``brain_end_session()`` intentionally; do NOT merge.
+"""In-memory pub/sub (NOT persisted). ``EventBus.emit()`` notifies subscribers
+(embeddings, session_history); ``_events.emit()`` writes events.jsonl + db.
+Both fire in brain_correct/end_session intentionally — do NOT merge.
 """
 
 from __future__ import annotations

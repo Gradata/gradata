@@ -1,7 +1,6 @@
-"""Rolling-window quality metrics (SPEC §5). ``MetricsWindow`` snapshots
-over a session window; ``compute_blandness`` (inverted Type-Token Ratio);
-``compute_metrics`` aggregates events into correction density, edit distance,
-acceptance distribution, rule success/misfire rates, blandness.
+"""Rolling-window quality metrics (SPEC §5). ``MetricsWindow`` snapshots;
+``compute_blandness`` (inverted TTR); ``compute_metrics`` aggregates density,
+edit distance, acceptance, rule success/misfire, blandness.
 """
 
 from __future__ import annotations

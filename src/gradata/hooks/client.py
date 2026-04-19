@@ -1,7 +1,5 @@
 """Daemon-aware hook entrypoint (``python -m gradata.hooks.client <name>``).
-Tries the local hook daemon first (no Python spawn cost), falls back to
-direct module import. Exits 0 on success, 127 on unknown hook, 1 on
-transport errors after fallback also fails.
+Tries the local daemon first, falls back to direct import. Exits 0/127/1.
 """
 
 from __future__ import annotations

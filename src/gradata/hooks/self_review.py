@@ -1,7 +1,5 @@
-"""PostToolUse hook: self-review against mandatory rules.
-
-After Write/Edit tool calls, checks if the output respects mandatory
-rules. Logs violations for the learning pipeline without blocking execution.
+"""PostToolUse hook: self-review against mandatory rules. After Write/Edit,
+logs violations to the learning pipeline without blocking execution.
 """
 
 from __future__ import annotations
