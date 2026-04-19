@@ -187,6 +187,9 @@ _NOISE_SUBSTRINGS = (
     "<observed_from_primary_session",
     "progress summary checkpoint",
     "caveat: the messages below were generated",
+    "base directory for this skill",
+    "this session is being continued from a previous",
+    "summary below covers the earlier portion",
 )
 
 
