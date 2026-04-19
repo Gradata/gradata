@@ -1,8 +1,6 @@
-"""Incremental centroid clustering for corrections via cosine similarity.
-Temporal-proximity gating + running-average centroid updates (O(1), no
-reassignment). Pure computation; caller owns state I/O. From EverOS
-(EverMind-AI) cluster_manager/manager.py.
-"""
+"""Incremental centroid clustering for corrections via cosine similarity. Temporal-proximity
+gating + running-average centroid updates (O(1), no reassignment). Pure computation; caller
+owns state I/O. From EverOS (EverMind-AI) cluster_manager/manager.py."""
 
 from __future__ import annotations
 

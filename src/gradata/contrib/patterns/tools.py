@@ -1,8 +1,6 @@
-"""Tool Registration — registry with typed signatures + plan-before-execute.
-Host (Claude Code hooks, MCP servers, scripts) registers; orchestrator and
-pipeline patterns query. Actual execution runs host-side. Layer 0:
-domain-agnostic.
-"""
+"""Tool Registration — registry with typed signatures + plan-before-execute. Host
+(Claude Code hooks, MCP servers, scripts) registers; orchestrator + pipeline patterns
+query. Actual execution runs host-side. Layer 0: domain-agnostic."""
 
 from __future__ import annotations
 

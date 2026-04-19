@@ -1,8 +1,6 @@
-"""MCP Integration — SDK abstraction over Model Context Protocol (Layer 0).
-Brain declares capabilities as MCP tool schemas; host runtime connects and
-routes tool calls. Schema/routing/normalization here; transport (stdio/SSE/
-HTTP) is owned by the host.
-"""
+"""MCP Integration — SDK abstraction over Model Context Protocol (Layer 0). Brain declares
+capabilities as MCP tool schemas; host runtime connects and routes tool calls. Schema/
+routing/normalization here; transport (stdio/SSE/HTTP) owned by host."""
 
 from __future__ import annotations
 
