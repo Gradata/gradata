@@ -1,15 +1,7 @@
-"""
-gradata.rules.rule_engine — public API (backward-compatible re-exports).
-=========================================================================
-The module was split into submodules for maintainability:
-
-  _scoring.py    — difficulty, reliability, scope weighting, transfer scope
-  _formatting.py — dedup, merge, entropy ordering, prompt injection
-  _engine.py     — apply_rules, filter_by_scope, TTL demotion, AppliedRule
-
-All public symbols remain importable from this package, so existing callers
-(``from gradata.rules.rule_engine import apply_rules``) continue to work
-without modification.
+"""gradata.rules.rule_engine — public API re-exports. Submodules: ``_scoring``
+(difficulty/reliability/scope weighting), ``_formatting`` (dedup/merge/
+entropy order/prompt injection), ``_engine`` (``apply_rules``,
+``filter_by_scope``, TTL demotion, ``AppliedRule``). Backwards compatible.
 """
 
 from ._engine import (
