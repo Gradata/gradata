@@ -1,8 +1,7 @@
 """MCP Integration — SDK abstraction over Model Context Protocol (Layer 0).
-
-Brain declares capabilities as MCP tool schemas; host runtime (Claude Code,
-Cursor, VS Code) connects and routes tool calls. Handles schema/routing/
-normalization; transport (stdio/SSE/HTTP) is owned by the host.
+Brain declares capabilities as MCP tool schemas; host runtime connects and
+routes tool calls. Schema/routing/normalization here; transport (stdio/SSE/
+HTTP) is owned by the host.
 """
 
 from __future__ import annotations

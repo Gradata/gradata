@@ -1,6 +1,5 @@
 """Risk-tiered human approval gates for agentic pipelines (stdlib-only).
-
-``assess_risk``: low/medium/high via keyword matching. ``gate``: auto-approves
+``assess_risk``: low/medium/high via keyword match. ``gate``: auto-approves
 low, surfaces ApprovalRequest for medium/high. Reversibility is a first-class
 derived signal independent of tier.
 """
