@@ -2,6 +2,7 @@
 Targeted regression tests for the 9 bugs found and fixed in S43.
 Each test verifies the fix at the data level, not just the API surface.
 """
+
 import json
 import os
 import sqlite3
@@ -19,10 +20,9 @@ def _make_brain(tmp_path, taxonomy=None):
     (brain_dir / "events.jsonl").write_text("", encoding="utf-8")
     (brain_dir / "system.db").write_text("", encoding="utf-8")
     if taxonomy:
-        (brain_dir / "taxonomy.json").write_text(
-            json.dumps(taxonomy), encoding="utf-8"
-        )
+        (brain_dir / "taxonomy.json").write_text(json.dumps(taxonomy), encoding="utf-8")
     from gradata.brain import Brain
+
     return Brain(brain_dir)
 
 
@@ -30,6 +30,7 @@ def _make_brain(tmp_path, taxonomy=None):
 # BUG 1: correction_rate in manifest was always 0.0
 # Root cause: cr[-1] on a dict keyed by session number, not index
 # ═══════════════════════════════════════════════════════════════════
+
 
 class TestBug1CorrectionRateManifest:
     def test_correction_rate_nonzero_after_corrections(self, tmp_path):
@@ -69,23 +70,23 @@ class TestBug1CorrectionRateManifest:
 # BUG 2: MCP brain_correct dispatch crashed on non-serializable dataclass
 # ═══════════════════════════════════════════════════════════════════
 
+
 class TestBug2MCPCorrectDispatch:
     def test_dispatch_correct_returns_content(self, tmp_path):
         brain = _make_brain(tmp_path)
         from gradata.mcp_server import _dispatch
-        result = _dispatch(brain, "brain_correct", {
-            "draft": "Old text here",
-            "final": "New text here"
-        })
+
+        result = _dispatch(
+            brain, "brain_correct", {"draft": "Old text here", "final": "New text here"}
+        )
         assert "content" in result, f"Expected content key, got: {result}"
         assert "error" not in result, f"Unexpected error: {result.get('error')}"
 
     def test_dispatch_correct_content_is_valid_json(self, tmp_path):
         brain = _make_brain(tmp_path)
         from gradata.mcp_server import _dispatch
-        result = _dispatch(brain, "brain_correct", {
-            "draft": "Original", "final": "Modified"
-        })
+
+        result = _dispatch(brain, "brain_correct", {"draft": "Original", "final": "Modified"})
         text = result["content"][0]["text"]
         parsed = json.loads(text)  # Should not raise
         assert "severity" in parsed
@@ -94,6 +95,7 @@ class TestBug2MCPCorrectDispatch:
     def test_dispatch_all_tools_no_crash(self, tmp_path):
         brain = _make_brain(tmp_path)
         from gradata.mcp_server import _dispatch
+
         tools = {
             "brain_search": {"query": "test"},
             "brain_correct": {"draft": "a", "final": "b"},
@@ -109,6 +111,7 @@ class TestBug2MCPCorrectDispatch:
 # ═══════════════════════════════════════════════════════════════════
 # BUG 3: Event emission could silently lose learning data
 # ═══════════════════════════════════════════════════════════════════
+
 
 class TestBug3EventPersistence:
     def test_event_has_persistence_flags(self, tmp_path):
@@ -147,9 +150,11 @@ class TestBug3EventPersistence:
 # BUG 4: FACTUAL category from edit classifier not in taxonomy
 # ═══════════════════════════════════════════════════════════════════
 
+
 class TestBug4FactualCategory:
     def test_factual_in_core_taxonomy(self):
         from gradata._tag_taxonomy import TAXONOMY
+
         categories = TAXONOMY["category"]["values"]
         assert "FACTUAL" in categories
         assert "CONTENT" in categories
@@ -169,6 +174,7 @@ class TestBug4FactualCategory:
 # BUG 5: apply_brain_rules() assumed specific path layout
 # ═══════════════════════════════════════════════════════════════════
 
+
 class TestBug5ApplyBrainRulesPath:
     def test_returns_empty_when_no_lessons(self, tmp_path):
         brain = _make_brain(tmp_path)
@@ -179,8 +185,7 @@ class TestBug5ApplyBrainRulesPath:
     def test_finds_lessons_in_brain_dir(self, tmp_path):
         brain = _make_brain(tmp_path)
         lessons = (
-            "## Active Lessons\n\n"
-            "[2026-03-24] [RULE] DRAFTING: Always include CTA in emails.\n"
+            "## Active Lessons\n\n[2026-03-24] [RULE] DRAFTING: Always include CTA in emails.\n"
         )
         (brain.dir / "lessons.md").write_text(lessons, encoding="utf-8")
         result = brain.apply_brain_rules("email_draft")
@@ -191,6 +196,7 @@ class TestBug5ApplyBrainRulesPath:
 # ═══════════════════════════════════════════════════════════════════
 # BUG 6: hardcoded_user removed from 6 files
 # ═══════════════════════════════════════════════════════════════════
+
 
 class TestBug6HardcodedUserRemoved:
     def test_no_hardcoded_user_in_sdk(self):
@@ -215,12 +221,14 @@ class TestBug6HardcodedUserRemoved:
 # BUG 7: Sales-domain coupling (23 hardcodings)
 # ═══════════════════════════════════════════════════════════════════
 
+
 class TestBug7DomainAgnostic:
     def test_engineering_brain_no_sales_taxonomy(self, tmp_path):
         eng_taxonomy = {
             "entity": {"desc": "Project", "mode": "dynamic", "required_on": []},
             "output": {
-                "desc": "Output type", "mode": "closed",
+                "desc": "Output type",
+                "mode": "closed",
                 "values": ["code_review", "design_doc", "test_plan"],
             },
             "extra_categories": ["CODE_QUALITY", "SECURITY"],
@@ -228,6 +236,7 @@ class TestBug7DomainAgnostic:
         brain = _make_brain(tmp_path, taxonomy=eng_taxonomy)
 
         from gradata._tag_taxonomy import TAXONOMY
+
         output_vals = TAXONOMY.get("output", {}).get("values", set())
         assert "code_review" in output_vals
         assert "email" not in output_vals  # Sales value NOT present
@@ -236,18 +245,21 @@ class TestBug7DomainAgnostic:
         recruit_taxonomy = {
             "entity": {"desc": "Candidate", "mode": "dynamic", "required_on": []},
             "output": {
-                "desc": "Output type", "mode": "closed",
+                "desc": "Output type",
+                "mode": "closed",
                 "values": ["interview_prep", "job_description", "offer_letter"],
             },
         }
         brain = _make_brain(tmp_path, taxonomy=recruit_taxonomy)
 
         from gradata._tag_taxonomy import TAXONOMY
+
         output_vals = TAXONOMY.get("output", {}).get("values", set())
         assert "interview_prep" in output_vals
 
     def test_onboard_creates_domain_dirs(self):
         from gradata.onboard import _DOMAIN_SUBDIRS
+
         assert "sales" in _DOMAIN_SUBDIRS
         assert "recruiting" in _DOMAIN_SUBDIRS
         assert "engineering" in _DOMAIN_SUBDIRS
@@ -259,6 +271,7 @@ class TestBug7DomainAgnostic:
 # ═══════════════════════════════════════════════════════════════════
 # BUG 8: RAG cascade silently swallowed errors
 # ═══════════════════════════════════════════════════════════════════
+
 
 class TestBug8RagCascadeErrors:
     def test_cascade_tracks_fts_error(self):
@@ -282,6 +295,7 @@ class TestBug8RagCascadeErrors:
 
     def test_cascade_no_error_when_no_retrievers(self):
         from gradata.contrib.patterns.rag import cascade_retrieve
+
         result = cascade_retrieve("test")
         assert result.mode == "empty"
         assert result.chunks == []
@@ -291,9 +305,11 @@ class TestBug8RagCascadeErrors:
 # BUG 9: Missing classes (SmartRAG, HumanLoopGate, etc.)
 # ═══════════════════════════════════════════════════════════════════
 
+
 class TestBug9MissingClasses:
     def test_smart_rag_importable_and_functional(self):
         from gradata.contrib.patterns.rag import SmartRAG
+
         rag = SmartRAG()
         result = rag.retrieve("test")
         assert result.chunks == []
@@ -301,18 +317,21 @@ class TestBug9MissingClasses:
 
     def test_naive_rag_importable_and_functional(self):
         from gradata.contrib.patterns.rag import NaiveRAG
+
         rag = NaiveRAG()
         result = rag.retrieve("test")
         assert result.chunks == []
 
     def test_human_loop_gate_importable(self):
         from gradata.contrib.patterns.human_loop import HumanLoopGate
+
         gate = HumanLoopGate()
         risk = gate.assess("delete database")
         assert risk.tier in ("low", "medium", "high", "critical")
 
     def test_rule_application_importable(self):
         from gradata.rules.rule_tracker import RuleApplication
+
         ra = RuleApplication(rule_id="test_001", accepted=True)
         assert ra.rule_id == "test_001"
         assert ra.accepted is True
@@ -320,23 +339,75 @@ class TestBug9MissingClasses:
     @pytest.mark.skipif(True, reason="requires gradata_cloud")
     def test_compute_density_importable(self):
         from gradata.enhancements.learning_pipeline import compute_density
+
         # Should not crash on missing DB
         assert callable(compute_density)
 
     def test_top_level_exports(self):
         """Core symbols importable from gradata top level."""
         from gradata import Brain, BrainContext, Lesson, LessonState, __version__
+
         assert Brain is not None
         assert __version__ is not None
 
     def test_pattern_exports_from_submodule(self):
-        """Pattern symbols importable from gradata.patterns."""
-        from gradata.patterns import (
-            SmartRAG, NaiveRAG, HumanLoopGate,
-            RuleApplication, Pipeline, Stage,
-            ParallelBatch, EpisodicMemory,
-            InputGuard, OutputGuard, MCPBridge,
-            Delegation, AudienceTier,
-        )
-        assert SmartRAG is not None
-        assert Pipeline is not None
+        """Pattern symbols importable from gradata.patterns (deprecated shim).
+
+        The shim forwards to gradata.contrib.patterns and emits a
+        DeprecationWarning on first access. This test validates both the
+        forwarding behavior and that the warning fires.
+        """
+        import warnings
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            from gradata.patterns import (  # noqa: F401
+                SmartRAG,
+                NaiveRAG,
+                HumanLoopGate,
+                RuleApplication,
+                Pipeline,
+                Stage,
+                ParallelBatch,
+                EpisodicMemory,
+                InputGuard,
+                OutputGuard,
+                MCPBridge,
+                Delegation,
+                AudienceTier,
+            )
+
+            assert SmartRAG is not None
+            assert Pipeline is not None
+            # DeprecationWarning may already have fired earlier in the session
+            # (module-level _WARNED flag), so we don't strictly require it here —
+            # the forwarding correctness is the invariant this test guards.
+            del caught
+
+    def test_patterns_shim_emits_deprecation_warning(self):
+        """First access through gradata.patterns must emit DeprecationWarning.
+
+        Guards against the runtime warning being silently removed — users who
+        don't read changelogs need the in-process signal before v0.8.0 ships
+        and the shim is removed entirely.
+        """
+        import importlib
+        import sys
+        import warnings
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            # Reset inside the recording context so _WARNED is False when the
+            # import fires and the warning is captured.
+            sys.modules.pop("gradata.patterns", None)
+            importlib.import_module("gradata.patterns")
+            from gradata.patterns import Pipeline  # noqa: F401
+
+        shim_warnings = [
+            w
+            for w in caught
+            if issubclass(w.category, DeprecationWarning)
+            and "gradata.contrib.patterns" in str(w.message)
+        ]
+        assert shim_warnings, "expected shim-specific DeprecationWarning on first access"
+        assert "v0.8.0" in str(shim_warnings[0].message)
