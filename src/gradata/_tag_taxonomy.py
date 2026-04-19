@@ -1,6 +1,5 @@
 """Configurable tag vocabulary for brain events: valid prefixes, allowed values per prefix,
-required-tag rules per event type. Domain-agnostic — brain ``taxonomy.json`` overrides
-SDK's sales-flavored defaults."""
+required-tag rules per event type. Brain ``taxonomy.json`` overrides SDK defaults."""
 
 import json
 import re

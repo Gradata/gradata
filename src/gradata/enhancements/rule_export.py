@@ -1,6 +1,5 @@
-"""Export graduated RULE-tier lessons to platform-specific rule files. Targets:
-cursor/agents/aider/codex/cline/continue. Library: ``export_rules(brain_root, target=...)``;
-CLI: ``gradata export --target cursor``."""
+"""Export graduated RULE-tier lessons to platform-specific rule files (cursor/agents/aider/
+codex/cline/continue). Library: ``export_rules``; CLI: ``gradata export --target cursor``."""
 
 from __future__ import annotations
 
