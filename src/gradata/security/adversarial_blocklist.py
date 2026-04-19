@@ -1,10 +1,8 @@
-"""Lightweight adversarial-phrase blocklist for correction ingest. Flags
-(not rejects) text containing canonical prompt-injection triggers via
-case-insensitive substring match against a seed list so approval_required
-intercepts graduation. Recall-optimised for human-readable injections,
-not universal adversarial suffixes (Zou 2023 GCG). Companion to
-correction_hash for A1 indirect injection. Refs: Greshake 2023, Wallace
-2019, Perez & Ribeiro 2022.
+"""Lightweight adversarial-phrase blocklist for correction ingest.
+
+Flags (not rejects) prompt-injection triggers via case-insensitive substring
+match so approval_required intercepts graduation. Recall-optimised for
+human-readable injections (not universal adversarial suffixes, Zou 2023 GCG).
 """
 
 from __future__ import annotations

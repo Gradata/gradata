@@ -1,10 +1,9 @@
-"""Cloud sync client — opt-in metrics telemetry to Gradata Cloud dashboard.
-Wire: POST https://api.gradata.ai/v1/telemetry/metrics, Bearer
-<GRADATA_API_TOKEN>. Payload = aggregated MetricsWindow fields only (session
-count, rule counts, rewrite rate, blandness, correction density); NEVER raw
-corrections. Default OFF — opt in via ``cloud.sync = true``. Corpus
-contribution (anonymized corrections for cross-user meta-rule synthesis) is
-a separate opt-in: ``CloudClient.contribute_corpus()``. urllib+json only.
+"""Cloud sync client — opt-in metrics telemetry to Gradata Cloud.
+
+POST https://api.gradata.ai/v1/telemetry/metrics (Bearer GRADATA_API_TOKEN).
+Payload = aggregated MetricsWindow fields only; NEVER raw corrections.
+Default OFF. Corpus contribution is a separate opt-in via
+``CloudClient.contribute_corpus()``. urllib+json only.
 """
 
 from __future__ import annotations

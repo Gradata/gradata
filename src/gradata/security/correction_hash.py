@@ -1,10 +1,9 @@
 """Correction content-provenance hashing + source-context classification.
-Defence vs A1 (indirect prompt injection via corrections; Greshake et al.
-2023, arxiv.org/abs/2302.12173). SHA-256 over canonical ``(before, after,
-source_context)`` — content-addressed, not HMAC (auth lives in
-``correction_provenance``). External pastes classified ``source_kind``
-untrusted → flagged ``requires_review=True``; graduate only after explicit
-``promote`` via the ``approval_required`` flow in ``_core.brain_correct``.
+
+SHA-256 over canonical ``(before, after, source_context)`` (content-addressed;
+auth lives in ``correction_provenance``). Untrusted ``source_kind`` → flagged
+``requires_review=True``; graduate only via ``approval_required`` promote.
+Defence vs A1 indirect prompt injection (Greshake 2023).
 """
 
 from __future__ import annotations

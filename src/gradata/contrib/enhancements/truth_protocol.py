@@ -1,10 +1,8 @@
-"""Truth Protocol — evidence-based output validation. All three ``verify_*``
-functions return ``TruthVerdict`` for a uniform caller interface. Banned-phrase
-detection is case-insensitive regex. ``numbers_without_source`` flags bare
-percentages/multipliers not preceded by a citation marker ("()", "source:"),
-biased toward false-positives. ``verify_mutations`` checks each action string
-ends with a log-evidence marker ("|" or "->").
-SDK LAYER: pure logic, stdlib only. No domain content. No I/O.
+"""Truth Protocol — evidence-based output validation (stdlib-only, no I/O).
+
+``verify_*`` functions return ``TruthVerdict`` uniformly. Banned-phrase detection
+is case-insensitive regex. ``numbers_without_source`` flags bare percentages not
+preceded by a citation marker; ``verify_mutations`` requires ``|`` or ``->``.
 """
 
 from __future__ import annotations
