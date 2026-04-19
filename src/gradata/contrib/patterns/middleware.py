@@ -1,7 +1,5 @@
-"""Composable ordered middleware with anchor-based positioning.
-
-Adapted from deer-flow (bytedance/deer-flow) agents/factory.py. Provides
-before/after lifecycle hooks around an operation with circular-dep detection.
+"""Composable ordered middleware with anchor-based positioning. Adapted from
+bytedance/deer-flow. Before/after lifecycle hooks + circular-dep detection.
 """
 
 from __future__ import annotations

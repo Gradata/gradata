@@ -1,8 +1,6 @@
-"""Scope Builder — rule scoping + context-to-scope inference (stdlib-only).
-
-RuleScope fields are hierarchical filters (empty = wildcard). ``build_scope(ctx)``
-infers a RuleScope; ``scope_matches`` returns 0.0–1.0 relevance;
-``scope_to_dict``/``scope_from_dict`` serialise.
+"""Rule scoping + context→scope inference (stdlib-only). RuleScope fields are
+hierarchical filters (empty=wildcard). ``build_scope(ctx)`` infers a scope;
+``scope_matches`` returns 0.0-1.0 relevance; ``scope_to/from_dict`` serialise.
 """
 
 from __future__ import annotations

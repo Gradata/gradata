@@ -1,7 +1,6 @@
-"""Epsilon-greedy Q-learning router for task-to-agent assignment. Learns
-which agent handles each task type best via reward signals from correction
-pipeline. Severity-derived rewards, brain-vault persistence, integrates
-orchestrator.route_by_keywords. Adapted from ruflo (ruvnet/ruflo).
+"""Epsilon-greedy Q-learning router (task→agent). Severity-derived rewards
+from the correction pipeline, brain-vault persistence, integrates
+``orchestrator.route_by_keywords``. Adapted from ruvnet/ruflo.
 """
 
 from __future__ import annotations

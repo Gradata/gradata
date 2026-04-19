@@ -1,8 +1,6 @@
-"""HMAC Rule Signing — tamper detection for graduated rules. HMAC-SHA256 per
-rule; unsigned/tampered rules are skipped (WARN) on injection. Backward
-compatible: no secret configured → pass-through unsigned. SDK Layer 1
-(enhancements), imports _types only. Key mgmt + multi-tenant signing live
-cloud-side.
+"""HMAC-SHA256 rule signing + tamper detection. Unsigned/tampered rules are
+skipped (WARN) on injection. Back-compat: no secret → pass-through unsigned.
+Layer 1; imports only _types. Key mgmt + multi-tenant signing live cloud-side.
 """
 
 from __future__ import annotations
