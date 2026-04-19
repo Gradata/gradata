@@ -1,14 +1,8 @@
-"""Print a rollup of recent gradata hook injections — what got injected,
-suppressed, and total bytes per hook over the last N entries.
-
-Usage::
-
-    python -m gradata.hooks.telemetry_summary           # last 500 entries
-    python -m gradata.hooks.telemetry_summary --tail 50 # last 50 entries
-    python -m gradata.hooks.telemetry_summary --reset   # truncate the log
-
-Reads ``{GRADATA_BRAIN_DIR}/telemetry.jsonl`` (written by ``run_hook``).
+"""Rollup of recent gradata hook injections (injected/suppressed/bytes per
+hook). Reads ``{GRADATA_BRAIN_DIR}/telemetry.jsonl`` (written by ``run_hook``).
+Run as ``python -m gradata.hooks.telemetry_summary [--tail N | --reset]``.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -88,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
     rows: list[dict] = []
     if log_path.is_file():
         with log_path.open("r", encoding="utf-8") as _ld_fh:
-            for _ld_line in _ld_fh.readlines()[-args.tail:]:
+            for _ld_line in _ld_fh.readlines()[-args.tail :]:
                 try:
                     rows.append(json.loads(_ld_line))
                 except (json.JSONDecodeError, ValueError):
