@@ -1,11 +1,7 @@
-"""Rule graph — conflict and co-occurrence edges between lessons.
-
-Lightweight adjacency list tracking relationships between rules:
-- conflict: rules that contradict each other
-- co_occurrence: rules that frequently fire together
-- typed relationships: REINFORCES, CONTRADICTS, SPECIALIZES, GENERALIZES
-
-Persisted as JSON (legacy edges) + SQLite (typed relationships).
+"""Rule graph — lightweight adjacency list tracking conflict/co-occurrence
+edges between lessons and typed relationships (REINFORCES, CONTRADICTS,
+SPECIALIZES, GENERALIZES). Persisted as JSON (legacy edges) + SQLite
+(typed relationships).
 """
 
 from __future__ import annotations
