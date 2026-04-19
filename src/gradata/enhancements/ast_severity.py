@@ -1,21 +1,11 @@
-"""
-AST-Aware Severity Classifier.
-==============================
+"""AST-Aware Severity Classifier — scores structural deltas by diffing
+``ast.dump()`` instead of raw text, collapsing whitespace/comment reformats
+to ``"as-is"`` and up-weighting signature/control-flow edits that line-level
+edit distance under-scores. Gated by :func:`ast_severity_enabled` +
+:func:`language_supported`; returns ``None`` on parse failure so callers
+fall back to edit-distance. Labels mirror ``diff_engine._SEVERITY_THRESHOLDS``.
+Cutoffs are guesses — tune against labelled correction data before gating.
 SDK LAYER: pure stdlib, no I/O.
-
-Scores the structural delta between two Python sources by diffing
-``ast.dump()`` output instead of raw text. Collapses whitespace / comment
-reformatting to ``"as-is"`` and up-weights signature / control-flow edits
-that line-level edit distance under-scores.
-
-Gating: callers invoke this only when :func:`ast_severity_enabled` is True
-AND :func:`language_supported` returns True for the path / language.
-Returns ``None`` on parse failure or unsupported language so the caller
-falls back to the edit-distance classifier.
-
-Labels mirror the string literals used by ``diff_engine._SEVERITY_THRESHOLDS``
-so downstream consumers don't branch on which classifier ran. Cutoffs are
-guesses — tune against labelled correction data before production gating.
 """
 
 from __future__ import annotations

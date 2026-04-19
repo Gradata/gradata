@@ -1,22 +1,8 @@
-"""Consolidated PostToolUse dispatcher.
-
-Replaces three separate hook invocations (auto_correct, tool_finding_capture,
-tool_failure_emit) with a single Python process. On Windows each fresh
-interpreter cold-start is ~200-500ms, so collapsing 3 spawns into 1 saves
-~0.5-1s per Edit/Bash and reduces stdout noise.
-
-Routing is matcher-aware: only hooks whose matcher includes the active
-tool_name are invoked. This preserves the per-hook matcher semantics that
-the previous settings.json layout enforced.
-
-Output is merged: ``result`` strings concatenate (newline-joined), other
-fields take the last writer. If every constituent returns ``None``, the
-dispatcher emits nothing.
-
-Settings.json migration: replace the auto_correct + tool_finding_capture +
-tool_failure_emit hook entries with a single entry pointing here. Keep
-``generated_runner_post`` separate (it shells out to user-installed hooks
-with its own timeout discipline).
+"""Consolidated PostToolUse dispatcher — one process replaces auto_correct +
+tool_finding_capture + tool_failure_emit, saving ~0.5-1s per Edit/Bash on
+Windows (200-500ms per cold interpreter). Matcher-aware routing preserves
+per-hook matcher semantics. ``result`` strings concatenate (newline-joined);
+other fields take the last writer; all-None constituents emit nothing.
 """
 
 from __future__ import annotations
