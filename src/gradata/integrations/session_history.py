@@ -1,7 +1,5 @@
-"""Rule effectiveness tracking: record which rules were injected and whether
-corrections fired against them. Injected-never-corrected = effective.
-Entry: ``SessionHistory().subscribe_to_bus(bus)``.
-"""
+"""Rule effectiveness tracking: record which rules were injected and whether corrections
+fired against them. Injected-never-corrected = effective. Entry: ``SessionHistory().subscribe_to_bus(bus)``."""
 
 from __future__ import annotations
 
