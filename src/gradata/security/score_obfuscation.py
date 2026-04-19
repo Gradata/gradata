@@ -1,11 +1,7 @@
-"""Score obfuscation — strip raw confidence floats from prompt-injected rules.
-
-Raw confidence scores (e.g. ``[RULE:0.95]``) leak internal state into LLM
-prompts, enabling prompt injection attacks that reference or manipulate
-specific thresholds.  This module replaces raw floats with tier labels
-(``[RULE]``, ``[PATTERN]``, ``[INSTINCT]``) for prompt injection while
-keeping raw floats available in local dev tools (brain.prove(),
-brain.rules(), brain.efficiency()).
+"""Score obfuscation — replace raw confidence floats (e.g. ``[RULE:0.95]``)
+with tier labels (``[RULE]``/``[PATTERN]``/``[INSTINCT]``) for prompt-injected
+rules, preventing prompt-injection attacks that reference specific thresholds.
+Raw floats remain in local dev tools (brain.prove/rules/efficiency).
 """
 
 from __future__ import annotations

@@ -1,13 +1,6 @@
-"""
-Layer 0: Base Agentic Patterns.
-
-patterns/ never imports from enhancements/.
-Pure logic, no external dependencies.
-
-Usage:
-    from . import Pipeline, Stage
-    from . import SmartRAG, NaiveRAG
-    from . import InputGuard, OutputGuard
+"""Layer 0: base agentic patterns. Pure logic, no external deps; never
+imports from enhancements/. Lazy-loads submodules (Pipeline/Stage,
+SmartRAG/NaiveRAG, InputGuard/OutputGuard) on first access.
 """
 
 # Lazy-load all pattern modules — nothing imported at module load time.

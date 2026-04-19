@@ -1,13 +1,6 @@
-"""
-Report Generation — Brain health, metrics, and audit reports.
-==============================================================
-Engineering Spec Section 10 requires:
-- Session CSV export
-- Rolling metrics report
-- Rule audit report
-- Brain health report
-
-All reports consume events from the events table (event-sourced).
+"""Report generation — session CSV export, rolling metrics, rule audit, and
+brain health reports (Engineering Spec §10). All reports are event-sourced
+from the events table.
 """
 
 from __future__ import annotations
@@ -56,10 +49,15 @@ def generate_health_report(db_path: Path) -> HealthReport:
     if not db.exists():
         return HealthReport(
             brain_dir=str(db.parent),
-            sessions_total=0, events_total=0, event_types={},
-            corrections_total=0, outputs_total=0,
-            correction_rate=0.0, first_draft_acceptance=0.0,
-            rules_active=0, lessons_active=0,
+            sessions_total=0,
+            events_total=0,
+            event_types={},
+            corrections_total=0,
+            outputs_total=0,
+            correction_rate=0.0,
+            first_draft_acceptance=0.0,
+            rules_active=0,
+            lessons_active=0,
             timestamp=datetime.now().isoformat(),
             issues=["system.db not found"],
         )
@@ -85,9 +83,7 @@ def generate_health_report(db_path: Path) -> HealthReport:
 
         # Sessions
         try:
-            sessions = conn.execute(
-                "SELECT COUNT(DISTINCT session) FROM events"
-            ).fetchone()[0]
+            sessions = conn.execute("SELECT COUNT(DISTINCT session) FROM events").fetchone()[0]
         except sqlite3.OperationalError:
             sessions = 0
 
@@ -212,6 +208,7 @@ def export_session_csv(db_path: Path, output: io.StringIO | None = None) -> str:
 def generate_metrics_report(db_path: Path, window: int = 20) -> str:
     """Generate rolling metrics report as formatted text."""
     from ..metrics import compute_metrics, format_metrics
+
     m = compute_metrics(db_path, window)
     return format_metrics(m)
 
@@ -259,9 +256,7 @@ def generate_rule_audit(db_path: Path) -> str:
             t = stats["total"]
             acc_rate = stats["accepted"] / t if t > 0 else 0
             mis_rate = stats["misfired"] / t if t > 0 else 0
-            lines.append(
-                f"  {rule_id}: {t} apps, {acc_rate:.0%} accepted, {mis_rate:.0%} misfired"
-            )
+            lines.append(f"  {rule_id}: {t} apps, {acc_rate:.0%} accepted, {mis_rate:.0%} misfired")
     except sqlite3.OperationalError:
         lines.append("events table not found.")
     finally:
