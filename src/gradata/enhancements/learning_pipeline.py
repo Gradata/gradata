@@ -1,8 +1,6 @@
-"""End-to-end correction pipeline: observe→cluster→discriminate→graduate→route.
-Wires observation_hooks, cluster_manager, lesson_discriminator,
-self_improvement, q_learning_router, context_brackets; each stage optional and
-degrades gracefully. Entry: ``Brain.process_correction()``.
-"""
+"""End-to-end correction pipeline: observe→cluster→discriminate→graduate→route. Wires
+observation_hooks, cluster_manager, lesson_discriminator, self_improvement,
+q_learning_router, context_brackets; each stage optional. Entry: ``Brain.process_correction()``."""
 
 from __future__ import annotations
 
