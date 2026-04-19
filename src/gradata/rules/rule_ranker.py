@@ -1,10 +1,7 @@
-"""Context-aware rule ranker: scope+confidence+context+recency+fire count.
-
-Weights: 30% scope / 25% confidence (or Thompson-sampled p from Beta(α,β)) /
-20% BM25 context relevance (substring-overlap fallback when bm25s missing) /
-15% recency / 10% fire count. Effectiveness bonus/penalty clamped to [0,1].
-Opt-in Thompson sampling via GRADATA_THOMPSON_RANKING=1 gives exploration
-weight to newly graduated rules. Deterministic per session_seed.
+"""Context-aware rule ranker. Weights: 30% scope / 25% confidence (Thompson-
+sampled p from Beta(α,β) when GRADATA_THOMPSON_RANKING=1) / 20% BM25 context
+(substring-overlap fallback) / 15% recency / 10% fire count. Effectiveness
+bonus clamped [0,1]. Deterministic per session_seed.
 """
 
 from __future__ import annotations

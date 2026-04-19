@@ -1,9 +1,7 @@
-"""Dependency-aware parallel task dispatch (sync, stdlib only).
-
-ParallelBatch: flat list of independent tasks, per-task error isolation.
-DependencyGraph: topological waves with input forwarding.
-merge_results: combine/best_of/synthesize strategies.
-Tasks in a wave run sequentially — host process supplies real concurrency.
+"""Dependency-aware parallel task dispatch (sync, stdlib only). ParallelBatch:
+flat independent tasks, per-task error isolation. DependencyGraph: topological
+waves with input forwarding. merge_results: combine/best_of/synthesize. Wave
+tasks run sequentially — host process supplies real concurrency.
 """
 
 from __future__ import annotations
