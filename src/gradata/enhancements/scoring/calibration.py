@@ -1,9 +1,7 @@
-"""Brier-score calibration tracking for confidence verification.
-
-Tracks predicted confidence vs observed lesson-fire outcomes to compute
-Brier score (MSE, lower=better), reliability diagram bins, and sharpness.
-Answers "when the system says 0.70, is it right 70% of the time?"
-Reference: Brier (1950), Monthly Weather Review.
+"""Brier-score calibration tracking for confidence verification. Tracks
+predicted confidence vs observed lesson-fire outcomes; computes Brier (MSE,
+lower=better), reliability bins, sharpness. "When the system says 0.70, is
+it right 70% of the time?" Brier (1950), Monthly Weather Review.
 """
 
 from __future__ import annotations

@@ -1,9 +1,5 @@
-"""
-Graduation submodule for the self_improvement package.
-
-Contains: _passes_beta_lb_gate() and graduate().
-
-All constants are imported from _confidence to avoid duplication.
+"""Graduation submodule for self_improvement. Contains _passes_beta_lb_gate()
+and graduate(). Constants imported from _confidence.
 """
 
 from __future__ import annotations
