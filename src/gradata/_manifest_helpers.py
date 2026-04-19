@@ -28,34 +28,25 @@ def _sdk_capabilities() -> dict:
     """
     capabilities: dict[str, dict] = {}
 
-    # Adapted from ChristopherKahler/paul
-    _paul_modules = [
+    # (name, module_path, source) triples grouped by upstream provenance.
+    all_modules = [
+        # ChristopherKahler/paul
         ("context_brackets", "gradata.contrib.patterns.context_brackets", "ChristopherKahler/paul"),
         ("reconciliation", "gradata.contrib.patterns.reconciliation", "ChristopherKahler/paul"),
         ("execute_qualify", "gradata.contrib.patterns.execute_qualify", "ChristopherKahler/paul"),
-    ]
-    # Adapted from ruflo
-    _ruflo_modules = [
+        # ruflo
         ("q_learning_router", "gradata.contrib.patterns.q_learning_router", "ruflo"),
-    ]
-    # Adapted from deer-flow
-    _deerflow_modules = [
+        # deer-flow
         ("loop_detection", "gradata.contrib.patterns.loop_detection", "deer-flow"),
         ("middleware_chain", "gradata.contrib.patterns.middleware", "deer-flow"),
-    ]
-    # Adapted from everything-claude-code
-    _ecc_modules = [
+        # everything-claude-code
         ("observation_hooks", "gradata.enhancements.observation_hooks", "ecc"),
         ("install_manifest", "gradata.contrib.enhancements.install_manifest", "ecc"),
-    ]
-    # Adapted from EverOS
-    _everos_modules = [
+        # EverOS
         ("memory_taxonomy", "gradata.enhancements.memory_taxonomy", "everos"),
         ("cluster_manager", "gradata.enhancements.cluster_manager", "everos"),
         ("lesson_discriminator", "gradata.enhancements.lesson_discriminator", "everos"),
-    ]
-    # Core enhancements
-    _core_modules = [
+        # Core enhancements
         ("behavioral_engine", "gradata.enhancements.behavioral_engine", "gradata"),
         ("learning_pipeline", "gradata.enhancements.learning_pipeline", "gradata"),
         ("self_improvement", "gradata.enhancements.self_improvement", "gradata"),
@@ -67,21 +58,8 @@ def _sdk_capabilities() -> dict:
         ("git_backfill", "gradata.enhancements.git_backfill", "gradata"),
         ("auto_correct_hook", "gradata.hooks.auto_correct", "gradata"),
         ("reporting", "gradata.enhancements.reporting", "fest.build-inspired+gradata"),
-        (
-            "quality_monitoring",
-            "gradata.enhancements.quality_monitoring",
-            "jarvis-inspired+gradata",
-        ),
+        ("quality_monitoring", "gradata.enhancements.quality_monitoring", "jarvis-inspired+gradata"),
     ]
-
-    all_modules = (
-        _paul_modules
-        + _ruflo_modules
-        + _deerflow_modules
-        + _ecc_modules
-        + _everos_modules
-        + _core_modules
-    )
 
     for name, module_path, source in all_modules:
         try:
