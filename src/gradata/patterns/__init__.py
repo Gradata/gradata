@@ -12,6 +12,8 @@ users notice at runtime rather than discovering the move when v0.8.0 removes
 this module entirely.
 """
 
+from __future__ import annotations
+
 import warnings
 
 _WARNED = False

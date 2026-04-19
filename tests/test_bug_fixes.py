@@ -395,15 +395,19 @@ class TestBug9MissingClasses:
         import sys
         import warnings
 
-        # Reset the module so the _WARNED flag is fresh for this test
-        sys.modules.pop("gradata.patterns", None)
-        importlib.import_module("gradata.patterns")
-
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
+            # Reset inside the recording context so _WARNED is False when the
+            # import fires and the warning is captured.
+            sys.modules.pop("gradata.patterns", None)
+            importlib.import_module("gradata.patterns")
             from gradata.patterns import Pipeline  # noqa: F401
 
-        deprecations = [w for w in caught if issubclass(w.category, DeprecationWarning)]
-        assert deprecations, "expected DeprecationWarning on first shim access"
-        assert "v0.8.0" in str(deprecations[0].message)
-        assert "gradata.contrib.patterns" in str(deprecations[0].message)
+        shim_warnings = [
+            w
+            for w in caught
+            if issubclass(w.category, DeprecationWarning)
+            and "gradata.contrib.patterns" in str(w.message)
+        ]
+        assert shim_warnings, "expected shim-specific DeprecationWarning on first access"
+        assert "v0.8.0" in str(shim_warnings[0].message)
