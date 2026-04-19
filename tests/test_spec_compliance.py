@@ -198,7 +198,7 @@ class TestMetricsAndSuccess:
         assert callable(evaluate_success_conditions)
 
     def test_4_failure_detectors_exist(self):
-        from gradata.enhancements import quality_monitoring as fd
+        from gradata.enhancements.scoring import failure_detectors as fd
 
         assert hasattr(fd, "detect_being_ignored")
         assert hasattr(fd, "detect_playing_safe")
