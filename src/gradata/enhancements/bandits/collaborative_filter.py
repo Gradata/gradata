@@ -1,9 +1,8 @@
 """Cross-brain pattern transfer via item-based collaborative filtering.
 
-LOCAL side: compute brain similarity fingerprints, identify transferable
-patterns, apply confidence boosts. If Brain A and Brain B graduated the same
-N rules and Brain A also graduated rule X, Brain B gets X with boosted
-initial confidence. Cloud side handles matching and aggregation.
+LOCAL side: brain similarity fingerprints + confidence boosts for transferable
+rules (Brain A & B share N rules → Brain A's rule X transfers to Brain B with
+boosted initial confidence). Cloud handles matching/aggregation.
 """
 
 from __future__ import annotations

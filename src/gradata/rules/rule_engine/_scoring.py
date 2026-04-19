@@ -1,8 +1,7 @@
-"""
-Rule scoring helpers — difficulty, reliability, scope weighting, transfer scope.
-=================================================================================
-Pure functions; no I/O, no external state.  All helpers used by the core engine
-to rank and filter lessons before injection.
+"""Rule scoring helpers — difficulty, reliability, scope weighting, transfer scope.
+
+Pure functions (no I/O, no external state) used by the core engine to rank
+and filter lessons before injection.
 """
 
 from __future__ import annotations

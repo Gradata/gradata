@@ -1,9 +1,8 @@
-"""MCP Integration — SDK abstraction over Model Context Protocol. Brain
-declares capabilities as MCP tool schemas; the host runtime (Claude Code,
-Cursor, VS Code) connects and routes tool calls to brain functions. Handles
-schema declaration, routing, and cross-platform normalization; transport
-(stdio/SSE/HTTP) is owned by the host.
-Layer 0 pattern: domain-agnostic.
+"""MCP Integration — SDK abstraction over Model Context Protocol (Layer 0).
+
+Brain declares capabilities as MCP tool schemas; host runtime (Claude Code,
+Cursor, VS Code) connects and routes tool calls. Handles schema/routing/
+normalization; transport (stdio/SSE/HTTP) is owned by the host.
 """
 
 from __future__ import annotations
