@@ -1,9 +1,4 @@
-"""
-Gradata Exceptions — structured error hierarchy.
-========================================================
-All SDK-specific errors inherit from BrainError so callers
-can catch the entire hierarchy with a single except clause.
-"""
+"""Gradata Exceptions — structured error hierarchy rooted at ``BrainError``."""
 
 
 class BrainError(Exception):
