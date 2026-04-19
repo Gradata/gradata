@@ -1,8 +1,7 @@
-"""Reconciliation — mandatory plan-vs-actual comparison (UNIFY phase).
-``Reconciler.reconcile(plan, actuals)`` scores deviations and returns a
-``ReconciliationSummary`` (``overall_score: DeviationScore``). Inputs are
-``PlanItem`` (id/description/criteria) and ``ActualResult``
-(plan_id/achieved/evidence). Adapted from paul/unify-phase.md.
+"""Reconciliation — plan-vs-actual comparison (UNIFY phase).
+``Reconciler.reconcile(plan, actuals)`` returns a ``ReconciliationSummary``
+scoring deviations. Inputs: ``PlanItem`` + ``ActualResult``. Adapted from
+paul/unify-phase.md.
 """
 
 from __future__ import annotations

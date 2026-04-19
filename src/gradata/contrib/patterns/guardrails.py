@@ -1,7 +1,6 @@
-"""Two-phase guardrails: input guards pre-execution, output guards post-execution.
-
-Composable via Guard/InputGuard/OutputGuard primitives. guarded() wires them
-around any callable. Built-ins: pii_detector, injection_detector, scope_validator,
+"""Two-phase guardrails: input pre-exec, output post-exec. Composable via
+Guard/InputGuard/OutputGuard primitives; ``guarded()`` wires them around any
+callable. Built-ins: pii_detector, injection_detector, scope_validator,
 banned_phrases, destructive_action.
 """
 

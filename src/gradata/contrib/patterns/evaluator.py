@@ -1,8 +1,7 @@
 """Evaluator-Optimizer quality loop (domain-agnostic, stdlib only).
-
-Generator produces candidate output; evaluator scores against weighted
-dimensions; falling below threshold triggers regeneration with feedback.
-Loop terminates on threshold or iteration budget.
+Generator produces candidate; evaluator scores against weighted dimensions;
+sub-threshold triggers regeneration with feedback. Terminates on threshold
+or iteration budget.
 """
 
 from __future__ import annotations
