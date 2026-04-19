@@ -1,19 +1,8 @@
-"""
-External memory adapters for Gradata.
-======================================
-
-Opt-in integrations that let Gradata mirror corrections and pull relevant
-context from external memory backends (Mem0, Letta, EverMind, Hermes, ...).
-
-Adapters are **not** wired into Gradata's event pipeline automatically.
-Users call adapter methods themselves from their own `Brain.correct()`
-callsites. A future release may add a `Brain(...)` constructor option
-that auto-mirrors events to an adapter.
-
-All adapters implement the :class:`MemoryAdapter` protocol defined below.
-Every adapter must be safe to call from any thread and must never raise
-on transport failure. A failed call returns ``None`` (for writes) or
-``[]`` (for reads) and logs at ``WARNING``.
+"""External memory adapters — opt-in integrations mirroring corrections and
+retrieving context from Mem0/Letta/EverMind/Hermes/etc. NOT auto-wired into
+the event pipeline; users call from their own ``Brain.correct()`` sites. All
+adapters implement :class:`MemoryAdapter`, must be thread-safe, must never
+raise on transport failure (return ``None``/``[]`` and log WARNING).
 """
 
 from __future__ import annotations

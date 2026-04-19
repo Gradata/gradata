@@ -1,19 +1,9 @@
-"""
-MCP Integration — Model Context Protocol server discovery and routing.
-======================================================================
+"""MCP Integration — SDK abstraction over Model Context Protocol. Brain
+declares capabilities as MCP tool schemas; the host runtime (Claude Code,
+Cursor, VS Code) connects and routes tool calls to brain functions. Handles
+schema declaration, routing, and cross-platform normalization; transport
+(stdio/SSE/HTTP) is owned by the host.
 Layer 0 pattern: domain-agnostic.
-
-Provides an SDK abstraction over MCP (Model Context Protocol) servers.
-The brain declares what capabilities it offers via MCP, and the host
-runtime (Claude Code, Cursor, VS Code) connects to it.
-
-This module handles:
-- Declaring brain capabilities as MCP tool schemas
-- Routing MCP tool calls to brain functions
-- Cross-platform data normalization
-
-The actual MCP transport (stdio, SSE, HTTP) is handled by the host.
-This module provides the SDK-side schema and routing layer.
 """
 
 from __future__ import annotations
@@ -110,16 +100,13 @@ class MCPBridge:
         except Exception as e:
             return {"error": str(e)}
 
-
     def stats(self) -> dict[str, Any]:
         """Bridge statistics."""
         return {
             "brain_tools": len(self._tools),
             "brain_handlers": len(self._handlers),
             "connected_servers": len(self._connected_servers),
-            "total_external_tools": sum(
-                len(s.tools) for s in self._connected_servers
-            ),
+            "total_external_tools": sum(len(s.tools) for s in self._connected_servers),
         }
 
 
@@ -130,29 +117,34 @@ def create_brain_mcp_tools() -> list[MCPToolSchema]:
     """
     return [
         MCPToolSchema(
-            "brain_search", "Search the brain for relevant context",
+            "brain_search",
+            "Search the brain for relevant context",
             {"query": {"type": "string", "description": "Search query"}},
         ),
         MCPToolSchema(
-            "brain_correct", "Record a user correction to improve the brain",
+            "brain_correct",
+            "Record a user correction to improve the brain",
             {
                 "draft": {"type": "string", "description": "Original AI draft"},
                 "final": {"type": "string", "description": "User-edited final version"},
             },
         ),
         MCPToolSchema(
-            "brain_log_output", "Log an AI-generated output for tracking",
+            "brain_log_output",
+            "Log an AI-generated output for tracking",
             {
                 "text": {"type": "string", "description": "Generated text"},
                 "output_type": {"type": "string", "description": "Type of output"},
             },
         ),
         MCPToolSchema(
-            "brain_manifest", "Generate and return brain quality manifest",
+            "brain_manifest",
+            "Generate and return brain quality manifest",
             {},
         ),
         MCPToolSchema(
-            "brain_health", "Check brain health status",
+            "brain_health",
+            "Check brain health status",
             {},
         ),
     ]

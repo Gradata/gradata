@@ -1,17 +1,7 @@
-"""
-Session History — Rule Effectiveness Tracking.
-================================================
-Tracks which rules were injected during a session and whether
-corrections occurred against them. A rule that was injected but
-never triggered a correction is considered *effective* (it
-prevented the mistake). A rule that was corrected is *not effective*
-(the agent still made the mistake despite the rule).
-
-Usage:
-    from .session_history import SessionHistory
-
-    sh = SessionHistory()
-    sh.subscribe_to_bus(bus)  # auto-wires to event bus
+"""Session History — Rule Effectiveness Tracking. Records which rules were
+injected in a session and whether corrections fired against them. Injected
+but never corrected = effective (prevented the mistake); corrected = not
+effective. Entry: ``SessionHistory().subscribe_to_bus(bus)``.
 """
 
 from __future__ import annotations
