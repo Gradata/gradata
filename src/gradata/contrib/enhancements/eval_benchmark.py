@@ -1,7 +1,6 @@
-"""Procedural-memory evaluation benchmark (LoCoMo-comparable). Dimensions:
-(1) correction recall — retrieval of past corrections; (2) rule precision —
-do graduated rules prevent re-occurrence; (3) graduation accuracy —
-INSTINCT→PATTERN→RULE promotion correctness.
+"""Procedural-memory eval benchmark (LoCoMo-comparable). Dimensions:
+(1) correction recall; (2) rule precision (do rules prevent re-occurrence);
+(3) graduation accuracy (INSTINCT→PATTERN→RULE correctness).
 """
 
 from __future__ import annotations

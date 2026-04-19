@@ -1,7 +1,6 @@
-"""One-line behavioral-adaptation context manager wrapping any LLM call.
-Injects rules into system messages, captures conversations for fact
-extraction, tracks corrections. Works with OpenAI/Anthropic/any chat API.
-Inspired by Letta's Learning SDK.
+"""One-line behavioral-adaptation context manager around any LLM call.
+Injects rules into system messages, captures conversations, tracks
+corrections. Works with any chat API. Inspired by Letta's Learning SDK.
 """
 
 from __future__ import annotations

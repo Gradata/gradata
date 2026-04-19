@@ -1,7 +1,6 @@
-"""Install Manifest — modular component registry with selective install.
-``InstallManifest.default().plan_install(profile=...)`` returns a plan
-(lite/standard/full or individual); ``Module`` carries cost + stability.
-``apply(plan)`` → ``InstallState`` persistable via ``.save()``.
+"""Modular component registry with selective install. ``plan_install(profile)``
+returns lite/standard/full; ``Module`` has cost+stability; ``apply(plan)`` →
+``InstallState`` (``.save()`` to persist).
 """
 
 from __future__ import annotations
