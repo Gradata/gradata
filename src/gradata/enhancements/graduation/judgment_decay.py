@@ -1,32 +1,10 @@
-"""
-Judgment Decay — Confidence Decay for Unused Lessons
-====================================================
-Layer 1 Enhancement: imports from patterns/ (memory, reflection)
+"""Confidence decay algorithm for unused lessons (pure, no I/O).
 
-Ensures lessons that are not being used gradually lose confidence,
-preventing knowledge bloat. Lessons that are actively applied get
-reinforced. Lessons with zero applications for extended periods
-are flagged UNTESTABLE and archived.
-
-This module provides the ALGORITHM only (pure computation, no I/O).
-The brain-layer wiring (file reads, DB queries, event emission) stays
-in brain/scripts/judgment_decay.py which calls these functions.
-
-Decay rules:
-  1. RULE tier: immune to decay (proven behavioral rules are permanent)
-  2. Per idle session: -0.02 confidence (floor: 0.10)
-  3. Per applied session: +0.05 reinforcement (capped at tier ceiling)
-  4. 20+ idle sessions with 0 applications AND 0 corrections → UNTESTABLE
-  5. Lessons added in the current session: skip decay
-  6. Session-type-aware: decay only ticks on sessions where the lesson's
-     category was testable (e.g., DRAFTING lessons ignore system sessions)
-
-Research backing:
-  - Decay rate 0.02/session: Ebbinghaus forgetting curve adapted for
-    discrete session intervals (not continuous time)
-  - Reinforcement bonus 0.05: Sub-survival bonus (0.10) to prevent
-    gaming via trivial applications
-  - UNTESTABLE threshold 20: Aligned with SPEC Section 1 kill switches
+Rules: RULE tier immune; -0.02 per idle session (floor 0.10); +0.05 per
+applied session (capped at tier ceiling); 20+ idle with 0 apps/corrections
+→ UNTESTABLE archive; current-session lessons skip decay; session-type-aware
+(DRAFTING lessons ignore system sessions). Research: Ebbinghaus curve
+adapted for discrete sessions. Brain-layer wiring lives in scripts/.
 """
 
 from __future__ import annotations
@@ -249,7 +227,10 @@ def compute_batch_decay(
         sessions_since = current_session - last_applied if last_applied > 0 else 0
 
         result = compute_decay(
-            lesson, sessions_since, applied_this, total_idle,
+            lesson,
+            sessions_since,
+            applied_this,
+            total_idle,
             session_type=session_type,
         )
         results.append(result)

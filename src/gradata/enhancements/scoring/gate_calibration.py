@@ -1,32 +1,8 @@
-"""
-Gate Calibration — Empirical threshold tuning for quality gates.
-================================================================
-Layer 1 Enhancement: pure logic, stdlib only.
+"""Empirical ROC-based threshold tuning for quality gates.
 
-The 8.0 quality gate threshold is currently arbitrary. This module
-collects human ratings alongside automated scores and computes the
-optimal threshold using ROC analysis (Anthropic Eval Guide, 2025).
-
-When enough data is collected (50+ rated outputs), the system can
-recommend a calibrated threshold that maximizes the F1 score of
-pass/fail decisions relative to the human's accept/reject ground truth.
-
-Usage:
-    calibrator = GateCalibrator()
-
-    # Collect data over sessions
-    calibrator.record(auto_score=8.2, human_accepted=True)
-    calibrator.record(auto_score=7.5, human_accepted=False)
-    calibrator.record(auto_score=7.8, human_accepted=True)
-    ...
-
-    # When enough data, compute optimal threshold
-    result = calibrator.compute_optimal_threshold()
-    print(result.recommended_threshold)  # e.g., 7.6
-    print(result.f1_at_recommended)      # e.g., 0.84
-    print(result.current_f1)             # e.g., 0.71 (at 8.0)
-
-Reference: Anthropic, "Demystifying Evals for AI Agents" (2025).
+Collects human accept/reject ground truth alongside auto scores; once 50+
+samples are rated, recommends the threshold that maximises F1 over the
+previously arbitrary 8.0 gate. Reference: Anthropic "Demystifying Evals" (2025).
 """
 
 from __future__ import annotations

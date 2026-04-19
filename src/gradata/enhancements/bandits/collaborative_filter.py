@@ -1,33 +1,9 @@
-"""
-Collaborative Filtering — Cross-brain pattern transfer for the marketplace.
-============================================================================
-Layer 1 Enhancement: pure logic, stdlib only.
+"""Cross-brain pattern transfer via item-based collaborative filtering.
 
-When the marketplace launches, new brains can bootstrap from patterns that
-proved themselves in similar brains. This module provides the infrastructure
-for cross-brain learning using item-based collaborative filtering.
-
-Core idea: if Brain A and Brain B both graduated the same 5 rules, and Brain A
-also graduated rule X, then Brain B should consider rule X as a candidate
-with boosted initial confidence.
-
-This module handles the LOCAL side: computing brain similarity vectors,
-identifying transferable patterns, and applying confidence boosts.
-The CLOUD side (matching brains, aggregating across the platform)
-runs on Gradata's servers.
-
-Usage:
-    # Export this brain's pattern fingerprint
-    fingerprint = BrainFingerprint.from_lessons(my_lessons)
-
-    # Receive recommended patterns from cloud
-    recommendations = cloud_client.get_recommendations(fingerprint)
-
-    # Apply boosts to local lessons
-    boosted = apply_transfer_boost(local_lessons, recommendations)
-
-Reference: Standard item-based collaborative filtering adapted for
-behavioral rules rather than products.
+LOCAL side: compute brain similarity fingerprints, identify transferable
+patterns, apply confidence boosts. If Brain A and Brain B graduated the same
+N rules and Brain A also graduated rule X, Brain B gets X with boosted
+initial confidence. Cloud side handles matching and aggregation.
 """
 
 from __future__ import annotations
@@ -45,8 +21,9 @@ class RuleFingerprint:
     exact text (which may vary between brains). The fingerprint
     captures the behavioral intent, not the wording.
     """
+
     category: str
-    description_hash: str     # First 8 chars of SHA-256 of normalized description
+    description_hash: str  # First 8 chars of SHA-256 of normalized description
     confidence: float
     fire_count: int
     domain: str = ""
@@ -55,13 +32,16 @@ class RuleFingerprint:
 @dataclass
 class BrainFingerprint:
     """A brain's pattern fingerprint for similarity matching."""
+
     domain: str
     total_sessions: int
     rules: list[RuleFingerprint]
-    category_distribution: dict[str, int]   # category -> rule count
+    category_distribution: dict[str, int]  # category -> rule count
 
     @classmethod
-    def from_lessons(cls, lessons: list, domain: str = "", total_sessions: int = 0) -> BrainFingerprint:
+    def from_lessons(
+        cls, lessons: list, domain: str = "", total_sessions: int = 0
+    ) -> BrainFingerprint:
         """Build a fingerprint from a list of Lesson objects."""
         rules = []
         cat_dist: dict[str, int] = {}
@@ -71,17 +51,17 @@ class BrainFingerprint:
             if lesson.confidence < 0.5:
                 continue
 
-            desc_hash = hashlib.sha256(
-                lesson.description.lower().strip().encode()
-            ).hexdigest()[:8]
+            desc_hash = hashlib.sha256(lesson.description.lower().strip().encode()).hexdigest()[:8]
 
-            rules.append(RuleFingerprint(
-                category=lesson.category,
-                description_hash=desc_hash,
-                confidence=lesson.confidence,
-                fire_count=lesson.fire_count,
-                domain=domain,
-            ))
+            rules.append(
+                RuleFingerprint(
+                    category=lesson.category,
+                    description_hash=desc_hash,
+                    confidence=lesson.confidence,
+                    fire_count=lesson.fire_count,
+                    domain=domain,
+                )
+            )
 
             cat_dist[lesson.category] = cat_dist.get(lesson.category, 0) + 1
 
@@ -96,12 +76,13 @@ class BrainFingerprint:
 @dataclass
 class TransferRecommendation:
     """A pattern recommended for transfer from another brain."""
+
     category: str
     description: str
-    source_confidence: float     # Confidence in the source brain
-    transfer_boost: float        # Suggested confidence boost (0.05-0.20)
+    source_confidence: float  # Confidence in the source brain
+    transfer_boost: float  # Suggested confidence boost (0.05-0.20)
     source_brain_similarity: float  # How similar the source brain is (0-1)
-    n_brains_graduated: int      # How many brains graduated this pattern
+    n_brains_graduated: int  # How many brains graduated this pattern
 
 
 def compute_brain_similarity(a: BrainFingerprint, b: BrainFingerprint) -> float:
@@ -146,15 +127,18 @@ def apply_transfer_boost(
     """
     for lesson in local_lessons:
         for rec in recommendations:
-            if (rec.category == lesson.category
-                    and rec.transfer_boost > 0
-                    and lesson.confidence < 0.90):  # Don't boost past RULE
+            if (
+                rec.category == lesson.category
+                and rec.transfer_boost > 0
+                and lesson.confidence < 0.90
+            ):  # Don't boost past RULE
                 boost = min(
                     rec.transfer_boost * rec.source_brain_similarity,
                     max_boost,
                 )
                 lesson.confidence = round(
-                    min(0.89, lesson.confidence + boost), 2  # Cap below RULE
+                    min(0.89, lesson.confidence + boost),
+                    2,  # Cap below RULE
                 )
                 break  # One boost per lesson per session
 

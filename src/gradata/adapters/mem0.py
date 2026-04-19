@@ -1,35 +1,8 @@
-"""
-Mem0 memory adapter.
-====================
+"""Opt-in Mem0 memory adapter (MemoryAdapter protocol).
 
-Opt-in mirror between Gradata corrections and a Mem0 workspace. Implements
-the :class:`~gradata.adapters.base.MemoryAdapter` protocol.
-
-Install the optional extra::
-
-    pip install "gradata[adapters-mem0]"
-
-Usage::
-
-    import os
-    from .mem0 import Mem0Adapter
-
-    adapter = Mem0Adapter(
-        api_key=os.environ["MEM0_API_KEY"],
-        user_id="oliver",
-    )
-
-    memory_id = adapter.push_correction(
-        draft="hey there",
-        final="Hi Oliver,",
-        summary="greeting style: full name, no 'hey there'",
-        tags=["email", "greeting"],
-    )
-
-    hits = adapter.pull_memory_for_context("draft cold email", k=5)
-
-The adapter never raises on backend failure: writes return ``None`` and
-reads return ``[]``. A host brain must stay up even if Mem0 is down.
+Mirrors Gradata corrections to a Mem0 workspace. Install via
+``pip install "gradata[adapters-mem0]"``. Never raises on backend failure:
+writes return None, reads return []. Host brain stays up even if Mem0 is down.
 """
 
 from __future__ import annotations

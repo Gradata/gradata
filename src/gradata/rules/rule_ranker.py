@@ -1,32 +1,10 @@
-"""Context-aware rule ranker with effectiveness, recency, BM25, and Thompson weighting.
+"""Context-aware rule ranker: scope+confidence+context+recency+fire count.
 
-Ranking modes (in order of precedence):
-
-1. **BM25 context relevance** (default when ``bm25s`` is available): scores rules
-   by BM25 over the corpus ``category + description + tags`` against a query built
-   from ``task_type + context_keywords``. Replaces the legacy substring-overlap
-   scorer. See the 2026-04 autoresearch synthesis §5 for the motivation.
-2. **Keyword fallback**: the original substring-overlap scorer is used when
-   ``bm25s`` is not installed (keeps the SDK zero-required-deps).
-3. **Thompson sampling** over Beta(α, β) posteriors on the candidate lessons
-   (opt-in via ``GRADATA_THOMPSON_RANKING=1``). When enabled, the confidence
-   term is replaced by ``p ~ Beta(α, β)`` — giving exploration weight to newly
-   graduated PATTERN-tier rules that have low observed posteriors but uncertain
-   upside. Deterministic within a session when ``session_seed`` is passed.
-
-Weighted formula (sums to 1.0):
-
-    30% scope match
-    25% confidence   (or Thompson-sampled p when Thompson mode is on)
-    20% context relevance  (BM25 normalized score when bm25s available)
-    15% recency
-    10% fire count
-
-Plus effectiveness bonus/penalty (clamped to [0, 1]).
-
-The ``rank_rules`` signature is stable — new behavior is additive. Callers that
-pass a plain ``list[dict[str, Any]]`` continue to work; lessons with ``alpha`` /
-``beta_param`` fields unlock Thompson sampling.
+Weights: 30% scope / 25% confidence (or Thompson-sampled p from Beta(α,β)) /
+20% BM25 context relevance (substring-overlap fallback when bm25s missing) /
+15% recency / 10% fire count. Effectiveness bonus/penalty clamped to [0,1].
+Opt-in Thompson sampling via GRADATA_THOMPSON_RANKING=1 gives exploration
+weight to newly graduated rules. Deterministic per session_seed.
 """
 
 from __future__ import annotations
@@ -39,6 +17,7 @@ from typing import Any
 
 try:  # BM25 is optional — SDK must stay zero-required-deps.
     import bm25s  # type: ignore[import-not-found]
+
     _BM25_AVAILABLE = True
 except ImportError:  # pragma: no cover - import gate
     bm25s = None  # type: ignore[assignment]
@@ -114,13 +93,18 @@ def rank_rules(
             if any(_corpus):
                 try:
                     _retr = bm25s.BM25()
-                    _retr.index(bm25s.tokenize(_corpus, stopwords="en", show_progress=False), show_progress=False)
+                    _retr.index(
+                        bm25s.tokenize(_corpus, stopwords="en", show_progress=False),
+                        show_progress=False,
+                    )
                     _qtok = bm25s.tokenize([" ".join(_qt)], stopwords="en", show_progress=False)
                     _ids, _scs = _retr.retrieve(_qtok, k=len(_corpus), show_progress=False)
                     _max = max((float(s) for s in _scs[0]), default=0.0)
                     bm25_scores = [0.0] * len(_corpus)
                     for _j in range(len(_ids[0])):
-                        bm25_scores[int(_ids[0][_j])] = float(_scs[0][_j]) / _max if _max > 0 else 0.0
+                        bm25_scores[int(_ids[0][_j])] = (
+                            float(_scs[0][_j]) / _max if _max > 0 else 0.0
+                        )
                 except Exception as _exc:  # pragma: no cover - defensive
                     _log.debug("bm25 scoring failed (%s) — falling back to keyword scorer", _exc)
                     bm25_scores = None
@@ -147,11 +131,17 @@ def rank_rules(
             _rid = rule.get("id") or rule.get("description", "")
             _ctx = min(1.0, _ctx + wiki_boost.get(_rid, 0.0))
         _ls = rule.get("last_session", 0)
-        _rec = 1.0 / (1.0 + max(0, current_session - _ls) * 0.1) if current_session > 0 and _ls > 0 else 0.5
+        _rec = (
+            1.0 / (1.0 + max(0, current_session - _ls) * 0.1)
+            if current_session > 0 and _ls > 0
+            else 0.5
+        )
         _fire = _fire_count_score(rule.get("fire_count", 0))
         _base = 0.30 * _scope + 0.25 * _confidence + 0.20 * _ctx + 0.15 * _rec + 0.10 * _fire
         _eb = 0.0
-        if effectiveness and (_info := effectiveness.get(rule.get("id") or rule.get("description", ""))):
+        if effectiveness and (
+            _info := effectiveness.get(rule.get("id") or rule.get("description", ""))
+        ):
             _eb = 0.10 if _info.get("effective") else -0.10
         score = max(0.0, min(1.0, _base + _eb))
         scored.append((score, rule))

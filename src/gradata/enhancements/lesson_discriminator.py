@@ -1,33 +1,9 @@
-"""
-Lesson Discriminator — Importance scoring for corrections/lessons.
-==================================================================
-Adapted from: EverOS (EverMind-AI/EverOS) profile_manager/discriminator.py
+"""Rule-based importance scoring for corrections before graduation.
 
-Determines whether a correction is "high-value" (worth graduating)
-before entering the graduation pipeline. Prevents noise from polluting
-the INSTINCT→PATTERN→RULE pipeline.
-
-EverOS uses LLM-based discrimination with confidence thresholds.
-This adaptation uses rule-based heuristics (no LLM dependency) with
-the same confidence threshold pattern.
-
-Usage::
-
-    from .lesson_discriminator import (
-        LessonDiscriminator, DiscriminatorConfig,
-        DiscriminatorVerdict, ImportanceSignal,
-    )
-
-    disc = LessonDiscriminator()
-    verdict = disc.evaluate(
-        correction_text="Changed 'Dear Sir' to 'Hey'",
-        severity="moderate",
-        task_type="email_draft",
-        occurrence_count=3,
-    )
-    print(verdict.is_high_value)  # True
-    print(verdict.confidence)     # 0.75
-    print(verdict.reasons)        # ["Recurring pattern (3x)", ...]
+Filters noise from the INSTINCT→PATTERN→RULE pipeline by deciding if a
+correction is "high-value" worth graduating. Uses rule-based heuristics
+(no LLM dep) with EverOS-style confidence thresholds.
+Adapted from EverOS (EverMind-AI/EverOS) profile_manager/discriminator.py.
 """
 
 from __future__ import annotations
@@ -45,11 +21,12 @@ __all__ = [
 
 class ImportanceSignal(Enum):
     """Signals that indicate a lesson's importance."""
-    SEVERITY = "severity"           # High edit distance
-    RECURRENCE = "recurrence"       # Seen multiple times
+
+    SEVERITY = "severity"  # High edit distance
+    RECURRENCE = "recurrence"  # Seen multiple times
     DOMAIN_BREADTH = "domain_breadth"  # Applies across task types
-    USER_EXPLICIT = "user_explicit"    # User explicitly flagged
-    NOVELTY = "novelty"             # Not covered by existing rules
+    USER_EXPLICIT = "user_explicit"  # User explicitly flagged
+    NOVELTY = "novelty"  # Not covered by existing rules
     CORRECTION_CHAIN = "correction_chain"  # Part of a correction sequence
 
 
@@ -65,14 +42,17 @@ class DiscriminatorConfig:
         novelty_bonus: Bonus for lessons not covered by existing rules.
         explicit_bonus: Bonus for user-flagged corrections.
     """
+
     min_confidence: float = 0.6
-    severity_weights: dict[str, float] = field(default_factory=lambda: {
-        "trivial": 0.15,
-        "minor": 0.35,
-        "moderate": 0.55,
-        "major": 0.75,
-        "rewrite": 0.90,
-    })
+    severity_weights: dict[str, float] = field(
+        default_factory=lambda: {
+            "trivial": 0.15,
+            "minor": 0.35,
+            "moderate": 0.55,
+            "major": 0.75,
+            "rewrite": 0.90,
+        }
+    )
     recurrence_bonus: float = 0.10
     max_recurrence_bonus: float = 0.30
     novelty_bonus: float = 0.15
@@ -90,6 +70,7 @@ class DiscriminatorVerdict:
         signals: Which importance signals fired.
         recommendation: Suggested action (graduate/monitor/discard).
     """
+
     is_high_value: bool
     confidence: float
     reasons: list[str] = field(default_factory=list)

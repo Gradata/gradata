@@ -1,33 +1,10 @@
-"""Runtime middleware adapters for non-Claude-Code environments.
+"""Runtime middleware adapters for non-Claude-Code agents (OpenAI, Anthropic, LangChain, CrewAI).
 
-Gradata's hooks only fire inside Claude Code. For direct-SDK agents
-(raw OpenAI SDK, raw Anthropic SDK, LangChain, CrewAI) this subpackage
-provides runtime wrappers that inject learned rules into system prompts
-and enforce RULE-tier patterns on outputs.
-
-Quick start:
-
-    from anthropic import Anthropic
-    from . import wrap_anthropic
-
-    client = wrap_anthropic(Anthropic(), brain_path="./brain")
-    # All client.messages.create(...) calls now get rules injected.
-
-The adapters share a common :class:`RuleSource` that reads from the same
-``lessons.md`` + brain database that Claude Code hooks use, so behaviour
-is consistent across environments.
-
-Environment overrides:
-    GRADATA_BYPASS=1 — disables all injection and enforcement (emergency kill switch).
-
-Optional deps:
-    - AnthropicMiddleware / wrap_anthropic  -> ``anthropic``
-    - OpenAIMiddleware / wrap_openai        -> ``openai``
-    - LangChainCallback                     -> ``langchain-core``
-    - CrewAIGuard                           -> works with plain CrewAI guardrails
-
-Importing an adapter without its optional dep raises a clear ImportError
-with the install hint.
+Wraps SDK clients to inject learned rules into system prompts and enforce
+RULE-tier patterns on outputs. Shares a common RuleSource with Claude Code
+hooks so behavior is consistent. GRADATA_BYPASS=1 is the emergency kill switch.
+Optional deps: anthropic / openai / langchain-core / crewai (import raises
+with install hint if missing).
 """
 
 from __future__ import annotations
@@ -62,11 +39,11 @@ __all__ = [  # noqa: RUF022 — logical grouping (core -> adapters) over alphabe
 # name -> (submodule, attribute) for lazy adapter loading.
 _LAZY_EXPORTS = {
     "AnthropicMiddleware": ("anthropic_adapter", "AnthropicMiddleware"),
-    "wrap_anthropic":      ("anthropic_adapter", "wrap_anthropic"),
-    "OpenAIMiddleware":    ("openai_adapter", "OpenAIMiddleware"),
-    "wrap_openai":         ("openai_adapter", "wrap_openai"),
-    "LangChainCallback":   ("langchain_adapter", "LangChainCallback"),
-    "CrewAIGuard":         ("crewai_adapter", "CrewAIGuard"),
+    "wrap_anthropic": ("anthropic_adapter", "wrap_anthropic"),
+    "OpenAIMiddleware": ("openai_adapter", "OpenAIMiddleware"),
+    "wrap_openai": ("openai_adapter", "wrap_openai"),
+    "LangChainCallback": ("langchain_adapter", "LangChainCallback"),
+    "CrewAIGuard": ("crewai_adapter", "CrewAIGuard"),
 }
 
 
