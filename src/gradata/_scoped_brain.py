@@ -1,8 +1,7 @@
 """ScopedBrain — domain-scoped view over a parent ``Brain``. ``brain.scope(D)``
-returns a proxy that filters graduated rules by domain and delegates the rest
-of the API unchanged. Domain match (see ``lesson_matches_domain``, case-
-insensitive): ``scope_json.domain == D`` OR ``applies_to == D`` / starts with
-``f"{D}:"``. No category-as-domain fallback — migrate legacy lessons with
+proxies filter graduated rules by domain (case-insensitive match on
+``scope_json.domain`` / ``applies_to``) and delegate the rest unchanged. No
+category-as-domain fallback; migrate legacy via
 ``scripts/migrate_legacy_scopes.py``. SDK Layer 0.
 """
 
