@@ -1,6 +1,5 @@
-"""Rollup of recent gradata hook injections (injected/suppressed/bytes per hook). Reads
-``{GRADATA_BRAIN_DIR}/telemetry.jsonl`` (written by ``run_hook``).
-Run as ``python -m gradata.hooks.telemetry_summary [--tail N | --reset]``."""
+"""Rollup of recent gradata hook injections (injected/suppressed/bytes per hook) from
+``{GRADATA_BRAIN_DIR}/telemetry.jsonl``. Run ``python -m gradata.hooks.telemetry_summary``."""
 
 from __future__ import annotations
 

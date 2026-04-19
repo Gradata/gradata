@@ -1,6 +1,5 @@
 """CrewAI Integration — DEPRECATED, removed in v0.8.0. Migrate enforcement to
-:class:`~gradata.middleware.crewai_adapter.CrewAIGuard`; :class:`BrainCrewMemory`
-still provides persistent memory until a middleware retrieval equivalent ships."""
+:class:`~gradata.middleware.crewai_adapter.CrewAIGuard`; :class:`BrainCrewMemory` remains."""
 
 from __future__ import annotations
 
