@@ -1,8 +1,7 @@
-"""LangChain Integration — DEPRECATED, removed in v0.8.0. For rule injection
-migrate to :class:`~gradata.middleware.langchain_adapter.LangChainCallback`
-(``ChatOpenAI(callbacks=[LangChainCallback(brain_path=...)])``).
-:class:`BrainMemory` here still implements LangChain's Memory interface for
-context retrieval; keep using it until a middleware equivalent ships.
+"""LangChain Integration — DEPRECATED, removed in v0.8.0. Migrate rule
+injection to :class:`~gradata.middleware.langchain_adapter.LangChainCallback`;
+:class:`BrainMemory` still provides LangChain Memory retrieval until a
+middleware equivalent ships.
 """
 
 from __future__ import annotations

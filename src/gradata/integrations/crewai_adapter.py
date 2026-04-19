@@ -1,8 +1,7 @@
-"""CrewAI Integration — DEPRECATED, removed in v0.8.0. Migrate rule
-enforcement to :class:`~gradata.middleware.crewai_adapter.CrewAIGuard`
-(``Agent(guardrails=[CrewAIGuard(brain_path=...)])``). :class:`BrainCrewMemory`
-here still provides persistent memory; a middleware retrieval equivalent
-is planned before v0.8.0.
+"""CrewAI Integration — DEPRECATED, removed in v0.8.0. Migrate enforcement
+to :class:`~gradata.middleware.crewai_adapter.CrewAIGuard`;
+:class:`BrainCrewMemory` still provides persistent memory until a middleware
+retrieval equivalent ships pre-v0.8.0.
 """
 
 from __future__ import annotations

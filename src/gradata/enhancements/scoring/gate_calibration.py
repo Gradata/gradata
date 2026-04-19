@@ -1,8 +1,6 @@
-"""Empirical ROC-based threshold tuning for quality gates.
-
-Collects human accept/reject ground truth alongside auto scores; once 50+
-samples are rated, recommends the threshold that maximises F1 over the
-previously arbitrary 8.0 gate. Reference: Anthropic "Demystifying Evals" (2025).
+"""Empirical ROC-based threshold tuning for quality gates. Collects human
+accept/reject truth + auto scores; once 50+ rated, recommends the F1-maximal
+threshold over the arbitrary 8.0 gate. Ref: Anthropic "Demystifying Evals".
 """
 
 from __future__ import annotations

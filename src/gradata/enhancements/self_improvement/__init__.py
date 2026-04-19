@@ -1,8 +1,7 @@
 """Procedural Memory — INSTINCT→PATTERN→RULE graduation pipeline. Confidence
-scoring, lesson parsing, FSRS-inspired graduation, adversarial validation.
-Cloud (``gradata_cloud.graduation.self_improvement``) layers FSRS scheduling
-+ multi-brain optimization. ``_confidence.py``: math/parse/format/update;
-``_graduation.py``: gate+graduate. SDK Layer 1 (imports patterns + _types).
+scoring, parsing, FSRS-inspired graduation, adversarial validation. Cloud
+layers FSRS scheduling + multi-brain optimization. Split: ``_confidence.py``
+(math/parse/format/update), ``_graduation.py`` (gate+graduate). SDK Layer 1.
 """
 
 # Re-export everything that was previously importable from the flat module.
