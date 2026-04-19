@@ -183,10 +183,8 @@ def platform_lock(fh: IO, *, timeout: float | None = None) -> Generator[None, No
         finally:
             if locked:
                 fh.seek(0)
-                try:
+                with contextlib.suppress(OSError):
                     msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
-                except OSError:
-                    pass
     else:
         import fcntl  # type: ignore[import]
 
@@ -195,7 +193,5 @@ def platform_lock(fh: IO, *, timeout: float | None = None) -> Generator[None, No
             yield
         finally:
             if locked:
-                try:
+                with contextlib.suppress(OSError):
                     fcntl.flock(fh, fcntl.LOCK_UN)
-                except OSError:
-                    pass
