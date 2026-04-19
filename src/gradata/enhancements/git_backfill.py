@@ -1,25 +1,7 @@
-"""
-Git Backfill — Bootstrap a brain from git history.
-====================================================
-Walks git log, extracts diffs, classifies corrections, and bootstraps
-a brain with historical data. A new brain can start with months of
-learning from day one.
+"""Bootstrap a brain from git history — walks log, extracts diffs, classifies corrections.
 
-Usage::
-
-    from .git_backfill import backfill_from_git
-
-    stats = backfill_from_git(
-        brain=brain,
-        repo_path=".",
-        lookback_days=90,
-        file_patterns=["*.py", "*.md", "*.ts"],
-    )
-    print(stats)  # {"commits_scanned": 150, "corrections_captured": 43, ...}
-
-Or via Brain method::
-
-    brain.backfill_from_git(repo_path=".", lookback_days=90)
+Lets a new brain start with months of historical learning. Entry points:
+backfill_from_git(brain, repo_path, lookback_days, file_patterns) or brain.backfill_from_git().
 """
 
 from __future__ import annotations
@@ -108,8 +90,12 @@ def scan_git_diffs(
         try:
             completed = subprocess.run(
                 ["git", *args],
-                capture_output=True, text=True, timeout=timeout,
-                encoding="utf-8", errors="replace", cwd=str(repo_path),
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                encoding="utf-8",
+                errors="replace",
+                cwd=str(repo_path),
             )
             return _GitResult(completed=completed)
         except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
@@ -160,13 +146,16 @@ def scan_git_diffs(
             if files_result.error is not None:
                 _log.warning(
                     "git diff-tree failed at %s for %s: %s: %s",
-                    repo_path, commit_hash[:8],
-                    type(files_result.error).__name__, files_result.error,
+                    repo_path,
+                    commit_hash[:8],
+                    type(files_result.error).__name__,
+                    files_result.error,
                 )
             elif files_result.completed is not None:
                 _log.warning(
                     "git diff-tree failed at %s for %s (rc=%d): %s",
-                    repo_path, commit_hash[:8],
+                    repo_path,
+                    commit_hash[:8],
                     files_result.completed.returncode,
                     (files_result.completed.stderr or files_result.completed.stdout or "").strip(),
                 )
@@ -174,15 +163,20 @@ def scan_git_diffs(
 
         assert files_result.completed is not None
         filtered_files = [
-            f.strip() for f in files_result.completed.stdout.strip().splitlines()
+            f.strip()
+            for f in files_result.completed.stdout.strip().splitlines()
             if any(Path(f.strip()).match(p) for p in patterns)
         ]
 
         for file_path in filtered_files[:10]:  # Cap files per commit
             old_result = _git(["show", f"{commit_hash}~1:{file_path}"])
             new_result = _git(["show", f"{commit_hash}:{file_path}"])
-            old_content = old_result.completed.stdout if old_result.ok and old_result.completed else ""
-            new_content = new_result.completed.stdout if new_result.ok and new_result.completed else ""
+            old_content = (
+                old_result.completed.stdout if old_result.ok and old_result.completed else ""
+            )
+            new_content = (
+                new_result.completed.stdout if new_result.ok and new_result.completed else ""
+            )
 
             if not old_content or not new_content or old_content == new_content:
                 continue
@@ -195,13 +189,15 @@ def scan_git_diffs(
             if max(old_lines, new_lines) > max_diff_lines * 5:
                 continue
 
-            diffs.append({
-                "commit": commit_hash[:8],
-                "file": file_path,
-                "old": old_content[:5000],
-                "new": new_content[:5000],
-                "date": commit_date,
-            })
+            diffs.append(
+                {
+                    "commit": commit_hash[:8],
+                    "file": file_path,
+                    "old": old_content[:5000],
+                    "new": new_content[:5000],
+                    "date": commit_date,
+                }
+            )
 
     return diffs
 

@@ -1,26 +1,8 @@
-"""
-Learning Context Wrapper — One-line behavioral adaptation for any LLM call.
-============================================================================
-Inspired by: Letta's Learning SDK (wraps any LLM call with memory).
+"""One-line behavioral-adaptation context manager wrapping any LLM call.
 
-Usage:
-    from . import brain_context
-
-    with brain_context("./my-brain"):
-        response = openai.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": "Draft an email..."}],
-        )
-    # Brain automatically:
-    # 1. Injected relevant rules into the system message
-    # 2. Captured the conversation for fact extraction
-    # 3. Ready to track corrections if user edits the response
-
-    # Record correction (call after user edits)
-    brain_context.correct(response.choices[0].message.content, user_edited_version)
-
-This is the distribution mechanism. One import, one context manager, works
-with OpenAI, Anthropic, or any chat completions API.
+Injects rules into system messages, captures conversations for fact extraction,
+tracks corrections. Works with OpenAI/Anthropic/any chat completions API.
+Inspired by Letta's Learning SDK.
 """
 
 from __future__ import annotations

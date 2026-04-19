@@ -1,26 +1,7 @@
-"""
-Three-Tool MCP Surface for Gradata.
-====================================
-SDK LAYER: Layer 0 (patterns-safe). Pure functions, no file I/O at module load.
+"""Three-tool MCP surface (correct/recall/manifest) — Layer 0, pure functions.
 
-Inspired by SuperMemory's 3-tool MCP pattern (memory, recall, whoAmI).
-Gradata equivalent: correct, recall, manifest.
-
-These functions are the logical core behind the MCP server tools.
-They can be called directly from Python or wired into any MCP transport.
-
-Usage::
-
-    from .mcp_tools import correct, recall, manifest
-
-    # Log a correction
-    result = correct("AI draft text", "User-edited final", category="DRAFTING")
-
-    # Get relevant rules for a task
-    rules_xml = recall("write cold email to CTO", max_rules=5)
-
-    # Get improvement proof
-    proof = manifest()
+Inspired by SuperMemory's 3-tool MCP pattern. Callable directly from Python or
+wired into any MCP transport. No file I/O at module load.
 """
 
 from __future__ import annotations
@@ -87,8 +68,7 @@ def correct(
     if category is None:
         _adc_combined = (draft + " " + final).lower()
         category = next(
-            (cat for cat, signals in _CATEGORY_SIGNALS
-             if any(s in _adc_combined for s in signals)),
+            (cat for cat, signals in _CATEGORY_SIGNALS if any(s in _adc_combined for s in signals)),
             "DRAFTING",
         )
 
@@ -117,14 +97,33 @@ def correct(
 
 # Category signal words. Order matters — first match wins.
 _CATEGORY_SIGNALS: list[tuple[str, tuple[str, ...]]] = [
-    ("FORMATTING", ("bold", "italic", "heading", "bullet", "indent",
-                    "em dash", "colon", "comma", "spacing", "markdown")),
-    ("ACCURACY", ("wrong", "incorrect", "inaccurate", "outdated",
-                  "error", "mistake", "not true", "false")),
-    ("TONE", ("tone", "formal", "casual", "aggressive", "softer",
-              "professional", "friendly", "polite")),
-    ("PROCESS", ("step", "order", "first", "before", "after",
-                 "verify", "check", "validate", "workflow")),
+    (
+        "FORMATTING",
+        (
+            "bold",
+            "italic",
+            "heading",
+            "bullet",
+            "indent",
+            "em dash",
+            "colon",
+            "comma",
+            "spacing",
+            "markdown",
+        ),
+    ),
+    (
+        "ACCURACY",
+        ("wrong", "incorrect", "inaccurate", "outdated", "error", "mistake", "not true", "false"),
+    ),
+    (
+        "TONE",
+        ("tone", "formal", "casual", "aggressive", "softer", "professional", "friendly", "polite"),
+    ),
+    (
+        "PROCESS",
+        ("step", "order", "first", "before", "after", "verify", "check", "validate", "workflow"),
+    ),
 ]
 
 
@@ -165,10 +164,7 @@ def recall(
     meta_rules = _load_meta_rules(meta_rules_path)
 
     # Filter to eligible states only
-    eligible = [
-        lesson for lesson in lessons
-        if lesson.state in ELIGIBLE_STATES
-    ]
+    eligible = [lesson for lesson in lessons if lesson.state in ELIGIBLE_STATES]
 
     # Score each lesson by relevance to query
     scored: list[tuple[float, str]] = []
@@ -238,6 +234,7 @@ def _load_lessons(lessons_path: str | Path | None = None) -> list[Lesson]:
         # Try default paths
         try:
             from . import _paths as _p
+
             path = _p.LESSONS_FILE
         except Exception:
             return []
@@ -247,6 +244,7 @@ def _load_lessons(lessons_path: str | Path | None = None) -> list[Lesson]:
 
     try:
         from .enhancements.self_improvement import parse_lessons
+
         return parse_lessons(path.read_text(encoding="utf-8"))
     except Exception:
         return []
@@ -259,6 +257,7 @@ def _load_meta_rules(meta_rules_path: str | Path | None = None) -> list[dict]:
     else:
         try:
             from . import _paths as _p
+
             path = _p.BRAIN_DIR / "meta-rules.json"
         except Exception:
             return []
@@ -330,12 +329,19 @@ def manifest(
     patterns = [lesson for lesson in lessons if lesson.state == LessonState.PATTERN]
     result["rules_count"] = len(rules) + len(patterns)
     result["meta_rules_count"] = len(meta_rules)
-    result["lessons_active"] = len([lesson for lesson in lessons if lesson.state in (LessonState.INSTINCT, LessonState.PATTERN)])
+    result["lessons_active"] = len(
+        [
+            lesson
+            for lesson in lessons
+            if lesson.state in (LessonState.INSTINCT, LessonState.PATTERN)
+        ]
+    )
     result["lessons_graduated"] = len(rules)
 
     # Try to get full manifest from brain (supplement, don't override file-based counts)
     try:
         from ._brain_manifest import generate_manifest
+
         full_manifest = generate_manifest()
         quality = full_manifest.get("quality", {})
         metadata = full_manifest.get("metadata", {})
@@ -346,7 +352,9 @@ def manifest(
         # Only use brain-derived counts if no explicit lessons_path was provided
         if not lessons_path:
             result["lessons_active"] = quality.get("lessons_active", result["lessons_active"])
-            result["lessons_graduated"] = quality.get("lessons_graduated", result["lessons_graduated"])
+            result["lessons_graduated"] = quality.get(
+                "lessons_graduated", result["lessons_graduated"]
+            )
     except Exception:
         pass
 

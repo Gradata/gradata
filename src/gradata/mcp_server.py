@@ -1,26 +1,8 @@
-"""
-MCP Server — JSON-RPC 2.0 stdio transport for the Gradata.
-=================================================================
-Implements the Model Context Protocol (MCP) over stdin/stdout so any
-MCP-compatible host (Claude Code, Cursor, VS Code Copilot Chat, etc.)
-can call brain tools directly.
+"""JSON-RPC 2.0 stdio MCP server exposing brain_* tools.
 
-Protocol overview:
-    - Messages are framed with HTTP-like headers:
-          Content-Length: <N>\\r\\n\\r\\n<json>
-    - Each message is a JSON-RPC 2.0 object (request or notification).
-    - Lifecycle: initialize -> notifications/initialized -> tool calls -> shutdown
-
-Usage:
-    python -m gradata.mcp_server --brain-dir /path/to/brain
-
-Tools exposed:
-    brain_search(query, top_k)              Search brain knowledge
-    brain_correct(draft, final)             Log a correction
-    brain_log_output(text, output_type,     Log AI output
-                     self_score)
-    brain_manifest()                        Return quality manifest
-    brain_health()                          Return health report
+Content-Length framed JSON-RPC over stdin/stdout. Lifecycle:
+initialize → notifications/initialized → tool calls → shutdown.
+Exposes brain_search, brain_correct, brain_log_output, brain_manifest, brain_health.
 """
 
 from __future__ import annotations

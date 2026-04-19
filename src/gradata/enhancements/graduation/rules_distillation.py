@@ -1,26 +1,8 @@
-"""
-Rules Distillation — Detect Repeated Patterns Ready for Rule Promotion
-======================================================================
-Layer 1 Enhancement: imports from patterns/ (memory)
+"""Cross-lesson pattern distillation for rule-promotion candidates (pure algorithm).
 
-Scans lessons, corrections, and events to find patterns that appear
-3+ times across categories. These are candidates for promotion to
-permanent behavioral rules.
-
-This module provides the ALGORITHM only (pure computation).
-The brain-layer CLI (brain/scripts/rules_distill.py) handles I/O.
-
-The distillation pipeline:
-  1. Collect all lessons (active + archived) and corrections
-  2. Group by category
-  3. Find categories with 3+ entries (configurable threshold)
-  4. Check if already covered by existing CARL rules
-  5. Propose promotions with evidence
-
-This is distinct from self_improvement.py's graduation (which promotes
-individual lessons based on confidence). Distillation finds CROSS-LESSON
-patterns — when multiple separate lessons in the same category all point
-to the same behavioral rule, that's a distillation candidate.
+Groups lessons/corrections by category, surfaces categories with 3+ entries not
+already covered by CARL rules. Distinct from per-lesson confidence graduation —
+this finds CROSS-LESSON convergence. CLI I/O lives in brain/scripts/rules_distill.py.
 """
 
 from __future__ import annotations
@@ -34,10 +16,10 @@ class LessonEntry:
     """A single lesson or correction entry for distillation analysis."""
 
     date: str
-    status: str          # "INSTINCT:0.30", "PATTERN:0.80", "RULE", "CORRECTION"
-    category: str        # "DRAFTING", "ACCURACY", "PROCESS", etc.
+    status: str  # "INSTINCT:0.30", "PATTERN:0.80", "RULE", "CORRECTION"
+    category: str  # "DRAFTING", "ACCURACY", "PROCESS", etc.
     description: str
-    source: str          # "lessons.md", "lessons-archive.md", "events.jsonl"
+    source: str  # "lessons.md", "lessons-archive.md", "events.jsonl"
 
 
 @dataclass
@@ -45,12 +27,12 @@ class DistillationProposal:
     """A proposed rule promotion based on repeated patterns."""
 
     category: str
-    count: int                          # Number of entries in this category
-    principle: str                      # Representative description
-    evidence_sources: list[str]         # Which files contributed
-    status_breakdown: dict[str, int]    # e.g., {"PATTERN:0.80": 3, "CORRECTION": 2}
-    already_covered_by: str | None      # Name of existing rule if covered
-    action: str                         # "PROPOSE" or "ALREADY_COVERED"
+    count: int  # Number of entries in this category
+    principle: str  # Representative description
+    evidence_sources: list[str]  # Which files contributed
+    status_breakdown: dict[str, int]  # e.g., {"PATTERN:0.80": 3, "CORRECTION": 2}
+    already_covered_by: str | None  # Name of existing rule if covered
+    action: str  # "PROPOSE" or "ALREADY_COVERED"
     entries: list[dict] = field(default_factory=list)  # Evidence entries
 
 
