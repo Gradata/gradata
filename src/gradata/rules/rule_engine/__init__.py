@@ -1,7 +1,6 @@
-"""gradata.rules.rule_engine — public API re-exports. Submodules: ``_scoring``
-(difficulty/reliability/scope weighting), ``_formatting`` (dedup/merge/
-entropy order/prompt injection), ``_engine`` (``apply_rules``,
-``filter_by_scope``, TTL demotion, ``AppliedRule``). Backwards compatible.
+"""Public API re-exports. Submodules: ``_scoring`` (difficulty/reliability/
+scope), ``_formatting`` (dedup/merge/entropy/injection), ``_engine``
+(``apply_rules``, ``filter_by_scope``, TTL demotion, ``AppliedRule``).
 """
 
 from ._engine import (

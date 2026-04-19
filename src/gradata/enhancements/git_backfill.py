@@ -1,7 +1,5 @@
-"""Bootstrap a brain from git history — walks log, extracts diffs, classifies corrections.
-
-Lets a new brain start with months of historical learning. Entry points:
-backfill_from_git(brain, repo_path, lookback_days, file_patterns) or brain.backfill_from_git().
+"""Bootstrap a brain from git history — walks log, extracts diffs, classifies.
+Entry: ``backfill_from_git(brain, repo_path, lookback_days, file_patterns)``.
 """
 
 from __future__ import annotations
