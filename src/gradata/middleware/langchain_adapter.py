@@ -1,8 +1,6 @@
-"""LangChain BaseCallbackHandler that injects <brain-rules> and checks LLM output.
-
-Prepends <brain-rules> to every prompt/message on on_llm_start/on_chat_model_start,
-then validates output against RULE-tier regex patterns on on_llm_end. For stricter
-control prefer gradata.middleware.OpenAIMiddleware around the underlying client.
+"""LangChain BaseCallbackHandler: injects <brain-rules> on prompt start and
+validates output against RULE regexes on llm_end. For stricter control prefer
+gradata.middleware.OpenAIMiddleware around the underlying client.
 """
 
 from __future__ import annotations

@@ -1,8 +1,7 @@
-"""Persistent HTTP daemon for hook dispatch — avoids ~300ms Windows spawn per hook.
-
-POST /hook/<name> (stdin JSON) runs gradata.hooks.<name>.main(data); GET /health
-and /shutdown. Start: python -m gradata.hooks.daemon [--start|--stop]. Clients
-should use gradata.hooks.client which falls back to direct invocation.
+"""Persistent HTTP daemon for hook dispatch (avoids ~300ms Windows spawn).
+POST /hook/<name> → gradata.hooks.<name>.main(data); GET /health, /shutdown.
+Start: ``python -m gradata.hooks.daemon [--start|--stop]``. Use
+gradata.hooks.client for transparent direct-invocation fallback.
 """
 
 from __future__ import annotations

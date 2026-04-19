@@ -1,8 +1,7 @@
 """Consolidated PostToolUse dispatcher — one process replaces auto_correct +
-tool_finding_capture + tool_failure_emit, saving ~0.5-1s per Edit/Bash on
-Windows (200-500ms per cold interpreter). Matcher-aware routing preserves
-per-hook matcher semantics. ``result`` strings concatenate (newline-joined);
-other fields take the last writer; all-None constituents emit nothing.
+tool_finding_capture + tool_failure_emit (~0.5-1s/Edit saved on Windows).
+Matcher-aware routing; ``result`` strings newline-concat, other fields take
+last writer; all-None constituents emit nothing.
 """
 
 from __future__ import annotations

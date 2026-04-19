@@ -1,8 +1,6 @@
-"""File Watcher Sidecar — polling-based CORRECTION capture for AI-authored files
-(Wave 4). SHA-256 content-hash change signal; 30s dedup window collapses
-editor auto-saves. Stdlib-only polling (portable across Win/mac/Linux, no
-inotify). Emit cascade: Brain.emit() → _events.emit() → plain-JSON fallback
-— a correction is never silently dropped. Host-agnostic SDK layer.
+"""File Watcher Sidecar — polling-based CORRECTION capture (Wave 4). SHA-256
+change signal, 30s dedup, stdlib-only (no inotify). Emit cascade:
+Brain.emit → _events.emit → plain-JSON fallback so corrections never drop.
 """
 
 from __future__ import annotations
