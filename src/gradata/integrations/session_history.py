@@ -1,7 +1,6 @@
-"""Session History — Rule Effectiveness Tracking. Records which rules were
-injected in a session and whether corrections fired against them. Injected
-but never corrected = effective (prevented the mistake); corrected = not
-effective. Entry: ``SessionHistory().subscribe_to_bus(bus)``.
+"""Rule effectiveness tracking: record which rules were injected and whether
+corrections fired against them. Injected-never-corrected = effective.
+Entry: ``SessionHistory().subscribe_to_bus(bus)``.
 """
 
 from __future__ import annotations

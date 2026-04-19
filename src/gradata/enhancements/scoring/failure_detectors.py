@@ -1,7 +1,5 @@
-"""Regression-pattern detectors over MetricsWindow snapshots.
-
-detect_failures(current, previous) aggregates being_ignored, playing_safe,
-overfitting, regression_to_mean. Empty list when previous is None.
+"""Regression-pattern detectors over MetricsWindow. detect_failures(cur,prev)
+aggregates being_ignored/playing_safe/overfitting/regression_to_mean.
 """
 
 from dataclasses import dataclass, field

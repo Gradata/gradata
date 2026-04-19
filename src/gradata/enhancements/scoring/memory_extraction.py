@@ -1,7 +1,6 @@
-"""Passive two-phase memory extraction from messages. EXTRACT: identify
-facts/preferences/entities/relationships via rule-based heuristics (no LLM).
-RECONCILE: ADD/UPDATE/INVALIDATE/SKIP vs existing facts. Inspired by Mem0's
-extract-then-update — captures info beyond behavioral corrections.
+"""Two-phase memory extraction. EXTRACT: rule-based heuristics (no LLM) pull
+facts/prefs/entities/relations. RECONCILE: ADD/UPDATE/INVALIDATE/SKIP.
+Mem0-style; captures info beyond behavioral corrections.
 """
 
 from __future__ import annotations

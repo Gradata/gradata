@@ -1,7 +1,6 @@
-"""Brain Scores — typed ``BrainScores`` dataclass wrapping the authoritative
-``gradata._events.compute_brain_scores()`` dict. Falls back to a simplified
-stdlib-only computation from the events table when that import is unavailable
-(minimal test stubs). Does NOT reimplement the 130+ line algorithm.
+"""Typed ``BrainScores`` wrapping ``_events.compute_brain_scores()``. Falls
+back to stdlib-only events-table computation when that import is unavailable.
+Does NOT reimplement the 130+ line algorithm.
 """
 
 from __future__ import annotations
