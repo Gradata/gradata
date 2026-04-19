@@ -1,47 +1,10 @@
-"""Trust-boundary sanitization for lesson content.
+"""Trust-boundary sanitization for lesson content across output contexts.
 
-Lesson text originates from user corrections and may contain attacker-crafted
-payloads.  Before this text crosses into structured output surfaces it must be
-escaped for the target context.
-
-Supported contexts
-------------------
-``"xml"``
-    Escape ``<``, ``>``, ``&``, ``"`` and ``'`` so that the text cannot
-    terminate or inject XML tags.  Specifically prevents ``</brain-rules>``
-    tag-termination attacks on the ``<brain-rules>`` injection block.
-
-``"js"``
-    Escape characters that break out of a JSON/JS string context: backslash,
-    double-quote, single-quote, template-literal backtick, null byte, and
-    ``</script>``-style tag breakouts.  Note: callers that already pass text
-    through ``json.dumps()`` should use ``"js_template"`` instead which only
-    strips the backtick / template-literal injection vectors not covered by
-    ``json.dumps``.
-
-``"js_template"``
-    Lighter variant for text already processed by ``json.dumps()``.
-    Escapes backticks and ``${`` (template-literal injections) and removes
-    raw HTML-closing tags that could escape a ``<script>`` block.
-
-``"llm_prompt"``
-    Conservative neutralization of prompt-injection markers.  Detected
-    markers are replaced with ``[FILTERED]`` rather than being silently
-    dropped, so the loss of content is visible in logs / synthesized output.
-    This is deliberately *conservative*: legitimate content that contains
-    these patterns will be flagged and the marker replaced, but the rest of
-    the sentence is preserved.
-
-Design notes
-------------
-- All functions are *pure* and side-effect free.
-- Raising on attacker input would allow DoS via lesson crafting; instead we
-  sanitize and continue.
-- The ``"llm_prompt"`` filter is intentionally narrow.  Broad blocklists
-  produce high false-positive rates; the adversarial_blocklist module handles
-  the *ingest* gate.  This function is the *output* gate: it neutralizes text
-  that already passed ingest (e.g. rephrased injections, or text that arrived
-  before the blocklist existed).
+Contexts: "xml" (escape <>&"' to prevent </brain-rules> tag breakout),
+"js" (full JSON/JS string escaping plus </script> breakout), "js_template"
+(lighter variant for text already through json.dumps — backtick, ${} breakout),
+"llm_prompt" (conservative [FILTERED] replacement of injection markers).
+All functions are pure; sanitize-and-continue rather than raise to avoid DoS.
 """
 
 from __future__ import annotations
@@ -61,7 +24,7 @@ SanitizeContext = Literal["xml", "js", "js_template", "llm_prompt"]
 
 _XML_ESCAPE_TABLE = str.maketrans(
     {
-        "&": "&amp;",   # Must be first to avoid double-escaping
+        "&": "&amp;",  # Must be first to avoid double-escaping
         "<": "&lt;",
         ">": "&gt;",
         '"': "&quot;",
@@ -105,34 +68,49 @@ _TEMPLATE_LITERAL_RE = re.compile(r"`|\$\{")
 # Design: named groups so we can log *which* pattern triggered.
 _PROMPT_INJECTION_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     # Classic openers
-    ("ignore_previous", re.compile(
-        r"\b(?:ignore|disregard|forget)\s+(?:previous|prior|all\s+previous|the\s+above|everything\s+above)"
-        r"\s+(?:instructions?|rules?|prompts?|context)?",
-        re.IGNORECASE,
-    )),
+    (
+        "ignore_previous",
+        re.compile(
+            r"\b(?:ignore|disregard|forget)\s+(?:previous|prior|all\s+previous|the\s+above|everything\s+above)"
+            r"\s+(?:instructions?|rules?|prompts?|context)?",
+            re.IGNORECASE,
+        ),
+    ),
     # Role hijack
-    ("role_hijack", re.compile(
-        r"\b(?:you\s+are\s+now|from\s+now\s+on\s+you\s+are|act\s+as\s+(?:if\s+you\s+(?:are|were)|a\b)|"
-        r"pretend\s+you\s+are|new\s+role\s*:|new\s+instructions?\s*:)",
-        re.IGNORECASE,
-    )),
+    (
+        "role_hijack",
+        re.compile(
+            r"\b(?:you\s+are\s+now|from\s+now\s+on\s+you\s+are|act\s+as\s+(?:if\s+you\s+(?:are|were)|a\b)|"
+            r"pretend\s+you\s+are|new\s+role\s*:|new\s+instructions?\s*:)",
+            re.IGNORECASE,
+        ),
+    ),
     # System prompt manipulation
-    ("system_prompt", re.compile(
-        r"\b(?:system\s+prompt|reveal\s+your\s+(?:prompt|instructions?)|"
-        r"show\s+your\s+(?:instructions?|prompt)|print\s+your\s+system)",
-        re.IGNORECASE,
-    )),
+    (
+        "system_prompt",
+        re.compile(
+            r"\b(?:system\s+prompt|reveal\s+your\s+(?:prompt|instructions?)|"
+            r"show\s+your\s+(?:instructions?|prompt)|print\s+your\s+system)",
+            re.IGNORECASE,
+        ),
+    ),
     # Override / bypass
-    ("override", re.compile(
-        r"\b(?:override\s+(?:previous|your)|bypass\s+your|jailbreak|dan\s+mode|"
-        r"developer\s+mode\s+enabled|do\s+anything\s+now)",
-        re.IGNORECASE,
-    )),
+    (
+        "override",
+        re.compile(
+            r"\b(?:override\s+(?:previous|your)|bypass\s+your|jailbreak|dan\s+mode|"
+            r"developer\s+mode\s+enabled|do\s+anything\s+now)",
+            re.IGNORECASE,
+        ),
+    ),
     # Instruction injection markers common in indirect prompt injection
-    ("instruction_marker", re.compile(
-        r"(?:^|\n)\s*(?:SYSTEM|HUMAN|ASSISTANT|USER|INSTRUCTION)\s*:\s*",
-        re.IGNORECASE | re.MULTILINE,
-    )),
+    (
+        "instruction_marker",
+        re.compile(
+            r"(?:^|\n)\s*(?:SYSTEM|HUMAN|ASSISTANT|USER|INSTRUCTION)\s*:\s*",
+            re.IGNORECASE | re.MULTILINE,
+        ),
+    ),
 )
 
 _FILTER_PLACEHOLDER = "[FILTERED]"
@@ -178,6 +156,7 @@ def sanitize_lesson_content(text: str, context: SanitizeContext) -> str:
 
     # Unknown context: return as-is but log so we notice gaps.
     import logging
+
     logging.getLogger(__name__).warning(
         "sanitize_lesson_content: unknown context %r — returning text unchanged", context
     )

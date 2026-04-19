@@ -1,41 +1,10 @@
-"""
-Advisory exclusive file locking — cross-platform context manager.
+"""Cross-platform advisory exclusive file-lock context manager.
 
-Usage::
-
-    from ._file_lock import platform_lock
-
-    with open(path, "ab") as fh:
-        with platform_lock(fh, timeout=5.0):
-            fh.seek(0, 2)
-            fh.write(data)
-            fh.flush()
-
-On Windows, ``msvcrt.locking`` is used against byte 0 of the file as an
-advisory mutex (all writers must call this on the same byte range).  The file
-handle must be seeked to position 0 before calling so every process contends
-on the same range; this is the caller's responsibility (platform_lock does NOT
-reposition the handle after releasing — the caller's write logic owns seeking).
-
-On POSIX, ``fcntl.flock(LOCK_EX)`` is used.  It is process-level only (the
-kernel-level exclusive is per-open-file-description), which is sufficient for
-the events.jsonl use-case.
-
-Timeout semantics
------------------
-* ``timeout=None`` (default) — blocks indefinitely using the OS blocking call.
-  This exactly matches the pre-refactor behaviour.
-* ``timeout=<seconds>`` — uses the non-blocking variant in a retry loop with
-  truncated exponential backoff (0.01 s → 0.02 → 0.04 … capped at 0.1 s).
-  Raises ``TimeoutError`` if the lock is not acquired within *timeout* seconds.
-
-Failure fallback
-----------------
-If the OS locking call raises ``OSError`` when no timeout is set (matches
-pre-refactor behaviour), the lock acquisition silently falls through and the
-caller proceeds unlocked rather than dropping data.  This is intentional:
-advisory locks are best-effort for preventing interleaving, not for data
-integrity.
+Windows: msvcrt.locking on byte 0 (caller must seek to 0 first).
+POSIX: fcntl.flock(LOCK_EX) — process-level, sufficient for events.jsonl.
+timeout=None blocks indefinitely; timeout=<s> retries with exponential
+backoff (0.01→0.1s cap) and raises TimeoutError. On OSError with no
+timeout, falls through unlocked rather than dropping data (advisory only).
 """
 
 from __future__ import annotations

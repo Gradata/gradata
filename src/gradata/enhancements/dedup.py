@@ -1,66 +1,9 @@
-"""
-Observation Dedup — fingerprint-based near-duplicate suppression.
-================================================================
-SDK LAYER: Layer 1 (enhancements). Stdlib only.
+"""Fingerprint-based near-duplicate suppression for observations.
 
-Problem
--------
-Ten sessions that all contain "don't use em-dashes" should NOT produce ten
-lesson reinforcements and inflate confidence 10x. Each (category, normalized
-text) pair is the same **observation** and must be deduped before it flows
-into the fire_count / confidence pipeline.
-
-Public API
-----------
-    from .dedup import (
-        observation_fingerprint,
-        is_duplicate,
-        register_observation,
-    )
-
-    fp = observation_fingerprint("Don't use em-dashes.", category="FORMAT")
-    if is_duplicate(db_path, fp, recent_window_sessions=10):
-        # suppress — already seen in recent window
-        ...
-    else:
-        register_observation(db_path, fp, session=42)
-
-Semantics
----------
-Default = **DROP** within the recent-session window. `seen_count` is tracked
-on the persisted row so MERGE semantics (bump fire_count by seen_count at
-window rollover) can be wired in later without losing evidence.
-
-MERGE vs DROP is a policy decision flagged for polyclaude — see the task brief
-for wt-observation-dedup. The current codebase cannot wire seen_count into
-`update_confidence` without editing `self_improvement.py`, which is off-limits
-for this worktree.
-
-Storage
--------
-A single table in system.db:
-
-    observation_dedup(
-        fingerprint TEXT PRIMARY KEY,
-        category    TEXT NOT NULL,
-        first_session INTEGER NOT NULL,
-        last_session  INTEGER NOT NULL,
-        seen_count    INTEGER NOT NULL DEFAULT 1,
-        first_seen_ts TEXT NOT NULL,
-        last_seen_ts  TEXT NOT NULL
-    )
-
-Normalization
--------------
-- lowercase
-- strip leading/trailing whitespace
-- collapse internal whitespace to a single space
-- drop trailing punctuation (. , ; : ! ?)
-- category is uppercased and prefixed to the hash input so the same phrasing
-  under different categories is NOT deduped together.
-
-Hash: sha1 of ``f"{CATEGORY}|{normalized_text}"`` — stable across processes
-and cheap enough to compute on every ingestion.
+Dedupes (category, normalized-text) pairs within a recent-session window so
+confidence isn't inflated by repeated observations. Default policy: DROP within
+the window; seen_count tracked on the persisted row for later MERGE semantics.
+Fingerprint = sha1("CATEGORY|normalized_text"), stored in observation_dedup table.
 """
 
 from __future__ import annotations
@@ -186,8 +129,7 @@ def register_observation(
     conn = _open(db_path)
     try:
         existing = conn.execute(
-            "SELECT seen_count, first_session FROM observation_dedup "
-            "WHERE fingerprint = ?",
+            "SELECT seen_count, first_session FROM observation_dedup WHERE fingerprint = ?",
             (fingerprint,),
         ).fetchone()
         if existing is None:
@@ -236,7 +178,8 @@ def check_and_register(
     """
     fp = observation_fingerprint(text, category=category)
     dup = is_duplicate(
-        db_path, fp,
+        db_path,
+        fp,
         current_session=session,
         recent_window_sessions=recent_window_sessions,
     )
@@ -273,8 +216,10 @@ def annotate_event_with_dedup(
     try:
         dedup_text = f"{(draft or '')[:500]}||{(final or '')[:500]}"
         info = check_and_register(
-            db_path, dedup_text,
-            category=(category or "UNKNOWN"), session=session,
+            db_path,
+            dedup_text,
+            category=(category or "UNKNOWN"),
+            session=session,
         )
         event["observation_fingerprint"] = info["fingerprint"]
         event["observation_seen_count"] = info["seen_count"]

@@ -1,46 +1,10 @@
-"""
-Agent Graduation — Compounding Behavioral Adaptation for Agents & Subagents
-============================================================================
-Layer 1 Enhancement: imports from patterns/ (sub_agents, human_loop, memory)
+"""INSTINCT→PATTERN→RULE graduation applied to agent/subagent outputs.
 
-Applies the same INSTINCT→PATTERN→RULE graduation pipeline to agent outputs,
-creating trained agents that compound over time. Three mechanisms:
-
-1. **Agent-level graduation**: Each agent type accumulates behavioral lessons
-   from orchestrator feedback (approve/edit/reject). Lessons graduate the
-   same way user corrections do — through confidence scoring and maturity.
-
-2. **Human approval graduation**: The approval gate ITSELF graduates.
-   Early sessions require manual review. As an agent proves reliable (high
-   FDA), the gate loosens from CONFIRM → PREVIEW → AUTO. New agent types
-   always start at CONFIRM.
-
-3. **Upward distillation**: Agent learnings that prove valuable (PATTERN+)
-   are distilled upward to the brain level, enriching the main lessons store.
-   Cross-agent patterns (discovered by one agent, useful to others) propagate
-   through the brain layer.
-
-Usage:
-    tracker = AgentGraduationTracker(brain_dir)
-
-    # Record agent output quality
-    tracker.record_outcome("research", output, "approved", edits=None)
-    tracker.record_outcome("writer", output, "edited", edits="rewrote intro")
-
-    # Check if an agent needs human approval
-    gate = tracker.approval_gate("research")  # "auto" | "preview" | "confirm"
-
-    # Get agent's graduated lessons for prompt injection
-    rules = tracker.get_agent_rules("research")
-
-    # Distill proven agent lessons up to brain level
-    distilled = tracker.distill_upward()
-
-Research backing:
-    - Same constants as user-level graduation (Brown et al. 2024, NIST Bayesian)
-    - Human-in-the-loop graduation mirrors trust calibration literature
-      (Lee & See 2004, "Trust in Automation")
-    - Hierarchical RL option discovery parallels (Sutton et al. 1999)
+Three mechanisms: (1) agent-level graduation — each agent accumulates
+behavioral lessons from approve/edit/reject feedback; (2) human approval
+gate graduation — CONFIRM→PREVIEW→AUTO as FDA rises; (3) upward distillation
+of proven PATTERN+ lessons to brain level for cross-agent propagation.
+Research: Brown 2024, Lee & See 2004, Sutton 1999.
 """
 
 from __future__ import annotations
@@ -73,11 +37,11 @@ from ..self_improvement import (
 # These define when an agent's approval gate graduates.
 # FDA = First-Draft Acceptance (output used without edits)
 
-GATE_CONFIRM_TO_PREVIEW = 0.70    # 70% FDA over 10+ outputs → PREVIEW
-GATE_PREVIEW_TO_AUTO = 0.90       # 90% FDA over 25+ outputs → AUTO
-GATE_MIN_OUTPUTS_PREVIEW = 10     # Minimum outputs before PREVIEW eligible
-GATE_MIN_OUTPUTS_AUTO = 25        # Minimum outputs before AUTO eligible
-GATE_DEMOTION_THRESHOLD = 3       # 3 consecutive rejections → demote gate
+GATE_CONFIRM_TO_PREVIEW = 0.70  # 70% FDA over 10+ outputs → PREVIEW
+GATE_PREVIEW_TO_AUTO = 0.90  # 90% FDA over 25+ outputs → AUTO
+GATE_MIN_OUTPUTS_PREVIEW = 10  # Minimum outputs before PREVIEW eligible
+GATE_MIN_OUTPUTS_AUTO = 25  # Minimum outputs before AUTO eligible
+GATE_DEMOTION_THRESHOLD = 3  # 3 consecutive rejections → demote gate
 
 
 @dataclass
@@ -90,9 +54,9 @@ class AgentProfile:
 
     agent_type: str
     total_outputs: int = 0
-    approved_unchanged: int = 0     # FDA — used without edits
-    approved_edited: int = 0        # Approved but the user made changes
-    rejected: int = 0               # Output rejected/redone
+    approved_unchanged: int = 0  # FDA — used without edits
+    approved_edited: int = 0  # Approved but the user made changes
+    rejected: int = 0  # Output rejected/redone
     consecutive_rejections: int = 0
     approval_gate: str = "confirm"  # "confirm" | "preview" | "auto"
     lessons: list[Lesson] = field(default_factory=list)
@@ -190,13 +154,19 @@ _ENFORCEABLE_PATTERNS: dict[str, list[tuple[str, str]]] = {
     ],
     "CONSTRAINT": [
         ("paid", r"(?i)\b(?:paid\s+tier|subscription\s+required|credit\s+card)\b"),
-        ("cost money", r"(?i)\b(?:monthly\s+fee|per\s+month|/mo(?:nth)?)\b.*(?:composio|clay|phantombuster)"),
+        (
+            "cost money",
+            r"(?i)\b(?:monthly\s+fee|per\s+month|/mo(?:nth)?)\b.*(?:composio|clay|phantombuster)",
+        ),
     ],
     "PRICING": [
         ("starter", r"(?i)starter.*(?:multi|multiple|two|2)\s*(?:account|brand)"),
     ],
     "DATA_INTEGRITY": [
-        ("owner_only", r"(?i)\b(?:EXCLUDED_NAMES_PLACEHOLDER)(?:'s)?\s+(?:campaign|deal|contact|lead)"),  # configure excluded names in brain config
+        (
+            "owner_only",
+            r"(?i)\b(?:EXCLUDED_NAMES_PLACEHOLDER)(?:'s)?\s+(?:campaign|deal|contact|lead)",
+        ),  # configure excluded names in brain config
     ],
 }
 
@@ -238,6 +208,7 @@ def _now() -> str:
 # ---------------------------------------------------------------------------
 # Agent Graduation Tracker
 # ---------------------------------------------------------------------------
+
 
 class AgentGraduationTracker:
     """Manages graduation pipelines for all agent types in a brain.
@@ -369,23 +340,35 @@ class AgentGraduationTracker:
         # Log outcome (append-only)
         outcomes_path = self._agent_dir(agent_type) / "outcomes.jsonl"
         with open(outcomes_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps({
-                "agent_type": agent_type,
-                "outcome": outcome,
-                "edits": edits,
-                "output_preview": output_preview[:200],
-                "session": session,
-                "timestamp": _now(),
-                "patterns_extracted": patterns or [],
-            }) + "\n")
+            f.write(
+                json.dumps(
+                    {
+                        "agent_type": agent_type,
+                        "outcome": outcome,
+                        "edits": edits,
+                        "output_preview": output_preview[:200],
+                        "session": session,
+                        "timestamp": _now(),
+                        "patterns_extracted": patterns or [],
+                    }
+                )
+                + "\n"
+            )
 
         # Extract lessons from edits (corrections feed agent graduation)
         if outcome == "edited" and edits:
-            self._extract_agent_lesson(profile, edits, session,
-                                        task_type=task_type, edit_category=edit_category)
+            self._extract_agent_lesson(
+                profile, edits, session, task_type=task_type, edit_category=edit_category
+            )
         elif outcome == "rejected" and edits:
-            self._extract_agent_lesson(profile, edits, session, is_rejection=True,
-                                        task_type=task_type, edit_category=edit_category)
+            self._extract_agent_lesson(
+                profile,
+                edits,
+                session,
+                is_rejection=True,
+                task_type=task_type,
+                edit_category=edit_category,
+            )
 
         # Update approval gate graduation
         self._update_approval_gate(profile)
@@ -479,9 +462,7 @@ class AgentGraduationTracker:
             # lesson whose category matches the corrected category. When
             # edit_category is empty (legacy callers), fall back to always
             # counting (backward compatible).
-            category_matches = (
-                not norm_edit_cat or lesson.category.upper() == norm_edit_cat
-            )
+            category_matches = not norm_edit_cat or lesson.category.upper() == norm_edit_cat
 
             if outcome == "approved":
                 lesson.confidence = min(1.0, lesson.confidence + ACCEPTANCE_BONUS)
@@ -593,8 +574,7 @@ class AgentGraduationTracker:
                     pass
 
             rules.append(
-                f"[{lesson.state.value}] {lesson.category}: "
-                f"{lesson.description}{scope_tag}"
+                f"[{lesson.state.value}] {lesson.category}: {lesson.description}{scope_tag}"
             )
         return rules
 
@@ -644,15 +624,17 @@ class AgentGraduationTracker:
                 if min_state == LessonState.RULE and lesson.state != LessonState.RULE:
                     continue
 
-                distilled.append({
-                    "agent_type": agent_type,
-                    "category": lesson.category,
-                    "description": lesson.description,
-                    "state": lesson.state.value,
-                    "confidence": lesson.confidence,
-                    "fire_count": lesson.fire_count,
-                    "source": f"agent:{agent_type}",
-                })
+                distilled.append(
+                    {
+                        "agent_type": agent_type,
+                        "category": lesson.category,
+                        "description": lesson.description,
+                        "state": lesson.state.value,
+                        "confidence": lesson.confidence,
+                        "fire_count": lesson.fire_count,
+                        "source": f"agent:{agent_type}",
+                    }
+                )
 
         return distilled
 
@@ -770,7 +752,9 @@ class AgentGraduationTracker:
             "best_agent": best,
         }
 
-    def get_deterministic_rules(self, agent_type: str, task_type: str = "") -> list[DeterministicRule]:
+    def get_deterministic_rules(
+        self, agent_type: str, task_type: str = ""
+    ) -> list[DeterministicRule]:
         """Get RULE-tier lessons compiled into enforceable guard logic.
 
         Only RULE-tier lessons with an enforceable pattern are returned.
@@ -837,12 +821,14 @@ class AgentGraduationTracker:
         for rule in det_rules:
             result = rule.check(output)
             if not result["passed"]:
-                violations.append({
-                    "rule": rule.name,
-                    "category": rule.category,
-                    "description": rule.description,
-                    "violation": result["detail"],
-                })
+                violations.append(
+                    {
+                        "rule": rule.name,
+                        "category": rule.category,
+                        "description": rule.description,
+                        "violation": result["detail"],
+                    }
+                )
 
         return EnforcementResult(
             passed=len(violations) == 0,

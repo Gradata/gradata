@@ -1,49 +1,10 @@
-"""
-Orchestrator — Domain-Agnostic Pattern Router
-==============================================
-Maps any incoming request to one of the 15 base agentic patterns and, where
-applicable, selects a secondary pattern for multi-step workflows.
+"""Domain-agnostic router mapping requests to one of 15 agentic patterns.
 
-All intent detection is driven by the configurable task-type registry in
-``scope.py``.  There are no sales-specific (or domain-specific) if/elif
-chains hardcoded here.  Domains extend behaviour by calling
-``register_intent_pattern`` at process startup.
-
-Architecture note
------------------
-The 15 base patterns below come from established agentic-systems literature.
-The Gradata treats them as primitives; domain logic (CARL rules,
-gates, voice) enhances *on top* of these primitives without replacing them.
-
-The 15 base patterns
---------------------
-1.  reflection          — Self-evaluation and quality checking
-2.  tool_use            — Calling external tools / APIs
-3.  planning            — Goal decomposition and step sequencing
-4.  memory              — Storing / retrieving past context
-5.  multi_agent         — Spawning or coordinating sub-agents
-6.  chain_of_thought    — Step-by-step reasoning
-7.  react               — Reason + Act interleaved loops
-8.  retrieval           — Fetching relevant knowledge (RAG)
-9.  summarization       — Condensing large inputs
-10. generation          — Open-ended content production
-11. classification      — Labelling or routing inputs
-12. extraction          — Pulling structured data from unstructured text
-13. transformation      — Reformatting or translating existing content
-14. validation          — Checking outputs against a rubric or schema
-15. orchestration       — Coordinating a pipeline of the above patterns
-
-Example::
-
-    from .orchestrator import classify_request
-
-    result = classify_request("review this pull request")
-    print(result.intent)            # code_review
-    print(result.selected_pattern)  # reflection
-
-    result = classify_request("prepare for the upcoming meeting")
-    print(result.intent)            # meeting_prep
-    print(result.selected_pattern)  # retrieval
+Intent detection is driven by the task-type registry in ``scope.py``; domains
+extend via ``register_intent_pattern`` — no hardcoded domain if/elif here.
+Patterns: reflection, tool_use, planning, memory, multi_agent, chain_of_thought,
+react, retrieval, summarization, generation, classification, extraction,
+transformation, validation, orchestration.
 """
 
 from __future__ import annotations
@@ -99,6 +60,7 @@ ALL_PATTERNS: frozenset[str] = frozenset(
 # ---------------------------------------------------------------------------
 # Intent-to-pattern mapping
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class IntentPattern:
@@ -159,7 +121,6 @@ DEFAULT_INTENT_PATTERNS: list[IntentPattern] = [
         primary=PATTERN_PLANNING,
         secondary=[PATTERN_CHAIN_OF_THOUGHT, PATTERN_ORCHESTRATION],
     ),
-
     # ── Engineering / developer ──────────────────────────────────────────────
     IntentPattern(
         intent="code_review",
@@ -181,7 +142,6 @@ DEFAULT_INTENT_PATTERNS: list[IntentPattern] = [
         primary=PATTERN_TRANSFORMATION,
         secondary=[PATTERN_REFLECTION, PATTERN_VALIDATION],
     ),
-
     # ── Recruiting / talent ──────────────────────────────────────────────────
     IntentPattern(
         intent="interview_prep",
@@ -198,7 +158,6 @@ DEFAULT_INTENT_PATTERNS: list[IntentPattern] = [
         primary=PATTERN_GENERATION,
         secondary=[PATTERN_REFLECTION, PATTERN_VALIDATION],
     ),
-
     # ── Sales (preserved for backward compatibility) ─────────────────────────
     IntentPattern(
         intent="email_draft",
@@ -288,21 +247,15 @@ def register_intent_pattern(
         )
     """
     if pattern not in ALL_PATTERNS:
-        raise ValueError(
-            f"Unknown pattern {pattern!r}.  "
-            f"Must be one of: {sorted(ALL_PATTERNS)}"
-        )
+        raise ValueError(f"Unknown pattern {pattern!r}.  Must be one of: {sorted(ALL_PATTERNS)}")
     bad = [s for s in (secondary or []) if s not in ALL_PATTERNS]
     if bad:
         raise ValueError(
-            f"Unknown secondary pattern(s) {bad!r}.  "
-            f"Must be one of: {sorted(ALL_PATTERNS)}"
+            f"Unknown secondary pattern(s) {bad!r}.  Must be one of: {sorted(ALL_PATTERNS)}"
         )
 
     global _REGISTERED_INTENT_PATTERNS
-    _REGISTERED_INTENT_PATTERNS = [
-        p for p in _REGISTERED_INTENT_PATTERNS if p.intent != intent
-    ]
+    _REGISTERED_INTENT_PATTERNS = [p for p in _REGISTERED_INTENT_PATTERNS if p.intent != intent]
 
     entry = IntentPattern(
         intent=intent,
@@ -318,6 +271,7 @@ def register_intent_pattern(
 # ---------------------------------------------------------------------------
 # Classification result
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class RequestClassification:
@@ -345,6 +299,7 @@ class RequestClassification:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def classify_request(query: str) -> RequestClassification:
     """Classify a raw query and return the full routing decision.
@@ -400,6 +355,7 @@ def classify_request(query: str) -> RequestClassification:
 # This is a simpler, domain-agnostic routing mechanism that maps keyword
 # lists to agent names.  Domains register their own rules at startup;
 # ``route_by_keywords`` then matches an incoming task description.
+
 
 @dataclass
 class RouteRule:
@@ -514,9 +470,15 @@ def execute_orchestrated(
     if len(tasks) == 1:
         try:
             result = worker(tasks[0])  # type: ignore[operator]
-            return {"strategy": "direct", "results": [{"task": tasks[0], "status": "completed", "result": result}]}
+            return {
+                "strategy": "direct",
+                "results": [{"task": tasks[0], "status": "completed", "result": result}],
+            }
         except Exception as e:
-            return {"strategy": "direct", "results": [{"task": tasks[0], "status": "failed", "error": str(e)}]}
+            return {
+                "strategy": "direct",
+                "results": [{"task": tasks[0], "status": "failed", "error": str(e)}],
+            }
 
     # Multiple tasks — classify to check if they're independent
     classifications = [classify_request(t) for t in tasks]

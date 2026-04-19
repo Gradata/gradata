@@ -1,45 +1,13 @@
+"""Opt-in anonymous SDK activation telemetry.
+
+Sends {event, sha256(machine_id), ISO-ts, sdk_version} for named activation
+events (brain_initialized, first_correction_captured). Never sends lesson
+text, correction content, paths, names, stack traces, or env vars.
+Default OFF; opt-in via ~/.gradata/config.toml [telemetry] enabled=true.
+GRADATA_TELEMETRY=0 is a kill switch; =1 does NOT auto-enable.
+Activation events fire at most once per machine per SDK install.
 """
-Opt-in anonymous telemetry for SDK activation events.
 
-What this does
---------------
-Sends named activation events (e.g. ``brain_initialized``,
-``first_correction_captured``) to the Gradata Cloud telemetry endpoint so
-we can measure time-to-first-value. Strictly opt-in. Strictly anonymous.
-
-What we send
-------------
-Exactly this shape — nothing else::
-
-    {
-        "event": "<event_name>",
-        "user_id": "<sha256(machine_id)>",
-        "ts": "<ISO 8601 UTC>",
-        "sdk_version": "<pyproject version>"
-    }
-
-What we DO NOT send
--------------------
-Lesson text. Correction content. Draft/final previews. File paths. Names.
-Emails. Stack traces. Environment variables. Anything identifiable.
-
-Opt-in semantics
-----------------
-1. The user-level Gradata config file (default ``~/.gradata/config.toml``,
-   overridable via ``GRADATA_CONFIG_DIR``) holds
-   ``[telemetry] enabled = true|false``.
-2. Default is OFF (missing file or missing key → off).
-3. ``GRADATA_TELEMETRY=0`` env var overrides to off, always. (Kill switch
-   for users who already opted in but need to silence one session.)
-4. ``GRADATA_TELEMETRY=1`` env var does NOT auto-enable. Users must opt in
-   via the prompt or by editing the config file.
-
-Idempotency
------------
-Activation events fire at most once per machine per SDK install (tracked
-in the same config file). Heartbeat/recurring events are not this module's
-concern.
-"""
 from __future__ import annotations
 
 import contextlib
@@ -87,6 +55,7 @@ def _config_dir() -> Path:
 def _config_path() -> Path:
     """Shared resolver for the telemetry config file."""
     return _config_dir() / _CONFIG_FILENAME
+
 
 # The exhaustive set of activation events. Adding a new one here is the
 # only place you need to touch — the prompt copy and the docs reference
@@ -247,6 +216,7 @@ def _build_payload(event: str) -> dict[str, str]:
     """Exact wire format. No extra fields, ever."""
     try:
         from . import __version__
+
         _ver = str(__version__)
     except Exception:
         _ver = "unknown"
