@@ -1,12 +1,6 @@
-"""
-Hierarchical Rule Tree — organize rules as Rosch category -> domain -> task_type.
-================================================================================
-Provides tree-based retrieval with task-type fast-path index. Rules at deeper
-levels (more specific) are preferred over broader parent rules via tiebreaker.
-
-Usage:
-    tree = RuleTree(lessons)
-    rules = tree.get_rules_for_context("email_draft", "sales", max_rules=5)
+"""Hierarchical rule tree — organizes rules as Rosch category → domain →
+task_type with a task-type fast-path index. Deeper (more specific) rules
+beat broader parents on tiebreak. Usage: ``RuleTree(lessons).get_rules_for_context(task_type, domain, max_rules=N)``.
 """
 
 from __future__ import annotations

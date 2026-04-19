@@ -1,12 +1,7 @@
-"""Gradata Rules — Core rule injection, tracking, and context system.
-
-These are NOT generic patterns. They're the mechanism by which graduated
-lessons become active rules that shape agent behavior.
-
-- rule_engine: Inject graduated rules into prompts
-- rule_context: Query graduated rules for pattern matching
-- rule_tracker: Track rule applications and misfires
-- scope: Task classification for context-appropriate rule injection
+"""Core rule injection, tracking, and context — the mechanism by which
+graduated lessons become active rules. ``rule_engine`` injects into prompts;
+``rule_context`` queries for pattern matching; ``rule_tracker`` records
+applications/misfires; ``scope`` classifies tasks for context-appropriate injection.
 """
 
 from .rule_tracker import RuleApplication

@@ -1,12 +1,7 @@
-"""
-Rule Application Tracker — records outcomes via the event system.
-=================================================================
-Event-sourced: rule applications are RULE_APPLICATION events in the
-events table, not a separate domain table. This aligns with the brain's
-append-only event architecture.
-
-Each time the rule engine surfaces a rule, the caller logs it here.
-Aggregate stats are queried from events for the self-improvement pipeline.
+"""Rule application tracker — records outcomes as RULE_APPLICATION events
+in the events table (no separate domain table). Each rule surfaced by the
+engine is logged here; aggregate stats are queried from events for the
+self-improvement pipeline.
 """
 
 from __future__ import annotations
