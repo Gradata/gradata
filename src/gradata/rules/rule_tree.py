@@ -1,6 +1,5 @@
-"""Hierarchical rule tree — Rosch category → domain → task_type with task-type fast-path
-index. Deeper (more specific) rules beat broader parents on tiebreak.
-Usage: ``RuleTree(lessons).get_rules_for_context(task_type, domain, max_rules=N)``."""
+"""Hierarchical rule tree — Rosch category → domain → task_type with task-type fast-path index.
+Deeper rules beat parents on tiebreak. Usage: ``RuleTree(lessons).get_rules_for_context(...)``."""
 
 from __future__ import annotations
 
