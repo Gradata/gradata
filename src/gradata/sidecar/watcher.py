@@ -1,7 +1,5 @@
-"""File Watcher Sidecar — polling-based CORRECTION capture (Wave 4). SHA-256
-change signal, 30s dedup, stdlib-only (no inotify). Emit cascade:
-Brain.emit → _events.emit → plain-JSON fallback so corrections never drop.
-"""
+"""File Watcher Sidecar — polling-based CORRECTION capture (Wave 4). SHA-256 change signal,
+30s dedup, stdlib-only (no inotify). Emit cascade: Brain.emit→_events.emit→plain-JSON."""
 
 from __future__ import annotations
 

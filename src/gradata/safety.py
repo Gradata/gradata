@@ -1,7 +1,5 @@
-"""PII and credential detection/redaction. Pipeline order: diff engine and
-behavioral extraction run on FULL text first, THEN PII is redacted BEFORE
-events.jsonl write. Regex only, zero external deps.
-"""
+"""PII and credential detection/redaction. Pipeline: diff engine + behavioral extraction
+run on FULL text first, THEN PII is redacted BEFORE events.jsonl. Regex only, zero deps."""
 
 from __future__ import annotations
 

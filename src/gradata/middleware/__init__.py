@@ -1,7 +1,6 @@
-"""Runtime middleware for non-Claude-Code agents (OpenAI/Anthropic/LangChain/
-CrewAI): inject rules into prompts, enforce RULE-tier patterns on outputs.
-GRADATA_BYPASS=1 kill switch. Optional deps raise with install hint.
-"""
+"""Runtime middleware for non-Claude-Code agents (OpenAI/Anthropic/LangChain/CrewAI):
+inject rules into prompts, enforce RULE-tier patterns on outputs. GRADATA_BYPASS=1 kill
+switch. Optional deps raise with install hint."""
 
 from __future__ import annotations
 
