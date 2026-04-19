@@ -1,7 +1,5 @@
-"""Rule-based mode classifier — Signal 5.
-
-Detects user intent mode from prompt text using keyword/regex matching.
-No LLM calls, no external dependencies.
+"""Rule-based mode classifier (Signal 5). Detects user intent from prompt
+text via keyword/regex. No LLM, no external deps.
 """
 
 from __future__ import annotations

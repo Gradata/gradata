@@ -1,6 +1,5 @@
-"""Causal Chain Tracking — Layer 1 provenance graph for corrections, rules,
-and behaviors. CausalChain is used by _core.py to track which corrections
-produced which rules, enabling ablation testing and provenance queries.
+"""Layer-1 provenance graph: tracks which corrections produced which rules/
+behaviors, enabling ablation testing + provenance queries.
 Adapted from Hindsight causal relations.
 """
 

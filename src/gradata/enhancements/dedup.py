@@ -1,7 +1,6 @@
-"""Fingerprint-based near-duplicate suppression for observations. Dedupes
-(category, normalized-text) pairs within a session window so confidence isn't
-inflated by repeats. Default: DROP within window; seen_count persisted for
-future MERGE. Fingerprint = sha1("CATEGORY|normalized_text") in observation_dedup.
+"""Fingerprint-based dedup for observations — (category, normalized-text)
+within a session window to avoid inflating confidence. Default DROP;
+seen_count persisted for MERGE. Fingerprint = sha1("CAT|text").
 """
 
 from __future__ import annotations

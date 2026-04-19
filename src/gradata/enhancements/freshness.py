@@ -1,7 +1,5 @@
-"""Freshness tracking for graduated rules.
-
-Adapted from Hindsight's observation freshness model, but session-count-based
-instead of calendar-based, and severity-weighted.
+"""Freshness tracking for graduated rules. Session-count-based + severity-
+weighted (adapted from Hindsight, which is calendar-based).
 """
 
 from __future__ import annotations

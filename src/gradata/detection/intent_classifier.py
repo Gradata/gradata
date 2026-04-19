@@ -1,7 +1,5 @@
-"""Dual-layer intent classifier for corrections.
-
-Classifies corrections by intent using regex heuristics to determine
-*why* the user corrected the output, not just *what* changed.
+"""Dual-layer intent classifier — regex heuristics determine *why* the user
+corrected the output, not just *what* changed.
 """
 
 from __future__ import annotations
