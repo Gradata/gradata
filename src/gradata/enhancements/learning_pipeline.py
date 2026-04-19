@@ -132,7 +132,6 @@ class LearningPipeline:
 
     def _init_stages(self, observation_dir, router_path, cluster_config, discriminator_config):
         """Initialize pipeline stages. Each is optional."""
-
         # Stage 1: Observation capture
         self._observer = None
         try:

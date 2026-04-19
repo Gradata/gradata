@@ -63,7 +63,6 @@ class BrainFingerprint:
     @classmethod
     def from_lessons(cls, lessons: list, domain: str = "", total_sessions: int = 0) -> BrainFingerprint:
         """Build a fingerprint from a list of Lesson objects."""
-
         rules = []
         cat_dist: dict[str, int] = {}
 
