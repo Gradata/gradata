@@ -8,7 +8,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 from ._base import run_hook
-from ._profiles import Profile
+from ._base import Profile
 
 _log = logging.getLogger(__name__)
 

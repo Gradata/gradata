@@ -1,8 +1,7 @@
 """Shared hook protocol for Gradata SDK hooks.
 
 Every hook module follows this pattern:
-    from ._base import run_hook
-    from ._profiles import Profile
+    from ._base import Profile, run_hook
 
     HOOK_META = {"event": "PreToolUse", "matcher": "Write", "profile": Profile.STANDARD, ...}
     def main(data: dict) -> dict | None: ...
@@ -14,9 +13,15 @@ import json
 import logging
 import os
 import sys
+from enum import IntEnum
 from pathlib import Path
 
-from ._profiles import Profile
+
+class Profile(IntEnum):
+    MINIMAL = 0    # Core learning loop only
+    STANDARD = 1   # + safety + quality
+    STRICT = 2     # + duplicate guard, implicit feedback, full maintenance
+
 
 _log = logging.getLogger(__name__)
 

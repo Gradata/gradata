@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from ._base import run_hook
-from ._profiles import Profile
+from ._base import Profile
 
 HOOK_META = {
     "event": "SessionStart",

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 
 from gradata.hooks import _base, telemetry_summary
-from gradata.hooks._profiles import Profile
+from gradata.hooks._base import Profile
 
 
 def test_run_hook_records_telemetry(tmp_path, monkeypatch):

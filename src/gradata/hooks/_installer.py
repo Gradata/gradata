@@ -13,7 +13,7 @@ from pathlib import Path
 
 _log = logging.getLogger(__name__)
 
-from ._profiles import Profile
+from ._base import Profile
 
 # ---------------------------------------------------------------------------
 # Hook registry: (module, event, matcher, profile, timeout, description)

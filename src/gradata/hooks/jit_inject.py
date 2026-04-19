@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ._base import extract_message, resolve_brain_dir, run_hook
-from ._profiles import Profile
+from ._base import Profile
 
 if TYPE_CHECKING:
     from .._types import Lesson

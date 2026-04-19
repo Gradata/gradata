@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 
 from ._base import extract_message, resolve_brain_dir, run_hook
-from ._profiles import Profile
+from ._base import Profile
 
 HOOK_META = {
     "event": "UserPromptSubmit",

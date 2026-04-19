@@ -6,7 +6,7 @@ import logging
 import re
 
 from ._base import extract_message, resolve_brain_dir, run_hook
-from ._profiles import Profile
+from ._base import Profile
 
 _log = logging.getLogger(__name__)
 

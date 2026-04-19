@@ -15,7 +15,7 @@ from pathlib import Path
 
 from ..rules.rule_ranker import rank_rules
 from ._base import resolve_brain_dir, run_hook
-from ._profiles import Profile
+from ._base import Profile
 
 try:
     from ..enhancements.self_improvement import is_hook_enforced, parse_lessons

@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 
 from ._base import run_hook
-from ._profiles import Profile
+from ._base import Profile
 
 HOOK_META = {
     "event": "PreToolUse",

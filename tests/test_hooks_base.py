@@ -3,7 +3,7 @@ import json
 import os
 from unittest.mock import patch
 
-from gradata.hooks._profiles import Profile
+from gradata.hooks._base import Profile
 from gradata.hooks._base import (
     get_profile, should_run, read_input, output_result, output_block, run_hook,
 )

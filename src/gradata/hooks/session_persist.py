@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from ._base import resolve_brain_dir, run_hook
-from ._profiles import Profile
+from ._base import Profile
 
 HOOK_META = {
     "event": "Stop",

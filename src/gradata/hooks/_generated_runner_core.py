@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .._env import env_str
 from ._base import should_run
-from ._profiles import Profile
+from ._base import Profile
 
 _log = logging.getLogger(__name__)
 
