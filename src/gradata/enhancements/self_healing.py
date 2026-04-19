@@ -1,15 +1,8 @@
-"""
-Self-Healing Engine — Detects rule failures, generates patches, gates them through graduation.
-
-When a RULE (confidence >= 0.80) fails to prevent a correction it covers,
-this module:
-  1. Detects the failure (detect_rule_failure)
-  2. Generates a candidate patch via deterministic heuristic (generate_patch_candidate)
-  3. Gates the candidate via retroactive test (retroactive_test)
-  4. If it passes, enters the graduation pipeline as INSTINCT
-
-Architecture: LLM-whim as diagnostician, pipeline as validator. Nothing
-touches production rules without surviving graduation.
+"""Self-healing: when a RULE (conf >= 0.80) fails to block a covered
+correction, ``detect_rule_failure`` → ``generate_patch_candidate``
+(deterministic heuristic) → ``retroactive_test`` gate. Passing candidates
+re-enter graduation at INSTINCT. LLM-whim diagnoses, pipeline validates —
+nothing hits production rules without surviving graduation.
 """
 
 from __future__ import annotations
@@ -333,9 +326,12 @@ def check_nudge_threshold(
         centroid = descriptions[0]
     else:
         from .similarity import best_similarity
+
         _fc_best, _fc_avg = descriptions[0], 0.0
         for _fc_desc in descriptions:
-            _fc_s = sum(best_similarity(_fc_desc, _fc_o) for _fc_o in descriptions if _fc_o != _fc_desc)
+            _fc_s = sum(
+                best_similarity(_fc_desc, _fc_o) for _fc_o in descriptions if _fc_o != _fc_desc
+            )
             _fc_s /= max(len(descriptions) - 1, 1)
             if _fc_s > _fc_avg:
                 _fc_avg, _fc_best = _fc_s, _fc_desc
