@@ -11,9 +11,12 @@ from pathlib import Path
 import pytest
 
 from gradata._mine_transcripts import (
+    _classify_correction,
     _detect_signals,
     _extract_user_text,
     _mine_session,
+    _pattern_hash,
+    _session_uuid_to_int,
     run_mine,
 )
 
@@ -266,6 +269,97 @@ def test_run_mine_commit_writes_jsonl_and_db(tmp_path):
     assert rows[0][0] == "2026-01-15T10:30:00+00:00"  # historical ts preserved
     assert rows[0][1] == "IMPLICIT_FEEDBACK"
     assert rows[0][2] == "gradata.mine"
+
+
+def test_classify_correction_taxonomy():
+    assert _classify_correction("make sure to fix the email subject line") == "DRAFTING"
+    assert _classify_correction("are you sure this apollo enrichment is right") == "LEADS"
+    assert _classify_correction("you forgot to import the module") == "ARCHITECTURE"
+    assert _classify_correction("the tone is too aggressive here") == "TONE"
+    assert _classify_correction("nothing matches this generic text abcdef") == "GENERAL"
+
+
+def test_pattern_hash_stable_and_normalizes():
+    a = _pattern_hash("DRAFTING", "  Fix  the  Subject  ")
+    b = _pattern_hash("drafting", "fix the subject")
+    assert a == b
+    assert len(a) == 16
+
+
+def test_session_uuid_to_int_stable_and_distinct():
+    u1 = "session-abc-123"
+    u2 = "session-xyz-789"
+    assert _session_uuid_to_int(u1) == _session_uuid_to_int(u1)  # stable
+    assert _session_uuid_to_int(u1) != _session_uuid_to_int(u2)  # distinct
+    assert _session_uuid_to_int("") == 0  # empty fallback
+    assert _session_uuid_to_int(u1) > 0  # positive
+
+
+def test_run_mine_commit_upserts_correction_patterns(tmp_path):
+    """--commit upserts mined signals into correction_patterns so the
+    rule_pipeline can lift them into RULE-state lessons."""
+    import sqlite3
+
+    from gradata import Brain
+    brain_dir = tmp_path / "brain"
+    Brain.init(brain_dir)
+
+    projects = tmp_path / "projects"
+    # Two different transcript sessions, each with a DRAFTING-flavored signal —
+    # should give us 2 distinct session_ids in correction_patterns.
+    msg_a = _user_msg("make sure the email subject is right")
+    msg_a["sessionId"] = "session-aaa"
+    msg_a["timestamp"] = "2026-01-15T10:30:00+00:00"
+    msg_b = _user_msg("make sure the email subject is right")
+    msg_b["sessionId"] = "session-bbb"
+    msg_b["timestamp"] = "2026-01-16T10:30:00+00:00"
+    _write_session(projects, "C--p1", [msg_a])
+    _write_session(projects, "C--p2", [msg_b])
+
+    run_mine(
+        brain_root=brain_dir,
+        projects_root=projects,
+        project=None,
+        commit=True,
+        dry_run=False,
+    )
+
+    with sqlite3.connect(str(brain_dir / "system.db")) as conn:
+        rows = conn.execute(
+            "SELECT category, session_id FROM correction_patterns"
+        ).fetchall()
+    assert len(rows) == 2
+    assert all(r[0] == "DRAFTING" for r in rows)
+    assert len({r[1] for r in rows}) == 2  # 2 distinct session_ids
+
+
+def test_run_mine_commit_patterns_idempotent(tmp_path):
+    """Re-running --commit against same transcripts should not duplicate
+    patterns (ON CONFLICT pattern_hash+session_id)."""
+    import sqlite3
+
+    from gradata import Brain
+    brain_dir = tmp_path / "brain"
+    Brain.init(brain_dir)
+
+    projects = tmp_path / "projects"
+    msg = _user_msg("make sure the email subject line is right")
+    msg["sessionId"] = "session-only"
+    msg["timestamp"] = "2026-01-15T10:30:00+00:00"
+    _write_session(projects, "C--p1", [msg])
+
+    for _ in range(3):
+        run_mine(
+            brain_root=brain_dir,
+            projects_root=projects,
+            project=None,
+            commit=True,
+            dry_run=False,
+        )
+
+    with sqlite3.connect(str(brain_dir / "system.db")) as conn:
+        count = conn.execute("SELECT COUNT(*) FROM correction_patterns").fetchone()[0]
+    assert count == 1
 
 
 def test_run_mine_commit_is_idempotent(tmp_path):
