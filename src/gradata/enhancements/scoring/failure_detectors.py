@@ -1,23 +1,7 @@
-"""
-Automated failure detectors for Gradata.
-=================================================
-Watches MetricsWindow snapshots for regression patterns and surfaces
-alerts before a brain quietly degrades.
+"""Regression-pattern detectors over MetricsWindow snapshots.
 
-Each detector compares the current window against a previous baseline.
-All detectors require a previous snapshot — returns an empty list when
-``previous`` is None so the caller doesn't have to guard against it.
-
-Public API
-----------
-detect_failures(current, previous) -> list[Alert]
-format_alerts(alerts)              -> str
-
-Individual detectors (also importable):
-    detect_being_ignored(current, previous)     -> list[Alert]
-    detect_playing_safe(current, previous)      -> list[Alert]
-    detect_overfitting(current, previous)       -> list[Alert]
-    detect_regression_to_mean(current, previous) -> list[Alert]
+detect_failures(current, previous) aggregates being_ignored, playing_safe,
+overfitting, regression_to_mean. Empty list when previous is None.
 """
 
 from dataclasses import dataclass, field
@@ -28,6 +12,7 @@ from ..metrics import MetricsWindow
 # ---------------------------------------------------------------------------
 # Data model
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Alert:
@@ -50,6 +35,7 @@ class Alert:
 # ---------------------------------------------------------------------------
 # Individual detectors
 # ---------------------------------------------------------------------------
+
 
 def detect_being_ignored(
     current: MetricsWindow,
@@ -186,8 +172,7 @@ def detect_overfitting(
             detector="overfitting",
             severity=severity,
             message=(
-                "Rule misfire rate increased. "
-                "New rules may be overfitting to specific sessions."
+                "Rule misfire rate increased. New rules may be overfitting to specific sessions."
             ),
             evidence={
                 "misfire_delta": round(misfire_delta, 4),
@@ -253,6 +238,7 @@ def detect_regression_to_mean(
 # Aggregator
 # ---------------------------------------------------------------------------
 
+
 def detect_failures(
     current: MetricsWindow,
     previous: MetricsWindow | None = None,
@@ -281,6 +267,7 @@ def detect_failures(
 # ---------------------------------------------------------------------------
 # Formatter
 # ---------------------------------------------------------------------------
+
 
 def format_alerts(alerts: list[Alert]) -> str:
     """Format a list of alerts as a human-readable string.

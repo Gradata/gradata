@@ -1,23 +1,8 @@
-"""
-Diff Engine — compute structured diffs between draft and final text.
-====================================================================
-SDK LAYER: Pure stdlib logic by default. Optional sentence-transformer
-embedder can be injected via ``compute_diff(..., embedder=...)`` or by
-installing the ``embeddings`` extra (``pip install gradata[embeddings]``).
+"""Structured diffs between draft and final text (stdlib; optional embedder).
 
-Usage::
-
-    from .diff_engine import compute_diff
-
-    result = compute_diff(draft, final)
-    print(result.severity)          # "minor"
-    print(result.summary_stats)     # {"lines_added": 2, ...}
-
-    # Opt-in semantic blend (DPO-style preference signal; Rafailov et al.
-    # 2023 treat before/after pairs as preference signal, so a semantic
-    # delta on the pair is a cheap proxy for preference strength).
-    result = compute_diff(draft, final, use_semantic=True)
-    print(result.blended_distance)  # 0.3·lev + 0.7·semantic
+compute_diff(draft, final) returns severity + summary stats. With use_semantic=True
+(requires gradata[embeddings]), blends 0.3·Levenshtein + 0.7·semantic as a
+DPO-style preference proxy (Rafailov et al. 2023).
 """
 
 from __future__ import annotations
