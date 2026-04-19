@@ -1,8 +1,7 @@
 """JSON-RPC 2.0 stdio MCP server exposing brain_* tools.
 
-Content-Length framed JSON-RPC over stdin/stdout. Lifecycle:
-initialize → notifications/initialized → tool calls → shutdown.
-Exposes brain_search, brain_correct, brain_log_output, brain_manifest, brain_health.
+Content-Length framed over stdin/stdout. Exposes brain_search, brain_correct,
+brain_log_output, brain_manifest, brain_health.
 """
 
 from __future__ import annotations
