@@ -225,8 +225,13 @@ def test_cluster_summary_format(three_qualifying_lessons):
     cluster_lines = [l for l in block.splitlines() if "[CLUSTER:" in l]
     assert len(cluster_lines) == 1
     line = cluster_lines[0]
-    # Must contain the confidence score, rule count marker, and category
-    assert "\u00d73]" in line or "|3]" in line, f"Missing size marker in: {line!r}"
+    # Must contain the confidence score, rule count marker, and category.
+    # Marker may be followed by a ` r:<anchors>` suffix for Meta-Harness A
+    # attribution, so accept both the bare `×3]`/`|3]` and `×3 r:...]`/`|3 r:...]`.
+    assert (
+        "\u00d73]" in line or "|3]" in line
+        or "\u00d73 r:" in line or "|3 r:" in line
+    ), f"Missing size marker in: {line!r}"
     assert "VALIDATION" in line
     # Confidence value should be in [0, 1] range formatted as float
     import re
@@ -336,3 +341,100 @@ def test_deterministic_meta_rule_does_not_suppress_cluster(three_qualifying_less
     assert len(cluster_lines) == 1, (
         "Deterministic meta-rules must not suppress clusters (they are not injected)."
     )
+
+
+# ---------------------------------------------------------------------------
+# Meta-Harness A: per-rule attribution anchors + .last_injection.json manifest
+# ---------------------------------------------------------------------------
+
+def test_cluster_line_carries_member_anchors(three_qualifying_lessons):
+    """Cluster injection lines must include `r:<anchor,anchor,...>` for each member."""
+    result = _run_main(three_qualifying_lessons)
+    assert result is not None
+    block = result["result"]
+    cluster_lines = [l for l in block.splitlines() if "[CLUSTER:" in l]
+    assert len(cluster_lines) == 1
+    line = cluster_lines[0]
+    import re
+    m = re.search(r"r:([0-9a-f,]+)\]", line)
+    assert m is not None, f"Cluster line missing anchor suffix: {line!r}"
+    anchors = m.group(1).split(",")
+    assert len(anchors) == 3, f"Expected 3 member anchors, got {anchors}"
+    for a in anchors:
+        assert len(a) == 4, f"Anchor must be 4 chars: {a!r}"
+
+
+def test_individual_line_carries_anchor():
+    """Non-clustered RULE lines must include ` r:<anchor>` before the closing `]`."""
+    lessons = [
+        _make_lesson("use absolute paths only", "PATHS", confidence=0.80),
+    ]
+    result = _run_main(lessons)
+    assert result is not None
+    block = result["result"]
+    rule_lines = [l for l in block.splitlines() if l.startswith("[RULE:")]
+    assert len(rule_lines) == 1
+    import re
+    assert re.search(r"\[RULE:[\d.]+\s+r:[0-9a-f]{4}\]", rule_lines[0]), (
+        f"Individual line missing anchor: {rule_lines[0]!r}"
+    )
+
+
+def test_injection_manifest_written(three_qualifying_lessons, tmp_path):
+    """<brain>/.last_injection.json must be written with anchor→lesson mapping."""
+    from gradata.hooks import inject_brain_rules as inj
+
+    brain_dir = tmp_path / "brain"
+    brain_dir.mkdir()
+    # lessons.md must exist since inj checks it before continuing
+    (brain_dir / "lessons.md").write_text("# mocked", encoding="utf-8")
+
+    with (
+        patch.object(inj, "parse_lessons", return_value=three_qualifying_lessons),
+        patch.object(inj, "is_hook_enforced", return_value=False),
+        patch.object(inj, "resolve_brain_dir", return_value=str(brain_dir)),
+        patch.object(inj, "load_meta_rules", return_value=[]),
+        patch.object(inj, "format_meta_rules_for_prompt", return_value=""),
+    ):
+        result = inj.main({"session_type": "coding", "session_number": 1})
+
+    assert result is not None
+    manifest_path = brain_dir / ".last_injection.json"
+    assert manifest_path.is_file(), "Manifest file was not written"
+    data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert "anchors" in data
+    # All 3 cluster members must be in the manifest
+    assert len(data["anchors"]) == 3
+    for anchor, entry in data["anchors"].items():
+        assert len(anchor) == 4
+        assert entry["category"] == "VALIDATION"
+        assert entry["cluster_category"] == "VALIDATION"
+        assert entry["state"] == "RULE"
+        assert "description" in entry
+        assert len(entry["full_id"]) == 12
+
+
+def test_injection_manifest_maps_individual_rule(tmp_path):
+    """Individual (non-clustered) rule must appear in manifest with cluster_category=None."""
+    from gradata.hooks import inject_brain_rules as inj
+
+    brain_dir = tmp_path / "brain"
+    brain_dir.mkdir()
+    (brain_dir / "lessons.md").write_text("# mocked", encoding="utf-8")
+
+    lessons = [_make_lesson("use absolute paths only", "PATHS", confidence=0.80)]
+    with (
+        patch.object(inj, "parse_lessons", return_value=lessons),
+        patch.object(inj, "is_hook_enforced", return_value=False),
+        patch.object(inj, "resolve_brain_dir", return_value=str(brain_dir)),
+        patch.object(inj, "load_meta_rules", return_value=[]),
+        patch.object(inj, "format_meta_rules_for_prompt", return_value=""),
+    ):
+        inj.main({"session_type": "coding", "session_number": 1})
+
+    data = json.loads((brain_dir / ".last_injection.json").read_text(encoding="utf-8"))
+    assert len(data["anchors"]) == 1
+    entry = next(iter(data["anchors"].values()))
+    assert entry["category"] == "PATHS"
+    assert entry["cluster_category"] is None
+    assert entry["description"] == "use absolute paths only"

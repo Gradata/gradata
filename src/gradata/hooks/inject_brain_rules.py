@@ -257,6 +257,26 @@ def main(data: dict) -> dict | None:
             _log.debug("meta-rule mutex pre-pass failed (%s) — clusters will fire", exc)
             cached_metas = None
 
+    # Injection manifest: short_anchor → {full_id, category, description, state,
+    # cluster_category}. Written to <brain>/.last_injection.json so the
+    # correction-capture hook can attribute misfires to specific rules inside
+    # clusters rather than to the cluster as a whole (Meta-Harness A).
+    injection_manifest: dict[str, dict] = {}
+    # Build lookup from the cluster member_ids string format back to Lesson.
+    # Format matches clustering.py: f"{l.category}:{l.description[:40]}".
+    _lesson_by_member_id = {
+        f"{l.category}:{l.description[:40]}": l for l in filtered
+    }
+
+    def _anchor_for(lesson) -> str | None:
+        """4-char stable anchor for a Lesson. None if _lesson_id unavailable."""
+        if _lesson_id is None:
+            return None
+        try:
+            return _lesson_id(lesson)[:4]
+        except Exception:
+            return None
+
     cluster_injected_ids: set[str] = set()
     cluster_lines: list[str] = []
     try:
@@ -272,9 +292,28 @@ def main(data: dict) -> dict | None:
             if cluster.cluster_confidence >= 0.75 and not cluster.has_contradictions:
                 safe_summary = sanitize_lesson_content(cluster.summary, "xml")
                 safe_category = sanitize_lesson_content(cluster.category, "xml")
+                member_anchors: list[str] = []
+                for mid in cluster.member_ids:
+                    member_lesson = _lesson_by_member_id.get(mid)
+                    if member_lesson is None:
+                        continue
+                    anchor = _anchor_for(member_lesson)
+                    if anchor is None or _lesson_id is None:
+                        continue
+                    member_anchors.append(anchor)
+                    injection_manifest[anchor] = {
+                        "full_id": _lesson_id(member_lesson),
+                        "category": member_lesson.category,
+                        "description": member_lesson.description,
+                        "state": member_lesson.state.name,
+                        "cluster_category": cluster.category,
+                    }
+                anchor_suffix = (
+                    f" r:{','.join(member_anchors)}" if member_anchors else ""
+                )
                 cluster_lines.append(
-                    f"[CLUSTER:{cluster.cluster_confidence:.2f}|×{cluster.size}] "
-                    f"{safe_category}: {safe_summary}"
+                    f"[CLUSTER:{cluster.cluster_confidence:.2f}|×{cluster.size}"
+                    f"{anchor_suffix}] {safe_category}: {safe_summary}"
                 )
                 cluster_injected_ids.update(cluster.member_ids)
     except ImportError:
@@ -314,9 +353,19 @@ def main(data: dict) -> dict | None:
             continue
         safe_desc = sanitize_lesson_content(r.description, "xml")
         safe_cat = sanitize_lesson_content(r.category, "xml")
+        anchor = _anchor_for(r)
+        anchor_suffix = f" r:{anchor}" if anchor else ""
         individual_lines.append(
-            f"[{r.state.name}:{r.confidence:.2f}] {safe_cat}: {safe_desc}"
+            f"[{r.state.name}:{r.confidence:.2f}{anchor_suffix}] {safe_cat}: {safe_desc}"
         )
+        if anchor and _lesson_id is not None:
+            injection_manifest[anchor] = {
+                "full_id": _lesson_id(r),
+                "category": r.category,
+                "description": r.description,
+                "state": r.state.name,
+                "cluster_category": None,
+            }
     if suppressed_by_meta:
         _log.debug(
             "Meta-rule mutex: suppressed %d leaf rules covered by injected metas",
@@ -325,6 +374,24 @@ def main(data: dict) -> dict | None:
 
     lines = cluster_lines + individual_lines
     rules_block = "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
+
+    # Persist injection manifest so correction-capture can attribute misfires
+    # to specific rules (Meta-Harness A). Silent failure: missing manifest
+    # just disables per-rule attribution, never blocks session start.
+    if injection_manifest:
+        try:
+            import json as _json
+            manifest_path = Path(brain_dir) / ".last_injection.json"
+            manifest_path.write_text(
+                _json.dumps(
+                    {"anchors": injection_manifest},
+                    indent=2,
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+        except Exception as exc:
+            _log.debug("injection manifest write failed: %s", exc)
 
     # Inject disposition (behavioral tendencies evolved from corrections)
     disposition_block = ""
