@@ -1,11 +1,6 @@
-"""Causal Chain Tracking — provenance graph for corrections, rules, and behaviors.
-
-SDK LAYER: Layer 1 (enhancements). No upstream imports from self_improvement.
-
-Extracted from self_improvement.py to isolate causal-chain graph logic into
-a focused module. CausalChain is used by _core.py to track which corrections
+"""Causal Chain Tracking — Layer 1 provenance graph for corrections, rules,
+and behaviors. CausalChain is used by _core.py to track which corrections
 produced which rules, enabling ablation testing and provenance queries.
-
 Adapted from Hindsight causal relations.
 """
 
