@@ -1,6 +1,5 @@
-"""DEPRECATED (removed v0.8.0). Use ``gradata.middleware.wrap_openai`` for
-richer enforcement via :class:`.RuleSource`; pin gradata<0.8 for legacy patch.
-"""
+"""DEPRECATED (removed v0.8.0). Use ``gradata.middleware.wrap_openai`` for richer enforcement
+via :class:`.RuleSource`; pin gradata<0.8 for legacy patch."""
 
 from __future__ import annotations
 

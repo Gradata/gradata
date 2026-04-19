@@ -1,6 +1,5 @@
-"""Bootstrap a brain from git history — walks log, extracts diffs, classifies.
-Entry: ``backfill_from_git(brain, repo_path, lookback_days, file_patterns)``.
-"""
+"""Bootstrap a brain from git history — walks log, extracts diffs, classifies. Entry:
+``backfill_from_git(brain, repo_path, lookback_days, file_patterns)``."""
 
 from __future__ import annotations
 

@@ -1,6 +1,5 @@
-"""Composable ordered middleware with anchor-based positioning. Adapted from
-bytedance/deer-flow. Before/after lifecycle hooks + circular-dep detection.
-"""
+"""Composable ordered middleware with anchor-based positioning. Before/after lifecycle hooks +
+circular-dep detection. Adapted from bytedance/deer-flow."""
 
 from __future__ import annotations
 
