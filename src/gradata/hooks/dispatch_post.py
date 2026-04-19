@@ -1,8 +1,6 @@
-"""Consolidated PostToolUse dispatcher — one process replaces auto_correct +
-tool_finding_capture + tool_failure_emit (~0.5-1s/Edit saved on Windows).
-Matcher-aware routing; ``result`` strings newline-concat, other fields take
-last writer; all-None constituents emit nothing.
-"""
+"""PostToolUse dispatcher — one process replaces auto_correct + tool_finding_capture
++ tool_failure_emit (~0.5-1s/Edit on Windows). Matcher-aware routing; ``result``
+newline-concat, other fields last-writer-wins; all-None constituents emit nothing."""
 
 from __future__ import annotations
 
