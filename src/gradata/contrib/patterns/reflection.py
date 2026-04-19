@@ -1,33 +1,7 @@
-"""
-Self-Critique / Reflection Pattern — Generate-Critique-Refine Loop
-==================================================================
-SDK LAYER: Pure logic, stdlib only, no file I/O.
-Implements the Reflection agentic pattern: an output is repeatedly
-critiqued against a structured checklist and refined until all
-required criteria pass or the cycle budget is exhausted.
+"""Self-critique Generate-Critique-Refine loop (stdlib only).
 
-Typical usage::
-
-    from .reflection import (
-        reflect,
-        EMAIL_CHECKLIST,
-        CriterionScore,
-        default_evaluator,
-    )
-
-    def my_refiner(output, failed):
-        # call your LLM here
-        return improved_output
-
-    result = reflect(
-        output=draft_email,
-        checklist=EMAIL_CHECKLIST,
-        evaluator=default_evaluator,
-        refiner=my_refiner,
-        max_cycles=3,
-    )
-    print(result.final_output)
-    print(result.converged)
+Repeatedly critiques an output against a structured checklist and refines
+it until all required criteria pass or the cycle budget is exhausted.
 """
 
 from __future__ import annotations

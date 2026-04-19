@@ -1,33 +1,9 @@
-"""
-Parallel Execution Pattern — Dependency-Aware Task Dispatch
-============================================================
-SDK LAYER: Pure logic, stdlib only. No domain-specific content.
+"""Dependency-aware parallel task dispatch (sync, stdlib only).
 
-Provides two execution strategies:
-
-``ParallelBatch``
-    Dispatch a flat list of independent tasks. Each task is called
-    sequentially (no asyncio); errors are caught per-task and never
-    propagate to siblings. The host process (e.g. Claude Code agents)
-    supplies real concurrency by spawning multiple instances.
-
-``DependencyGraph``
-    Accept tasks with ``depends_on`` edges, sort them into topological
-    *waves*, execute each wave in order, and forward the output of
-    completed tasks to their dependents via ``input_data``.
-
-``merge_results``
-    Combine a list of ``TaskResult`` objects into a single value using
-    one of three strategies: ``"combine"`` (list), ``"best_of"``
-    (highest-ranked successful result), or ``"synthesize"``
-    (structured summary dict).
-
-Note on "concurrent" semantics
--------------------------------
-This SDK version is synchronous. Tasks in the same wave are called one
-after another. The graph guarantees *logical* parallelism — tasks that
-have no dependency relationship between them will never block each other
-from being scheduled together if the caller adds true concurrency on top.
+ParallelBatch: flat list of independent tasks, per-task error isolation.
+DependencyGraph: topological waves with input forwarding.
+merge_results: combine/best_of/synthesize strategies.
+Tasks in a wave run sequentially — host process supplies real concurrency.
 """
 
 from __future__ import annotations

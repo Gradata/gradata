@@ -1,38 +1,7 @@
-"""
-Middleware Chain — Composable ordered middleware with anchor positioning.
-=========================================================================
-Adapted from: deer-flow (bytedance/deer-flow) agents/factory.py
+"""Composable ordered middleware with anchor-based positioning.
 
-Provides a pluggable middleware chain for the learning pipeline and
-brain operations. Each middleware can hook into before/after execution
-points. Middlewares are ordered via anchor-based positioning (Next/Prev)
-with circular dependency detection.
-
-This is architecturally cleaner than a flat hooks list because:
-- Middlewares declare their relative position (not absolute index)
-- Circular dependencies are detected at registration time
-- Each middleware is a self-contained class with typed lifecycle hooks
-
-Usage::
-
-    from .middleware import (
-        Middleware, MiddlewareChain, MiddlewareContext,
-    )
-
-    class LoggingMiddleware(Middleware):
-        name = "logging"
-
-        def before(self, ctx: MiddlewareContext) -> MiddlewareContext:
-            print(f"Before: {ctx.operation}")
-            return ctx
-
-        def after(self, ctx: MiddlewareContext) -> MiddlewareContext:
-            print(f"After: {ctx.operation}, result={ctx.result}")
-            return ctx
-
-    chain = MiddlewareChain()
-    chain.add(LoggingMiddleware())
-    result = chain.execute("correct", data={"draft": "...", "final": "..."})
+Adapted from deer-flow (bytedance/deer-flow) agents/factory.py. Provides
+before/after lifecycle hooks around an operation with circular-dep detection.
 """
 
 from __future__ import annotations

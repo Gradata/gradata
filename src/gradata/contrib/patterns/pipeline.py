@@ -1,33 +1,7 @@
-"""
-Sequential Pipeline Pattern
-============================
-Assembly-line execution of named stages with typed I/O and optional quality
-gates per stage.  Each stage can retry on gate failure up to ``max_retries``
-times before the pipeline halts.
+"""Sequential assembly-line pipeline with per-stage quality gates.
 
-SDK LAYER: Pure logic, stdlib only.  No file I/O, no imports from brain
-internals.  Callers wire logging/event emission externally if desired.
-
-Usage::
-
-    from .pipeline import Pipeline, Stage, GateResult, gate
-
-    def research(query: str) -> dict:
-        return {"findings": f"Research on {query}"}
-
-    def draft(data: dict) -> str:
-        return f"Email based on {data['findings']}"
-
-    @gate
-    def quality_check(text: str) -> bool:
-        return len(text) > 10
-
-    pipe = Pipeline(
-        Stage("research", research),
-        Stage("draft", draft, gate=quality_check),
-    )
-    result = pipe.run("pricing strategy")
-    print(result.success, result.stages_completed)
+Stages run in order with typed I/O; gate failures trigger retry up to
+``max_retries`` before the pipeline halts. Pure stdlib, no I/O.
 """
 
 from __future__ import annotations

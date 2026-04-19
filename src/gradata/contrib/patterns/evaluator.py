@@ -1,55 +1,8 @@
-"""
-Evaluator-Optimizer Pattern
-============================
-Two independent agents collaborate in a quality loop:
+"""Evaluator-Optimizer quality loop (domain-agnostic, stdlib only).
 
-  1. A **generator** produces candidate output for a given task.
-  2. An **evaluator** scores the output against a set of weighted dimensions.
-  3. If the weighted average falls below the threshold, the generator is called
-     again with the evaluator's feedback attached.
-  4. The loop terminates when the threshold is met or the iteration budget is
-     exhausted.
-
-Domain-agnostic
----------------
-This module contains **zero** domain-specific logic.  Callers supply:
-
-* The generator callable (any domain).
-* The evaluator callable (any domain).
-* The dimension set appropriate for the task type.
-
-The predefined ``QUALITY_DIMENSIONS`` list provides a reasonable generic
-starting point that can be overridden or extended for any domain.
-
-Stdlib only — no third-party dependencies.
-
-Example
--------
-    from .evaluator import (
-        evaluate_optimize_loop,
-        QUALITY_DIMENSIONS,
-    )
-
-    def my_generator(task, feedback=None):
-        # call an LLM, run a template, anything...
-        return generated_text
-
-    def my_evaluator(output, dimension):
-        # call an LLM judge, run heuristics, anything...
-        score = ...
-        rationale = ...
-        return score, rationale
-
-    result = evaluate_optimize_loop(
-        generator=my_generator,
-        evaluator=my_evaluator,
-        task="Summarize the quarterly results",
-        dimensions=QUALITY_DIMENSIONS,
-        threshold=8.0,
-        max_iterations=4,
-    )
-    print(result.final_output)
-    print(result.converged)
+Generator produces candidate output; evaluator scores against weighted
+dimensions; falling below threshold triggers regeneration with feedback.
+Loop terminates on threshold or iteration budget.
 """
 
 from __future__ import annotations

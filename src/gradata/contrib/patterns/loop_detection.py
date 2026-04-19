@@ -1,35 +1,7 @@
-"""
-Loop Detection — Prevent agent infinite loops via tool-call hashing.
-=====================================================================
-Adapted from: deer-flow (bytedance/deer-flow) loop_detection_middleware.py
+"""Detect agent infinite loops via sliding-window tool-call hashing.
 
-Detects when an agent is stuck in a loop by hashing tool call sequences
-in a sliding window. Progressive intervention:
-  - 3 repeats: WARN (log, continue)
-  - 5 repeats: STOP (halt execution, return error)
-
-The hash is computed from normalized (tool_name, sorted_args) tuples,
-making it resistant to argument reordering.
-
-Usage::
-
-    from .loop_detection import (
-        LoopDetector, LoopAction, LoopEvent,
-    )
-
-    detector = LoopDetector()
-    action = detector.record("Bash", {"command": "pytest"})
-    assert action == LoopAction.ALLOW
-
-    # After 3 identical calls:
-    for _ in range(2):
-        detector.record("Bash", {"command": "pytest"})
-    action = detector.record("Bash", {"command": "pytest"})
-    assert action == LoopAction.WARN
-
-    # After 5:
-    action = detector.record("Bash", {"command": "pytest"})
-    assert action == LoopAction.STOP
+Adapted from deer-flow (bytedance/deer-flow). Progressive intervention:
+3 repeats WARN, 5 repeats STOP. Hashes normalized (tool_name, sorted_args).
 """
 
 from __future__ import annotations
@@ -51,9 +23,10 @@ __all__ = [
 
 class LoopAction(Enum):
     """Action to take based on loop detection."""
-    ALLOW = "allow"    # No loop detected, proceed normally
-    WARN = "warn"      # Loop pattern detected, log warning but continue
-    STOP = "stop"      # Hard loop detected, halt execution
+
+    ALLOW = "allow"  # No loop detected, proceed normally
+    WARN = "warn"  # Loop pattern detected, log warning but continue
+    STOP = "stop"  # Hard loop detected, halt execution
 
 
 @dataclass
@@ -66,6 +39,7 @@ class LoopEvent:
         action: The action determined by the detector.
         repeat_count: How many times this exact call has been seen in window.
     """
+
     tool_name: str
     call_hash: str
     action: LoopAction
@@ -81,6 +55,7 @@ class LoopDetectorConfig:
         warn_threshold: Number of identical calls before warning.
         stop_threshold: Number of identical calls before hard stop.
     """
+
     window_size: int = 20
     warn_threshold: int = 3
     stop_threshold: int = 5
@@ -118,7 +93,8 @@ class LoopDetector:
         """
         _raw = json.dumps(
             {"name": tool_name, "args": _normalize_args(arguments or {})},
-            sort_keys=True, separators=(",", ":"),
+            sort_keys=True,
+            separators=(",", ":"),
         )
         call_hash = hashlib.md5(_raw.encode()).hexdigest()
         self._window.append(call_hash)
@@ -187,6 +163,7 @@ class LoopDetector:
             "most_repeated_tool": most_repeated,
         }
 
+
 def _normalize_args(args: dict[str, Any]) -> dict[str, Any]:
     """Recursively normalize arguments for consistent hashing.
 
@@ -199,10 +176,7 @@ def _normalize_args(args: dict[str, Any]) -> dict[str, Any]:
         if isinstance(val, dict):
             result[key] = _normalize_args(val)
         elif isinstance(val, (list, tuple)):
-            result[key] = [
-                _normalize_args(v) if isinstance(v, dict) else v
-                for v in val
-            ]
+            result[key] = [_normalize_args(v) if isinstance(v, dict) else v for v in val]
         else:
             result[key] = val
     return result
