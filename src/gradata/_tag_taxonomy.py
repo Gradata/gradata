@@ -1,12 +1,6 @@
-"""
-Tag Taxonomy — Configurable vocabulary for brain event tagging.
-================================================================
-Defines valid tag prefixes, their allowed values, and which event types
-REQUIRE which tags. Domain-agnostic: loads overrides from brain config.
-
-Domain-specific values (output types, personas, frameworks, etc.) are
-defaults that can be replaced by a brain's ``taxonomy.json`` config.
-The SDK ships with sales defaults because that's the first domain.
+"""Configurable tag vocabulary for brain events: valid prefixes, allowed
+values per prefix, and required-tag rules per event type. Domain-agnostic —
+brain ``taxonomy.json`` overrides the SDK's sales-flavored defaults.
 """
 
 import json

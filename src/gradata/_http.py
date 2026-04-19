@@ -1,15 +1,6 @@
-"""Shared HTTP transport helpers for Gradata SDK.
-
-Single responsibility: enforce HTTPS at every network boundary before
-any request is made or any URL is stored.
-
-Design notes
-------------
-- Zero new dependencies (stdlib only).
-- Localhost / loopback addresses are explicitly exempted so local
-  development servers (Ollama, vLLM, LM Studio) keep working.
-- Callers must call ``require_https(url)`` BEFORE constructing any
-  urllib.request.Request or passing a URL to a third-party client.
+"""HTTPS-at-the-boundary enforcement. Call ``require_https(url)`` before
+any ``urllib.request.Request`` or third-party client call. Stdlib only;
+localhost/loopback exempted so local LLM servers (Ollama/vLLM/LM Studio) work.
 """
 
 from __future__ import annotations
