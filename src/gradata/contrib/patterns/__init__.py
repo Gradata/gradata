@@ -1,7 +1,6 @@
-"""Layer 0: base agentic patterns. Pure logic, no external deps; never
-imports from enhancements/. Lazy-loads submodules (Pipeline/Stage,
-SmartRAG/NaiveRAG, InputGuard/OutputGuard) on first access.
-"""
+"""Layer 0: base agentic patterns. Pure logic, no external deps; never imports from
+enhancements/. Lazy-loads submodules (Pipeline/Stage, SmartRAG/NaiveRAG, InputGuard/
+OutputGuard) on first access."""
 
 # Lazy-load all pattern modules — nothing imported at module load time.
 # This keeps `import gradata` fast; individual patterns load on first access.

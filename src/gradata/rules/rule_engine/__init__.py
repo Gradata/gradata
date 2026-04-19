@@ -1,7 +1,6 @@
-"""Public API re-exports. Submodules: ``_scoring`` (difficulty/reliability/
-scope), ``_formatting`` (dedup/merge/entropy/injection), ``_engine``
-(``apply_rules``, ``filter_by_scope``, TTL demotion, ``AppliedRule``).
-"""
+"""Public API re-exports. Submodules: ``_scoring`` (difficulty/reliability/scope),
+``_formatting`` (dedup/merge/entropy/injection), ``_engine`` (``apply_rules``,
+``filter_by_scope``, TTL demotion, ``AppliedRule``)."""
 
 from ._engine import (
     DEFAULT_TTL_SESSIONS,
