@@ -1,8 +1,7 @@
-"""Trust-boundary sanitization for lesson content. Contexts: ``xml``
-(escape ``<>&"'`` to prevent ``</brain-rules>`` breakout), ``js`` (full
-JSON/JS escaping + ``</script>``), ``js_template`` (lighter variant for
-json.dumps output — backtick/``${}``), ``llm_prompt`` (``[FILTERED]``
-replacement of injection markers). Pure; sanitize-and-continue to avoid DoS.
+"""Trust-boundary sanitization for lesson content. Contexts: ``xml`` (escape
+``<>&"'`` to prevent ``</brain-rules>`` breakout), ``js`` (JSON/JS +
+``</script>``), ``js_template`` (lighter for json.dumps: backtick/``${}``),
+``llm_prompt`` (``[FILTERED]`` replacement). Pure; sanitize-and-continue.
 """
 
 from __future__ import annotations

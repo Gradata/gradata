@@ -1,8 +1,7 @@
-"""Cross-lesson pattern distillation for rule-promotion candidates (pure algorithm).
-
-Groups lessons/corrections by category, surfaces categories with 3+ entries not
-already covered by CARL rules. Distinct from per-lesson confidence graduation —
-this finds CROSS-LESSON convergence. CLI I/O lives in brain/scripts/rules_distill.py.
+"""Cross-lesson pattern distillation for rule-promotion candidates (pure).
+Groups by category, surfaces 3+-entry clusters not yet covered by CARL rules.
+Distinct from per-lesson graduation — this finds CROSS-LESSON convergence.
+CLI I/O lives in brain/scripts/rules_distill.py.
 """
 
 from __future__ import annotations
