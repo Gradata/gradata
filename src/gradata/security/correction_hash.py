@@ -1,9 +1,7 @@
 """Correction content-provenance hashing + source-context classification.
-
-SHA-256 over canonical ``(before, after, source_context)`` (content-addressed;
-auth lives in ``correction_provenance``). Untrusted ``source_kind`` → flagged
-``requires_review=True``; graduate only via ``approval_required`` promote.
-Defence vs A1 indirect prompt injection (Greshake 2023).
+SHA-256 over canonical ``(before, after, source_context)`` (auth in
+``correction_provenance``). Untrusted ``source_kind`` → ``requires_review``;
+graduation needs ``approval_required``. Defence vs A1 indirect injection.
 """
 
 from __future__ import annotations
