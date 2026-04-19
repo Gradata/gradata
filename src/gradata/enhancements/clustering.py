@@ -1,7 +1,6 @@
-"""Rule Clustering and Contradiction Detection — Layer 1 cluster analysis.
-Detects contradictions between rules and groups related lessons by
-category/domain. Imports from gradata._types only.
-"""
+"""Rule Clustering and Contradiction Detection — Layer 1 cluster analysis. Detects
+contradictions between rules and groups related lessons by category/domain.
+Imports from gradata._types only."""
 
 from __future__ import annotations
 

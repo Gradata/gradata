@@ -1,7 +1,6 @@
-"""Confidence decay for unused lessons (pure, no I/O). Ebbinghaus-style: RULE
-immune, -0.02/idle (floor 0.10), +0.05/apply; 20+ idle → UNTESTABLE archive.
-Session-type-aware. Brain wiring lives in scripts/.
-"""
+"""Confidence decay for unused lessons (pure, no I/O). Ebbinghaus-style: RULE immune,
+-0.02/idle (floor 0.10), +0.05/apply; 20+ idle → UNTESTABLE archive. Session-type-aware.
+Brain wiring lives in scripts/."""
 
 from __future__ import annotations
 
