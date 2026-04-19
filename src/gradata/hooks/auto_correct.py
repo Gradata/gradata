@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """PostToolUse hook auto-capturing Edit/Write diffs as brain corrections.
-
-Reads tool input/output JSON from stdin, extracts before/after content, and
-calls brain.correct() on meaningful diffs. Install via Claude Code settings
+Reads tool input/output JSON from stdin, extracts before/after, calls
+brain.correct() on meaningful diffs. Install via Claude Code settings
 PostToolUse matcher "Edit|Write" → "python -m gradata.hooks.auto_correct".
-Also runnable as standalone CLI for testing.
+Also runnable as CLI.
 """
 
 from __future__ import annotations
