@@ -1,7 +1,5 @@
-"""Three-tool MCP surface (correct/recall/manifest) — Layer 0, pure functions.
-
-Inspired by SuperMemory's 3-tool MCP pattern. Callable directly from Python or
-wired into any MCP transport. No file I/O at module load.
+"""Three-tool MCP surface (correct/recall/manifest) — Layer 0 pure functions.
+SuperMemory-style pattern; callable from Python or any MCP transport.
 """
 
 from __future__ import annotations

@@ -1,7 +1,5 @@
-"""JSON-RPC 2.0 stdio MCP server exposing brain_* tools.
-
-Content-Length framed over stdin/stdout. Exposes brain_search, brain_correct,
-brain_log_output, brain_manifest, brain_health.
+"""JSON-RPC 2.0 stdio MCP server (Content-Length framed) exposing brain_*:
+search, correct, log_output, manifest, health.
 """
 
 from __future__ import annotations

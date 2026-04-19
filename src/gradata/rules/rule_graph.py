@@ -1,7 +1,5 @@
-"""Rule graph — lightweight adjacency list tracking conflict/co-occurrence
-edges between lessons and typed relationships (REINFORCES, CONTRADICTS,
-SPECIALIZES, GENERALIZES). Persisted as JSON (legacy edges) + SQLite
-(typed relationships).
+"""Adjacency list of lesson edges (conflict/co-occurrence) + typed relations
+(REINFORCES/CONTRADICTS/SPECIALIZES/GENERALIZES). JSON (legacy) + SQLite.
 """
 
 from __future__ import annotations

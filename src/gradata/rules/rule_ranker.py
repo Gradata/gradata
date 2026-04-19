@@ -1,7 +1,6 @@
-"""Context-aware rule ranker. Weights: 30% scope / 25% confidence (Thompson-
-sampled p from Beta(α,β) when GRADATA_THOMPSON_RANKING=1) / 20% BM25 context
-(substring-overlap fallback) / 15% recency / 10% fire count. Effectiveness
-bonus clamped [0,1]. Deterministic per session_seed.
+"""Context-aware rule ranker. Weights: 30% scope / 25% confidence (Thompson
+Beta(α,β) when GRADATA_THOMPSON_RANKING=1) / 20% BM25 / 15% recency / 10%
+fires. Effectiveness bonus ∈[0,1]. Deterministic per session_seed.
 """
 
 from __future__ import annotations
