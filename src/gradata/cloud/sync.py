@@ -1,8 +1,6 @@
-"""Cloud sync client — opt-in metrics telemetry to Gradata Cloud.
-POST /v1/telemetry/metrics (Bearer GRADATA_API_TOKEN). Aggregated
-MetricsWindow fields only; NEVER raw corrections. Default OFF. Corpus
-contribution separate via ``CloudClient.contribute_corpus()``.
-"""
+"""Cloud sync client — opt-in metrics telemetry to Gradata Cloud. POST
+/v1/telemetry/metrics (Bearer GRADATA_API_TOKEN). Aggregated MetricsWindow only; NEVER
+raw corrections. Default OFF. Corpus contribution via ``CloudClient.contribute_corpus()``."""
 
 from __future__ import annotations
 
