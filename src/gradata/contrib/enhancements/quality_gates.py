@@ -1,19 +1,7 @@
-"""Quality Gates — 8.0 minimum threshold system with fix cycling.
-=================================================================
-SDK LAYER: Pure logic, no I/O, no domain-specific content.
-Caller supplies scorer and fixer callables; this module orchestrates
-the evaluate-fix-re-evaluate loop and surfaces structured verdicts.
-
-Design decisions
-----------------
-* ``QualityGate`` is a plain class (not a dataclass) so its constructor
-  can validate rubric weights without forcing callers to import field().
-* ``default_scorer`` uses a minimal heuristic (length + keyword density)
-  so the gate is usable without an LLM scorer during unit tests.
-* Predefined rubric sets are module-level constants — callers can extend
-  them with list concatenation or pass their own sets entirely.
-* ``run_with_fix`` is the primary entry point; ``evaluate`` is exposed for
-  callers that want a single-pass score without the fix loop.
+"""Quality Gates — 8.0-min threshold with evaluate-fix-re-evaluate cycling.
+Caller supplies scorer + fixer callables; ``run_with_fix`` is the primary
+entry point, ``evaluate`` for single-pass scoring. ``default_scorer`` is a
+length+keyword heuristic usable without an LLM. Pure logic, no I/O.
 """
 
 from __future__ import annotations

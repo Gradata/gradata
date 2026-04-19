@@ -1,19 +1,7 @@
-"""
-Brain Scores — compound health metric for an Gradata.
-=========================================================
-Wraps the authoritative ``compute_brain_scores()`` implementation in
-``gradata._events`` and reshapes its dict return value into a typed
-``BrainScores`` dataclass.
-
-Design contract:
-- This module does NOT reimplement the 130+ line scoring algorithm.
-- It delegates to ``gradata._events.compute_brain_scores`` and maps
-  the result into ``BrainScores``.
-- If that import fails (e.g., during testing with a minimal stub), a
-  lightweight fallback computes a simplified version directly from the
-  events table using only stdlib.
-
-Stdlib only: sqlite3, dataclasses, math.
+"""Brain Scores — typed ``BrainScores`` dataclass wrapping the authoritative
+``gradata._events.compute_brain_scores()`` dict. Falls back to a simplified
+stdlib-only computation from the events table when that import is unavailable
+(minimal test stubs). Does NOT reimplement the 130+ line algorithm.
 """
 
 from __future__ import annotations

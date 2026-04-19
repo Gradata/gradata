@@ -1,16 +1,7 @@
-"""
-Sub-Agent Orchestrator — structured delegation with typed contracts.
-===================================================================
-Layer 0 pattern: domain-agnostic.
-
-Decomposes complex tasks into delegations with explicit objectives,
-input/output contracts, and success criteria. Executes delegations
-(parallel where independent, sequential where dependent), then
-synthesizes results.
-
-This is the SDK abstraction over brain/scripts/spawn.py (964 lines).
-The brain-specific routing and agent definitions stay in brain/;
-this module provides the portable delegation infrastructure.
+"""Sub-Agent Orchestrator — structured delegation with typed contracts:
+decompose task → delegations (typed I/O + success criteria) → execute
+parallel/sequential → synthesise. Portable layer under ``brain/scripts/spawn.py``
+(routing/agent defs stay brain-side). Layer 0 pattern: domain-agnostic.
 """
 
 from __future__ import annotations
@@ -33,14 +24,14 @@ class Delegation:
     and how to know if it succeeded.
     """
 
-    agent: str                          # agent type/name (e.g., "researcher", "writer", "critic")
-    objective: str                      # one-sentence goal
-    input_data: Any = None              # data to pass to the agent
-    output_format: str = "text"         # expected output type hint
-    success_criteria: str = ""          # how to evaluate success
+    agent: str  # agent type/name (e.g., "researcher", "writer", "critic")
+    objective: str  # one-sentence goal
+    input_data: Any = None  # data to pass to the agent
+    output_format: str = "text"  # expected output type hint
+    success_criteria: str = ""  # how to evaluate success
     depends_on: list[str] = field(default_factory=list)  # delegation IDs this depends on
     timeout_seconds: int = 300
-    id: str = ""                        # auto-assigned if empty
+    id: str = ""  # auto-assigned if empty
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -64,7 +55,7 @@ class OrchestratedResult:
     """Result of orchestrating multiple delegations."""
 
     success: bool
-    output: Any                         # synthesized final output
+    output: Any  # synthesized final output
     delegations_completed: int
     delegations_total: int
     delegation_results: list[DelegationResult] = field(default_factory=list)
@@ -120,35 +111,41 @@ def orchestrate(
             handler = handlers.get(delegation.agent, default_handler)
 
             if handler is None:
-                results.append(DelegationResult(
-                    delegation_id=delegation.id,
-                    agent=delegation.agent,
-                    success=False,
-                    error=f"No handler for agent '{delegation.agent}'",
-                ))
+                results.append(
+                    DelegationResult(
+                        delegation_id=delegation.id,
+                        agent=delegation.agent,
+                        success=False,
+                        error=f"No handler for agent '{delegation.agent}'",
+                    )
+                )
                 continue
 
             start = time.perf_counter()
             try:
                 output = handler(delegation, context)
                 duration = (time.perf_counter() - start) * 1000
-                results.append(DelegationResult(
-                    delegation_id=delegation.id,
-                    agent=delegation.agent,
-                    success=True,
-                    output=output,
-                    duration_ms=round(duration, 2),
-                ))
+                results.append(
+                    DelegationResult(
+                        delegation_id=delegation.id,
+                        agent=delegation.agent,
+                        success=True,
+                        output=output,
+                        duration_ms=round(duration, 2),
+                    )
+                )
                 context[delegation.id] = output
             except Exception as e:
                 duration = (time.perf_counter() - start) * 1000
-                results.append(DelegationResult(
-                    delegation_id=delegation.id,
-                    agent=delegation.agent,
-                    success=False,
-                    error=str(e),
-                    duration_ms=round(duration, 2),
-                ))
+                results.append(
+                    DelegationResult(
+                        delegation_id=delegation.id,
+                        agent=delegation.agent,
+                        success=False,
+                        error=str(e),
+                        duration_ms=round(duration, 2),
+                    )
+                )
 
         execution_order.append(wave_ids)
 
@@ -274,6 +271,7 @@ def load_agent_definition(
 # ---------------------------------------------------------------------------
 # Inter-agent handoff management (extracted from brain/scripts/spawn.py)
 # ---------------------------------------------------------------------------
+
 
 def create_handoff(
     task_id: str,
