@@ -1,6 +1,5 @@
-"""Risk-tiered human approval gates for agentic pipelines (stdlib-only). ``assess_risk``:
-low/medium/high via keyword match. ``gate``: auto-approves low, surfaces ApprovalRequest
-for medium/high. Reversibility is a first-class derived signal independent of tier."""
+"""Risk-tiered human approval gates for agentic pipelines (stdlib-only). ``assess_risk`` returns
+low/medium/high; ``gate`` auto-approves low, surfaces ApprovalRequest for medium/high."""
 
 from __future__ import annotations
 

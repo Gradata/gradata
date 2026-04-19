@@ -1,6 +1,5 @@
-"""Canonical accessors for GRADATA_* env vars — every var read from >1 call site lives here
-so defaults and tests share one patch point. Exposes: LLM_BASE/MODEL/KEY, GEMMA_API_KEY/
-MODEL, ENCRYPTION_KEY, BRAIN, API_URL (default https://api.gradata.ai/api/v1), BYPASS."""
+"""Canonical GRADATA_* env var accessors — every var read from >1 call site lives here for
+one patch point. Exposes LLM_BASE/MODEL/KEY, GEMMA_API_KEY/MODEL, ENCRYPTION_KEY, BRAIN, API_URL."""
 
 from __future__ import annotations
 
