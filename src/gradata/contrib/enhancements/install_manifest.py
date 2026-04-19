@@ -1,8 +1,7 @@
 """Install Manifest — modular component registry with selective install.
 ``InstallManifest.default().plan_install(profile=...)`` returns a plan
-(lite/standard/full or individual modules); each ``Module`` carries cost +
-stability tags. ``apply(plan)`` returns an ``InstallState`` persistable via
-``.save()``. Adapted from affaan-m/everything-claude-code manifests.
+(lite/standard/full or individual); ``Module`` carries cost + stability.
+``apply(plan)`` → ``InstallState`` persistable via ``.save()``.
 """
 
 from __future__ import annotations

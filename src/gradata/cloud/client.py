@@ -1,8 +1,7 @@
-"""CloudClient — API client for Gradata Cloud. Handles auth, brain sync, and
-routes graduation-pipeline calls to the cloud API; when connected it acts
-as a drop-in replacement for local enhancements (``Brain.correct``,
-``Brain.apply_brain_rules`` route through it). Synchronous urllib only —
-preserves the base SDK's zero-dependency guarantee.
+"""CloudClient — API client for Gradata Cloud. Auth, brain sync, and
+graduation-pipeline routing. When connected acts as a drop-in replacement
+for local enhancements (``Brain.correct``, ``Brain.apply_brain_rules``).
+Synchronous urllib only — preserves SDK zero-dependency guarantee.
 """
 
 from __future__ import annotations
