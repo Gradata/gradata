@@ -1,12 +1,6 @@
-"""
-Audit Trail + Provenance — SQLite-backed rule provenance tracking.
-===================================================================
-SDK LAYER: Layer 0 (no Brain dependency). All functions take primitive
-paths so they can be used without instantiating a Brain object.
-Brain gets a thin 1-line trace() wrapper.
-
-Tracks which corrections led to which rules, enabling full lineage
-from correction → lesson → graduated rule.
+"""SQLite-backed rule provenance tracking — full lineage from correction
+→ lesson → graduated rule. Layer 0 (no Brain dep); functions take primitive
+paths. Brain gets a thin 1-line ``trace()`` wrapper.
 """
 
 from __future__ import annotations
@@ -22,6 +16,7 @@ _log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Write provenance
 # ---------------------------------------------------------------------------
+
 
 def write_provenance(
     db_path: str | Path,
@@ -59,6 +54,7 @@ def write_provenance(
 # ---------------------------------------------------------------------------
 # Query provenance
 # ---------------------------------------------------------------------------
+
 
 def query_provenance(
     db_path: str | Path,
@@ -103,6 +99,7 @@ def query_provenance(
 # ---------------------------------------------------------------------------
 # Scan events.jsonl for specific IDs
 # ---------------------------------------------------------------------------
+
 
 def _scan_events_for_ids(
     events_path: str | Path,
@@ -149,6 +146,7 @@ def _scan_events_for_ids(
 # Full trace: provenance + events + transitions
 # ---------------------------------------------------------------------------
 
+
 def trace_rule(
     db_path: str | Path,
     events_path: str | Path,
@@ -188,8 +186,7 @@ def trace_rule(
     correction_event_ids: list[str] = []
     if provenance:
         correction_event_ids = [
-            r["correction_event_id"] for r in provenance
-            if r.get("correction_event_id")
+            r["correction_event_id"] for r in provenance if r.get("correction_event_id")
         ]
     if not correction_event_ids and target.correction_event_ids:
         correction_event_ids = target.correction_event_ids

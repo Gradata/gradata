@@ -1,13 +1,7 @@
-"""EventBus -- lightweight in-memory pub/sub for Gradata's nervous system.
-
-This is the IN-MEMORY subscriber notification system. It does NOT persist events.
-For event persistence (JSONL + SQLite), see _events.py / brain.emit().
-
-Both systems fire in brain_correct() and brain_end_session() intentionally:
-  - EventBus.emit() -> notifies in-memory subscribers (embeddings, session_history)
-  - brain.emit() / _events.emit() -> writes to events.jsonl + system.db
-
-Do NOT merge these two systems. They serve different purposes.
+"""Lightweight in-memory pub/sub — NOT persisted. ``EventBus.emit()``
+notifies in-memory subscribers (embeddings, session_history); ``brain.emit()``
+/ ``_events.emit()`` writes to events.jsonl + system.db. Both fire in
+``brain_correct()`` / ``brain_end_session()`` intentionally; do NOT merge.
 """
 
 from __future__ import annotations
@@ -32,7 +26,9 @@ class EventBus:
 
     def __init__(self) -> None:
         self.listeners: dict[str, list[tuple[Callable, bool]]] = defaultdict(list)
-        self._pool = ThreadPoolExecutor(max_workers=MAX_ASYNC_WORKERS, thread_name_prefix="gradata-bus")
+        self._pool = ThreadPoolExecutor(
+            max_workers=MAX_ASYNC_WORKERS, thread_name_prefix="gradata-bus"
+        )
         self._lock = threading.Lock()
 
     def on(self, event: str, handler: Callable, async_handler: bool = False) -> None:
@@ -42,7 +38,9 @@ class EventBus:
             if any(h is handler for h, _ in entries):
                 return
             if len(entries) >= MAX_LISTENERS_PER_EVENT:
-                logger.warning("EventBus: max listeners (%d) reached for %r", MAX_LISTENERS_PER_EVENT, event)
+                logger.warning(
+                    "EventBus: max listeners (%d) reached for %r", MAX_LISTENERS_PER_EVENT, event
+                )
                 return
             entries.append((handler, async_handler))
 
