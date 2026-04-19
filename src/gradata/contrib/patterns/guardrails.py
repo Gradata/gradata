@@ -1,6 +1,5 @@
-"""Two-phase guardrails: input pre-exec, output post-exec. Composable via Guard/
-InputGuard/OutputGuard; ``guarded()`` wires them around any callable. Built-ins:
-pii_detector, injection_detector, scope_validator, banned_phrases, destructive_action."""
+"""Two-phase guardrails — input pre-exec, output post-exec. Composable via Guard/InputGuard/
+OutputGuard; ``guarded()`` wires them. Built-ins: pii, injection, scope, banned, destructive."""
 
 from __future__ import annotations
 
