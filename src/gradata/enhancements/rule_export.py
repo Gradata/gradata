@@ -1,20 +1,10 @@
 """Export graduated RULE-tier lessons to platform-specific rule files.
-
-Supported targets:
-- cursor    -> .cursorrules (freeform markdown rule-per-line)
-- agents    -> AGENTS.md (markdown with headings + bullet rules)
-- aider     -> .aider.conf.yml (YAML with custom system prompt rules)
-- codex     -> .codex/AGENTS.md (Codex CLI rules, same AGENTS schema)
-- cline     -> .clinerules (Cline rules file — single markdown)
-- continue  -> .continue/rules/gradata-rules.md (Continue.dev rules)
-
-Usage (library):
-    from .rule_export import export_rules
-    text = export_rules(brain_root, target="cursor")
-
-Usage (CLI):
-    gradata export --target cursor --output .cursorrules
+Targets: cursor (.cursorrules), agents (AGENTS.md), aider (.aider.conf.yml),
+codex (.codex/AGENTS.md), cline (.clinerules), continue
+(.continue/rules/gradata-rules.md). Library: ``export_rules(brain_root,
+target=...)``; CLI: ``gradata export --target cursor --output .cursorrules``.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -71,7 +61,12 @@ def _make_grouped_formatter(title: str):
         _by_cat: dict[str, list[str]] = {}
         for _cat, _desc in rules:
             _by_cat.setdefault(_cat, []).append(_desc)
-        _lines = [f"# {title}", "", "Graduated rules learned from corrections. Follow these in every response.", ""]
+        _lines = [
+            f"# {title}",
+            "",
+            "Graduated rules learned from corrections. Follow these in every response.",
+            "",
+        ]
         for _cat in sorted(_by_cat):
             _lines.append(f"## {_cat}")
             _lines.append("")
@@ -79,6 +74,7 @@ def _make_grouped_formatter(title: str):
                 _lines.append(f"- {_desc}")
             _lines.append("")
         return "\n".join(_lines) + "\n"
+
     return _fmt
 
 
@@ -101,9 +97,7 @@ DEFAULT_PATHS: dict[str, str] = {
 }
 
 
-def export_rules(
-    brain_root: Path, *, target: str, lessons_path: Path | None = None
-) -> str:
+def export_rules(brain_root: Path, *, target: str, lessons_path: Path | None = None) -> str:
     """Return a formatted string of graduated rules for the given target.
 
     ``lessons_path`` overrides the default ``brain_root / "lessons.md"`` lookup,
@@ -114,15 +108,17 @@ def export_rules(
         raise ValueError(f"unknown target: {target}. Supported: {list(_FORMATTERS)}")
     import re as _re
     from .self_improvement import parse_lessons
+
     _lf = lessons_path if lessons_path is not None else Path(brain_root) / "lessons.md"
     rules: list[tuple[str, str]] = []
     if _lf.exists():
-        _raw = _re.sub(r"(\[\w+:[\d.]+\])\s+\[hooked\]\s+", r"\1 ",
-                       _lf.read_text(encoding="utf-8"))
+        _raw = _re.sub(r"(\[\w+:[\d.]+\])\s+\[hooked\]\s+", r"\1 ", _lf.read_text(encoding="utf-8"))
         for _lesson in parse_lessons(_raw):
             _sv = getattr(getattr(_lesson, "state", None), "value", getattr(_lesson, "state", None))
             if str(_sv).upper() != "RULE":
                 continue
-            _desc = _re.sub(r"^\[hooked\]\s*", "", (getattr(_lesson, "description", "") or "").strip())
+            _desc = _re.sub(
+                r"^\[hooked\]\s*", "", (getattr(_lesson, "description", "") or "").strip()
+            )
             rules.append((getattr(_lesson, "category", "") or "", _desc))
     return _FORMATTERS[target](rules)

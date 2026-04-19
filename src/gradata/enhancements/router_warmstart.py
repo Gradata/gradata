@@ -1,19 +1,7 @@
-"""
-Router Warm-Start — Bootstrap Q-Learning router from vault data.
-=================================================================
-Loads existing correction events from the brain's event database,
-computes reward signals from severity, and pre-trains the router's
-Q-table so it doesn't start cold.
-
-Usage::
-
-    from .router_warmstart import warm_start_router
-
-    router = warm_start_router(
-        db_path=Path("brain/system.db"),
-        router_path=Path("brain/q_router.json"),
-    )
-    print(router.stats())  # Shows pre-trained Q-table
+"""Router Warm-Start — bootstrap Q-Learning router from vault data: load
+existing correction events, compute severity-based reward signals, and
+pre-train the Q-table so it doesn't start cold.
+Entry: ``warm_start_router(db_path, router_path)``.
 """
 
 from __future__ import annotations
@@ -55,11 +43,13 @@ def warm_start_router(
     """
     from ..contrib.patterns.q_learning_router import QLearningRouter, RouterConfig
 
-    router = QLearningRouter(RouterConfig(
-        epsilon_start=0.5,  # Less exploration since we have data
-        epsilon_min=0.05,
-        epsilon_decay=0.99,
-    ))
+    router = QLearningRouter(
+        RouterConfig(
+            epsilon_start=0.5,  # Less exploration since we have data
+            epsilon_min=0.05,
+            epsilon_decay=0.99,
+        )
+    )
 
     # Load existing router state if available
     if router_path and Path(router_path).exists():
@@ -75,7 +65,8 @@ def warm_start_router(
         conn.row_factory = sqlite3.Row
 
         # Fetch correction events with severity and category
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT
                 json_extract(data_json, '$.severity') as severity,
                 json_extract(data_json, '$.category') as category,
@@ -86,7 +77,9 @@ def warm_start_router(
               AND json_extract(data_json, '$.category') IS NOT NULL
             ORDER BY rowid DESC
             LIMIT ?
-        """, (max_events,)).fetchall()
+        """,
+            (max_events,),
+        ).fetchall()
 
         conn.close()
 

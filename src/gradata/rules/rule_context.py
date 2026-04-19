@@ -1,20 +1,8 @@
-"""RuleContext — Central hub for graduated rules consumed by all patterns.
-
-This is the ONE mechanism that connects the graduation pipeline to the 22
-pattern modules. Graduation publishes rules here. Patterns query from here.
-The cycle: corrections → graduation → rules → patterns improve → fewer corrections.
-
-Lives in patterns/ (Layer 0) so all patterns can import without circular deps.
-Does NOT import from enhancements/ — graduation pushes data IN via the bridge.
-
-Usage:
-    # Any pattern can query:
-    from .rule_context import get_rule_context
-    ctx = get_rule_context()
-    tone_rules = ctx.query(category="TONE")
-
-    # Graduation bridge publishes:
-    ctx.publish(GraduatedRule(category="TONE", principle="keep it casual", ...))
+"""RuleContext — central hub connecting the graduation pipeline to all 22
+pattern modules. Graduation publishes rules here via ``ctx.publish(...)``;
+patterns query via ``get_rule_context().query(category=...)``. Cycle:
+corrections → graduation → rules → patterns improve. Lives in patterns/
+(Layer 0) to avoid circular deps; does NOT import from enhancements/.
 """
 
 from __future__ import annotations
@@ -28,13 +16,13 @@ class GraduatedRule:
     """A rule that has graduated through the learning pipeline."""
 
     rule_id: str
-    category: str          # TONE, DRAFTING, SECURITY, PROCESS, etc.
-    principle: str         # The rule text
-    confidence: float      # 0.60+ for PATTERN, 0.90+ for RULE
+    category: str  # TONE, DRAFTING, SECURITY, PROCESS, etc.
+    principle: str  # The rule text
+    confidence: float  # 0.60+ for PATTERN, 0.90+ for RULE
     scope: dict = field(default_factory=dict)  # task_type, agent_type, audience, etc.
     source_type: str = "lesson"  # "lesson", "meta_rule", "distilled"
-    tags: tuple[str, ...] = ()   # Freeform tags for pattern matching
-    agent_type: str = ""         # Scoped to specific agent (empty = universal)
+    tags: tuple[str, ...] = ()  # Freeform tags for pattern matching
+    agent_type: str = ""  # Scoped to specific agent (empty = universal)
 
     @property
     def is_rule_tier(self) -> bool:
@@ -116,7 +104,8 @@ class RuleContext:
             d_norm = domain.strip().lower()
             if d_norm:
                 candidates = [
-                    r for r in candidates
+                    r
+                    for r in candidates
                     if str((r.scope or {}).get("domain", "")).strip().lower() == d_norm
                     or (_ap := str((r.scope or {}).get("applies_to", "")).strip().lower()) == d_norm
                     or _ap.startswith(f"{d_norm}:")
@@ -144,20 +133,21 @@ class RuleContext:
     def for_guardrails(self) -> list[GraduatedRule]:
         """Rules that should become guardrail checks (SECURITY, ACCURACY, SAFETY)."""
         guard_categories = {"SECURITY", "ACCURACY", "SAFETY", "HONESTY", "DATA_INTEGRITY"}
-        return [r for r in self.query(min_confidence=0.60, limit=20)
-                if r.category in guard_categories]
+        return [
+            r for r in self.query(min_confidence=0.60, limit=20) if r.category in guard_categories
+        ]
 
     def for_evaluator(self, task_type: str = "") -> list[GraduatedRule]:
         """Rules that should become evaluation dimensions (DRAFTING, STYLE, FORMAT)."""
         eval_categories = {"DRAFTING", "STYLE", "FORMAT", "TONE", "CONTENT", "STRUCTURE"}
-        rules = [r for r in self.query(min_confidence=0.60, limit=20)
-                 if r.category in eval_categories]
+        rules = [
+            r for r in self.query(min_confidence=0.60, limit=20) if r.category in eval_categories
+        ]
         if task_type:
             scoped = [r for r in rules if r.scope.get("task_type") == task_type]
             universal = [r for r in rules if not r.scope.get("task_type")]
             return (scoped + universal)[:10]
         return rules[:10]
-
 
     def for_agent(self, agent_type: str) -> list[GraduatedRule]:
         """Rules scoped to a specific agent type."""
@@ -183,10 +173,13 @@ class RuleContext:
             "total_rules": len(rules),
             "rule_tier": sum(1 for r in rules if r.is_rule_tier),
             "pattern_tier": sum(1 for r in rules if 0.60 <= r.confidence < 0.90),
-            "categories": dict(sorted(
-                {k: len(v) for k, v in self._by_category.items()}.items(),
-                key=lambda x: x[1], reverse=True
-            )),
+            "categories": dict(
+                sorted(
+                    {k: len(v) for k, v in self._by_category.items()}.items(),
+                    key=lambda x: x[1],
+                    reverse=True,
+                )
+            ),
             "agents": list(self._by_agent.keys()),
         }
 

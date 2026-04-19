@@ -1,20 +1,11 @@
-"""
-Procedural Memory — INSTINCT → PATTERN → RULE graduation pipeline.
-===================================================================
-SDK LAYER: Layer 1 (enhancements). Imports from Layer 0 (patterns)
-and shared types only.
-
-This is the open-source graduation engine. Corrections become procedural
-memory: confidence scoring, lesson parsing, FSRS-inspired graduation,
-adversarial validation, and formatting.
-
-The proprietary cloud version (gradata_cloud.graduation.self_improvement)
-adds FSRS-based scheduling and multi-brain optimization on top.
-
-Package layout
---------------
-_confidence.py  — constants, FSRS math, parse/format, update_confidence
-_graduation.py  — _passes_beta_lb_gate, graduate
+"""Procedural Memory — INSTINCT→PATTERN→RULE graduation pipeline. Open-source
+engine: confidence scoring, lesson parsing, FSRS-inspired graduation,
+adversarial validation, formatting. Proprietary cloud
+(``gradata_cloud.graduation.self_improvement``) layers FSRS scheduling +
+multi-brain optimization. Layout: ``_confidence.py`` (constants, FSRS math,
+parse/format, update_confidence); ``_graduation.py`` (_passes_beta_lb_gate,
+graduate).
+SDK LAYER: Layer 1 (enhancements). Imports patterns (Layer 0) + shared types.
 """
 
 # Re-export everything that was previously importable from the flat module.
