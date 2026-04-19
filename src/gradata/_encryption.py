@@ -1,15 +1,7 @@
-"""Encryption at rest for brain databases.
-
-Optional feature — requires: pip install gradata[encrypted]
-
-Encrypt-on-close, decrypt-on-open pattern:
-  - Brain opens: decrypt system.db.enc → system.db, use SQLite normally
-  - Brain closes: encrypt system.db → system.db.enc, delete plaintext
-
-Key management (priority order):
-  1. Brain(encryption_key="...") constructor parameter
-  2. GRADATA_ENCRYPTION_KEY environment variable
-  3. ~/.gradata/encryption.key auto-generated file
+"""Brain DB encryption at rest (optional — ``pip install gradata[encrypted]``).
+Decrypt ``system.db.enc`` → ``system.db`` on open, re-encrypt + delete plaintext
+on close. Key priority: ``Brain(encryption_key=...)`` > ``GRADATA_ENCRYPTION_KEY``
+env > ``~/.gradata/encryption.key`` (auto-generated).
 """
 
 from __future__ import annotations
