@@ -1,10 +1,9 @@
-"""Confidence decay algorithm for unused lessons (pure, no I/O).
-
-Rules: RULE tier immune; -0.02 per idle session (floor 0.10); +0.05 per
-applied session (capped at tier ceiling); 20+ idle with 0 apps/corrections
-→ UNTESTABLE archive; current-session lessons skip decay; session-type-aware
-(DRAFTING lessons ignore system sessions). Research: Ebbinghaus curve
-adapted for discrete sessions. Brain-layer wiring lives in scripts/.
+"""Confidence decay for unused lessons (pure, no I/O). RULE tier is immune;
+-0.02 per idle session (floor 0.10), +0.05 per applied session (capped at
+tier ceiling); 20+ idle with 0 apps/corrections → UNTESTABLE archive;
+current-session lessons skip decay; session-type-aware (DRAFTING lessons
+ignore system sessions). Ebbinghaus curve adapted to discrete sessions;
+brain-layer wiring lives in scripts/.
 """
 
 from __future__ import annotations
