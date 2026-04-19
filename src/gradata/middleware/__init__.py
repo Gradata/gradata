@@ -1,10 +1,8 @@
-"""Runtime middleware adapters for non-Claude-Code agents (OpenAI, Anthropic, LangChain, CrewAI).
-
-Wraps SDK clients to inject learned rules into system prompts and enforce
-RULE-tier patterns on outputs. Shares a common RuleSource with Claude Code
-hooks so behavior is consistent. GRADATA_BYPASS=1 is the emergency kill switch.
-Optional deps: anthropic / openai / langchain-core / crewai (import raises
-with install hint if missing).
+"""Runtime middleware adapters for non-Claude-Code agents (OpenAI, Anthropic,
+LangChain, CrewAI). Wraps SDK clients to inject learned rules into system
+prompts and enforce RULE-tier patterns on outputs. Shares RuleSource with
+Claude Code hooks. GRADATA_BYPASS=1 = kill switch. Optional deps: anthropic/
+openai/langchain-core/crewai (import raises with install hint if missing).
 """
 
 from __future__ import annotations

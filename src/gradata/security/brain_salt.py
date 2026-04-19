@@ -1,9 +1,7 @@
-"""Per-brain salt for non-deterministic graduation thresholds.
-
-Each brain gets a unique 32-byte salt stored as `.brain_salt` in the vault.
-The salt jitters PATTERN_THRESHOLD and RULE_THRESHOLD by +/-5% so that
-an attacker who knows the graduation algorithm cannot predict the exact
-confidence boundary for any specific brain.
+"""Per-brain salt for non-deterministic graduation thresholds. Each brain
+gets a unique 32-byte salt in `.brain_salt`, jittering PATTERN/RULE_THRESHOLD
+by ±5% so an attacker who knows the algorithm can't predict exact confidence
+boundaries for any specific brain.
 """
 
 from __future__ import annotations
