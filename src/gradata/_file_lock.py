@@ -1,9 +1,8 @@
-"""Cross-platform advisory exclusive file-lock context manager. Windows uses
-``msvcrt.locking`` on byte 0 (caller must seek to 0); POSIX uses
-``fcntl.flock(LOCK_EX)``. ``timeout=None`` blocks indefinitely; numeric
-timeouts retry with exponential backoff (0.01→0.1s cap) and raise
-TimeoutError. On OSError without a timeout, falls through unlocked rather
-than dropping data.
+"""Cross-platform advisory exclusive file-lock context manager.
+
+Windows: ``msvcrt.locking`` on byte 0 (caller must seek to 0); POSIX:
+``fcntl.flock(LOCK_EX)``. ``timeout=None`` blocks; numeric timeouts retry
+with exponential backoff. On OSError without timeout, falls through unlocked.
 """
 
 from __future__ import annotations

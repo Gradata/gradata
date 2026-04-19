@@ -1,9 +1,8 @@
 """Rule-based importance scoring for corrections before graduation.
 
-Filters noise from the INSTINCT→PATTERN→RULE pipeline by deciding if a
-correction is "high-value" worth graduating. Uses rule-based heuristics
-(no LLM dep) with EverOS-style confidence thresholds.
-Adapted from EverOS (EverMind-AI/EverOS) profile_manager/discriminator.py.
+Filters noise from INSTINCT→PATTERN→RULE by deciding if a correction is
+high-value (rule-based heuristics, no LLM dep). Adapted from EverOS
+profile_manager/discriminator.py.
 """
 
 from __future__ import annotations

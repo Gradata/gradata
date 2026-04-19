@@ -1,9 +1,8 @@
-"""Scope Builder — rule scoping + context-to-scope inference. RuleScope fields
-are hierarchical filters; empty string = wildcard. Flow: ``build_scope(ctx)``
-infers a RuleScope; retrieval calls ``scope_matches(rule_scope, query_scope)``
-for relevance ranking (0.0 irrelevant → 1.0 perfect match);
-``scope_to_dict`` / ``scope_from_dict`` serialise.
-SDK LAYER: pure logic, stdlib only. No file I/O.
+"""Scope Builder — rule scoping + context-to-scope inference (stdlib-only).
+
+RuleScope fields are hierarchical filters (empty = wildcard). ``build_scope(ctx)``
+infers a RuleScope; ``scope_matches`` returns 0.0–1.0 relevance;
+``scope_to_dict``/``scope_from_dict`` serialise.
 """
 
 from __future__ import annotations
