@@ -1,25 +1,7 @@
-"""CrewAI middleware adapter.
+"""CrewAIGuard callable for CrewAI agent ``guardrails=[...]`` lists.
 
-Provides :class:`CrewAIGuard`, a callable that CrewAI agents can register
-in their ``guardrails=[...]`` list. The guard runs on the agent's output
-and returns the CrewAI-expected ``(valid, result_or_error)`` tuple.
-
-Usage::
-
-    from crewai import Agent
-    from . import CrewAIGuard
-
-    guard = CrewAIGuard(brain_path="./brain")
-    agent = Agent(
-        role="Writer",
-        goal="Draft clean prose",
-        backstory="...",
-        guardrails=[guard],
-    )
-
-This adapter has no hard dependency on ``crewai`` — it only implements
-the guard callable shape CrewAI expects, so tests can exercise it with a
-plain Python call.
+Runs on agent output, returns CrewAI-expected ``(valid, result_or_error)``.
+No hard dep on crewai — tests can exercise it with a plain call.
 """
 
 from __future__ import annotations

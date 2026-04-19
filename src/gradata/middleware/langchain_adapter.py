@@ -1,26 +1,8 @@
-"""LangChain middleware adapter.
+"""LangChain BaseCallbackHandler that injects <brain-rules> and checks LLM output.
 
-Provides :class:`LangChainCallback`, a ``BaseCallbackHandler`` that:
-
-- Injects the Gradata ``<brain-rules>`` block into prompts at
-  ``on_llm_start`` / ``on_chat_model_start``.
-- Checks the LLM output against RULE-tier regex patterns at ``on_llm_end``.
-
-Usage::
-
-    from langchain_openai import ChatOpenAI
-    from . import LangChainCallback
-
-    llm = ChatOpenAI(callbacks=[LangChainCallback(brain_path="./brain")])
-    llm.invoke("Write a short greeting")
-
-Because LangChain callbacks mutate internal prompt buffers in-place, the
-injection covers every prompt / message batch entry in a single callback
-invocation: ``on_llm_start`` prepends the block to every prompt in the
-list, and ``on_chat_model_start`` injects a system message into every
-batch. For stricter control (e.g. structured responses), prefer the
-:class:`gradata.middleware.OpenAIMiddleware` wrapper over the underlying
-client.
+Prepends <brain-rules> to every prompt/message on on_llm_start/on_chat_model_start,
+then validates output against RULE-tier regex patterns on on_llm_end. For stricter
+control prefer gradata.middleware.OpenAIMiddleware around the underlying client.
 """
 
 from __future__ import annotations
@@ -37,6 +19,7 @@ from ._core import (
 
 try:
     from langchain_core.callbacks import BaseCallbackHandler as _BaseCallbackHandler
+
     _LANGCHAIN_AVAILABLE = True
 except ImportError:
     _BaseCallbackHandler = object  # type: ignore[assignment,misc]

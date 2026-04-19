@@ -1,25 +1,7 @@
-"""Anthropic SDK middleware adapter.
+"""Wraps anthropic.Anthropic() so messages.create() gets rule-injection + output check.
 
-Wraps an ``anthropic.Anthropic()`` client so every
-``client.messages.create(...)`` call gets Gradata rules injected into the
-system prompt and its response optionally checked against RULE-tier regex
-patterns.
-
-Usage::
-
-    from anthropic import Anthropic
-    from . import wrap_anthropic
-
-    client = wrap_anthropic(Anthropic(), brain_path="./brain")
-    resp = client.messages.create(
-        model="claude-sonnet-4-5",
-        messages=[{"role": "user", "content": "Hi"}],
-        max_tokens=128,
-    )
-
-The wrapper preserves the original ``messages`` object shape; only the
-``system`` kwarg is mutated on the way in, and the response is only
-inspected on the way out.
+Mutates only the ``system`` kwarg inbound and inspects the response outbound;
+messages shape is preserved. See wrap_anthropic(client, brain_path=...).
 """
 
 from __future__ import annotations
@@ -116,5 +98,8 @@ def wrap_anthropic(
 ) -> AnthropicMiddleware:
     """Convenience constructor — see :class:`AnthropicMiddleware`."""
     return AnthropicMiddleware(
-        client, brain_path=brain_path, source=source, strict=strict,
+        client,
+        brain_path=brain_path,
+        source=source,
+        strict=strict,
     )
