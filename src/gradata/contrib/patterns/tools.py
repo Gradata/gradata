@@ -1,15 +1,8 @@
-"""
-Tool Registration — typed tool signatures with plan-before-execute.
-===================================================================
+"""Tool Registration — registry with typed signatures, descriptions, and
+plan-before-execute workflow. Host (Claude Code hooks, MCP servers, custom
+scripts) registers; orchestrator + pipeline patterns query. SDK is the
+abstraction layer — actual execution runs in the host runtime.
 Layer 0 pattern: domain-agnostic.
-
-Provides a registry for tools the brain can use, with typed signatures,
-description, and plan-before-execute workflow. Tools are registered by
-the host (Claude Code hooks, MCP servers, custom scripts) and queried
-by the brain's orchestrator and pipeline patterns.
-
-This is the SDK abstraction layer. Actual tool execution happens in the
-host runtime, not in the SDK.
 """
 
 from __future__ import annotations
@@ -96,8 +89,7 @@ class ToolRegistry:
         """Search tools by name or description keyword."""
         q = query.lower()
         return [
-            t for t in self._tools.values()
-            if q in t.name.lower() or q in t.description.lower()
+            t for t in self._tools.values() if q in t.name.lower() or q in t.description.lower()
         ]
 
     def execute(
@@ -119,7 +111,8 @@ class ToolRegistry:
         handler = self._handlers.get(name)
         if handler is None:
             return ToolResult(
-                tool=name, success=False,
+                tool=name,
+                success=False,
                 error=f"No handler registered for '{name}'",
             )
 
@@ -129,13 +122,19 @@ class ToolRegistry:
             try:
                 output = handler(**params)
                 return ToolResult(
-                    tool=name, success=True, output=output, retries=attempt,
+                    tool=name,
+                    success=True,
+                    output=output,
+                    retries=attempt,
                 )
             except Exception as e:
                 last_error = str(e)
 
         return ToolResult(
-            tool=name, success=False, error=last_error, retries=max_retries,
+            tool=name,
+            success=False,
+            error=last_error,
+            retries=max_retries,
         )
 
     def stats(self) -> dict[str, Any]:

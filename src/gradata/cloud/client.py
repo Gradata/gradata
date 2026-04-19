@@ -1,15 +1,8 @@
-"""
-CloudClient — API client for Gradata Cloud.
-==============================================
-Handles authentication, brain sync, and routing of graduation
-pipeline calls to the cloud API.
-
-The client is designed to be a drop-in replacement for local
-enhancements. When connected, Brain.correct() and Brain.apply_brain_rules()
-route through this client instead of running locally.
-
-All network calls are synchronous (urllib, no async deps) to maintain
-the zero-dependency guarantee for the base SDK.
+"""CloudClient — API client for Gradata Cloud. Handles auth, brain sync, and
+routes graduation-pipeline calls to the cloud API; when connected it acts
+as a drop-in replacement for local enhancements (``Brain.correct``,
+``Brain.apply_brain_rules`` route through it). Synchronous urllib only —
+preserves the base SDK's zero-dependency guarantee.
 """
 
 from __future__ import annotations
@@ -46,9 +39,9 @@ class CloudClient:
     ) -> None:
         self.brain_dir = Path(brain_dir).resolve()
         self.api_key = api_key or os.environ.get(ENV_API_KEY, "")
-        self.endpoint = (
-            endpoint or os.environ.get(ENV_ENDPOINT, "") or DEFAULT_ENDPOINT
-        ).rstrip("/")
+        self.endpoint = (endpoint or os.environ.get(ENV_ENDPOINT, "") or DEFAULT_ENDPOINT).rstrip(
+            "/"
+        )
         if self.endpoint:
             require_https(self.endpoint, "GRADATA_ENDPOINT")
         self.connected = False
@@ -65,11 +58,14 @@ class CloudClient:
 
         try:
             manifest = self._read_local_manifest()
-            resp = self._post("/brains/connect", {
-                "brain_name": manifest.get("metadata", {}).get("name", self.brain_dir.name),
-                "domain": manifest.get("metadata", {}).get("domain", ""),
-                "manifest": manifest,
-            })
+            resp = self._post(
+                "/brains/connect",
+                {
+                    "brain_name": manifest.get("metadata", {}).get("name", self.brain_dir.name),
+                    "domain": manifest.get("metadata", {}).get("domain", ""),
+                    "manifest": manifest,
+                },
+            )
             self._brain_id = resp.get("brain_id")
             self.connected = True
             logger.info("Connected to Gradata Cloud: brain_id=%s", self._brain_id)
@@ -126,10 +122,13 @@ class CloudClient:
             return {"status": "not_connected"}
 
         try:
-            return self._post("/brains/sync", {
-                "brain_id": self._brain_id,
-                "manifest": self._read_local_manifest(),
-            })
+            return self._post(
+                "/brains/sync",
+                {
+                    "brain_id": self._brain_id,
+                    "manifest": self._read_local_manifest(),
+                },
+            )
         except Exception as e:
             logger.warning("Sync failed: %s", e)
             return {"status": "error", "error": str(e)}
