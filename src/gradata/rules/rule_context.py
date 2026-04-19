@@ -1,8 +1,6 @@
-"""RuleContext — hub connecting graduation to all 22 pattern modules.
-Graduation publishes via ``ctx.publish(...)``; patterns query via
-``get_rule_context().query(...)``. Lives in patterns/ (Layer 0) to avoid
-circular deps; does NOT import from enhancements/.
-"""
+"""RuleContext — hub connecting graduation to all 22 pattern modules. Graduation
+publishes via ``ctx.publish(...)``; patterns query ``get_rule_context().query(...)``.
+Layer 0 (patterns/) to avoid circular deps; does NOT import from enhancements/."""
 
 from __future__ import annotations
 
