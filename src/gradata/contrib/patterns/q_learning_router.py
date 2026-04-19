@@ -1,31 +1,9 @@
-"""
-Q-Learning Agent Router — Reinforcement learning for task-to-agent routing.
-============================================================================
-Adapted from: ruflo (ruvnet/ruflo) v3/@claude-flow/cli/src/ruvector/q-learning-router.ts
+"""Epsilon-greedy Q-learning router for task-to-agent assignment.
 
-Epsilon-greedy Q-learning router that learns which agent handles each
-task type best, based on reward signals from the correction pipeline.
-
-Key adaptations for Gradata:
-- Reward signals from correction severity (not hardcoded)
-- Feature extraction tuned for Gradata task types
-- Persistence to brain vault
-- Integration with orchestrator.py route_by_keywords
-
-Usage::
-
-    from .q_learning_router import (
-        QLearningRouter, RouterConfig, RouteDecision,
-    )
-
-    router = QLearningRouter()
-    decision = router.route("review this pull request for security issues")
-    print(decision.agent)       # "code_reviewer"
-    print(decision.confidence)  # 0.85
-    print(decision.exploiting)  # True (vs exploring)
-
-    # After task completes, feed reward
-    router.update_reward(decision, reward=0.9)
+Learns which agent handles each task type best via reward signals from the
+correction pipeline. Severity-derived rewards, brain-vault persistence,
+integration with orchestrator.route_by_keywords.
+Adapted from ruflo (ruvnet/ruflo) q-learning-router.ts.
 """
 
 from __future__ import annotations
@@ -63,10 +41,19 @@ class RouterConfig:
         feature_dim: Dimensionality of feature vectors.
         save_interval: Auto-save after this many updates.
     """
-    agents: list[str] = field(default_factory=lambda: [
-        "coder", "reviewer", "architect", "researcher",
-        "debugger", "writer", "optimizer", "tester",
-    ])
+
+    agents: list[str] = field(
+        default_factory=lambda: [
+            "coder",
+            "reviewer",
+            "architect",
+            "researcher",
+            "debugger",
+            "writer",
+            "optimizer",
+            "tester",
+        ]
+    )
     learning_rate: float = 0.1
     discount_factor: float = 0.95
     epsilon_start: float = 1.0
@@ -90,6 +77,7 @@ class RouteDecision:
         confidence: Confidence in the decision (max Q / sum Q).
         exploiting: True if decision was greedy, False if exploring.
     """
+
     agent: str
     state_hash: str = ""
     q_values: dict[str, float] = field(default_factory=dict)
@@ -107,6 +95,7 @@ class Experience:
         reward: Reward received.
         td_error: Temporal difference error magnitude (for prioritized replay).
     """
+
     state_hash: str
     action_idx: int
     reward: float
@@ -157,7 +146,7 @@ def _extract_features(text: str, dim: int = 32) -> list[float]:
     # N-gram hash features (remaining dimensions)
     for n in range(1, 4):  # unigrams, bigrams, trigrams
         for j in range(len(words) - n + 1):
-            ngram = " ".join(words[j:j + n])
+            ngram = " ".join(words[j : j + n])
             h = int(hashlib.md5(ngram.encode()).hexdigest(), 16)
             idx = 8 + (h % max(1, dim - 8))
             if idx < dim:
@@ -186,6 +175,7 @@ def _hash_state(features: list[float], quantize_bits: int = 4) -> str:
 # ---------------------------------------------------------------------------
 # Q-Learning Router
 # ---------------------------------------------------------------------------
+
 
 class QLearningRouter:
     """Q-Learning based agent router with experience replay.
@@ -378,6 +368,7 @@ class QLearningRouter:
 
         # Key derived from machine identity (not secret, just tamper detection)
         import platform
+
         key = f"gradata-router-{platform.node()}".encode()
         return _hmac.new(key, data_bytes, "sha256").hexdigest()
 
@@ -431,6 +422,7 @@ class QLearningRouter:
             expected = self._compute_hmac(body)
             if stored_hmac != expected:
                 import logging
+
                 logging.getLogger(__name__).warning(
                     "Q-table integrity check failed: %s may be tampered", filepath
                 )
@@ -489,9 +481,7 @@ class QLearningRouter:
         """Get or initialize Q-values for a state."""
         if state_hash not in self.q_table:
             # Initialize with small random values to break ties
-            self.q_table[state_hash] = [
-                random.uniform(0.0, 0.01) for _ in self.config.agents
-            ]
+            self.q_table[state_hash] = [random.uniform(0.0, 0.01) for _ in self.config.agents]
         return self.q_table[state_hash]
 
     def _compute_confidence(self, q_values: list[float]) -> float:

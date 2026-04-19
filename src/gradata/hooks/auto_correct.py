@@ -1,30 +1,10 @@
 #!/usr/bin/env python3
-"""
-Auto-Correct Hook — Automatic correction capture for Claude Code.
-===================================================================
-PostToolUse hook that fires on Edit/Write tool calls and captures
-the before/after diff as a brain correction. Install once, learn forever.
+"""PostToolUse hook auto-capturing Edit/Write diffs as brain corrections.
 
-This is the "install and forget" piece. Without this hook, users have
-to manually call brain_correct(). With it, every edit the user makes
-(or accepts) is automatically captured as a learning signal.
-
-Installation (Claude Code settings.json):
-    {
-      "hooks": {
-        "PostToolUse": [{
-          "matcher": "Edit|Write",
-          "command": "python -m gradata.hooks.auto_correct"
-        }]
-      }
-    }
-
-The hook reads tool input/output from stdin (JSON), extracts the
-before/after content, and calls brain.correct() if a meaningful
-diff exists.
-
-Also works as a standalone CLI for testing:
-    echo '{"tool_name":"Edit","input":{"old_string":"Dear","new_string":"Hey"}}' | python -m gradata.hooks.auto_correct
+Reads tool input/output JSON from stdin, extracts before/after content, and
+calls brain.correct() on meaningful diffs. Install via Claude Code settings
+PostToolUse matcher "Edit|Write" → "python -m gradata.hooks.auto_correct".
+Also runnable as standalone CLI for testing.
 """
 
 from __future__ import annotations
@@ -62,7 +42,9 @@ def _get_brain():
         return None
 
 
-def _extract_correction(tool_input: dict, tool_output: dict | str | None = None) -> tuple[str, str] | None:
+def _extract_correction(
+    tool_input: dict, tool_output: dict | str | None = None
+) -> tuple[str, str] | None:
     """Extract before/after text from a tool call.
 
     Handles Edit (old_string/new_string) and Write (checks git diff).

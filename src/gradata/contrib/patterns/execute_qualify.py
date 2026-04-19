@@ -1,31 +1,10 @@
-"""
-Execute/Qualify — Fresh verification loop with diagnostic routing.
-==================================================================
-Adapted from: paul (ChristopherKahler/paul) checkpoints.md, apply-phase.md
+"""Disciplined execute-then-verify loop with root-cause retry routing.
 
-Enforces a disciplined execute-then-verify loop:
-1. Execute the task
-2. Report status (DONE/DONE_WITH_CONCERNS/NEEDS_CONTEXT/BLOCKED)
-3. Qualify: re-read output files fresh, run verification, compare to spec
-4. Score: PASS/GAP/DRIFT
-5. On failure: classify root cause (intent/spec/code) and retry (max 3)
-
-The key insight: never trust memory. Always re-read files after execution.
-
-Usage::
-
-    from .execute_qualify import (
-        ExecuteQualifyLoop, QualifyResult, FailureClassification,
-    )
-
-    loop = ExecuteQualifyLoop(max_attempts=3)
-    result = loop.run(
-        executor=my_executor,
-        qualifier=my_qualifier,
-        task_spec="Implement login endpoint",
-    )
-    print(result.passed)        # True/False
-    print(result.attempts_used) # 1-3
+Steps: execute → report status (DONE/CONCERNS/NEEDS_CONTEXT/BLOCKED) → qualify
+by re-reading fresh files and comparing to spec → score PASS/GAP/DRIFT → on
+failure classify cause (intent/spec/code) and retry up to max_attempts.
+Key invariant: never trust memory, always re-read post-execution.
+Adapted from paul (ChristopherKahler/paul) checkpoints.md, apply-phase.md.
 """
 
 from __future__ import annotations
@@ -55,6 +34,7 @@ __all__ = [
 
 class TaskStatus(Enum):
     """Four-level task execution outcome."""
+
     DONE = "done"
     DONE_WITH_CONCERNS = "done_with_concerns"
     NEEDS_CONTEXT = "needs_context"
@@ -64,6 +44,7 @@ class TaskStatus(Enum):
 @dataclass
 class TaskOutcome:
     """Structured outcome from task execution."""
+
     status: TaskStatus
     task_id: str = ""
     description: str = ""
@@ -97,8 +78,7 @@ def report_outcome(
 
     if status == TaskStatus.DONE_WITH_CONCERNS and not concerns:
         raise ValueError(
-            "DONE_WITH_CONCERNS requires at least one concern. "
-            "Use DONE if there are no concerns."
+            "DONE_WITH_CONCERNS requires at least one concern. Use DONE if there are no concerns."
         )
     if status == TaskStatus.NEEDS_CONTEXT and not missing_context:
         raise ValueError(
@@ -106,10 +86,7 @@ def report_outcome(
             "Specify what information is needed."
         )
     if status == TaskStatus.BLOCKED and not blockers:
-        raise ValueError(
-            "BLOCKED requires at least one blocker. "
-            "Specify what prevents progress."
-        )
+        raise ValueError("BLOCKED requires at least one blocker. Specify what prevents progress.")
 
     return TaskOutcome(
         status=status,
@@ -165,6 +142,7 @@ def format_outcome(outcome: TaskOutcome) -> str:
 
 class QualifyScore(Enum):
     """Qualification score from fresh verification."""
+
     PASS = "pass"
     GAP = "gap"
     DRIFT = "drift"
@@ -178,6 +156,7 @@ class FailureClassification(Enum):
     - SPEC: The acceptance criteria were wrong. Fix plan first, then code.
     - CODE: Implementation doesn't match correct plan. Fix code in place.
     """
+
     INTENT = "intent"
     SPEC = "spec"
     CODE = "code"
@@ -193,6 +172,7 @@ class QualifyResult:
         classification: Root cause if score != PASS.
         concerns: Issues found during qualification.
     """
+
     score: QualifyScore
     evidence: str = ""
     classification: FailureClassification | None = None
@@ -215,14 +195,13 @@ class ExecuteQualifyResult:
         final_qualify: The last QualifyResult from verification.
         attempt_history: Full history of (outcome, qualify) pairs.
     """
+
     passed: bool
     attempts_used: int
     max_attempts: int
     final_outcome: TaskOutcome | None = None
     final_qualify: QualifyResult | None = None
-    attempt_history: list[tuple[TaskOutcome, QualifyResult | None]] = field(
-        default_factory=list
-    )
+    attempt_history: list[tuple[TaskOutcome, QualifyResult | None]] = field(default_factory=list)
 
 
 # Type aliases for callables
