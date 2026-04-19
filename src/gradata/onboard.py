@@ -1,6 +1,5 @@
-"""Onboarding wizard for bootstrapping a new Gradata. Interactive mode prompts
-via ``input()``; non-interactive takes kwargs (name, domain, company, embedding).
-"""
+"""Onboarding wizard for bootstrapping a new Gradata. Interactive mode prompts via ``input()``;
+non-interactive takes kwargs (name, domain, company, embedding)."""
 
 from __future__ import annotations
 

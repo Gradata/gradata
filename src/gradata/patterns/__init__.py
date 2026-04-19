@@ -1,6 +1,5 @@
-"""Back-compat shim — patterns moved to gradata.contrib.patterns. Canonical:
-``from ..contrib.patterns import Pipeline, SmartRAG, Guard``. Old imports work.
-"""
+"""Back-compat shim — patterns moved to gradata.contrib.patterns. Canonical import:
+``from gradata.contrib.patterns import Pipeline, SmartRAG, Guard``. Old imports still work."""
 
 
 def __getattr__(name: str):

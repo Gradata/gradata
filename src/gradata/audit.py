@@ -1,6 +1,5 @@
-"""SQLite-backed rule provenance tracking — full lineage from correction → lesson →
-graduated rule. Layer 0 (no Brain dep); functions take primitive paths. Brain gets a thin
-1-line ``trace()`` wrapper."""
+"""SQLite-backed rule provenance tracking — full lineage from correction → lesson → graduated
+rule. Layer 0 (no Brain dep); functions take primitive paths. Brain gets a 1-line ``trace()``."""
 
 from __future__ import annotations
 
