@@ -1,8 +1,7 @@
 """Meta-Rule SQLite persistence — all DB I/O for meta_rules / super_meta_rules.
-Core logic + discovery (:class:`SuperMetaRule`) live in ``meta_rules.py``.
-Exposes differential-privacy scaffold (:class:`DPConfig`,
-:func:`apply_dp_to_export_row`) for cloud export sharing, OFF by default.
-Refs: Dwork & Roth 2014; Abadi et al. 2016 (arXiv:1607.00133).
+Core logic + :class:`SuperMetaRule` discovery live in ``meta_rules.py``.
+Exposes differential-privacy scaffold (:class:`DPConfig`) for cloud export,
+OFF by default. Refs: Dwork & Roth 2014; Abadi et al. 2016.
 """
 
 from __future__ import annotations

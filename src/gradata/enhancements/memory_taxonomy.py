@@ -1,8 +1,7 @@
-"""Typed memory units mapping EverOS's 5 memory types to Gradata's learning
-domain: Episodic→CorrectionNarrative, EventLog→AtomicFact, Foresight→
-PredictedImpact, Profile→BrainProfile, GroupProfile→CrossBrainProfile.
-Foresight = forward-looking predictions with temporal bounds. Adapted from
-EverOS (EverMind-AI/EverOS) memory_types.py.
+"""Typed memory units mapping EverOS's 5 types to Gradata's learning domain:
+Episodic→CorrectionNarrative, EventLog→AtomicFact, Foresight→PredictedImpact
+(forward-looking, time-bounded), Profile→BrainProfile, GroupProfile→
+CrossBrainProfile. From EverOS (EverMind-AI) memory_types.py.
 """
 
 from __future__ import annotations

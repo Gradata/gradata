@@ -1,7 +1,6 @@
 """Structured diffs between draft and final text (stdlib; optional embedder).
-
-compute_diff(draft, final) returns severity + summary stats. With use_semantic=True
-(requires gradata[embeddings]), blends 0.3·Levenshtein + 0.7·semantic as a
+``compute_diff`` returns severity + summary stats. ``use_semantic=True``
+(``gradata[embeddings]``) blends 0.3·Levenshtein + 0.7·semantic as a
 DPO-style preference proxy (Rafailov et al. 2023).
 """
 

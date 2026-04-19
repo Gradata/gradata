@@ -1,8 +1,7 @@
 """Reporting — brain briefing + health reports as agent-agnostic markdown.
-``generate_briefing(brain)`` → ``BrainBriefing`` (``to_markdown()``);
-``export_briefing(brain, formats=["claude","cursor","copilot"])`` fans out to
-CLAUDE.md / .cursorrules / .github/copilot-instructions.md. No MCP/SDK
-required consumer-side — just a file the agent reads.
+``generate_briefing(brain)`` returns ``BrainBriefing``; ``export_briefing``
+fans out to CLAUDE.md / .cursorrules / .github/copilot-instructions.md. No
+MCP/SDK required consumer-side.
 """
 
 from __future__ import annotations

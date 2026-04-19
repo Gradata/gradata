@@ -1,8 +1,7 @@
-"""Deterministic 100%-capture tool-use observation hooks for the learning pipeline.
-
-Project-scoped via git-remote hash for portable cross-machine identification.
-Fires on every tool call (no sampling) to feed the graduation engine.
-Adapted from everything-claude-code continuous-learning-v2/hooks/observe.sh.
+"""Deterministic 100%-capture tool-use hooks for the learning pipeline.
+Project-scoped via git-remote hash; fires on every tool call (no sampling) to
+feed graduation. Adapted from everything-claude-code continuous-learning-v2
+hooks/observe.sh.
 """
 
 from __future__ import annotations
