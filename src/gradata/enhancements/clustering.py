@@ -1,10 +1,6 @@
-"""Rule Clustering and Contradiction Detection — Phase 1 cluster analysis.
-
-SDK LAYER: Layer 1 (enhancements). Imports from gradata._types only.
-
-Extracted from self_improvement.py to isolate cluster analysis into a focused
-module. Used by the rule pipeline and tests to detect contradictions between
-rules and group related lessons by category/domain.
+"""Rule Clustering and Contradiction Detection — Layer 1 cluster analysis.
+Detects contradictions between rules and groups related lessons by
+category/domain. Imports from gradata._types only.
 """
 
 from __future__ import annotations
@@ -172,7 +168,7 @@ def promote_instinct_clusters(
         confs = [m.confidence for m in members]
         mean_conf = sum(confs) / len(confs)
         variance = sum((c - mean_conf) ** 2 for c in confs) / len(confs)
-        std_dev = variance ** 0.5
+        std_dev = variance**0.5
 
         if std_dev > (1.0 - coherence_threshold):
             continue  # Too much variance
