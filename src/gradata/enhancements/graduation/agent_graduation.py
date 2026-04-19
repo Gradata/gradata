@@ -1,7 +1,6 @@
-"""INSTINCT→PATTERN→RULE graduation for agent/subagent outputs. Mechanisms:
-(1) agent-level via approve/edit/reject, (2) approval-gate CONFIRM→PREVIEW→
-AUTO as FDA rises, (3) upward distillation of PATTERN+ to brain level.
-Refs: Brown 2024, Lee & See 2004, Sutton 1999.
+"""INSTINCT→PATTERN→RULE graduation for agent outputs. Mechanisms:
+(1) approve/edit/reject; (2) approval gate CONFIRM→PREVIEW→AUTO as FDA rises;
+(3) upward distillation of PATTERN+ to brain. Refs: Brown'24, Lee&See'04.
 """
 
 from __future__ import annotations

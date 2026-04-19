@@ -1,7 +1,6 @@
-"""AST-Aware Severity Classifier — scores structural deltas via ``ast.dump()``
-diff. Collapses reformats to "as-is"; up-weights signature/control-flow edits.
-Gated by ast_severity_enabled + language_supported; None on parse fail.
-Labels mirror diff_engine._SEVERITY_THRESHOLDS. Pure stdlib.
+"""AST-aware severity: scores structural deltas via ``ast.dump()`` diff.
+Reformats→"as-is"; up-weights signature/control-flow edits. Gated by
+ast_severity_enabled + language. Labels mirror diff_engine thresholds.
 """
 
 from __future__ import annotations
