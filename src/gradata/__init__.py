@@ -1,26 +1,12 @@
-"""
-Gradata — Procedural memory for AI agents.
-
-Quick start:
-    from . import Brain
-    brain = Brain.init("./my-brain")
-
-    # Core correction loop (builds procedural memory)
-    brain.log_output("draft email text", output_type="email", self_score=7)
-    brain.correct(draft="original", final="user-edited version")
-    brain.apply_brain_rules("draft message to stakeholder")
-
-    # Search + retrieval
-    brain.search("budget objections")
-
-    # Quality
-    brain.manifest()
-    brain.export()
+"""Gradata — Procedural memory for AI agents. Entry: ``Brain.init(dir)``;
+core loop: ``brain.log_output`` → ``brain.correct(draft, final)`` →
+``brain.apply_brain_rules(msg)``. Also: ``search``, ``manifest``, ``export``.
 """
 
 try:
     from importlib.metadata import PackageNotFoundError as _PkgNotFound
     from importlib.metadata import version as _pkg_version
+
     try:
         __version__ = _pkg_version("gradata")
     except _PkgNotFound:

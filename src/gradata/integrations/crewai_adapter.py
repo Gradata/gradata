@@ -1,19 +1,8 @@
-"""CrewAI Integration — DEPRECATED.
-
-.. deprecated::
-    ``gradata.integrations.crewai_adapter`` is deprecated and will be
-    removed in v0.8.0.
-
-    For output enforcement (recommended)::
-
-        from ..middleware import CrewAIGuard
-        agent = Agent(role="Writer", guardrails=[CrewAIGuard(brain_path="./brain")])
-
-    :class:`~gradata.middleware.crewai_adapter.CrewAIGuard` enforces RULE-tier
-    patterns on agent outputs.  :class:`BrainCrewMemory` (this module) provides
-    persistent memory storage — both can coexist.  Migrate to the guard for
-    rule enforcement; a retrieval-memory equivalent for CrewAI is planned for
-    gradata.middleware before v0.8.0.
+"""CrewAI Integration — DEPRECATED, removed in v0.8.0. Migrate rule
+enforcement to :class:`~gradata.middleware.crewai_adapter.CrewAIGuard`
+(``Agent(guardrails=[CrewAIGuard(brain_path=...)])``). :class:`BrainCrewMemory`
+here still provides persistent memory; a middleware retrieval equivalent
+is planned before v0.8.0.
 """
 
 from __future__ import annotations
