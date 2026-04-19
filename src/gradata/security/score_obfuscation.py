@@ -1,7 +1,6 @@
-"""Score obfuscation — replace raw confidence floats (e.g. ``[RULE:0.95]``)
-with tier labels (``[RULE]``/``[PATTERN]``/``[INSTINCT]``) for prompt-injected
-rules, preventing prompt-injection attacks that reference specific thresholds.
-Raw floats remain in local dev tools (brain.prove/rules/efficiency).
+"""Replace raw confidence floats with tier labels in prompt-injected rules
+(``[RULE:0.95]`` → ``[RULE]``) to block threshold-referencing injection.
+Raw floats remain in local dev tools.
 """
 
 from __future__ import annotations

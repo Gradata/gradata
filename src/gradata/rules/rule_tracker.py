@@ -1,7 +1,5 @@
-"""Rule application tracker — records outcomes as RULE_APPLICATION events
-in the events table (no separate domain table). Each rule surfaced by the
-engine is logged here; aggregate stats are queried from events for the
-self-improvement pipeline.
+"""Records rule outcomes as RULE_APPLICATION events (no domain table).
+Aggregate stats for self-improvement are queried from events.
 """
 
 from __future__ import annotations

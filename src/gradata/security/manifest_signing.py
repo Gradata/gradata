@@ -1,7 +1,5 @@
-"""HMAC-SHA256 manifest signing and verification.
-
-Signs brain manifests with a per-brain salt so tampering is detectable.
-Uses ``hmac.compare_digest`` for timing-safe verification.
+"""HMAC-SHA256 manifest signing + verification. Signs with per-brain salt
+so tampering is detectable; uses ``hmac.compare_digest`` (timing-safe).
 """
 
 from __future__ import annotations

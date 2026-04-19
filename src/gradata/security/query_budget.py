@@ -1,7 +1,5 @@
-"""Sliding-window query budgeting — rate limiting and burst detection.
-
-Tracks per-endpoint call timestamps using ``time.monotonic()`` and a
-``collections.defaultdict``.  Zero external dependencies.
+"""Sliding-window rate limiting + burst detection. Tracks per-endpoint
+timestamps via ``time.monotonic()`` + ``defaultdict``. Zero deps.
 """
 
 from __future__ import annotations
