@@ -83,9 +83,12 @@ def _ensure_table(conn: sqlite3.Connection):
     # Dedup guard keyed by (tenant_id, ts, type, source). Tenant scoping
     # prevents cross-tenant collisions after multi-tenant rollout while
     # preserving retry-safe idempotent writes within a tenant.
-    with contextlib.suppress(sqlite3.OperationalError):
+    # Suppresses IntegrityError too: legacy DBs may hold pre-existing
+    # duplicate rows that block the UNIQUE index creation — tolerated so
+    # writes still proceed (INSERT OR IGNORE degrades to plain INSERT).
+    with contextlib.suppress(sqlite3.OperationalError, sqlite3.IntegrityError):
         conn.execute("DROP INDEX IF EXISTS idx_events_dedup")
-    with contextlib.suppress(sqlite3.OperationalError):
+    with contextlib.suppress(sqlite3.OperationalError, sqlite3.IntegrityError):
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedup_tenant "
             "ON events(tenant_id, ts, type, source)"
@@ -107,18 +110,22 @@ def _ensure_table(conn: sqlite3.Connection):
 
 def emit(event_type: str, source: str, data: dict | None = None, tags: list | None = None,
          session: int | None = None, valid_from: str | None = None, valid_until: str | None = None,
-         ctx: BrainContext | None = None):
+         ctx: BrainContext | None = None, ts: str | None = None):
     """Emit an event to the brain's event log.
 
     Args:
         ctx: Optional BrainContext for path resolution. If None, falls back to
              module-level globals (backward compat).
+        ts: Optional historical timestamp (ISO 8601). Defaults to now(UTC).
+             Used by transcript backfill to preserve original event time;
+             dedup key (tenant_id, ts, type, source) makes re-runs idempotent.
     """
     # Resolve paths: prefer explicit ctx, fall back to globals
     events_jsonl = ctx.events_jsonl if ctx else _p.EVENTS_JSONL
     db_path = ctx.db_path if ctx else _p.DB_PATH
 
-    ts = datetime.now(UTC).isoformat()
+    if ts is None:
+        ts = datetime.now(UTC).isoformat()
     if session is None:
         session = _detect_session(ctx=ctx)
 

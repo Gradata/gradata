@@ -206,7 +206,6 @@ def run_mine(
         print(f"  {n:5d}  {proj}")
 
     brain_root.mkdir(parents=True, exist_ok=True)
-    live_events = brain_root / "events.jsonl"
     shadow_events = brain_root / "events.backfill.jsonl"
 
     if dry_run or not commit:
@@ -220,8 +219,35 @@ def run_mine(
             print("\n[dry-run] no file written")
         return 0
 
-    with live_events.open("a", encoding="utf-8") as fh:
-        for ev in total_events:
-            fh.write(json.dumps(ev, ensure_ascii=False) + "\n")
-    print(f"\n[commit] appended {len(total_events)} events -> {live_events}")
+    # Dual-write via _events.emit() so events land in both events.jsonl AND
+    # system.db — session_close._has_new_triggers reads the DB, so without
+    # the DB write, graduation won't see these backfilled events.
+    # emit() dedup key (tenant_id, ts, type, source) + ts override makes
+    # re-runs idempotent while preserving historical timestamps.
+    from gradata._events import emit as _emit
+    from gradata.brain import Brain
+    brain = Brain(brain_root)  # ensures table + ctx setup
+    written = 0
+    skipped = 0
+    for ev in total_events:
+        try:
+            payload = json.loads(ev["data"])
+        except (json.JSONDecodeError, TypeError):
+            skipped += 1
+            continue
+        try:
+            _emit(
+                event_type=ev["event"],
+                source=ev["source"],
+                data=payload,
+                session=0,
+                ts=ev["ts"],
+                ctx=brain.ctx,
+            )
+        except Exception:
+            skipped += 1
+            continue
+        written += 1
+
+    print(f"\n[commit] wrote {written} events to events.jsonl + system.db ({skipped} skipped)")
     return 0

@@ -230,26 +230,69 @@ def test_run_mine_missing_project_dir_warns(tmp_path, capsys):
     assert "skip missing" in err
 
 
-def test_run_mine_commit_appends_live(tmp_path):
-    brain = tmp_path / "brain"
-    brain.mkdir()
-    live = brain / "events.jsonl"
-    live.write_text('{"event": "PRE_EXISTING"}\n', encoding="utf-8")
+def test_run_mine_commit_writes_jsonl_and_db(tmp_path):
+    """--commit dual-writes to events.jsonl AND system.db so graduation
+    can see the backfilled events via _has_new_triggers."""
+    import sqlite3
+
+    from gradata import Brain
+    brain_dir = tmp_path / "brain"
+    Brain.init(brain_dir)
 
     projects = tmp_path / "projects"
-    _write_session(
-        projects,
-        "C--p1",
-        [_user_msg("are you sure about that")],
-    )
+    msg = _user_msg("are you sure about that approach")
+    msg["timestamp"] = "2026-01-15T10:30:00+00:00"
+    _write_session(projects, "C--p1", [msg])
+
     run_mine(
-        brain_root=brain,
+        brain_root=brain_dir,
         projects_root=projects,
         project=None,
         commit=True,
         dry_run=False,
     )
-    lines = live.read_text(encoding="utf-8").strip().splitlines()
-    assert len(lines) == 2
-    assert json.loads(lines[0])["event"] == "PRE_EXISTING"
-    assert json.loads(lines[1])["event"] == "IMPLICIT_FEEDBACK"
+
+    # JSONL written
+    jsonl_lines = (brain_dir / "events.jsonl").read_text(encoding="utf-8").strip().splitlines()
+    feedback_lines = [l for l in jsonl_lines if '"IMPLICIT_FEEDBACK"' in l]
+    assert len(feedback_lines) == 1
+
+    # DB also got the event — this is what _has_new_triggers reads
+    with sqlite3.connect(str(brain_dir / "system.db")) as conn:
+        rows = conn.execute(
+            "SELECT ts, type, source FROM events WHERE type = 'IMPLICIT_FEEDBACK'"
+        ).fetchall()
+    assert len(rows) == 1
+    assert rows[0][0] == "2026-01-15T10:30:00+00:00"  # historical ts preserved
+    assert rows[0][1] == "IMPLICIT_FEEDBACK"
+    assert rows[0][2] == "gradata.mine"
+
+
+def test_run_mine_commit_is_idempotent(tmp_path):
+    """Re-running --commit against same transcripts should dedup (same
+    ts+type+source+tenant) — no duplicate rows in DB."""
+    import sqlite3
+
+    from gradata import Brain
+    brain_dir = tmp_path / "brain"
+    Brain.init(brain_dir)
+
+    projects = tmp_path / "projects"
+    msg = _user_msg("are you sure about that approach")
+    msg["timestamp"] = "2026-01-15T10:30:00+00:00"
+    _write_session(projects, "C--p1", [msg])
+
+    for _ in range(2):
+        run_mine(
+            brain_root=brain_dir,
+            projects_root=projects,
+            project=None,
+            commit=True,
+            dry_run=False,
+        )
+
+    with sqlite3.connect(str(brain_dir / "system.db")) as conn:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM events WHERE type = 'IMPLICIT_FEEDBACK'"
+        ).fetchone()[0]
+    assert count == 1  # dedup by (tenant_id, ts, type, source)
