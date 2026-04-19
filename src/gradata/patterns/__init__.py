@@ -1,11 +1,7 @@
 """Backward compatibility shim — patterns moved to gradata.contrib.patterns.
-
-Usage (new canonical path):
-    from ..contrib.patterns import Pipeline, SmartRAG, Guard
-    from ..rules import RuleApplication, AudienceTier, TaskType
-
-Usage (backward compat, still works):
-    from . import Pipeline, SmartRAG, Guard
+New canonical: ``from ..contrib.patterns import Pipeline, SmartRAG, Guard`` /
+``from ..rules import RuleApplication, AudienceTier, TaskType``. Old
+``from . import ...`` still works.
 """
 
 
