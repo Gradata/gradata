@@ -1,10 +1,9 @@
 """Disciplined execute-then-verify loop with root-cause retry routing.
-
-Steps: execute → report status (DONE/CONCERNS/NEEDS_CONTEXT/BLOCKED) → qualify
-by re-reading fresh files and comparing to spec → score PASS/GAP/DRIFT → on
-failure classify cause (intent/spec/code) and retry up to max_attempts.
-Key invariant: never trust memory, always re-read post-execution.
-Adapted from paul (ChristopherKahler/paul) checkpoints.md, apply-phase.md.
+Steps: execute → status (DONE/CONCERNS/NEEDS_CONTEXT/BLOCKED) → qualify by
+re-reading fresh files vs spec → score PASS/GAP/DRIFT → on failure classify
+(intent/spec/code) and retry up to max_attempts. Invariant: never trust
+memory, always re-read post-execution. Adapted from paul (ChristopherKahler/
+paul) checkpoints.md + apply-phase.md.
 """
 
 from __future__ import annotations

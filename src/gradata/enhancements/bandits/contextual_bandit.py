@@ -1,10 +1,8 @@
 """Thompson-Sampling contextual bandit for rule selection (explore-exploit).
-
-Each rule holds Beta(alpha=accepts, beta=rejects); draws from the posterior
-pick top-k per context, balancing exploration of low-confidence rules with
-exploitation of proven ones. Context-dependent — a rule that works for
-executives may not for peers even within the same scope.
-Reference: Multi-Armed Bandits Meet LLMs (arXiv:2505.13355, 2025).
+Each rule holds Beta(alpha=accepts, beta=rejects); posterior draws pick
+top-k per context, balancing exploration of low-confidence rules with
+exploitation. Context-dependent — a rule working for executives may not
+for peers. Ref: Multi-Armed Bandits Meet LLMs (arXiv:2505.13355, 2025).
 """
 
 from __future__ import annotations

@@ -1,10 +1,9 @@
-"""Domain-agnostic router mapping requests to one of 15 agentic patterns.
-
-Intent detection is driven by the task-type registry in ``scope.py``; domains
-extend via ``register_intent_pattern`` — no hardcoded domain if/elif here.
-Patterns: reflection, tool_use, planning, memory, multi_agent, chain_of_thought,
+"""Domain-agnostic router mapping requests to one of 15 agentic patterns
+(reflection, tool_use, planning, memory, multi_agent, chain_of_thought,
 react, retrieval, summarization, generation, classification, extraction,
-transformation, validation, orchestration.
+transformation, validation, orchestration). Intent detection comes from
+``scope.py``'s task-type registry; domains extend via
+``register_intent_pattern`` (no hardcoded if/elif here).
 """
 
 from __future__ import annotations

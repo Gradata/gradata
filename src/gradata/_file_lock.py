@@ -1,10 +1,9 @@
-"""Cross-platform advisory exclusive file-lock context manager.
-
-Windows: msvcrt.locking on byte 0 (caller must seek to 0 first).
-POSIX: fcntl.flock(LOCK_EX) — process-level, sufficient for events.jsonl.
-timeout=None blocks indefinitely; timeout=<s> retries with exponential
-backoff (0.01→0.1s cap) and raises TimeoutError. On OSError with no
-timeout, falls through unlocked rather than dropping data (advisory only).
+"""Cross-platform advisory exclusive file-lock context manager. Windows uses
+``msvcrt.locking`` on byte 0 (caller must seek to 0); POSIX uses
+``fcntl.flock(LOCK_EX)``. ``timeout=None`` blocks indefinitely; numeric
+timeouts retry with exponential backoff (0.01→0.1s cap) and raise
+TimeoutError. On OSError without a timeout, falls through unlocked rather
+than dropping data.
 """
 
 from __future__ import annotations
