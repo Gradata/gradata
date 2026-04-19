@@ -1,24 +1,7 @@
-"""
-Context Brackets — Explicit context degradation management.
-============================================================
-Adapted from: paul (ChristopherKahler/paul) context-management.md
+"""Four-bracket context-capacity model (FRESH/MODERATE/DEEP/CRITICAL) with guidance.
 
-Models context capacity as four brackets (FRESH/MODERATE/DEEP/CRITICAL)
-and provides actionable guidance for each bracket. Prevents late-session
-context rot by making degradation explicit and prescriptive.
-
-Usage::
-
-    from .context_brackets import (
-        ContextBracket, BracketConfig, get_bracket,
-        get_bracket_guidance, estimate_remaining_capacity,
-    )
-
-    bracket = get_bracket(remaining_ratio=0.35)
-    assert bracket == ContextBracket.DEEP
-
-    guidance = get_bracket_guidance(bracket)
-    print(guidance.strategy)  # "Complete current task, prepare handoff"
+Makes late-session context degradation explicit via get_bracket(ratio) →
+bracket + actionable strategy. Adapted from paul (ChristopherKahler/paul) context-management.md.
 """
 
 from __future__ import annotations

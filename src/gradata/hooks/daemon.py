@@ -1,25 +1,10 @@
-"""Persistent HTTP daemon for Gradata hooks -- eliminates Python spawn overhead.
+"""Persistent HTTP daemon for hook dispatch — avoids ~300ms Windows spawn per hook.
 
-On Windows, each hook invocation pays ~300ms process startup. With 20+ hooks
-per session that's ~6s of pure overhead. This daemon keeps the gradata module
-tree warm in-process; hook calls become localhost HTTP requests (~1ms).
-
-Protocol
---------
-POST /hook/<name>   body=stdin JSON, runs ``gradata.hooks.<name>.main(data)``
-GET  /health        liveness probe
-GET  /shutdown      graceful stop
-
-Usage
------
-Start::
-    python -m gradata.hooks.daemon              # foreground
-    python -m gradata.hooks.daemon --start      # background (writes PID)
-    python -m gradata.hooks.daemon --stop
-
-Clients should use :mod:`gradata.hooks.client` which auto-falls-back to
-direct invocation when the daemon is not running.
+POST /hook/<name> (stdin JSON) runs gradata.hooks.<name>.main(data); GET /health
+and /shutdown. Start: python -m gradata.hooks.daemon [--start|--stop]. Clients
+should use gradata.hooks.client which falls back to direct invocation.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -68,12 +53,17 @@ def _run_hook(name: str, body: str) -> dict:
         sys.stdout, sys.stderr = out, err
         result = mod.main(data)  # type: ignore[attr-defined]
     except SystemExit as e:
-        return {"stdout": out.getvalue(), "stderr": err.getvalue(),
-                "exit_code": int(e.code) if isinstance(e.code, int) else 0}
+        return {
+            "stdout": out.getvalue(),
+            "stderr": err.getvalue(),
+            "exit_code": int(e.code) if isinstance(e.code, int) else 0,
+        }
     except Exception:
-        return {"stdout": out.getvalue(),
-                "stderr": err.getvalue() + traceback.format_exc(),
-                "exit_code": 1}
+        return {
+            "stdout": out.getvalue(),
+            "stderr": err.getvalue() + traceback.format_exc(),
+            "exit_code": 1,
+        }
     finally:
         sys.stdout, sys.stderr = old_stdout, old_stderr
 
@@ -98,16 +88,22 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self._reply(200, {
-                "status": "ok",
-                "uptime_s": round(time.time() - _START_TIME, 1),
-                "pid": os.getpid(),
-                "cached_modules": sorted(_MODULE_CACHE.keys()),
-            })
+            self._reply(
+                200,
+                {
+                    "status": "ok",
+                    "uptime_s": round(time.time() - _START_TIME, 1),
+                    "pid": os.getpid(),
+                    "cached_modules": sorted(_MODULE_CACHE.keys()),
+                },
+            )
         elif self.path == "/shutdown":
             self._reply(200, {"status": "shutting_down"})
             import threading
-            threading.Thread(target=lambda: (time.sleep(0.1), self.server.shutdown()), daemon=True).start()
+
+            threading.Thread(
+                target=lambda: (time.sleep(0.1), self.server.shutdown()), daemon=True
+            ).start()
         else:
             self._reply(404, {"error": "not found"})
 
@@ -115,7 +111,7 @@ class _Handler(BaseHTTPRequestHandler):
         if not self.path.startswith("/hook/"):
             self._reply(404, {"error": "not found"})
             return
-        name = self.path[len("/hook/"):]
+        name = self.path[len("/hook/") :]
         length = int(self.headers.get("Content-Length", "0"))
         body = self.rfile.read(length).decode("utf-8") if length else ""
         result = _run_hook(name, body)
@@ -144,6 +140,7 @@ def run_foreground() -> None:
 def stop_daemon() -> bool:
     import urllib.error
     import urllib.request
+
     try:
         urllib.request.urlopen(f"http://{HOST}:{PORT}/shutdown", timeout=2).read()
         return True
@@ -168,6 +165,7 @@ def main() -> int:
             if pid is not None:
                 import urllib.error
                 import urllib.request
+
                 try:
                     with urllib.request.urlopen(f"http://{HOST}:{PORT}/health", timeout=0.5):
                         pass
@@ -181,10 +179,13 @@ def main() -> int:
         # Re-spawn ourselves detached. Relies on `python -m gradata.hooks.daemon`
         # (no --start) to run the foreground loop.
         import subprocess
+
         subprocess.Popen(
             [sys.executable, "-m", "gradata.hooks.daemon"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            creationflags=getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=getattr(subprocess, "DETACHED_PROCESS", 0)
+            | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
         )
         return 0
 
