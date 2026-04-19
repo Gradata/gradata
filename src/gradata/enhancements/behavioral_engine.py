@@ -1,6 +1,5 @@
-"""Per-domain behavioral directives with MUST/SHOULD/MAY priority tiers. DirectiveRegistry
-matches tasks to directives and returns applicable constraints for prompt injection: MUST
-blocks, SHOULD warns, MAY suggests."""
+"""Per-domain behavioral directives with MUST/SHOULD/MAY tiers. DirectiveRegistry matches tasks
+to constraints for prompt injection: MUST blocks, SHOULD warns, MAY suggests."""
 
 from __future__ import annotations
 

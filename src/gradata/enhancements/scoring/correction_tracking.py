@@ -1,6 +1,5 @@
-"""Correction Tracking — queries CORRECTION events from the brain's events table to
-produce a CorrectionProfile quantifying whether the brain is learning. Domain-agnostic,
-stdlib only (sqlite3, dataclasses, math)."""
+"""Correction Tracking — queries CORRECTION events from the brain's events table to produce a
+CorrectionProfile quantifying whether the brain is learning. Domain-agnostic; stdlib only."""
 
 from __future__ import annotations
 
