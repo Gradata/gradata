@@ -348,6 +348,9 @@ class TestBug9MissingClasses:
         from gradata import Brain, BrainContext, Lesson, LessonState, __version__
 
         assert Brain is not None
+        assert BrainContext is not None
+        assert Lesson is not None
+        assert LessonState is not None
         assert __version__ is not None
 
     def test_pattern_exports_from_submodule(self):
@@ -361,7 +364,7 @@ class TestBug9MissingClasses:
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            from gradata.patterns import (  # noqa: F401
+            from gradata.patterns import (
                 SmartRAG,
                 NaiveRAG,
                 HumanLoopGate,
@@ -377,8 +380,22 @@ class TestBug9MissingClasses:
                 AudienceTier,
             )
 
-            assert SmartRAG is not None
-            assert Pipeline is not None
+            for sym in (
+                SmartRAG,
+                NaiveRAG,
+                HumanLoopGate,
+                RuleApplication,
+                Pipeline,
+                Stage,
+                ParallelBatch,
+                EpisodicMemory,
+                InputGuard,
+                OutputGuard,
+                MCPBridge,
+                Delegation,
+                AudienceTier,
+            ):
+                assert sym is not None
             # DeprecationWarning may already have fired earlier in the session
             # (module-level _WARNED flag), so we don't strictly require it here —
             # the forwarding correctness is the invariant this test guards.
@@ -401,7 +418,9 @@ class TestBug9MissingClasses:
             # import fires and the warning is captured.
             sys.modules.pop("gradata.patterns", None)
             importlib.import_module("gradata.patterns")
-            from gradata.patterns import Pipeline  # noqa: F401
+            from gradata.patterns import Pipeline
+
+            assert Pipeline is not None
 
         shim_warnings = [
             w
