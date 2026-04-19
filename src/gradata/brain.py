@@ -1932,8 +1932,3 @@ class Brain(BrainInspectionMixin):
             "results": results,
             "failures": failed,
         }
-
-
-# Re-export Pipeline type
-with contextlib.suppress(ImportError):
-    pass
