@@ -1,7 +1,5 @@
-"""Report generation — session CSV export, rolling metrics, rule audit, and
-brain health reports (Engineering Spec §10). All reports are event-sourced
-from the events table.
-"""
+"""Report generation — session CSV export, rolling metrics, rule audit, brain health
+(Engineering Spec §10). All reports are event-sourced from the events table."""
 
 from __future__ import annotations
 

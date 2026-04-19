@@ -1,7 +1,6 @@
-"""Rule Canary — graduated rules (PATTERN→RULE) run canary for 3 sessions;
-regressions (corrections in category) auto-rollback to INSTINCT. SQLite table
-``rule_canary`` (category PK, status, start_session, correction_count).
-"""
+"""Rule Canary — graduated rules (PATTERN→RULE) run canary for 3 sessions; regressions
+(corrections in category) auto-rollback to INSTINCT. SQLite table ``rule_canary``
+(category PK, status, start_session, correction_count)."""
 
 from __future__ import annotations
 
