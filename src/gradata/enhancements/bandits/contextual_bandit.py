@@ -1,37 +1,9 @@
-"""
-Contextual Bandit — Explore-exploit for rule application.
-=========================================================
-Layer 1 Enhancement: pure logic, stdlib only.
+"""Thompson-Sampling contextual bandit for rule selection (explore-exploit).
 
-Instead of applying all matching rules uniformly, use a contextual bandit
-to learn WHICH rules to surface in WHICH contexts. This enables:
-
-- Exploration: occasionally surface lower-confidence rules to test them
-- Exploitation: prefer rules with proven track records in similar contexts
-- Context-dependent selection: a rule that works for executives may not
-  work for peers, even if both are "email_draft" scoped
-
-Algorithm: Thompson Sampling with Beta priors.
-Each rule maintains Beta(alpha, beta) where:
-  - alpha = successful applications (accepted)
-  - beta = failed applications (misfired or contradicted)
-Thompson Sampling draws from each rule's posterior and selects the
-highest-scoring rules, naturally balancing explore vs exploit.
-
-Usage:
-    bandit = RuleBandit()
-
-    # Update from outcomes
-    bandit.update("RULE_001", accepted=True)
-    bandit.update("RULE_002", accepted=False)
-
-    # Select rules for a context
-    selected = bandit.select(
-        candidates=["RULE_001", "RULE_002", "RULE_003"],
-        context={"task": "email_draft", "audience": "executive"},
-        k=3,
-    )
-
+Each rule holds Beta(alpha=accepts, beta=rejects); draws from the posterior
+pick top-k per context, balancing exploration of low-confidence rules with
+exploitation of proven ones. Context-dependent — a rule that works for
+executives may not for peers even within the same scope.
 Reference: Multi-Armed Bandits Meet LLMs (arXiv:2505.13355, 2025).
 """
 
@@ -49,9 +21,10 @@ class RuleArm:
     alpha = successes + 1 (prior), beta = failures + 1 (prior).
     Starting at Beta(1,1) = uniform prior (no information).
     """
+
     rule_id: str
-    alpha: float = 1.0      # successes + prior
-    beta: float = 1.0       # failures + prior
+    alpha: float = 1.0  # successes + prior
+    beta: float = 1.0  # failures + prior
     total_pulls: int = 0
     context_scores: dict[str, float] = field(default_factory=dict)
 
@@ -68,9 +41,10 @@ class RuleArm:
 @dataclass
 class SelectionResult:
     """Result of bandit-based rule selection."""
-    selected_rules: list[str]           # Rule IDs selected
-    scores: dict[str, float]            # Rule ID -> Thompson sample score
-    was_exploration: dict[str, bool]    # Rule ID -> True if selected via exploration
+
+    selected_rules: list[str]  # Rule IDs selected
+    scores: dict[str, float]  # Rule ID -> Thompson sample score
+    was_exploration: dict[str, bool]  # Rule ID -> True if selected via exploration
 
 
 class RuleBandit:

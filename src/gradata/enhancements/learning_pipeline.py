@@ -1,36 +1,8 @@
-"""
-Learning Pipeline — End-to-end correction processing chain.
-=============================================================
-Wires the adapted modules into a unified pipeline:
+"""End-to-end correction pipeline: observe→cluster→discriminate→graduate→route.
 
-    observation_hooks (capture)
-      → cluster_manager (group related corrections)
-      → lesson_discriminator (filter noise)
-      → self_improvement (graduate INSTINCT→PATTERN→RULE)
-      → q_learning_router (route based on learned rewards)
-      → context_brackets (degrade gracefully)
-
-Each stage is optional — the pipeline degrades gracefully when
-modules are missing. The Brain class calls process_correction()
-as the single entry point after a correction is captured.
-
-Usage::
-
-    from .learning_pipeline import LearningPipeline
-
-    pipeline = LearningPipeline(brain_dir=Path("./my-brain"))
-    result = pipeline.process_correction(
-        draft="Dear Sir,",
-        final="Hey,",
-        severity="moderate",
-        category="TONE",
-        session_id="s42",
-        task_type="email_draft",
-    )
-    print(result.stages_completed)   # ["observe", "cluster", "discriminate", "graduate"]
-    print(result.is_high_value)      # True
-    print(result.cluster_id)         # "cluster_3"
-    print(result.lesson_state)       # "PATTERN"
+Wires observation_hooks, cluster_manager, lesson_discriminator, self_improvement,
+q_learning_router, and context_brackets. Each stage is optional; pipeline degrades
+gracefully when modules are missing. Brain.process_correction() is the entry point.
 """
 
 from __future__ import annotations
@@ -70,6 +42,7 @@ class PipelineResult:
         processing_time_ms: Total pipeline processing time.
         metadata: Arbitrary metadata from pipeline stages.
     """
+
     stages_completed: list[str] = field(default_factory=list)
     stages_skipped: list[str] = field(default_factory=list)
     stages_failed: list[str] = field(default_factory=list)
@@ -101,11 +74,7 @@ class PipelineResult:
 
     @property
     def stages_total(self) -> int:
-        return (
-            len(self.stages_completed)
-            + len(self.stages_skipped)
-            + len(self.stages_failed)
-        )
+        return len(self.stages_completed) + len(self.stages_skipped) + len(self.stages_failed)
 
 
 class LearningPipeline:
@@ -136,7 +105,10 @@ class LearningPipeline:
         self._observer = None
         try:
             from .observation_hooks import ObservationStore
-            obs_dir = observation_dir or (self.brain_dir / "observations" if self.brain_dir else None)
+
+            obs_dir = observation_dir or (
+                self.brain_dir / "observations" if self.brain_dir else None
+            )
             if obs_dir:
                 self._observer = ObservationStore(base_dir=obs_dir)
         except ImportError:
@@ -151,6 +123,7 @@ class LearningPipeline:
                 ClusterManager,
                 ClusterState,
             )
+
             self._cluster_mgr = ClusterManager(cluster_config or ClusterConfig())
             self._cluster_state = ClusterState()
             # Try loading persisted state
@@ -158,6 +131,7 @@ class LearningPipeline:
                 state_file = self.brain_dir / "cluster_state.json"
                 if state_file.exists():
                     import json
+
                     data = json.loads(state_file.read_text(encoding="utf-8"))
                     self._cluster_state = ClusterState.from_dict(data)
         except ImportError:
@@ -167,6 +141,7 @@ class LearningPipeline:
         self._discriminator = None
         try:
             from .lesson_discriminator import LessonDiscriminator
+
             self._discriminator = LessonDiscriminator(discriminator_config)
         except ImportError:
             pass
@@ -175,6 +150,7 @@ class LearningPipeline:
         self._memory_taxonomy = None
         try:
             from .memory_taxonomy import classify_memory_type
+
             self._memory_taxonomy = classify_memory_type
         except ImportError:
             pass
@@ -183,6 +159,7 @@ class LearningPipeline:
         self._router = None
         try:
             from ..contrib.patterns.q_learning_router import QLearningRouter
+
             self._router = QLearningRouter()
             if router_path:
                 self._router.load(router_path)
@@ -197,6 +174,7 @@ class LearningPipeline:
         self._context_tracker = None
         try:
             from ..contrib.patterns.context_brackets import ContextTracker
+
             self._context_tracker = ContextTracker(max_tokens=200_000)
         except ImportError:
             pass
@@ -249,6 +227,7 @@ class LearningPipeline:
         if self._observer:
             try:
                 from .observation_hooks import observe_tool_use
+
                 obs = observe_tool_use(
                     tool_name="brain.correct",
                     input_data=f"severity={severity} category={category}",
@@ -362,6 +341,7 @@ class LearningPipeline:
         # Save cluster state
         if self._cluster_state:
             import json
+
             state_file = self.brain_dir / "cluster_state.json"
             state_file.write_text(
                 json.dumps(self._cluster_state.to_dict(), indent=2),
@@ -381,6 +361,7 @@ class LearningPipeline:
         if self._cluster_mgr and self._cluster_state:
             stats["stages_available"].append("cluster")
             from .cluster_manager import ClusterManager
+
             stats["cluster"] = ClusterManager().stats(self._cluster_state)
         if self._discriminator:
             stats["stages_available"].append("discriminate")

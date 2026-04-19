@@ -1,34 +1,11 @@
 """Lightweight adversarial-phrase blocklist for correction ingest.
 
-Companion defence to ``correction_hash`` (A1 indirect prompt injection).
-Scans correction text for canonical prompt-injection triggers and, on match,
-flags the correction ``requires_review=True`` so the existing
-``approval_required`` gate intercepts graduation.
-
-Design choices:
-
-* **Flag, do not reject.** Users legitimately write about these concepts
-  (teaching a colleague, drafting a red-team report, documenting attacks).
-  False positives are expected; the cost of a false positive is a one-click
-  promote, the cost of a false negative is a persistent poisoned rule.
-* **Case-insensitive, whitespace-tolerant substring match.** Low false
-  negative rate, near-zero runtime cost. This is not a universal adversarial
-  suffix detector — those transfer across models (Zou et al. 2023 GCG,
-  https://arxiv.org/abs/2307.15043) and require embedding-based detection.
-  The goal here is to catch obvious human-readable injection attempts in
-  pasted text.
-* **Seed list only.** The phrase list is intentionally small so it is
-  auditable and extendable via configuration. Expansion should be data-driven
-  once we observe misses in production.
-
-References:
-- Greshake et al. 2023, "Not What You've Signed Up For" (indirect prompt
-  injection threat model). https://arxiv.org/abs/2302.12173
-- Wallace et al. 2019, "Universal Adversarial Triggers for Attacking and
-  Analyzing NLP" (transferable adversarial trigger sequences).
-  https://arxiv.org/abs/1908.07125
-- Perez & Ribeiro 2022, "Ignore Previous Prompt: Attack Techniques For
-  Language Models" (goal hijacking & prompt leakage patterns).
+Flags (not rejects) correction text containing canonical prompt-injection
+triggers so the approval_required gate intercepts graduation. Case-insensitive,
+whitespace-tolerant substring match against an auditable seed list — optimised
+for recall on obvious human-readable injections, not universal adversarial
+suffixes (Zou 2023 GCG). Companion to correction_hash for A1 indirect injection.
+References: Greshake 2023, Wallace 2019, Perez & Ribeiro 2022.
 """
 
 from __future__ import annotations

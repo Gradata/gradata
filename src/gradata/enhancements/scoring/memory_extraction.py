@@ -1,34 +1,9 @@
-"""
-Passive Memory Extraction — Extract facts from any conversation.
-================================================================
-Layer 1 Enhancement: pure logic, stdlib only.
+"""Passive two-phase memory extraction from conversation messages.
 
-Stolen from: Mem0's two-phase extract-then-update pipeline.
-
-The correction pipeline only learns from user edits. This module captures
-ALL useful information from conversations — facts, preferences, entities,
-relationships — not just behavioral corrections.
-
-Two-phase pipeline:
-  1. EXTRACT: Identify candidate facts/preferences from messages
-  2. RECONCILE: Compare candidates against existing facts, decide
-     ADD / UPDATE / INVALIDATE / SKIP
-
-The extraction uses rule-based heuristics (no LLM dependency for the SDK).
-Cloud mode can use LLM-powered extraction for higher quality.
-
-Usage:
-    extractor = MemoryExtractor()
-    facts = extractor.extract(messages)
-    actions = extractor.reconcile(facts, existing_facts)
-
-    for action in actions:
-        if action.op == "add":
-            store(action.fact)
-        elif action.op == "update":
-            update(action.target_id, action.fact)
-        elif action.op == "invalidate":
-            invalidate(action.target_id, reason=action.reason)
+EXTRACT: identify candidate facts/preferences/entities/relationships via
+rule-based heuristics (no LLM dep). RECONCILE: compare against existing
+facts, decide ADD/UPDATE/INVALIDATE/SKIP. Inspired by Mem0's extract-then-update
+pipeline — captures useful info beyond behavioral corrections.
 """
 
 from __future__ import annotations
@@ -41,10 +16,11 @@ from datetime import UTC, datetime
 @dataclass
 class ExtractedFact:
     """A candidate fact extracted from conversation."""
-    content: str                    # Natural language fact
-    fact_type: str                  # preference, entity, relationship, action_item, temporal
-    confidence: float = 0.7        # Extraction confidence (0-1)
-    source_role: str = "user"      # Who said it: user, assistant
+
+    content: str  # Natural language fact
+    fact_type: str  # preference, entity, relationship, action_item, temporal
+    confidence: float = 0.7  # Extraction confidence (0-1)
+    source_role: str = "user"  # Who said it: user, assistant
     entities: list[str] = field(default_factory=list)  # Named entities mentioned
     timestamp: str = ""
 
@@ -52,11 +28,12 @@ class ExtractedFact:
 @dataclass
 class ReconcileAction:
     """Action to take after comparing extracted fact against existing facts."""
-    op: str                         # add, update, invalidate, skip
+
+    op: str  # add, update, invalidate, skip
     fact: ExtractedFact
-    target_id: str | None = None    # ID of existing fact to update/invalidate
-    reason: str = ""                # Why this action
-    supersedes: str | None = None   # ID of fact being superseded (for temporal tracking)
+    target_id: str | None = None  # ID of existing fact to update/invalidate
+    reason: str = ""  # Why this action
+    supersedes: str | None = None  # ID of fact being superseded (for temporal tracking)
 
 
 # ---------------------------------------------------------------------------
@@ -65,8 +42,13 @@ class ReconcileAction:
 
 # Preference patterns: "I prefer X", "I like X", "don't use X", "always X"
 _PREFERENCE_PATTERNS = [
-    re.compile(r"(?:i|we)\s+(?:prefer|like|want|need|love|hate|dislike|avoid)\s+(.+?)(?:\.|$)", re.I),
-    re.compile(r"(?:always|never|don't|do not)\s+(?:use|include|add|write|mention|say)\s+(.+?)(?:\.|$)", re.I),
+    re.compile(
+        r"(?:i|we)\s+(?:prefer|like|want|need|love|hate|dislike|avoid)\s+(.+?)(?:\.|$)", re.I
+    ),
+    re.compile(
+        r"(?:always|never|don't|do not)\s+(?:use|include|add|write|mention|say)\s+(.+?)(?:\.|$)",
+        re.I,
+    ),
     re.compile(r"(?:instead of|rather than)\s+(.+?)(?:,|\.|\s+use)", re.I),
 ]
 
@@ -77,19 +59,26 @@ _ENTITY_PATTERN = re.compile(r"\b([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)\b")
 _ACTION_PATTERNS = [
     re.compile(r"(?:need to|should|will|going to|have to|must)\s+(.+?)(?:\.|$)", re.I),
     re.compile(r"(?:follow up|schedule|send|check|review|prepare|draft)\s+(.+?)(?:\.|$)", re.I),
-    re.compile(r"(?:by|before|on|until)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d{1,2}[/-]\d{1,2})", re.I),
+    re.compile(
+        r"(?:by|before|on|until)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d{1,2}[/-]\d{1,2})",
+        re.I,
+    ),
 ]
 
 # Temporal patterns: dates, deadlines, timeframes
 _TEMPORAL_PATTERNS = [
-    re.compile(r"(?:meeting|call|demo|appointment)\s+(?:on|at|scheduled for)\s+(.+?)(?:\.|$)", re.I),
+    re.compile(
+        r"(?:meeting|call|demo|appointment)\s+(?:on|at|scheduled for)\s+(.+?)(?:\.|$)", re.I
+    ),
     re.compile(r"(?:deadline|due|expires?)\s+(?:on|by|is)?\s*(.+?)(?:\.|$)", re.I),
 ]
 
 # Relationship patterns: "X works at Y", "X is the Y at Z"
 _RELATIONSHIP_PATTERNS = [
     re.compile(r"(\w+(?:\s+\w+)?)\s+(?:works at|is at|joined)\s+(.+?)(?:\.|$)", re.I),
-    re.compile(r"(\w+(?:\s+\w+)?)\s+is\s+(?:the\s+)?(\w+(?:\s+\w+)?)\s+(?:at|of|for)\s+(.+?)(?:\.|$)", re.I),
+    re.compile(
+        r"(\w+(?:\s+\w+)?)\s+is\s+(?:the\s+)?(\w+(?:\s+\w+)?)\s+(?:at|of|for)\s+(.+?)(?:\.|$)", re.I
+    ),
 ]
 
 
@@ -123,54 +112,62 @@ class MemoryExtractor:
                 for match in pattern.finditer(content):
                     fact_text = match.group(0).strip()
                     if len(fact_text) > 10:  # Skip trivially short matches
-                        facts.append(ExtractedFact(
-                            content=fact_text,
-                            fact_type="preference",
-                            confidence=0.8,
-                            source_role=role,
-                            entities=self._extract_entities(fact_text),
-                            timestamp=now,
-                        ))
+                        facts.append(
+                            ExtractedFact(
+                                content=fact_text,
+                                fact_type="preference",
+                                confidence=0.8,
+                                source_role=role,
+                                entities=self._extract_entities(fact_text),
+                                timestamp=now,
+                            )
+                        )
 
             # Extract action items (prospective memory)
             for pattern in _ACTION_PATTERNS:
                 for match in pattern.finditer(content):
                     fact_text = match.group(0).strip()
                     if len(fact_text) > 10 and role == "user":
-                        facts.append(ExtractedFact(
-                            content=fact_text,
-                            fact_type="action_item",
-                            confidence=0.6,
-                            source_role=role,
-                            entities=self._extract_entities(fact_text),
-                            timestamp=now,
-                        ))
+                        facts.append(
+                            ExtractedFact(
+                                content=fact_text,
+                                fact_type="action_item",
+                                confidence=0.6,
+                                source_role=role,
+                                entities=self._extract_entities(fact_text),
+                                timestamp=now,
+                            )
+                        )
 
             # Extract temporal facts (meetings, deadlines)
             for pattern in _TEMPORAL_PATTERNS:
                 for match in pattern.finditer(content):
                     fact_text = match.group(0).strip()
-                    facts.append(ExtractedFact(
-                        content=fact_text,
-                        fact_type="temporal",
-                        confidence=0.7,
-                        source_role=role,
-                        timestamp=now,
-                    ))
+                    facts.append(
+                        ExtractedFact(
+                            content=fact_text,
+                            fact_type="temporal",
+                            confidence=0.7,
+                            source_role=role,
+                            timestamp=now,
+                        )
+                    )
 
             # Extract relationships
             for pattern in _RELATIONSHIP_PATTERNS:
                 for match in pattern.finditer(content):
                     fact_text = match.group(0).strip()
                     entities = [g for g in match.groups() if g]
-                    facts.append(ExtractedFact(
-                        content=fact_text,
-                        fact_type="relationship",
-                        confidence=0.6,
-                        source_role=role,
-                        entities=entities,
-                        timestamp=now,
-                    ))
+                    facts.append(
+                        ExtractedFact(
+                            content=fact_text,
+                            fact_type="relationship",
+                            confidence=0.6,
+                            source_role=role,
+                            entities=entities,
+                            timestamp=now,
+                        )
+                    )
 
         # Deduplicate by content similarity
         return self._deduplicate(facts)
@@ -199,43 +196,53 @@ class MemoryExtractor:
 
             if match is None:
                 # No similar fact exists — ADD
-                actions.append(ReconcileAction(
-                    op="add",
-                    fact=candidate,
-                    reason="New fact, no similar existing entry",
-                ))
+                actions.append(
+                    ReconcileAction(
+                        op="add",
+                        fact=candidate,
+                        reason="New fact, no similar existing entry",
+                    )
+                )
             elif self._is_contradiction(candidate, match):
                 # Contradicts existing — INVALIDATE old + ADD new
                 # Temporal preservation: don't delete, mark as superseded
-                actions.append(ReconcileAction(
-                    op="invalidate",
-                    fact=candidate,
-                    target_id=match.get("id"),
-                    reason="Superseded by newer information",
-                    supersedes=match.get("id"),
-                ))
-                actions.append(ReconcileAction(
-                    op="add",
-                    fact=candidate,
-                    reason=f"Replaces invalidated fact {match.get('id')}",
-                    supersedes=match.get("id"),
-                ))
+                actions.append(
+                    ReconcileAction(
+                        op="invalidate",
+                        fact=candidate,
+                        target_id=match.get("id"),
+                        reason="Superseded by newer information",
+                        supersedes=match.get("id"),
+                    )
+                )
+                actions.append(
+                    ReconcileAction(
+                        op="add",
+                        fact=candidate,
+                        reason=f"Replaces invalidated fact {match.get('id')}",
+                        supersedes=match.get("id"),
+                    )
+                )
             elif self._is_enrichment(candidate, match):
                 # Adds new info to existing — UPDATE
-                actions.append(ReconcileAction(
-                    op="update",
-                    fact=candidate,
-                    target_id=match.get("id"),
-                    reason="Enriches existing fact with new details",
-                ))
+                actions.append(
+                    ReconcileAction(
+                        op="update",
+                        fact=candidate,
+                        target_id=match.get("id"),
+                        reason="Enriches existing fact with new details",
+                    )
+                )
             else:
                 # Already well-represented — SKIP
-                actions.append(ReconcileAction(
-                    op="skip",
-                    fact=candidate,
-                    target_id=match.get("id"),
-                    reason="Already captured",
-                ))
+                actions.append(
+                    ReconcileAction(
+                        op="skip",
+                        fact=candidate,
+                        target_id=match.get("id"),
+                        reason="Already captured",
+                    )
+                )
 
         return actions
 

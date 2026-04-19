@@ -1,36 +1,9 @@
-"""
-Human-in-the-Loop Pattern — Risk-Tiered Approval Gates
-=======================================================
-SDK LAYER: Pure logic, stdlib only. No domain-specific content.
+"""Risk-tiered human approval gates for agentic pipelines (pure stdlib).
 
-Provides three primitives for inserting human oversight into agentic
-pipelines based on the risk level of a proposed action:
-
-``assess_risk``
-    Classify an action string into ``"low"``, ``"medium"``, or ``"high"``
-    risk using keyword matching.  Keywords are domain-agnostic; callers
-    may extend the classification by passing a ``context`` dict.
-
-``gate``
-    Decide whether an action requires human approval.  Low-risk actions
-    may be auto-approved; medium and high-risk actions always surface an
-    ``ApprovalRequest`` to the caller.
-
-``preview_action``
-    Produce a human-readable summary of what the action will do and
-    which entities it will affect, so the reviewer can make an informed
-    decision without reading raw code or API payloads.
-
-Design principles
------------------
-- Zero domain assumptions.  Keyword lists cover generic computing verbs;
-  callers layer domain context on top via ``context`` dicts.
-- No I/O.  All functions are pure transforms over plain Python dicts and
-  strings.  Persistence, UI rendering, and approval collection are the
-  host's responsibility.
-- Reversibility is a first-class signal.  The ``RiskAssessment.reversible``
-  flag is derived automatically and exposed so downstream logic can use it
-  independently of the tier.
+assess_risk: low/medium/high via keyword matching (extensible via context).
+gate: auto-approves low risk, surfaces ApprovalRequest for medium/high.
+preview_action: human-readable summary for the reviewer.
+Reversibility is a first-class derived signal, independent of tier.
 """
 
 from __future__ import annotations

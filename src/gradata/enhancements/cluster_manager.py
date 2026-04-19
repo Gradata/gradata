@@ -1,35 +1,8 @@
-"""
-Cluster Manager — Incremental centroid clustering for corrections.
-===================================================================
-Adapted from: EverOS (EverMind-AI/EverOS) cluster_manager/manager.py
+"""Incremental centroid clustering for corrections via cosine similarity.
 
-Groups related corrections/lessons using cosine similarity with
-temporal proximity gating and running-average centroid updates.
-No full recomputation needed — clusters update incrementally.
-
-Key design from EverOS:
-- Pure computation: caller loads/saves state (clean DI)
-- Temporal gating: corrections too far apart in time skip similarity check
-- Running-average centroids: O(1) memory per update
-- No reassignment: once clustered, items stay (stable clusters)
-
-Usage::
-
-    from .cluster_manager import (
-        ClusterManager, ClusterConfig, ClusterState, ClusterAssignment,
-    )
-
-    mgr = ClusterManager()
-    state = ClusterState()
-
-    assignment = mgr.assign(
-        state=state,
-        item_id="correction_42",
-        vector=[0.1, 0.2, ...],
-        timestamp=time.time(),
-    )
-    print(assignment.cluster_id)   # "cluster_0" or existing
-    print(assignment.is_new)       # True if new cluster created
+Temporal-proximity gating + running-average centroid updates (O(1) per update,
+no reassignment once placed). Pure computation — caller owns state I/O.
+Adapted from EverOS (EverMind-AI/EverOS) cluster_manager/manager.py.
 """
 
 from __future__ import annotations
