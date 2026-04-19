@@ -1,17 +1,9 @@
-"""
-Scope Builder — Rule scoping and context-to-scope inference.
-=============================================================
-SDK LAYER: Pure logic, stdlib only (dataclasses). No file I/O.
-
-A RuleScope describes the context in which a rule applies. Fields are
-hierarchical filters: empty string means "wildcard — match anything".
-
-Typical flow:
-    1. Agent receives a session context dict
-    2. ``build_scope(context)`` infers a RuleScope from that dict
-    3. Rule retrieval calls ``scope_matches(rule_scope, query_scope)``
-       to rank rules by relevance (0.0 = irrelevant, 1.0 = perfect match)
-    4. Rules serialise/deserialise via ``scope_to_dict`` / ``scope_from_dict``
+"""Scope Builder — rule scoping + context-to-scope inference. RuleScope fields
+are hierarchical filters; empty string = wildcard. Flow: ``build_scope(ctx)``
+infers a RuleScope; retrieval calls ``scope_matches(rule_scope, query_scope)``
+for relevance ranking (0.0 irrelevant → 1.0 perfect match);
+``scope_to_dict`` / ``scope_from_dict`` serialise.
+SDK LAYER: pure logic, stdlib only. No file I/O.
 """
 
 from __future__ import annotations
