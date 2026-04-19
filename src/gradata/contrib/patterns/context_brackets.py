@@ -1,7 +1,6 @@
-"""Four-bracket context-capacity model (FRESH/MODERATE/DEEP/CRITICAL) with guidance.
-
-Makes late-session context degradation explicit via get_bracket(ratio) →
-bracket + actionable strategy. Adapted from paul (ChristopherKahler/paul) context-management.md.
+"""Four-bracket context-capacity model (FRESH/MODERATE/DEEP/CRITICAL).
+``get_bracket(ratio)`` returns bracket + actionable strategy.
+Adapted from ChristopherKahler/paul context-management.md.
 """
 
 from __future__ import annotations

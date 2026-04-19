@@ -1,7 +1,6 @@
 """Thompson-Sampling contextual bandit for rule selection. Each rule holds
-Beta(α=accepts, β=rejects); posterior draws pick top-k per context, balancing
-exploration/exploitation. Context-dependent: a rule working for executives may
-not for peers. Ref: arXiv:2505.13355 (2025).
+Beta(α=accepts, β=rejects); posterior draws pick top-k per context.
+Ref: arXiv:2505.13355 (2025).
 """
 
 from __future__ import annotations

@@ -1,7 +1,6 @@
-"""Quality Gates — 8.0-min threshold with evaluate-fix-re-evaluate cycling.
-Caller supplies scorer + fixer callables; ``run_with_fix`` is the primary
-entry point, ``evaluate`` for single-pass scoring. ``default_scorer`` is a
-length+keyword heuristic usable without an LLM. Pure logic, no I/O.
+"""8.0-min threshold gates with evaluate-fix-re-evaluate cycling. Caller
+supplies scorer+fixer; entry ``run_with_fix``, single-pass ``evaluate``.
+``default_scorer`` is a length+keyword heuristic (no LLM). Pure logic.
 """
 
 from __future__ import annotations
