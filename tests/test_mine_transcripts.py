@@ -185,6 +185,51 @@ def test_run_mine_shadow_writes_backfill_only(tmp_path):
     assert not (brain / "events.jsonl").exists()
 
 
+def test_run_mine_project_filter(tmp_path):
+    brain = tmp_path / "brain"
+    projects = tmp_path / "projects"
+    _write_session(projects, "C--keep", [_user_msg("are you sure about it")])
+    _write_session(projects, "C--skip", [_user_msg("make sure to test")])
+    run_mine(
+        brain_root=brain,
+        projects_root=projects,
+        project="C--keep",
+        commit=False,
+        dry_run=False,
+    )
+    lines = (brain / "events.backfill.jsonl").read_text(encoding="utf-8").strip().splitlines()
+    assert len(lines) == 1
+    ev = json.loads(lines[0])
+    assert json.loads(ev["data"])["project"] == "C--keep"
+
+
+def test_run_mine_missing_projects_root_returns_1(tmp_path, capsys):
+    rc = run_mine(
+        brain_root=tmp_path / "brain",
+        projects_root=tmp_path / "does-not-exist",
+        project=None,
+        commit=False,
+        dry_run=True,
+    )
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "transcript root not found" in err
+
+
+def test_run_mine_missing_project_dir_warns(tmp_path, capsys):
+    projects = tmp_path / "projects"
+    projects.mkdir()
+    run_mine(
+        brain_root=tmp_path / "brain",
+        projects_root=projects,
+        project="C--does-not-exist",
+        commit=False,
+        dry_run=True,
+    )
+    err = capsys.readouterr().err
+    assert "skip missing" in err
+
+
 def test_run_mine_commit_appends_live(tmp_path):
     brain = tmp_path / "brain"
     brain.mkdir()
