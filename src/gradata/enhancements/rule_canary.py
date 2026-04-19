@@ -1,16 +1,6 @@
-"""
-Rule Canary — Graduated rules run in canary mode for 3 sessions before full activation.
-
-When a rule graduates (PATTERN -> RULE), it enters canary mode. If it causes
-regressions (corrections in its category) during the canary period, it gets
-auto-rolled back to INSTINCT confidence.
-
-SQLite table: rule_canary (category PK, status, start_session, correction_count)
-
-Usage:
-    from .rule_canary import (
-        promote_to_canary, check_canary_health, rollback_rule, get_canary_rules,
-    )
+"""Rule Canary — graduated rules (PATTERN→RULE) run canary for 3 sessions;
+regressions (corrections in category) auto-rollback to INSTINCT. SQLite table
+``rule_canary`` (category PK, status, start_session, correction_count).
 """
 
 from __future__ import annotations
@@ -28,6 +18,7 @@ def _now_iso() -> str:
     """ISO-8601 UTC timestamp for audit columns."""
     return datetime.now(UTC).isoformat()
 
+
 # Default canary period: 3 sessions
 CANARY_SESSIONS = 3
 # Rollback target confidence (back to INSTINCT range)
@@ -35,8 +26,8 @@ ROLLBACK_CONFIDENCE = 0.50
 
 
 class CanaryStatus(Enum):
-    CANARY = "canary"           # first 3 sessions after graduation
-    ACTIVE = "active"           # passed canary period
+    CANARY = "canary"  # first 3 sessions after graduation
+    ACTIVE = "active"  # passed canary period
     ROLLED_BACK = "rolled_back"  # caused regression, disabled
 
 
@@ -92,7 +83,9 @@ def _get_db_path(ctx=None) -> Path:
     except Exception:
         pass
 
-    raise ValueError("Cannot resolve rule_canary DB path: no context, BRAIN_DIR, or relative path found")
+    raise ValueError(
+        "Cannot resolve rule_canary DB path: no context, BRAIN_DIR, or relative path found"
+    )
 
 
 def promote_to_canary(rule_category: str, session: int, db_path: Path | None = None) -> None:
@@ -214,6 +207,7 @@ def rollback_rule(rule_category: str, reason: str, db_path: Path | None = None) 
         # Emit RULE_ROLLBACK event
         try:
             from .._events import emit
+
             emit(
                 "RULE_ROLLBACK",
                 "rule_canary:rollback_rule",
@@ -248,6 +242,7 @@ def promote_to_active(rule_category: str, db_path: Path | None = None) -> None:
         # Emit CANARY_PROMOTED event
         try:
             from .._events import emit
+
             emit(
                 "CANARY_PROMOTED",
                 "rule_canary:promote_to_active",

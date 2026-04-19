@@ -1,18 +1,8 @@
-"""
-HMAC Rule Signing — tamper detection for graduated rules.
-==========================================================
-SDK LAYER: Layer 1 (enhancements). Imports from _types only.
-
-Prevents tampered or forged rules from being injected into prompts.
-Each rule is signed with HMAC-SHA256 using a secret key. On injection,
-the signature is verified; unsigned or tampered rules are skipped with
-a WARNING log.
-
-Backward compatible: when no secret key is configured (solo use),
-rules pass through unsigned and unverified.
-
-OPEN SOURCE: Signing algorithm is open. Key management and
-multi-tenant signing are proprietary cloud-side.
+"""HMAC Rule Signing — tamper detection for graduated rules. HMAC-SHA256 per
+rule; unsigned/tampered rules are skipped (WARN) on injection. Backward
+compatible: no secret configured → pass-through unsigned. SDK Layer 1
+(enhancements), imports _types only. Key mgmt + multi-tenant signing live
+cloud-side.
 """
 
 from __future__ import annotations
