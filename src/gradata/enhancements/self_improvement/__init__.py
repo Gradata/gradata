@@ -1,6 +1,5 @@
-"""Procedural Memory — INSTINCT→PATTERN→RULE graduation pipeline. Confidence scoring,
-parsing, FSRS-inspired graduation, adversarial validation. Cloud adds FSRS scheduling +
-multi-brain opt. Split: ``_confidence.py`` (math), ``_graduation.py`` (gate). Layer 1."""
+"""Procedural Memory — INSTINCT→PATTERN→RULE graduation. Confidence scoring, FSRS-inspired
+graduation, adversarial validation. Split: ``_confidence.py`` (math), ``_graduation.py`` (gate)."""
 
 # Re-export everything that was previously importable from the flat module.
 # All of these imports MUST keep working:

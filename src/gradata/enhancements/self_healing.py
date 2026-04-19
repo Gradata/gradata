@@ -1,6 +1,5 @@
-"""Self-healing: when a RULE (conf ≥ 0.80) fails to block a covered correction,
-``detect_rule_failure`` → ``generate_patch_candidate`` (heuristic) → ``retroactive_test``
-gate; passing candidates re-enter graduation at INSTINCT. LLM diagnoses, pipeline validates."""
+"""Self-healing: on RULE (conf≥0.80) failing to block a covered correction, ``detect_rule_failure``
+→ ``generate_patch_candidate`` → ``retroactive_test``; passing candidates re-enter at INSTINCT."""
 
 from __future__ import annotations
 

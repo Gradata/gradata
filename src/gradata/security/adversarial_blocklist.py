@@ -1,6 +1,5 @@
-"""Adversarial-phrase blocklist for correction ingest. Flags (not rejects) prompt-injection
-triggers via case-insensitive substring match so approval_required intercepts graduation.
-Recall-optimised for human-readable injections (not GCG suffixes, Zou 2023)."""
+"""Adversarial-phrase blocklist for correction ingest — flags prompt-injection triggers via
+substring match so approval_required intercepts graduation. Recall-optimised, not GCG suffixes."""
 
 from __future__ import annotations
 
