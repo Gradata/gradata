@@ -1,13 +1,9 @@
-"""Daemon-aware hook entrypoint. Used as ``python -m gradata.hooks.client <name>``.
-
-Tries the local hook daemon first (fast: no Python spawn cost); falls back to
-direct module import if the daemon isn't running. Used by ``settings.json``
-hook commands so users can opt in to the daemon without any config change
-other than changing the command to route through this module.
-
-Exits 0 on success, 127 on unknown hook, 1 on transport errors (after
-fallback also fails).
+"""Daemon-aware hook entrypoint (``python -m gradata.hooks.client <name>``).
+Tries the local hook daemon first (no Python spawn cost), falls back to
+direct module import. Exits 0 on success, 127 on unknown hook, 1 on
+transport errors after fallback also fails.
 """
+
 from __future__ import annotations
 
 import importlib

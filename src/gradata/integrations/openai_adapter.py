@@ -1,15 +1,7 @@
-"""OpenAI Integration — DEPRECATED.
-
-.. deprecated::
-    ``gradata.integrations.openai_adapter`` is deprecated and will be
-    removed in v0.8.0.  Use ``gradata.middleware.openai_adapter`` instead::
-
-        from ..middleware import wrap_openai
-        client = wrap_openai(OpenAI(), brain_path="./brain")
-
-    ``wrap_openai`` returns an ``OpenAIMiddleware`` proxy with richer rule
-    enforcement via :class:`~gradata.middleware._core.RuleSource`.  If you
-    need the legacy in-place patch behaviour, pin to gradata<0.8.
+"""OpenAI Integration — DEPRECATED (removed in v0.8.0). Use
+``gradata.middleware.wrap_openai`` for richer rule enforcement via
+:class:`~gradata.middleware._core.RuleSource`; pin to gradata<0.8 for the
+legacy in-place patch.
 """
 
 from __future__ import annotations

@@ -1,15 +1,7 @@
-"""Anthropic Integration — DEPRECATED.
-
-.. deprecated::
-    ``gradata.integrations.anthropic_adapter`` is deprecated and will be
-    removed in v0.8.0.  Use ``gradata.middleware.anthropic_adapter`` instead::
-
-        from ..middleware import wrap_anthropic
-        client = wrap_anthropic(Anthropic(), brain_path="./brain")
-
-    ``wrap_anthropic`` returns an ``AnthropicMiddleware`` wrapper (richer rule
-    enforcement via :class:`~gradata.middleware._core.RuleSource`).  If you
-    need the legacy in-place patch behaviour, pin to gradata<0.8.
+"""Anthropic Integration — DEPRECATED (removed in v0.8.0). Use
+``gradata.middleware.wrap_anthropic`` for richer rule enforcement via
+:class:`~gradata.middleware._core.RuleSource`; pin to gradata<0.8 for the
+legacy in-place patch.
 """
 
 from __future__ import annotations
