@@ -1,8 +1,6 @@
-"""External memory adapters — opt-in integrations mirroring corrections and
-retrieving context from Mem0/Letta/EverMind/etc. Not auto-wired; users call
-from their own ``Brain.correct()`` sites. All adapters implement
-:class:`MemoryAdapter`, thread-safe, never raise on transport failure.
-"""
+"""External memory adapters — opt-in integrations mirroring corrections and retrieving
+context from Mem0/Letta/EverMind/etc. Not auto-wired; users call from ``Brain.correct()``.
+All adapters implement :class:`MemoryAdapter`, thread-safe, never raise on transport failure."""
 
 from __future__ import annotations
 

@@ -1,8 +1,4 @@
-"""
-Context Packet Builder.
-=========================
-Generates structured context briefs before agent spawn.
-"""
+"""Context Packet Builder — generates structured context briefs before agent spawn."""
 
 import contextlib
 import json

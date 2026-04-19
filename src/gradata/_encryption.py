@@ -1,8 +1,6 @@
-"""Brain DB encryption at rest (optional — ``pip install gradata[encrypted]``).
-Decrypt ``system.db.enc`` → ``system.db`` on open, re-encrypt + delete plaintext
-on close. Key priority: ``Brain(encryption_key=...)`` > ``GRADATA_ENCRYPTION_KEY``
-env > ``~/.gradata/encryption.key`` (auto-generated).
-"""
+"""Brain DB encryption at rest (optional — ``pip install gradata[encrypted]``). Decrypt
+``system.db.enc`` → ``system.db`` on open, re-encrypt + delete plaintext on close. Key
+priority: ``Brain(encryption_key=...)`` > env > ``~/.gradata/encryption.key`` (auto-gen)."""
 
 from __future__ import annotations
 
