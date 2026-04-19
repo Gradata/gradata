@@ -1,7 +1,4 @@
-"""
-Context Compiler.
-===================
-Extracts entities from a user message, queries the brain,
+"""Context Compiler — extracts entities from user messages, queries the brain,
 returns formatted context injection.
 """
 

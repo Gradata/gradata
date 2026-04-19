@@ -1,8 +1,7 @@
-"""Opt-in Mem0 memory adapter (MemoryAdapter protocol).
-
-Mirrors Gradata corrections to a Mem0 workspace. Install via
-``pip install "gradata[adapters-mem0]"``. Never raises on backend failure:
-writes return None, reads return []. Host brain stays up even if Mem0 is down.
+"""Opt-in Mem0 memory adapter (MemoryAdapter protocol). Mirrors corrections
+to a Mem0 workspace. Install: ``pip install "gradata[adapters-mem0]"``.
+Never raises on backend failure (writes→None, reads→[]); host brain stays up
+even if Mem0 is down.
 """
 
 from __future__ import annotations

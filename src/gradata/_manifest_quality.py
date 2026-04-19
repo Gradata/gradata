@@ -1,8 +1,5 @@
-"""
-Brain Manifest Quality Scoring.
-================================
-Quality scoring functions for brain manifest generation.
-Split from _brain_manifest.py for file size compliance (<500 lines).
+"""Brain Manifest Quality Scoring — quality scoring functions for manifest
+generation. Split from _brain_manifest.py for file-size compliance.
 """
 
 import math
