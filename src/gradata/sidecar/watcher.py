@@ -1,29 +1,8 @@
-"""
-File Watcher Sidecar — Wave 4: Observation Capture.
-=====================================================
-Detects when the user edits an AI-generated file and emits a CORRECTION
-event automatically.  The correction detection problem is the highest-risk
-gap in the Gradata SDK: the MCP protocol has no concept of user feedback, so
-we close it here with a polling-based sidecar that requires only stdlib.
-
-Design decisions
-----------------
-* Polling, not inotify/FSEvents/ReadDirectoryChanges.
-  Portable across Windows, macOS, Linux without platform-specific APIs.
-* SHA-256 content hash as the change signal.
-  Avoids false positives from mtime jitter / editor temp files.
-* 30-second dedup window.
-  Editor auto-save (VSCode, Vim :set autowriteall) fires every few seconds;
-  we collapse those saves into a single CORRECTION event.
-* Graceful brain integration.
-  Tries Brain.emit() first, falls back to _events.emit(), falls back to
-  writing a plain JSON file so no correction is ever silently dropped.
-
-Architecture note (SDK layer boundary)
----------------------------------------
-This module lives in the brain/ SDK layer.  It is host-agnostic: it does
-NOT import CLAUDE.md, hooks, or anything runtime-specific.  All I/O is
-through the event system (gradata._events) or the Brain class.
+"""File Watcher Sidecar — polling-based CORRECTION capture for AI-authored files
+(Wave 4). SHA-256 content-hash change signal; 30s dedup window collapses
+editor auto-saves. Stdlib-only polling (portable across Win/mac/Linux, no
+inotify). Emit cascade: Brain.emit() → _events.emit() → plain-JSON fallback
+— a correction is never silently dropped. Host-agnostic SDK layer.
 """
 
 from __future__ import annotations
@@ -42,10 +21,10 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-_SEVERITY_AS_IS = "as-is"        # edit_distance < 0.02
-_SEVERITY_MINOR = "minor"        # 0.02 <= edit_distance < 0.10
+_SEVERITY_AS_IS = "as-is"  # edit_distance < 0.02
+_SEVERITY_MINOR = "minor"  # 0.02 <= edit_distance < 0.10
 _SEVERITY_MODERATE = "moderate"  # 0.10 <= edit_distance < 0.40
-_SEVERITY_MAJOR = "major"        # 0.40 <= edit_distance < 0.80
+_SEVERITY_MAJOR = "major"  # 0.40 <= edit_distance < 0.80
 _SEVERITY_DISCARDED = "discarded"  # edit_distance >= 0.80
 
 _SOURCE = "sidecar:watcher"
@@ -241,7 +220,9 @@ class FileWatcher:
 
         _ned_old = watched.original_content
         if len(_ned_old) + len(current_content) > 50_000:
-            _ned_ratio = difflib.SequenceMatcher(None, _ned_old.splitlines(), current_content.splitlines()).ratio()
+            _ned_ratio = difflib.SequenceMatcher(
+                None, _ned_old.splitlines(), current_content.splitlines()
+            ).ratio()
         else:
             _ned_ratio = difflib.SequenceMatcher(None, _ned_old, current_content).ratio()
         edit_distance = round(1.0 - _ned_ratio, 4)
@@ -251,16 +232,26 @@ class FileWatcher:
                 classify_ast_severity,
                 language_supported,
             )
-            _as_sev = classify_ast_severity(
-                watched.original_content, current_content,
-            ) if ast_severity_enabled() and language_supported(path=resolved) else None
+
+            _as_sev = (
+                classify_ast_severity(
+                    watched.original_content,
+                    current_content,
+                )
+                if ast_severity_enabled() and language_supported(path=resolved)
+                else None
+            )
         except Exception:
             _as_sev = None
         severity = _as_sev or (
-            _SEVERITY_AS_IS if edit_distance < 0.02
-            else _SEVERITY_MINOR if edit_distance < 0.10
-            else _SEVERITY_MODERATE if edit_distance < 0.40
-            else _SEVERITY_MAJOR if edit_distance < 0.80
+            _SEVERITY_AS_IS
+            if edit_distance < 0.02
+            else _SEVERITY_MINOR
+            if edit_distance < 0.10
+            else _SEVERITY_MODERATE
+            if edit_distance < 0.40
+            else _SEVERITY_MAJOR
+            if edit_distance < 0.80
             else _SEVERITY_DISCARDED
         )
         return FileChange(
@@ -317,13 +308,15 @@ class FileWatcher:
 
         # Build the event payload
         watched = self._watched.get(change.path)
-        _bud_lines = list(difflib.unified_diff(
-            change.old_content.splitlines(keepends=True),
-            change.new_content.splitlines(keepends=True),
-            fromfile=f"a/{Path(change.path).name}",
-            tofile=f"b/{Path(change.path).name}",
-            lineterm="",
-        ))
+        _bud_lines = list(
+            difflib.unified_diff(
+                change.old_content.splitlines(keepends=True),
+                change.new_content.splitlines(keepends=True),
+                fromfile=f"a/{Path(change.path).name}",
+                tofile=f"b/{Path(change.path).name}",
+                lineterm="",
+            )
+        )
         if len(_bud_lines) > 50:
             _bud_lines = [*_bud_lines[:50], "\n... diff truncated at 50 lines ..."]
         diff_text = "\n".join(_bud_lines)
@@ -333,7 +326,7 @@ class FileWatcher:
             "edit_distance": change.edit_distance,
             "severity": change.severity,
             "diff": diff_text,
-            "original": change.old_content[:500],    # truncated for DB storage
+            "original": change.old_content[:500],  # truncated for DB storage
             "modified": change.new_content[:500],
         }
         event_tags = [
@@ -348,6 +341,7 @@ class FileWatcher:
         if not emitted:
             try:
                 from .. import _events as _tem_events
+
                 emitted = _tem_events.emit("CORRECTION", _SOURCE, event_data, event_tags) or {}
             except Exception as _tem_exc:
                 logger.debug("Module-level _events.emit failed: %s", _tem_exc)
@@ -406,9 +400,7 @@ class FileWatcher:
             while True:
                 changes = self.check_all()
                 if changes:
-                    logger.info(
-                        "Sweep %d: detected %d change(s)", iteration + 1, len(changes)
-                    )
+                    logger.info("Sweep %d: detected %d change(s)", iteration + 1, len(changes))
                 iteration += 1
                 if max_iterations and iteration >= max_iterations:
                     break
@@ -448,9 +440,12 @@ class FileWatcher:
             # If Brain exposes a .correct() helper, use it; otherwise emit
             # a raw CORRECTION event so downstream analytics work.
             if hasattr(brain, "correct"):
-                return brain.correct(  # type: ignore[attr-defined]
-                    change.old_content, change.new_content
-                ) or {}
+                return (
+                    brain.correct(  # type: ignore[attr-defined]
+                        change.old_content, change.new_content
+                    )
+                    or {}
+                )
             return brain.emit("CORRECTION", _SOURCE, data, tags) or {}
         except Exception as exc:
             logger.debug("Brain emit failed: %s", exc)
@@ -485,9 +480,7 @@ class FileWatcher:
                 json.dumps(payload, indent=2, ensure_ascii=False),
                 encoding="utf-8",
             )
-            logger.warning(
-                "Fallback: CORRECTION written to %s", sidecar_path
-            )
+            logger.warning("Fallback: CORRECTION written to %s", sidecar_path)
             return {"type": "CORRECTION", "source": _SOURCE, "fallback_path": str(sidecar_path)}
         except OSError as exc:
             logger.error("All emission paths failed for %s: %s", change.path, exc)

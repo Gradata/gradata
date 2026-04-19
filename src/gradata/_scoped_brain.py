@@ -1,29 +1,9 @@
-"""
-ScopedBrain — A domain-scoped view over a parent Brain.
-========================================================
-SDK LAYER: Layer 0 (no enhancement deps). Filters the parent brain's
-graduated rules to those matching a domain, then delegates the rest of
-the API (correct, emit, search, memory, etc.) straight to the parent.
-
-Usage::
-
-    brain = Brain("./my-brain")
-    code_brain = brain.scope("code")
-    rules = code_brain.rules()          # only code-domain rules
-    prompt = code_brain.inject("fix bug")  # only code rules injected
-
-Domain match semantics (see ``lesson_matches_domain``):
-    A lesson belongs to domain ``D`` if ANY of the following holds:
-
-    1. ``scope_json.domain == D`` (exact match on the stored RuleScope).
-    2. ``scope_json.applies_to == D`` or starts with ``f"{D}:"``
-       (e.g. ``"code:refactor"`` matches domain ``"code"``).
-
-    Matching is case-insensitive. The category-as-domain fallback was
-    removed per the 4/4 STRICT council verdict: ``category`` is a
-    taxonomy label (STYLE, TONE, SECURITY), not a domain. Legacy
-    lessons without a ``scope_json.domain`` must be migrated using
-    ``scripts/migrate_legacy_scopes.py``.
+"""ScopedBrain — domain-scoped view over a parent ``Brain``. ``brain.scope(D)``
+returns a proxy that filters graduated rules by domain and delegates the rest
+of the API unchanged. Domain match (see ``lesson_matches_domain``, case-
+insensitive): ``scope_json.domain == D`` OR ``applies_to == D`` / starts with
+``f"{D}:"``. No category-as-domain fallback — migrate legacy lessons with
+``scripts/migrate_legacy_scopes.py``. SDK Layer 0.
 """
 
 from __future__ import annotations
