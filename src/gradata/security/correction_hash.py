@@ -1,26 +1,10 @@
-"""Correction content-provenance hashing and source-context classification.
-
-Defence against A1 (indirect prompt injection via corrections) from the
-Gradata red-team taxonomy. The threat model, from Greshake et al. 2023
-(*Not What You've Signed Up For*, https://arxiv.org/abs/2302.12173), is that
-any imperative text pasted into a correction flows through graduation and is
-re-injected into future sessions as a ``<brain-rules>`` directive. Corrections
-that originated from external pastes therefore need:
-
-1. A content-provenance hash so we can later de-duplicate, audit, or revoke
-   any graduated rule that traces back to a known-bad paste.
-2. A ``source_kind`` classification so the graduation pipeline knows whether
-   the text was written by the user (trusted edit of an AI output) or
-   pasted from an external source (untrusted — requires human review).
-
-The hash is SHA-256 of the canonical tuple ``(before, after, source_context)``.
-It is *not* an HMAC — that is handled separately in ``correction_provenance``
-for authentication. This module is content-addressed (same bytes → same hash)
-so that provenance can be checked without needing the brain salt.
-
-A paste-from-external correction is flagged ``requires_review=True`` and must
-receive an explicit ``promote`` action (via the existing ``approval_required``
-pending-approval flow in ``_core.brain_correct``) before it can graduate.
+"""Correction content-provenance hashing + source-context classification.
+Defence vs A1 (indirect prompt injection via corrections; Greshake et al.
+2023, arxiv.org/abs/2302.12173). SHA-256 over canonical ``(before, after,
+source_context)`` — content-addressed, not HMAC (auth lives in
+``correction_provenance``). External pastes classified ``source_kind``
+untrusted → flagged ``requires_review=True``; graduate only after explicit
+``promote`` via the ``approval_required`` flow in ``_core.brain_correct``.
 """
 
 from __future__ import annotations
@@ -95,14 +79,14 @@ def compute_correction_hash(
         ctx_repr = source_context
     else:
         try:
-            ctx_repr = json.dumps(source_context, sort_keys=True, separators=(",", ":"), default=str)
+            ctx_repr = json.dumps(
+                source_context, sort_keys=True, separators=(",", ":"), default=str
+            )
         except (TypeError, ValueError):
             ctx_repr = str(source_context)
     # Length-prefixed concatenation so "ab"+"c" and "a"+"bc" hash differently.
     payload = (
-        f"{len(before)}:{before}\x00"
-        f"{len(after)}:{after}\x00"
-        f"{len(ctx_repr)}:{ctx_repr}"
+        f"{len(before)}:{before}\x00{len(after)}:{after}\x00{len(ctx_repr)}:{ctx_repr}"
     ).encode()
     return hashlib.sha256(payload).hexdigest()
 
@@ -164,7 +148,9 @@ def build_provenance(
     source_kind, requires_review = classify_source_context(source_context)
     return {
         "provenance_hash": compute_correction_hash(
-            before_text, after_text, source_context,
+            before_text,
+            after_text,
+            source_context,
         ),
         "source_kind": source_kind,
         "requires_review": requires_review,

@@ -1,27 +1,8 @@
-"""
-Reporting — Brain briefing + health reports.
-=============================================
-Merged from: brain_briefing.py + reports.py
-Inspired by: fest.build's "fest next" (agent-agnostic context)
-
-Generates a single markdown file that any AI agent can consume:
-Claude Code (CLAUDE.md), Cursor (.cursorrules), Copilot
-(.github/copilot-instructions.md), or any system prompt.
-
-No MCP, no SDK, no Python required on the consumer side.
-Just a file the agent reads.
-
-Usage::
-
-    from .reporting import (
-        BrainBriefing, generate_briefing, export_briefing,
-    )
-
-    briefing = generate_briefing(brain)
-    print(briefing.to_markdown())
-
-    # Export to multiple formats at once
-    export_briefing(brain, formats=["claude", "cursor", "copilot"])
+"""Reporting — brain briefing + health reports as agent-agnostic markdown.
+``generate_briefing(brain)`` → ``BrainBriefing`` (``to_markdown()``);
+``export_briefing(brain, formats=["claude","cursor","copilot"])`` fans out to
+CLAUDE.md / .cursorrules / .github/copilot-instructions.md. No MCP/SDK
+required consumer-side — just a file the agent reads.
 """
 
 from __future__ import annotations
@@ -49,6 +30,7 @@ EXPORT_TARGETS: dict[str, str] = {
 @dataclass
 class BriefingRule:
     """A single rule from the brain, formatted for injection."""
+
     category: str
     description: str
     confidence: float
@@ -75,6 +57,7 @@ class BrainBriefing:
         brain_health: Health metrics.
         metadata: Additional context.
     """
+
     rules: list[BriefingRule] = field(default_factory=list)
     anti_patterns: list[str] = field(default_factory=list)
     recent_corrections: list[dict[str, Any]] = field(default_factory=list)
@@ -168,7 +151,7 @@ def generate_briefing(
 
         # Find lessons file
         lessons_path = None
-        if hasattr(brain, 'dir'):
+        if hasattr(brain, "dir"):
             candidates = [
                 brain.dir / "lessons.md",
                 brain.dir.parent / ".claude" / "lessons.md",
@@ -189,17 +172,16 @@ def generate_briefing(
 
             for lesson in lessons:
                 state_upper = lesson.state.value.upper()
-                if (
-                    state_upper in allowed_states
-                    and lesson.confidence >= min_confidence
-                ):
-                    briefing.rules.append(BriefingRule(
-                        category=lesson.category,
-                        description=lesson.description,
-                        confidence=lesson.confidence,
-                        state=state_upper,
-                        fire_count=lesson.fire_count,
-                    ))
+                if state_upper in allowed_states and lesson.confidence >= min_confidence:
+                    briefing.rules.append(
+                        BriefingRule(
+                            category=lesson.category,
+                            description=lesson.description,
+                            confidence=lesson.confidence,
+                            state=state_upper,
+                            fire_count=lesson.fire_count,
+                        )
+                    )
 
             # Sort by confidence descending, optionally cap
             briefing.rules.sort(key=lambda r: r.confidence, reverse=True)
@@ -211,11 +193,11 @@ def generate_briefing(
     # Extract quality metrics
     try:
         from .._brain_manifest import _quality_metrics
-        ctx = brain.ctx if hasattr(brain, 'ctx') else None
+
+        ctx = brain.ctx if hasattr(brain, "ctx") else None
         quality = _quality_metrics(ctx=ctx)
         briefing.brain_health = {
-            k: v for k, v in quality.items()
-            if v is not None and v != [] and v != {}
+            k: v for k, v in quality.items() if v is not None and v != [] and v != {}
         }
     except Exception:
         pass
@@ -225,17 +207,20 @@ def generate_briefing(
         events = brain.query_events(event_type="CORRECTION", last_n_sessions=5, limit=10)
         for evt in events:
             data = evt.get("data", {})
-            briefing.recent_corrections.append({
-                "severity": data.get("severity", "unknown"),
-                "category": data.get("category", "UNKNOWN"),
-                "summary": data.get("summary", ""),
-            })
+            briefing.recent_corrections.append(
+                {
+                    "severity": data.get("severity", "unknown"),
+                    "category": data.get("category", "UNKNOWN"),
+                    "summary": data.get("summary", ""),
+                }
+            )
     except Exception:
         pass
 
     # Add anti-patterns from the negative rule library
     try:
         from .quality_monitoring import DEFAULT_ANTI_PATTERNS
+
         briefing.anti_patterns = list(DEFAULT_ANTI_PATTERNS)
     except ImportError:
         pass
@@ -292,6 +277,7 @@ _lessons_cache: dict = {"path": None, "mtime": 0.0, "count": 0}
 @dataclass
 class HealthReport:
     """Brain health assessment."""
+
     healthy: bool = True
     issues: list[str] = field(default_factory=list)
     sessions_total: int = 0
@@ -304,10 +290,13 @@ def generate_health_report(db_path=None, ctx=None) -> HealthReport:
     report = HealthReport()
     try:
         import sqlite3
+
         db = Path(db_path) if db_path else (Path(ctx.brain_dir) / "system.db" if ctx else None)
         if db and db.exists():
             conn = sqlite3.connect(str(db))
-            report.sessions_total = conn.execute("SELECT COUNT(DISTINCT session) FROM events").fetchone()[0] or 0
+            report.sessions_total = (
+                conn.execute("SELECT COUNT(DISTINCT session) FROM events").fetchone()[0] or 0
+            )
             report.events_total = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0] or 0
             conn.close()
     except Exception:
@@ -326,6 +315,7 @@ def generate_health_report(db_path=None, ctx=None) -> HealthReport:
                 else:
                     from .._core import _filter_lessons_by_state
                     from .self_improvement import parse_lessons
+
                     _cal_ls = parse_lessons(_cal_lp.read_text(encoding="utf-8"))
                     _cal_c = len(_filter_lessons_by_state(_cal_ls, min_state="INSTINCT"))
                     _lessons_cache.update({"path": str(_cal_lp), "mtime": _cal_mt, "count": _cal_c})
@@ -339,8 +329,12 @@ def generate_health_report(db_path=None, ctx=None) -> HealthReport:
 def format_health_report(report: HealthReport) -> str:
     """Format health report as human-readable string."""
     status = "HEALTHY" if report.healthy else "UNHEALTHY"
-    lines = [f"Brain Health: {status}", f"  Sessions: {report.sessions_total}",
-             f"  Events: {report.events_total}", f"  Active lessons: {report.lessons_active}"]
+    lines = [
+        f"Brain Health: {status}",
+        f"  Sessions: {report.sessions_total}",
+        f"  Events: {report.events_total}",
+        f"  Active lessons: {report.lessons_active}",
+    ]
     if report.issues:
         lines.append("  Issues:")
         for issue in report.issues:

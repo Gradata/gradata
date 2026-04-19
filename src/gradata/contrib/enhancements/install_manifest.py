@@ -1,28 +1,8 @@
-"""
-Install Manifest — Modular component registry with selective install.
-=====================================================================
-Adapted from: everything-claude-code (affaan-m/everything-claude-code)
-manifests/install-profiles.json, install-components.json, install-modules.json
-
-Provides a manifest-driven system for selective feature activation.
-Users pick profiles (lite/standard/full) or individual modules.
-Each module has cost/stability tags for informed decisions.
-
-Usage::
-
-    from .install_manifest import (
-        InstallManifest, Module, Profile, InstallState,
-        ModuleCost, ModuleStability,
-    )
-
-    manifest = InstallManifest.default()
-    plan = manifest.plan_install(profile="standard")
-    print(plan.modules)  # List of modules to install
-    print(plan.estimated_cost)  # "medium"
-
-    # Apply and persist state
-    state = manifest.apply(plan)
-    state.save(Path("~/.gradata/install-state.json"))
+"""Install Manifest — modular component registry with selective install.
+``InstallManifest.default().plan_install(profile=...)`` returns a plan
+(lite/standard/full or individual modules); each ``Module`` carries cost +
+stability tags. ``apply(plan)`` returns an ``InstallState`` persistable via
+``.save()``. Adapted from affaan-m/everything-claude-code manifests.
 """
 
 from __future__ import annotations
