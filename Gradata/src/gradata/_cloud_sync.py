@@ -22,6 +22,7 @@ Not yet implemented (future work, explicitly out of scope):
 - Deletes (cloud rows never get removed by this path).
 - Bulk batching beyond one table per HTTP call.
 """
+
 from __future__ import annotations
 
 import json
@@ -30,6 +31,7 @@ import os
 import sqlite3
 import urllib.error
 import urllib.request
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
@@ -41,6 +43,19 @@ _log = logging.getLogger("gradata.cloud_sync")
 ENV_ENABLED: Final[str] = "GRADATA_CLOUD_SYNC"
 ENV_URL: Final[str] = "GRADATA_CLOUD_URL"
 ENV_KEY: Final[str] = "GRADATA_CLOUD_KEY"
+# Aliases — accept the Supabase-native env var names too, so a single .env
+# works for both the cloud backend service and the SDK push path.
+ENV_URL_ALIAS: Final[str] = "GRADATA_SUPABASE_URL"
+ENV_KEY_ALIAS: Final[str] = "GRADATA_SUPABASE_SERVICE_KEY"
+
+
+def _env_url() -> str:
+    return os.environ.get(ENV_URL) or os.environ.get(ENV_URL_ALIAS) or ""
+
+
+def _env_key() -> str:
+    return os.environ.get(ENV_KEY) or os.environ.get(ENV_KEY_ALIAS) or ""
+
 
 # Tables pushed to the cloud. Order matters only for foreign keys; we keep
 # the parent tables first so Supabase FK constraints pass on first try.
@@ -53,12 +68,169 @@ PUSH_TABLES: Final[tuple[str, ...]] = (
     "rule_provenance",
 )
 
+# Local SQLite table -> cloud Supabase table when names differ.
+_TABLE_REMAP: Final[dict[str, str]] = {
+    "correction_patterns": "corrections",
+}
+
+# Deterministic UUID namespace — stable across re-runs so upserts work.
+_UUID_NS: Final[uuid.UUID] = uuid.UUID("b8a1c9e2-9f5d-4c9b-8a1e-7f3b2d1a0e4c")
+
+
+def _row_uuid(tenant_id: str, table: str, local_key: Any) -> str:
+    """Return a deterministic UUID for (tenant, table, local_key)."""
+    return str(uuid.uuid5(_UUID_NS, f"{tenant_id}:{table}:{local_key}"))
+
+
+def _maybe_json(value: Any, default: Any = None) -> Any:
+    """Parse a text-encoded JSON column, tolerating nulls + bad data."""
+    if value is None or value == "":
+        return default
+    if not isinstance(value, str):
+        return value
+    try:
+        return json.loads(value)
+    except (ValueError, TypeError):
+        return default
+
+
+def _scrub(value: Any) -> Any:
+    """Recursively clean strings for Postgres JSONB.
+
+    Strips NUL bytes (\\u0000 not allowed) and unpaired UTF-16 surrogates
+    (\\ud800-\\udfff) that encode-survive in Python but poison JSONB.
+    """
+    if isinstance(value, str):
+        cleaned = value.replace("\x00", "") if "\x00" in value else value
+        # Round-trip through UTF-8 with surrogate replacement to drop lone halves.
+        try:
+            cleaned.encode("utf-8")
+        except UnicodeEncodeError:
+            cleaned = cleaned.encode("utf-8", "replace").decode("utf-8")
+        return cleaned
+    if isinstance(value, dict):
+        return {k: _scrub(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_scrub(v) for v in value]
+    return value
+
+
+def _transform_row(table: str, row: dict[str, Any], tenant_id: str) -> dict[str, Any]:
+    """Map a local SQLite row to the cloud Supabase row shape.
+
+    The cloud schema is narrower: `brain_id` not `tenant_id`, `data` JSONB for
+    extras, UUIDs for ids. We pick the known cloud columns explicitly and
+    pack everything else into `data` so new SDK columns surface without a
+    schema migration.
+    """
+    if table == "events":
+        parsed = _maybe_json(row.get("data_json"), default={"_raw": row.get("data_json")})
+        data_blob: dict[str, Any] = parsed if isinstance(parsed, dict) else {"_value": parsed}
+        # Cloud JSONB rejects control chars / non-JSON-serializable values.
+        # Fallback: stringify via repr if round-trip fails.
+        try:
+            json.dumps(data_blob, ensure_ascii=False)
+        except (TypeError, ValueError):
+            data_blob = {"_repr": repr(data_blob)}
+        tags = _maybe_json(row.get("tags_json"), default=[])
+        if not isinstance(tags, list):
+            tags = []
+        # Cloud `events.session` is INTEGER; local has heterogeneous data
+        # (floats like 4.5, UUIDs). Coerce or drop into data.session_raw.
+        session_raw = row.get("session")
+        session_int: int | None
+        try:
+            session_int = int(session_raw) if session_raw is not None else None
+        except (ValueError, TypeError):
+            session_int = None
+            if "session_raw" not in data_blob:
+                data_blob["session_raw"] = session_raw
+        return {
+            "id": _row_uuid(tenant_id, table, row.get("id")),
+            "brain_id": tenant_id,
+            "type": row.get("type"),
+            "source": row.get("source"),
+            "session": session_int,
+            "data": data_blob,
+            "tags": tags,
+            "created_at": row.get("ts"),
+        }
+
+    if table == "meta_rules":
+        extras = {
+            k: v
+            for k, v in row.items()
+            if k not in ("id", "tenant_id", "principle", "scope", "confidence")
+        }
+        raw_lesson_ids = _maybe_json(row.get("source_lesson_ids"), default=[])
+        if raw_lesson_ids:
+            extras["source_lesson_ids_raw"] = raw_lesson_ids
+        visibility = row.get("visibility") or "private"
+        if visibility not in ("private", "shared", "global"):
+            visibility = "private"
+        principle = row.get("principle") or ""
+        title = (principle[:80] + "...") if len(principle) > 83 else (principle or "meta-rule")
+        return {
+            "id": _row_uuid(tenant_id, table, row.get("id")),
+            "brain_id": tenant_id,
+            "title": title,
+            "principle": principle,
+            "description": principle,
+            "scope": row.get("scope"),
+            "visibility": visibility,
+            "confidence": row.get("confidence"),
+            "data": extras,
+        }
+
+    if table == "correction_patterns":
+        extras = {
+            k: v
+            for k, v in row.items()
+            if k
+            not in (
+                "tenant_id",
+                "session_id",
+                "category",
+                "severity",
+                "representative_text",
+                "created_at",
+            )
+        }
+        raw_severity = row.get("severity")
+        severity = (
+            raw_severity
+            if raw_severity in ("trivial", "minor", "moderate", "major", "rewrite")
+            else "minor"
+        )
+        if severity != raw_severity:
+            extras["severity_raw"] = raw_severity
+        return {
+            "id": _row_uuid(tenant_id, table, row.get("pattern_hash")),
+            "brain_id": tenant_id,
+            "session": row.get("session_id"),
+            "category": row.get("category"),
+            "severity": severity,
+            "description": row.get("representative_text"),
+            "data": extras,
+            "created_at": row.get("created_at"),
+        }
+
+    out: dict[str, Any] = {"brain_id": tenant_id}
+    for k, v in row.items():
+        if k in ("tenant_id",):
+            continue
+        if k == "id" and isinstance(v, int):
+            out["id"] = _row_uuid(tenant_id, table, v)
+            continue
+        out[k] = v
+    return out
+
 
 def enabled() -> bool:
     """True when the env flag is set AND both URL/key are present."""
     if os.environ.get(ENV_ENABLED, "").strip() not in ("1", "true", "yes"):
         return False
-    return bool(os.environ.get(ENV_URL) and os.environ.get(ENV_KEY))
+    return bool(_env_url() and _env_key())
 
 
 def _iso_now() -> str:
@@ -129,13 +301,41 @@ def _rows_since(
     return [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
 
 
+_POST_BATCH_SIZE: Final[int] = 500
+
+
 def _post(table: str, rows: list[dict[str, Any]]) -> int:
-    """POST rows to Supabase PostgREST. Returns count accepted."""
+    """POST rows to Supabase PostgREST. Returns count accepted.
+
+    Applies ``_TABLE_REMAP`` so local table names that differ from the cloud
+    (e.g. ``correction_patterns`` -> ``corrections``) route correctly. Batches
+    large pushes because PostgREST rejects oversize bodies with opaque
+    "Empty or invalid json" errors.
+    """
     if not rows:
         return 0
-    url = f"{os.environ[ENV_URL].rstrip('/')}/rest/v1/{table}"
-    key = os.environ[ENV_KEY]
-    body = json.dumps(rows).encode("utf-8")
+    # Dedupe within the batch so ON CONFLICT DO UPDATE doesn't hit the same
+    # row twice in a single statement (Postgres rejects that).
+    seen: set[Any] = set()
+    deduped: list[dict[str, Any]] = []
+    for r in rows:
+        key = r.get("id")
+        if key is not None:
+            if key in seen:
+                continue
+            seen.add(key)
+        deduped.append(r)
+    rows = deduped
+    if len(rows) > _POST_BATCH_SIZE:
+        total = 0
+        for i in range(0, len(rows), _POST_BATCH_SIZE):
+            total += _post(table, rows[i : i + _POST_BATCH_SIZE])
+        return total
+    cloud_table = _TABLE_REMAP.get(table, table)
+    url = f"{_env_url().rstrip('/')}/rest/v1/{cloud_table}"
+    key = _env_key()
+    # Final scrub catches NUL / lone surrogates anywhere in the payload.
+    body = json.dumps(_scrub(rows)).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=body,
@@ -208,7 +408,8 @@ def push(brain_dir: str | Path) -> dict[str, int]:
             rows = _rows_since(conn, table, tenant_id, since)
             if not rows:
                 continue
-            accepted = _post(table, rows)
+            transformed = [_transform_row(table, r, tenant_id) for r in rows]
+            accepted = _post(table, transformed)
             pushed[table] = accepted
             if accepted != len(rows):
                 all_ok = False
