@@ -1,102 +1,190 @@
-# Dependencies
-node_modules/
+# ============================================================================
+# gradata workspace .gitignore — post Phase B layout
+#
+# Layout:
+#   Gradata/   public SDK (shipped)
+#   Sprites/   private sales/dogfood (never shipped)
+#   Hausgem/   ecom placeholder (never shipped)
+# ============================================================================
 
-# Environment and credentials
+# ----------------------------------------------------------------------------
+# Private workspace folders — never ship in the public repo
+# ----------------------------------------------------------------------------
+Sprites/
+Hausgem/
+.reorg/
+
+# ----------------------------------------------------------------------------
+# Secrets & credentials
+# ----------------------------------------------------------------------------
 .env
-*.env
 .env.*
-.mcp.json
+*.env
 *.key
 *.pem
+*.secret
+credentials*
 credentials.json
 client_secret*.json
 token.json
+.mcp.json
 
-# OneDrive temp files
-~$*
-gradata-plugin/
-
-# Orphans from PR #76 cloud split — dirs removed from repo, remain on disk
-/cloud/
-/sdk/
-
-# OS files
-Thumbs.db
-Desktop.ini
-.DS_Store
-
-# Obsidian workspace (user-specific)
-.obsidian/
-
-# Auto-generated (regenerated each session)
+# ----------------------------------------------------------------------------
+# Build & cache artifacts (regenerable, never tracked)
+# ----------------------------------------------------------------------------
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.ruff_cache/
+.pytest_cache/
+.coverage
 .vectorstore/
-brain.manifest.json
+.next/
+site/
+_site/
+node_modules/
+
+# MCP / code-intel caches
+.code-review-graph/
+.gstack/
+.gitnexus/
+.superpowers/
+.claude-flow/data/
+.claude-flow/logs/
+graphify-out/
+**/graphify-out/
+
+# Virtual environments
+.venv/
+venv/
+
+# ----------------------------------------------------------------------------
+# Local brain runtime (regenerated per session)
+# ----------------------------------------------------------------------------
 system.db
+brain.manifest.json
+*.db
 *.db-wal
 *.sqlite
 *.jsonl
-__pycache__/
-*.pyc
-vendor/
 
-# Internal session handoff memory (never ships in the public repo)
-memory/
-.claude-flow
-autoresearch-results.tsv
-
-# Build artifacts (regenerate on deploy)
-.next/
-sdk/website-next/.next/
-sdk/website-next/node_modules/
-
-# Test coverage artifacts
-.coverage
-
-# Local session handoff notes
-sessions/
-
-# User config (personal, not part of SDK)
-CLAUDE.md
-domain/
-.carl/
-.claude/
-skills/
-.opencli/
+# ----------------------------------------------------------------------------
+# OS / IDE / editor
+# ----------------------------------------------------------------------------
+Thumbs.db
+Desktop.ini
+.DS_Store
+~$*
+.idea/
 .vscode/
+.obsidian/
+.codex/
+.claude/
 .claude-octopus/
+.agents/
+.opencli/
+.carl/
+
+# ----------------------------------------------------------------------------
+# Workspace-level personal config (not SDK code)
+# ----------------------------------------------------------------------------
+CLAUDE.md
+AGENTS.md
+FEATURES.md
+SPEC.md
+AUDIT.md
+GATE0-PROOF.md
 .agentignore
 .claudeignore
-package.json
-package-lock.json
-# Exception: npm packages we intentionally ship
-!gradata-install/package.json
-!packages/npm/package.json
-!packages/**/package.json
+.planning/
 
-# Sales data (private, never in public repo)
-Leads/
-/brain/
-/brain/prospects/
-/brain/sessions/
-/brain/emails/
-
-# Intermediates (disposable, never commit)
+# ----------------------------------------------------------------------------
+# Session / memory / internal notes
+# ----------------------------------------------------------------------------
+memory/
+sessions/
+.claude-flow
+autoresearch-results.tsv
 .tmp/
 
-# Archived research (not for public repo)
-sdk/research/_archived_v2_reference/
+# ----------------------------------------------------------------------------
+# Stale paths from before PR #76 cloud split
+# ----------------------------------------------------------------------------
+/cloud/
+/sdk/
+/railway.toml
+vendor/
 
-# Cache directories
-.pytest_cache/
-.ruff_cache/
+# ----------------------------------------------------------------------------
+# Gradata/ — SDK-internal artifacts and private drafts
+# (whole subtrees that are present on disk but shouldn't ship)
+# ----------------------------------------------------------------------------
+Gradata/docs/superpowers/
+Gradata/docs/audit-history/
+Gradata/docs/audit-reports/
+Gradata/docs/Session Notes/
+Gradata/docs/Exports/
+Gradata/docs/cloud/
+Gradata/docs/content/
+Gradata/docs/research/_archived_v2_reference/
+Gradata/docs/study-protocol.md
+Gradata/docs/provisional-patent-draft.md
+Gradata/docs/META_LEARNING.md
+Gradata/docs/STRESS_TEST_PROTOCOL.md
+Gradata/docs/GRADATA-LAUNCH-STRATEGY.md
+Gradata/docs/GTM-Execution-Plan.md
+Gradata/docs/gradata-marketing-strategy.md
+Gradata/docs/gradata-comparison-table.md
+Gradata/docs/ablation-experiment-s93.md
+Gradata/docs/ARCHITECTURE.md
+Gradata/docs/north-star-research.md
+Gradata/docs/launch-post.md
+Gradata/docs/public-launch-narrative.md
+Gradata/docs/RELEASE-*-DRAFT.md
+Gradata/design-system/
+Gradata/gradata-plugin/
+Gradata/skills/
+Gradata/test-brain/
+Gradata/website/
+Gradata/website-next/
+Gradata/onboarding/
+Gradata/templates/
+Gradata/research/
+Gradata/package.json
+Gradata/package-lock.json
 
-# Graphify knowledge-graph cache (third-party tool output, regenerable)
-graphify-out/
-**/graphify-out/
-src/gradata/graphify-out/
+# Gradata/scripts — only publish-npm.sh and cloud/ subdir ship publicly
+Gradata/scripts/*
+!Gradata/scripts/publish-npm.sh
+!Gradata/scripts/cloud/
+!Gradata/scripts/migrate_legacy_scopes.py
 
-# Junk files from cmd.exe redirect misparse (Windows agent output artifacts)
-# When subagents run Bash commands, cmd.exe interprets > in stdout as redirects
+# npm sub-package build outputs (source tracked, outputs ignored)
+Gradata/packages/npm/node_modules/
+Gradata/packages/npm/dist/
+Gradata/packages/*/node_modules/
+Gradata/packages/*/dist/
+
+# Exceptions — npm package manifests we intentionally ship
+!Gradata/gradata-install/package.json
+!Gradata/packages/**/package.json
+!Gradata/packages/**/*.json
+
+# Ensure hook templates ship
+!Gradata/src/gradata/hooks/templates/
+
+# ----------------------------------------------------------------------------
+# Sales data leakage guards (even though Sprites/ is already ignored)
+# ----------------------------------------------------------------------------
+apollo-leads-*.csv
+Leads/
+
+# ----------------------------------------------------------------------------
+# Windows cmd.exe stdout misparse artifacts
+# (subagents running Bash with > redirects land these in cwd)
+# ----------------------------------------------------------------------------
 $null
 GateResult
 None
@@ -104,127 +192,3 @@ Path
 Graph
 bool
 dict[str
-site/
-_site/
-__pycache__/
-*.pyc
-*.egg-info/
-dist/
-build/
-.vectorstore/
-
-# Sensitive files — never commit to public repo
-system.db
-brain.manifest.json
-*.db
-SPEC.md
-AUDIT.md
-GATE0-PROOF.md
-.planning/
-
-# Internal docs — implementation plans, audit reports, session notes (contain algorithm details)
-docs/superpowers/
-docs/audit-history/
-docs/audit-reports/
-docs/Session Notes/
-docs/Exports/
-docs/provisional-patent-draft.md
-docs/META_LEARNING.md
-docs/STRESS_TEST_PROTOCOL.md
-docs/GRADATA-LAUNCH-STRATEGY.md
-docs/GTM-Execution-Plan.md
-docs/gradata-marketing-strategy.md
-docs/ablation-experiment-s93.md
-docs/ARCHITECTURE.md
-docs/north-star-research.md
-
-# Internal dev tooling — not part of SDK
-CLAUDE.md
-FEATURES.md
-.claude/
-docs/GTM-Execution-Plan.md
-docs/gradata-comparison-table.md
-
-# npm package build artifacts (sources tracked, outputs ignored)
-packages/npm/node_modules/
-packages/npm/dist/
-packages/*/node_modules/
-packages/*/dist/
-
-# Secrets
-.env
-.env.*
-*.secret
-credentials*
-
-# Virtual environments
-.venv/
-venv/
-
-# IDE / editor
-.idea/
-.vscode/
-
-# Node
-node_modules/
-
-# Development artifacts (not shipped)
-test-brain/
-website/
-website-next/
-onboarding/
-templates/
-!src/gradata/hooks/templates/
-# examples/ — included for open source hygiene
-research/
-!docs/research/
-scripts/*
-!scripts/publish-npm.sh
-!cloud/scripts/
-!scripts/migrate_legacy_scopes.py
-docs/cloud/
-docs/study-protocol.md
-
-
-# Codex local configuration
-.codex/
-
-# Claude Flow runtime data
-.claude-flow/data/
-.claude-flow/logs/
-.agents/
-AGENTS.md
-design-system/
-
-# Environment variables
-.env
-.env.local
-.env.*.local
-.gstack/
-.gitnexus
-.superpowers/
-
-# Pre-launch marketing drafts (private — live in vault instead)
-docs/content/
-docs/launch-post.md
-docs/public-launch-narrative.md
-docs/RELEASE-*-DRAFT.md
-
-# Railway config for the cloud API now lives in the private
-# gradata-cloud repo at cloud/railway.toml — the root-level copy
-# here is a stale leftover from before the split.
-/railway.toml
-
-# Sales exports — should live in brain/leads, never in the SDK repo.
-apollo-leads-*.csv
-
-
-# Phase B reorg — private workspace dirs never ship in public repo
-Sprites/
-Hausgem/
-.reorg/
-
-# Phase B reorg — paths updated to match new structure
-# (Previous entries like `src/...`, `docs/...`, `scripts/*` now live under Gradata/)
-Gradata/docs/audit-reports/
-Gradata/docs/gradata-marketing-strategy.md
