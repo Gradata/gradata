@@ -548,6 +548,7 @@ def _seed_correction_patterns(db_path: Path, rows: list[tuple]) -> None:
 
 
 def test_patterns_to_graduated_lessons_lifts_qualifying_clusters(tmp_path):
+    """2-session patterns lift to PATTERN (weak evidence), not RULE."""
     from gradata.enhancements.rule_pipeline import _patterns_to_graduated_lessons
 
     db_path = tmp_path / "system.db"
@@ -563,8 +564,35 @@ def test_patterns_to_graduated_lessons_lifts_qualifying_clusters(tmp_path):
     cats = sorted(l.category for l in lessons)
     assert cats == ["DEMO_PREP", "LEADS"]
     for l in lessons:
-        assert l.state == LessonState.RULE
-        assert l.confidence >= 0.90
+        # 2 distinct sessions => PATTERN @ 0.70 under the session-aware mapping
+        assert l.state == LessonState.PATTERN
+        assert 0.65 <= l.confidence <= 0.75
+
+
+def test_patterns_to_graduated_lessons_session_count_drives_state(tmp_path):
+    """Session count maps to state: 2→PATTERN@0.70, 3-4→PATTERN@0.80, 5+→RULE@0.92."""
+    from gradata.enhancements.rule_pipeline import _patterns_to_graduated_lessons
+
+    db_path = tmp_path / "system.db"
+    rows: list[tuple] = []
+    # 2-session pattern → PATTERN @ 0.70
+    for sid in (10, 11):
+        rows.append(("hA", "LEADS", "weak evidence pattern", sid, "major", 2.0, f"2026-04-{sid:02d}"))
+    # 3-session pattern → PATTERN @ 0.80
+    for sid in (20, 21, 22):
+        rows.append(("hB", "TONE", "moderate evidence pattern", sid, "major", 2.0, f"2026-04-{sid:02d}"))
+    # 5-session pattern → RULE @ 0.92
+    for sid in (30, 31, 32, 33, 34):
+        rows.append(("hC", "DRAFTING", "strong evidence pattern", sid, "major", 2.0, f"2026-04-{sid:02d}"))
+    _seed_correction_patterns(db_path, rows)
+
+    lessons = {l.category: l for l in _patterns_to_graduated_lessons(db_path, current_session=40)}
+    assert lessons["LEADS"].state == LessonState.PATTERN
+    assert lessons["LEADS"].confidence == 0.70
+    assert lessons["TONE"].state == LessonState.PATTERN
+    assert lessons["TONE"].confidence == 0.80
+    assert lessons["DRAFTING"].state == LessonState.RULE
+    assert lessons["DRAFTING"].confidence == 0.92
 
 
 def test_patterns_to_graduated_lessons_strips_noise(tmp_path):

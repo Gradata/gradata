@@ -45,19 +45,40 @@ def _normalize_pattern_description(text: str) -> str:
     return text
 
 
+def _state_for_sessions(distinct_sessions: int) -> tuple[LessonState, float]:
+    """Map mined-pattern session count onto (state, confidence).
+
+    Aligns backfilled correction_patterns with the live graduation hierarchy
+    (MIN_APPLICATIONS_FOR_PATTERN=3, MIN_APPLICATIONS_FOR_RULE=5). Previously
+    every candidate was teleported to RULE@0.92 regardless of session count —
+    a 2-session pattern ended up with the same standing as a 50-session rule.
+
+    Mapping:
+      - 2 sessions     → PATTERN @ 0.70 (weak but promising)
+      - 3-4 sessions   → PATTERN @ 0.80 (stronger, one step from RULE)
+      - 5+ sessions    → RULE    @ 0.92 (meets live fire-count floor)
+    """
+    if distinct_sessions >= 5:
+        return LessonState.RULE, 0.92
+    if distinct_sessions >= 3:
+        return LessonState.PATTERN, 0.80
+    return LessonState.PATTERN, 0.70
+
+
 def _patterns_to_graduated_lessons(
     db_path: Path,
     current_session: int,
     min_sessions: int = 2,
     min_score: float = 3.0,
 ) -> list[Lesson]:
-    """Lift graduated correction_patterns into synthetic RULE-state lessons.
+    """Lift correction_patterns into lessons matching the live graduation hierarchy.
 
-    Before this wiring the 437-row correction_patterns table was orphaned --
-    query_graduation_candidates had no production caller, so meta-rule
-    synthesis never saw the real user corrections. This bridges the gap:
-    clusters that already hit (sessions >= min_sessions, weight >= min_score)
-    are lifted directly to RULE state for synthesis.
+    Originally this bridge lifted every qualifying candidate directly to RULE
+    state with confidence 0.92 to populate a cold brain. That bypassed the
+    INSTINCT → PATTERN → RULE gates and over-promoted 2-session patterns to
+    the same standing as battle-tested rules. ``_state_for_sessions`` now
+    assigns state + confidence based on the session-count evidence so
+    backfilled lessons respect the same bar as live-graduated ones.
     """
     try:
         from gradata.enhancements.meta_rules_storage import (  # type: ignore[import]
@@ -92,13 +113,15 @@ def _patterns_to_graduated_lessons(
             continue
         seen.add(dedup_key)
         first_seen = str(row.get("first_seen") or "")[:10] or "2026-01-01"
+        distinct_sessions = int(row.get("distinct_sessions") or 2)
+        state, confidence = _state_for_sessions(distinct_sessions)
         lessons.append(Lesson(
             date=first_seen,
-            state=LessonState.RULE,
-            confidence=0.92,
+            state=state,
+            confidence=confidence,
             category=category,
             description=desc,
-            fire_count=int(row.get("distinct_sessions") or 2),
+            fire_count=distinct_sessions,
         ))
     return lessons
 
