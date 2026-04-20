@@ -1,4 +1,5 @@
 """Tests for intelligence + completeness hooks (Phase 4-5)."""
+
 import json
 import os
 import tempfile
@@ -19,10 +20,12 @@ def test_agent_precontext_injects_rules(tmp_path):
         "[2026-04-01] [PATTERN:0.65] CODE: Use type hints\n"
     )
     with patch.dict(os.environ, {"BRAIN_DIR": str(tmp_path), "GRADATA_BRAIN_DIR": str(tmp_path)}):
-        result = precontext_main({
-            "tool_name": "Agent",
-            "tool_input": {"subagent_type": "general", "prompt": "do stuff"},
-        })
+        result = precontext_main(
+            {
+                "tool_name": "Agent",
+                "tool_input": {"subagent_type": "general", "prompt": "do stuff"},
+            }
+        )
     assert result is not None
     assert "agent-rules" in result["result"]
     assert "Always plan first" in result["result"]
@@ -35,10 +38,12 @@ def test_agent_precontext_no_brain(monkeypatch):
         "gradata.hooks.agent_precontext.resolve_brain_dir",
         lambda: None,
     )
-    result = precontext_main({
-        "tool_name": "Agent",
-        "tool_input": {"subagent_type": "general"},
-    })
+    result = precontext_main(
+        {
+            "tool_name": "Agent",
+            "tool_input": {"subagent_type": "general"},
+        }
+    )
     assert result is None
 
 
@@ -49,10 +54,12 @@ def test_agent_precontext_scope_matching(tmp_path):
         "[2026-04-01] [RULE:0.91] CODE: Write tests before code\n"
     )
     with patch.dict(os.environ, {"BRAIN_DIR": str(tmp_path), "GRADATA_BRAIN_DIR": str(tmp_path)}):
-        result = precontext_main({
-            "tool_name": "Agent",
-            "tool_input": {"description": "research the sales pipeline"},
-        })
+        result = precontext_main(
+            {
+                "tool_name": "Agent",
+                "tool_input": {"description": "research the sales pipeline"},
+            }
+        )
     assert result is not None
     # Sales rule should rank higher for sales-related agent
     lines = result["result"].split("\n")
@@ -65,13 +72,17 @@ from gradata.hooks.agent_graduation import main as graduation_main
 
 
 def test_agent_graduation_emits_event(tmp_path):
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}), \
-         patch("gradata._events.emit") as mock_emit:
-            result = graduation_main({
+    with (
+        patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}),
+        patch("gradata._events.emit") as mock_emit,
+    ):
+        result = graduation_main(
+            {
                 "tool_name": "Agent",
                 "tool_input": {"subagent_type": "code"},
                 "tool_output": "Here is the result of the agent work",
-            })
+            }
+        )
     assert result is None  # fire-and-forget
     mock_emit.assert_called_once()
     call_kwargs = mock_emit.call_args
@@ -80,11 +91,13 @@ def test_agent_graduation_emits_event(tmp_path):
 
 def test_agent_graduation_no_brain():
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": "/nonexistent/xyz"}):
-        result = graduation_main({
-            "tool_name": "Agent",
-            "tool_input": {},
-            "tool_output": "done",
-        })
+        result = graduation_main(
+            {
+                "tool_name": "Agent",
+                "tool_input": {},
+                "tool_output": "done",
+            }
+        )
     assert result is None
 
 
@@ -94,33 +107,41 @@ from gradata.hooks.tool_failure_emit import main as failure_main
 
 
 def test_tool_failure_detects_error(tmp_path):
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}), \
-         patch("gradata._events.emit") as mock_emit:
-            result = failure_main({
+    with (
+        patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}),
+        patch("gradata._events.emit") as mock_emit,
+    ):
+        result = failure_main(
+            {
                 "tool_name": "Bash",
                 "tool_input": {"command": "npm install"},
                 "tool_output": "npm ERR! ECONNREFUSED connection refused",
-            })
+            }
+        )
     assert result is None  # fire-and-forget
     mock_emit.assert_called_once()
     assert mock_emit.call_args[0][0] == "TOOL_FAILURE"
 
 
 def test_tool_failure_ignores_clean_output():
-    result = failure_main({
-        "tool_name": "Bash",
-        "tool_input": {"command": "echo hello"},
-        "tool_output": "hello\nAll tests passed.",
-    })
+    result = failure_main(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "echo hello"},
+            "tool_output": "hello\nAll tests passed.",
+        }
+    )
     assert result is None
 
 
 def test_tool_failure_filters_false_positive():
-    result = failure_main({
-        "tool_name": "Bash",
-        "tool_input": {"command": "grep errors"},
-        "tool_output": "no errors found in the output",
-    })
+    result = failure_main(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "grep errors"},
+            "tool_output": "no errors found in the output",
+        }
+    )
     assert result is None
 
 
@@ -138,11 +159,13 @@ def clean_findings():
 
 
 def test_finding_capture_stores_test_failure(clean_findings):
-    result = finding_main({
-        "tool_name": "Bash",
-        "tool_input": {"command": "pytest tests/"},
-        "tool_output": "FAILED tests/test_foo.py::test_bar - AssertionError\nshort test summary",
-    })
+    result = finding_main(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "pytest tests/"},
+            "tool_output": "FAILED tests/test_foo.py::test_bar - AssertionError\nshort test summary",
+        }
+    )
     assert result is None  # storing only, no output
     assert FINDINGS_FILE.exists()
     findings = json.loads(FINDINGS_FILE.read_text())
@@ -152,26 +175,36 @@ def test_finding_capture_stores_test_failure(clean_findings):
 
 def test_finding_capture_detects_acted_on(clean_findings):
     # Pre-populate a finding
-    FINDINGS_FILE.write_text(json.dumps([{
-        "files": ["tests/test_foo.py"],
-        "preview": "FAILED",
-        "command": "pytest",
-    }]))
+    FINDINGS_FILE.write_text(
+        json.dumps(
+            [
+                {
+                    "files": ["tests/test_foo.py"],
+                    "preview": "FAILED",
+                    "command": "pytest",
+                }
+            ]
+        )
+    )
 
-    result = finding_main({
-        "tool_name": "Edit",
-        "tool_input": {"file_path": "tests/test_foo.py", "old_string": "x", "new_string": "y"},
-    })
+    result = finding_main(
+        {
+            "tool_name": "Edit",
+            "tool_input": {"file_path": "tests/test_foo.py", "old_string": "x", "new_string": "y"},
+        }
+    )
     assert result is not None
     assert "Correction captured" in result["result"]
 
 
 def test_finding_capture_noop_no_failure():
-    result = finding_main({
-        "tool_name": "Bash",
-        "tool_input": {"command": "ls"},
-        "tool_output": "file1.py  file2.py",
-    })
+    result = finding_main(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "ls"},
+            "tool_output": "file1.py  file2.py",
+        }
+    )
     assert result is None
 
 
@@ -184,9 +217,15 @@ def test_context_inject_returns_context(tmp_path):
     mock_brain = MagicMock()
     mock_brain.search.return_value = [{"text": "Relevant brain knowledge here"}]
 
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}), \
-         patch("gradata.brain.Brain", return_value=mock_brain):
-            result = context_main({"message": "How do I set up the pipeline for new prospects in the onboarding workflow? I'd like to understand the full process from lead capture through to qualification."})
+    with (
+        patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path), "GRADATA_CONTEXT_INJECT": "1"}),
+        patch("gradata.brain.Brain", return_value=mock_brain),
+    ):
+        result = context_main(
+            {
+                "message": "How do I set up the pipeline for new prospects in the onboarding workflow? I'd like to understand the full process from lead capture through to qualification."
+            }
+        )
 
     assert result is not None
     assert "brain context:" in result["result"]
@@ -288,11 +327,13 @@ def test_duplicate_guard_blocks_similar(tmp_path):
     (hooks_dir / "__init__.py").write_text("")
 
     with patch.dict(os.environ, {"CLAUDE_PROJECT_DIR": str(tmp_path)}):
-        result = guard_main({
-            "tool_input": {
-                "file_path": str(tmp_path / "src" / "gradata" / "hooks" / "auto_corrector.py"),
-            },
-        })
+        result = guard_main(
+            {
+                "tool_input": {
+                    "file_path": str(tmp_path / "src" / "gradata" / "hooks" / "auto_corrector.py"),
+                },
+            }
+        )
     assert result is not None
     assert result["decision"] == "block"
     assert "auto_correct.py" in result["reason"]
@@ -304,11 +345,13 @@ def test_duplicate_guard_allows_unique(tmp_path):
     (hooks_dir / "auto_correct.py").write_text("# existing")
 
     with patch.dict(os.environ, {"CLAUDE_PROJECT_DIR": str(tmp_path)}):
-        result = guard_main({
-            "tool_input": {
-                "file_path": str(tmp_path / "src" / "gradata" / "hooks" / "brand_new_thing.py"),
-            },
-        })
+        result = guard_main(
+            {
+                "tool_input": {
+                    "file_path": str(tmp_path / "src" / "gradata" / "hooks" / "brand_new_thing.py"),
+                },
+            }
+        )
     assert result is None
 
 
@@ -319,9 +362,11 @@ def test_duplicate_guard_allows_existing_file(tmp_path):
     target.write_text("# existing")
 
     with patch.dict(os.environ, {"CLAUDE_PROJECT_DIR": str(tmp_path)}):
-        result = guard_main({
-            "tool_input": {"file_path": str(target)},
-        })
+        result = guard_main(
+            {
+                "tool_input": {"file_path": str(target)},
+            }
+        )
     assert result is None  # Overwriting existing file is fine
 
 
@@ -344,11 +389,13 @@ def test_brain_maintain_runs_silently(tmp_path):
     lessons = tmp_path / "lessons.md"
     lessons.write_text("[2026-04-01] [RULE:0.92] PROCESS: Plan first\n")
 
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}), \
-         patch("gradata._query.fts_index") as mock_fts, \
-         patch("gradata._brain_manifest.generate_manifest", return_value={}), \
-         patch("gradata._brain_manifest.write_manifest"):
-            result = maintain_main({})
+    with (
+        patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}),
+        patch("gradata._query.fts_index") as mock_fts,
+        patch("gradata._brain_manifest.generate_manifest", return_value={}),
+        patch("gradata._brain_manifest.write_manifest"),
+    ):
+        result = maintain_main({})
     assert result is None  # Silent maintenance
     mock_fts.assert_called()
 
@@ -365,9 +412,11 @@ from gradata.hooks.session_persist import main as persist_main
 
 
 def test_session_persist_writes_handoff(brain_dir):
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(brain_dir)}), \
-         patch("gradata.hooks.session_persist._get_modified_files", return_value=["src/foo.py"]):
-            result = persist_main({})
+    with (
+        patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(brain_dir)}),
+        patch("gradata.hooks.session_persist._get_modified_files", return_value=["src/foo.py"]),
+    ):
+        result = persist_main({})
 
     assert result is None  # Silent
     persist_dir = brain_dir / "sessions" / "persist"
@@ -415,9 +464,11 @@ def test_implicit_feedback_ignores_neutral():
 
 
 def test_implicit_feedback_emits_event(tmp_path):
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}), \
-         patch("gradata._events.emit") as mock_emit:
-            result = feedback_main({"message": "I told you not to do that, are you sure?"})
+    with (
+        patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}),
+        patch("gradata._events.emit") as mock_emit,
+    ):
+        result = feedback_main({"message": "I told you not to do that, are you sure?"})
     assert result is not None
     mock_emit.assert_called_once()
     assert mock_emit.call_args[0][0] == "IMPLICIT_FEEDBACK"
