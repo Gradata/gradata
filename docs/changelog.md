@@ -22,7 +22,7 @@ The canonical changelog lives in [`CHANGELOG.md`](https://github.com/Gradata/gra
 - `integrations/` collapsed into `middleware/` with deprecation shims
 - `self_improvement.py` split into `_confidence` + `_graduation` submodules
 - `rule_engine.py` split into 5-file package
-- GRADATA_* env var access centralized in `_env.py`
+- Most `GRADATA_*` env var access centralized in `_env.py` (exception: `GRADATA_RULE_VERIFIER`, still read directly in `rule_pipeline.py` — migration pending)
 
 ### Fixed
 
