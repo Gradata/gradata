@@ -218,3 +218,13 @@ docs/RELEASE-*-DRAFT.md
 # Sales exports — should live in brain/leads, never in the SDK repo.
 apollo-leads-*.csv
 
+
+# Phase B reorg — private workspace dirs never ship in public repo
+Sprites/
+Hausgem/
+.reorg/
+
+# Phase B reorg — paths updated to match new structure
+# (Previous entries like `src/...`, `docs/...`, `scripts/*` now live under Gradata/)
+Gradata/docs/audit-reports/
+Gradata/docs/gradata-marketing-strategy.md
