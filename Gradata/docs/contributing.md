@@ -6,12 +6,12 @@ Thanks for your interest in contributing to Gradata. This page covers the dev se
 
 ```bash
 git clone https://github.com/Gradata/gradata.git
-cd gradata
+cd gradata/Gradata
 pip install -e ".[dev]"
 pytest tests/
 ```
 
-The `dev` extra installs pytest, hypothesis, pyright, bandit, ruff, and coverage.
+The SDK lives under the `Gradata/` subfolder of the repo; all SDK commands run from there. The `dev` extra installs pytest, hypothesis, pyright, bandit, ruff, and coverage.
 
 On Windows, use PowerShell or WSL. The hooks invoke Python directly (`python -m gradata.hooks.*`), so Python must be on your `PATH`.
 
