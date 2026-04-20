@@ -6,10 +6,12 @@ Thanks for your interest in contributing.
 
 ```bash
 git clone https://github.com/Gradata/gradata.git
-cd gradata
+cd gradata/Gradata
 pip install -e ".[dev]"
 pytest tests/
 ```
+
+The SDK lives under the `Gradata/` subfolder of the repo; the repo root holds workspace-level scaffolding. All SDK commands run from `Gradata/`.
 
 ## Running Tests
 
