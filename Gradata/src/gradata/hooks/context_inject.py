@@ -88,7 +88,7 @@ def main(data: dict) -> dict | None:
             _load_injected_descriptions(brain_dir) if dedup_enabled else []
         )
 
-        separator = "\n---\n"
+        separator = "\n|\n"
         context_parts = []
         total_len = 0
         for r in results:
@@ -106,7 +106,7 @@ def main(data: dict) -> dict | None:
             return None
 
         joined = separator.join(context_parts)
-        return {"result": f"brain context: {joined}"}
+        return {"result": f"ctx:{joined}"}
     except Exception:
         return None
 
