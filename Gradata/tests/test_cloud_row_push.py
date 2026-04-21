@@ -1,4 +1,5 @@
 """Tests for gradata._cloud_sync — per-tenant row push MVP."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -16,14 +17,9 @@ def brain(tmp_path: Path, monkeypatch) -> Path:
     monkeypatch.delenv(_cloud_sync.ENV_ENABLED, raising=False)
     monkeypatch.delenv(_cloud_sync.ENV_URL, raising=False)
     monkeypatch.delenv(_cloud_sync.ENV_KEY, raising=False)
-    (tmp_path / ".tenant_id").write_text(
-        "11111111-2222-3333-4444-555555555555", encoding="utf-8"
-    )
+    (tmp_path / ".tenant_id").write_text("11111111-2222-3333-4444-555555555555", encoding="utf-8")
     conn = sqlite3.connect(tmp_path / "system.db")
-    conn.execute(
-        "CREATE TABLE events (id INTEGER PRIMARY KEY, ts TEXT, type TEXT, "
-        "tenant_id TEXT)"
-    )
+    conn.execute("CREATE TABLE events (id INTEGER PRIMARY KEY, ts TEXT, type TEXT, tenant_id TEXT)")
     conn.execute(
         "INSERT INTO events (ts, type, tenant_id) VALUES (?, ?, ?)",
         ("2026-04-17T00:00:00Z", "correction", "11111111-2222-3333-4444-555555555555"),
@@ -33,8 +29,7 @@ def brain(tmp_path: Path, monkeypatch) -> Path:
         ("2026-04-17T00:00:00Z", "other", "other-tenant"),
     )
     conn.execute(
-        "CREATE TABLE sync_state (brain_id TEXT PRIMARY KEY, last_push_at TEXT, "
-        "updated_at TEXT)"
+        "CREATE TABLE sync_state (brain_id TEXT PRIMARY KEY, last_push_at TEXT, updated_at TEXT)"
     )
     conn.commit()
     conn.close()
@@ -69,7 +64,7 @@ def test_push_filters_by_tenant(brain: Path, monkeypatch):
     events_rows = next((r for t, r in captured if t == "events"), [])
     # Only our tenant's row goes up; "other-tenant" row is filtered.
     assert len(events_rows) == 1
-    assert events_rows[0]["tenant_id"] == "11111111-2222-3333-4444-555555555555"
+    assert events_rows[0]["brain_id"] == "11111111-2222-3333-4444-555555555555"
     assert result.get("events") == 1
 
 
