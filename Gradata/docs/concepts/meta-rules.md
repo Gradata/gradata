@@ -44,10 +44,10 @@ Clustering uses a combination of:
 
 Minimum group size is controlled by `min_group_size=3` in `discover_meta_rules()`.
 
-!!! info "Cloud vs open source"
-    In the open-source SDK, meta-rule **clustering** runs locally but the **principle synthesis** step requires [Gradata Cloud](../cloud/overview.md). Without cloud, `discover_meta_rules()` returns an empty list and `merge_into_meta()` produces a placeholder meta-rule with correct IDs and confidence but `principle = "(requires Gradata Cloud)"`.
+!!! info "Local by default"
+    Meta-rule clustering **and** principle synthesis both run locally. Synthesis uses whichever LLM path you've configured: your own Anthropic API key (set `ANTHROPIC_API_KEY`) or the Claude Code Max OAuth path via `claude -p`. Cloud is not required for any of it — the full `[rule, rule, rule] → "Verify before acting"` pipeline runs in the OSS SDK.
 
-    The math, the events, and the storage are all open. Only the LLM-driven synthesis that turns `[rule, rule, rule] → "Verify before acting"` is cloud-gated.
+    Cloud becomes relevant when you want a hosted dashboard, cross-device sync, team brains, or (future) opt-in corpus donation. It does not re-synthesize or override what graduated locally.
 
 ## Confidence
 

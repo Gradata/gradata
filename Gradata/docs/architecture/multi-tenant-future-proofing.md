@@ -13,13 +13,13 @@
 - Embeddings stored as BLOB (`brain_embeddings`); FTS5 via `brain_fts`.
 - `events.scope` column exists (default 'local') — partial seed for tenant scoping, not used.
 - `sync_state` table exists per source but not cloud-bound.
-- Proprietary scoring/graduation code in `gradata_cloud_backup/`.
+- Proprietary dashboard / team-sharing code in `gradata_cloud_backup/`. Graduation runs locally in the OSS SDK.
 - Open SDK is Apache-2.0 — cannot require cloud to run.
 
 ## Architectural Decisions (Lock In Now)
 
 ### 1. Local-first stays the source of truth
-SDK writes to local SQLite + jsonl. Cloud is a **sync target + shared meta-rule source + proprietary scoring service**. Do NOT migrate SDK storage to Postgres. Reasons: privacy, offline, open source, speed.
+SDK writes to local SQLite + jsonl and runs the full learning loop (graduation, synthesis, rule-to-hook promotion) locally. Cloud is a **sync target + dashboard + future team + future shared-corpus surface** — not a gate on the local loop. Do NOT migrate SDK storage to Postgres. Reasons: privacy, offline, open source, speed.
 
 ### 2. Supabase is the cloud target
 Postgres + Auth + RLS + pgvector + Realtime in one project. Free tier covers pre-revenue. Alternative (Neon + Clerk + own RLS) costs weeks you don't have.
@@ -36,9 +36,9 @@ Add `visibility TEXT` to `meta_rules`, `rules` (if separate table emerges):
 - `global` — Gradata-curated, pushed to all tenants (e.g., quality_gates, truth_protocol)
 
 ### 5. Proprietary boundary
-- **Open SDK** writes raw events, computes local diffs, injects rules.
-- **Cloud (proprietary)** owns: graduation scoring, cross-tenant meta-rule mining, profiling, billing, licensing.
-- Clean interface: SDK posts events → Cloud returns scored rules. Stateless call.
+- **Open SDK** writes raw events, computes local diffs, injects rules, graduates lessons, and synthesizes meta-rules locally (BYO API key or Claude Code Max OAuth).
+- **Cloud (proprietary)** owns: dashboard/visualization, cross-tenant meta-rule corpus (opt-in donation), team sharing, billing, licensing.
+- Clean interface: SDK pushes events + graduated rules to cloud. Cloud reflects them back through UI. Cloud never re-runs graduation.
 
 ### 6. Schema versioning
 Add `schema_version INT` to event envelope + a `migrations` table. Forward-only migrations. SDK refuses to run against incompatible brain.
@@ -116,9 +116,9 @@ Files to create:
 ### Phase 3 — Verification (half day)
 
 10. Spin up a **test tenant** (not Oliver, not user #2). Run full flow:
-    - Onboard → writes local brain → syncs to cloud → pulls global rules → corrects a draft → rule graduates → syncs back
+    - Onboard → writes local brain → corrects a draft → rule graduates **locally** → syncs reflection up to cloud → dashboard renders.
     - Verify RLS: test tenant cannot see Oliver's events (SQL probe)
-    - Ablation: disable cloud sync → SDK still works fully offline
+    - Ablation: disable cloud sync → SDK still works fully offline, including graduation + synthesis.
 
 ### Phase 4 — Explicitly deferred
 
