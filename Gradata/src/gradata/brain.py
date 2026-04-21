@@ -94,6 +94,14 @@ class Brain(BrainInspectionMixin):
 
         self._rule_cache = RuleCache()
 
+        # Capability probe cached once: apply_brain_rules() is a hot path
+        # and we don't want find_spec() in every call.
+        import importlib.util as _util
+
+        self._has_self_improvement = (
+            _util.find_spec("gradata.enhancements.self_improvement") is not None
+        )
+
         from gradata.rules.rule_graph import RuleGraph
 
         self._rule_graph = RuleGraph(self.dir / "rule_graph.json")
@@ -216,7 +224,8 @@ class Brain(BrainInspectionMixin):
             from gradata._events import get_current_session
 
             return get_current_session()
-        except Exception:
+        except Exception as exc:
+            logger.debug("get_current_session failed: %s", exc)
             return 0
 
     @classmethod
@@ -498,6 +507,12 @@ class Brain(BrainInspectionMixin):
             return {"patched": False, "error": f"not_found: no rule matching category={category!r}"}
 
         write_lessons_safe(lessons_path, format_lessons(lessons))
+
+        # lessons.md just changed; invalidate caches so readers don't serve
+        # a pre-patch copy until the next auto_heal() flush.
+        self._lessons_parse_cache = None
+        with contextlib.suppress(Exception):
+            self._rule_cache.invalidate()
 
         # Re-sign the patched rule so HMAC verification stays valid
         try:
@@ -1083,6 +1098,12 @@ class Brain(BrainInspectionMixin):
             )
         write_lessons_safe(lessons_path, format_lessons(lessons))
 
+        # lessons.md changed — evict mtime cache + formatted-rule cache so the
+        # next apply_brain_rules() call reflects the forget.
+        self._lessons_parse_cache = None
+        with contextlib.suppress(Exception):
+            self._rule_cache.invalidate()
+
         for r in results:
             with contextlib.suppress(Exception):
                 self.emit(
@@ -1143,6 +1164,10 @@ class Brain(BrainInspectionMixin):
         from gradata._db import write_lessons_safe
 
         write_lessons_safe(lessons_path, format_lessons(lessons))
+        # lessons.md changed — evict caches so readers see the kill immediately.
+        self._lessons_parse_cache = None
+        with contextlib.suppress(Exception):
+            self._rule_cache.invalidate()
         try:
             self.emit(
                 "LESSON_CHANGE",
@@ -1206,15 +1231,12 @@ class Brain(BrainInspectionMixin):
         # Open conn only to read the pending row, then close before taking the
         # file lock. Holding a SQLite connection across a potentially-blocking
         # file-lock section kept a WAL reader slot idle under contention.
-        conn = get_connection(self.db_path)
-        conn.row_factory = sqlite3.Row
-        try:
+        with contextlib.closing(get_connection(self.db_path)) as conn:
+            conn.row_factory = sqlite3.Row
             row = conn.execute(
                 "SELECT * FROM pending_approvals WHERE id = ? AND resolution IS NULL",
                 (approval_id,),
             ).fetchone()
-        finally:
-            conn.close()
         if not row:
             return {"resolved": False, "reason": "not_found_or_already_resolved"}
         cat, desc = row["lesson_category"], row["lesson_description"]
@@ -1239,21 +1261,23 @@ class Brain(BrainInspectionMixin):
                 from gradata._db import write_lessons_safe
 
                 write_lessons_safe(lessons_path, format_lessons(lessons))
+                # lessons.md changed — evict caches so readers see the
+                # approval/rejection immediately.
+                self._lessons_parse_cache = None
+                with contextlib.suppress(Exception):
+                    self._rule_cache.invalidate()
 
         if not matched:
             return {"resolved": False, "reason": "lesson_not_found_in_file"}
 
         from datetime import date
 
-        conn = get_connection(self.db_path)
-        try:
+        with contextlib.closing(get_connection(self.db_path)) as conn:
             conn.execute(
                 "UPDATE pending_approvals SET resolution = ?, resolved_at = ? WHERE id = ?",
                 (resolution, date.today().isoformat(), approval_id),
             )
             conn.commit()
-        finally:
-            conn.close()
         return {"resolved": True, "category": cat, "description": desc}
 
     def review_pending(self) -> list[dict]:
@@ -1627,7 +1651,8 @@ class Brain(BrainInspectionMixin):
             # Embed prove() data so the manifest is a complete quality certificate
             try:
                 m["proof"] = self.prove()
-            except Exception:
+            except Exception as exc:
+                logger.debug("proof generation failed: %s", exc)
                 m["proof"] = {
                     "proven": False,
                     "confidence_level": "error",
