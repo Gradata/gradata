@@ -36,6 +36,7 @@ def is_hook_enforced(lesson: Lesson) -> bool:
     desc = getattr(lesson, "description", "") or ""
     return desc.lstrip().startswith("[hooked]")
 
+
 # ---------------------------------------------------------------------------
 # Constants (SPEC-aligned, research-backed)
 # ---------------------------------------------------------------------------
@@ -748,6 +749,7 @@ def update_confidence(
             lesson._pre_session_state = lesson.state  # type: ignore[attr-defined]
 
         cat = lesson.category.upper()
+        _fired_this_session = False
 
         # Session-type immunity: skip lessons whose category isn't testable
         if not _is_testable(cat, session_type):
@@ -809,6 +811,7 @@ def update_confidence(
                     # CONTRADICTING or UNKNOWN: FSRS penalty
                     lesson.beta_param += 1.0
                     base_penalty = fsrs_penalty(lesson.confidence, machine=is_machine)
+                    severity = "moderate"
                     if cat in severity_data:
                         raw_severity = severity_data[cat]
                         severity = _normalize_severity(raw_severity)
@@ -900,9 +903,13 @@ def update_confidence(
                 if was_injected:
                     lesson.fire_count += 1
                     lesson.sessions_since_fire = 0
+                    _fired_this_session = True
 
-        # Track sessions since fire
-        lesson.sessions_since_fire += 1
+        # Track sessions since fire. Skip when the lesson fired this session —
+        # otherwise the reset-then-increment path produced a systematic off-by-one
+        # (fired lesson reported sessions_since_fire=1 instead of 0).
+        if not _fired_this_session:
+            lesson.sessions_since_fire += 1
 
         # Inline UNTESTABLE detection
         if (
@@ -1196,17 +1203,30 @@ def compute_learning_velocity(
 
 
 def __getattr__(name: str):  # type: ignore[return]
-    _PIPELINE_NAMES = {"PipelineResult", "run_rule_pipeline", "_generate_skill_file", "review_generated_skill"}
+    _PIPELINE_NAMES = {
+        "PipelineResult",
+        "run_rule_pipeline",
+        "_generate_skill_file",
+        "review_generated_skill",
+    }
     _CAUSAL_NAMES = {"CausalRelation", "CausalLink", "CausalChain"}
-    _CLUSTER_NAMES = {"RuleCluster", "detect_contradictions", "cluster_rules", "promote_instinct_clusters"}
+    _CLUSTER_NAMES = {
+        "RuleCluster",
+        "detect_contradictions",
+        "cluster_rules",
+        "promote_instinct_clusters",
+    }
 
     if name in _PIPELINE_NAMES:
         from gradata.enhancements import rule_pipeline
+
         return getattr(rule_pipeline, name)
     if name in _CAUSAL_NAMES:
         from gradata.enhancements import causal_chains
+
         return getattr(causal_chains, name)
     if name in _CLUSTER_NAMES:
         from gradata.enhancements import clustering
+
         return getattr(clustering, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -679,12 +679,13 @@ def refresh_meta_rules(
     _log.info("Meta-rule discovery requires Gradata Cloud")
     corrections = recent_corrections or []
 
-    # Validate existing meta-rules (invalidation still works locally)
+    # Validate existing meta-rules (invalidation still works locally).
+    # Use dataclasses.replace so callers holding references to the input list
+    # do not observe hidden mutation of last_validated_session.
     valid: list[MetaRule] = []
     for meta in existing_metas:
         if validate_meta_rule(meta, corrections):
-            meta.last_validated_session = current_session
-            valid.append(meta)
+            valid.append(replace(meta, last_validated_session=current_session))
 
     valid.sort(key=lambda m: m.confidence, reverse=True)
     return valid

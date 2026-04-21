@@ -538,9 +538,7 @@ class Brain(BrainInspectionMixin):
         """
         from gradata.enhancements.self_healing import auto_heal_failures
 
-        result = auto_heal_failures(
-            self, failure_events=failure_events, max_patches=max_patches
-        )
+        result = auto_heal_failures(self, failure_events=failure_events, max_patches=max_patches)
         # Patching rewrites lessons.md; invalidate the in-memory rule cache
         # so subsequent apply_brain_rules() calls see the patched text
         # instead of a stale pre-patch prompt.
@@ -661,7 +659,9 @@ class Brain(BrainInspectionMixin):
                 # l.category may have arbitrary casing (parse_lessons preserves
                 # on-disk form); compare case-insensitively against the canonical
                 # upper-cased `category` we're inserting.
-                if (l.category or "").strip().upper() == category and _norm(l.description) == desc_norm:
+                if (l.category or "").strip().upper() == category and _norm(
+                    l.description
+                ) == desc_norm:
                     return {
                         "added": False,
                         "reason": "duplicate",
@@ -881,7 +881,10 @@ class Brain(BrainInspectionMixin):
             from gradata.rules.rule_engine import apply_rules_with_tree
 
             applied = apply_rules_with_tree(
-                lessons, scope, max_rules=max_rules, event_bus=_bus,
+                lessons,
+                scope,
+                max_rules=max_rules,
+                event_bus=_bus,
             )
         except (ImportError, Exception):
             applied = apply_rules(lessons, scope, max_rules=max_rules, bus=_bus)
@@ -891,23 +894,26 @@ class Brain(BrainInspectionMixin):
         # session's prompts. Fire-and-forget — never fails apply_brain_rules.
         if _bus is not None and applied:
             try:
-                _bus.emit("rules.injected", {
-                    "rules": [
-                        {
-                            "id": a.rule_id,
-                            "category": a.lesson.category,
-                            "confidence": a.lesson.confidence,
-                            "state": a.lesson.state.value,
-                        }
-                        for a in applied
-                    ],
-                    "scope": {
-                        "task_type": scope.task_type,
-                        "domain": scope.domain,
-                        "audience": scope.audience,
+                _bus.emit(
+                    "rules.injected",
+                    {
+                        "rules": [
+                            {
+                                "id": a.rule_id,
+                                "category": a.lesson.category,
+                                "confidence": a.lesson.confidence,
+                                "state": a.lesson.state.value,
+                            }
+                            for a in applied
+                        ],
+                        "scope": {
+                            "task_type": scope.task_type,
+                            "domain": scope.domain,
+                            "audience": scope.audience,
+                        },
+                        "task": task,
                     },
-                    "task": task,
-                })
+                )
             except Exception as e:
                 logger.debug("rules.injected emit failed: %s", e)
 
@@ -1180,19 +1186,24 @@ class Brain(BrainInspectionMixin):
         from gradata._db import get_connection, lessons_lock
         from gradata.enhancements.self_improvement import format_lessons, parse_lessons
 
+        # Open conn only to read the pending row, then close before taking the
+        # file lock. Holding a SQLite connection across a potentially-blocking
+        # file-lock section kept a WAL reader slot idle under contention.
         conn = get_connection(self.db_path)
         conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT * FROM pending_approvals WHERE id = ? AND resolution IS NULL", (approval_id,)
-        ).fetchone()
-        if not row:
+        try:
+            row = conn.execute(
+                "SELECT * FROM pending_approvals WHERE id = ? AND resolution IS NULL",
+                (approval_id,),
+            ).fetchone()
+        finally:
             conn.close()
+        if not row:
             return {"resolved": False, "reason": "not_found_or_already_resolved"}
         cat, desc = row["lesson_category"], row["lesson_description"]
 
         lessons_path = self._find_lessons_path()
         if not lessons_path or not lessons_path.is_file():
-            conn.close()
             return {"resolved": False, "reason": "no_lessons_file"}
 
         with lessons_lock(lessons_path):
@@ -1213,17 +1224,19 @@ class Brain(BrainInspectionMixin):
                 write_lessons_safe(lessons_path, format_lessons(lessons))
 
         if not matched:
-            conn.close()
             return {"resolved": False, "reason": "lesson_not_found_in_file"}
 
         from datetime import date
 
-        conn.execute(
-            "UPDATE pending_approvals SET resolution = ?, resolved_at = ? WHERE id = ?",
-            (resolution, date.today().isoformat(), approval_id),
-        )
-        conn.commit()
-        conn.close()
+        conn = get_connection(self.db_path)
+        try:
+            conn.execute(
+                "UPDATE pending_approvals SET resolution = ?, resolved_at = ? WHERE id = ?",
+                (resolution, date.today().isoformat(), approval_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
         return {"resolved": True, "category": cat, "description": desc}
 
     def review_pending(self) -> list[dict]:
