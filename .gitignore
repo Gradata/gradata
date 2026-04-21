@@ -82,6 +82,21 @@ Desktop.ini
 .obsidian/
 .codex/
 .claude/
+# Track the handoff watchdog hooks so future sessions (and fresh clones)
+# keep the context-pressure watchdog wired into Claude Code. Everything
+# else under .claude/ stays local.
+!.claude/
+.claude/*
+!.claude/hooks/
+.claude/hooks/*
+!.claude/hooks/dispatcher-user-prompt.js
+!.claude/hooks/dispatcher-session-start.js
+!.claude/hooks/user-prompt/
+!.claude/hooks/session-start/
+.claude/hooks/user-prompt/*
+!.claude/hooks/user-prompt/handoff-watchdog.js
+.claude/hooks/session-start/*
+!.claude/hooks/session-start/handoff-inject.js
 .claude-octopus/
 .agents/
 .opencli/
