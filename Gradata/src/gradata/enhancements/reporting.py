@@ -26,9 +26,12 @@ Usage::
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+_log = logging.getLogger(__name__)
 
 __all__ = [
     "EXPORT_TARGETS",
@@ -49,6 +52,7 @@ EXPORT_TARGETS: dict[str, str] = {
 @dataclass
 class BriefingRule:
     """A single rule from the brain, formatted for injection."""
+
     category: str
     description: str
     confidence: float
@@ -75,6 +79,7 @@ class BrainBriefing:
         brain_health: Health metrics.
         metadata: Additional context.
     """
+
     rules: list[BriefingRule] = field(default_factory=list)
     anti_patterns: list[str] = field(default_factory=list)
     recent_corrections: list[dict[str, Any]] = field(default_factory=list)
@@ -168,7 +173,7 @@ def generate_briefing(
 
         # Find lessons file
         lessons_path = None
-        if hasattr(brain, 'dir'):
+        if hasattr(brain, "dir"):
             candidates = [
                 brain.dir / "lessons.md",
                 brain.dir.parent / ".claude" / "lessons.md",
@@ -189,53 +194,55 @@ def generate_briefing(
 
             for lesson in lessons:
                 state_upper = lesson.state.value.upper()
-                if (
-                    state_upper in allowed_states
-                    and lesson.confidence >= min_confidence
-                ):
-                    briefing.rules.append(BriefingRule(
-                        category=lesson.category,
-                        description=lesson.description,
-                        confidence=lesson.confidence,
-                        state=state_upper,
-                        fire_count=lesson.fire_count,
-                    ))
+                if state_upper in allowed_states and lesson.confidence >= min_confidence:
+                    briefing.rules.append(
+                        BriefingRule(
+                            category=lesson.category,
+                            description=lesson.description,
+                            confidence=lesson.confidence,
+                            state=state_upper,
+                            fire_count=lesson.fire_count,
+                        )
+                    )
 
             # Sort by confidence descending, optionally cap
             briefing.rules.sort(key=lambda r: r.confidence, reverse=True)
             if max_rules > 0:
                 briefing.rules = briefing.rules[:max_rules]
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.debug("briefing: rules extraction failed: %s", exc)
 
     # Extract quality metrics
     try:
         from gradata._brain_manifest import _quality_metrics
-        ctx = brain.ctx if hasattr(brain, 'ctx') else None
+
+        ctx = brain.ctx if hasattr(brain, "ctx") else None
         quality = _quality_metrics(ctx=ctx)
         briefing.brain_health = {
-            k: v for k, v in quality.items()
-            if v is not None and v != [] and v != {}
+            k: v for k, v in quality.items() if v is not None and v != [] and v != {}
         }
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.debug("briefing: quality metrics failed: %s", exc)
 
     # Extract recent corrections from events
     try:
         events = brain.query_events(event_type="CORRECTION", last_n_sessions=5, limit=10)
         for evt in events:
             data = evt.get("data", {})
-            briefing.recent_corrections.append({
-                "severity": data.get("severity", "unknown"),
-                "category": data.get("category", "UNKNOWN"),
-                "summary": data.get("summary", ""),
-            })
-    except Exception:
-        pass
+            briefing.recent_corrections.append(
+                {
+                    "severity": data.get("severity", "unknown"),
+                    "category": data.get("category", "UNKNOWN"),
+                    "summary": data.get("summary", ""),
+                }
+            )
+    except Exception as exc:
+        _log.debug("briefing: correction extraction failed: %s", exc)
 
     # Add anti-patterns from the negative rule library
     try:
         from gradata.enhancements.quality_monitoring import DEFAULT_ANTI_PATTERNS
+
         briefing.anti_patterns = list(DEFAULT_ANTI_PATTERNS)
     except ImportError:
         pass
@@ -300,6 +307,7 @@ def _count_active_lessons(brain_dir: Path) -> int:
     try:
         from gradata._core import _filter_lessons_by_state
         from gradata.enhancements.self_improvement import parse_lessons
+
         lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
         count = len(_filter_lessons_by_state(lessons, min_state="INSTINCT"))
         _lessons_cache.update({"path": str(lessons_path), "mtime": mtime, "count": count})
@@ -311,6 +319,7 @@ def _count_active_lessons(brain_dir: Path) -> int:
 @dataclass
 class HealthReport:
     """Brain health assessment."""
+
     healthy: bool = True
     issues: list[str] = field(default_factory=list)
     sessions_total: int = 0
@@ -323,10 +332,13 @@ def generate_health_report(db_path=None, ctx=None) -> HealthReport:
     report = HealthReport()
     try:
         import sqlite3
+
         db = Path(db_path) if db_path else (Path(ctx.brain_dir) / "system.db" if ctx else None)
         if db and db.exists():
             conn = sqlite3.connect(str(db))
-            report.sessions_total = conn.execute("SELECT COUNT(DISTINCT session) FROM events").fetchone()[0] or 0
+            report.sessions_total = (
+                conn.execute("SELECT COUNT(DISTINCT session) FROM events").fetchone()[0] or 0
+            )
             report.events_total = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0] or 0
             conn.close()
     except Exception:
@@ -347,8 +359,12 @@ def generate_health_report(db_path=None, ctx=None) -> HealthReport:
 def format_health_report(report: HealthReport) -> str:
     """Format health report as human-readable string."""
     status = "HEALTHY" if report.healthy else "UNHEALTHY"
-    lines = [f"Brain Health: {status}", f"  Sessions: {report.sessions_total}",
-             f"  Events: {report.events_total}", f"  Active lessons: {report.lessons_active}"]
+    lines = [
+        f"Brain Health: {status}",
+        f"  Sessions: {report.sessions_total}",
+        f"  Events: {report.events_total}",
+        f"  Active lessons: {report.lessons_active}",
+    ]
     if report.issues:
         lines.append("  Issues:")
         for issue in report.issues:
