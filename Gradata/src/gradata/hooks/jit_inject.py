@@ -334,15 +334,11 @@ def main(data: dict) -> dict | None:
         },
     )
 
-    # Abbreviate state names (PATTERN→P, INSTINCT→I, RULE→R) to save ~1 token
-    # per injected rule; state semantics are preserved, verbosity reduced.
-    # Use a compact single-line header instead of XML open/close tags (~10 tok
-    # savings per turn measured 2026-04-21 autoresearch loop).
-    # Drop the colon and decimal point from confidence: [P:0.83] → [P83]
-    # saves 3 tokens per rule (measured 2026-04-21 autoresearch loop iteration 1).
-    _STATE_ABBREV = {"PATTERN": "P", "INSTINCT": "I", "RULE": "R"}
     # Dedup by normalized description: if two rules share identical description
     # text (different categories), emit only the first — same signal, no extra cost.
+    # Drop the [Pxx]/[Rxx]/[Ixx] state+confidence prefix: description text is
+    # self-explanatory and the prefix costs ~3 tokens/rule with no added LLM
+    # signal (saves ~6.5 tok/turn avg, ~65 weighted_tokens measured 2026-04-21).
     seen_descs: set[str] = set()
     lines = []
     for r, _sim in ranked:
@@ -350,16 +346,7 @@ def main(data: dict) -> dict | None:
         if norm_desc in seen_descs:
             continue
         seen_descs.add(norm_desc)
-        # Drop the category label: the description is self-explanatory and the
-        # category label costs 2-4 tokens per rule with no added LLM signal.
-        # Confidence + description is sufficient for the model to act on the rule.
-        lines.append(
-            f"[{_STATE_ABBREV.get(r.state.name, r.state.name)}{round(r.confidence * 100):02d}]"
-            f" {r.description}"
-        )
-    # Drop the separate `[jit]` section header: the [P83]/[I83]/[R83] markers
-    # already identify these as JIT rule injections. Saves 3 tokens per firing turn
-    # (measured 2026-04-21 autoresearch loop iteration 3).
+        lines.append(r.description)
     rules_block = "\n".join(lines)
     return {"result": rules_block}
 
