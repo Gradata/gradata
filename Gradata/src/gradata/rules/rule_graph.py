@@ -39,37 +39,13 @@ class RuleRelationType(Enum):
 
 
 # ---------------------------------------------------------------------------
-# Contradiction detection patterns (reused from contradiction_detector)
+# Contradiction detection patterns (imported from contradiction_detector)
 # ---------------------------------------------------------------------------
 
-_POLARITY_PAIRS: list[tuple[str, str]] = [
-    ("always", "never"),
-    ("must", "must not"),
-    ("must", "never"),
-    ("required", "forbidden"),
-    ("mandatory", "optional"),
-]
-
-_ACTION_OPPOSITES: list[tuple[str, str]] = [
-    ("use", "avoid"),
-    ("use", "don't use"),
-    ("use", "do not use"),
-    ("include", "exclude"),
-    ("include", "remove"),
-    ("include", "omit"),
-    ("add", "remove"),
-    ("add", "don't add"),
-    ("add", "do not add"),
-    ("enable", "disable"),
-    ("prefer", "avoid"),
-    ("keep", "remove"),
-    ("keep", "drop"),
-    ("keep", "delete"),
-    ("show", "hide"),
-    ("allow", "block"),
-    ("allow", "deny"),
-    ("accept", "reject"),
-]
+from gradata.enhancements.contradiction_detector import (  # noqa: E402
+    _ACTION_OPPOSITES,
+    _POLARITY_PAIRS,
+)
 
 _STOPWORDS = {
     "a",
