@@ -24,10 +24,9 @@ File posts to an optional external dashboard — fine to keep, but the
 module docstring should make clear it is optional telemetry, not a
 mandatory cloud dependency. Callers already tolerate absence.
 
-### 3. Docstring drift in `meta_rules.py`
-Module header still says "require Gradata Cloud" and "no-ops in the
-open-source build". That is no longer true as of the local-first port —
-rewrite the header to describe the local clustering algorithm.
+### 3. ~~Docstring drift in `meta_rules.py`~~ (fixed in PR #126)
+Module header now describes the local clustering algorithm and points
+at `rule_synthesizer` for LLM-assisted distillation. Closed.
 
 ### 4. Test-level cloud gating
 Former `@_requires_cloud` / `skipif` markers were deleted in this cycle.

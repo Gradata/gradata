@@ -1,15 +1,30 @@
 """
 Meta-Rule Emergence — compound learning through principle discovery.
 ====================================================================
-Meta-rule discovery and synthesis require Gradata Cloud.  The open-source
-SDK preserves the full data model, formatting, ranking, validation, and
-storage API so that cloud-generated meta-rules work seamlessly.
+Fully local-first. No cloud service is required to discover, synthesize,
+or rank meta-rules.
 
-Discovery, grouping, and synthesis are no-ops in the open-source build.
+Algorithm:
+  1. Filter graduated lessons to RULE/PATTERN state. RULE lessons below
+     ``_SYNTHESIS_CONF_FLOOR`` (0.90) are treated as decayed "zombies"
+     and excluded — they were shown (2026-04-14 ablation) to regress
+     small-model correctness when their principles entered synthesis.
+  2. Group by category (cheap pre-filter).
+  3. Small groups (<= 2 * min_group_size) treat the category as the
+     cluster. Large groups sub-cluster by greedy semantic similarity.
+  4. Each cluster of size >= min_group_size becomes a ``MetaRule``
+     via :func:`merge_into_meta` (count/(count+3) confidence smoothing).
+  5. Meta-rules not reinforced within ``_DECAY_WINDOW`` sessions lose
+     ``_DECAY_RATE`` confidence per session, dropping out below
+     ``_DECAY_MIN_CONFIDENCE``.
 
-Public API is fully preserved here via re-exports from:
+Ranking, validation, formatting, and persistence are in:
   - ``meta_rules_storage`` (SQLite persistence)
   - ``super_meta_rules`` (tier-2/3 logic)
+
+LLM-assisted distillation of the principle text is handled separately
+by ``rule_synthesizer`` at session close, using the user's own provider
+credentials (Anthropic SDK or Claude Code Max OAuth via ``claude -p``).
 """
 
 from __future__ import annotations
@@ -19,7 +34,7 @@ import json
 import logging
 import re
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from gradata._env import env_str
 from gradata._http import require_https
@@ -248,14 +263,18 @@ _NOISE_PATTERNS = (
     "added:",
     "quality_gates,",
     "no explicit corrections",
-    "oliver directed all content",
     "list or heading structure",
     "structure changed",
 )
 
 
 def _apply_decay(metas: list[MetaRule], current_session: int) -> list[MetaRule]:
-    """Drop or decay meta-rules that haven't been reinforced recently."""
+    """Drop or decay meta-rules that haven't been reinforced recently.
+
+    Returns a new list of (possibly replaced) meta-rules. Does not mutate
+    the inputs — ``refresh_meta_rules`` passes existing persisted metas
+    through this function and relies on them being unchanged on disk.
+    """
     result: list[MetaRule] = []
     for meta in metas:
         gap = current_session - meta.last_validated_session
@@ -265,8 +284,7 @@ def _apply_decay(metas: list[MetaRule], current_session: int) -> list[MetaRule]:
         penalty = (gap - _DECAY_WINDOW) * _DECAY_RATE
         decayed = max(0.0, meta.confidence - penalty)
         if decayed >= _DECAY_MIN_CONFIDENCE:
-            meta.confidence = round(decayed, 2)
-            result.append(meta)
+            result.append(replace(meta, confidence=round(decayed, 2)))
     return result
 
 
@@ -300,7 +318,8 @@ def _build_principle(category: str, best_text: str) -> str:
     """Turn a representative correction into a prompt-ready principle."""
     task_type = _CATEGORY_TASK_MAP.get(category, "working")
     text = re.sub(r"^(?:User corrected:\s*|AI produced.*?:\s*)", "", best_text).strip()
-    text = re.sub(r'^Oliver:\s*["\u201c](.+?)["\u201d]\s*', r"\1", text).strip()
+    # Strip a name-prefix like `Owner: "text"` — generic, not owner-specific.
+    text = re.sub(r'^[A-Za-z][A-Za-z ]{1,30}:\s*["\u201c](.+?)["\u201d]\s*', r"\1", text).strip()
     text = re.sub(r'^["\u201c\u201d]+|["\u201c\u201d]+$', "", text).strip()
     if not text:
         text = best_text
@@ -364,6 +383,9 @@ def discover_meta_rules(
         if len(group) <= min_group_size * 2:
             metas.append(merge_into_meta(group, session=current_session))
             continue
+        # threshold=0.20 is intentionally looser than the helper's 0.35
+        # default: the by-category pre-filter above already removes most
+        # noise, so recall matters more than precision here.
         for cluster in _cluster_by_similarity(group, threshold=0.20):
             if len(cluster) >= min_group_size:
                 metas.append(merge_into_meta(cluster, session=current_session))

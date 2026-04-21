@@ -502,10 +502,12 @@ class AgentGraduationTracker:
     ) -> None:
         """Update confidence on existing agent lessons based on outcome.
 
-        Same mechanics as user-level graduation:
-        - Approved unchanged: +0.05 (acceptance bonus)
-        - Approved with edits: +0.10 (survival bonus — lesson survived)
-        - Rejected: -0.25 (misfire penalty)
+        Same mechanics as user-level graduation. Magnitudes live in
+        :mod:`gradata.enhancements.self_improvement._confidence` — this
+        method must not drift from those constants:
+        - Approved unchanged: + ACCEPTANCE_BONUS
+        - Approved with edits: + SURVIVAL_BONUS
+        - Rejected:            + MISFIRE_PENALTY  (constant is negative)
 
         H2 fix: fire_count is only incremented when the lesson's category
         matches edit_category (or when edit_category is not provided, for
