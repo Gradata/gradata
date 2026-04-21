@@ -20,6 +20,7 @@ import pytest
 # OpenAI adapter
 # ===========================================================================
 
+
 class TestOpenAIAdapter:
     """Tests for patch_openai()."""
 
@@ -28,9 +29,7 @@ class TestOpenAIAdapter:
         client = MagicMock()
         # response shape: response.choices[0].message.content
         mock_response = MagicMock()
-        mock_response.choices = [
-            MagicMock(message=MagicMock(content="Hello from AI"))
-        ]
+        mock_response.choices = [MagicMock(message=MagicMock(content="Hello from AI"))]
         client.chat.completions.create.return_value = mock_response
         return client, mock_response
 
@@ -61,6 +60,7 @@ class TestOpenAIAdapter:
         from gradata.integrations.openai_adapter import patch_openai
 
         client, _ = self._make_client()
+        original_create = client.chat.completions.create
         # Give the brain a rule to inject
         with patch.object(fresh_brain, "apply_brain_rules", return_value="RULE: Be concise"):
             patched = patch_openai(client, brain_dir=fresh_brain.dir)
@@ -72,24 +72,34 @@ class TestOpenAIAdapter:
             ]
             patched.chat.completions.create(model="gpt-4", messages=messages)
 
-            # The system message should now contain the rule
-            system_msg = next(m for m in messages if m["role"] == "system")
+            # The underlying client.create must have received a messages list
+            # whose system entry contains the rule. The adapter now clones
+            # the caller's list before injecting — so we inspect call_args,
+            # not the caller's untouched list.
+            call_messages = original_create.call_args.kwargs["messages"]
+            system_msg = next(m for m in call_messages if m["role"] == "system")
             assert "RULE: Be concise" in system_msg["content"]
+            # Caller's own list must remain untouched (no shared-state mutation).
+            assert messages[0]["content"] == "You are helpful."
 
     def test_creates_system_message_when_missing(self, fresh_brain):
         """If no system message exists, one is created with brain rules."""
         from gradata.integrations.openai_adapter import patch_openai
 
         client, _ = self._make_client()
+        original_create = client.chat.completions.create
         patched = patch_openai(client, brain_dir=fresh_brain.dir)
         patched._brain.apply_brain_rules = MagicMock(return_value="RULE: Be brief")
 
         messages = [{"role": "user", "content": "Hello"}]
         patched.chat.completions.create(model="gpt-4", messages=messages)
 
-        # A system message should have been inserted at the front
-        assert messages[0]["role"] == "system"
-        assert "RULE: Be brief" in messages[0]["content"]
+        # A system message should have been inserted in the cloned list.
+        call_messages = original_create.call_args.kwargs["messages"]
+        assert call_messages[0]["role"] == "system"
+        assert "RULE: Be brief" in call_messages[0]["content"]
+        # Caller's own list must remain untouched.
+        assert messages == [{"role": "user", "content": "Hello"}]
 
     def test_output_captured(self, fresh_brain):
         """AI output is logged via brain.log_output."""
@@ -113,9 +123,13 @@ class TestOpenAIAdapter:
 
         client, mock_response = self._make_client()
         # Use a real SimpleNamespace so _brain won't auto-appear like on MagicMock
-        real_client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(
-            create=client.chat.completions.create,
-        )))
+        real_client = SimpleNamespace(
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(
+                    create=client.chat.completions.create,
+                )
+            )
+        )
         patched = patch_openai(real_client, brain_dir=tmp_path / "does-not-exist")
         assert not hasattr(patched, "_brain")
         # Original create should still work
@@ -129,6 +143,7 @@ class TestOpenAIAdapter:
 # ===========================================================================
 # Anthropic adapter
 # ===========================================================================
+
 
 class TestAnthropicAdapter:
     """Tests for patch_anthropic()."""
@@ -212,9 +227,11 @@ class TestAnthropicAdapter:
 
         client, mock_response = self._make_client()
         # Use SimpleNamespace so _brain won't auto-appear like on MagicMock
-        real_client = SimpleNamespace(messages=SimpleNamespace(
-            create=client.messages.create,
-        ))
+        real_client = SimpleNamespace(
+            messages=SimpleNamespace(
+                create=client.messages.create,
+            )
+        )
         patched = patch_anthropic(real_client, brain_dir=tmp_path / "nonexistent")
         assert not hasattr(patched, "_brain")
         result = patched.messages.create(
@@ -247,6 +264,7 @@ class TestAnthropicAdapter:
 # ===========================================================================
 # LangChain adapter
 # ===========================================================================
+
 
 class TestLangChainAdapter:
     """Tests for BrainMemory (LangChain-compatible memory)."""
@@ -319,9 +337,7 @@ class TestLangChainAdapter:
         from gradata.integrations.langchain_adapter import BrainMemory
 
         memory = BrainMemory(brain_dir=fresh_brain.dir)
-        with patch.object(
-            memory.brain, "apply_brain_rules", return_value="RULE: Always be polite"
-        ):
+        with patch.object(memory.brain, "apply_brain_rules", return_value="RULE: Always be polite"):
             result = memory.load_memory_variables({"input": "Draft email"})
             assert "RULE: Always be polite" in result["brain_context"]
 
@@ -329,6 +345,7 @@ class TestLangChainAdapter:
 # ===========================================================================
 # CrewAI adapter
 # ===========================================================================
+
 
 class TestCrewAIAdapter:
     """Tests for BrainCrewMemory (CrewAI-compatible memory)."""
@@ -393,9 +410,7 @@ class TestCrewAIAdapter:
         from gradata.integrations.crewai_adapter import BrainCrewMemory
 
         mem = BrainCrewMemory(brain_dir=fresh_brain.dir)
-        with patch.object(
-            mem.brain, "apply_brain_rules", return_value="RULE: Focus on ROI"
-        ):
+        with patch.object(mem.brain, "apply_brain_rules", return_value="RULE: Focus on ROI"):
             rules = mem.get_rules(task="email_draft")
             assert "RULE: Focus on ROI" in rules
 
@@ -404,9 +419,7 @@ class TestCrewAIAdapter:
         from gradata.integrations.crewai_adapter import BrainCrewMemory
 
         mem = BrainCrewMemory(brain_dir=fresh_brain.dir)
-        with patch.object(
-            mem.brain, "apply_brain_rules", side_effect=RuntimeError("test error")
-        ):
+        with patch.object(mem.brain, "apply_brain_rules", side_effect=RuntimeError("test error")):
             rules = mem.get_rules()
             assert rules == ""
 
@@ -423,9 +436,7 @@ class TestCrewAIAdapter:
         from gradata.integrations.crewai_adapter import BrainCrewMemory
 
         mem = BrainCrewMemory(brain_dir=fresh_brain.dir)
-        with patch.object(
-            mem.brain, "observe", side_effect=RuntimeError("db locked")
-        ):
+        with patch.object(mem.brain, "observe", side_effect=RuntimeError("db locked")):
             # Should not raise
             mem.save("Some memory content")
 
@@ -434,9 +445,7 @@ class TestCrewAIAdapter:
         from gradata.integrations.crewai_adapter import BrainCrewMemory
 
         mem = BrainCrewMemory(brain_dir=fresh_brain.dir)
-        with patch.object(
-            mem.brain, "search", side_effect=RuntimeError("db locked")
-        ):
+        with patch.object(mem.brain, "search", side_effect=RuntimeError("db locked")):
             results = mem.search("anything")
             assert results == []
 
@@ -445,22 +454,26 @@ class TestCrewAIAdapter:
 # Deprecation shim tests
 # ===========================================================================
 
+
 class TestDeprecationWarnings:
     """Verify that importing integrations adapter modules emits DeprecationWarning."""
 
     def _reimport(self, module_name: str):
         """Force a fresh import by removing the module from sys.modules first."""
         import sys
+
         # Remove the module (and any cached sub-module) so the warning fires again.
         for key in list(sys.modules):
             if key == module_name or key.startswith(module_name + "."):
                 del sys.modules[key]
         import importlib
+
         return importlib.import_module(module_name)
 
     def test_anthropic_adapter_warns_on_import(self):
         """Importing gradata.integrations.anthropic_adapter raises DeprecationWarning."""
         import warnings
+
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             self._reimport("gradata.integrations.anthropic_adapter")
@@ -470,6 +483,7 @@ class TestDeprecationWarnings:
     def test_openai_adapter_warns_on_import(self):
         """Importing gradata.integrations.openai_adapter raises DeprecationWarning."""
         import warnings
+
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             self._reimport("gradata.integrations.openai_adapter")
@@ -479,6 +493,7 @@ class TestDeprecationWarnings:
     def test_langchain_adapter_warns_on_import(self):
         """Importing gradata.integrations.langchain_adapter raises DeprecationWarning."""
         import warnings
+
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             self._reimport("gradata.integrations.langchain_adapter")
@@ -488,6 +503,7 @@ class TestDeprecationWarnings:
     def test_crewai_adapter_warns_on_import(self):
         """Importing gradata.integrations.crewai_adapter raises DeprecationWarning."""
         import warnings
+
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             self._reimport("gradata.integrations.crewai_adapter")
@@ -522,6 +538,7 @@ class TestDeprecationWarnings:
     def test_non_adapter_integrations_not_deprecated(self):
         """embeddings and session_history do NOT emit DeprecationWarning."""
         import warnings
+
         for mod_name in [
             "gradata.integrations.embeddings",
             "gradata.integrations.session_history",
@@ -529,6 +546,7 @@ class TestDeprecationWarnings:
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always")
                 import importlib
+
                 importlib.import_module(mod_name)
             depr = [w for w in caught if issubclass(w.category, DeprecationWarning)]
             assert not depr, f"{mod_name} should not emit DeprecationWarning, got: {depr}"

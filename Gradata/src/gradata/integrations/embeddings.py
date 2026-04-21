@@ -7,6 +7,7 @@ and single-linkage clustering for lesson deduplication.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import math
@@ -69,7 +70,11 @@ class EmbeddingClient:
         text_lower = text.lower()
         for i in range(len(text_lower) - 2):
             trigram = text_lower[i : i + 3]
-            h = hash(trigram)
+            # NOTE: use md5 (not Python's hash()) — built-in hash() is
+            # per-process randomized via PYTHONHASHSEED, which would make
+            # local embedding vectors non-deterministic across runs and
+            # silently corrupt cosine-similarity / clustering output.
+            h = int.from_bytes(hashlib.md5(trigram.encode("utf-8")).digest()[:8], "big")
             idx = h % self.dim
             vec[idx] += 1.0
         norm = math.sqrt(sum(v * v for v in vec))

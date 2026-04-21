@@ -142,22 +142,44 @@ class RuleApplication:
 
 
 def get_rule_history(db_path: Path, rule_id: str, limit: int = 20) -> list[dict]:
-    """Recent RULE_APPLICATION events for a specific rule."""
-    try:
-        from gradata._events import query
+    """Recent RULE_APPLICATION events for a specific rule.
 
-        events = query(event_type="RULE_APPLICATION", limit=500)
-        matching = [e for e in events if e.get("data", {}).get("rule_id") == rule_id]
+    Uses a direct SQL `tags_json LIKE` filter to avoid pulling 500 rows
+    and filtering Python-side — the rule_id is stored as a `rule:<id>`
+    tag at emit time, so we can push the selectivity into SQLite.
+    """
+    try:
+        import contextlib
+        import json
+        import sqlite3
+
+        from gradata import _paths as _p
+
+        with contextlib.closing(sqlite3.connect(str(db_path or _p.DB_PATH))) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM events "
+                "WHERE type = 'RULE_APPLICATION' AND tags_json LIKE ? "
+                "ORDER BY id DESC LIMIT ?",
+                (f'%"rule:{rule_id}"%', limit),
+            ).fetchall()
+
         return [
             {
-                "rule_id": e["data"].get("rule_id", ""),
-                "session": e.get("session"),
-                "accepted": e["data"].get("accepted", False),
-                "misfired": e["data"].get("misfired", False),
-                "contradicted": e["data"].get("contradicted", False),
-                "ts": e.get("ts"),
+                "rule_id": rule_id,
+                "session": r["session"],
+                "accepted": (json.loads(r["data_json"]) if r["data_json"] else {}).get(
+                    "accepted", False
+                ),
+                "misfired": (json.loads(r["data_json"]) if r["data_json"] else {}).get(
+                    "misfired", False
+                ),
+                "contradicted": (json.loads(r["data_json"]) if r["data_json"] else {}).get(
+                    "contradicted", False
+                ),
+                "ts": r["ts"],
             }
-            for e in matching[:limit]
+            for r in rows
         ]
     except Exception as e:
         logging.getLogger("gradata.rule_tracker").warning(
