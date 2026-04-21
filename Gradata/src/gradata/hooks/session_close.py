@@ -303,8 +303,19 @@ def _resolve_pending_applications(brain_dir: str, data: dict) -> None:
                 if category and category in rejecting_categories:
                     outcome = "REJECTED"
                 elif lesson_desc:
+                    # Require a long-enough substring to avoid false-positive
+                    # REJECT matches on shared prefixes like "never hardcode ".
+                    normalized_lesson = lesson_desc.strip().lower()
                     for desc in rejecting_descriptions:
-                        if desc and desc[:30] and desc[:30] in lesson_desc:
+                        if not desc:
+                            continue
+                        normalized_desc = desc.strip().lower()
+                        if len(normalized_desc) < 40:
+                            continue
+                        if (
+                            normalized_desc in normalized_lesson
+                            or normalized_lesson in normalized_desc
+                        ):
                             outcome = "REJECTED"
                             break
                 updates.append((outcome, row_id))

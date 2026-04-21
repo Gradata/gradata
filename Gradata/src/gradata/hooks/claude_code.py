@@ -18,24 +18,28 @@ import sys
 def install_hook(profile: str = "standard") -> None:
     """Add Gradata hooks to Claude Code settings."""
     from gradata.hooks._installer import install
+
     install(profile)
 
 
 def uninstall_hook() -> None:
     """Remove Gradata hooks from Claude Code settings."""
     from gradata.hooks._installer import uninstall
+
     uninstall()
 
 
 def hook_status() -> None:
     """Check if Gradata hooks are installed."""
     from gradata.hooks._installer import status
+
     status()
 
 
 def capture_correction() -> None:
     """Called by Claude Code hook — reads stdin for tool use context and records correction."""
     import logging
+
     _log = logging.getLogger("gradata.hooks")
 
     try:
@@ -50,10 +54,8 @@ def capture_correction() -> None:
     if tool_name not in ("Edit", "Write"):
         return
 
-    # Extract draft (old content) and final (new content) from tool input/output
+    # Extract draft (old content) and final (new content) from tool input
     tool_input = payload.get("tool_input", {})
-    payload.get("tool_output", "")
-
     old_string = tool_input.get("old_string", "")
     new_string = tool_input.get("new_string", "")
 
@@ -61,18 +63,19 @@ def capture_correction() -> None:
         return
 
     from gradata.hooks._base import resolve_brain_dir
+
     brain_dir = resolve_brain_dir()
     if not brain_dir:
         return
 
     try:
         from gradata import Brain
+
         brain = Brain(brain_dir)
         brain.correct(draft=old_string, final=new_string, category="CODE")
         _log.debug("Captured correction from Claude Code hook")
     except Exception as e:
         _log.debug("Hook capture failed: %s", e)
-
 
 
 # ---------------------------------------------------------------------------
