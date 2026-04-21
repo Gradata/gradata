@@ -137,11 +137,14 @@ def _read_brain_prompt(brain_dir: Path) -> str | None:
     import re as _re
 
     text = _re.sub(r"<!--.*?-->", "", text, flags=_re.DOTALL).strip()
-    # Truncate inner body BEFORE wrapping so the XML tags remain intact.
+    # Replace verbose <brain-wisdom>…</brain-wisdom> wrapper with compact [wisdom]
+    # marker — saves 8 tokens per session start with identical LLM semantics.
+    text = _re.sub(r"<brain-wisdom>\s*", "", text)
+    text = _re.sub(r"\s*</brain-wisdom>", "", text).strip()
+    # Truncate body before wrapping.
     if len(text) > MAX_BRAIN_PROMPT_CHARS:
         text = text[:MAX_BRAIN_PROMPT_CHARS] + "\n[trunc]"
-    if "<brain-wisdom>" not in text:
-        text = f"<brain-wisdom>\n{text}\n</brain-wisdom>"
+    text = f"[wisdom]\n{text}"
     return text
 
 

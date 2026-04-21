@@ -206,6 +206,9 @@ def main(data: dict) -> dict | None:
             if parent_ids:
                 top = [r for r in top if _compute_lesson_id(r) not in parent_ids]
 
+        if not top:
+            return None
+
         _STATE_ABBREV = {"PATTERN": "P", "INSTINCT": "I", "RULE": "R"}
         lines = []
         for r in top:

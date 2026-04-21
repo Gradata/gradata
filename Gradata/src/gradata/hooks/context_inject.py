@@ -55,6 +55,20 @@ def _is_duplicate(snippet: str, injected_descriptions: list[str], threshold: flo
     return any(_jaccard(snippet, desc) >= threshold for desc in injected_descriptions)
 
 
+def _strip_frontmatter(text: str) -> str:
+    """Strip YAML/TOML frontmatter (---...--- block) from the start of text.
+
+    Frontmatter fields (type, pattern, personas, last_seen) carry no semantic
+    signal for the LLM — only the content after the closing '---' matters.
+    """
+    if not text.startswith("---"):
+        return text
+    end = text.find("---", 3)
+    if end == -1:
+        return text
+    return text[end + 3 :].lstrip()
+
+
 def main(data: dict) -> dict | None:
     # Kill-switch: GRADATA_CONTEXT_INJECT=0 disables brain context retrieval
     # entirely. Use when SessionStart rules + manual brain queries suffice.
@@ -91,11 +105,12 @@ def main(data: dict) -> dict | None:
             _load_injected_descriptions(brain_dir) if dedup_enabled else []
         )
 
-        separator = "\n|\n"
+        separator = "|"
         context_parts = []
         total_len = 0
         for r in results:
             text = r.get("text", "") or r.get("content", "") or str(r)
+            text = _strip_frontmatter(text)
             snippet = text[:200]
             if dedup_enabled and _is_duplicate(snippet, injected_descriptions, _DEDUP_THRESHOLD):
                 continue
