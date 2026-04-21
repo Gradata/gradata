@@ -88,6 +88,15 @@ SIGNAL_MAP = {
     "gap": GAP_PATTERNS,
 }
 
+# Any of these signals means the prior output was NOT tacitly accepted.
+_NEGATIVE_SIGNAL_TYPES = {"negation", "reminder", "challenge", "gap"}
+
+# Tacit-acceptance threshold: substantive follow-up messages without negative
+# signals imply the prior output was OK. Short messages ("ok", "thanks", "go")
+# are too ambiguous — they might be mid-sentence fragments or acknowledgements
+# unrelated to the last output.
+_TACIT_MIN_LENGTH = 30
+
 
 def _detect_signals(text: str) -> list[dict]:
     signals = []
@@ -116,10 +125,17 @@ def main(data: dict) -> dict | None:
             return None
 
         signals = _detect_signals(message)
-        if not signals:
+        signal_types = {s["type"] for s in signals}
+        has_negative = bool(signal_types & _NEGATIVE_SIGNAL_TYPES)
+        has_approval = "approval" in signal_types
+        # Tacit acceptance: substantive follow-up with no negative signals. The
+        # brain.correct() pipeline logs ~20x more CORRECTION than OUTPUT_ACCEPTED
+        # because users rarely type "looks good" — silence is approval.
+        tacit_accept = not has_negative and not has_approval and len(message) >= _TACIT_MIN_LENGTH
+
+        if not signals and not tacit_accept:
             return None
 
-        # Emit event if brain dir available
         brain_dir = resolve_brain_dir()
 
         if brain_dir:
@@ -128,23 +144,34 @@ def main(data: dict) -> dict | None:
                 from gradata._paths import BrainContext
 
                 ctx = BrainContext.from_brain_dir(brain_dir)
-                emit(
-                    "IMPLICIT_FEEDBACK",
-                    source="hook:implicit_feedback",
-                    data={
-                        "signals": [s["type"] for s in signals],
-                        "snippets": [s["snippet"] for s in signals[:3]],
-                        "message_preview": message[:200],
-                    },
-                    ctx=ctx,
-                )
-                # Emit OUTPUT_ACCEPTED for approval signals
-                if any(s["type"] == "approval" for s in signals):
+                if signals:
+                    emit(
+                        "IMPLICIT_FEEDBACK",
+                        source="hook:implicit_feedback",
+                        data={
+                            "signals": [s["type"] for s in signals],
+                            "snippets": [s["snippet"] for s in signals[:3]],
+                            "message_preview": message[:200],
+                        },
+                        ctx=ctx,
+                    )
+                if has_approval:
                     emit(
                         "OUTPUT_ACCEPTED",
                         source="hook:implicit_feedback",
                         data={
+                            "mode": "explicit",
                             "snippets": [s["snippet"] for s in signals if s["type"] == "approval"],
+                            "message_preview": message[:200],
+                        },
+                        ctx=ctx,
+                    )
+                elif tacit_accept:
+                    emit(
+                        "OUTPUT_ACCEPTED",
+                        source="hook:implicit_feedback",
+                        data={
+                            "mode": "tacit",
                             "message_preview": message[:200],
                         },
                         ctx=ctx,
@@ -152,8 +179,10 @@ def main(data: dict) -> dict | None:
             except Exception as exc:
                 _log.debug("implicit_feedback emit failed: %s", exc)
 
-        signal_names = ", ".join(s["type"] for s in signals)
-        return {"result": f"IMPLICIT FEEDBACK: [{signal_names}]"}
+        if signals:
+            signal_names = ", ".join(s["type"] for s in signals)
+            return {"result": f"IMPLICIT FEEDBACK: [{signal_names}]"}
+        return None
     except Exception as exc:
         _log.debug("implicit_feedback hook error: %s", exc)
         return None
