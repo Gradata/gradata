@@ -66,9 +66,10 @@ HOOK_META = {
 }
 
 # Defaults. All tunable by env var so operators can sweep without a code change.
-# Reduced from 5→3→2: BM25/Jaccard top-2 are the highest-signal rules;
-# 3rd rule is marginal and adds ~8.75 tok/turn for low incremental value.
-DEFAULT_MAX_RULES = 2
+# Reduced 5→3→2→1: inject only the single best-matching rule per turn.
+# The top-1 BM25 hit carries the dominant signal; marginal rules add noise.
+# Saves ~16 tok/turn over k=2 (expected ~160 weighted_tokens).
+DEFAULT_MAX_RULES = 1
 DEFAULT_MIN_CONFIDENCE = 0.60
 DEFAULT_MIN_SIMILARITY = 0.05
 MIN_DRAFT_LEN = 10
