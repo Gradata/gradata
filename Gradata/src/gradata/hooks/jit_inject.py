@@ -328,13 +328,15 @@ def main(data: dict) -> dict | None:
 
     # Abbreviate state names (PATTERN→P, INSTINCT→I, RULE→R) to save ~1 token
     # per injected rule; state semantics are preserved, verbosity reduced.
+    # Use a compact single-line header instead of XML open/close tags (~10 tok
+    # savings per turn measured 2026-04-21 autoresearch loop).
     _STATE_ABBREV = {"PATTERN": "P", "INSTINCT": "I", "RULE": "R"}
     lines = [
         f"[{_STATE_ABBREV.get(r.state.name, r.state.name)}:{r.confidence:.2f}]"
         f" {r.category}: {r.description}"
         for r, _sim in ranked
     ]
-    rules_block = "<brain-rules-jit>\n" + "\n".join(lines) + "\n</brain-rules-jit>"
+    rules_block = "[jit]\n" + "\n".join(lines)
     return {"result": rules_block}
 
 
