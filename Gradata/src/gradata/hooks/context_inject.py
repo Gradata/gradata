@@ -20,6 +20,9 @@ HOOK_META = {
 # pass through without FTS cost. Override via GRADATA_MIN_MESSAGE_LEN.
 MIN_MESSAGE_LEN = int(os.environ.get("GRADATA_MIN_MESSAGE_LEN", "100"))
 MAX_CONTEXT_LEN = int(os.environ.get("GRADATA_MAX_CONTEXT_LEN", "800"))
+# Reduce default top_k from 3→2: third result rarely changes decisions and
+# costs ~48 tokens/turn in the typical scenario (2026-04-21 autoresearch).
+CONTEXT_TOP_K = int(os.environ.get("GRADATA_CONTEXT_TOP_K", "2"))
 
 # Jaccard threshold above which a snippet is considered a duplicate of an
 # already-injected rule description. Override via GRADATA_CONTEXT_DEDUP_THRESHOLD.
@@ -74,7 +77,7 @@ def main(data: dict) -> dict | None:
             from gradata.brain import Brain
 
             brain = Brain(brain_dir)
-            results = brain.search(message, top_k=3)
+            results = brain.search(message, top_k=CONTEXT_TOP_K)
         except Exception:
             return None
 
