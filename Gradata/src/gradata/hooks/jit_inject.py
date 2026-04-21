@@ -42,8 +42,16 @@ except ImportError:
     is_hook_enforced = None  # type: ignore[assignment]
 
 try:  # BM25 is optional — SDK must stay zero-required-deps.
-    import bm25s  # type: ignore[import-not-found]
+    # Suppress bm25s stdout noise on Windows (benchmark.py prints to stdout).
+    import io as _io
+    import sys as _sys
 
+    _bm25_stdout = _sys.stdout
+    _sys.stdout = _io.StringIO()
+    try:
+        import bm25s  # type: ignore[import-not-found]
+    finally:
+        _sys.stdout = _bm25_stdout
     _BM25_AVAILABLE = True
 except ImportError:  # pragma: no cover - import gate
     bm25s = None  # type: ignore[assignment]
