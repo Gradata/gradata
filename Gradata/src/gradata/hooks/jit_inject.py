@@ -337,11 +337,35 @@ def main(data: dict) -> dict | None:
         },
     )
 
-    # Dedup by normalized description: if two rules share identical description
-    # text (different categories), emit only the first — same signal, no extra cost.
-    # Drop the [Pxx]/[Rxx]/[Ixx] state+confidence prefix: description text is
-    # self-explanatory and the prefix costs ~3 tokens/rule with no added LLM
-    # signal (saves ~6.5 tok/turn avg, ~65 weighted_tokens measured 2026-04-21).
+    # Dedup against the session wisdom block: skip JIT rules that are already
+    # substantially covered by the session-start wisdom block (brain_prompt.md).
+    # Threshold 0.25 Jaccard: "playbooks from the start" ↔ "always consult playbooks"
+    # scores ~0.33, so covered rules skip. Saves ~11 tok/turn avg on typical sessions.
+    wisdom_lines: list[str] = []
+    bp_path = Path(brain_dir) / "brain_prompt.md"
+    if bp_path.is_file():
+        try:
+            bp_text = bp_path.read_text(encoding="utf-8")
+            wisdom_lines = [ln[2:].strip() for ln in bp_text.splitlines() if ln.startswith("- ")]
+        except OSError:
+            pass
+
+    _WISDOM_DEDUP_THRESHOLD = 0.25
+
+    def _already_in_wisdom(desc: str) -> bool:
+        if not wisdom_lines:
+            return False
+        desc_words = set(desc.lower().split())
+        for wl in wisdom_lines:
+            wl_words = set(wl.lower().split())
+            if not desc_words or not wl_words:
+                continue
+            j = len(desc_words & wl_words) / len(desc_words | wl_words)
+            if j >= _WISDOM_DEDUP_THRESHOLD:
+                return True
+        return False
+
+    # Dedup by normalized description AND by overlap with session wisdom block.
     seen_descs: set[str] = set()
     lines = []
     for r, _sim in ranked:
@@ -349,7 +373,11 @@ def main(data: dict) -> dict | None:
         if norm_desc in seen_descs:
             continue
         seen_descs.add(norm_desc)
+        if _already_in_wisdom(r.description):
+            continue
         lines.append(r.description)
+    if not lines:
+        return None
     rules_block = "\n".join(lines)
     return {"result": rules_block}
 
