@@ -15,8 +15,12 @@ backends are in _query.py and _embed.py (the existing modules).
 
 from __future__ import annotations
 
+import logging
+import zlib
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -121,7 +125,10 @@ def rrf_merge(
 
     for result_list in result_lists:
         for rank, chunk in enumerate(result_list):
-            cid = chunk.chunk_id or f"{chunk.source}:{hash(chunk.content) % 10000}"
+            cid = (
+                chunk.chunk_id
+                or f"{chunk.source}:{zlib.crc32(chunk.content.encode('utf-8')) & 0x7FFFFFFF}"
+            )
             scores[cid] = scores.get(cid, 0.0) + 1.0 / (k + rank + 1)
             if cid not in chunks_by_id:
                 chunks_by_id[cid] = chunk
@@ -401,15 +408,15 @@ def cascade_retrieve(
                         fts2 = fts_fn(expanded_query, limit * 2)
                         pass2_results.append(fts2)
                         pass2_total += len(fts2)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("two-pass fts expansion failed: %s", exc)
                 if vector_fn is not None:
                     try:
                         vec2 = vector_fn(expanded_query, limit * 2)
                         pass2_results.append(vec2)
                         pass2_total += len(vec2)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("two-pass vector expansion failed: %s", exc)
 
                 if pass2_results:
                     all_combined = all_results + pass2_results
@@ -462,15 +469,14 @@ def order_by_relevance_position(chunks: list[Chunk]) -> list[Chunk]:
         return chunks
 
     sorted_chunks = sorted(chunks, key=lambda c: -c.relevance_score)
-    result: list[Chunk] = []
-    left = True
-    for chunk in sorted_chunks:
-        if left:
-            result.insert(0, chunk)
-        else:
-            result.append(chunk)
-        left = not left
-    return result
+    # Split alternating items into head/tail without O(N) list.insert(0, ...)
+    # which was O(N^2) total. Reversing the head at the end restores order.
+    head: list[Chunk] = []
+    tail: list[Chunk] = []
+    for i, chunk in enumerate(sorted_chunks):
+        (head if i % 2 == 0 else tail).append(chunk)
+    head.reverse()
+    return head + tail
 
 
 # ---------------------------------------------------------------------------
@@ -524,5 +530,6 @@ class NaiveRAG:
             return RetrievalResult(
                 chunks=results, query=query, mode="naive", total_candidates=len(results)
             )
-        except Exception:
+        except Exception as exc:
+            logger.debug("NaiveRAG.retrieve fts_fn failed: %s", exc)
             return RetrievalResult(chunks=[], query=query, mode="naive", total_candidates=0)

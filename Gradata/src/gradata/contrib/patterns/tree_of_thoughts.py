@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 @dataclass
 class Thought:
     """A single candidate in the exploration tree."""
+
     content: str
     score: float = 0.0
     rationale: str = ""
@@ -28,6 +29,7 @@ class Thought:
 @dataclass
 class ToTResult:
     """Result of Tree of Thoughts exploration."""
+
     best: Thought
     alternatives: list[Thought]
     depth: int
@@ -120,18 +122,26 @@ def evaluate_rule_candidates(
     """
     effective_scorer: Callable[[str], tuple[float, str]]
     if scorer is None:
+        # Precompute rule word-sets once instead of O(N*M) re-tokenisation
+        # per candidate × rule inside the scorer closure.
+        rule_word_sets: list[set[str]] = [set(r.lower().split()) for r in existing_rules]
+
         def _default_scorer(candidate: str) -> tuple[float, str]:
             # Heuristic: shorter, more specific rules score higher
             words = candidate.split()
             length_score = max(0.0, 1.0 - len(words) / 50)
             # Penalize overlap with existing rules
+            candidate_words = set(candidate.lower().split())
             overlap_penalty = 0.0
-            for rule in existing_rules:
-                common = set(candidate.lower().split()) & set(rule.lower().split())
-                if len(common) > 5:
+            for rule_words in rule_word_sets:
+                if len(candidate_words & rule_words) > 5:
                     overlap_penalty += 0.2
             score = round(length_score - overlap_penalty, 4)
-            return (max(0.0, min(1.0, score)), f"length={len(words)}, overlap_penalty={overlap_penalty:.2f}")
+            return (
+                max(0.0, min(1.0, score)),
+                f"length={len(words)}, overlap_penalty={overlap_penalty:.2f}",
+            )
+
         effective_scorer = _default_scorer
     else:
         effective_scorer = scorer

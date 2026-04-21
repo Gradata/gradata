@@ -35,6 +35,7 @@ per process, or use process-level locks for multi-worker deployments.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import sys
 from pathlib import Path
@@ -1828,8 +1829,6 @@ class Brain(BrainInspectionMixin):
     def health(self) -> dict:
         """Generate brain health report."""
         try:
-            import dataclasses
-
             from gradata.enhancements.reporting import generate_health_report
 
             return dataclasses.asdict(generate_health_report(self.db_path))
