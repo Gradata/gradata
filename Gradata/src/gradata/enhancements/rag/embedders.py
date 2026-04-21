@@ -88,7 +88,7 @@ def _hash_vector(text: str, dim: int) -> list[float]:
     raw = [(b / 255.0) - 0.5 for b in digest]
     norm = math.sqrt(sum(x * x for x in raw))
     if norm == 0:
-        return raw
+        return [0.0] * len(raw)
     return [x / norm for x in raw]
 
 

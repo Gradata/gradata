@@ -124,6 +124,41 @@ class TestHandoffWatchdog:
         assert wd.check(tokens_used=500, tokens_max=1000) is not None
 
 
+class TestHandoffWatchdogEmission:
+    def test_emits_handoff_triggered_event(self, tmp_path, monkeypatch):
+        calls = []
+
+        def fake_emit(event_type, source, data=None, tags=None, **kw):
+            del kw
+            calls.append((event_type, source, data or {}, tags or []))
+
+        from gradata import _events as events
+
+        monkeypatch.setattr(events, "emit", fake_emit)
+
+        def synth():
+            return HandoffDoc(task_id="t9", agent_name="writer", summary="S.")
+
+        wd = HandoffWatchdog(
+            task_id="t9",
+            agent_name="writer",
+            handoff_dir=tmp_path,
+            synthesizer=synth,
+            threshold=0.5,
+        )
+        wd.check(tokens_used=800, tokens_max=1000)
+
+        assert len(calls) == 1
+        event_type, source, data, tags = calls[0]
+        assert event_type == "handoff.triggered"
+        assert source == "handoff_watchdog"
+        assert data["task_id"] == "t9"
+        assert data["agent_name"] == "writer"
+        assert data["threshold"] == 0.5
+        assert 0.79 <= data["pressure"] <= 0.81
+        assert "handoff" in tags
+
+
 class TestLoadHandoff:
     def test_missing_returns_none(self, tmp_path):
         assert load_handoff("t1", "writer", tmp_path) is None

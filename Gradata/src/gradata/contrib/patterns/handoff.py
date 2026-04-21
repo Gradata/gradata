@@ -107,7 +107,7 @@ class HandoffWatchdog:
     handoff_dir: Path
     synthesizer: Callable[[], HandoffDoc]
     threshold: float = field(default_factory=_read_threshold)
-    _fired: bool = False
+    _fired: bool = field(default=False, init=False, repr=False, compare=False)
 
     def check(self, tokens_used: int, tokens_max: int) -> HandoffDoc | None:
         """Trigger handoff synthesis if pressure >= threshold and not yet fired.
