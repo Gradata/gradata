@@ -116,6 +116,30 @@ def _isolate_brain_dir_env():
         os.environ["BRAIN_DIR"] = prev
 
 
+# Hook kill-switch env vars from #133 — when set to "0" in a dev shell they
+# disable the corresponding hook. Tests assume hooks are enabled, so scrub
+# them process-wide for the duration of the session and restore on teardown.
+_HOOK_KILL_SWITCHES = (
+    "GRADATA_SECRET_SCAN",
+    "GRADATA_CONFIG_PROTECTION",
+    "GRADATA_SESSION_PERSIST",
+    "GRADATA_CONTEXT_INJECT",
+    "GRADATA_BRAIN_MAINTAIN",
+    "GRADATA_CONFIG_VALIDATE",
+    "GRADATA_DUPLICATE_GUARD",
+)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _unset_hook_kill_switches():
+    """Hermetic tests: never inherit the dev shell's kill-switch env."""
+    saved = {k: os.environ.pop(k, None) for k in _HOOK_KILL_SWITCHES}
+    yield
+    for k, v in saved.items():
+        if v is not None:
+            os.environ[k] = v
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
