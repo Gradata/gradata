@@ -1276,11 +1276,20 @@ class Brain(BrainInspectionMixin):
         from datetime import date
 
         with contextlib.closing(get_connection(self.db_path)) as conn:
-            conn.execute(
-                "UPDATE pending_approvals SET resolution = ?, resolved_at = ? WHERE id = ?",
+            # Re-check resolution IS NULL to prevent lost-race overwrites when
+            # two workers resolve the same approval concurrently. rowcount == 0
+            # means another worker won the race.
+            cur = conn.execute(
+                "UPDATE pending_approvals SET resolution = ?, resolved_at = ? "
+                "WHERE id = ? AND resolution IS NULL",
                 (resolution, date.today().isoformat(), approval_id),
             )
             conn.commit()
+            if cur.rowcount == 0:
+                return {
+                    "resolved": False,
+                    "reason": "already_resolved_by_other_worker",
+                }
         return {"resolved": True, "category": cat, "description": desc}
 
     def review_pending(self) -> list[dict]:

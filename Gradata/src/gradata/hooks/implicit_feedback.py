@@ -74,9 +74,12 @@ APPROVAL_PATTERNS = [
 
 # GAP: the output omitted something the user expected. Parity with the removed
 # JS implicit-feedback hook (hook-overlap audit 2026-04-21, Tier A item 5).
+# NOTE: `forgot|missed` are owned by CHALLENGE_PATTERNS above; the gap variant
+# uses `skipped|dropped|ignored` only so _detect_signals() can't emit both
+# `gap` and `challenge` for the same phrase.
 GAP_PATTERNS = [
     re.compile(r"\bwhat about\b", re.I),
-    re.compile(r"\byou (forgot|missed|skipped|dropped|ignored)\b", re.I),
+    re.compile(r"\byou (skipped|dropped|ignored)\b", re.I),
     re.compile(r"\bdid (you|u) (check|verify|test|review)\b", re.I),
 ]
 
@@ -94,8 +97,39 @@ _NEGATIVE_SIGNAL_TYPES = {"negation", "reminder", "challenge", "gap"}
 # Tacit-acceptance threshold: substantive follow-up messages without negative
 # signals imply the prior output was OK. Short messages ("ok", "thanks", "go")
 # are too ambiguous — they might be mid-sentence fragments or acknowledgements
-# unrelated to the last output.
-_TACIT_MIN_LENGTH = 30
+# unrelated to the last output. Questions are NOT tacit acceptance either —
+# they usually signal confusion or follow-up work.
+_TACIT_MIN_LENGTH = 60
+_QUESTION_PREFIXES = (
+    "what",
+    "why",
+    "how",
+    "when",
+    "where",
+    "who",
+    "which",
+    "can",
+    "could",
+    "should",
+    "would",
+    "will",
+    "is",
+    "are",
+    "do",
+    "does",
+    "did",
+)
+
+
+def _looks_like_question(message: str) -> bool:
+    """Heuristic: message is a question (not tacit acceptance)."""
+    stripped = message.strip()
+    if not stripped:
+        return False
+    if stripped.endswith("?"):
+        return True
+    first_word = stripped.split(None, 1)[0].lower().rstrip(",.!:;")
+    return first_word in _QUESTION_PREFIXES
 
 
 def _detect_signals(text: str) -> list[dict]:
@@ -131,7 +165,12 @@ def main(data: dict) -> dict | None:
         # Tacit acceptance: substantive follow-up with no negative signals. The
         # brain.correct() pipeline logs ~20x more CORRECTION than OUTPUT_ACCEPTED
         # because users rarely type "looks good" — silence is approval.
-        tacit_accept = not has_negative and not has_approval and len(message) >= _TACIT_MIN_LENGTH
+        tacit_accept = (
+            not has_negative
+            and not has_approval
+            and len(message) >= _TACIT_MIN_LENGTH
+            and not _looks_like_question(message)
+        )
 
         if not signals and not tacit_accept:
             return None

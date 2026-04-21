@@ -33,6 +33,23 @@ _DEFAULT_API_BASE = os.environ.get("GRADATA_CLOUD_API_BASE", "https://api.gradat
 _CONFIG_FILE_NAME = "cloud-config.json"
 
 
+def _normalize_api_base(api_base: str) -> str:
+    """Upgrade legacy bases missing ``/api/v1`` to the versioned path.
+
+    Earlier releases wrote ``https://api.gradata.ai`` (no version segment)
+    to cloud-config.json. Request paths were rewritten to include
+    ``/api/v1`` in the base, so legacy configs would POST to unversioned
+    endpoints and silently break. Detect the gradata.ai host without a
+    path suffix and append ``/api/v1`` so legacy clients self-heal.
+    """
+    if not api_base:
+        return api_base
+    stripped = api_base.rstrip("/")
+    if stripped in ("https://api.gradata.ai", "http://api.gradata.ai"):
+        return stripped + "/api/v1"
+    return api_base
+
+
 @dataclass
 class CloudConfig:
     """Per-brain cloud sync configuration, persisted to brain_dir/cloud-config.json."""
@@ -58,7 +75,7 @@ def load_config(brain_dir: Path) -> CloudConfig:
         return CloudConfig(
             sync_enabled=bool(data.get("sync_enabled", False)),
             token=str(data.get("token", "")),
-            api_base=str(data.get("api_base", _DEFAULT_API_BASE)),
+            api_base=_normalize_api_base(str(data.get("api_base", _DEFAULT_API_BASE))),
             contribute_corpus=bool(data.get("contribute_corpus", False)),
             last_sync_at=str(data.get("last_sync_at", "")),
         )

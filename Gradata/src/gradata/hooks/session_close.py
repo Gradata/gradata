@@ -303,21 +303,27 @@ def _resolve_pending_applications(brain_dir: str, data: dict) -> None:
                 if category and category in rejecting_categories:
                     outcome = "REJECTED"
                 elif lesson_desc:
-                    # Require a long-enough substring to avoid false-positive
-                    # REJECT matches on shared prefixes like "never hardcode ".
+                    # Require a long-enough substring on BOTH sides to avoid
+                    # false-positive REJECT matches on shared prefixes like
+                    # "never hardcode ". Gating only one side let a short
+                    # lesson description match a long rejecting description
+                    # (or vice-versa) via prefix containment.
                     normalized_lesson = lesson_desc.strip().lower()
-                    for desc in rejecting_descriptions:
-                        if not desc:
-                            continue
-                        normalized_desc = desc.strip().lower()
-                        if len(normalized_desc) < 40:
-                            continue
-                        if (
-                            normalized_desc in normalized_lesson
-                            or normalized_lesson in normalized_desc
-                        ):
-                            outcome = "REJECTED"
-                            break
+                    if len(normalized_lesson) < 40:
+                        pass
+                    else:
+                        for desc in rejecting_descriptions:
+                            if not desc:
+                                continue
+                            normalized_desc = desc.strip().lower()
+                            if len(normalized_desc) < 40:
+                                continue
+                            if (
+                                normalized_desc in normalized_lesson
+                                or normalized_lesson in normalized_desc
+                            ):
+                                outcome = "REJECTED"
+                                break
                 updates.append((outcome, row_id))
 
             conn.executemany(

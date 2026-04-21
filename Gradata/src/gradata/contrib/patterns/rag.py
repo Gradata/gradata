@@ -424,7 +424,11 @@ def cascade_retrieve(
                     graduated = apply_graduation_scoring(merged, cfg)
                     return RetrievalResult(
                         chunks=graduated[:limit],
-                        query=expanded_query,
+                        # Preserve the original user query. Exposing
+                        # `expanded_query` leaked mined corpus terms into
+                        # downstream telemetry/logging that assume this
+                        # field is user input.
+                        query=query,
                         mode=f"two_pass (expanded: +{len(expansion_terms)} terms)",
                         total_candidates=total + pass2_total,
                     )

@@ -200,7 +200,11 @@ def guarded(
 
         failing_input = [c for c in input_checks if c.result == "fail"]
         if failing_input:
-            block_reason = "; ".join(f"{c.name}: {c.details}" for c in failing_input)
+            # Docstring contract: block_reason describes the FIRST blocking
+            # failure. Return only the first — joining all fails made callers
+            # see different text than promised.
+            first = failing_input[0]
+            block_reason = f"{first.name}: {first.details}"
             return GuardedResult(
                 input_checks=input_checks,
                 output_checks=[],
