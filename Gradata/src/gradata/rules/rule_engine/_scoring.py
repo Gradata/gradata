@@ -8,7 +8,6 @@ to rank and filter lessons before injection.
 from __future__ import annotations
 
 import json
-import logging
 
 from gradata._scope import RuleScope, scope_matches
 from gradata._types import CorrectionType, Lesson, LessonState, RuleTransferScope
@@ -31,6 +30,30 @@ _CT_BOOST: dict[CorrectionType, float] = {
     CorrectionType.BEHAVIORAL: 1.1,
     CorrectionType.DOMAIN: 0.9,
 }
+
+
+# ---------------------------------------------------------------------------
+# Shared scope_json helpers
+# ---------------------------------------------------------------------------
+
+
+def lesson_scope(lesson: Lesson) -> RuleScope:
+    """Parse ``lesson.scope_json`` into a :class:`RuleScope`, wildcard on fail.
+
+    Centralises the try/loads/filter-to-known-fields pattern used by the
+    scoring helpers and the rule engine so bad JSON is handled uniformly
+    (and only logged once per callsite).
+    """
+    if not lesson.scope_json:
+        return RuleScope()
+    try:
+        scope_dict = json.loads(lesson.scope_json)
+    except (json.JSONDecodeError, TypeError):
+        return RuleScope()
+    if not isinstance(scope_dict, dict):
+        return RuleScope()
+    fields = RuleScope.__dataclass_fields__
+    return RuleScope(**{k: v for k, v in scope_dict.items() if k in fields})
 
 
 # ---------------------------------------------------------------------------
@@ -366,21 +389,11 @@ def validate_assumptions(
     # (c) Scope / task-type mismatch
     current_tt = context.get("current_task_type", "")
     if current_tt and lesson.scope_json:
-        try:
-            scope_dict = json.loads(lesson.scope_json)
-            rule_tt = scope_dict.get("task_type", "")
-            if rule_tt and rule_tt != current_tt:
-                return (
-                    False,
-                    f"rule scoped to '{rule_tt}' but current task is '{current_tt}'",
-                )
-        except (json.JSONDecodeError, AttributeError) as exc:
-            # Malformed scope_json — don't block the rule, but surface at
-            # debug level so corrupted rows are visible in logs.
-            logging.getLogger(__name__).debug(
-                "validate_assumptions: bad scope_json for lesson=%s: %s",
-                getattr(lesson, "description", "?")[:40],
-                exc,
+        rule_tt = lesson_scope(lesson).task_type or ""
+        if rule_tt and rule_tt != current_tt:
+            return (
+                False,
+                f"rule scoped to '{rule_tt}' but current task is '{current_tt}'",
             )
 
     return (True, "")

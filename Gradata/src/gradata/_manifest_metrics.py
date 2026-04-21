@@ -7,7 +7,24 @@ Split from _brain_manifest.py for file size compliance (<500 lines).
 
 import re
 import statistics
-from datetime import datetime
+from datetime import UTC, datetime
+
+
+def _parse_ts_utc(raw: str) -> datetime:
+    """Parse an ISO-8601 timestamp and coerce to aware UTC.
+
+    SQLite stores timestamps as raw text, so the same column can yield
+    both naive (``2026-04-01T12:00:00``) and aware
+    (``2026-04-01T12:00:00+00:00`` / ``...Z``) values. Subtracting a
+    naive from an aware datetime raises; coerce both sides here so
+    callers can subtract freely.
+    """
+    dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt
+
+
 from typing import TYPE_CHECKING
 
 import gradata._paths as _p
@@ -149,8 +166,8 @@ def _temporal_provenance(ctx: "BrainContext | None" = None) -> dict:
         result["distinct_days"] = days
         if agg[1] and agg[2]:
             try:
-                t0 = datetime.fromisoformat(str(agg[1]).replace("Z", "+00:00"))
-                t1 = datetime.fromisoformat(str(agg[2]).replace("Z", "+00:00"))
+                t0 = _parse_ts_utc(str(agg[1]))
+                t1 = _parse_ts_utc(str(agg[2]))
                 result["session_spread_days"] = max(0, (t1 - t0).days)
             except (ValueError, TypeError):
                 pass
@@ -190,10 +207,8 @@ def _temporal_provenance(ctx: "BrainContext | None" = None) -> dict:
             gaps = []
             for i in range(1, len(session_starts)):
                 try:
-                    t0 = datetime.fromisoformat(
-                        str(session_starts[i - 1][0]).replace("Z", "+00:00")
-                    )
-                    t1 = datetime.fromisoformat(str(session_starts[i][0]).replace("Z", "+00:00"))
+                    t0 = _parse_ts_utc(str(session_starts[i - 1][0]))
+                    t1 = _parse_ts_utc(str(session_starts[i][0]))
                     gaps.append((t1 - t0).total_seconds() / 3600)
                 except (ValueError, TypeError):
                     continue

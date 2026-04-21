@@ -316,13 +316,28 @@ class Brain(BrainInspectionMixin):
         return None
 
     def _load_lessons(self, create: bool = False):
-        """Load and parse lessons from lessons.md. Returns list or empty list."""
+        """Load and parse lessons from lessons.md. Returns list or empty list.
+
+        Caches the parsed result keyed on (path, mtime) so repeated reads in
+        the same session skip the parse when the file is unchanged. Writer
+        paths that re-parse + mutate + rewrite should call ``parse_lessons``
+        directly (see forget/disable_lesson/add_rule) to avoid sharing
+        mutable state with the cache.
+        """
         from gradata.enhancements.self_improvement import parse_lessons
 
         path = self._find_lessons_path(create=create)
         if not path or not path.is_file():
+            self._lessons_parse_cache = None
             return []
-        return parse_lessons(path.read_text(encoding="utf-8"))
+        mtime = path.stat().st_mtime
+        key = (str(path), mtime)
+        cache = getattr(self, "_lessons_parse_cache", None)
+        if cache is not None and cache[0] == key:
+            return cache[1]
+        lessons = parse_lessons(path.read_text(encoding="utf-8"))
+        self._lessons_parse_cache = (key, lessons)
+        return lessons
 
     @property
     def memory(self):
@@ -847,9 +862,10 @@ class Brain(BrainInspectionMixin):
         # Rules are always computed locally from the brain's own lessons.
         # Pulling rules from cloud would allow a compromised server to inject
         # malicious instructions into AI prompts → remote code execution.
-        try:
-            from gradata.enhancements.self_improvement import parse_lessons
-        except ImportError:
+        # Capability check: enhancements package must be installed for rules.
+        import importlib.util as _util
+
+        if _util.find_spec("gradata.enhancements.self_improvement") is None:
             return ""
         from gradata._scope import build_scope
         from gradata.rules.rule_engine import apply_rules, format_rules_for_prompt
@@ -871,7 +887,8 @@ class Brain(BrainInspectionMixin):
         if cached is not None:
             return cached
 
-        lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+        # mtime-cached parse: reuses prior result when lessons.md is unchanged.
+        lessons = self._load_lessons()
 
         # Try tree-based retrieval first (falls back to flat if no paths).
         # Pass the brain's bus so rule_engine can fire `rule_scoped_out`

@@ -29,6 +29,7 @@ from ._scoring import (
     detect_task_type,
     effective_confidence,
     is_rule_disabled_for_domain,
+    lesson_scope,
     validate_assumptions,
 )
 
@@ -148,18 +149,7 @@ def filter_by_scope(
         # wildcard scope, which returns a score driven purely by what the query
         # provides.  When lessons gain explicit scope metadata in a future
         # iteration, this derivation logic should be updated.
-        # Use lesson's stored scope if available, otherwise wildcard
-        if lesson.scope_json:
-            try:
-                scope_dict = json.loads(lesson.scope_json)
-                lesson_scope = RuleScope(
-                    **{k: v for k, v in scope_dict.items() if k in RuleScope.__dataclass_fields__}
-                )
-            except Exception:
-                lesson_scope = RuleScope()
-        else:
-            lesson_scope = RuleScope()
-        score = compute_scope_weight(lesson_scope, scope)
+        score = compute_scope_weight(lesson_scope(lesson), scope)
         if score >= min_relevance:
             results.append((lesson, score))
     return results
@@ -274,19 +264,8 @@ def apply_rules(
     # Step 2 & 3 — score with weighted scope matching and threshold
     scored: list[tuple[Lesson, float]] = []
     for lesson in eligible:
-        # Use lesson's stored scope if available, otherwise wildcard
-        if lesson.scope_json:
-            try:
-                scope_dict = json.loads(lesson.scope_json)
-                lesson_scope = RuleScope(
-                    **{k: v for k, v in scope_dict.items() if k in RuleScope.__dataclass_fields__}
-                )
-            except Exception:
-                lesson_scope = RuleScope()
-        else:
-            lesson_scope = RuleScope()
         # Use weighted scope matching (exact > partial > wildcard)
-        relevance = compute_scope_weight(lesson_scope, scope)
+        relevance = compute_scope_weight(lesson_scope(lesson), scope)
         relevance *= _CT_BOOST.get(lesson.correction_type, 1.0)
         if relevance >= 0.4:
             scored.append((lesson, relevance))
