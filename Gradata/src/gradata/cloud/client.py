@@ -168,6 +168,11 @@ class CloudClient:
         if manifest_path.exists():
             try:
                 return json.loads(manifest_path.read_text(encoding="utf-8"))
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "Failed to parse %s: %s — sending empty manifest to cloud",
+                    manifest_path,
+                    exc,
+                )
                 return {}
         return {}

@@ -1561,24 +1561,31 @@ class Brain(BrainInspectionMixin):
             if not db or not db.exists():
                 return []
             results, terms = [], query.lower().split()
+            if not terms:
+                return []
+            # Push term filter into SQL so we don't scan 500 rows + filter
+            # Python-side. Each term becomes a `data_json LIKE ?` — lowercase
+            # both sides so the filter matches regardless of stored case.
+            where = " AND ".join(["LOWER(data_json) LIKE ?"] * len(terms))
+            params: list = [f"%{t}%" for t in terms]
+            params.append(top_k)
             with sqlite3.connect(str(db)) as conn:
                 rows = conn.execute(
-                    "SELECT id, ts, type, source, data_json FROM events ORDER BY id DESC LIMIT 500"
+                    f"SELECT id, ts, type, source, data_json FROM events "
+                    f"WHERE {where} ORDER BY id DESC LIMIT ?",
+                    params,
                 ).fetchall()
             for row_id, ts, etype, _, data_json in rows:
-                if any(t in (data_json or "").lower() for t in terms):
-                    results.append(
-                        {
-                            "source": f"event:{etype}:{row_id}",
-                            "file_type": "event",
-                            "text": (data_json or "")[:500],
-                            "score": 1.0,
-                            "confidence": "keyword_match",
-                            "modified": ts,
-                        }
-                    )
-                if len(results) >= top_k:
-                    break
+                results.append(
+                    {
+                        "source": f"event:{etype}:{row_id}",
+                        "file_type": "event",
+                        "text": (data_json or "")[:500],
+                        "score": 1.0,
+                        "confidence": "keyword_match",
+                        "modified": ts,
+                    }
+                )
             return results
 
     def embed(self, full: bool = False) -> int:
@@ -1946,8 +1953,3 @@ class Brain(BrainInspectionMixin):
             "results": results,
             "failures": failed,
         }
-
-
-# Re-export Pipeline type
-with contextlib.suppress(ImportError):
-    pass
