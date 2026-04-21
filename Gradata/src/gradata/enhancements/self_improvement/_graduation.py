@@ -31,33 +31,21 @@ from gradata.enhancements.self_improvement._confidence import (
 _log = logging.getLogger(__name__)
 
 
-
 # ---------------------------------------------------------------------------
 # Graduation
 # ---------------------------------------------------------------------------
 
 
-def _passes_beta_lb_gate(lesson: Lesson) -> bool:
-    """Beta lower-bound gate on PATTERN -> RULE promotion.
+def _read_beta_lb_config() -> tuple[bool, float, int]:
+    """Read Beta-LB gate env config once. Returns (enabled, threshold, min_fires).
 
-    Opt-in via env var ``GRADATA_BETA_LB_GATE`` (default off). When enabled,
-    requires the 5th-percentile lower bound of Beta(α, β) to meet the
-    configured threshold (``GRADATA_BETA_LB_THRESHOLD``, default 0.85) AND
-    at least ``GRADATA_BETA_LB_MIN_FIRES`` observations (default 5).
-
-    Rationale: the v4 ablation min2022 random-label control showed that
-    ~15–20% of current RULE-tier graduations are calibrated by format,
-    not content. The Beta posterior captures uncertainty the mean
-    (lesson.confidence) discards. Feature-flagged so production
-    calibration is unchanged until this is measured in-band.
+    Called once per ``graduate()`` invocation so per-lesson gate checks can
+    skip repeated ``os.environ.get`` lookups inside the graduation loop.
     """
+    import math
     import os
 
-    if os.environ.get("GRADATA_BETA_LB_GATE", "").lower() not in ("1", "true", "yes", "on"):
-        return True  # gate disabled — defer to existing conf + fire_count checks
-
-    import math
-
+    enabled = os.environ.get("GRADATA_BETA_LB_GATE", "").lower() in ("1", "true", "yes", "on")
     try:
         threshold = float(os.environ.get("GRADATA_BETA_LB_THRESHOLD", "0.85"))
         if not math.isfinite(threshold):
@@ -69,6 +57,26 @@ def _passes_beta_lb_gate(lesson: Lesson) -> bool:
         min_fires = max(0, int(os.environ.get("GRADATA_BETA_LB_MIN_FIRES", "5")))
     except (TypeError, ValueError):
         min_fires = 5
+    return enabled, threshold, min_fires
+
+
+def _passes_beta_lb_gate(
+    lesson: Lesson,
+    config: tuple[bool, float, int] | None = None,
+) -> bool:
+    """Beta lower-bound gate on PATTERN -> RULE promotion.
+
+    Opt-in via env var ``GRADATA_BETA_LB_GATE`` (default off). When enabled,
+    requires the 5th-percentile lower bound of Beta(α, β) to meet the
+    configured threshold (``GRADATA_BETA_LB_THRESHOLD``, default 0.85) AND
+    at least ``GRADATA_BETA_LB_MIN_FIRES`` observations (default 5).
+
+    Pass ``config`` (from :func:`_read_beta_lb_config`) when calling in a
+    loop to avoid re-reading env vars per lesson.
+    """
+    enabled, threshold, min_fires = config if config is not None else _read_beta_lb_config()
+    if not enabled:
+        return True  # gate disabled — defer to existing conf + fire_count checks
 
     if lesson.fire_count < min_fires:
         return False
@@ -118,6 +126,9 @@ def graduate(
     else:
         eff_pattern_threshold = PATTERN_THRESHOLD
         eff_rule_threshold = RULE_THRESHOLD
+
+    # Read Beta-LB gate env once; reuse for every lesson in the loop below.
+    beta_lb_config = _read_beta_lb_config()
     if renter:
         active = [l for l in lessons if l.state in (LessonState.INSTINCT, LessonState.PATTERN)]
         graduated = [
@@ -132,6 +143,18 @@ def graduate(
     existing_rules = [l for l in lessons if l.state == LessonState.RULE]
     existing_rule_descs = [r.description for r in existing_rules]
     existing_rule_summary = " | ".join(d for d in existing_rule_descs[:10])
+
+    # Precompute existing-rule TF vectors once so the per-candidate dedup
+    # gate below doesn't re-tokenize and re-weight every rule on every
+    # comparison (was O(N_candidates × M_rules × |tokens|), now additive).
+    try:
+        from gradata.enhancements.similarity import semantic_vector
+
+        existing_rule_vectors: list[tuple[str, dict[str, float]]] = [
+            (r.description, semantic_vector(r.description)) for r in existing_rules
+        ]
+    except ImportError:
+        existing_rule_vectors = []
 
     for lesson in lessons:
         if lesson.state in (LessonState.KILLED, LessonState.ARCHIVED):
@@ -217,28 +240,33 @@ def graduate(
             and lesson.state == LessonState.PATTERN
             and lesson.confidence >= eff_rule_threshold
             and lesson.fire_count >= MIN_APPLICATIONS_FOR_RULE
-            and _passes_beta_lb_gate(lesson)
+            and _passes_beta_lb_gate(lesson, config=beta_lb_config)
         ):
             blocked = False
 
             # Gate 1: dedup — skip if too similar to an existing rule.
-            # TODO: At 5,000+ rules, pre-compute TF-IDF vectors for existing_rules
-            # outside the lesson loop to avoid redundant tokenization (O(n*m) → O(n+m)).
-            try:
-                from gradata.enhancements.similarity import semantic_similarity
+            # Uses precomputed TF vectors for the stored rules so the
+            # tokenization cost scales as O(N+M) rather than O(N*M).
+            if existing_rule_vectors:
+                try:
+                    from gradata.enhancements.similarity import (
+                        semantic_vector,
+                        similarity_from_vectors,
+                    )
 
-                for existing in existing_rules:
-                    sim = semantic_similarity(lesson.description, existing.description)
-                    if sim > _GRADUATION_DEDUP_THRESHOLD:
-                        blocked = True
-                        _log.debug(
-                            "Graduation blocked (duplicate): %.2f sim with '%s'",
-                            sim,
-                            existing.description[:60],
-                        )
-                        break
-            except ImportError:
-                pass
+                    probe_vec = semantic_vector(lesson.description)
+                    for existing_desc, existing_vec in existing_rule_vectors:
+                        sim = similarity_from_vectors(probe_vec, existing_vec)
+                        if sim > _GRADUATION_DEDUP_THRESHOLD:
+                            blocked = True
+                            _log.debug(
+                                "Graduation blocked (duplicate): %.2f sim with '%s'",
+                                sim,
+                                existing_desc[:60],
+                            )
+                            break
+                except ImportError:
+                    pass
 
             # Gate 2: adversarial — skip if contradicts an existing rule
             if not blocked:
@@ -349,5 +377,3 @@ def graduate(
     active = [l for l in lessons if l.state in (LessonState.INSTINCT, LessonState.PATTERN)]
     graduated = [l for l in lessons if l.state not in (LessonState.INSTINCT, LessonState.PATTERN)]
     return active, graduated
-
-

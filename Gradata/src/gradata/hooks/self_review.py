@@ -3,13 +3,14 @@
 After Write/Edit tool calls, checks if the output respects mandatory
 rules. Logs violations for the learning pipeline without blocking execution.
 """
+
 from __future__ import annotations
 
 import logging
 import re
 from pathlib import Path
 
-from gradata.hooks._base import resolve_brain_dir, run_hook
+from gradata.hooks._base import emit_hook_event, resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
 
 _log = logging.getLogger(__name__)
@@ -24,9 +25,7 @@ HOOK_META = {
 _REVIEWED_TOOLS = frozenset({"Write", "Edit", "MultiEdit"})
 
 # Regex to pull the banned token out of "never use/do/create/add/include <X>"
-_NEVER_RE = re.compile(
-    r"never\s+(?:use|do|create|add|include)\s+(.+)", re.I
-)
+_NEVER_RE = re.compile(r"never\s+(?:use|do|create|add|include)\s+(.+)", re.I)
 
 # Process-level cache: (brain_dir, mtime) → parsed mandatory rules
 _rules_cache: dict[tuple[str, float], list[dict]] = {}
@@ -50,9 +49,7 @@ def _load_mandatory_rules(brain_dir: str) -> list[dict]:
         result = [
             {"description": l.description, "category": l.category}
             for l in lessons
-            if l.state == LessonState.RULE
-            and l.confidence >= 0.90
-            and l.fire_count >= 10
+            if l.state == LessonState.RULE and l.confidence >= 0.90 and l.fire_count >= 10
         ]
         _rules_cache.clear()
         _rules_cache[cache_key] = result
@@ -104,25 +101,18 @@ def _check_rule_compliance(
 
 def _log_violations(brain_dir: str, violations: list[dict]) -> None:
     """Emit SELF_REVIEW_VIOLATION events so the learning pipeline can record them."""
-    try:
-        from gradata._events import emit
-        from gradata._paths import BrainContext
-
-        ctx = BrainContext.from_brain_dir(brain_dir)
-        for v in violations:
-            emit(
-                "SELF_REVIEW_VIOLATION",
-                source="hook:self_review",
-                data={
-                    "rule": v["rule"],
-                    "category": v["category"],
-                    "evidence": v["evidence"],
-                    "severity": v["severity"],
-                },
-                ctx=ctx,
-            )
-    except Exception as exc:
-        _log.debug("_log_violations emit failed: %s", exc)
+    for v in violations:
+        emit_hook_event(
+            "SELF_REVIEW_VIOLATION",
+            "hook:self_review",
+            {
+                "rule": v["rule"],
+                "category": v["category"],
+                "evidence": v["evidence"],
+                "severity": v["severity"],
+            },
+            brain_dir=brain_dir,
+        )
 
 
 def _extract_output_text(data: dict) -> str:

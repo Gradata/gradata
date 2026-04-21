@@ -55,11 +55,13 @@ def warm_start_router(
     """
     from gradata.contrib.patterns.q_learning_router import QLearningRouter, RouterConfig
 
-    router = QLearningRouter(RouterConfig(
-        epsilon_start=0.5,  # Less exploration since we have data
-        epsilon_min=0.05,
-        epsilon_decay=0.99,
-    ))
+    router = QLearningRouter(
+        RouterConfig(
+            epsilon_start=0.5,  # Less exploration since we have data
+            epsilon_min=0.05,
+            epsilon_decay=0.99,
+        )
+    )
 
     # Load existing router state if available
     if router_path and Path(router_path).exists():
@@ -70,25 +72,28 @@ def warm_start_router(
         _log.warning("Database not found: %s", db_path)
         return router
 
+    import contextlib
+
     try:
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
+        with contextlib.closing(sqlite3.connect(str(db_path))) as conn:
+            conn.row_factory = sqlite3.Row
 
-        # Fetch correction events with severity and category
-        rows = conn.execute("""
-            SELECT
-                json_extract(data_json, '$.severity') as severity,
-                json_extract(data_json, '$.category') as category,
-                json_extract(data_json, '$.outcome') as outcome
-            FROM events
-            WHERE type = 'CORRECTION'
-              AND json_extract(data_json, '$.severity') IS NOT NULL
-              AND json_extract(data_json, '$.category') IS NOT NULL
-            ORDER BY rowid DESC
-            LIMIT ?
-        """, (max_events,)).fetchall()
-
-        conn.close()
+            # Fetch correction events with severity and category
+            rows = conn.execute(
+                """
+                SELECT
+                    json_extract(data_json, '$.severity') as severity,
+                    json_extract(data_json, '$.category') as category,
+                    json_extract(data_json, '$.outcome') as outcome
+                FROM events
+                WHERE type = 'CORRECTION'
+                  AND json_extract(data_json, '$.severity') IS NOT NULL
+                  AND json_extract(data_json, '$.category') IS NOT NULL
+                ORDER BY rowid DESC
+                LIMIT ?
+            """,
+                (max_events,),
+            ).fetchall()
 
         if not rows:
             _log.info("No correction events found for warm-start")

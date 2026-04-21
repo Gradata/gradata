@@ -59,6 +59,10 @@ def patch_openai(client: Any, brain_dir: str | Path = "./brain") -> Any:
             rules = brain.apply_brain_rules("general", {"task": user_msg[:100]})
 
             if rules:
+                # Clone messages + mutate the clone. Previously we mutated
+                # the caller's list/dicts in-place, which caused rules to
+                # accumulate on shared message arrays across repeat calls.
+                messages = [dict(m) for m in messages]
                 has_system = any(m.get("role") == "system" for m in messages)
                 if has_system:
                     for m in messages:
@@ -67,6 +71,11 @@ def patch_openai(client: Any, brain_dir: str | Path = "./brain") -> Any:
                             break
                 else:
                     messages.insert(0, {"role": "system", "content": rules})
+                # Route the cloned list through whichever param the caller used.
+                if "messages" in kwargs:
+                    kwargs["messages"] = messages
+                elif len(args) > 1:
+                    args = args[:1] + (messages,) + args[2:]
         except Exception as e:
             logger.debug("Rule injection skipped: %s", e)
 
@@ -77,9 +86,7 @@ def patch_openai(client: Any, brain_dir: str | Path = "./brain") -> Any:
             if ai_content:
                 brain.log_output(ai_content, output_type="chat")
                 if hasattr(brain, "observe"):
-                    brain.observe(
-                        [*messages, {"role": "assistant", "content": ai_content}]
-                    )
+                    brain.observe([*messages, {"role": "assistant", "content": ai_content}])
         except Exception as e:
             logger.debug("Response capture skipped: %s", e)
 

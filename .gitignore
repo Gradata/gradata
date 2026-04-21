@@ -82,6 +82,21 @@ Desktop.ini
 .obsidian/
 .codex/
 .claude/
+# Track only the two handoff-watchdog hook files so future sessions (and
+# fresh clones) keep the context-pressure watchdog code under version
+# control. Wiring them into the dispatcher/settings is machine-local —
+# see Gradata/src/gradata/hooks/_installer.py for the portable install
+# path (TODO: add watchdog to installer assets).
+!.claude/
+.claude/*
+!.claude/hooks/
+.claude/hooks/*
+!.claude/hooks/user-prompt/
+!.claude/hooks/session-start/
+.claude/hooks/user-prompt/*
+!.claude/hooks/user-prompt/handoff-watchdog.js
+.claude/hooks/session-start/*
+!.claude/hooks/session-start/handoff-inject.js
 .claude-octopus/
 .agents/
 .opencli/

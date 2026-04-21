@@ -42,10 +42,10 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-_SEVERITY_AS_IS = "as-is"        # edit_distance < 0.02
-_SEVERITY_MINOR = "minor"        # 0.02 <= edit_distance < 0.10
+_SEVERITY_AS_IS = "as-is"  # edit_distance < 0.02
+_SEVERITY_MINOR = "minor"  # 0.02 <= edit_distance < 0.10
 _SEVERITY_MODERATE = "moderate"  # 0.10 <= edit_distance < 0.40
-_SEVERITY_MAJOR = "major"        # 0.40 <= edit_distance < 0.80
+_SEVERITY_MAJOR = "major"  # 0.40 <= edit_distance < 0.80
 _SEVERITY_DISCARDED = "discarded"  # edit_distance >= 0.80
 
 _SOURCE = "sidecar:watcher"
@@ -253,6 +253,9 @@ class FileWatcher:
     ) -> None:
         self._watch_dir = Path(watch_dir).resolve()
         self._brain_db: Path | None = Path(brain_db).resolve() if brain_db else None
+        # Cached Brain instance — constructing one per emit opens a fresh
+        # SQLite connection that never gets closed. Build lazily once.
+        self._brain_instance = None
 
         # path -> WatchedFile; keyed by str(Path.resolve())
         self._watched: dict[str, WatchedFile] = {}
@@ -346,9 +349,7 @@ class FileWatcher:
             )
             return None
 
-        edit_distance = _normalise_edit_distance(
-            watched.original_content, current_content
-        )
+        edit_distance = _normalise_edit_distance(watched.original_content, current_content)
         severity = _ast_severity_or_none(
             watched.original_content, current_content, resolved
         ) or _classify_severity(edit_distance)
@@ -406,16 +407,14 @@ class FileWatcher:
 
         # Build the event payload
         watched = self._watched.get(change.path)
-        diff_text = _build_unified_diff(
-            change.old_content, change.new_content, change.path
-        )
+        diff_text = _build_unified_diff(change.old_content, change.new_content, change.path)
         event_data: dict = {
             "path": change.path,
             "output_type": watched.output_type if watched else "",
             "edit_distance": change.edit_distance,
             "severity": change.severity,
             "diff": diff_text,
-            "original": change.old_content[:500],    # truncated for DB storage
+            "original": change.old_content[:500],  # truncated for DB storage
             "modified": change.new_content[:500],
         }
         event_tags = [
@@ -484,9 +483,7 @@ class FileWatcher:
             while True:
                 changes = self.check_all()
                 if changes:
-                    logger.info(
-                        "Sweep %d: detected %d change(s)", iteration + 1, len(changes)
-                    )
+                    logger.info("Sweep %d: detected %d change(s)", iteration + 1, len(changes))
                 iteration += 1
                 if max_iterations and iteration >= max_iterations:
                     break
@@ -519,16 +516,21 @@ class FileWatcher:
         if self._brain_db is None:
             return {}
         try:
-            from gradata.brain import Brain
+            if self._brain_instance is None:
+                from gradata.brain import Brain
 
-            brain = Brain(self._brain_db)
+                self._brain_instance = Brain(self._brain_db)
+            brain = self._brain_instance
 
             # If Brain exposes a .correct() helper, use it; otherwise emit
             # a raw CORRECTION event so downstream analytics work.
             if hasattr(brain, "correct"):
-                return brain.correct(  # type: ignore[attr-defined]
-                    change.old_content, change.new_content
-                ) or {}
+                return (
+                    brain.correct(  # type: ignore[attr-defined]
+                        change.old_content, change.new_content
+                    )
+                    or {}
+                )
             return brain.emit("CORRECTION", _SOURCE, data, tags) or {}
         except Exception as exc:
             logger.debug("Brain emit failed: %s", exc)
@@ -584,9 +586,7 @@ class FileWatcher:
                 json.dumps(payload, indent=2, ensure_ascii=False),
                 encoding="utf-8",
             )
-            logger.warning(
-                "Fallback: CORRECTION written to %s", sidecar_path
-            )
+            logger.warning("Fallback: CORRECTION written to %s", sidecar_path)
             return {"type": "CORRECTION", "source": _SOURCE, "fallback_path": str(sidecar_path)}
         except OSError as exc:
             logger.error("All emission paths failed for %s: %s", change.path, exc)

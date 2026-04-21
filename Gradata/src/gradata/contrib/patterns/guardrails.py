@@ -48,9 +48,9 @@ class GuardCheck:
     """
 
     name: str
-    result: str          # "pass" | "fail" | "override"
+    result: str  # "pass" | "fail" | "override"
     details: str
-    action_taken: str    # "blocked" | "redacted" | "passed" | "user_override"
+    action_taken: str  # "blocked" | "redacted" | "passed" | "user_override"
 
 
 @dataclass
@@ -200,9 +200,11 @@ def guarded(
 
         failing_input = [c for c in input_checks if c.result == "fail"]
         if failing_input:
-            block_reason = "; ".join(
-                f"{c.name}: {c.details}" for c in failing_input
-            )
+            # Docstring contract: block_reason describes the FIRST blocking
+            # failure. Return only the first — joining all fails made callers
+            # see different text than promised.
+            first = failing_input[0]
+            block_reason = f"{first.name}: {first.details}"
             return GuardedResult(
                 input_checks=input_checks,
                 output_checks=[],
@@ -242,12 +244,8 @@ def guarded(
 # ---------------------------------------------------------------------------
 
 # Input patterns
-_RE_EMAIL = re.compile(
-    r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b"
-)
-_RE_PHONE = re.compile(
-    r"(?:\+\d[\s\-.]?)?(?:\(\d{3}\)|\d{3})[\s\-.]?\d{3}[\s\-.]?\d{4}\b"
-)
+_RE_EMAIL = re.compile(r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b")
+_RE_PHONE = re.compile(r"(?:\+\d[\s\-.]?)?(?:\(\d{3}\)|\d{3})[\s\-.]?\d{3}[\s\-.]?\d{4}\b")
 _RE_SSN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
 _RE_API_KEY = re.compile(r"\b(?:sk-|key-)[A-Za-z0-9_\-]{8,}\b")
 
@@ -269,7 +267,6 @@ _RE_DESTRUCTIVE = re.compile(
 # Domain-specific brains can override this via configure_scope_guard().
 # Layer 0 patterns MUST NOT hardcode domain-specific competitor names.
 _RE_OUT_OF_SCOPE: re.Pattern | None = None
-
 
 
 # ---------------------------------------------------------------------------
@@ -329,7 +326,12 @@ def _check_injection(data: Any) -> GuardCheck:
 def _check_scope(data: Any) -> GuardCheck:
     """Validate that the request is in-scope (configurable, disabled by default)."""
     if _RE_OUT_OF_SCOPE is None:
-        return GuardCheck(name="scope_validator", result="pass", details="scope guard disabled", action_taken="passed")
+        return GuardCheck(
+            name="scope_validator",
+            result="pass",
+            details="scope guard disabled",
+            action_taken="passed",
+        )
     text = str(data)
     match = _RE_OUT_OF_SCOPE.search(text)
     if match:
@@ -455,7 +457,7 @@ def check_write_path(
         target = target[2:]
 
     # 1. Global deny list
-    for pattern in (global_deny or []):
+    for pattern in global_deny or []:
         if fnmatch(target, pattern) or fnmatch(target.split("/")[-1], pattern):
             return ManifestCheckResult(False, f"DENIED by global policy: matches '{pattern}'")
 
@@ -465,7 +467,7 @@ def check_write_path(
             return ManifestCheckResult(True, f"ALLOWED: matches agent write path '{pattern}'")
 
     # 3. Check tools_denied for write restrictions
-    for denial in (agent_tools_denied or []):
+    for denial in agent_tools_denied or []:
         if denial.startswith("Write "):
             deny_pattern = denial[6:]
             if fnmatch(target, deny_pattern):
@@ -493,7 +495,9 @@ def check_exec_command(
     cmd_lower = command.lower().strip()
     for pattern in deny_patterns:
         if pattern.lower() in cmd_lower:
-            return ManifestCheckResult(False, f"DENIED: command matches blocked pattern '{pattern}'")
+            return ManifestCheckResult(
+                False, f"DENIED: command matches blocked pattern '{pattern}'"
+            )
     return ManifestCheckResult(True, "ALLOWED: no deny patterns matched")
 
 
@@ -553,7 +557,9 @@ def validate_agent_spawn(
     if available >= max_tokens:
         return ManifestCheckResult(True, f"ALLOWED: budget {max_tokens} tokens", max_tokens)
 
-    usage_pct = int((max_tokens / parent_budget_remaining) * 100) if parent_budget_remaining > 0 else 100
+    usage_pct = (
+        int((max_tokens / parent_budget_remaining) * 100) if parent_budget_remaining > 0 else 100
+    )
 
     if usage_pct >= child_hard_limit_percent:
         return ManifestCheckResult(
@@ -630,12 +636,11 @@ def guards_from_graduated_rules() -> list[Guard]:
 
     guards = []
     for rule in rules:
-        rule.principle.lower()
 
         def _make_check(rule_text: str, rule_cat: str) -> Callable[[Any], GuardCheck]:
             """Create a check function that scans output for rule violations."""
+
             def check_fn(data: Any) -> GuardCheck:
-                str(data).lower() if data else ""
                 # Simple keyword check — does the output violate the rule?
                 # Rules are phrased as "never X" or "always Y"
                 # This is a heuristic; real guardrails need LLM-backed checks
@@ -645,10 +650,13 @@ def guards_from_graduated_rules() -> list[Guard]:
                     details=f"Rule: {rule_text[:80]}",
                     action_taken="passed",
                 )
+
             return check_fn
 
-        guards.append(Guard(
-            name=f"rule_{rule.category.lower()}_{len(guards)}",
-            check_fn=_make_check(rule.principle, rule.category),
-        ))
+        guards.append(
+            Guard(
+                name=f"rule_{rule.category.lower()}_{len(guards)}",
+                check_fn=_make_check(rule.principle, rule.category),
+            )
+        )
     return guards

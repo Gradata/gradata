@@ -2,6 +2,7 @@
 Tests for synthesize_meta_rules_agentic() — Feature 5 of the Gradata
 Behavioral Engine. Covers all 10 specified test cases.
 """
+
 from __future__ import annotations
 
 import sys
@@ -50,8 +51,7 @@ def _make_lesson(
 def _make_rule_group(category: str, n: int = 3, confidence: float = 0.92) -> list[Lesson]:
     """Return n RULE-state lessons in the same category."""
     return [
-        _make_lesson(category, f"Rule {i} for {category}", confidence=confidence)
-        for i in range(n)
+        _make_lesson(category, f"Rule {i} for {category}", confidence=confidence) for i in range(n)
     ]
 
 
@@ -93,7 +93,9 @@ def test_mixed_confidence_only_high_qualify():
     # 2 high-confidence + 3 low-confidence — only 2 qualify, not enough for a group
     high = _make_rule_group("ACCURACY", n=2, confidence=0.95)
     low = _make_rule_group("ACCURACY", n=3, confidence=0.85)
-    result = synthesize_meta_rules_agentic(lessons=high + low, min_confidence=0.90, min_group_size=3)
+    result = synthesize_meta_rules_agentic(
+        lessons=high + low, min_confidence=0.90, min_group_size=3
+    )
     assert result == []
 
 
@@ -301,7 +303,9 @@ def test_synthesis_evidence_defaults():
 
 def test_non_rule_state_lessons_excluded():
     """INSTINCT and PATTERN lessons must not contribute to synthesis."""
-    instinct = _make_lesson("DRAFTING", "Instinct lesson", confidence=0.92, state=LessonState.INSTINCT)
+    instinct = _make_lesson(
+        "DRAFTING", "Instinct lesson", confidence=0.92, state=LessonState.INSTINCT
+    )
     pattern = _make_lesson("DRAFTING", "Pattern lesson", confidence=0.92, state=LessonState.PATTERN)
     # Add 3 genuine RULE-state so total would qualify if state check is broken
     rules = _make_rule_group("DRAFTING", n=3, confidence=0.92)
@@ -325,8 +329,11 @@ def test_llm_principle_used_when_synthesizer_returns_string(monkeypatch):
     import gradata.enhancements.meta_rules as mr
 
     monkeypatch.setattr(
-        mr, "_try_llm_principle",
-        lambda rules, category: "When drafting, lead with the benefit, not the feature."
+        mr,
+        "_try_llm_principle",
+        lambda rules, category, creds=None: (
+            "When drafting, lead with the benefit, not the feature."
+        ),
     )
     lessons = _make_rule_group("DRAFTING", n=3, confidence=0.92)
     result = synthesize_meta_rules_agentic(lessons=lessons)
@@ -340,7 +347,7 @@ def test_llm_principle_falls_back_to_deterministic_on_none(monkeypatch):
     """When LLM returns None (no creds or failure), deterministic path runs."""
     import gradata.enhancements.meta_rules as mr
 
-    monkeypatch.setattr(mr, "_try_llm_principle", lambda rules, category: None)
+    monkeypatch.setattr(mr, "_try_llm_principle", lambda rules, category, creds=None: None)
     lessons = _make_rule_group("DRAFTING", n=3, confidence=0.92)
     result = synthesize_meta_rules_agentic(lessons=lessons)
 

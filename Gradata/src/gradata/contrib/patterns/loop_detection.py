@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections import deque
+from collections import Counter, deque
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -51,9 +51,10 @@ __all__ = [
 
 class LoopAction(Enum):
     """Action to take based on loop detection."""
-    ALLOW = "allow"    # No loop detected, proceed normally
-    WARN = "warn"      # Loop pattern detected, log warning but continue
-    STOP = "stop"      # Hard loop detected, halt execution
+
+    ALLOW = "allow"  # No loop detected, proceed normally
+    WARN = "warn"  # Loop pattern detected, log warning but continue
+    STOP = "stop"  # Hard loop detected, halt execution
 
 
 @dataclass
@@ -66,6 +67,7 @@ class LoopEvent:
         action: The action determined by the detector.
         repeat_count: How many times this exact call has been seen in window.
     """
+
     tool_name: str
     call_hash: str
     action: LoopAction
@@ -81,6 +83,7 @@ class LoopDetectorConfig:
         warn_threshold: Number of identical calls before warning.
         stop_threshold: Number of identical calls before hard stop.
     """
+
     window_size: int = 20
     warn_threshold: int = 3
     stop_threshold: int = 5
@@ -100,6 +103,7 @@ class LoopDetector:
     def __init__(self, config: LoopDetectorConfig | None = None) -> None:
         self.config = config or LoopDetectorConfig()
         self._window: deque[str] = deque(maxlen=self.config.window_size)
+        self._counts: Counter[str] = Counter()
         self._events: list[LoopEvent] = []
 
     def record(
@@ -117,10 +121,16 @@ class LoopDetector:
             LoopAction indicating whether to proceed, warn, or stop.
         """
         call_hash = self._hash_call(tool_name, arguments)
+        # Maintain Counter alongside the deque so repeat detection is O(1)
+        # instead of O(window_size) per record() call.
+        if len(self._window) == self._window.maxlen:
+            evicted = self._window[0]
+            self._counts[evicted] -= 1
+            if self._counts[evicted] <= 0:
+                del self._counts[evicted]
         self._window.append(call_hash)
-
-        # Count occurrences of this hash in the window
-        repeat_count = sum(1 for h in self._window if h == call_hash)
+        self._counts[call_hash] += 1
+        repeat_count = self._counts[call_hash]
 
         # Determine action
         if repeat_count >= self.config.stop_threshold:
@@ -143,6 +153,7 @@ class LoopDetector:
     def reset(self) -> None:
         """Clear the sliding window and event history."""
         self._window.clear()
+        self._counts.clear()
         self._events.clear()
 
     @property
@@ -210,10 +221,7 @@ def _normalize_args(args: dict[str, Any]) -> dict[str, Any]:
         if isinstance(val, dict):
             result[key] = _normalize_args(val)
         elif isinstance(val, (list, tuple)):
-            result[key] = [
-                _normalize_args(v) if isinstance(v, dict) else v
-                for v in val
-            ]
+            result[key] = [_normalize_args(v) if isinstance(v, dict) else v for v in val]
         else:
             result[key] = val
     return result

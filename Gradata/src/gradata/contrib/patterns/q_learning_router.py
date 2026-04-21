@@ -31,8 +31,12 @@ Usage::
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
+import logging
+import platform
 import random
+import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -63,10 +67,19 @@ class RouterConfig:
         feature_dim: Dimensionality of feature vectors.
         save_interval: Auto-save after this many updates.
     """
-    agents: list[str] = field(default_factory=lambda: [
-        "coder", "reviewer", "architect", "researcher",
-        "debugger", "writer", "optimizer", "tester",
-    ])
+
+    agents: list[str] = field(
+        default_factory=lambda: [
+            "coder",
+            "reviewer",
+            "architect",
+            "researcher",
+            "debugger",
+            "writer",
+            "optimizer",
+            "tester",
+        ]
+    )
     learning_rate: float = 0.1
     discount_factor: float = 0.95
     epsilon_start: float = 1.0
@@ -90,6 +103,7 @@ class RouteDecision:
         confidence: Confidence in the decision (max Q / sum Q).
         exploiting: True if decision was greedy, False if exploring.
     """
+
     agent: str
     state_hash: str = ""
     q_values: dict[str, float] = field(default_factory=dict)
@@ -107,6 +121,7 @@ class Experience:
         reward: Reward received.
         td_error: Temporal difference error magnitude (for prioritized replay).
     """
+
     state_hash: str
     action_idx: int
     reward: float
@@ -157,7 +172,7 @@ def _extract_features(text: str, dim: int = 32) -> list[float]:
     # N-gram hash features (remaining dimensions)
     for n in range(1, 4):  # unigrams, bigrams, trigrams
         for j in range(len(words) - n + 1):
-            ngram = " ".join(words[j:j + n])
+            ngram = " ".join(words[j : j + n])
             h = int(hashlib.md5(ngram.encode()).hexdigest(), 16)
             idx = 8 + (h % max(1, dim - 8))
             if idx < dim:
@@ -187,6 +202,7 @@ def _hash_state(features: list[float], quantize_bits: int = 4) -> str:
 # Q-Learning Router
 # ---------------------------------------------------------------------------
 
+
 class QLearningRouter:
     """Q-Learning based agent router with experience replay.
 
@@ -207,6 +223,8 @@ class QLearningRouter:
         self.q_table: dict[str, list[float]] = {}
         self.epsilon = self.config.epsilon_start
         self.update_count = 0
+        # O(1) agent->index lookup used by reward updates (avoids linear list.index()).
+        self._agent_index: dict[str, int] = {a: i for i, a in enumerate(self.config.agents)}
 
         # LRU cache: state_hash -> (agent, timestamp)
         self._cache: OrderedDict[str, tuple[str, float]] = OrderedDict()
@@ -236,8 +254,6 @@ class QLearningRouter:
         Returns:
             A RouteDecision with the selected agent and metadata.
         """
-        import time
-
         features = _extract_features(task_description, self.config.feature_dim)
         state_hash = _hash_state(features)
 
@@ -308,7 +324,7 @@ class QLearningRouter:
         """
         reward = max(0.0, min(1.0, reward))
         state_hash = decision.state_hash
-        action_idx = self.config.agents.index(decision.agent)
+        action_idx = self._agent_index[decision.agent]
 
         q_values = self._get_q_values(state_hash)
         old_q = q_values[action_idx]
@@ -369,13 +385,12 @@ class QLearningRouter:
 
     @staticmethod
     def _compute_hmac(data_bytes: bytes) -> str:
-        """Compute HMAC-SHA256 for integrity verification."""
-        import hmac as _hmac
+        """Compute HMAC-SHA256 for integrity verification.
 
-        # Key derived from machine identity (not secret, just tamper detection)
-        import platform
+        Key is derived from machine identity (not secret, just tamper detection).
+        """
         key = f"gradata-router-{platform.node()}".encode()
-        return _hmac.new(key, data_bytes, "sha256").hexdigest()
+        return hmac.new(key, data_bytes, "sha256").hexdigest()
 
     def save(self, filepath: str | Path) -> None:
         """Save router state to JSON file with HMAC integrity check.
@@ -426,7 +441,6 @@ class QLearningRouter:
             body = json.dumps(state, sort_keys=True, separators=(",", ":")).encode()
             expected = self._compute_hmac(body)
             if stored_hmac != expected:
-                import logging
                 logging.getLogger(__name__).warning(
                     "Q-table integrity check failed: %s may be tampered", filepath
                 )
@@ -485,9 +499,7 @@ class QLearningRouter:
         """Get or initialize Q-values for a state."""
         if state_hash not in self.q_table:
             # Initialize with small random values to break ties
-            self.q_table[state_hash] = [
-                random.uniform(0.0, 0.01) for _ in self.config.agents
-            ]
+            self.q_table[state_hash] = [random.uniform(0.0, 0.01) for _ in self.config.agents]
         return self.q_table[state_hash]
 
     def _compute_confidence(self, q_values: list[float]) -> float:

@@ -71,15 +71,15 @@ class BrainMemory:
             rules = self.brain.apply_brain_rules("general", {"task": str(user_input)[:100]})
             if rules:
                 parts.append(rules)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("apply_brain_rules failed: %s", exc)
 
         try:
             context = self.brain.context_for(str(user_input)[:200])
             if context:
                 parts.append(context)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("context_for failed: %s", exc)
 
         return {self.memory_key: "\n\n".join(parts)}
 
@@ -101,8 +101,8 @@ class BrainMemory:
             try:
                 if hasattr(self.brain, "observe"):
                     self.brain.observe(messages)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("brain.observe failed: %s", exc)
 
     def clear(self) -> None:
         """No-op for persistent brain memory."""

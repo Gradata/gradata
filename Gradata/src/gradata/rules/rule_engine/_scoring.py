@@ -33,6 +33,30 @@ _CT_BOOST: dict[CorrectionType, float] = {
 
 
 # ---------------------------------------------------------------------------
+# Shared scope_json helpers
+# ---------------------------------------------------------------------------
+
+
+def lesson_scope(lesson: Lesson) -> RuleScope:
+    """Parse ``lesson.scope_json`` into a :class:`RuleScope`, wildcard on fail.
+
+    Centralises the try/loads/filter-to-known-fields pattern used by the
+    scoring helpers and the rule engine so bad JSON is handled uniformly
+    (and only logged once per callsite).
+    """
+    if not lesson.scope_json:
+        return RuleScope()
+    try:
+        scope_dict = json.loads(lesson.scope_json)
+    except (json.JSONDecodeError, TypeError):
+        return RuleScope()
+    if not isinstance(scope_dict, dict):
+        return RuleScope()
+    fields = RuleScope.__dataclass_fields__
+    return RuleScope(**{k: v for k, v in scope_dict.items() if k in fields})
+
+
+# ---------------------------------------------------------------------------
 # Task-type detection keywords (for scope-weighted matching)
 # ---------------------------------------------------------------------------
 
@@ -365,15 +389,11 @@ def validate_assumptions(
     # (c) Scope / task-type mismatch
     current_tt = context.get("current_task_type", "")
     if current_tt and lesson.scope_json:
-        try:
-            scope_dict = json.loads(lesson.scope_json)
-            rule_tt = scope_dict.get("task_type", "")
-            if rule_tt and rule_tt != current_tt:
-                return (
-                    False,
-                    f"rule scoped to '{rule_tt}' but current task is '{current_tt}'",
-                )
-        except Exception:
-            pass  # malformed scope_json — don't block on it
+        rule_tt = lesson_scope(lesson).task_type or ""
+        if rule_tt and rule_tt != current_tt:
+            return (
+                False,
+                f"rule scoped to '{rule_tt}' but current task is '{current_tt}'",
+            )
 
     return (True, "")

@@ -8,6 +8,7 @@ Every hook module follows this pattern:
     def main(data: dict) -> dict | None: ...
     if __name__ == "__main__": run_hook(main, HOOK_META)
 """
+
 from __future__ import annotations
 
 import json
@@ -85,6 +86,34 @@ def get_brain() -> Brain | None:
         return None
 
 
+def emit_hook_event(
+    event_type: str,
+    source: str,
+    data: dict,
+    brain_dir: str | None = None,
+) -> bool:
+    """Emit a brain event from a hook. Returns True on success, False otherwise.
+
+    Collapses the `resolve_brain_dir → BrainContext.from_brain_dir → emit`
+    boilerplate that every hook was repeating. All failures are swallowed — a
+    hook must never break a user's turn because the brain vault is missing.
+    """
+    if brain_dir is None:
+        brain_dir = resolve_brain_dir()
+    if not brain_dir:
+        return False
+    try:
+        from gradata._events import emit
+        from gradata._paths import BrainContext
+
+        ctx = BrainContext.from_brain_dir(brain_dir)
+        emit(event_type, source=source, data=data, ctx=ctx)
+        return True
+    except Exception as exc:
+        _log.debug("emit_hook_event(%s) failed: %s", event_type, exc)
+        return False
+
+
 def _record_telemetry(meta: dict, hook_name: str, payload: str | None) -> None:
     """Best-effort: append one JSONL line with bytes-out per hook invocation.
 
@@ -99,12 +128,14 @@ def _record_telemetry(meta: dict, hook_name: str, payload: str | None) -> None:
             return
         import time
 
-        line = json.dumps({
-            "ts": time.time(),
-            "event": meta.get("event", "?"),
-            "hook": hook_name,
-            "bytes": len(payload or ""),
-        })
+        line = json.dumps(
+            {
+                "ts": time.time(),
+                "event": meta.get("event", "?"),
+                "hook": hook_name,
+                "bytes": len(payload or ""),
+            }
+        )
         log_path = Path(brain_dir) / "telemetry.jsonl"
         with log_path.open("a", encoding="utf-8") as fh:
             fh.write(line + "\n")

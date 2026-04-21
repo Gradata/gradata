@@ -58,9 +58,27 @@ def _locked_append(path: Path, line: str) -> None:
     _locked_append_many(path, [line])
 
 
+# Process-level cache: once we've initialized the schema on a given db path
+# in this process, subsequent emit()/supersede() calls skip the 10+ DDL
+# statements and single commit. SQLite parses CREATE IF NOT EXISTS etc. on
+# every call otherwise, adding measurable latency to hot write paths.
+_schema_initialized: set[str] = set()
+
+
 def _ensure_table(conn: sqlite3.Connection):
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=5000")
+    # Skip DDL if this process already ensured the schema for this db file.
+    # The conn-level PRAGMAs above still need to run per-connection.
+    try:
+        db_file = next(
+            (row[2] for row in conn.execute("PRAGMA database_list").fetchall() if row[1] == "main"),
+            None,
+        )
+    except sqlite3.Error:
+        db_file = None
+    if db_file and db_file in _schema_initialized:
+        return
     conn.execute("""
         CREATE TABLE IF NOT EXISTS events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,11 +124,21 @@ def _ensure_table(conn: sqlite3.Connection):
     with contextlib.suppress(sqlite3.OperationalError):
         conn.execute("CREATE INDEX IF NOT EXISTS idx_events_tenant ON events(tenant_id)")
     conn.commit()
+    if db_file:
+        _schema_initialized.add(db_file)
 
 
-def emit(event_type: str, source: str, data: dict | None = None, tags: list | None = None,
-         session: int | None = None, valid_from: str | None = None, valid_until: str | None = None,
-         ctx: BrainContext | None = None, ts: str | None = None):
+def emit(
+    event_type: str,
+    source: str,
+    data: dict | None = None,
+    tags: list | None = None,
+    session: int | None = None,
+    valid_from: str | None = None,
+    valid_until: str | None = None,
+    ctx: BrainContext | None = None,
+    ts: str | None = None,
+):
     """Emit an event to the brain's event log.
 
     Args:
@@ -141,10 +169,12 @@ def emit(event_type: str, source: str, data: dict | None = None, tags: list | No
     enriched_tags = tags or []
     try:
         from gradata._tag_taxonomy import enrich_tags, validate_tags
+
         enriched_tags = enrich_tags(enriched_tags, event_type, data or {})
         issues = validate_tags(enriched_tags, event_type)
         if issues:
             import logging
+
             _logger = logging.getLogger("gradata.events")
             for issue in issues[:2]:
                 _logger.debug("tag validation: %s", issue)
@@ -152,9 +182,14 @@ def emit(event_type: str, source: str, data: dict | None = None, tags: list | No
         pass
 
     event = {
-        "ts": ts, "session": session, "type": event_type, "source": source,
-        "data": data or {}, "tags": enriched_tags,
-        "valid_from": valid_from, "valid_until": valid_until,
+        "ts": ts,
+        "session": session,
+        "type": event_type,
+        "source": source,
+        "data": data or {},
+        "tags": enriched_tags,
+        "valid_from": valid_from,
+        "valid_until": valid_until,
     }
 
     # Dual-write: JSONL (portable) + SQLite (queryable).
@@ -181,8 +216,17 @@ def emit(event_type: str, source: str, data: dict | None = None, tags: list | No
                 "INSERT OR IGNORE INTO events "
                 "(ts, session, type, source, data_json, tags_json, valid_from, valid_until, tenant_id, schema_version) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
-                (ts, session, event_type, source, json.dumps(data or {}),
-                 json.dumps(enriched_tags), valid_from, valid_until, _tid),
+                (
+                    ts,
+                    session,
+                    event_type,
+                    source,
+                    json.dumps(data or {}),
+                    json.dumps(enriched_tags),
+                    valid_from,
+                    valid_until,
+                    _tid,
+                ),
             )
             if cursor.rowcount == 1:
                 event["id"] = cursor.lastrowid
@@ -199,6 +243,7 @@ def emit(event_type: str, source: str, data: dict | None = None, tags: list | No
 
     if not jsonl_ok and not sqlite_ok:
         from gradata.exceptions import EventPersistenceError
+
         raise EventPersistenceError(
             f"Event {event_type} failed to persist to BOTH JSONL and SQLite. "
             "Learning data lost. Check file permissions and disk space."
@@ -208,25 +253,47 @@ def emit(event_type: str, source: str, data: dict | None = None, tags: list | No
     return event
 
 
-
-def emit_gate_result(gate_name: str, result: str, sources_checked: list | None = None, detail: str = "") -> dict:
+def emit_gate_result(
+    gate_name: str, result: str, sources_checked: list | None = None, detail: str = ""
+) -> dict:
     sources = sources_checked or []
-    return emit("GATE_RESULT", "gate:execution", {
-        "gate": gate_name, "result": result, "sources_checked": sources,
-        "sources_complete": len(sources) > 0, "detail": detail,
-    }, tags=[f"gate:{gate_name}"])
+    return emit(
+        "GATE_RESULT",
+        "gate:execution",
+        {
+            "gate": gate_name,
+            "result": result,
+            "sources_checked": sources,
+            "sources_complete": len(sources) > 0,
+            "detail": detail,
+        },
+        tags=[f"gate:{gate_name}"],
+    )
 
 
 def emit_gate_override(gate_name: str, reason: str, steps_skipped: list | None = None) -> dict:
-    return emit("GATE_OVERRIDE", "gate:override", {
-        "gate": gate_name, "reason": reason,
-        "steps_skipped": steps_skipped or [], "override_type": "explicit",
-    }, tags=[f"gate:{gate_name}", "override:explicit"])
+    return emit(
+        "GATE_OVERRIDE",
+        "gate:override",
+        {
+            "gate": gate_name,
+            "reason": reason,
+            "steps_skipped": steps_skipped or [],
+            "override_type": "explicit",
+        },
+        tags=[f"gate:{gate_name}", "override:explicit"],
+    )
 
 
-def query(event_type: str | None = None, session: int | None = None, last_n_sessions: int | None = None,
-          limit: int = 100, as_of: str | None = None, active_only: bool = False,
-          ctx: BrainContext | None = None) -> list:
+def query(
+    event_type: str | None = None,
+    session: int | None = None,
+    last_n_sessions: int | None = None,
+    limit: int = 100,
+    as_of: str | None = None,
+    active_only: bool = False,
+    ctx: BrainContext | None = None,
+) -> list:
     db_path = ctx.db_path if ctx else _p.DB_PATH
     with contextlib.closing(sqlite3.connect(str(db_path))) as conn:
         conn.row_factory = sqlite3.Row
@@ -261,19 +328,28 @@ def query(event_type: str | None = None, session: int | None = None, last_n_sess
 
     return [
         {
-            "id": r["id"], "ts": r["ts"], "session": r["session"],
-            "type": r["type"], "source": r["source"],
+            "id": r["id"],
+            "ts": r["ts"],
+            "session": r["session"],
+            "type": r["type"],
+            "source": r["source"],
             "data": json.loads(r["data_json"]) if r["data_json"] else {},
             "tags": json.loads(r["tags_json"]) if r["tags_json"] else [],
-            "valid_from": r["valid_from"], "valid_until": r["valid_until"],
+            "valid_from": r["valid_from"],
+            "valid_until": r["valid_until"],
         }
         for r in rows
     ]
 
 
-def supersede(event_id: int, new_data: dict | None = None, new_tags: list | None = None,
-              source: str = "supersede", new_valid_from: str | None = None,
-              ctx: BrainContext | None = None):
+def supersede(
+    event_id: int,
+    new_data: dict | None = None,
+    new_tags: list | None = None,
+    source: str = "supersede",
+    new_valid_from: str | None = None,
+    ctx: BrainContext | None = None,
+):
     now = datetime.now(UTC).isoformat()
     db = ctx.db_path if ctx else _p.DB_PATH
     with contextlib.closing(sqlite3.connect(str(db))) as conn:
@@ -286,9 +362,12 @@ def supersede(event_id: int, new_data: dict | None = None, new_tags: list | None
         conn.commit()
     orig_tags = json.loads(original["tags_json"]) if original["tags_json"] else []
     replacement = emit(
-        event_type=original["type"], source=source,
+        event_type=original["type"],
+        source=source,
         data=new_data or (json.loads(original["data_json"]) if original["data_json"] else {}),
-        tags=new_tags or orig_tags, session=_detect_session(ctx=ctx), valid_from=new_valid_from or now,
+        tags=new_tags or orig_tags,
+        session=_detect_session(ctx=ctx),
+        valid_from=new_valid_from or now,
         ctx=ctx,
     )
     replacement["superseded_id"] = event_id
@@ -299,11 +378,14 @@ def correction_rate(last_n_sessions: int = 5, ctx: BrainContext | None = None) -
     db = ctx.db_path if ctx else _p.DB_PATH
     with contextlib.closing(sqlite3.connect(str(db))) as conn:
         _ensure_table(conn)
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT session, COUNT(*) as count FROM events WHERE type = 'CORRECTION'
             AND session >= (SELECT COALESCE(MAX(session), 0) - ? FROM events)
             GROUP BY session ORDER BY session
-        """, (last_n_sessions - 1,)).fetchall()
+        """,
+            (last_n_sessions - 1,),
+        ).fetchall()
     return {r[0]: r[1] for r in rows}
 
 
@@ -312,8 +394,10 @@ def compute_leading_indicators(session: int, ctx: BrainContext | None = None) ->
     with contextlib.closing(sqlite3.connect(str(db))) as conn:
         _ensure_table(conn)
         result = {
-            "first_draft_acceptance": 0.0, "correction_density": 0.0,
-            "avg_time_to_deliverable_ms": 0.0, "source_coverage": 0.0,
+            "first_draft_acceptance": 0.0,
+            "correction_density": 0.0,
+            "avg_time_to_deliverable_ms": 0.0,
+            "source_coverage": 0.0,
             "confidence_calibration": 1.0,
         }
         outputs = conn.execute(
@@ -328,7 +412,9 @@ def compute_leading_indicators(session: int, ctx: BrainContext | None = None) ->
             "SELECT COUNT(*) FROM events WHERE type = 'CORRECTION' AND session = ?", (session,)
         ).fetchone()[0]
         output_count = len(outputs) if outputs else 0
-        result["correction_density"] = min(corrections / output_count, 1.0) if output_count > 0 else 0.0
+        result["correction_density"] = (
+            min(corrections / output_count, 1.0) if output_count > 0 else 0.0
+        )
 
         gates = conn.execute(
             "SELECT data_json FROM events WHERE type = 'GATE_RESULT' AND session = ?", (session,)
@@ -364,7 +450,9 @@ def compute_leading_indicators(session: int, ctx: BrainContext | None = None) ->
                 # v1 format: delta-based (legacy)
                 total_cal = len(delta_events)
                 within_range = sum(1 for d in delta_events if abs(d.get("delta", 0)) <= 2)
-                result["confidence_calibration"] = within_range / total_cal if total_cal > 0 else 1.0
+                result["confidence_calibration"] = (
+                    within_range / total_cal if total_cal > 0 else 1.0
+                )
 
     return result
 
@@ -397,7 +485,6 @@ def _detect_session(ctx: BrainContext | None = None) -> int:
 # ── Brain-quality functions (promoted from brain shim) ────────────────
 
 
-
 def find_contradictions(event_type: str | None = None, tag_prefix: str | None = None) -> list:
     """Find events that may contradict each other — same tags, overlapping validity.
 
@@ -418,16 +505,19 @@ def find_contradictions(event_type: str | None = None, tag_prefix: str | None = 
 
     conflicts = []
     for i, a in enumerate(events):
-        for b in events[i + 1:]:
+        for b in events[i + 1 :]:
             # Check tag overlap
             shared_tags = set(a.get("tags", [])) & set(b.get("tags", []))
             if shared_tags and a["type"] == b["type"]:
-                conflicts.append({
-                    "event_a": {"id": a["id"], "ts": a["ts"], "data": a["data"]},
-                    "event_b": {"id": b["id"], "ts": b["ts"], "data": b["data"]},
-                    "shared_tags": list(shared_tags),
-                    "both_active": a.get("valid_until") is None and b.get("valid_until") is None,
-                })
+                conflicts.append(
+                    {
+                        "event_a": {"id": a["id"], "ts": a["ts"], "data": a["data"]},
+                        "event_b": {"id": b["id"], "ts": b["ts"], "data": b["data"]},
+                        "shared_tags": list(shared_tags),
+                        "both_active": a.get("valid_until") is None
+                        and b.get("valid_until") is None,
+                    }
+                )
 
     return conflicts
 
@@ -437,12 +527,15 @@ def audit_trend(last_n_sessions: int = 5, ctx: BrainContext | None = None) -> li
     db = ctx.db_path if ctx else _p.DB_PATH
     with contextlib.closing(sqlite3.connect(str(db))) as conn:
         _ensure_table(conn)
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT session, data_json FROM events
             WHERE type = 'AUDIT_SCORE'
             AND session >= (SELECT COALESCE(MAX(session), 0) - ? FROM events)
             ORDER BY session
-        """, (last_n_sessions - 1,)).fetchall()
+        """,
+            (last_n_sessions - 1,),
+        ).fetchall()
     return [{"session": r[0], "data": json.loads(r[1])} for r in rows]
 
 
@@ -467,6 +560,7 @@ class RetainOrchestrator:
 
     def __init__(self, brain_dir: str | Path) -> None:
         from pathlib import Path as _Path
+
         self.brain_dir = _Path(brain_dir)
         self.events_path = self.brain_dir / "events.jsonl"
         self.db_path = self.brain_dir / "system.db"
@@ -545,19 +639,13 @@ class RetainOrchestrator:
                             continue
             result["phases"]["read"] = {
                 "existing_keys": len(existing_keys),
-                "new": sum(
-                    1 for e in self._pending
-                    if self._event_key(e) not in existing_keys
-                ),
+                "new": sum(1 for e in self._pending if self._event_key(e) not in existing_keys),
             }
         except Exception as exc:
             result["errors"].append(f"Phase 1: {exc}")
             # Fall through with empty existing_keys — safer than aborting
 
-        new_events = [
-            e for e in self._pending
-            if self._event_key(e) not in existing_keys
-        ]
+        new_events = [e for e in self._pending if self._event_key(e) not in existing_keys]
 
         if not new_events:
             self._pending.clear()
@@ -569,8 +657,7 @@ class RetainOrchestrator:
             # multi-process interleaving on Windows (msvcrt.locking) and POSIX
             # (fcntl.flock). Single lock + single fsync for the whole batch.
             lines = [
-                json.dumps(event, default=str, ensure_ascii=False) + "\n"
-                for event in new_events
+                json.dumps(event, default=str, ensure_ascii=False) + "\n" for event in new_events
             ]
             _locked_append_many(self.events_path, lines)
             result["written"] = len(new_events)
@@ -620,6 +707,7 @@ class RetainOrchestrator:
         try:
             try:
                 from gradata._brain_manifest import update_manifest  # type: ignore[import]
+
                 update_manifest(self.brain_dir)
                 manifest_updated = True
             except (ImportError, Exception):

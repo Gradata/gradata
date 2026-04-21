@@ -29,6 +29,7 @@ from ._scoring import (
     detect_task_type,
     effective_confidence,
     is_rule_disabled_for_domain,
+    lesson_scope,
     validate_assumptions,
 )
 
@@ -148,18 +149,7 @@ def filter_by_scope(
         # wildcard scope, which returns a score driven purely by what the query
         # provides.  When lessons gain explicit scope metadata in a future
         # iteration, this derivation logic should be updated.
-        # Use lesson's stored scope if available, otherwise wildcard
-        if lesson.scope_json:
-            try:
-                scope_dict = json.loads(lesson.scope_json)
-                lesson_scope = RuleScope(
-                    **{k: v for k, v in scope_dict.items() if k in RuleScope.__dataclass_fields__}
-                )
-            except Exception:
-                lesson_scope = RuleScope()
-        else:
-            lesson_scope = RuleScope()
-        score = compute_scope_weight(lesson_scope, scope)
+        score = compute_scope_weight(lesson_scope(lesson), scope)
         if score >= min_relevance:
             results.append((lesson, score))
     return results
@@ -274,19 +264,8 @@ def apply_rules(
     # Step 2 & 3 — score with weighted scope matching and threshold
     scored: list[tuple[Lesson, float]] = []
     for lesson in eligible:
-        # Use lesson's stored scope if available, otherwise wildcard
-        if lesson.scope_json:
-            try:
-                scope_dict = json.loads(lesson.scope_json)
-                lesson_scope = RuleScope(
-                    **{k: v for k, v in scope_dict.items() if k in RuleScope.__dataclass_fields__}
-                )
-            except Exception:
-                lesson_scope = RuleScope()
-        else:
-            lesson_scope = RuleScope()
         # Use weighted scope matching (exact > partial > wildcard)
-        relevance = compute_scope_weight(lesson_scope, scope)
+        relevance = compute_scope_weight(lesson_scope(lesson), scope)
         relevance *= _CT_BOOST.get(lesson.correction_type, 1.0)
         if relevance >= 0.4:
             scored.append((lesson, relevance))
@@ -345,13 +324,26 @@ def apply_rules(
             scores.get("misfires", 0),
         )
 
+    # Pre-compute difficulty per category once: compute_rule_difficulty is
+    # O(E) per call, and calling it inside sort key was O(N × E). Collapse
+    # to O(E + N) by bucketing events per category first.
+    if events:
+        difficulty_by_cat: dict[str, float] = {}
+        unique_cats = {t[0].category.upper() for t in scored}
+        for cat in unique_cats:
+            difficulty_by_cat[cat] = compute_rule_difficulty(cat, events)
+
+        def _difficulty(lesson: Lesson) -> float:
+            return difficulty_by_cat.get(lesson.category.upper(), 0.5)
+    else:
+
+        def _difficulty(lesson: Lesson) -> float:
+            return _difficulty_from_lesson(lesson)
+
     scored.sort(
         key=lambda t: (
             _STATE_PRIORITY[t[0].state],
-            # Difficulty: use event history if available, else lesson counters
-            compute_rule_difficulty(t[0].category, events)
-            if events
-            else _difficulty_from_lesson(t[0]),
+            _difficulty(t[0]),
             t[1],
             _effective_conf(t[0], current_domain),
         ),
@@ -437,7 +429,10 @@ def apply_rules_with_tree(
     # Format as AppliedRule objects
     applied = []
     for lesson in candidates[:max_rules]:
-        rule_id = f"{lesson.category}:{hash(lesson.description) % 10000:04d}"
+        # Stable, deterministic ID — Python's built-in hash() is randomized
+        # per-process (PYTHONHASHSEED), which broke RuleCache/RuleGraph lookups
+        # keyed on rule_id across runs.
+        rule_id = _make_rule_id(lesson)
         instruction = (
             f'<rule confidence="{lesson.confidence:.2f}">'
             f"{lesson.category}: {lesson.description}</rule>"

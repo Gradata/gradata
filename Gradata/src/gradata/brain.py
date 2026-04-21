@@ -35,6 +35,7 @@ per process, or use process-level locks for multi-worker deployments.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import sys
 from pathlib import Path
@@ -93,6 +94,14 @@ class Brain(BrainInspectionMixin):
         from gradata.rules.cache import RuleCache
 
         self._rule_cache = RuleCache()
+
+        # Capability probe cached once: apply_brain_rules() is a hot path
+        # and we don't want find_spec() in every call.
+        import importlib.util as _util
+
+        self._has_self_improvement = (
+            _util.find_spec("gradata.enhancements.self_improvement") is not None
+        )
 
         from gradata.rules.rule_graph import RuleGraph
 
@@ -216,7 +225,8 @@ class Brain(BrainInspectionMixin):
             from gradata._events import get_current_session
 
             return get_current_session()
-        except Exception:
+        except Exception as exc:
+            logger.debug("get_current_session failed: %s", exc)
             return 0
 
     @classmethod
@@ -316,13 +326,28 @@ class Brain(BrainInspectionMixin):
         return None
 
     def _load_lessons(self, create: bool = False):
-        """Load and parse lessons from lessons.md. Returns list or empty list."""
+        """Load and parse lessons from lessons.md. Returns list or empty list.
+
+        Caches the parsed result keyed on (path, mtime) so repeated reads in
+        the same session skip the parse when the file is unchanged. Writer
+        paths that re-parse + mutate + rewrite should call ``parse_lessons``
+        directly (see forget/disable_lesson/add_rule) to avoid sharing
+        mutable state with the cache.
+        """
         from gradata.enhancements.self_improvement import parse_lessons
 
         path = self._find_lessons_path(create=create)
         if not path or not path.is_file():
+            self._lessons_parse_cache = None
             return []
-        return parse_lessons(path.read_text(encoding="utf-8"))
+        mtime = path.stat().st_mtime
+        key = (str(path), mtime)
+        cache = getattr(self, "_lessons_parse_cache", None)
+        if cache is not None and cache[0] == key:
+            return cache[1]
+        lessons = parse_lessons(path.read_text(encoding="utf-8"))
+        self._lessons_parse_cache = (key, lessons)
+        return lessons
 
     @property
     def memory(self):
@@ -422,8 +447,8 @@ class Brain(BrainInspectionMixin):
             # be defensive in case the schema changes.
             if not dry_run and result and result.get("graduated"):
                 _telemetry.send_once("first_graduation")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("telemetry send_once failed: %s", e)
 
         return result
 
@@ -484,6 +509,12 @@ class Brain(BrainInspectionMixin):
 
         write_lessons_safe(lessons_path, format_lessons(lessons))
 
+        # lessons.md just changed; invalidate caches so readers don't serve
+        # a pre-patch copy until the next auto_heal() flush.
+        self._lessons_parse_cache = None
+        with contextlib.suppress(Exception):
+            self._rule_cache.invalidate()
+
         # Re-sign the patched rule so HMAC verification stays valid
         try:
             from gradata.enhancements.rule_integrity import sign_and_store
@@ -538,9 +569,7 @@ class Brain(BrainInspectionMixin):
         """
         from gradata.enhancements.self_healing import auto_heal_failures
 
-        result = auto_heal_failures(
-            self, failure_events=failure_events, max_patches=max_patches
-        )
+        result = auto_heal_failures(self, failure_events=failure_events, max_patches=max_patches)
         # Patching rewrites lessons.md; invalidate the in-memory rule cache
         # so subsequent apply_brain_rules() calls see the patched text
         # instead of a stale pre-patch prompt.
@@ -661,7 +690,9 @@ class Brain(BrainInspectionMixin):
                 # l.category may have arbitrary casing (parse_lessons preserves
                 # on-disk form); compare case-insensitively against the canonical
                 # upper-cased `category` we're inserting.
-                if (l.category or "").strip().upper() == category and _norm(l.description) == desc_norm:
+                if (l.category or "").strip().upper() == category and _norm(
+                    l.description
+                ) == desc_norm:
                     return {
                         "added": False,
                         "reason": "duplicate",
@@ -847,9 +878,10 @@ class Brain(BrainInspectionMixin):
         # Rules are always computed locally from the brain's own lessons.
         # Pulling rules from cloud would allow a compromised server to inject
         # malicious instructions into AI prompts → remote code execution.
-        try:
-            from gradata.enhancements.self_improvement import parse_lessons
-        except ImportError:
+        # Capability check: enhancements package must be installed for rules.
+        import importlib.util as _util
+
+        if _util.find_spec("gradata.enhancements.self_improvement") is None:
             return ""
         from gradata._scope import build_scope
         from gradata.rules.rule_engine import apply_rules, format_rules_for_prompt
@@ -871,7 +903,8 @@ class Brain(BrainInspectionMixin):
         if cached is not None:
             return cached
 
-        lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+        # mtime-cached parse: reuses prior result when lessons.md is unchanged.
+        lessons = self._load_lessons()
 
         # Try tree-based retrieval first (falls back to flat if no paths).
         # Pass the brain's bus so rule_engine can fire `rule_scoped_out`
@@ -881,7 +914,10 @@ class Brain(BrainInspectionMixin):
             from gradata.rules.rule_engine import apply_rules_with_tree
 
             applied = apply_rules_with_tree(
-                lessons, scope, max_rules=max_rules, event_bus=_bus,
+                lessons,
+                scope,
+                max_rules=max_rules,
+                event_bus=_bus,
             )
         except (ImportError, Exception):
             applied = apply_rules(lessons, scope, max_rules=max_rules, bus=_bus)
@@ -891,23 +927,26 @@ class Brain(BrainInspectionMixin):
         # session's prompts. Fire-and-forget — never fails apply_brain_rules.
         if _bus is not None and applied:
             try:
-                _bus.emit("rules.injected", {
-                    "rules": [
-                        {
-                            "id": a.rule_id,
-                            "category": a.lesson.category,
-                            "confidence": a.lesson.confidence,
-                            "state": a.lesson.state.value,
-                        }
-                        for a in applied
-                    ],
-                    "scope": {
-                        "task_type": scope.task_type,
-                        "domain": scope.domain,
-                        "audience": scope.audience,
+                _bus.emit(
+                    "rules.injected",
+                    {
+                        "rules": [
+                            {
+                                "id": a.rule_id,
+                                "category": a.lesson.category,
+                                "confidence": a.lesson.confidence,
+                                "state": a.lesson.state.value,
+                            }
+                            for a in applied
+                        ],
+                        "scope": {
+                            "task_type": scope.task_type,
+                            "domain": scope.domain,
+                            "audience": scope.audience,
+                        },
+                        "task": task,
                     },
-                    "task": task,
-                })
+                )
             except Exception as e:
                 logger.debug("rules.injected emit failed: %s", e)
 
@@ -1060,6 +1099,12 @@ class Brain(BrainInspectionMixin):
             )
         write_lessons_safe(lessons_path, format_lessons(lessons))
 
+        # lessons.md changed — evict mtime cache + formatted-rule cache so the
+        # next apply_brain_rules() call reflects the forget.
+        self._lessons_parse_cache = None
+        with contextlib.suppress(Exception):
+            self._rule_cache.invalidate()
+
         for r in results:
             with contextlib.suppress(Exception):
                 self.emit(
@@ -1120,6 +1165,10 @@ class Brain(BrainInspectionMixin):
         from gradata._db import write_lessons_safe
 
         write_lessons_safe(lessons_path, format_lessons(lessons))
+        # lessons.md changed — evict caches so readers see the kill immediately.
+        self._lessons_parse_cache = None
+        with contextlib.suppress(Exception):
+            self._rule_cache.invalidate()
         try:
             self.emit(
                 "LESSON_CHANGE",
@@ -1153,8 +1202,10 @@ class Brain(BrainInspectionMixin):
             return []
         import sqlite3
 
+        from gradata._db import get_connection
+
         try:
-            with sqlite3.connect(str(self.db_path)) as conn:
+            with contextlib.closing(get_connection(self.db_path)) as conn:
                 conn.row_factory = sqlite3.Row
                 if category:
                     rows = conn.execute(
@@ -1180,19 +1231,21 @@ class Brain(BrainInspectionMixin):
         from gradata._db import get_connection, lessons_lock
         from gradata.enhancements.self_improvement import format_lessons, parse_lessons
 
-        conn = get_connection(self.db_path)
-        conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT * FROM pending_approvals WHERE id = ? AND resolution IS NULL", (approval_id,)
-        ).fetchone()
+        # Open conn only to read the pending row, then close before taking the
+        # file lock. Holding a SQLite connection across a potentially-blocking
+        # file-lock section kept a WAL reader slot idle under contention.
+        with contextlib.closing(get_connection(self.db_path)) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT * FROM pending_approvals WHERE id = ? AND resolution IS NULL",
+                (approval_id,),
+            ).fetchone()
         if not row:
-            conn.close()
             return {"resolved": False, "reason": "not_found_or_already_resolved"}
         cat, desc = row["lesson_category"], row["lesson_description"]
 
         lessons_path = self._find_lessons_path()
         if not lessons_path or not lessons_path.is_file():
-            conn.close()
             return {"resolved": False, "reason": "no_lessons_file"}
 
         with lessons_lock(lessons_path):
@@ -1211,19 +1264,32 @@ class Brain(BrainInspectionMixin):
                 from gradata._db import write_lessons_safe
 
                 write_lessons_safe(lessons_path, format_lessons(lessons))
+                # lessons.md changed — evict caches so readers see the
+                # approval/rejection immediately.
+                self._lessons_parse_cache = None
+                with contextlib.suppress(Exception):
+                    self._rule_cache.invalidate()
 
         if not matched:
-            conn.close()
             return {"resolved": False, "reason": "lesson_not_found_in_file"}
 
         from datetime import date
 
-        conn.execute(
-            "UPDATE pending_approvals SET resolution = ?, resolved_at = ? WHERE id = ?",
-            (resolution, date.today().isoformat(), approval_id),
-        )
-        conn.commit()
-        conn.close()
+        with contextlib.closing(get_connection(self.db_path)) as conn:
+            # Re-check resolution IS NULL to prevent lost-race overwrites when
+            # two workers resolve the same approval concurrently. rowcount == 0
+            # means another worker won the race.
+            cur = conn.execute(
+                "UPDATE pending_approvals SET resolution = ?, resolved_at = ? "
+                "WHERE id = ? AND resolution IS NULL",
+                (resolution, date.today().isoformat(), approval_id),
+            )
+            conn.commit()
+            if cur.rowcount == 0:
+                return {
+                    "resolved": False,
+                    "reason": "already_resolved_by_other_worker",
+                }
         return {"resolved": True, "category": cat, "description": desc}
 
     def review_pending(self) -> list[dict]:
@@ -1231,16 +1297,17 @@ class Brain(BrainInspectionMixin):
         if not self.db_path.is_file():
             return []
         try:
+            import contextlib
             import sqlite3
 
             from gradata._db import get_connection
 
-            conn = get_connection(self.db_path)
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                "SELECT * FROM pending_approvals WHERE resolution IS NULL ORDER BY created_at DESC"
-            ).fetchall()
-            conn.close()
+            with contextlib.closing(get_connection(self.db_path)) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    "SELECT * FROM pending_approvals "
+                    "WHERE resolution IS NULL ORDER BY created_at DESC"
+                ).fetchall()
             return [dict(r) for r in rows]
         except Exception as e:
             logger.debug("review_pending query failed: %s", e)
@@ -1547,24 +1614,31 @@ class Brain(BrainInspectionMixin):
             if not db or not db.exists():
                 return []
             results, terms = [], query.lower().split()
+            if not terms:
+                return []
+            # Push term filter into SQL so we don't scan 500 rows + filter
+            # Python-side. Each term becomes a `data_json LIKE ?` — lowercase
+            # both sides so the filter matches regardless of stored case.
+            where = " AND ".join(["LOWER(data_json) LIKE ?"] * len(terms))
+            params: list = [f"%{t}%" for t in terms]
+            params.append(top_k)
             with sqlite3.connect(str(db)) as conn:
                 rows = conn.execute(
-                    "SELECT id, ts, type, source, data_json FROM events ORDER BY id DESC LIMIT 500"
+                    f"SELECT id, ts, type, source, data_json FROM events "
+                    f"WHERE {where} ORDER BY id DESC LIMIT ?",
+                    params,
                 ).fetchall()
             for row_id, ts, etype, _, data_json in rows:
-                if any(t in (data_json or "").lower() for t in terms):
-                    results.append(
-                        {
-                            "source": f"event:{etype}:{row_id}",
-                            "file_type": "event",
-                            "text": (data_json or "")[:500],
-                            "score": 1.0,
-                            "confidence": "keyword_match",
-                            "modified": ts,
-                        }
-                    )
-                if len(results) >= top_k:
-                    break
+                results.append(
+                    {
+                        "source": f"event:{etype}:{row_id}",
+                        "file_type": "event",
+                        "text": (data_json or "")[:500],
+                        "score": 1.0,
+                        "confidence": "keyword_match",
+                        "modified": ts,
+                    }
+                )
             return results
 
     def embed(self, full: bool = False) -> int:
@@ -1589,7 +1663,8 @@ class Brain(BrainInspectionMixin):
             # Embed prove() data so the manifest is a complete quality certificate
             try:
                 m["proof"] = self.prove()
-            except Exception:
+            except Exception as exc:
+                logger.debug("proof generation failed: %s", exc)
                 m["proof"] = {
                     "proven": False,
                     "confidence_level": "error",
@@ -1763,8 +1838,6 @@ class Brain(BrainInspectionMixin):
     def health(self) -> dict:
         """Generate brain health report."""
         try:
-            import dataclasses
-
             from gradata.enhancements.reporting import generate_health_report
 
             return dataclasses.asdict(generate_health_report(self.db_path))
@@ -1932,8 +2005,3 @@ class Brain(BrainInspectionMixin):
             "results": results,
             "failures": failed,
         }
-
-
-# Re-export Pipeline type
-with contextlib.suppress(ImportError):
-    pass

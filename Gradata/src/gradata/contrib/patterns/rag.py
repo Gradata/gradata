@@ -15,8 +15,12 @@ backends are in _query.py and _embed.py (the existing modules).
 
 from __future__ import annotations
 
+import logging
+import zlib
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -26,12 +30,13 @@ if TYPE_CHECKING:
 # Data types
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Chunk:
     """A retrieved chunk of brain content."""
 
     content: str
-    source: str           # file/doc name
+    source: str  # file/doc name
     chunk_id: str = ""
     relevance_score: float = 0.0
     recency_weight: float = 1.0
@@ -45,7 +50,7 @@ class RetrievalResult:
 
     chunks: list[Chunk]
     query: str
-    mode: str              # "fts", "vector", "hybrid", "cascade"
+    mode: str  # "fts", "vector", "hybrid", "cascade"
     total_candidates: int = 0
     citations: dict[str, str] = field(default_factory=dict)  # claim -> source
 
@@ -54,23 +59,26 @@ class RetrievalResult:
 class CascadeConfig:
     """Configuration for the retrieval cascade."""
 
-    fts_threshold: float = 0.3      # min FTS score to stop cascade
-    vector_threshold: float = 0.5   # min vector score to stop cascade
-    hybrid_rrf_k: int = 60          # RRF constant
+    fts_threshold: float = 0.3  # min FTS score to stop cascade
+    vector_threshold: float = 0.5  # min vector score to stop cascade
+    hybrid_rrf_k: int = 60  # RRF constant
     max_results: int = 10
-    two_pass: bool = False          # Enable two-pass query expansion
-    two_pass_top_k: int = 3         # How many results to mine for expansion terms
-    graduation_boost: dict[str, float] = field(default_factory=lambda: {
-        "RULE": 1.2,
-        "PATTERN": 1.0,
-        "INSTINCT": 0.8,
-        "UNTESTABLE": 0.5,
-    })
+    two_pass: bool = False  # Enable two-pass query expansion
+    two_pass_top_k: int = 3  # How many results to mine for expansion terms
+    graduation_boost: dict[str, float] = field(
+        default_factory=lambda: {
+            "RULE": 1.2,
+            "PATTERN": 1.0,
+            "INSTINCT": 0.8,
+            "UNTESTABLE": 0.5,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # Graduation-aware scoring
 # ---------------------------------------------------------------------------
+
 
 def apply_graduation_scoring(
     chunks: list[Chunk],
@@ -102,6 +110,7 @@ def apply_graduation_scoring(
 # Reciprocal Rank Fusion (RRF)
 # ---------------------------------------------------------------------------
 
+
 def rrf_merge(
     *result_lists: list[Chunk],
     k: int = 60,
@@ -116,7 +125,10 @@ def rrf_merge(
 
     for result_list in result_lists:
         for rank, chunk in enumerate(result_list):
-            cid = chunk.chunk_id or f"{chunk.source}:{hash(chunk.content) % 10000}"
+            cid = (
+                chunk.chunk_id
+                or f"{chunk.source}:{zlib.crc32(chunk.content.encode('utf-8')) & 0x7FFFFFFF}"
+            )
             scores[cid] = scores.get(cid, 0.0) + 1.0 / (k + rank + 1)
             if cid not in chunks_by_id:
                 chunks_by_id[cid] = chunk
@@ -125,15 +137,17 @@ def rrf_merge(
     merged: list[Chunk] = []
     for cid, score in sorted(scores.items(), key=lambda x: -x[1]):
         chunk = chunks_by_id[cid]
-        merged.append(Chunk(
-            content=chunk.content,
-            source=chunk.source,
-            chunk_id=cid,
-            relevance_score=round(score, 6),
-            recency_weight=chunk.recency_weight,
-            memory_type=chunk.memory_type,
-            graduation_level=chunk.graduation_level,
-        ))
+        merged.append(
+            Chunk(
+                content=chunk.content,
+                source=chunk.source,
+                chunk_id=cid,
+                relevance_score=round(score, 6),
+                recency_weight=chunk.recency_weight,
+                memory_type=chunk.memory_type,
+                graduation_level=chunk.graduation_level,
+            )
+        )
     return merged
 
 
@@ -143,7 +157,114 @@ def rrf_merge(
 
 # Common stopwords to filter out during term extraction (pure stdlib)
 _STOPWORDS = frozenset(
-    ["a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would", "shall", "should", "may", "might", "can", "could", "of", "in", "to", "for", "on", "with", "at", "by", "from", "as", "into", "through", "during", "before", "after", "above", "below", "between", "out", "off", "over", "under", "again", "further", "then", "once", "here", "there", "when", "where", "why", "how", "all", "each", "every", "both", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "it", "its", "and", "but", "or", "if", "while", "that", "this", "these", "those", "i", "me", "my", "we", "our", "you", "your", "he", "him", "his", "she", "her", "they", "them", "their", "what", "which", "who", "whom"]
+    [
+        "a",
+        "an",
+        "the",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "may",
+        "might",
+        "can",
+        "could",
+        "of",
+        "in",
+        "to",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "out",
+        "off",
+        "over",
+        "under",
+        "again",
+        "further",
+        "then",
+        "once",
+        "here",
+        "there",
+        "when",
+        "where",
+        "why",
+        "how",
+        "all",
+        "each",
+        "every",
+        "both",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "no",
+        "nor",
+        "not",
+        "only",
+        "own",
+        "same",
+        "so",
+        "than",
+        "too",
+        "very",
+        "it",
+        "its",
+        "and",
+        "but",
+        "or",
+        "if",
+        "while",
+        "that",
+        "this",
+        "these",
+        "those",
+        "i",
+        "me",
+        "my",
+        "we",
+        "our",
+        "you",
+        "your",
+        "he",
+        "him",
+        "his",
+        "she",
+        "her",
+        "they",
+        "them",
+        "their",
+        "what",
+        "which",
+        "who",
+        "whom",
+    ]
 )
 
 
@@ -197,6 +318,7 @@ def extract_expansion_terms(
 # ---------------------------------------------------------------------------
 # Retrieval cascade
 # ---------------------------------------------------------------------------
+
 
 def cascade_retrieve(
     query: str,
@@ -271,6 +393,46 @@ def cascade_retrieve(
             _cascade_errors.append(f"hybrid-vec: {e}")
 
     if all_results:
+        # Stage 4: Two-pass query expansion (if enabled) — attempted before we
+        # finalize the hybrid result so expansion terms can actually enrich the
+        # returned chunks rather than running in an unreachable post-return block.
+        if cfg.two_pass:
+            flat_chunks = [c for sublist in all_results for c in sublist]
+            expansion_terms = extract_expansion_terms(flat_chunks, query, top_k=cfg.two_pass_top_k)
+            if expansion_terms:
+                expanded_query = query + " " + " ".join(expansion_terms)
+                pass2_results: list[list[Chunk]] = []
+                pass2_total = 0
+                if fts_fn is not None:
+                    try:
+                        fts2 = fts_fn(expanded_query, limit * 2)
+                        pass2_results.append(fts2)
+                        pass2_total += len(fts2)
+                    except Exception as exc:
+                        logger.debug("two-pass fts expansion failed: %s", exc)
+                if vector_fn is not None:
+                    try:
+                        vec2 = vector_fn(expanded_query, limit * 2)
+                        pass2_results.append(vec2)
+                        pass2_total += len(vec2)
+                    except Exception as exc:
+                        logger.debug("two-pass vector expansion failed: %s", exc)
+
+                if pass2_results:
+                    all_combined = all_results + pass2_results
+                    merged = rrf_merge(*all_combined, k=cfg.hybrid_rrf_k)
+                    graduated = apply_graduation_scoring(merged, cfg)
+                    return RetrievalResult(
+                        chunks=graduated[:limit],
+                        # Preserve the original user query. Exposing
+                        # `expanded_query` leaked mined corpus terms into
+                        # downstream telemetry/logging that assume this
+                        # field is user input.
+                        query=query,
+                        mode=f"two_pass (expanded: +{len(expansion_terms)} terms)",
+                        total_candidates=total + pass2_total,
+                    )
+
         merged = rrf_merge(*all_results, k=cfg.hybrid_rrf_k)
         graduated = apply_graduation_scoring(merged, cfg)
         result = RetrievalResult(
@@ -283,54 +445,22 @@ def cascade_retrieve(
             result.mode = f"hybrid (warnings: {', '.join(_cascade_errors)})"
         return result
 
-    # Stage 4: Two-pass query expansion (if enabled and we got SOME results)
-    if cfg.two_pass and all_results:
-        flat_chunks = [c for sublist in all_results for c in sublist]
-        expansion_terms = extract_expansion_terms(flat_chunks, query, top_k=cfg.two_pass_top_k)
-        if expansion_terms:
-            expanded_query = query + " " + " ".join(expansion_terms)
-            # Second pass with expanded query
-            pass2_results: list[list[Chunk]] = []
-            pass2_total = 0
-            if fts_fn is not None:
-                try:
-                    fts2 = fts_fn(expanded_query, limit * 2)
-                    pass2_results.append(fts2)
-                    pass2_total += len(fts2)
-                except Exception:
-                    pass
-            if vector_fn is not None:
-                try:
-                    vec2 = vector_fn(expanded_query, limit * 2)
-                    pass2_results.append(vec2)
-                    pass2_total += len(vec2)
-                except Exception:
-                    pass
-
-            if pass2_results:
-                # Merge pass 1 + pass 2, deduplicate by chunk_id
-                all_combined = all_results + pass2_results
-                merged = rrf_merge(*all_combined, k=cfg.hybrid_rrf_k)
-                graduated = apply_graduation_scoring(merged, cfg)
-                return RetrievalResult(
-                    chunks=graduated[:limit],
-                    query=expanded_query,
-                    mode=f"two_pass (expanded: +{len(expansion_terms)} terms)",
-                    total_candidates=total + pass2_total,
-                )
-
     # Stage 5: Nothing found — include error context if cascade failed
     mode = "empty"
     if _cascade_errors:
         mode = f"cascade_failed ({', '.join(_cascade_errors)})"
     return RetrievalResult(
-        chunks=[], query=query, mode=mode, total_candidates=0,
+        chunks=[],
+        query=query,
+        mode=mode,
+        total_candidates=0,
     )
 
 
 # ---------------------------------------------------------------------------
 # Context ordering (Lost in the Middle paper)
 # ---------------------------------------------------------------------------
+
 
 def order_by_relevance_position(chunks: list[Chunk]) -> list[Chunk]:
     """Reorder chunks per "Lost in the Middle" paper findings.
@@ -343,20 +473,20 @@ def order_by_relevance_position(chunks: list[Chunk]) -> list[Chunk]:
         return chunks
 
     sorted_chunks = sorted(chunks, key=lambda c: -c.relevance_score)
-    result: list[Chunk] = []
-    left = True
-    for chunk in sorted_chunks:
-        if left:
-            result.insert(0, chunk)
-        else:
-            result.append(chunk)
-        left = not left
-    return result
+    # Split alternating items into head/tail without O(N) list.insert(0, ...)
+    # which was O(N^2) total. Reversing the head at the end restores order.
+    head: list[Chunk] = []
+    tail: list[Chunk] = []
+    for i, chunk in enumerate(sorted_chunks):
+        (head if i % 2 == 0 else tail).append(chunk)
+    head.reverse()
+    return head + tail
 
 
 # ---------------------------------------------------------------------------
 # Convenience classes (wrap cascade_retrieve for OOP usage)
 # ---------------------------------------------------------------------------
+
 
 class SmartRAG:
     """Smart retrieval with graduation-aware scoring and cascade strategy.
@@ -381,7 +511,9 @@ class SmartRAG:
 
     def retrieve(self, query: str) -> RetrievalResult:
         """Run the cascade retrieval pipeline."""
-        return cascade_retrieve(query, fts_fn=self.fts_fn, vector_fn=self.vector_fn, config=self.config)
+        return cascade_retrieve(
+            query, fts_fn=self.fts_fn, vector_fn=self.vector_fn, config=self.config
+        )
 
 
 class NaiveRAG:
@@ -399,6 +531,9 @@ class NaiveRAG:
             return RetrievalResult(chunks=[], query=query, mode="naive", total_candidates=0)
         try:
             results = self.fts_fn(query, top_k)
-            return RetrievalResult(chunks=results, query=query, mode="naive", total_candidates=len(results))
-        except Exception:
+            return RetrievalResult(
+                chunks=results, query=query, mode="naive", total_candidates=len(results)
+            )
+        except Exception as exc:
+            logger.debug("NaiveRAG.retrieve fts_fn failed: %s", exc)
             return RetrievalResult(chunks=[], query=query, mode="naive", total_candidates=0)

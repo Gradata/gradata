@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 
-from gradata.hooks._base import extract_message, resolve_brain_dir, run_hook
+from gradata.hooks._base import emit_hook_event, extract_message, run_hook
 from gradata.hooks._profiles import Profile
 
 _log = logging.getLogger(__name__)
@@ -72,12 +72,64 @@ APPROVAL_PATTERNS = [
     re.compile(r"\bnailed it\b", re.I),
 ]
 
+# GAP: the output omitted something the user expected. Parity with the removed
+# JS implicit-feedback hook (hook-overlap audit 2026-04-21, Tier A item 5).
+# NOTE: `forgot|missed` are owned by CHALLENGE_PATTERNS above; the gap variant
+# uses `skipped|dropped|ignored` only so _detect_signals() can't emit both
+# `gap` and `challenge` for the same phrase.
+GAP_PATTERNS = [
+    re.compile(r"\bwhat about\b", re.I),
+    re.compile(r"\byou (skipped|dropped|ignored)\b", re.I),
+    re.compile(r"\bdid (you|u) (check|verify|test|review)\b", re.I),
+]
+
 SIGNAL_MAP = {
     "negation": NEGATION_PATTERNS,
     "reminder": REMINDER_PATTERNS,
     "challenge": CHALLENGE_PATTERNS,
     "approval": APPROVAL_PATTERNS,
+    "gap": GAP_PATTERNS,
 }
+
+# Any of these signals means the prior output was NOT tacitly accepted.
+_NEGATIVE_SIGNAL_TYPES = {"negation", "reminder", "challenge", "gap"}
+
+# Tacit-acceptance threshold: substantive follow-up messages without negative
+# signals imply the prior output was OK. Short messages ("ok", "thanks", "go")
+# are too ambiguous — they might be mid-sentence fragments or acknowledgements
+# unrelated to the last output. Questions are NOT tacit acceptance either —
+# they usually signal confusion or follow-up work.
+_TACIT_MIN_LENGTH = 60
+_QUESTION_PREFIXES = (
+    "what",
+    "why",
+    "how",
+    "when",
+    "where",
+    "who",
+    "which",
+    "can",
+    "could",
+    "should",
+    "would",
+    "will",
+    "is",
+    "are",
+    "do",
+    "does",
+    "did",
+)
+
+
+def _looks_like_question(message: str) -> bool:
+    """Heuristic: message is a question (not tacit acceptance)."""
+    stripped = message.strip()
+    if not stripped:
+        return False
+    if stripped.endswith("?"):
+        return True
+    first_word = stripped.split(None, 1)[0].lower().rstrip(",.!:;")
+    return first_word in _QUESTION_PREFIXES
 
 
 def _detect_signals(text: str) -> list[dict]:
@@ -107,44 +159,53 @@ def main(data: dict) -> dict | None:
             return None
 
         signals = _detect_signals(message)
-        if not signals:
+        signal_types = {s["type"] for s in signals}
+        has_negative = bool(signal_types & _NEGATIVE_SIGNAL_TYPES)
+        has_approval = "approval" in signal_types
+        # Tacit acceptance: substantive follow-up with no negative signals. The
+        # brain.correct() pipeline logs ~20x more CORRECTION than OUTPUT_ACCEPTED
+        # because users rarely type "looks good" — silence is approval.
+        tacit_accept = (
+            not has_negative
+            and not has_approval
+            and len(message) >= _TACIT_MIN_LENGTH
+            and not _looks_like_question(message)
+        )
+
+        if not signals and not tacit_accept:
             return None
 
-        # Emit event if brain dir available
-        brain_dir = resolve_brain_dir()
+        if signals:
+            emit_hook_event(
+                "IMPLICIT_FEEDBACK",
+                "hook:implicit_feedback",
+                {
+                    "signals": [s["type"] for s in signals],
+                    "snippets": [s["snippet"] for s in signals[:3]],
+                    "message_preview": message[:200],
+                },
+            )
+        if has_approval:
+            emit_hook_event(
+                "OUTPUT_ACCEPTED",
+                "hook:implicit_feedback",
+                {
+                    "mode": "explicit",
+                    "snippets": [s["snippet"] for s in signals if s["type"] == "approval"],
+                    "message_preview": message[:200],
+                },
+            )
+        elif tacit_accept:
+            emit_hook_event(
+                "OUTPUT_ACCEPTED",
+                "hook:implicit_feedback",
+                {"mode": "tacit", "message_preview": message[:200]},
+            )
 
-        if brain_dir:
-            try:
-                from gradata._events import emit
-                from gradata._paths import BrainContext
-
-                ctx = BrainContext.from_brain_dir(brain_dir)
-                emit(
-                    "IMPLICIT_FEEDBACK",
-                    source="hook:implicit_feedback",
-                    data={
-                        "signals": [s["type"] for s in signals],
-                        "snippets": [s["snippet"] for s in signals[:3]],
-                        "message_preview": message[:200],
-                    },
-                    ctx=ctx,
-                )
-                # Emit OUTPUT_ACCEPTED for approval signals
-                if any(s["type"] == "approval" for s in signals):
-                    emit(
-                        "OUTPUT_ACCEPTED",
-                        source="hook:implicit_feedback",
-                        data={
-                            "snippets": [s["snippet"] for s in signals if s["type"] == "approval"],
-                            "message_preview": message[:200],
-                        },
-                        ctx=ctx,
-                    )
-            except Exception as exc:
-                _log.debug("implicit_feedback emit failed: %s", exc)
-
-        signal_names = ", ".join(s["type"] for s in signals)
-        return {"result": f"IMPLICIT FEEDBACK: [{signal_names}]"}
+        if signals:
+            signal_names = ", ".join(s["type"] for s in signals)
+            return {"result": f"IMPLICIT FEEDBACK: [{signal_names}]"}
+        return None
     except Exception as exc:
         _log.debug("implicit_feedback hook error: %s", exc)
         return None

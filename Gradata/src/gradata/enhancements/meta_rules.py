@@ -679,12 +679,13 @@ def refresh_meta_rules(
     _log.info("Meta-rule discovery requires Gradata Cloud")
     corrections = recent_corrections or []
 
-    # Validate existing meta-rules (invalidation still works locally)
+    # Validate existing meta-rules (invalidation still works locally).
+    # Use dataclasses.replace so callers holding references to the input list
+    # do not observe hidden mutation of last_validated_session.
     valid: list[MetaRule] = []
     for meta in existing_metas:
         if validate_meta_rule(meta, corrections):
-            meta.last_validated_session = current_session
-            valid.append(meta)
+            valid.append(replace(meta, last_validated_session=current_session))
 
     valid.sort(key=lambda m: m.confidence, reverse=True)
     return valid
@@ -851,7 +852,22 @@ def _call_gemma_native(prompt: str, creds: str, model: str, timeout: float = 15.
         return None
 
 
-def _try_llm_principle(rules: list[Lesson], category: str) -> str | None:
+def _resolve_principle_creds() -> dict[str, str | None]:
+    """Resolve LLM credentials once per synthesis run (hoisted from per-call)."""
+    return {
+        "openai_key": env_str("GRADATA_LLM_KEY"),
+        "openai_base": env_str("GRADATA_LLM_BASE"),
+        "openai_model": env_str("GRADATA_LLM_MODEL", "gpt-4o-mini"),
+        "gemma_key": env_str("GRADATA_GEMMA_API_KEY"),
+        "gemma_model": env_str("GRADATA_GEMMA_MODEL", _GEMMA_DEFAULT_MODEL),
+    }
+
+
+def _try_llm_principle(
+    rules: list[Lesson],
+    category: str,
+    creds: dict[str, str | None] | None = None,
+) -> str | None:
     """Best-effort LLM synthesis of ONE behavioral principle for a rule group.
 
     Returns the principle string or None (no credentials, empty input, or
@@ -860,12 +876,15 @@ def _try_llm_principle(rules: list[Lesson], category: str) -> str | None:
     Provider resolution:
       1. ``GRADATA_LLM_KEY`` + ``GRADATA_LLM_BASE`` -- OpenAI-compat endpoint.
       2. ``GRADATA_GEMMA_API_KEY`` -- Google's native Gemma API.
+
+    When ``creds`` is passed, env vars are not re-read (hot-loop optimization).
     """
     if not rules:
         return None
 
-    k = env_str("GRADATA_LLM_KEY")
-    b = env_str("GRADATA_LLM_BASE")
+    c = creds if creds is not None else _resolve_principle_creds()
+    k = c.get("openai_key")
+    b = c.get("openai_base")
     if k and b:
         try:
             from gradata.enhancements.llm_synthesizer import synthesise_principle_llm
@@ -875,15 +894,15 @@ def _try_llm_principle(rules: list[Lesson], category: str) -> str | None:
                 theme=category,
                 api_key=k,
                 api_base=b,
-                model=env_str("GRADATA_LLM_MODEL", "gpt-4o-mini"),
+                model=c.get("openai_model") or "gpt-4o-mini",
             )
         except Exception as exc:
             _log.debug("OpenAI-compat synthesis failed for %s: %s", category, exc)
             return None
 
-    g = env_str("GRADATA_GEMMA_API_KEY")
+    g = c.get("gemma_key")
     if g:
-        model = env_str("GRADATA_GEMMA_MODEL", _GEMMA_DEFAULT_MODEL)
+        model = c.get("gemma_model") or _GEMMA_DEFAULT_MODEL
         return _call_gemma_native(_build_principle_prompt(rules, category), g, model)
 
     return None
@@ -1204,6 +1223,9 @@ def synthesize_meta_rules_agentic(
 
     new_metas: list[MetaRule] = []
 
+    # Resolve LLM credentials once instead of re-reading env per category.
+    principle_creds = _resolve_principle_creds()
+
     for category, rules in groups.items():
         if evidence.iteration >= max_iterations:
             _log.debug("Agentic synthesis: hit max iterations %d", max_iterations)
@@ -1231,7 +1253,7 @@ def synthesize_meta_rules_agentic(
         # Without creds we emit deterministic meta-rules that are stored but
         # never injected (INJECTABLE_META_SOURCES excludes them) — warn loudly
         # so the capability gap is visible instead of silent 100% discard.
-        llm_principle = _try_llm_principle(rules, category)
+        llm_principle = _try_llm_principle(rules, category, creds=principle_creds)
         if llm_principle:
             principle = llm_principle
             source = "llm_synth"

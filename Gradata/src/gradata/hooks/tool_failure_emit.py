@@ -1,9 +1,10 @@
 """PostToolUse hook: detect tool failures and emit TOOL_FAILURE event."""
+
 from __future__ import annotations
 
 import re
 
-from gradata.hooks._base import resolve_brain_dir, run_hook
+from gradata.hooks._base import emit_hook_event, run_hook
 from gradata.hooks._profiles import Profile
 
 HOOK_META = {
@@ -20,7 +21,10 @@ ERROR_PATTERNS = [
     re.compile(r"\btraceback\b", re.I),
     re.compile(r"\bException\b"),
     re.compile(r"\bHTTP\s+[45]\d{2}\b"),
-    re.compile(r"\b[45]\d{2}\s+(Bad Request|Unauthorized|Forbidden|Not Found|Internal Server Error|Bad Gateway|Service Unavailable)\b", re.I),
+    re.compile(
+        r"\b[45]\d{2}\s+(Bad Request|Unauthorized|Forbidden|Not Found|Internal Server Error|Bad Gateway|Service Unavailable)\b",
+        re.I,
+    ),
     re.compile(r"\bECONNREFUSED\b"),
     re.compile(r"\brate limit\b", re.I),
 ]
@@ -68,24 +72,17 @@ def main(data: dict) -> dict | None:
         if not signals:
             return None
 
-        brain_dir = resolve_brain_dir()
-
-        if brain_dir:
-            from gradata._events import emit
-            from gradata._paths import BrainContext
-            ctx = BrainContext.from_brain_dir(brain_dir)
-            command = data.get("tool_input", {}).get("command", "")[:200]
-            emit(
-                "TOOL_FAILURE",
-                source="hook:tool_failure_emit",
-                data={
-                    "tool": "Bash",
-                    "signals": signals[:5],
-                    "command_preview": command,
-                    "output_preview": output[:300],
-                },
-                ctx=ctx,
-            )
+        command = data.get("tool_input", {}).get("command", "")[:200]
+        emit_hook_event(
+            "TOOL_FAILURE",
+            "hook:tool_failure_emit",
+            {
+                "tool": "Bash",
+                "signals": signals[:5],
+                "command_preview": command,
+                "output_preview": output[:300],
+            },
+        )
     except Exception:
         pass
     return None

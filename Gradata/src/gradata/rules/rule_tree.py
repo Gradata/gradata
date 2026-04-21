@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import zlib
 from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -376,7 +377,7 @@ def export_tree_obsidian(tree: RuleTree, vault_path: Path) -> None:
             filename = f"{slug}.md"
 
             content = f"""---
-id: {lesson.category}_{hash(lesson.description) % 10000:04d}
+id: {lesson.category}_{zlib.crc32(lesson.description.encode("utf-8")) % 10000:04d}
 confidence: {lesson.confidence}
 state: {lesson.state.value}
 path: {lesson.path}
