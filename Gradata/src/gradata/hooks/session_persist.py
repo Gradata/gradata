@@ -1,4 +1,5 @@
 """Stop hook: persist session handoff data for cross-session continuity."""
+
 from __future__ import annotations
 
 import json
@@ -26,8 +27,13 @@ def _get_modified_files() -> list[str]:
     try:
         result = subprocess.run(
             ["git", "diff", "--name-only", "HEAD"],
-            capture_output=True, text=True, timeout=5, cwd=cwd, check=False,
-            encoding="utf-8", errors="replace",
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=cwd,
+            check=False,
+            encoding="utf-8",
+            errors="replace",
         )
         if result.returncode == 0:
             files.extend(f.strip() for f in result.stdout.splitlines() if f.strip())
@@ -38,8 +44,13 @@ def _get_modified_files() -> list[str]:
     try:
         result = subprocess.run(
             ["git", "ls-files", "--others", "--exclude-standard"],
-            capture_output=True, text=True, timeout=5, cwd=cwd, check=False,
-            encoding="utf-8", errors="replace",
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=cwd,
+            check=False,
+            encoding="utf-8",
+            errors="replace",
         )
         if result.returncode == 0:
             files.extend(f.strip() for f in result.stdout.splitlines() if f.strip())
@@ -51,6 +62,10 @@ def _get_modified_files() -> list[str]:
 
 
 def main(_data: dict) -> dict | None:
+    # Opt-out kill switch: projects with a JS session-persist writer disable this
+    # hook to avoid 2x git subprocess + overlapping handoff files.
+    if os.environ.get("GRADATA_SESSION_PERSIST", "1") == "0":
+        return None
     try:
         brain_dir_str = resolve_brain_dir()
         if not brain_dir_str:

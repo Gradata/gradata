@@ -1,4 +1,5 @@
 """PreToolUse hook: block modifications to linter/formatter config files."""
+
 from __future__ import annotations
 
 import os
@@ -15,19 +16,38 @@ HOOK_META = {
 }
 
 PROTECTED_FILES = {
-    ".eslintrc", ".eslintrc.js", ".eslintrc.json", ".eslintrc.yml", ".eslintrc.yaml",
-    "eslint.config.js", "eslint.config.mjs", "eslint.config.cjs",
-    ".prettierrc", ".prettierrc.js", ".prettierrc.json", ".prettierrc.yml",
-    "prettier.config.js", "prettier.config.mjs",
-    "biome.json", "biome.jsonc",
-    "ruff.toml", ".ruff.toml", "pyproject.toml",
+    ".eslintrc",
+    ".eslintrc.js",
+    ".eslintrc.json",
+    ".eslintrc.yml",
+    ".eslintrc.yaml",
+    "eslint.config.js",
+    "eslint.config.mjs",
+    "eslint.config.cjs",
+    ".prettierrc",
+    ".prettierrc.js",
+    ".prettierrc.json",
+    ".prettierrc.yml",
+    "prettier.config.js",
+    "prettier.config.mjs",
+    "biome.json",
+    "biome.jsonc",
+    "ruff.toml",
+    ".ruff.toml",
+    "pyproject.toml",
     ".shellcheckrc",
-    ".stylelintrc", ".stylelintrc.json",
-    ".markdownlint.json", ".markdownlintrc",
+    ".stylelintrc",
+    ".stylelintrc.json",
+    ".markdownlint.json",
+    ".markdownlintrc",
 }
 
 
 def main(data: dict) -> dict | None:
+    # Opt-out kill switch: projects with a JS config-protection hook disable this
+    # to avoid 2x file-block check (the JS version has a pyproject.toml carve-out).
+    if os.environ.get("GRADATA_CONFIG_PROTECTION", "1") == "0":
+        return None
     tool_input = data.get("tool_input", {})
     file_path = tool_input.get("file_path", "")
     if not file_path:

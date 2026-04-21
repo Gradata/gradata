@@ -1,7 +1,9 @@
 """SessionStart hook: validate Claude Code settings.json configuration."""
+
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from gradata.hooks._base import run_hook
@@ -57,9 +59,10 @@ def _validate_json(path: Path) -> list[str]:
                     continue
                 command = hook.get("command", "")
                 if " -m gradata.hooks." in command:
-                    module_name = command.split("gradata.hooks.")[-1].split()[0].strip('"\'')
+                    module_name = command.split("gradata.hooks.")[-1].split()[0].strip("\"'")
                     try:
                         import gradata.hooks as hooks_pkg
+
                         hooks_dir = Path(hooks_pkg.__file__).parent
                         module_path = hooks_dir / f"{module_name}.py"
                         if not module_path.is_file():
@@ -74,6 +77,10 @@ def _validate_json(path: Path) -> list[str]:
 
 
 def main(data: dict) -> dict | None:
+    # Opt-out kill switch: projects with a JS config-validate hook disable this
+    # duplicate. Both write to stderr only, so this is maintenance-only.
+    if os.environ.get("GRADATA_CONFIG_VALIDATE", "1") == "0":
+        return None
     try:
         settings_path = _find_settings()
         if not settings_path:

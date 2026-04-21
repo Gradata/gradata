@@ -1,6 +1,8 @@
 """Stop hook: run brain maintenance tasks at session end."""
+
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from gradata.hooks._base import resolve_brain_dir, run_hook
@@ -17,6 +19,7 @@ def _rebuild_fts(brain_dir: str, ctx=None) -> None:
     """Rebuild FTS index from brain content files."""
     try:
         from gradata._query import fts_index
+
         brain_path = Path(brain_dir)
 
         # Index lessons.md
@@ -42,6 +45,7 @@ def _generate_manifest(ctx=None) -> None:
     """Generate brain manifest for quality tracking."""
     try:
         from gradata._brain_manifest import generate_manifest, write_manifest
+
         manifest = generate_manifest(ctx=ctx)
         write_manifest(manifest, ctx=ctx)
     except Exception:
@@ -49,12 +53,17 @@ def _generate_manifest(ctx=None) -> None:
 
 
 def main(data: dict) -> dict | None:
+    # Opt-out kill switch: projects with a superset JS brain_maintain disable this
+    # hook to avoid double FTS rebuild + manifest (~8-20s per Stop).
+    if os.environ.get("GRADATA_BRAIN_MAINTAIN", "1") == "0":
+        return None
     try:
         brain_dir = resolve_brain_dir()
         if not brain_dir:
             return None
 
         from gradata._paths import BrainContext
+
         ctx = BrainContext.from_brain_dir(brain_dir)
 
         _rebuild_fts(brain_dir, ctx=ctx)
