@@ -14,14 +14,18 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 
 from gradata.contrib.patterns.handoff import (
     consume_handoff,
     default_handoff_dir,
+    parse_rules_snapshot_ts,
     pick_latest_unconsumed,
 )
 from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
+
+HANDOFF_ACTIVE_FILE = ".handoff_active.json"
 
 _log = logging.getLogger(__name__)
 
@@ -66,6 +70,19 @@ def main(data: dict) -> dict | None:
     safe = _sanitize(body.strip())
     block = f'<handoff source="{candidate.name}">\n{safe}\n</handoff>'
 
+    rules_ts = parse_rules_snapshot_ts(body)
+    if rules_ts:
+        try:
+            import json as _json
+
+            sentinel = Path(brain_dir) / HANDOFF_ACTIVE_FILE
+            sentinel.write_text(
+                _json.dumps({"rules_snapshot_ts": rules_ts, "source": candidate.name}),
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            _log.debug("handoff sentinel write failed: %s", exc)
+
     consume_handoff(candidate)
 
     try:
@@ -74,7 +91,7 @@ def main(data: dict) -> dict | None:
         events.emit(
             event_type="handoff.injected",
             source="inject_handoff_hook",
-            data={"file": candidate.name, "chars": len(safe)},
+            data={"file": candidate.name, "chars": len(safe), "rules_ts": rules_ts or ""},
             tags=["handoff", "injection"],
         )
     except Exception as exc:

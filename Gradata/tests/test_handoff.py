@@ -12,6 +12,7 @@ from gradata.contrib.patterns.handoff import (
     default_handoff_dir,
     load_handoff,
     measure_pressure,
+    parse_rules_snapshot_ts,
     pick_latest_unconsumed,
 )
 
@@ -181,6 +182,29 @@ class TestLoadHandoff:
         loaded = load_handoff("t1", "writer", tmp_path)
         assert loaded is not None
         assert "X." in loaded
+
+
+class TestRulesSnapshotTs:
+    def test_doc_renders_rules_ts(self):
+        doc = HandoffDoc(
+            task_id="t1",
+            agent_name="writer",
+            summary="s",
+            rules_snapshot_ts="2026-04-21T12:00:00+00:00",
+        )
+        assert "_rules_ts_: 2026-04-21T12:00:00+00:00" in doc.render()
+
+    def test_parse_extracts_ts(self):
+        body = "# Handoff — t1\n_rules_ts_: 2026-04-21T12:00:00+00:00\nbody"
+        assert parse_rules_snapshot_ts(body) == "2026-04-21T12:00:00+00:00"
+
+    def test_parse_returns_none_when_missing(self):
+        assert parse_rules_snapshot_ts("just body, no marker") is None
+
+    def test_default_ts_auto_populates(self):
+        doc = HandoffDoc(task_id="t", agent_name="a", summary="s")
+        assert doc.rules_snapshot_ts
+        assert "T" in doc.rules_snapshot_ts  # ISO format
 
 
 class TestDefaultHandoffDir:

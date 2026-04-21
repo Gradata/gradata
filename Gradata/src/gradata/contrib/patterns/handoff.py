@@ -14,6 +14,7 @@ See GitHub issue #127.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -67,15 +68,21 @@ class HandoffDoc:
     next_action: str = ""
     artifacts: list[str] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    rules_snapshot_ts: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def render(self) -> str:
         """Return the doc as a stable Markdown string.
 
         Shape is fixed so the next agent can pattern-match reliably.
+        ``_rules_ts_`` lets the next SessionStart skip the ranked brain-rules
+        block when ``lessons.md`` has not changed since synthesis — the prior
+        agent already operated under those rules and the handoff carries the
+        continuity.
         """
         lines = [
             f"# Handoff — {self.task_id}",
             f"_from_: {self.agent_name}  _at_: {self.created_at}",
+            f"_rules_ts_: {self.rules_snapshot_ts}",
             "",
             "## Where we left off",
             self.summary.strip() or "(no summary provided)",
@@ -190,6 +197,19 @@ def consume_handoff(path: Path) -> None:
         return
 
 
+_RULES_TS_RE = re.compile(r"_rules_ts_:\s*([^\s]+)")
+
+
+def parse_rules_snapshot_ts(body: str) -> str | None:
+    """Extract the ``_rules_ts_`` marker from a rendered handoff body.
+
+    Returns the ISO timestamp string, or None when the marker is absent
+    (older handoffs written before the field existed, or non-standard docs).
+    """
+    match = _RULES_TS_RE.search(body)
+    return match.group(1) if match else None
+
+
 def pick_latest_unconsumed(handoff_dir: Path) -> Path | None:
     """Return the most recently written ``*.handoff.md``, or None if empty.
 
@@ -215,5 +235,6 @@ __all__ = [
     "default_handoff_dir",
     "load_handoff",
     "measure_pressure",
+    "parse_rules_snapshot_ts",
     "pick_latest_unconsumed",
 ]

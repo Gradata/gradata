@@ -55,6 +55,45 @@ MIN_CONFIDENCE = float(os.environ.get("GRADATA_MIN_CONFIDENCE", "0.60"))
 # Meta-rules are high-level principles — separate cap from MAX_RULES.
 MAX_META_RULES = int(os.environ.get("GRADATA_MAX_META_RULES", "5"))
 
+# Sentinel written by inject_handoff when a handoff carries a rules snapshot.
+# When present, we compare mtime(lessons.md) vs. snapshot_ts and skip the
+# ranked <brain-rules> block if nothing has graduated since — the handoff
+# already carries the prior agent's operating rules implicitly.
+_HANDOFF_ACTIVE_FILE = ".handoff_active.json"
+
+
+def _should_skip_ranked_rules(brain_dir: Path, lessons_path: Path) -> bool:
+    """Return True when a fresh handoff carries the current rule snapshot.
+
+    Consumes the sentinel on read so subsequent sessions re-inject normally
+    unless a new handoff was produced. Any parse/IO error returns False so
+    injection behaves exactly as before — this is a pure optimization layer.
+    """
+    if os.environ.get("GRADATA_HANDOFF_RULES_DELTA", "1") != "1":
+        return False
+    sentinel = brain_dir / _HANDOFF_ACTIVE_FILE
+    if not sentinel.is_file():
+        return False
+    try:
+        import json as _json
+
+        payload = _json.loads(sentinel.read_text(encoding="utf-8"))
+        snapshot_iso = str(payload.get("rules_snapshot_ts") or "")
+        if not snapshot_iso:
+            return False
+        snapshot = datetime.fromisoformat(snapshot_iso)
+        lessons_mtime = datetime.fromtimestamp(lessons_path.stat().st_mtime, tz=UTC)
+        unchanged = lessons_mtime <= snapshot
+    except (OSError, ValueError, KeyError) as exc:
+        _log.debug("handoff sentinel parse failed (%s) — falling back", exc)
+        return False
+    finally:
+        try:
+            sentinel.unlink()
+        except OSError:
+            pass
+    return unchanged
+
 
 def _score(lesson) -> float:
     """Back-compat scorer. Kept so existing tests / callers keep working.
@@ -225,6 +264,13 @@ def main(data: dict) -> dict | None:
         filtered = [lesson for lesson in filtered if not is_hook_enforced(lesson)]
     if not filtered:
         return None
+
+    # Handoff-delta optimization: when a fresh handoff carried a rules
+    # snapshot timestamp and lessons.md has not changed since, the prior
+    # agent already operated under these rules — suppress the ranked block
+    # to avoid re-paying the injection cost. Mandatory / disposition /
+    # meta-rules / brain_prompt paths still fire as normal.
+    skip_ranked_rules = _should_skip_ranked_rules(Path(brain_dir), lessons_path)
 
     # Wiki-aware selection: find categories relevant to session context
     context = data.get("session_type", "") or data.get("task_type", "") or Path.cwd().name
@@ -433,7 +479,10 @@ def main(data: dict) -> dict | None:
         )
 
     lines = cluster_lines + individual_lines
-    rules_block = "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
+    if skip_ranked_rules:
+        rules_block = ""
+    else:
+        rules_block = "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
 
     # Persist injection manifest so correction-capture can attribute misfires
     # to specific rules (Meta-Harness A). Silent failure: missing manifest
@@ -458,7 +507,12 @@ def main(data: dict) -> dict | None:
     # Closes the compound-quality audit gap: without these, no row proves a
     # graduated rule ever fired. session_close resolves them to
     # CONFIRMED/REJECTED based on correction activity in the same session.
-    if injection_manifest and db_path.is_file() and lesson_id_fn is not None:
+    if (
+        injection_manifest
+        and db_path.is_file()
+        and lesson_id_fn is not None
+        and not skip_ranked_rules
+    ):
         try:
             import json as _json
 

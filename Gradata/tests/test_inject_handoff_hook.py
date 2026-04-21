@@ -140,6 +140,37 @@ class TestEmission:
         assert injected["chars"] > 0
 
 
+class TestRulesSnapshotSentinel:
+    @pytest.fixture(autouse=True)
+    def _fresh_module(self, monkeypatch):
+        """Isolate from test_truncates_oversized_body's permanent reload."""
+        monkeypatch.delenv("GRADATA_HANDOFF_MAX_CHARS", raising=False)
+        import importlib
+
+        importlib.reload(inject_handoff)
+
+    def test_writes_sentinel_when_ts_present(self, brain):
+        tmp, handoff_dir = brain
+        (handoff_dir / "x.handoff.md").write_text(
+            "# Handoff — t1\n_rules_ts_: 2026-04-21T00:00:00+00:00\nbody",
+            encoding="utf-8",
+        )
+        inject_handoff.main({})
+        sentinel = tmp / ".handoff_active.json"
+        assert sentinel.is_file()
+        import json
+
+        payload = json.loads(sentinel.read_text(encoding="utf-8"))
+        assert payload["rules_snapshot_ts"] == "2026-04-21T00:00:00+00:00"
+        assert payload["source"] == "x.handoff.md"
+
+    def test_no_sentinel_when_ts_missing(self, brain):
+        tmp, handoff_dir = brain
+        (handoff_dir / "x.handoff.md").write_text("body only", encoding="utf-8")
+        inject_handoff.main({})
+        assert not (tmp / ".handoff_active.json").exists()
+
+
 class TestNoBrainDir:
     def test_missing_brain_returns_none(self, tmp_path, monkeypatch):
         monkeypatch.delenv("GRADATA_BRAIN_DIR", raising=False)
