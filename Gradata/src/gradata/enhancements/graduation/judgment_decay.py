@@ -35,7 +35,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from gradata.enhancements.self_improvement import (
-    PATTERN_THRESHOLD,
     Lesson,
     LessonState,
 )

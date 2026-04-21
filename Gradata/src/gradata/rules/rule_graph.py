@@ -13,7 +13,6 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
-import re
 import sqlite3
 from datetime import UTC, datetime
 from enum import Enum
@@ -45,13 +44,9 @@ class RuleRelationType(Enum):
 from gradata.enhancements.contradiction_detector import (  # noqa: E402
     _ACTION_OPPOSITES,
     _POLARITY_PAIRS,
+    _normalize,
 )
 from gradata.enhancements.similarity import _STOP_WORDS as _STOPWORDS  # noqa: E402
-
-
-def _normalize(text: str) -> str:
-    """Lowercase and strip punctuation for matching."""
-    return re.sub(r"[^\w\s]", " ", text.lower()).strip()
 
 
 def _extract_keywords(text: str) -> set[str]:
