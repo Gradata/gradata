@@ -175,10 +175,37 @@ def _read_brain_prompt(brain_dir: Path) -> str | None:
             if idx != -1:
                 text = text[:idx].rstrip()
                 break
-    # Truncate body before wrapping.
+    # Compress verbose section header — saves 8 tokens per session.
+    # "Non-negotiables (response rejected if violated):" → "MUST:"
+    text = _re.sub(
+        r"Non-negotiables?\s*\([^)]*\)\s*:",
+        "MUST:",
+        text,
+        count=1,
+    )
+    # Limit to first GRADATA_WISDOM_MAX_RULES non-negotiable rules.
+    # Keeps the highest-priority rules (listed first in brain_prompt.md) and
+    # drops marginal ones that cost tokens for low per-turn incremental value.
+    # Default 9: saves 2 rules × ~14 tok vs 11-rule default.
+    wisdom_max_rules = int(os.environ.get("GRADATA_WISDOM_MAX_RULES", "9"))
+    if wisdom_max_rules > 0:
+        rule_lines = [ln for ln in text.split("\n") if ln.startswith("- ")]
+        if len(rule_lines) > wisdom_max_rules:
+            # Find the character position just after the Nth rule line.
+            remaining = wisdom_max_rules
+            cutoff = len(text)
+            for j, ch in enumerate(text):
+                if text[j : j + 2] == "- " and j > 0 and text[j - 1] == "\n":
+                    remaining -= 1
+                    if remaining < 0:
+                        cutoff = j
+                        break
+            text = text[:cutoff].rstrip()
+    # Truncate body before wrapping (safety net — rule-limit above is primary).
     if len(text) > MAX_BRAIN_PROMPT_CHARS:
-        text = text[:MAX_BRAIN_PROMPT_CHARS] + "\n[trunc]"
-    text = f"[wisdom]\n{text}"
+        text = text[:MAX_BRAIN_PROMPT_CHARS]
+    # Drop the [wisdom] wrapper — section header (MUST:) is self-explanatory.
+    # Saves 4 tokens per session start (measured 2026-04-21 autoresearch loop).
     return text
 
 

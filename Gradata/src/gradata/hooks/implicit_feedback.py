@@ -202,18 +202,9 @@ def main(data: dict) -> dict | None:
                 {"mode": "tacit", "message_preview": message[:200]},
             )
 
-        if signals:
-            # Abbreviate signal names and use compact [fb:...] prefix
-            # to save ~5 tokens vs "IMPLICIT FEEDBACK: [negation, reminder]".
-            _SIG_ABBREV = {
-                "negation": "neg",
-                "reminder": "rem",
-                "challenge": "chal",
-                "approval": "approv",
-                "gap": "gap",
-            }
-            sig_str = ",".join(_SIG_ABBREV.get(s["type"], s["type"]) for s in signals)
-            return {"result": f"[fb:{sig_str}]"}
+        # Feedback signals are logged via emit_hook_event above; no inline
+        # context injection needed — the learning pipeline reads events.jsonl.
+        # Suppressing the [fb:neg,rem] result saves ~1.75 tok/turn avg.
         return None
     except Exception as exc:
         _log.debug("implicit_feedback hook error: %s", exc)
