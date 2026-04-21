@@ -72,11 +72,20 @@ APPROVAL_PATTERNS = [
     re.compile(r"\bnailed it\b", re.I),
 ]
 
+# GAP: the output omitted something the user expected. Parity with the removed
+# JS implicit-feedback hook (hook-overlap audit 2026-04-21, Tier A item 5).
+GAP_PATTERNS = [
+    re.compile(r"\bwhat about\b", re.I),
+    re.compile(r"\byou (forgot|missed|skipped|dropped|ignored)\b", re.I),
+    re.compile(r"\bdid (you|u) (check|verify|test|review)\b", re.I),
+]
+
 SIGNAL_MAP = {
     "negation": NEGATION_PATTERNS,
     "reminder": REMINDER_PATTERNS,
     "challenge": CHALLENGE_PATTERNS,
     "approval": APPROVAL_PATTERNS,
+    "gap": GAP_PATTERNS,
 }
 
 
