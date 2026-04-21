@@ -241,27 +241,28 @@ def store_relationship(
     """
     clamped = max(0.0, min(1.0, confidence))
     _tid = tenant_for(Path(db_path).parent)
-    conn = sqlite3.connect(str(db_path))
-    # Defensive migration: brains created before migration 001 lack tenant_id.
-    with contextlib.suppress(sqlite3.OperationalError):
-        conn.execute("ALTER TABLE rule_relationships ADD COLUMN tenant_id TEXT")
-    with contextlib.suppress(sqlite3.OperationalError):
-        conn.execute("ALTER TABLE rule_relationships ADD COLUMN visibility TEXT DEFAULT 'private'")
-    conn.execute(
-        "INSERT INTO rule_relationships "
-        "(rule_a_id, rule_b_id, relationship, confidence, detected_at, tenant_id) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (
-            rule_a_id,
-            rule_b_id,
-            rel_type.value,
-            clamped,
-            datetime.now(UTC).isoformat(),
-            _tid,
-        ),
-    )
-    conn.commit()
-    conn.close()
+    with contextlib.closing(sqlite3.connect(str(db_path))) as conn:
+        # Defensive migration: brains created before migration 001 lack tenant_id.
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute("ALTER TABLE rule_relationships ADD COLUMN tenant_id TEXT")
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute(
+                "ALTER TABLE rule_relationships ADD COLUMN visibility TEXT DEFAULT 'private'"
+            )
+        conn.execute(
+            "INSERT INTO rule_relationships "
+            "(rule_a_id, rule_b_id, relationship, confidence, detected_at, tenant_id) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                rule_a_id,
+                rule_b_id,
+                rel_type.value,
+                clamped,
+                datetime.now(UTC).isoformat(),
+                _tid,
+            ),
+        )
+        conn.commit()
 
 
 def get_related_rules(
@@ -273,25 +274,23 @@ def get_related_rules(
 
     Returns list of dicts with keys: related_rule_id, relationship, confidence.
     """
-    conn = sqlite3.connect(str(db_path))
-    conn.row_factory = sqlite3.Row
+    with contextlib.closing(sqlite3.connect(str(db_path))) as conn:
+        conn.row_factory = sqlite3.Row
 
-    if rel_type is not None:
-        rows = conn.execute(
-            "SELECT rule_a_id, rule_b_id, relationship, confidence "
-            "FROM rule_relationships "
-            "WHERE (rule_a_id = ? OR rule_b_id = ?) AND relationship = ?",
-            (rule_id, rule_id, rel_type.value),
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT rule_a_id, rule_b_id, relationship, confidence "
-            "FROM rule_relationships "
-            "WHERE rule_a_id = ? OR rule_b_id = ?",
-            (rule_id, rule_id),
-        ).fetchall()
-
-    conn.close()
+        if rel_type is not None:
+            rows = conn.execute(
+                "SELECT rule_a_id, rule_b_id, relationship, confidence "
+                "FROM rule_relationships "
+                "WHERE (rule_a_id = ? OR rule_b_id = ?) AND relationship = ?",
+                (rule_id, rule_id, rel_type.value),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT rule_a_id, rule_b_id, relationship, confidence "
+                "FROM rule_relationships "
+                "WHERE rule_a_id = ? OR rule_b_id = ?",
+                (rule_id, rule_id),
+            ).fetchall()
 
     results = []
     for row in rows:
