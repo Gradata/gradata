@@ -173,6 +173,52 @@ class InMemoryStore:
 
 
 # ---------------------------------------------------------------------------
+# Shared helpers for typed memory layers
+# ---------------------------------------------------------------------------
+
+
+def _store_memory(
+    store: MemoryStore,
+    memory_type: str,
+    content: str,
+    metadata: dict | None,
+    source: str,
+) -> str:
+    """Build a Memory object and persist it via *store*."""
+    now = _now_iso()
+    meta: dict = {"source": source}
+    if metadata:
+        meta.update(metadata)
+    return store.store(
+        Memory(
+            id=str(uuid.uuid4()),
+            memory_type=memory_type,
+            content=content,
+            metadata=meta,
+            created=now,
+            last_accessed=now,
+        )
+    )
+
+
+def _decay_memories(
+    store: InMemoryStore,
+    memory_type: str,
+    max_age_days: int,
+    min_reinforcements: int,
+) -> list[str]:
+    """Prune stale, unreinforced memories of *memory_type* from *store*."""
+    pruned: list[str] = []
+    for memory in list(store.all()):
+        if memory.memory_type != memory_type:
+            continue
+        if memory.age_days() > max_age_days and memory.reinforcement_count < min_reinforcements:
+            store.delete(memory.id)
+            pruned.append(memory.id)
+    return pruned
+
+
+# ---------------------------------------------------------------------------
 # EpisodicMemory — what happened
 # ---------------------------------------------------------------------------
 
@@ -193,20 +239,7 @@ class EpisodicMemory:
         source: str = "agent",
     ) -> str:
         """Record an episodic event."""
-        now = _now_iso()
-        meta: dict = {"source": source}
-        if metadata:
-            meta.update(metadata)
-
-        memory = Memory(
-            id=str(uuid.uuid4()),
-            memory_type=self.memory_type,
-            content=content,
-            metadata=meta,
-            created=now,
-            last_accessed=now,
-        )
-        return self._store.store(memory)
+        return _store_memory(self._store, self.memory_type, content, metadata, source)
 
     def retrieve(self, query: str, limit: int = 10) -> list[Memory]:
         """Retrieve episodic memories matching ``query``."""
@@ -219,14 +252,7 @@ class EpisodicMemory:
                 "decay() is only implemented for InMemoryStore. "
                 "Custom backends must implement their own pruning logic."
             )
-        pruned: list[str] = []
-        for memory in list(self._store.all()):
-            if memory.memory_type != self.memory_type:
-                continue
-            if memory.age_days() > max_age_days and memory.reinforcement_count < min_reinforcements:
-                self._store.delete(memory.id)
-                pruned.append(memory.id)
-        return pruned
+        return _decay_memories(self._store, self.memory_type, max_age_days, min_reinforcements)
 
 
 # ---------------------------------------------------------------------------
@@ -250,20 +276,7 @@ class SemanticMemory:
         source: str = "agent",
     ) -> str:
         """Record a semantic fact."""
-        now = _now_iso()
-        meta: dict = {"source": source}
-        if metadata:
-            meta.update(metadata)
-
-        memory = Memory(
-            id=str(uuid.uuid4()),
-            memory_type=self.memory_type,
-            content=content,
-            metadata=meta,
-            created=now,
-            last_accessed=now,
-        )
-        return self._store.store(memory)
+        return _store_memory(self._store, self.memory_type, content, metadata, source)
 
     def retrieve(self, query: str, limit: int = 10) -> list[Memory]:
         """Retrieve semantic facts matching ``query``."""
@@ -309,20 +322,7 @@ class ProceduralMemory:
         source: str = "agent",
     ) -> str:
         """Record a procedural pattern or workflow."""
-        now = _now_iso()
-        meta: dict = {"source": source}
-        if metadata:
-            meta.update(metadata)
-
-        memory = Memory(
-            id=str(uuid.uuid4()),
-            memory_type=self.memory_type,
-            content=content,
-            metadata=meta,
-            created=now,
-            last_accessed=now,
-        )
-        return self._store.store(memory)
+        return _store_memory(self._store, self.memory_type, content, metadata, source)
 
     def retrieve(self, query: str, limit: int = 10) -> list[Memory]:
         """Retrieve procedural patterns matching ``query``."""
@@ -349,14 +349,7 @@ class ProceduralMemory:
                 "decay() is only implemented for InMemoryStore. "
                 "Custom backends must implement their own pruning logic."
             )
-        pruned: list[str] = []
-        for memory in list(self._store.all()):
-            if memory.memory_type != self.memory_type:
-                continue
-            if memory.age_days() > max_age_days and memory.reinforcement_count < min_reinforcements:
-                self._store.delete(memory.id)
-                pruned.append(memory.id)
-        return pruned
+        return _decay_memories(self._store, self.memory_type, max_age_days, min_reinforcements)
 
 
 # ---------------------------------------------------------------------------
