@@ -168,14 +168,13 @@ class TestPipelineE2E:
             Lesson(
                 "2026-04-03",
                 LessonState.RULE,
-                0.88,
+                0.90,
                 "PROCESS",
                 "Use post-call skill, not generic drafting for follow-ups",
             ),
         ]
         metas = discover_meta_rules(rule_lessons, min_group_size=3, current_session=98)
-        if not metas:
-            pytest.skip("discover_meta_rules not yet implemented")
+        assert metas, "discover_meta_rules should return at least one meta for 3 RULE lessons"
         meta = metas[0]
         assert "cut:" not in meta.principle.lower(), "Principle is word-diff noise"
         assert len(meta.principle) > 20
@@ -195,14 +194,13 @@ class TestPipelineE2E:
             Lesson(
                 "2026-04-03",
                 LessonState.RULE,
-                0.88,
+                0.90,
                 "DRAFTING",
                 "Tight prose, direct sentences, no decorative punctuation",
             ),
         ]
         metas = discover_meta_rules(rule_lessons, min_group_size=3, current_session=98)
-        if not metas:
-            pytest.skip("discover_meta_rules not yet implemented")
+        assert metas, "discover_meta_rules should return at least one meta for 3 RULE lessons"
         assert len(metas[0].applies_when) > 0
 
     def test_meta_rule_has_context_weights(self):
@@ -220,14 +218,13 @@ class TestPipelineE2E:
             Lesson(
                 "2026-04-03",
                 LessonState.RULE,
-                0.88,
+                0.90,
                 "DRAFTING",
                 "Tight prose, direct sentences, no decorative punctuation",
             ),
         ]
         metas = discover_meta_rules(rule_lessons, min_group_size=3, current_session=98)
-        if not metas:
-            pytest.skip("discover_meta_rules not yet implemented")
+        assert metas, "discover_meta_rules should return at least one meta for 3 RULE lessons"
         weights = metas[0].context_weights
         # The task_type for DRAFTING is "drafting" — check it has elevated weight
         task_type_weight = max(v for k, v in weights.items() if k != "default")
@@ -339,7 +336,7 @@ class TestCrossCategoryIsolation:
             Lesson("2026-04-01", LessonState.RULE, 0.92, "DRAFTING", "Use colons not dashes"),
             Lesson("2026-04-02", LessonState.RULE, 0.90, "DRAFTING", "No bold mid-paragraph"),
             Lesson(
-                "2026-04-03", LessonState.RULE, 0.88, "DRAFTING", "Tight prose, direct sentences"
+                "2026-04-03", LessonState.RULE, 0.90, "DRAFTING", "Tight prose, direct sentences"
             ),
             Lesson(
                 "2026-04-01", LessonState.RULE, 0.92, "ARCHITECTURE", "Keep files under 500 lines"
@@ -348,12 +345,11 @@ class TestCrossCategoryIsolation:
                 "2026-04-02", LessonState.RULE, 0.90, "ARCHITECTURE", "Validate input at boundaries"
             ),
             Lesson(
-                "2026-04-03", LessonState.RULE, 0.88, "ARCHITECTURE", "Prefer editing over creating"
+                "2026-04-03", LessonState.RULE, 0.90, "ARCHITECTURE", "Prefer editing over creating"
             ),
         ]
         metas = discover_meta_rules(lessons, min_group_size=3, current_session=98)
-        if not metas:
-            pytest.skip("discover_meta_rules not yet implemented")
+        assert metas, "discover_meta_rules should return metas for 6 RULE lessons in 2 categories"
         for meta in metas:
             cat_set = set(meta.source_categories)
             assert not ({"DRAFTING", "ARCHITECTURE"} <= cat_set), (
