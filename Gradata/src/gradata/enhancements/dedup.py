@@ -38,17 +38,7 @@ for this worktree.
 
 Storage
 -------
-A single table in system.db:
-
-    observation_dedup(
-        fingerprint TEXT PRIMARY KEY,
-        category    TEXT NOT NULL,
-        first_session INTEGER NOT NULL,
-        last_session  INTEGER NOT NULL,
-        seen_count    INTEGER NOT NULL DEFAULT 1,
-        first_seen_ts TEXT NOT NULL,
-        last_seen_ts  TEXT NOT NULL
-    )
+A single table in system.db (schema: see ``_CREATE_SQL`` constant).
 
 Normalization
 -------------
@@ -196,8 +186,7 @@ def register_observation(
     conn = _open(db_path)
     try:
         existing = conn.execute(
-            "SELECT seen_count, first_session FROM observation_dedup "
-            "WHERE fingerprint = ?",
+            "SELECT seen_count, first_session FROM observation_dedup WHERE fingerprint = ?",
             (fingerprint,),
         ).fetchone()
         if existing is None:
@@ -246,7 +235,8 @@ def check_and_register(
     """
     fp = observation_fingerprint(text, category=category)
     dup = is_duplicate(
-        db_path, fp,
+        db_path,
+        fp,
         current_session=session,
         recent_window_sessions=recent_window_sessions,
     )
@@ -283,8 +273,10 @@ def annotate_event_with_dedup(
     try:
         dedup_text = f"{(draft or '')[:500]}||{(final or '')[:500]}"
         info = check_and_register(
-            db_path, dedup_text,
-            category=(category or "UNKNOWN"), session=session,
+            db_path,
+            dedup_text,
+            category=(category or "UNKNOWN"),
+            session=session,
         )
         event["observation_fingerprint"] = info["fingerprint"]
         event["observation_seen_count"] = info["seen_count"]
