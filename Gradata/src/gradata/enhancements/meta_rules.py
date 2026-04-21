@@ -44,8 +44,9 @@ class MetaRule:
       - ``"deterministic"`` (default): produced by token-frequency / cluster
         heuristics. Empirically (2026-04-14 ablation) these regress
         correctness when injected into prompts. Excluded from injection.
-      - ``"llm_synth"``: produced by cloud-side LLM synthesis from the
-        source rules. Eligible for injection.
+      - ``"llm_synth"``: produced by local LLM synthesis (user's own
+        Anthropic key or Claude Code Max OAuth via rule_synthesizer.py).
+        Eligible for injection.
       - ``"human_curated"``: hand-written or human-edited principle. Always
         eligible for injection.
     """
