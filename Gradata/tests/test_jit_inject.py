@@ -1,4 +1,5 @@
 """Tests for just-in-time (JIT) rule injection hook."""
+
 from __future__ import annotations
 
 import json
@@ -16,8 +17,13 @@ from gradata.hooks.jit_inject import (
 )
 
 
-def _lesson(category: str, description: str, *, confidence: float = 0.92,
-            state: LessonState = LessonState.RULE) -> Lesson:
+def _lesson(
+    category: str,
+    description: str,
+    *,
+    confidence: float = 0.92,
+    state: LessonState = LessonState.RULE,
+) -> Lesson:
     return Lesson(
         date="2026-04-14",
         state=state,
@@ -85,8 +91,12 @@ class TestRankRulesForDraft:
 
     def test_confidence_floor_excludes_instincts(self) -> None:
         lessons = [
-            _lesson("LOWCONF", "kubernetes deploy production", confidence=0.40,
-                    state=LessonState.INSTINCT),
+            _lesson(
+                "LOWCONF",
+                "kubernetes deploy production",
+                confidence=0.40,
+                state=LessonState.INSTINCT,
+            ),
             _lesson("HIGHCONF", "kubernetes deploy production", confidence=0.95),
         ]
         draft = "deploy kubernetes to production"
@@ -101,7 +111,9 @@ class TestRankRulesForDraft:
             _lesson("RULE", "kubernetes deploy"),
         ]
         ranked = rank_rules_for_draft(
-            lessons, "kubernetes deploy tomorrow", min_similarity=0.01,
+            lessons,
+            "kubernetes deploy tomorrow",
+            min_similarity=0.01,
         )
         assert len(ranked) == 1
         assert ranked[0][0].category == "RULE"
@@ -120,8 +132,10 @@ class TestRankRulesForDraft:
             _lesson("HIGH", "kubernetes deploy production today"),
         ]
         ranked = rank_rules_for_draft(
-            lessons, "deploy kubernetes to production today",
-            k=5, min_similarity=0.01,
+            lessons,
+            "deploy kubernetes to production today",
+            k=5,
+            min_similarity=0.01,
         )
         assert ranked[0][0].category == "HIGH"
         assert ranked[0][1] > ranked[1][1]
@@ -134,8 +148,10 @@ class TestRankRulesForDraft:
             _lesson("RARE", "rollback postgres replica lag alerts"),
         ]
         ranked = rank_rules_for_draft(
-            lessons, "postgres replica lag during rollback",
-            k=5, min_similarity=0.0,
+            lessons,
+            "postgres replica lag during rollback",
+            k=5,
+            min_similarity=0.0,
         )
         assert ranked[0][0].category == "RARE"
 
@@ -144,8 +160,10 @@ class TestRankRulesForDraft:
         monkeypatch.setattr(jit_inject, "bm25s", None)
         lessons = [_lesson("X", "kubernetes deploy production today")]
         ranked = rank_rules_for_draft(
-            lessons, "deploy kubernetes production today",
-            k=5, min_similarity=0.05,
+            lessons,
+            "deploy kubernetes production today",
+            k=5,
+            min_similarity=0.05,
         )
         assert len(ranked) == 1
         assert ranked[0][0].category == "X"
@@ -195,16 +213,11 @@ class TestMainHookFlagOn:
         result = main({"prompt": "Deploy the kubernetes cluster to aws"})
         assert result is None
 
-    def test_event_emitted_on_miss(self, brain: Path) -> None:
+    def test_zero_match_emits_nothing(self, brain: Path) -> None:
+        """Zero-match prompts must NOT write to events.jsonl (hot-path I/O fix)."""
         main({"prompt": "Deploy the kubernetes cluster to aws"})
         events_path = brain / "events.jsonl"
-        assert events_path.exists()
-        lines = events_path.read_text(encoding="utf-8").strip().splitlines()
-        assert len(lines) == 1
-        payload = json.loads(lines[0])
-        assert payload["type"] == "JIT_INJECTION"
-        assert payload["injected"] == 0
-        assert payload["candidates"] >= 1
+        assert not events_path.exists(), "events.jsonl should not be created on zero-match"
 
     def test_event_emitted_on_hit(self, brain: Path) -> None:
         main({"prompt": "Update the pipedrive deal for the CEO today"})
@@ -231,10 +244,20 @@ class TestMainHookFlagOn:
 
 
 class TestJitEnvParsing:
-    @pytest.mark.parametrize("value,expected", [
-        ("1", True), ("true", True), ("TRUE", True), ("yes", True), ("on", True),
-        ("0", False), ("false", False), ("", False), ("no", False),
-    ])
+    @pytest.mark.parametrize(
+        "value,expected",
+        [
+            ("1", True),
+            ("true", True),
+            ("TRUE", True),
+            ("yes", True),
+            ("on", True),
+            ("0", False),
+            ("false", False),
+            ("", False),
+            ("no", False),
+        ],
+    )
     def test_flag_parsing(self, monkeypatch, value: str, expected: bool) -> None:
         monkeypatch.setenv("GRADATA_JIT_ENABLED", value)
         assert jit_inject._jit_enabled() is expected
