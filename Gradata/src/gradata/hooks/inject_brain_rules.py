@@ -54,6 +54,7 @@ MAX_RULES = int(os.environ.get("GRADATA_MAX_RULES", "10"))
 MIN_CONFIDENCE = float(os.environ.get("GRADATA_MIN_CONFIDENCE", "0.60"))
 # Meta-rules are high-level principles — separate cap from MAX_RULES.
 MAX_META_RULES = int(os.environ.get("GRADATA_MAX_META_RULES", "5"))
+MAX_BRAIN_PROMPT_CHARS = int(os.environ.get("GRADATA_MAX_BRAIN_PROMPT_CHARS", "4000"))
 
 # Sentinel written by inject_handoff when a handoff carries a rules snapshot.
 # When present, we compare mtime(lessons.md) vs. snapshot_ts and skip the
@@ -131,6 +132,9 @@ def _read_brain_prompt(brain_dir: Path) -> str | None:
         return None
     if not text or _BRAIN_PROMPT_MARKER not in text[:400]:
         return None
+    # Truncate inner body BEFORE wrapping so the XML tags remain intact.
+    if len(text) > MAX_BRAIN_PROMPT_CHARS:
+        text = text[:MAX_BRAIN_PROMPT_CHARS] + "\n<!-- truncated -->"
     if "<brain-wisdom>" not in text:
         text = f"<brain-wisdom>\n{text}\n</brain-wisdom>"
     return text

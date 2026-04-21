@@ -1,4 +1,5 @@
 """Tests for core learning loop hooks."""
+
 import os
 from pathlib import Path
 from unittest.mock import patch
@@ -207,7 +208,8 @@ def test_inject_caps_meta_rules_and_context_promotes_lower_confidence(tmp_path):
     # between the meta-rules tags.
     meta_section = text.split("<brain-meta-rules>")[1].split("</brain-meta-rules>")[0]
     numbered_lines = [
-        line for line in meta_section.splitlines()
+        line
+        for line in meta_section.splitlines()
         if line.strip() and line.lstrip()[0].isdigit() and ". [META:" in line
     ]
     assert len(numbered_lines) == MAX_META_RULES, (
@@ -359,6 +361,7 @@ def test_session_close_skips_when_no_triggers(tmp_path):
 def test_session_close_fires_on_correction(tmp_path):
     """When a CORRECTION event exists after the stamp, the waterfall must run."""
     import sqlite3
+
     db = tmp_path / "system.db"
     with sqlite3.connect(db) as conn:
         conn.execute("CREATE TABLE events (id INTEGER PRIMARY KEY, ts TEXT, type TEXT)")
@@ -385,8 +388,10 @@ def test_session_close_no_brain(tmp_path):
 
 # --- session_boot ---------------------------------------------------------
 
+
 def _seed_events_db(db_path: Path) -> None:
     import sqlite3
+
     with sqlite3.connect(db_path) as conn:
         conn.execute(
             "CREATE TABLE events (id INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -399,6 +404,7 @@ def _seed_events_db(db_path: Path) -> None:
 def test_session_boot_hook_meta_only_fires_on_startup():
     """Regression guard: matcher='startup' prevents compact/resume double-bumps."""
     from gradata.hooks.session_boot import HOOK_META
+
     assert HOOK_META["event"] == "SessionStart"
     assert HOOK_META["matcher"] == "startup"
 
@@ -406,9 +412,9 @@ def test_session_boot_hook_meta_only_fires_on_startup():
 @pytest.mark.parametrize(
     ("case", "seeded_sessions", "db_name", "expected"),
     [
-        ("fresh_db",          (),          "system.db",  1),   # no rows → 0+1
-        ("high_water_skew",   (3, 7, 5),   "system.db",  8),   # MAX=7 → 7+1
-        ("missing_db",        None,        "missing.db", 1),   # table absent → fallback
+        ("fresh_db", (), "system.db", 1),  # no rows → 0+1
+        ("high_water_skew", (3, 7, 5), "system.db", 8),  # MAX=7 → 7+1
+        ("missing_db", None, "missing.db", 1),  # table absent → fallback
     ],
 )
 def test_session_boot_next_session_boundaries(tmp_path, case, seeded_sessions, db_name, expected):
@@ -425,30 +431,34 @@ def test_session_boot_next_session_boundaries(tmp_path, case, seeded_sessions, d
                 for s in seeded_sessions:
                     conn.execute(
                         "INSERT INTO events (ts, session, type, source) "
-                        "VALUES ('2026-01-01T00:00:00Z', ?, 'X', 'test')", (s,),
+                        "VALUES ('2026-01-01T00:00:00Z', ?, 'X', 'test')",
+                        (s,),
                     )
     assert _next_session(db) == expected, f"case={case}"
 
 
 def test_session_boot_main_emits_session_boot_event(tmp_path):
     from gradata.hooks.session_boot import main as boot_main
+
     db = tmp_path / "system.db"
     _seed_events_db(db)
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
         boot_main({})
     import sqlite3
+
     with sqlite3.connect(db) as conn:
         row = conn.execute(
             "SELECT session, type, source FROM events WHERE type='SESSION_BOOT'"
         ).fetchone()
     assert row is not None
-    assert row[0] == 1                      # first session
+    assert row[0] == 1  # first session
     assert row[2] == "hook:session_boot"
 
 
 def test_session_boot_main_no_db_noop(tmp_path):
     """Missing system.db means brain isn't initialized — hook must no-op."""
     from gradata.hooks.session_boot import main as boot_main
+
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
         result = boot_main({})
     assert result is None
@@ -457,12 +467,16 @@ def test_session_boot_main_no_db_noop(tmp_path):
 
 # --- status_line ----------------------------------------------------------
 
+
 def test_status_line_no_brain_fallback(tmp_path, capsys):
     from gradata.hooks.status_line import main as status_main
+
     fake_home = tmp_path / "fakehome"
     fake_home.mkdir()
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": "", "BRAIN_DIR": ""}), \
-         patch("gradata.hooks._base.Path.home", return_value=fake_home):
+    with (
+        patch.dict(os.environ, {"GRADATA_BRAIN_DIR": "", "BRAIN_DIR": ""}),
+        patch("gradata.hooks._base.Path.home", return_value=fake_home),
+    ):
         rc = status_main()
     assert rc == 0
     assert capsys.readouterr().out.strip() == "gradata: no brain"
@@ -470,6 +484,7 @@ def test_status_line_no_brain_fallback(tmp_path, capsys):
 
 def test_status_line_zero_when_brain_empty(tmp_path, capsys):
     from gradata.hooks.status_line import main as status_main
+
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
         rc = status_main()
     assert rc == 0
@@ -480,6 +495,7 @@ def test_status_line_counts_rules_and_patterns(tmp_path, capsys):
     import sqlite3
 
     from gradata.hooks.status_line import main as status_main
+
     db = tmp_path / "system.db"
     _seed_events_db(db)
     with sqlite3.connect(db) as conn:
@@ -498,3 +514,39 @@ def test_status_line_counts_rules_and_patterns(tmp_path, capsys):
         rc = status_main()
     assert rc == 0
     assert capsys.readouterr().out.strip() == "s42 | 2R 1P"
+
+
+# --- _read_brain_prompt truncation ----------------------------------------
+
+
+def test_read_brain_prompt_truncates_at_cap(tmp_path):
+    """When brain_prompt.md exceeds MAX_BRAIN_PROMPT_CHARS, the inner text is
+    truncated and the sentinel <!-- truncated --> is appended BEFORE the
+    <brain-wisdom> wrapper is applied, so the wrapper tags remain intact."""
+    from gradata.hooks.inject_brain_rules import _read_brain_prompt
+
+    # A body that contains the required AUTO-GENERATED marker and is longer
+    # than the cap we set via the env var (50 chars).
+    body = "AUTO-GENERATED\n" + "x" * 200
+    (tmp_path / "brain_prompt.md").write_text(body, encoding="utf-8")
+
+    with patch.dict(os.environ, {"GRADATA_MAX_BRAIN_PROMPT_CHARS": "50"}):
+        # Re-import to pick up the patched env var value at call time.
+        # _read_brain_prompt reads MAX_BRAIN_PROMPT_CHARS from the module
+        # global, so we need to reload (or patch the module attribute).
+        import gradata.hooks.inject_brain_rules as _mod
+
+        orig = _mod.MAX_BRAIN_PROMPT_CHARS
+        _mod.MAX_BRAIN_PROMPT_CHARS = 50
+        try:
+            result = _read_brain_prompt(tmp_path)
+        finally:
+            _mod.MAX_BRAIN_PROMPT_CHARS = orig
+
+    assert result is not None
+    assert "<!-- truncated -->" in result
+    # Wrapper tags must remain intact (truncation happened before wrapping)
+    assert result.startswith("<brain-wisdom>")
+    assert result.endswith("</brain-wisdom>")
+    # The raw body should be capped — no 200 trailing x's
+    assert "x" * 200 not in result
