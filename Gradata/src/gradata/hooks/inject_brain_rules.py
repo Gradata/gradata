@@ -12,6 +12,7 @@ import os
 import shutil
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 from gradata.hooks._base import resolve_brain_dir, run_hook
@@ -451,6 +452,42 @@ def main(data: dict) -> dict | None:
             )
         except Exception as exc:
             _log.debug("injection manifest write failed: %s", exc)
+
+    # lesson_applications PENDING rows — one per injected rule/cluster member.
+    # Closes the compound-quality audit gap: without these, no row proves a
+    # graduated rule ever fired. session_close resolves them to
+    # CONFIRMED/REJECTED based on correction activity in the same session.
+    if injection_manifest and db_path.is_file() and lesson_id_fn is not None:
+        try:
+            import json as _json
+
+            from gradata._db import get_connection
+
+            applied_at = datetime.now(UTC).isoformat()
+            session_num = int(data.get("session_number") or 0)
+            task_context = (context or "")[:200]
+            rows = []
+            for entry in injection_manifest.values():
+                ctx_blob = _json.dumps(
+                    {
+                        "category": entry.get("category", ""),
+                        "description": entry.get("description", "")[:200],
+                        "task": task_context,
+                    }
+                )
+                rows.append((entry["full_id"], session_num, applied_at, ctx_blob, "PENDING", 1))
+            if rows:
+                conn = get_connection(db_path)
+                conn.executemany(
+                    "INSERT INTO lesson_applications "
+                    "(lesson_id, session, applied_at, context, outcome, success) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    rows,
+                )
+                conn.commit()
+                conn.close()
+        except Exception as exc:
+            _log.debug("lesson_applications write failed: %s", exc)
 
     # Inject disposition (behavioral tendencies evolved from corrections)
     disposition_block = ""

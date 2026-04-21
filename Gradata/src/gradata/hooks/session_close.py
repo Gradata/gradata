@@ -234,6 +234,91 @@ def _refresh_brain_prompt(brain_dir: str, data: dict) -> None:
         _log.debug("brain_prompt refresh skipped: %s", e)
 
 
+def _resolve_pending_applications(brain_dir: str, data: dict) -> None:
+    """Resolve PENDING lesson_applications rows for the current session.
+
+    Heuristic:
+      - REJECTED if any CORRECTION/IMPLICIT_FEEDBACK event in the session
+        shares the lesson's category (correction against a same-category
+        rule implies the rule didn't land).
+      - CONFIRMED otherwise (rule survived the session without a
+        category-matching correction).
+
+    Best-effort; missing tables / DB errors are swallowed.
+    """
+    try:
+        import json as _json
+
+        db = Path(brain_dir) / "system.db"
+        if not db.is_file():
+            return
+        session_num = int(data.get("session_number") or 0)
+        with sqlite3.connect(db) as conn:
+            pending = conn.execute(
+                "SELECT id, lesson_id, context FROM lesson_applications "
+                "WHERE outcome = 'PENDING' AND session = ?",
+                (session_num,),
+            ).fetchall()
+            if not pending:
+                return
+
+            event_rows = conn.execute(
+                "SELECT data_json FROM events WHERE session = ? "
+                "AND type IN ('CORRECTION', 'IMPLICIT_FEEDBACK', 'RULE_FAILURE')",
+                (session_num,),
+            ).fetchall()
+            rejecting_categories: set[str] = set()
+            rejecting_descriptions: set[str] = set()
+            for (raw,) in event_rows:
+                try:
+                    payload = _json.loads(raw) if isinstance(raw, str) else raw
+                except (TypeError, _json.JSONDecodeError):
+                    continue
+                if not isinstance(payload, dict):
+                    continue
+                cat = payload.get("category")
+                desc = payload.get("rule") or payload.get("description")
+                if isinstance(cat, str) and cat:
+                    rejecting_categories.add(cat.upper())
+                if isinstance(desc, str) and desc:
+                    rejecting_descriptions.add(desc.strip())
+
+            updates: list[tuple[str, int]] = []
+            for row_id, _lesson_id, ctx_raw in pending:
+                category = ""
+                lesson_desc = ""
+                if isinstance(ctx_raw, str) and ctx_raw:
+                    try:
+                        parsed_ctx = _json.loads(ctx_raw)
+                    except (TypeError, _json.JSONDecodeError):
+                        parsed_ctx = None
+                    if isinstance(parsed_ctx, dict):
+                        cat_v = parsed_ctx.get("category")
+                        desc_v = parsed_ctx.get("description")
+                        if isinstance(cat_v, str):
+                            category = cat_v.upper()
+                        if isinstance(desc_v, str):
+                            lesson_desc = desc_v
+                outcome = "CONFIRMED"
+                if category and category in rejecting_categories:
+                    outcome = "REJECTED"
+                elif lesson_desc:
+                    for desc in rejecting_descriptions:
+                        if desc and desc[:30] and desc[:30] in lesson_desc:
+                            outcome = "REJECTED"
+                            break
+                updates.append((outcome, row_id))
+
+            conn.executemany(
+                "UPDATE lesson_applications SET outcome = ?, success = "
+                "CASE WHEN ? = 'CONFIRMED' THEN 1 ELSE 0 END WHERE id = ?",
+                [(o, o, rid) for o, rid in updates],
+            )
+            conn.commit()
+    except Exception as exc:
+        _log.debug("lesson_applications resolve skipped: %s", exc)
+
+
 def _flush_retain_queue(brain_dir: str) -> None:
     """Always runs — cheap + essential so no queued events are lost."""
     try:
@@ -265,6 +350,7 @@ def main(data: dict) -> dict | None:
     _run_graduation(brain_dir_str)
     _run_pipeline(brain_dir_str, data)
     _run_tree_consolidation(brain_dir_str)
+    _resolve_pending_applications(brain_dir_str, data)
     _refresh_brain_prompt(brain_dir_str, data)
 
     _write_stamp(brain_dir, upper_bound)
