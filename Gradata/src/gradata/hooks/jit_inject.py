@@ -341,11 +341,19 @@ def main(data: dict) -> dict | None:
     # Drop the colon and decimal point from confidence: [P:0.83] → [P83]
     # saves 3 tokens per rule (measured 2026-04-21 autoresearch loop iteration 1).
     _STATE_ABBREV = {"PATTERN": "P", "INSTINCT": "I", "RULE": "R"}
-    lines = [
-        f"[{_STATE_ABBREV.get(r.state.name, r.state.name)}{round(r.confidence * 100):02d}]"
-        f" {r.category}: {r.description}"
-        for r, _sim in ranked
-    ]
+    # Dedup by normalized description: if two rules share identical description
+    # text (different categories), emit only the first — same signal, no extra cost.
+    seen_descs: set[str] = set()
+    lines = []
+    for r, _sim in ranked:
+        norm_desc = r.description.strip().lower()
+        if norm_desc in seen_descs:
+            continue
+        seen_descs.add(norm_desc)
+        lines.append(
+            f"[{_STATE_ABBREV.get(r.state.name, r.state.name)}{round(r.confidence * 100):02d}]"
+            f" {r.category}: {r.description}"
+        )
     rules_block = "[jit]\n" + "\n".join(lines)
     return {"result": rules_block}
 
