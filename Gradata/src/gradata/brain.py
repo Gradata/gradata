@@ -1201,8 +1201,10 @@ class Brain(BrainInspectionMixin):
             return []
         import sqlite3
 
+        from gradata._db import get_connection
+
         try:
-            with sqlite3.connect(str(self.db_path)) as conn:
+            with contextlib.closing(get_connection(self.db_path)) as conn:
                 conn.row_factory = sqlite3.Row
                 if category:
                     rows = conn.execute(

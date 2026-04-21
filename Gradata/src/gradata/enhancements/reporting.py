@@ -331,17 +331,18 @@ def generate_health_report(db_path=None, ctx=None) -> HealthReport:
     """Generate a basic health report from the brain database."""
     report = HealthReport()
     try:
+        import contextlib
         import sqlite3
 
         db = Path(db_path) if db_path else (Path(ctx.brain_dir) / "system.db" if ctx else None)
         if db and db.exists():
-            conn = sqlite3.connect(str(db))
-            report.sessions_total = (
-                conn.execute("SELECT COUNT(DISTINCT session) FROM events").fetchone()[0] or 0
-            )
-            report.events_total = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0] or 0
-            conn.close()
-    except Exception:
+            with contextlib.closing(sqlite3.connect(str(db))) as conn:
+                report.sessions_total = (
+                    conn.execute("SELECT COUNT(DISTINCT session) FROM events").fetchone()[0] or 0
+                )
+                report.events_total = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0] or 0
+    except Exception as exc:
+        _log.debug("health report db read failed: %s", exc)
         report.issues.append("Could not read database")
         report.healthy = False
 
@@ -350,8 +351,8 @@ def generate_health_report(db_path=None, ctx=None) -> HealthReport:
         brain_dir = Path(db_path).parent if db_path else (Path(ctx.brain_dir) if ctx else None)
         if brain_dir:
             report.lessons_active = _count_active_lessons(brain_dir)
-    except Exception:
-        pass  # Non-critical — lessons count is informational
+    except Exception as exc:
+        _log.debug("health report lessons count failed: %s", exc)
 
     return report
 
