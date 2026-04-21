@@ -164,9 +164,56 @@ def load_handoff(task_id: str, agent_name: str, handoff_dir: Path) -> str | None
         return None
 
 
+def default_handoff_dir(brain_dir: str | Path) -> Path:
+    """Canonical location for handoff docs under a brain directory.
+
+    The SessionStart hook reads from this path, and callers that do not
+    need a custom location should pass it to :class:`HandoffWatchdog` so
+    the two halves of the pipeline wire together automatically.
+    """
+    return Path(brain_dir) / "handoffs"
+
+
+def consume_handoff(path: Path) -> None:
+    """Mark a handoff as consumed by moving it out of the active dir.
+
+    Preserves the file for audit under ``{handoff_dir}/consumed/`` rather
+    than deleting, so a post-mortem can still read what was injected.
+    Silent on failure: injection already succeeded, and a stale file on
+    disk is preferable to breaking session start.
+    """
+    try:
+        consumed_dir = path.parent / "consumed"
+        consumed_dir.mkdir(parents=True, exist_ok=True)
+        path.replace(consumed_dir / path.name)
+    except OSError:
+        return
+
+
+def pick_latest_unconsumed(handoff_dir: Path) -> Path | None:
+    """Return the most recently written ``*.handoff.md``, or None if empty.
+
+    Ignores the ``consumed/`` subdirectory so a handoff is only injected
+    once per session. Resolution by mtime: when the watchdog fires
+    repeatedly across nested tasks, the freshest wins.
+    """
+    if not handoff_dir.is_dir():
+        return None
+    candidates = [
+        p for p in handoff_dir.glob("*.handoff.md") if p.is_file() and p.parent == handoff_dir
+    ]
+    if not candidates:
+        return None
+    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return candidates[0]
+
+
 __all__ = [
     "HandoffDoc",
     "HandoffWatchdog",
+    "consume_handoff",
+    "default_handoff_dir",
     "load_handoff",
     "measure_pressure",
+    "pick_latest_unconsumed",
 ]

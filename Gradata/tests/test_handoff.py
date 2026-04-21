@@ -8,8 +8,11 @@ from gradata.contrib.patterns.handoff import (
     HandoffDoc,
     HandoffWatchdog,
     _read_threshold,
+    consume_handoff,
+    default_handoff_dir,
     load_handoff,
     measure_pressure,
+    pick_latest_unconsumed,
 )
 
 
@@ -178,3 +181,56 @@ class TestLoadHandoff:
         loaded = load_handoff("t1", "writer", tmp_path)
         assert loaded is not None
         assert "X." in loaded
+
+
+class TestDefaultHandoffDir:
+    def test_appends_handoffs_folder(self, tmp_path):
+        assert default_handoff_dir(tmp_path) == tmp_path / "handoffs"
+
+    def test_accepts_string(self, tmp_path):
+        result = default_handoff_dir(str(tmp_path))
+        assert result == tmp_path / "handoffs"
+
+
+class TestPickLatestUnconsumed:
+    def test_missing_dir_returns_none(self, tmp_path):
+        assert pick_latest_unconsumed(tmp_path / "nope") is None
+
+    def test_empty_dir_returns_none(self, tmp_path):
+        assert pick_latest_unconsumed(tmp_path) is None
+
+    def test_picks_most_recent(self, tmp_path):
+        old = tmp_path / "a.handoff.md"
+        new = tmp_path / "b.handoff.md"
+        old.write_text("old", encoding="utf-8")
+        new.write_text("new", encoding="utf-8")
+        import os as _os
+        import time as _time
+
+        past = _time.time() - 60
+        _os.utime(old, (past, past))
+        assert pick_latest_unconsumed(tmp_path) == new
+
+    def test_ignores_consumed_subdir(self, tmp_path):
+        consumed_dir = tmp_path / "consumed"
+        consumed_dir.mkdir()
+        (consumed_dir / "c.handoff.md").write_text("c", encoding="utf-8")
+        assert pick_latest_unconsumed(tmp_path) is None
+
+    def test_ignores_non_handoff_files(self, tmp_path):
+        (tmp_path / "notes.md").write_text("x", encoding="utf-8")
+        assert pick_latest_unconsumed(tmp_path) is None
+
+
+class TestConsumeHandoff:
+    def test_moves_to_consumed_dir(self, tmp_path):
+        src = tmp_path / "a.handoff.md"
+        src.write_text("body", encoding="utf-8")
+        consume_handoff(src)
+        assert not src.exists()
+        moved = tmp_path / "consumed" / "a.handoff.md"
+        assert moved.exists()
+        assert moved.read_text(encoding="utf-8") == "body"
+
+    def test_silent_on_missing(self, tmp_path):
+        consume_handoff(tmp_path / "ghost.handoff.md")
