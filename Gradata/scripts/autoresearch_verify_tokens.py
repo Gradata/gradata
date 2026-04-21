@@ -112,22 +112,66 @@ def _collect_once_strings() -> dict[str, str]:
     }
 
 
-def _collect_per_turn_strings() -> dict[str, str]:
-    """Return strings emitted once per user prompt."""
-    data = {
-        "hook_event_name": "UserPromptSubmit",
-        "session_id": "autoresearch",
-        "prompt": (
-            "Help me debug an authentication flow where tokens keep expiring before "
-            "requests complete. I've already tried increasing the TTL but users still "
-            "hit 401s intermittently — what could be causing this?"
-        ),
-    }
-    return {
-        "context_inject": _run_hook("gradata.hooks.context_inject", data),
-        "implicit_feedback": _run_hook("gradata.hooks.implicit_feedback", data),
-        "jit_inject": _run_hook("gradata.hooks.jit_inject", data),
-    }
+# Four prompt lengths probe the per-turn surface. Any threshold-gaming
+# (raising MIN_MESSAGE_LEN / MIN_DRAFT_LEN so short prompts silently skip
+# injection) now shows zero improvement because longer prompts still trigger.
+_PROBE_PROMPTS = [
+    # ~80 chars — short turn
+    "fix this null pointer in the auth handler",
+    # ~250 chars — medium
+    (
+        "Help me debug an authentication flow where tokens keep expiring before "
+        "requests complete. I've already tried increasing the TTL but users still "
+        "hit 401s intermittently — what could be causing this?"
+    ),
+    # ~700 chars — long
+    (
+        "Walk me through how the rule-graduation pipeline decides when an INSTINCT "
+        "promotes to a PATTERN. I see the threshold is 0.60 but I'm seeing rules with "
+        "confidence 0.62 stuck as INSTINCT for days. Is there a survival-count "
+        "requirement on top? And if I force-graduate one manually through brain.patch_rule, "
+        "does that re-enter the dedup pipeline or is it treated as hand-curated content "
+        "that bypasses clustering? I want to make sure I don't accidentally create "
+        "duplicates when I manually promote rules from the dashboard."
+    ),
+    # ~1800 chars — very long (multi-paragraph prompt)
+    (
+        "I'm designing a new cold-start path for Gradata where the first Brain() "
+        "instantiation in a fresh temp dir needs to be under 200ms. Currently it's "
+        "~250ms and the culprit is eager schema probes in _db.init_schema plus the "
+        "module-level bm25s import which pulls in numpy. Questions: (1) Can I lazy-"
+        "defer init_schema until the first DB read? The concern is that test fixtures "
+        "create a Brain and immediately call .correct() — so 'first read' is essentially "
+        "'first operation'. (2) For bm25s, is there a way to make its import side-effect-"
+        "free on Windows? I noticed it spits diagnostic text to stdout during import on "
+        "3.12. (3) More broadly — is there a pattern in the codebase where heavy "
+        "enhancements register themselves via entry_points so the Brain doesn't have to "
+        "eagerly import everything under enhancements/? I want to know if the SDK has "
+        "a plugin protocol I should be using instead of the current hard imports. This "
+        "matters because downstream projects have complained about import time and "
+        "we've already shipped batch 7-10 performance fixes but import is still the "
+        "long pole. Looking for architectural guidance not just micro-optimization."
+    ),
+]
+
+
+def _collect_per_turn_strings() -> list[dict[str, str]]:
+    """Return emissions for each probe prompt — preserves variance across lengths."""
+    turns: list[dict[str, str]] = []
+    for prompt in _PROBE_PROMPTS:
+        data = {
+            "hook_event_name": "UserPromptSubmit",
+            "session_id": "autoresearch",
+            "prompt": prompt,
+        }
+        turns.append(
+            {
+                "context_inject": _run_hook("gradata.hooks.context_inject", data),
+                "implicit_feedback": _run_hook("gradata.hooks.implicit_feedback", data),
+                "jit_inject": _run_hook("gradata.hooks.jit_inject", data),
+            }
+        )
+    return turns
 
 
 def _collect_per_edit_strings() -> dict[str, str]:
@@ -174,7 +218,14 @@ def measure_weighted_tokens() -> dict:
     agent = _collect_per_agent_strings()
 
     once_tokens = sum(_count(s, enc) for s in once.values())
-    turn_tokens = sum(_count(s, enc) for s in turn.values())
+    # turn is a list of dicts (one per probe prompt) — average across lengths
+    # so threshold-gaming on one length doesn't dominate.
+    per_prompt_turn_tokens = [
+        sum(_count(s, enc) for s in prompt_group.values()) for prompt_group in turn
+    ]
+    turn_tokens = (
+        sum(per_prompt_turn_tokens) / len(per_prompt_turn_tokens) if per_prompt_turn_tokens else 0
+    )
     edit_tokens = sum(_count(s, enc) for s in edit.values())
     agent_tokens = sum(_count(s, enc) for s in agent.values())
 
@@ -258,8 +309,10 @@ def semantic_gate() -> bool:
 def _extract_rule_ids(raw_strings: dict) -> set[str]:
     ids: set[str] = set()
     for group in raw_strings.values():
-        for emitted in group.values():
-            ids.update(RULE_ID_PATTERN.findall(emitted))
+        iterable = group if isinstance(group, list) else [group]
+        for bucket in iterable:
+            for emitted in bucket.values():
+                ids.update(RULE_ID_PATTERN.findall(emitted))
     return ids
 
 
