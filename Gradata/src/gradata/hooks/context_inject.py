@@ -19,7 +19,7 @@ HOOK_META = {
 # search. Ack-style replies ("ok", "sounds good", "continue where we left off")
 # pass through without FTS cost. Override via GRADATA_MIN_MESSAGE_LEN.
 MIN_MESSAGE_LEN = int(os.environ.get("GRADATA_MIN_MESSAGE_LEN", "100"))
-MAX_CONTEXT_LEN = int(os.environ.get("GRADATA_MAX_CONTEXT_LEN", "2000"))
+MAX_CONTEXT_LEN = int(os.environ.get("GRADATA_MAX_CONTEXT_LEN", "800"))
 
 # Jaccard threshold above which a snippet is considered a duplicate of an
 # already-injected rule description. Override via GRADATA_CONTEXT_DEDUP_THRESHOLD.
@@ -93,7 +93,7 @@ def main(data: dict) -> dict | None:
         total_len = 0
         for r in results:
             text = r.get("text", "") or r.get("content", "") or str(r)
-            snippet = text[:500]
+            snippet = text[:200]
             if dedup_enabled and _is_duplicate(snippet, injected_descriptions, _DEDUP_THRESHOLD):
                 continue
             sep_cost = len(separator) if context_parts else 0
