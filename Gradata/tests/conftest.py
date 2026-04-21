@@ -22,6 +22,7 @@ from gradata import Brain
 # Core helper — rewires module-level path caches after Brain.init()
 # ---------------------------------------------------------------------------
 
+
 def init_brain(
     tmp_path: Path,
     name: str = "TestBrain",
@@ -60,6 +61,7 @@ def init_brain(
     _bm.MANIFEST_PATH = _p.BRAIN_DIR / "brain.manifest.json"
 
     import gradata._export_brain as _ex
+
     _ex.BRAIN_DIR = _p.BRAIN_DIR
     _ex.WORKING_DIR = _p.WORKING_DIR
     _ex.PROSPECTS_DIR = _p.PROSPECTS_DIR
@@ -79,10 +81,12 @@ def init_brain(
     _ex.CARL_GLOBAL = _p.CARL_DIR / "global"
 
     import gradata._query as _q
+
     _q.DB_PATH = _p.DB_PATH
     _q.BRAIN_DIR = _p.BRAIN_DIR
 
     import gradata._tag_taxonomy as _tt
+
     _tt.PROSPECTS_DIR = _p.PROSPECTS_DIR
 
     return brain
@@ -91,6 +95,7 @@ def init_brain(
 # ---------------------------------------------------------------------------
 # Environment isolation
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def _isolate_brain_dir_env():
@@ -114,6 +119,7 @@ def _isolate_brain_dir_env():
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def fresh_brain(tmp_path: Path) -> Brain:
@@ -151,6 +157,7 @@ def brain_with_content(tmp_path: Path) -> Brain:
 # Low-level path fixtures — brain directory, events log, and database
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def brain_dir(tmp_path: Path) -> Path:
     """Return ``tmp_path / "brain"`` with the directory already created.
@@ -184,6 +191,7 @@ def brain_db(brain_dir: Path) -> Path:
     """
     db_path = brain_dir / "system.db"
     from gradata._events import _ensure_table  # noqa: PLC0415
+
     conn = sqlite3.connect(str(db_path))
     try:
         _ensure_table(conn)

@@ -381,7 +381,9 @@ def format_meta_rules_for_prompt(
     # otherwise apply the cap after the fact (no ranking case).
     if context:
         metas = rank_meta_rules_by_context(
-            metas, context, max_rules=limit if limit is not None else len(metas),
+            metas,
+            context,
+            max_rules=limit if limit is not None else len(metas),
         )
     elif limit is not None:
         metas = metas[:limit]
@@ -634,10 +636,12 @@ def _call_gemma_native(prompt: str, creds: str, model: str, timeout: float = 15.
     import urllib.request
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    payload = json.dumps({
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": 200, "temperature": 0.3},
-    }).encode()
+    payload = json.dumps(
+        {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"maxOutputTokens": 200, "temperature": 0.3},
+        }
+    ).encode()
     headers = {"Content-Type": "application/json", "x-goog-api-key": creds}
     try:
         req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
@@ -647,8 +651,14 @@ def _call_gemma_native(prompt: str, creds: str, model: str, timeout: float = 15.
         if 15 <= len(text) <= 500:
             return text
         return None
-    except (urllib.error.URLError, urllib.error.HTTPError, OSError, KeyError,
-            json.JSONDecodeError, IndexError) as exc:
+    except (
+        urllib.error.URLError,
+        urllib.error.HTTPError,
+        OSError,
+        KeyError,
+        json.JSONDecodeError,
+        IndexError,
+    ) as exc:
         _log.debug("Gemma native call failed: %s", exc)
         return None
 
@@ -901,10 +911,7 @@ def _gather_graduated_rules(
     min_confidence: float = MIN_SOURCE_CONFIDENCE,
 ) -> list[Lesson]:
     """Phase 1 (forced): Retrieve graduated rules above confidence threshold."""
-    return [
-        l for l in lessons
-        if l.state == LessonState.RULE and l.confidence >= min_confidence
-    ]
+    return [l for l in lessons if l.state == LessonState.RULE and l.confidence >= min_confidence]
 
 
 def _gather_correction_history(
@@ -913,14 +920,16 @@ def _gather_correction_history(
     """Phase 2 (forced): Gather correction history for graduated rules."""
     history = []
     for rule in rules:
-        history.append({
-            "rule_id": _lesson_id(rule),
-            "category": rule.category,
-            "description": rule.description,
-            "confidence": rule.confidence,
-            "fire_count": getattr(rule, "fire_count", 0),
-            "correction_count": len(getattr(rule, "correction_event_ids", []) or []),
-        })
+        history.append(
+            {
+                "rule_id": _lesson_id(rule),
+                "category": rule.category,
+                "description": rule.description,
+                "confidence": rule.confidence,
+                "fire_count": getattr(rule, "fire_count", 0),
+                "correction_count": len(getattr(rule, "correction_event_ids", []) or []),
+            }
+        )
     return history
 
 
@@ -985,7 +994,8 @@ def synthesize_meta_rules_agentic(
     if len(evidence.graduated_rules) < min_group_size:
         _log.debug(
             "Agentic synthesis: only %d graduated rules (need %d), skipping",
-            len(evidence.graduated_rules), min_group_size,
+            len(evidence.graduated_rules),
+            min_group_size,
         )
         return []
 
@@ -1030,15 +1040,28 @@ def synthesize_meta_rules_agentic(
         # Prefer LLM-synthesized behavioral principle when credentials available.
         # Empirically (2026-04-14 ablation) deterministic principles regress
         # correctness; LLM principles are injectable, deterministic are not.
+        # Without creds we emit deterministic meta-rules that are stored but
+        # never injected (INJECTABLE_META_SOURCES excludes them) — warn loudly
+        # so the capability gap is visible instead of silent 100% discard.
         llm_principle = _try_llm_principle(rules, category)
         if llm_principle:
             principle = llm_principle
             source = "llm_synth"
         else:
-            principle = f"Across {len(rules)} corrections in {category}: " + "; ".join(descriptions[:5])
+            principle = f"Across {len(rules)} corrections in {category}: " + "; ".join(
+                descriptions[:5]
+            )
             if len(descriptions) > 5:
                 principle += f" (and {len(descriptions) - 5} more)"
             source = "deterministic"
+            _log.warning(
+                "meta-rule synthesis degraded to deterministic for '%s' (%d rules) — "
+                "no LLM creds. Resulting meta-rule will be stored but not injected. "
+                "Set GRADATA_LLM_KEY+GRADATA_LLM_BASE or GRADATA_GEMMA_API_KEY to "
+                "enable injectable LLM synthesis.",
+                category,
+                len(rules),
+            )
 
         meta = MetaRule(
             id=mid,
@@ -1059,13 +1082,17 @@ def synthesize_meta_rules_agentic(
     # Rules appearing in 3+ domains are universal principle candidates.
     if evidence.iteration < max_iterations:
         cross_domain = detect_cross_domain_candidates(
-            evidence.graduated_rules, min_domains=3,
+            evidence.graduated_rules,
+            min_domains=3,
         )
         for candidate in cross_domain:
             if evidence.iteration >= max_iterations:
                 break
-            cd_ids = [_lesson_id(r) for r in evidence.graduated_rules
-                      if r.description.strip() == candidate["description"]]
+            cd_ids = [
+                _lesson_id(r)
+                for r in evidence.graduated_rules
+                if r.description.strip() == candidate["description"]
+            ]
             validated_cd = _validate_citations(cd_ids, evidence.rule_ids_retrieved)
             if len(validated_cd) < 3:
                 continue
@@ -1089,7 +1116,9 @@ def synthesize_meta_rules_agentic(
 
     _log.info(
         "Agentic synthesis: %d new meta-rules from %d groups + cross-domain (%d iterations)",
-        len(new_metas), len(groups), evidence.iteration,
+        len(new_metas),
+        len(groups),
+        evidence.iteration,
     )
     return new_metas
 
