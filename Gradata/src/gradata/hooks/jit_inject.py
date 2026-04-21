@@ -338,9 +338,11 @@ def main(data: dict) -> dict | None:
     # per injected rule; state semantics are preserved, verbosity reduced.
     # Use a compact single-line header instead of XML open/close tags (~10 tok
     # savings per turn measured 2026-04-21 autoresearch loop).
+    # Drop the colon and decimal point from confidence: [P:0.83] → [P83]
+    # saves 3 tokens per rule (measured 2026-04-21 autoresearch loop iteration 1).
     _STATE_ABBREV = {"PATTERN": "P", "INSTINCT": "I", "RULE": "R"}
     lines = [
-        f"[{_STATE_ABBREV.get(r.state.name, r.state.name)}:{r.confidence:.2f}]"
+        f"[{_STATE_ABBREV.get(r.state.name, r.state.name)}{round(r.confidence * 100):02d}]"
         f" {r.category}: {r.description}"
         for r, _sim in ranked
     ]
