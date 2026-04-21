@@ -354,7 +354,10 @@ def main(data: dict) -> dict | None:
             f"[{_STATE_ABBREV.get(r.state.name, r.state.name)}{round(r.confidence * 100):02d}]"
             f" {r.category}: {r.description}"
         )
-    rules_block = "[jit]\n" + "\n".join(lines)
+    # Drop the separate `[jit]` section header: the [P83]/[I83]/[R83] markers
+    # already identify these as JIT rule injections. Saves 3 tokens per firing turn
+    # (measured 2026-04-21 autoresearch loop iteration 3).
+    rules_block = "\n".join(lines)
     return {"result": rules_block}
 
 

@@ -203,8 +203,17 @@ def main(data: dict) -> dict | None:
             )
 
         if signals:
-            signal_names = ", ".join(s["type"] for s in signals)
-            return {"result": f"IMPLICIT FEEDBACK: [{signal_names}]"}
+            # Abbreviate signal names and use compact [fb:...] prefix
+            # to save ~5 tokens vs "IMPLICIT FEEDBACK: [negation, reminder]".
+            _SIG_ABBREV = {
+                "negation": "neg",
+                "reminder": "rem",
+                "challenge": "chal",
+                "approval": "approv",
+                "gap": "gap",
+            }
+            sig_str = ",".join(_SIG_ABBREV.get(s["type"], s["type"]) for s in signals)
+            return {"result": f"[fb:{sig_str}]"}
         return None
     except Exception as exc:
         _log.debug("implicit_feedback hook error: %s", exc)

@@ -141,6 +141,29 @@ def _read_brain_prompt(brain_dir: Path) -> str | None:
     # marker — saves 8 tokens per session start with identical LLM semantics.
     text = _re.sub(r"<brain-wisdom>\s*", "", text)
     text = _re.sub(r"\s*</brain-wisdom>", "", text).strip()
+    # Strip **bold** markdown markers — they add ~5 tokens for zero semantic gain.
+    text = _re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
+    # Collapse indented sub-bullets (`  - item`) into inline `;`-separated suffixes.
+    # E.g. `- Lead handling:\n  - A\n  - B` → `- Lead handling: A; B`
+    # Saves ~12 tokens per session start (measured 2026-04-21 autoresearch loop).
+    lines = text.split("\n")
+    result: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        sub_items: list[str] = []
+        j = i + 1
+        while j < len(lines) and lines[j].startswith("  - "):
+            sub_items.append(lines[j][4:])
+            j += 1
+        if sub_items:
+            parent = line.rstrip(":")
+            result.append(parent + ": " + "; ".join(sub_items))
+            i = j
+        else:
+            result.append(line)
+            i += 1
+    text = "\n".join(result)
     # Truncate body before wrapping.
     if len(text) > MAX_BRAIN_PROMPT_CHARS:
         text = text[:MAX_BRAIN_PROMPT_CHARS] + "\n[trunc]"
