@@ -17,6 +17,7 @@ Usage:
     gradata install brain-archive.zip          # Install from marketplace
     gradata install --list                     # List installed brains
 """
+
 from __future__ import annotations
 
 import argparse
@@ -40,6 +41,7 @@ def _get_brain(args):
     brains, etc.).
     """
     from gradata import Brain
+
     brain_dir = env_str("GRADATA_BRAIN") or getattr(args, "brain_dir", None) or Path.cwd()
     return Brain(brain_dir)
 
@@ -113,8 +115,12 @@ def cmd_manifest(args):
         meta = m.get("metadata", {})
         quality = m.get("quality", {})
         rag = m.get("rag", {})
-        print(f"Brain {meta.get('brain_version', '?')} | {meta.get('sessions_trained', 0)} sessions | {meta.get('maturity_phase', '?')}")
-        print(f"  Quality: correction_rate={quality.get('correction_rate')}, lessons={quality.get('lessons_active', 0)} active / {quality.get('lessons_graduated', 0)} graduated")
+        print(
+            f"Brain {meta.get('brain_version', '?')} | {meta.get('sessions_trained', 0)} sessions | {meta.get('maturity_phase', '?')}"
+        )
+        print(
+            f"  Quality: correction_rate={quality.get('correction_rate')}, lessons={quality.get('lessons_active', 0)} active / {quality.get('lessons_graduated', 0)} graduated"
+        )
         print(f"  RAG: {rag.get('provider', '?')} ({rag.get('chunks_indexed', 0)} chunks)")
 
 
@@ -132,11 +138,14 @@ def cmd_stats(args):
 def cmd_audit(args):
     try:
         from gradata._data_flow_audit import run_audit
+
         report = run_audit()
         if args.json:
             print(json.dumps(report, indent=2))
         else:
-            status = "PASS" if report["score"] >= 80 else "WARN" if report["score"] >= 60 else "FAIL"
+            status = (
+                "PASS" if report["score"] >= 80 else "WARN" if report["score"] >= 60 else "FAIL"
+            )
             print(f"{status}: {report['passed']}/{report['total']} checks ({report['score']}%)")
             failures = [c for c in report["checks"] if not c["passed"]]
             if failures:
@@ -156,6 +165,7 @@ def cmd_export(args):
     target = getattr(args, "target", None)
     if target:
         from gradata.enhancements.rule_export import export_rules
+
         brain_root = _resolve_brain_root(args)
         # Prefer the canonical lessons path the rest of the SDK uses, rather
         # than hardcoding brain_root/"lessons.md" inside the exporter.
@@ -197,6 +207,7 @@ def cmd_context(args):
 def cmd_validate(args):
     brain = _get_brain(args)
     from gradata._validator import print_report, validate_brain
+
     manifest_path = Path(args.manifest) if args.manifest else brain.dir / "brain.manifest.json"
     report = validate_brain(manifest_path)
     if args.json:
@@ -209,8 +220,15 @@ def cmd_validate(args):
 
 def cmd_doctor(args):
     from gradata._doctor import diagnose, print_diagnosis
+
     brain_dir = getattr(args, "brain_dir", None)
-    report = diagnose(brain_dir=brain_dir)
+    cloud_only = getattr(args, "cloud", False)
+    include_cloud = not getattr(args, "no_cloud", False)
+    report = diagnose(
+        brain_dir=brain_dir,
+        include_cloud=include_cloud,
+        cloud_only=cloud_only,
+    )
     if getattr(args, "json", False):
         print(json.dumps(report, indent=2))
     else:
@@ -250,11 +268,14 @@ def cmd_health(args):
         except ImportError:
             from gradata.enhancements.reporting import format_health_report, generate_health_report
     except ImportError:
-        print("Health reports require the reporting module. Cloud features require the Gradata cloud service (coming soon).")
+        print(
+            "Health reports require the reporting module. Cloud features require the Gradata cloud service (coming soon)."
+        )
         sys.exit(1)
     report = generate_health_report(brain.db_path)
     if getattr(args, "json", False):
         import dataclasses
+
         print(json.dumps(dataclasses.asdict(report), indent=2))
     else:
         print(format_health_report(report))
@@ -282,7 +303,9 @@ def cmd_report(args):
                 generate_rule_audit,
             )
     except ImportError:
-        print("Reports require the reporting module. Cloud features require the Gradata cloud service (coming soon).")
+        print(
+            "Reports require the reporting module. Cloud features require the Gradata cloud service (coming soon)."
+        )
         sys.exit(1)
     report_type = args.type
     if report_type == "csv":
@@ -376,6 +399,7 @@ def cmd_diagnose(args):
     if lessons_path.exists():
         try:
             from gradata.enhancements.self_improvement import parse_lessons
+
             lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
             states = Counter(lesson.state.value for lesson in lessons)
             print(f"Lessons: {len(lessons)}")
@@ -413,6 +437,7 @@ def cmd_correct(args):
 def cmd_review(args):
     brain = _get_brain(args)
     import json as _json
+
     if args.approve:
         result = brain.approve_lesson(args.approve)
         if args.json:
@@ -440,9 +465,9 @@ def cmd_review(args):
             for p in pending:
                 print(f"  ID {p['id']}  [{p['lesson_category']}]  {p['lesson_description'][:60]}")
                 print(f"    Severity: {p.get('severity', '?')}  |  Created: {p['created_at']}")
-                if p.get('draft_text'):
+                if p.get("draft_text"):
                     print(f"    Draft:  {p['draft_text'][:80]}...")
-                if p.get('final_text'):
+                if p.get("final_text"):
                     print(f"    Final:  {p['final_text'][:80]}...")
                 print()
             print("  gradata review --approve ID   Accept a lesson")
@@ -474,7 +499,9 @@ def cmd_convergence(args):
         print(f"  S{s:<4} │{bar} {c}")
 
     print(f"  {'─' * (chart_width + 15)}")
-    print(f"  Total: {data.get('total_corrections', 0)} corrections across {data.get('total_sessions', 0)} sessions")
+    print(
+        f"  Total: {data.get('total_corrections', 0)} corrections across {data.get('total_sessions', 0)} sessions"
+    )
     print(f"  Trend: {trend} (p={data.get('p_value', 1.0):.3f})")
 
     # Category breakdown
@@ -491,6 +518,7 @@ def cmd_convergence(args):
 def cmd_demo(args):
     """Copy pre-trained demo brain to target directory."""
     import shutil
+
     target = Path(args.target)
     demo_src = Path(__file__).parent / "demo" / "brain"
     if not demo_src.is_dir():
@@ -510,6 +538,7 @@ def _gradata_config_path(args=None) -> Path:
     Precedence: --config arg > GRADATA_CONFIG env > ~/.gradata/config.toml
     """
     import os
+
     explicit = getattr(args, "config", None) if args else None
     if explicit:
         return Path(explicit)
@@ -522,13 +551,22 @@ def _gradata_config_path(args=None) -> Path:
 def _sanitize_toml_value(val: str) -> str:
     """Finding 12: strip characters that could inject TOML structure."""
     # Remove newlines, brackets, and unbalanced quotes to prevent injection
-    return val.replace("\n", "").replace("\r", "").replace("[", "").replace("]", "").replace('"', "").replace("\\", "").strip()
+    return (
+        val.replace("\n", "")
+        .replace("\r", "")
+        .replace("[", "")
+        .replace("]", "")
+        .replace('"', "")
+        .replace("\\", "")
+        .strip()
+    )
 
 
 def _check_config_permissions(config_path: Path) -> None:
     """Finding 4: warn if config file is world-readable (Unix only)."""
     import os
     import stat
+
     try:
         st = os.stat(config_path)
         # Check if group or others have any permissions
@@ -636,9 +674,9 @@ def cmd_login(args):
             config_path.write_text(
                 f"# Gradata cloud config (auto-generated by `gradata login`)\n"
                 f"[cloud]\n"
-                f"api_key = \"{safe_key}\"\n"
-                f"brain_id = \"{safe_brain}\"\n"
-                f"api_url = \"{safe_url}\"\n",
+                f'api_key = "{safe_key}"\n'
+                f'brain_id = "{safe_brain}"\n'
+                f'api_url = "{safe_url}"\n',
                 encoding="utf-8",
             )
 
@@ -679,6 +717,7 @@ def cmd_logout(args):
         print("Not logged in (no config file found).")
 
     import os
+
     os.environ.pop("GRADATA_API_KEY", None)
 
 
@@ -740,7 +779,10 @@ def cmd_rule_add(args):
     from gradata import Brain as _Brain
 
     add_result = _Brain(brain_root).add_rule(
-        description=description, category=category, state="RULE", confidence=1.0,
+        description=description,
+        category=category,
+        state="RULE",
+        confidence=1.0,
     )
     if not add_result.get("added"):
         reason = add_result.get("reason", "unknown")
@@ -757,12 +799,12 @@ def cmd_rule_add(args):
 # (yashserai19/TECHBITS). Seeded at RULE tier so they inject immediately, no
 # correction loop required. Users still get learned rules on top.
 _SEVEN_STARTER_RULES: list[tuple[str, str]] = [
-    ("PATTERN",  "Follow existing patterns before introducing new abstractions"),
-    ("CODE",     "Keep diffs small and focused"),
-    ("PROCESS",  "Run the smallest relevant test or lint after each change"),
-    ("TRUTH",    "State clearly when a command cannot be run — never pretend it ran"),
-    ("PROCESS",  "State assumptions before implementing"),
-    ("PROCESS",  "Update docs, tests, and types when behavior changes"),
+    ("PATTERN", "Follow existing patterns before introducing new abstractions"),
+    ("CODE", "Keep diffs small and focused"),
+    ("PROCESS", "Run the smallest relevant test or lint after each change"),
+    ("TRUTH", "State clearly when a command cannot be run — never pretend it ran"),
+    ("PROCESS", "State assumptions before implementing"),
+    ("PROCESS", "Update docs, tests, and types when behavior changes"),
     ("SECURITY", "Never expose secrets — no keys, tokens, or credentials in code or output"),
 ]
 
@@ -790,7 +832,10 @@ def cmd_seed(args):
     skipped = 0
     for category, text in rules:
         result = brain.add_rule(
-            description=text, category=category, state="RULE", confidence=1.0,
+            description=text,
+            category=category,
+            state="RULE",
+            confidence=1.0,
         )
         if result.get("added"):
             added += 1
@@ -829,9 +874,7 @@ def cmd_rule_list(args):
         # Accept both modern layout (marker inside description) and the legacy
         # "[RULE:conf] [hooked] CATEGORY: desc" layout where the marker appears
         # between the state bracket and the category.
-        lesson_re = _re.compile(
-            r"^\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+(?:\[hooked\]\s+)?(\w+):\s+(.+)$"
-        )
+        lesson_re = _re.compile(r"^\[[\d-]+\]\s+\[RULE:[\d.]+\]\s+(?:\[hooked\]\s+)?(\w+):\s+(.+)$")
         for line in lessons_file.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
             # Legacy marker position: remember it, then strip for regex.
@@ -842,14 +885,12 @@ def cmd_rule_list(args):
             category = m.group(1)
             desc = m.group(2).strip()
             modern_marker = desc.startswith("[hooked] ")
-            clean_desc = desc[len("[hooked] "):] if modern_marker else desc
+            clean_desc = desc[len("[hooked] ") :] if modern_marker else desc
             rules.append((category, clean_desc, modern_marker or legacy_marker))
 
     # Discover installed hook files (pre + post)
-    pre_dir = Path(os.environ.get("GRADATA_HOOK_ROOT")
-                   or ".claude/hooks/pre-tool/generated")
-    post_dir = Path(os.environ.get("GRADATA_HOOK_ROOT_POST")
-                    or ".claude/hooks/post-tool/generated")
+    pre_dir = Path(os.environ.get("GRADATA_HOOK_ROOT") or ".claude/hooks/pre-tool/generated")
+    post_dir = Path(os.environ.get("GRADATA_HOOK_ROOT_POST") or ".claude/hooks/post-tool/generated")
 
     installed_files: dict[str, Path] = {}  # slug (file stem) -> path
     for d in (pre_dir, post_dir):
@@ -914,10 +955,8 @@ def cmd_rule_remove(args):
     lessons_file = brain_root / "lessons.md"
 
     # 1. Delete hook file from whichever generated dir holds it
-    pre_dir = Path(os.environ.get("GRADATA_HOOK_ROOT")
-                   or ".claude/hooks/pre-tool/generated")
-    post_dir = Path(os.environ.get("GRADATA_HOOK_ROOT_POST")
-                    or ".claude/hooks/post-tool/generated")
+    pre_dir = Path(os.environ.get("GRADATA_HOOK_ROOT") or ".claude/hooks/pre-tool/generated")
+    post_dir = Path(os.environ.get("GRADATA_HOOK_ROOT_POST") or ".claude/hooks/post-tool/generated")
 
     removed_file = None
     for d in (pre_dir, post_dir):
@@ -962,7 +1001,7 @@ def cmd_rule_remove(args):
             legacy_marker = bool(_re.search(r"\[RULE:[\d.]+\]\s+\[hooked\]\s+", stripped))
             modern_marker = desc.startswith("[hooked] ")
             was_hooked = legacy_marker or modern_marker
-            clean_desc = desc[len("[hooked] "):] if modern_marker else desc
+            clean_desc = desc[len("[hooked] ") :] if modern_marker else desc
             match_this = _slug(clean_desc) == slug
 
             if not match_this:
@@ -990,7 +1029,7 @@ def cmd_rule_remove(args):
                 meta_line = lines[i]
                 meta_stripped = meta_line.strip()
                 if meta_stripped.startswith("Metadata:"):
-                    payload = meta_stripped[len("Metadata:"):].strip()
+                    payload = meta_stripped[len("Metadata:") :].strip()
                     try:
                         md = _json_meta.loads(payload)
                     except (ValueError, TypeError):
@@ -1017,6 +1056,7 @@ def cmd_rule_remove(args):
                 HOOK_DEMOTED,
                 RULE_PATCH_REVERTED,
             )
+
             _events.emit(
                 RULE_PATCH_REVERTED,
                 "cli:rule-remove",
@@ -1064,12 +1104,15 @@ def cmd_hooks(args):
     action = args.action
     if action == "install":
         from gradata.hooks.claude_code import install_hook
+
         install_hook(profile=getattr(args, "profile", "standard"))
     elif action == "uninstall":
         from gradata.hooks.claude_code import uninstall_hook
+
         uninstall_hook()
     elif action == "status":
         from gradata.hooks.claude_code import hook_status
+
         hook_status()
 
 
@@ -1078,8 +1121,9 @@ def main():
         prog="gradata",
         description="Personal AI Brain SDK",
     )
-    parser.add_argument("--brain-dir", "-b", type=Path,
-                        help="Brain directory (default: current dir)")
+    parser.add_argument(
+        "--brain-dir", "-b", type=Path, help="Brain directory (default: current dir)"
+    )
     sub = parser.add_subparsers(dest="command")
 
     # init
@@ -1088,10 +1132,15 @@ def main():
     p_init.add_argument("--name", default=None, help="Brain name (default: directory name)")
     p_init.add_argument("--domain", default=None, help="Brain domain (e.g., Sales, Engineering)")
     p_init.add_argument("--company", default=None, help="Company name (creates company.md)")
-    p_init.add_argument("--embedding", choices=["local", "gemini"], default=None,
-                         help="Embedding provider: local (default) or gemini")
-    p_init.add_argument("--no-interactive", action="store_true",
-                         help="Skip interactive prompts, use defaults")
+    p_init.add_argument(
+        "--embedding",
+        choices=["local", "gemini"],
+        default=None,
+        help="Embedding provider: local (default) or gemini",
+    )
+    p_init.add_argument(
+        "--no-interactive", action="store_true", help="Skip interactive prompts, use defaults"
+    )
 
     # search
     p_search = sub.add_parser("search", help="Search the brain")
@@ -1119,15 +1168,15 @@ def main():
         "export",
         help="Export brain (marketplace archive, or graduated rules for cursor/agents/aider)",
     )
-    p_export.add_argument("--mode", choices=["full", "no-prospects", "domain-only"],
-                          default="full")
+    p_export.add_argument("--mode", choices=["full", "no-prospects", "domain-only"], default="full")
     p_export.add_argument(
         "--target",
         choices=["cursor", "agents", "aider", "codex", "cline", "continue"],
         help="Emit graduated RULE-tier lessons in platform-specific format",
     )
-    p_export.add_argument("--output", "-o",
-                          help="Output file when using --target (default: stdout)")
+    p_export.add_argument(
+        "--output", "-o", help="Output file when using --target (default: stdout)"
+    )
 
     # context
     p_ctx = sub.add_parser("context", help="Compile context for a message")
@@ -1142,6 +1191,8 @@ def main():
     # doctor
     p_doctor = sub.add_parser("doctor", help="Check environment and brain health")
     p_doctor.add_argument("--json", action="store_true", help="Output as JSON")
+    p_doctor.add_argument("--cloud", action="store_true", help="Only run cloud checks")
+    p_doctor.add_argument("--no-cloud", action="store_true", help="Skip cloud checks (offline)")
 
     # install
     p_install = sub.add_parser("install", help="Install a brain from marketplace archive")
@@ -1156,25 +1207,29 @@ def main():
 
     # report
     p_report = sub.add_parser("report", help="Generate reports (csv, metrics, rules)")
-    p_report.add_argument("type", choices=["csv", "metrics", "rules", "health"],
-                          help="Report type")
+    p_report.add_argument("type", choices=["csv", "metrics", "rules", "health"], help="Report type")
     p_report.add_argument("--window", type=int, default=20, help="Rolling window size")
 
     # watch — sidecar file watcher
     p_watch = sub.add_parser("watch", help="Watch a directory for AI-generated file edits")
-    p_watch.add_argument("--dir", required=True, type=str,
-                         help="Directory to watch for file changes")
-    p_watch.add_argument("--brain", default=None, type=str,
-                         help="Path to brain directory (default: current dir)")
-    p_watch.add_argument("--interval", type=float, default=5.0,
-                         help="Poll interval in seconds (default: 5)")
+    p_watch.add_argument(
+        "--dir", required=True, type=str, help="Directory to watch for file changes"
+    )
+    p_watch.add_argument(
+        "--brain", default=None, type=str, help="Path to brain directory (default: current dir)"
+    )
+    p_watch.add_argument(
+        "--interval", type=float, default=5.0, help="Poll interval in seconds (default: 5)"
+    )
 
     # diagnose — free correction pattern diagnostic (no graduation needed)
     sub.add_parser("diagnose", help="Analyze correction patterns (free diagnostic)")
 
     # review — human-in-the-loop approval
     p_review = sub.add_parser("review", help="Review pending lessons for approval")
-    p_review.add_argument("--approve", type=int, metavar="ID", help="Approve a pending lesson by ID")
+    p_review.add_argument(
+        "--approve", type=int, metavar="ID", help="Approve a pending lesson by ID"
+    )
     p_review.add_argument("--reject", type=int, metavar="ID", help="Reject a pending lesson by ID")
     p_review.add_argument("--reason", type=str, default="", help="Reason for rejection")
     p_review.add_argument("--json", action="store_true", help="Output as JSON")
@@ -1196,13 +1251,21 @@ def main():
     # login / logout — device auth flow for cloud sync
     sub.add_parser("login", help="Connect SDK to app.gradata.ai (device auth flow)")
     p_logout = sub.add_parser("logout", help="Disconnect SDK from cloud")
-    p_logout.add_argument("--config", type=str, default=None,
-                          help="Path to config file (default: ~/.gradata/config.toml)")
+    p_logout.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Path to config file (default: ~/.gradata/config.toml)",
+    )
 
     p_hooks = sub.add_parser("hooks", help="Manage Claude Code hook integration")
     p_hooks.add_argument("action", choices=["install", "uninstall", "status"], help="Hook action")
-    p_hooks.add_argument("--profile", choices=["minimal", "standard", "strict"],
-                         default="standard", help="Hook profile tier (default: standard)")
+    p_hooks.add_argument(
+        "--profile",
+        choices=["minimal", "standard", "strict"],
+        default="standard",
+        help="Hook profile tier (default: standard)",
+    )
 
     # seed — pre-populate brain with high-confidence starter rules
     p_seed = sub.add_parser(
@@ -1221,14 +1284,18 @@ def main():
         "mine",
         help="Backfill brain from ~/.claude/projects transcript archive",
     )
-    p_mine.add_argument("--commit", action="store_true",
-                        help="Append to live events.jsonl (default: shadow file only)")
-    p_mine.add_argument("--dry-run", action="store_true",
-                        help="Report counts only, write nothing")
-    p_mine.add_argument("--project", default=None,
-                        help="Only scan one project dir (default: all)")
-    p_mine.add_argument("--projects-root", default=None,
-                        help="Override transcript root (default: ~/.claude/projects)")
+    p_mine.add_argument(
+        "--commit",
+        action="store_true",
+        help="Append to live events.jsonl (default: shadow file only)",
+    )
+    p_mine.add_argument("--dry-run", action="store_true", help="Report counts only, write nothing")
+    p_mine.add_argument("--project", default=None, help="Only scan one project dir (default: all)")
+    p_mine.add_argument(
+        "--projects-root",
+        default=None,
+        help="Override transcript root (default: ~/.claude/projects)",
+    )
 
     # rule — user-declared rules (fast-track to RULE tier, try hook install)
     p_rule = sub.add_parser("rule", help="Manage user-declared rules")
@@ -1238,8 +1305,11 @@ def main():
     rule_sub.add_parser("list", help="List RULE-tier lessons and hook status")
     p_rule_remove = rule_sub.add_parser("remove", help="Remove a graduated hook by slug")
     p_rule_remove.add_argument("slug", help="Hook slug (from `gradata rule list`)")
-    p_rule_remove.add_argument("--purge", action="store_true",
-                               help="Also delete the lesson (default: keep as soft injection)")
+    p_rule_remove.add_argument(
+        "--purge",
+        action="store_true",
+        help="Also delete the lesson (default: keep as soft injection)",
+    )
 
     args = parser.parse_args()
 
