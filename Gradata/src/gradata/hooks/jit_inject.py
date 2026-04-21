@@ -326,8 +326,13 @@ def main(data: dict) -> dict | None:
         },
     )
 
+    # Abbreviate state names (PATTERN→P, INSTINCT→I, RULE→R) to save ~1 token
+    # per injected rule; state semantics are preserved, verbosity reduced.
+    _STATE_ABBREV = {"PATTERN": "P", "INSTINCT": "I", "RULE": "R"}
     lines = [
-        f"[{r.state.name}:{r.confidence:.2f}] {r.category}: {r.description}" for r, _sim in ranked
+        f"[{_STATE_ABBREV.get(r.state.name, r.state.name)}:{r.confidence:.2f}]"
+        f" {r.category}: {r.description}"
+        for r, _sim in ranked
     ]
     rules_block = "<brain-rules-jit>\n" + "\n".join(lines) + "\n</brain-rules-jit>"
     return {"result": rules_block}

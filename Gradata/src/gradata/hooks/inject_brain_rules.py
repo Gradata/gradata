@@ -132,9 +132,14 @@ def _read_brain_prompt(brain_dir: Path) -> str | None:
         return None
     if not text or _BRAIN_PROMPT_MARKER not in text[:400]:
         return None
+    # Strip XML/HTML comments — they carry no semantic signal for the LLM and
+    # cost ~40 tokens per session start (measured 2026-04-21 autoresearch loop).
+    import re as _re
+
+    text = _re.sub(r"<!--.*?-->", "", text, flags=_re.DOTALL).strip()
     # Truncate inner body BEFORE wrapping so the XML tags remain intact.
     if len(text) > MAX_BRAIN_PROMPT_CHARS:
-        text = text[:MAX_BRAIN_PROMPT_CHARS] + "\n<!-- truncated -->"
+        text = text[:MAX_BRAIN_PROMPT_CHARS] + "\n[trunc]"
     if "<brain-wisdom>" not in text:
         text = f"<brain-wisdom>\n{text}\n</brain-wisdom>"
     return text
