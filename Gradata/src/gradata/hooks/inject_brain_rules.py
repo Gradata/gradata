@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -478,14 +479,18 @@ def main(data: dict) -> dict | None:
                 rows.append((entry["full_id"], session_num, applied_at, ctx_blob, "PENDING", 1))
             if rows:
                 conn = get_connection(db_path)
-                conn.executemany(
-                    "INSERT INTO lesson_applications "
-                    "(lesson_id, session, applied_at, context, outcome, success) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    rows,
-                )
-                conn.commit()
-                conn.close()
+                try:
+                    conn.executemany(
+                        "INSERT INTO lesson_applications "
+                        "(lesson_id, session, applied_at, context, outcome, success) "
+                        "VALUES (?, ?, ?, ?, ?, ?)",
+                        rows,
+                    )
+                    conn.commit()
+                finally:
+                    conn.close()
+        except sqlite3.OperationalError as exc:
+            _log.warning("lesson_applications write failed (schema issue?): %s", exc)
         except Exception as exc:
             _log.debug("lesson_applications write failed: %s", exc)
 

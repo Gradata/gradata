@@ -408,10 +408,18 @@ def push(brain_dir: str | Path) -> dict[str, int]:
             rows = _rows_since(conn, table, tenant_id, since)
             if not rows:
                 continue
-            transformed = [_transform_row(table, r, tenant_id) for r in rows]
+            transformed = []
+            for r in rows:
+                try:
+                    transformed.append(_transform_row(table, r, tenant_id))
+                except Exception as exc:
+                    _log.warning("cloud_sync: skipping malformed row in %s: %s", table, exc)
+                    all_ok = False
+            if not transformed:
+                continue
             accepted = _post(table, transformed)
             pushed[table] = accepted
-            if accepted != len(rows):
+            if accepted != len(transformed):
                 all_ok = False
         if pushed and all_ok:
             _mark_push(conn, tenant_id, started)

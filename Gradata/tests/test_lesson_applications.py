@@ -105,6 +105,36 @@ def test_session_close_rejects_on_category_correction(tmp_path):
     assert by_category.get("TONE") == "CONFIRMED"
 
 
+def test_session_close_rejects_on_implicit_feedback(tmp_path):
+    """IMPLICIT_FEEDBACK events (text-speak corrections) must also flip PENDING→REJECTED."""
+    brain = _setup_brain(
+        tmp_path,
+        "[2026-04-01] [RULE:0.92] PROCESS: Always plan before implementing\n",
+    )
+    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(brain)}):
+        inject_main({"session_number": 33})
+
+    conn = sqlite3.connect(brain / "system.db")
+    conn.execute(
+        "INSERT INTO events (ts, session, type, source, data_json) "
+        "VALUES (?, ?, 'IMPLICIT_FEEDBACK', 'user_prompt', ?)",
+        (
+            "2026-04-20T12:00:00+00:00",
+            33,
+            json.dumps({"category": "PROCESS", "signal_type": "challenge"}),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    _resolve_pending_applications(str(brain), {"session_number": 33})
+    rows = _lesson_applications(brain)
+    assert rows, "expected at least one lesson_applications row"
+    # The sole PROCESS rule must be rejected on the IMPLICIT_FEEDBACK signal.
+    outcomes = {r[2] for r in rows}
+    assert outcomes == {"REJECTED"}
+
+
 def test_injection_no_db_is_silent(tmp_path):
     (tmp_path / "lessons.md").write_text(
         "[2026-04-01] [RULE:0.92] PROCESS: Always plan before implementing\n",

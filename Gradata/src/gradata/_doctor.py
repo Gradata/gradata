@@ -44,7 +44,7 @@ def _check_vector_store():
     """Report vector store status. FTS5 is primary search, sqlite-vec planned."""
     return {
         "name": "vector_store",
-        "status": "fts5",
+        "status": "ok",
         "detail": "FTS5 is the primary search engine. sqlite-vec planned for vector similarity.",
     }
 
