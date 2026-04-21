@@ -70,7 +70,12 @@ HOOK_META = {
 # The top-1 BM25 hit carries the dominant signal; marginal rules add noise.
 # Saves ~16 tok/turn over k=2 (expected ~160 weighted_tokens).
 DEFAULT_MAX_RULES = 1
-DEFAULT_MIN_CONFIDENCE = 0.60
+# Raised 0.60→0.90: rules below 0.90 are softer guidance (PATTERN tier) already
+# covered by the Active guidance section in the wisdom block or not high-signal
+# enough for per-turn injection. Rules ≥0.90 (RULE tier) in brain_prompt.md are
+# already in the session wisdom block, so the wisdom-dedup step will filter them.
+# Net effect: JIT fires only for novel RULE-tier rules outside the wisdom block.
+DEFAULT_MIN_CONFIDENCE = 0.90
 DEFAULT_MIN_SIMILARITY = 0.05
 MIN_DRAFT_LEN = 10
 
