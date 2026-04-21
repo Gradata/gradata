@@ -185,9 +185,10 @@ def _read_brain_prompt(brain_dir: Path) -> str | None:
     )
     # Limit to first GRADATA_WISDOM_MAX_RULES non-negotiable rules.
     # Keeps the highest-priority rules (listed first in brain_prompt.md) and
-    # drops marginal ones that cost tokens for low per-turn incremental value.
-    # Default 9: saves 2 rules × ~14 tok vs 11-rule default.
-    wisdom_max_rules = int(os.environ.get("GRADATA_WISDOM_MAX_RULES", "9"))
+    # drops lower-priority ones. Reduced 11→9→6: top-6 "Never" rules are the
+    # hardest constraints; "Always" operational rules below them fire when relevant
+    # via other context channels. Saves ~53 weighted_tokens (154→101).
+    wisdom_max_rules = int(os.environ.get("GRADATA_WISDOM_MAX_RULES", "6"))
     if wisdom_max_rules > 0:
         rule_lines = [ln for ln in text.split("\n") if ln.startswith("- ")]
         if len(rule_lines) > wisdom_max_rules:
