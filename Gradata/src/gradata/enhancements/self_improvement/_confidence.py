@@ -10,6 +10,7 @@ also live here and are imported by _graduation.py.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 
@@ -394,20 +395,16 @@ def parse_lessons(text: str) -> list[Lesson]:
             elif meta_line.startswith("Scope:"):
                 scope_json = meta_line[len("Scope:") :].strip()
             elif meta_line.startswith("Beta params:"):
-                import json as _json_bp
-
                 try:
-                    bp = _json_bp.loads(meta_line[len("Beta params:") :].strip())
+                    bp = json.loads(meta_line[len("Beta params:") :].strip())
                     alpha = bp.get("alpha", 1.0)
                     beta_param_val = bp.get("beta", 1.0)
-                except _json_bp.JSONDecodeError:
+                except json.JSONDecodeError:
                     pass
             elif meta_line.startswith("Domain scores:"):
-                import json as _json
-
                 try:
-                    domain_scores = _json.loads(meta_line[len("Domain scores:") :].strip())
-                except _json.JSONDecodeError:
+                    domain_scores = json.loads(meta_line[len("Domain scores:") :].strip())
+                except json.JSONDecodeError:
                     domain_scores = {}
             elif meta_line.startswith("Path:"):
                 path = meta_line[len("Path:") :].strip()
@@ -418,26 +415,22 @@ def parse_lessons(text: str) -> list[Lesson]:
                     if x.strip()
                 ]
             elif meta_line.startswith("Climb:"):
-                import json as _json_cl
-
                 try:
-                    _cl = _json_cl.loads(meta_line[len("Climb:") :].strip())
+                    _cl = json.loads(meta_line[len("Climb:") :].strip())
                     climb_count = _cl.get("count", 0)
                     last_climb_session = _cl.get("last_session", 0)
                     tree_level = _cl.get("level", 0)
-                except _json_cl.JSONDecodeError:
+                except json.JSONDecodeError:
                     pass
             elif meta_line.startswith("Metadata:"):
-                import json as _json_md
-
                 try:
-                    _md_dict = _json_md.loads(meta_line[len("Metadata:") :].strip())
+                    _md_dict = json.loads(meta_line[len("Metadata:") :].strip())
                     from gradata._types import RuleMetadata as _RM
 
                     metadata_obj = _RM(
                         **{k: v for k, v in _md_dict.items() if k in _RM.__dataclass_fields__}
                     )
-                except (ValueError, TypeError, _json_md.JSONDecodeError):
+                except (ValueError, TypeError, json.JSONDecodeError):
                     metadata_obj = None
             meta_m = _META_RE.search(meta_line)
             if meta_m:
@@ -1110,15 +1103,11 @@ def format_lessons(lessons: list[Lesson]) -> str:
             lines.append(f"  Scope: {lesson.scope_json}")
 
         if lesson.domain_scores:
-            import json as _json
-
-            lines.append(f"  Domain scores: {_json.dumps(lesson.domain_scores)}")
+            lines.append(f"  Domain scores: {json.dumps(lesson.domain_scores)}")
 
         if lesson.alpha != 1.0 or lesson.beta_param != 1.0:
-            import json as _json_bp
-
             lines.append(
-                f"  Beta params: {_json_bp.dumps({'alpha': lesson.alpha, 'beta': lesson.beta_param})}"
+                f"  Beta params: {json.dumps({'alpha': lesson.alpha, 'beta': lesson.beta_param})}"
             )
 
         if lesson.path:
@@ -1128,18 +1117,14 @@ def format_lessons(lessons: list[Lesson]) -> str:
             lines.append(f"  Secondary categories: {','.join(lesson.secondary_categories)}")
 
         if lesson.climb_count or lesson.last_climb_session or lesson.tree_level:
-            import json as _json_cl
-
             lines.append(
-                f"  Climb: {_json_cl.dumps({'count': lesson.climb_count, 'last_session': lesson.last_climb_session, 'level': lesson.tree_level})}"
+                f"  Climb: {json.dumps({'count': lesson.climb_count, 'last_session': lesson.last_climb_session, 'level': lesson.tree_level})}"
             )
 
         if hasattr(lesson, "metadata") and lesson.metadata is not None:
-            import json as _json_meta
-
             md = lesson.metadata.to_dict() if hasattr(lesson.metadata, "to_dict") else {}
             if any(v for v in md.values() if v and v != 0.5):  # only write non-default
-                lines.append(f"  Metadata: {_json_meta.dumps(md)}")
+                lines.append(f"  Metadata: {json.dumps(md)}")
 
         lines.append("")  # blank line between lessons
 
