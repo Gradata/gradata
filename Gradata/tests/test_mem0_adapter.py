@@ -1,13 +1,10 @@
 """Tests for :mod:`gradata.adapters.mem0`.
 
-All tests use an injected fake client so the suite runs offline. A single
-``@pytest.mark.integration`` smoke test hits the real Mem0 API when
-``MEM0_API_KEY`` is set in the environment.
+All tests use an injected fake client so the suite runs offline.
 """
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
 import pytest
@@ -89,9 +86,7 @@ def test_runtime_checkable_protocol() -> None:
 
 
 def test_push_correction_returns_id_from_results_envelope() -> None:
-    fake = _FakeMem0Client(
-        add_response={"results": [{"id": "mem-123"}, {"id": "mem-124"}]}
-    )
+    fake = _FakeMem0Client(add_response={"results": [{"id": "mem-123"}, {"id": "mem-124"}]})
     adapter = Mem0Adapter(user_id="oliver", client=fake)
 
     memory_id = adapter.push_correction(
@@ -238,9 +233,7 @@ def test_pull_memory_for_context_normalises_results() -> None:
 
 
 def test_pull_memory_for_context_handles_bare_list() -> None:
-    fake = _FakeMem0Client(
-        search_response=[{"text": "plain text memory", "score": 0.5}]
-    )
+    fake = _FakeMem0Client(search_response=[{"text": "plain text memory", "score": 0.5}])
     adapter = Mem0Adapter(user_id="oliver", client=fake)
     hits = adapter.pull_memory_for_context("q")
     assert hits == [{"text": "plain text memory", "metadata": {}, "score": 0.5}]
@@ -253,9 +246,7 @@ def test_pull_memory_for_context_retries_without_filters_for_old_sdks() -> None:
     )
     adapter = Mem0Adapter(user_id="oliver", client=fake)
 
-    hits = adapter.pull_memory_for_context(
-        "q", k=3, filters={"tag": "email"}
-    )
+    hits = adapter.pull_memory_for_context("q", k=3, filters={"tag": "email"})
 
     assert len(hits) == 1
     # Exactly one successful call: the retry without the filters kwarg.
@@ -275,9 +266,7 @@ def test_pull_memory_for_context_returns_empty_on_exception(
         hits = adapter.pull_memory_for_context("q")
 
     assert hits == []
-    assert any(
-        "pull_memory_for_context failed" in r.message for r in caplog.records
-    )
+    assert any("pull_memory_for_context failed" in r.message for r in caplog.records)
 
 
 def test_pull_memory_for_context_handles_none() -> None:
@@ -326,30 +315,3 @@ def test_reconcile_returns_empty_on_exception(
     with caplog.at_level("WARNING", logger="gradata.adapters.mem0"):
         assert adapter.reconcile() == {}
     assert any("reconcile failed" in r.message for r in caplog.records)
-
-
-# ---------------------------------------------------------------------------
-# Real-client integration smoke test (skipped unless MEM0_API_KEY is set)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.integration
-@pytest.mark.skipif(
-    not os.environ.get("MEM0_API_KEY"),
-    reason="MEM0_API_KEY not set; skipping real Mem0 smoke test",
-)
-def test_real_mem0_roundtrip() -> None:
-    adapter = Mem0Adapter(
-        api_key=os.environ["MEM0_API_KEY"],
-        user_id="gradata-ci-smoke",
-    )
-    memory_id = adapter.push_correction(
-        draft="hey there",
-        final="Hi Oliver,",
-        summary="greeting style smoke test",
-        tags=["gradata-ci"],
-    )
-    assert memory_id is not None
-
-    hits = adapter.pull_memory_for_context("greeting style", k=3)
-    assert isinstance(hits, list)

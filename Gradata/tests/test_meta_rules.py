@@ -235,85 +235,6 @@ def test_refresh_meta_rules():
     print(f"[PASS] refresh_meta_rules -> {len(result)} meta-rules")
 
 
-@pytest.mark.skipif(
-    not Path(os.environ.get("GRADATA_LESSONS_PATH", "/nonexistent")).exists(),
-    reason="requires GRADATA_LESSONS_PATH env var pointing to real lessons.md",
-)
-def test_with_real_data():
-    """Load real lessons from the project and discover meta-rules."""
-    lessons_path = Path(os.environ.get("GRADATA_LESSONS_PATH", "lessons.md"))
-    archive_path = Path(os.environ.get("GRADATA_ARCHIVE_PATH", "lessons-archive.md"))
-
-    all_text = ""
-    for p in [lessons_path, archive_path]:
-        if p.exists():
-            all_text += "\n" + p.read_text(encoding="utf-8")
-
-    lessons = parse_lessons_from_markdown(all_text)
-    print(f"\n{'=' * 60}")
-    print(f"REAL DATA: Parsed {len(lessons)} lessons")
-    print(f"  INSTINCT: {sum(1 for l in lessons if l.state == LessonState.INSTINCT)}")
-    print(f"  PATTERN:  {sum(1 for l in lessons if l.state == LessonState.PATTERN)}")
-    print(f"  RULE:     {sum(1 for l in lessons if l.state == LessonState.RULE)}")
-    print(f"  UNTESTABLE: {sum(1 for l in lessons if l.state == LessonState.UNTESTABLE)}")
-
-    # Categories
-    from collections import Counter
-
-    cat_counts = Counter(l.category for l in lessons)
-    print(f"\n  Categories: {dict(cat_counts)}")
-
-    # Discover meta-rules including INSTINCT (lower threshold for real data test)
-    # First with only PATTERN+RULE (default)
-    metas_strict = discover_meta_rules(lessons, min_group_size=3, current_session=70)
-    print(f"\n  Meta-rules discovered (PATTERN+RULE only, min 3): {len(metas_strict)}")
-    for meta in metas_strict:
-        print(f"\n  [{meta.id}] confidence={meta.confidence:.2f}")
-        print(f"    Categories: {meta.source_categories}")
-        print(f"    Sources: {len(meta.source_lesson_ids)} lessons")
-        print(f"    Principle: {meta.principle}")
-        if meta.examples:
-            for ex in meta.examples:
-                print(f"    Example: {ex}")
-
-    # Also test with all eligible lessons relaxed to include INSTINCT
-    # (to show what would emerge as lessons graduate)
-    all_for_preview = []
-    for l in lessons:
-        # Temporarily promote INSTINCT to PATTERN for preview
-        preview = Lesson(
-            date=l.date,
-            state=LessonState.PATTERN if l.state == LessonState.INSTINCT else l.state,
-            confidence=max(l.confidence, 0.60),
-            category=l.category,
-            description=l.description,
-            root_cause=l.root_cause,
-        )
-        all_for_preview.append(preview)
-
-    metas_preview = discover_meta_rules(all_for_preview, min_group_size=3, current_session=70)
-    print(f"\n  PREVIEW (if all INSTINCT graduated): {len(metas_preview)} meta-rules")
-    for meta in metas_preview:
-        print(f"\n  [{meta.id}] confidence={meta.confidence:.2f}")
-        print(f"    Categories: {meta.source_categories}")
-        print(f"    Sources: {len(meta.source_lesson_ids)} lessons")
-        print(f"    Principle: {meta.principle}")
-
-    # Format for prompt
-    if metas_preview:
-        print(f"\n{'=' * 60}")
-        print("FORMATTED FOR PROMPT INJECTION:")
-        print(format_meta_rules_for_prompt(metas_preview))
-
-    # Save to real system.db
-    db_path = Path(os.environ.get("GRADATA_DB_PATH", "system.db"))
-    if db_path.exists() and metas_strict:
-        saved = save_meta_rules(db_path, metas_strict)
-        print(f"\nSaved {saved} meta-rules to {db_path}")
-        loaded = load_meta_rules(db_path)
-        print(f"Verified: loaded {len(loaded)} meta-rules back from DB")
-
-
 # ---------------------------------------------------------------------------
 # Differential-privacy export scaffold tests
 # ---------------------------------------------------------------------------
@@ -437,10 +358,6 @@ if __name__ == "__main__":
     test_apply_dp_enabled_suppresses_text_and_perturbs_numbers()
     test_apply_dp_noise_actually_perturbs_confidence()
     test_apply_dp_rejects_bad_config()
-
-    print("\n" + "=" * 60)
-    print("Running against REAL lesson data...\n")
-    test_with_real_data()
 
     print("\n" + "=" * 60)
     print("ALL TESTS PASSED")

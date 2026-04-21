@@ -1,23 +1,15 @@
-"""Integration tests — full correction pipeline with real LLM extraction.
+"""Integration tests — full correction → lesson → convergence flow.
 
-These tests hit external APIs and cost money. Skip in normal CI.
-Run manually: pytest tests/test_integration_workflow.py -v -m integration
+These exercise the hermetic local pipeline (no network, no LLM). They used
+to be gated behind an API-key check — that was stale: brain.correct(),
+brain.convergence(), and brain.efficiency() are all local operations.
 """
-import os
-import tempfile
 
 import pytest
 
 from gradata.brain import Brain
 
-# Skip all tests if no API key available
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skipif(
-        not os.environ.get("ANTHROPIC_API_KEY") and not os.environ.get("OPENAI_API_KEY"),
-        reason="No API key — skipping integration tests",
-    ),
-]
+pytestmark = [pytest.mark.integration]
 
 
 @pytest.fixture

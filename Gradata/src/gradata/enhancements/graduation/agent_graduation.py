@@ -73,11 +73,11 @@ from gradata.enhancements.self_improvement import (
 # These define when an agent's approval gate graduates.
 # FDA = First-Draft Acceptance (output used without edits)
 
-GATE_CONFIRM_TO_PREVIEW = 0.70    # 70% FDA over 10+ outputs → PREVIEW
-GATE_PREVIEW_TO_AUTO = 0.90       # 90% FDA over 25+ outputs → AUTO
-GATE_MIN_OUTPUTS_PREVIEW = 10     # Minimum outputs before PREVIEW eligible
-GATE_MIN_OUTPUTS_AUTO = 25        # Minimum outputs before AUTO eligible
-GATE_DEMOTION_THRESHOLD = 3       # 3 consecutive rejections → demote gate
+GATE_CONFIRM_TO_PREVIEW = 0.70  # 70% FDA over 10+ outputs → PREVIEW
+GATE_PREVIEW_TO_AUTO = 0.90  # 90% FDA over 25+ outputs → AUTO
+GATE_MIN_OUTPUTS_PREVIEW = 10  # Minimum outputs before PREVIEW eligible
+GATE_MIN_OUTPUTS_AUTO = 25  # Minimum outputs before AUTO eligible
+GATE_DEMOTION_THRESHOLD = 3  # 3 consecutive rejections → demote gate
 
 
 @dataclass
@@ -90,9 +90,9 @@ class AgentProfile:
 
     agent_type: str
     total_outputs: int = 0
-    approved_unchanged: int = 0     # FDA — used without edits
-    approved_edited: int = 0        # Approved but the user made changes
-    rejected: int = 0               # Output rejected/redone
+    approved_unchanged: int = 0  # FDA — used without edits
+    approved_edited: int = 0  # Approved but the user made changes
+    rejected: int = 0  # Output rejected/redone
     consecutive_rejections: int = 0
     approval_gate: str = "confirm"  # "confirm" | "preview" | "auto"
     lessons: list[Lesson] = field(default_factory=list)
@@ -129,9 +129,9 @@ class AgentOutcome:
     """Record of a single agent output evaluation."""
 
     agent_type: str
-    outcome: str           # "approved" | "edited" | "rejected"
-    edits: str | None      # What was changed (if edited)
-    output_preview: str    # First 200 chars of agent output
+    outcome: str  # "approved" | "edited" | "rejected"
+    edits: str | None  # What was changed (if edited)
+    output_preview: str  # First 200 chars of agent output
     session: int = 0
     timestamp: str = ""
     patterns_extracted: list[str] = field(default_factory=list)
@@ -207,13 +207,19 @@ _ENFORCEABLE_PATTERNS: dict[str, list[tuple[str, str]]] = {
     ],
     "CONSTRAINT": [
         ("paid", r"(?i)\b(?:paid\s+tier|subscription\s+required|credit\s+card)\b"),
-        ("cost money", r"(?i)\b(?:monthly\s+fee|per\s+month|/mo(?:nth)?)\b.*(?:composio|clay|phantombuster)"),
+        (
+            "cost money",
+            r"(?i)\b(?:monthly\s+fee|per\s+month|/mo(?:nth)?)\b.*(?:composio|clay|phantombuster)",
+        ),
     ],
     "PRICING": [
         ("starter", r"(?i)starter.*(?:multi|multiple|two|2)\s*(?:account|brand)"),
     ],
     "DATA_INTEGRITY": [
-        ("owner_only", r"(?i)\b(?:EXCLUDED_NAMES_PLACEHOLDER)(?:'s)?\s+(?:campaign|deal|contact|lead)"),  # configure excluded names in brain config
+        (
+            "owner_only",
+            r"(?i)\b(?:EXCLUDED_NAMES_PLACEHOLDER)(?:'s)?\s+(?:campaign|deal|contact|lead)",
+        ),  # configure excluded names in brain config
     ],
 }
 
@@ -255,6 +261,7 @@ def _now() -> str:
 # ---------------------------------------------------------------------------
 # Agent Graduation Tracker
 # ---------------------------------------------------------------------------
+
 
 class AgentGraduationTracker:
     """Manages graduation pipelines for all agent types in a brain.
@@ -394,23 +401,35 @@ class AgentGraduationTracker:
         )
         outcomes_path = self._agent_dir(agent_type) / "outcomes.jsonl"
         with open(outcomes_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps({
-                "agent_type": outcome_record.agent_type,
-                "outcome": outcome_record.outcome,
-                "edits": outcome_record.edits,
-                "output_preview": outcome_record.output_preview,
-                "session": outcome_record.session,
-                "timestamp": outcome_record.timestamp,
-                "patterns_extracted": outcome_record.patterns_extracted,
-            }) + "\n")
+            f.write(
+                json.dumps(
+                    {
+                        "agent_type": outcome_record.agent_type,
+                        "outcome": outcome_record.outcome,
+                        "edits": outcome_record.edits,
+                        "output_preview": outcome_record.output_preview,
+                        "session": outcome_record.session,
+                        "timestamp": outcome_record.timestamp,
+                        "patterns_extracted": outcome_record.patterns_extracted,
+                    }
+                )
+                + "\n"
+            )
 
         # Extract lessons from edits (corrections feed agent graduation)
         if outcome == "edited" and edits:
-            self._extract_agent_lesson(profile, edits, session,
-                                        task_type=task_type, edit_category=edit_category)
+            self._extract_agent_lesson(
+                profile, edits, session, task_type=task_type, edit_category=edit_category
+            )
         elif outcome == "rejected" and edits:
-            self._extract_agent_lesson(profile, edits, session, is_rejection=True,
-                                        task_type=task_type, edit_category=edit_category)
+            self._extract_agent_lesson(
+                profile,
+                edits,
+                session,
+                is_rejection=True,
+                task_type=task_type,
+                edit_category=edit_category,
+            )
 
         # Update approval gate graduation
         self._update_approval_gate(profile)
@@ -504,9 +523,7 @@ class AgentGraduationTracker:
             # lesson whose category matches the corrected category. When
             # edit_category is empty (legacy callers), fall back to always
             # counting (backward compatible).
-            category_matches = (
-                not norm_edit_cat or lesson.category.upper() == norm_edit_cat
-            )
+            category_matches = not norm_edit_cat or lesson.category.upper() == norm_edit_cat
 
             if outcome == "approved":
                 lesson.confidence = min(1.0, lesson.confidence + ACCEPTANCE_BONUS)
@@ -517,7 +534,7 @@ class AgentGraduationTracker:
                 if category_matches:
                     lesson.fire_count += 1
             elif outcome == "rejected":
-                lesson.confidence = max(0.0, lesson.confidence - MISFIRE_PENALTY)
+                lesson.confidence = max(0.0, lesson.confidence + MISFIRE_PENALTY)
 
             # Check for promotion
             # H1 fix: INSTINCT->PATTERN uses strict > so a lesson born at
@@ -618,8 +635,7 @@ class AgentGraduationTracker:
                     pass
 
             rules.append(
-                f"[{lesson.state.value}] {lesson.category}: "
-                f"{lesson.description}{scope_tag}"
+                f"[{lesson.state.value}] {lesson.category}: {lesson.description}{scope_tag}"
             )
         return rules
 
@@ -669,15 +685,17 @@ class AgentGraduationTracker:
                 if min_state == LessonState.RULE and lesson.state != LessonState.RULE:
                     continue
 
-                distilled.append({
-                    "agent_type": agent_type,
-                    "category": lesson.category,
-                    "description": lesson.description,
-                    "state": lesson.state.value,
-                    "confidence": lesson.confidence,
-                    "fire_count": lesson.fire_count,
-                    "source": f"agent:{agent_type}",
-                })
+                distilled.append(
+                    {
+                        "agent_type": agent_type,
+                        "category": lesson.category,
+                        "description": lesson.description,
+                        "state": lesson.state.value,
+                        "confidence": lesson.confidence,
+                        "fire_count": lesson.fire_count,
+                        "source": f"agent:{agent_type}",
+                    }
+                )
 
         return distilled
 
@@ -795,7 +813,9 @@ class AgentGraduationTracker:
             "best_agent": best,
         }
 
-    def get_deterministic_rules(self, agent_type: str, task_type: str = "") -> list[DeterministicRule]:
+    def get_deterministic_rules(
+        self, agent_type: str, task_type: str = ""
+    ) -> list[DeterministicRule]:
         """Get RULE-tier lessons compiled into enforceable guard logic.
 
         Only RULE-tier lessons with an enforceable pattern are returned.
@@ -862,12 +882,14 @@ class AgentGraduationTracker:
         for rule in det_rules:
             result = rule.check(output)
             if not result["passed"]:
-                violations.append({
-                    "rule": rule.name,
-                    "category": rule.category,
-                    "description": rule.description,
-                    "violation": result["detail"],
-                })
+                violations.append(
+                    {
+                        "rule": rule.name,
+                        "category": rule.category,
+                        "description": rule.description,
+                        "violation": result["detail"],
+                    }
+                )
 
         return EnforcementResult(
             passed=len(violations) == 0,
