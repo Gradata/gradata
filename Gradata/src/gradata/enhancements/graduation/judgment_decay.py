@@ -141,80 +141,50 @@ def compute_decay(
     tier = lesson.state.value
     old_conf = lesson.confidence
 
-    # Session-type filter: skip lessons that can't be tested in this session type
-    if not is_category_testable(lesson.category, session_type):
-        return DecayResult(
-            category=lesson.category,
-            tier=tier,
-            old_confidence=old_conf,
-            new_confidence=old_conf,
-            action="skipped",
-            reason=f"{lesson.category} not testable in {session_type} session",
-        )
-
-    # RULE tier: immune to decay
-    if lesson.state == LessonState.RULE:
-        return DecayResult(
-            category=lesson.category,
-            tier=tier,
-            old_confidence=old_conf,
-            new_confidence=old_conf,
-            action="skipped",
-            reason="RULE tier is immune to decay",
-        )
-
-    # Applied this session → reinforce
-    if was_applied_this_session:
-        ceiling = INSTINCT_CEILING if lesson.state == LessonState.INSTINCT else PATTERN_CEILING
-        new_conf = round(min(ceiling, old_conf + REINFORCEMENT_BONUS), 2)
-        return DecayResult(
-            category=lesson.category,
-            tier=tier,
-            old_confidence=old_conf,
-            new_confidence=new_conf,
-            action="reinforced",
-            reason=f"applied this session (+{REINFORCEMENT_BONUS})",
-        )
-
-    # UNTESTABLE check: too many idle sessions
-    if total_idle_sessions >= UNTESTABLE_THRESHOLD:
-        return DecayResult(
-            category=lesson.category,
-            tier=tier,
-            old_confidence=old_conf,
-            new_confidence=0.0,
-            action="archived",
-            reason=f"{total_idle_sessions} idle sessions >= {UNTESTABLE_THRESHOLD} threshold",
-        )
-
-    # Standard decay
-    if sessions_since_applied > 0:
-        penalty = DECAY_PER_IDLE_SESSION * sessions_since_applied
-        new_conf = round(max(CONFIDENCE_FLOOR, old_conf - penalty), 2)
-
-        # Check for demotion
-        action = "decayed"
-        if lesson.state == LessonState.PATTERN and new_conf < PATTERN_THRESHOLD:
-            action = "decayed"  # Caller should check and demote if needed
-
+    def _result(new_conf: float, action: str, reason: str) -> DecayResult:
         return DecayResult(
             category=lesson.category,
             tier=tier,
             old_confidence=old_conf,
             new_confidence=new_conf,
             action=action,
-            reason=f"{sessions_since_applied} idle sessions (-{penalty:.2f})",
+            reason=reason,
+        )
+
+    # Session-type filter: skip lessons that can't be tested in this session type
+    if not is_category_testable(lesson.category, session_type):
+        return _result(
+            old_conf, "skipped", f"{lesson.category} not testable in {session_type} session"
+        )
+
+    # RULE tier: immune to decay
+    if lesson.state == LessonState.RULE:
+        return _result(old_conf, "skipped", "RULE tier is immune to decay")
+
+    # Applied this session → reinforce
+    if was_applied_this_session:
+        ceiling = INSTINCT_CEILING if lesson.state == LessonState.INSTINCT else PATTERN_CEILING
+        new_conf = round(min(ceiling, old_conf + REINFORCEMENT_BONUS), 2)
+        return _result(new_conf, "reinforced", f"applied this session (+{REINFORCEMENT_BONUS})")
+
+    # UNTESTABLE check: too many idle sessions
+    if total_idle_sessions >= UNTESTABLE_THRESHOLD:
+        return _result(
+            0.0,
+            "archived",
+            f"{total_idle_sessions} idle sessions >= {UNTESTABLE_THRESHOLD} threshold",
+        )
+
+    # Standard decay
+    if sessions_since_applied > 0:
+        penalty = DECAY_PER_IDLE_SESSION * sessions_since_applied
+        new_conf = round(max(CONFIDENCE_FLOOR, old_conf - penalty), 2)
+        return _result(
+            new_conf, "decayed", f"{sessions_since_applied} idle sessions (-{penalty:.2f})"
         )
 
     # No change needed
-    return DecayResult(
-        category=lesson.category,
-        tier=tier,
-        old_confidence=old_conf,
-        new_confidence=old_conf,
-        action="skipped",
-        reason="no idle sessions detected",
-    )
+    return _result(old_conf, "skipped", "no idle sessions detected")
 
 
 def compute_batch_decay(
@@ -249,7 +219,10 @@ def compute_batch_decay(
         sessions_since = current_session - last_applied if last_applied > 0 else 0
 
         result = compute_decay(
-            lesson, sessions_since, applied_this, total_idle,
+            lesson,
+            sessions_since,
+            applied_this,
+            total_idle,
             session_type=session_type,
         )
         results.append(result)
