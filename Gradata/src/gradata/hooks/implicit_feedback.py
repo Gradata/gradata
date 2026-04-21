@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 
-from gradata.hooks._base import extract_message, resolve_brain_dir, run_hook
+from gradata.hooks._base import emit_hook_event, extract_message, run_hook
 from gradata.hooks._profiles import Profile
 
 _log = logging.getLogger(__name__)
@@ -136,48 +136,32 @@ def main(data: dict) -> dict | None:
         if not signals and not tacit_accept:
             return None
 
-        brain_dir = resolve_brain_dir()
-
-        if brain_dir:
-            try:
-                from gradata._events import emit
-                from gradata._paths import BrainContext
-
-                ctx = BrainContext.from_brain_dir(brain_dir)
-                if signals:
-                    emit(
-                        "IMPLICIT_FEEDBACK",
-                        source="hook:implicit_feedback",
-                        data={
-                            "signals": [s["type"] for s in signals],
-                            "snippets": [s["snippet"] for s in signals[:3]],
-                            "message_preview": message[:200],
-                        },
-                        ctx=ctx,
-                    )
-                if has_approval:
-                    emit(
-                        "OUTPUT_ACCEPTED",
-                        source="hook:implicit_feedback",
-                        data={
-                            "mode": "explicit",
-                            "snippets": [s["snippet"] for s in signals if s["type"] == "approval"],
-                            "message_preview": message[:200],
-                        },
-                        ctx=ctx,
-                    )
-                elif tacit_accept:
-                    emit(
-                        "OUTPUT_ACCEPTED",
-                        source="hook:implicit_feedback",
-                        data={
-                            "mode": "tacit",
-                            "message_preview": message[:200],
-                        },
-                        ctx=ctx,
-                    )
-            except Exception as exc:
-                _log.debug("implicit_feedback emit failed: %s", exc)
+        if signals:
+            emit_hook_event(
+                "IMPLICIT_FEEDBACK",
+                "hook:implicit_feedback",
+                {
+                    "signals": [s["type"] for s in signals],
+                    "snippets": [s["snippet"] for s in signals[:3]],
+                    "message_preview": message[:200],
+                },
+            )
+        if has_approval:
+            emit_hook_event(
+                "OUTPUT_ACCEPTED",
+                "hook:implicit_feedback",
+                {
+                    "mode": "explicit",
+                    "snippets": [s["snippet"] for s in signals if s["type"] == "approval"],
+                    "message_preview": message[:200],
+                },
+            )
+        elif tacit_accept:
+            emit_hook_event(
+                "OUTPUT_ACCEPTED",
+                "hook:implicit_feedback",
+                {"mode": "tacit", "message_preview": message[:200]},
+            )
 
         if signals:
             signal_names = ", ".join(s["type"] for s in signals)
