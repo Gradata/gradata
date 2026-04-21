@@ -1,6 +1,6 @@
 # Gradata Cloud
 
-Gradata Cloud is the hosted dashboard and back-end that complements the open-source SDK. The SDK keeps running locally; Cloud adds synchronization, cross-device continuity, team sharing, meta-rule synthesis, and an operator view for engineering teams.
+Gradata Cloud is the hosted dashboard that complements the open-source SDK. **The SDK is functionally complete on its own** — graduation, meta-rule synthesis, rule-to-hook promotion, and every piece of the learning loop run locally. Cloud adds visualization, cross-device continuity, team sharing, and managed backups on top of that local loop.
 
 ## What's in the SDK vs the Cloud
 
@@ -14,15 +14,14 @@ Gradata Cloud is the hosted dashboard and back-end that complements the open-sou
 | Search (FTS5 + optional embeddings) | Yes | Yes |
 | Cross-platform export (`.cursorrules`, `BRAIN-RULES.md`, ...) | Yes | Yes |
 | Meta-rule **clustering** | Yes | Yes |
-| Meta-rule **synthesis** (LLM-generated principles) | Placeholder | Yes |
+| Meta-rule **synthesis** (local LLM via your own key or Claude Code Max OAuth) | Yes | Yes |
 | Dashboard with charts | No | Yes |
 | Cross-device sync of a brain | No | Yes |
 | Team brains (shared rules, per-member overrides) | No | Yes |
 | Operator view (customer KPIs, alerts) | No | Yes |
-| Cloud-side rule evaluation and A/B harness | No | Yes |
 | Managed backups | No | Yes |
 
-The SDK is Apache-2.0 and will stay permissively open. Cloud is a hosted SaaS tier with team features, corpus aggregation, and brain marketplace on top.
+The SDK is Apache-2.0 and will stay permissively open. Cloud is a hosted SaaS tier that **visualizes** the local learning loop — it does not gate, override, or re-run it. Team features and brain marketplace build on top later.
 
 ## When to self-host vs use Cloud
 
@@ -34,10 +33,10 @@ The SDK is Apache-2.0 and will stay permissively open. Cloud is a hosted SaaS ti
 
 **Use Cloud if:**
 
-- Get meta-rule synthesis out of the box (no LLM wiring on your side).
+- You want a dashboard to watch your brain mature (graduations, correction-rate decay, compound-quality score).
 - Teams can maintain shared, version-controlled brains across multiple operators.
-- Includes dashboard, alerts, and billing.
 - Managed backups and cross-device sync handled for you.
+- Operator / alerting view for engineering leads.
 
 ## Architecture
 
@@ -48,14 +47,13 @@ flowchart LR
     end
     subgraph Cloud["Gradata Cloud"]
       C[Sync API] --> D[Postgres + pgvector]
-      D --> E[Meta-rule synthesis]
       D --> F[Dashboard]
       D --> G[Operator view]
     end
-    A <-->|optional<br/>outbound only| C
+    A -->|optional<br/>outbound only| C
 ```
 
-The SDK talks to Cloud only when you opt in with an API key. Sync is outbound: your local brain is the source of truth, Cloud holds a mirror plus derived metrics.
+The SDK talks to Cloud only when you opt in with an API key. Sync is strictly outbound and read-only from Cloud's perspective: your local brain is the source of truth, Cloud holds a mirror plus derived metrics. Cloud never mutates your local state or re-runs graduation.
 
 ## Getting an API key
 

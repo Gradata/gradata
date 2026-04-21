@@ -8,9 +8,18 @@ Sub-agents inherit scope from the parent brain through two channels:
    running under a scoped brain view.
 
 Falls back to keyword inference when no explicit scope is set.
+
+Dedup (GRADATA_SUBAGENT_DEDUP=1, default on):
+  Reads ``brain_dir/.last_injection.json`` written by the parent SessionStart
+  (inject_brain_rules.py).  Any rule whose ``full_id`` matches an anchor
+  already injected at the parent level is skipped — avoiding a ~500-2500 token
+  per-agent re-injection tax in multi-agent workflows.  Silent on missing
+  manifest (falls back to current behaviour).
 """
+
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -22,6 +31,11 @@ try:
     from gradata.enhancements.self_improvement import parse_lessons
 except ImportError:
     parse_lessons = None
+
+try:
+    from gradata.enhancements.meta_rules import _lesson_id as _compute_lesson_id
+except ImportError:
+    _compute_lesson_id = None  # type: ignore[assignment]
 
 HOOK_META = {
     "event": "PreToolUse",
@@ -85,6 +99,26 @@ def _lesson_to_rule_dict(lesson) -> dict:
     }
 
 
+def _load_parent_injected_ids(brain_dir: str) -> set[str]:
+    """Return the set of ``full_id`` values already injected at parent SessionStart.
+
+    Reads ``brain_dir/.last_injection.json`` written by inject_brain_rules.py.
+    Returns an empty set on any error (missing file, bad JSON, etc.) so the
+    caller silently falls back to injecting everything.
+    """
+    try:
+        manifest_path = Path(brain_dir) / ".last_injection.json"
+        if not manifest_path.is_file():
+            return set()
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        anchors: dict = data.get("anchors") or {}
+        return {
+            str(v["full_id"]) for v in anchors.values() if isinstance(v, dict) and "full_id" in v
+        }
+    except Exception:
+        return set()
+
+
 def _resolve_agent_brain_dir() -> str | None:
     """Resolve brain dir for the precontext hook.
 
@@ -118,7 +152,11 @@ def main(data: dict) -> dict | None:
 
         text = lessons_path.read_text(encoding="utf-8")
         all_lessons = parse_lessons(text)
-        filtered = [lesson for lesson in all_lessons if lesson.state.name in ("RULE", "PATTERN") and lesson.confidence >= MIN_CONFIDENCE]
+        filtered = [
+            lesson
+            for lesson in all_lessons
+            if lesson.state.name in ("RULE", "PATTERN") and lesson.confidence >= MIN_CONFIDENCE
+        ]
         if not filtered:
             return None
 
@@ -160,6 +198,13 @@ def main(data: dict) -> dict | None:
             lesson = rd.get("_lesson")
             if lesson is not None:
                 top.append(lesson)
+
+        # Dedup: skip rules the parent session already injected at SessionStart.
+        # Gated by GRADATA_SUBAGENT_DEDUP (default "1"). Silent on missing manifest.
+        if os.environ.get("GRADATA_SUBAGENT_DEDUP", "1") == "1" and _compute_lesson_id is not None:
+            parent_ids = _load_parent_injected_ids(brain_dir)
+            if parent_ids:
+                top = [r for r in top if _compute_lesson_id(r) not in parent_ids]
 
         lines = []
         for r in top:

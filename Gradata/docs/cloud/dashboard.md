@@ -1,6 +1,6 @@
 # Dashboard
 
-The Gradata Cloud dashboard is a Next.js app at [app.gradata.ai](https://app.gradata.ai). It wraps the same data the local `brain.manifest.json` exposes, plus Cloud-only views for meta-rule synthesis, team management, and the operator console.
+The Gradata Cloud dashboard is a Next.js app at [app.gradata.ai](https://app.gradata.ai). It visualizes the same data the local `brain.manifest.json` exposes, plus Cloud-only views for team management and the operator console. Meta-rule synthesis runs locally in the SDK — the dashboard renders the results, it does not re-run them.
 
 <!-- Screenshot placeholders will land after the dashboard design pass. -->
 

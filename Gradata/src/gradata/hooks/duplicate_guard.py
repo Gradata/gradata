@@ -1,4 +1,5 @@
 """PreToolUse hook: block file creation when a similar file already exists."""
+
 from __future__ import annotations
 
 import logging
@@ -78,6 +79,10 @@ def _in_watched_dir(file_path: str) -> bool:
 
 
 def main(data: dict) -> dict | None:
+    # Opt-out kill switch: projects with a JS duplicate-guard disable this hook
+    # to avoid 2x SequenceMatcher pass on every Write.
+    if os.environ.get("GRADATA_DUPLICATE_GUARD", "1") == "0":
+        return None
     try:
         tool_input = data.get("tool_input", {})
         file_path = tool_input.get("file_path", "")
@@ -117,7 +122,7 @@ def main(data: dict) -> dict | None:
         return {
             "decision": "block",
             "reason": (
-                f"BLOCKED: You're creating \"{Path(file_path).name}\" but similar file(s) "
+                f'BLOCKED: You\'re creating "{Path(file_path).name}" but similar file(s) '
                 f"already exist: {names}. Read the existing file first. "
                 f"If it does what you need, edit it instead."
             ),

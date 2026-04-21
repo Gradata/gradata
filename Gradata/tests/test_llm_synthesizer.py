@@ -44,9 +44,7 @@ class TestSynthesiseLLMMocked:
 
     def _mock_response(self, content: str):
         """Create a mock urllib response."""
-        body = json.dumps({
-            "choices": [{"message": {"content": content}}]
-        }).encode()
+        body = json.dumps({"choices": [{"message": {"content": content}}]}).encode()
         mock_resp = MagicMock()
         mock_resp.read.return_value = body
         mock_resp.__enter__ = MagicMock(return_value=mock_resp)
@@ -55,7 +53,9 @@ class TestSynthesiseLLMMocked:
 
     @patch("gradata.enhancements.llm_synthesizer.urllib.request.urlopen")
     def test_successful_synthesis(self, mock_urlopen):
-        principle = "When writing sales emails, use specific technical terms instead of generic follow-ups."
+        principle = (
+            "When writing sales emails, use specific technical terms instead of generic follow-ups."
+        )
         mock_urlopen.return_value = self._mock_response(principle)
 
         lessons = [
@@ -64,7 +64,10 @@ class TestSynthesiseLLMMocked:
             _make_lesson("cut: might. added: specific timeline"),
         ]
         result = synthesise_principle_llm(
-            lessons, "content", api_key="sk-test", api_base="https://api.example.com/v1",
+            lessons,
+            "content",
+            api_key="sk-test",
+            api_base="https://api.example.com/v1",
         )
         assert result == principle
 
@@ -79,17 +82,24 @@ class TestSynthesiseLLMMocked:
         mock_urlopen.return_value = self._mock_response("Short.")
         lessons = [_make_lesson("cut: x. added: y")]
         result = synthesise_principle_llm(
-            lessons, "content", api_key="sk-test", api_base="https://api.example.com/v1",
+            lessons,
+            "content",
+            api_key="sk-test",
+            api_base="https://api.example.com/v1",
         )
         assert result is None
 
     @patch("gradata.enhancements.llm_synthesizer.urllib.request.urlopen")
     def test_network_error_returns_none(self, mock_urlopen):
         import urllib.error
+
         mock_urlopen.side_effect = urllib.error.URLError("connection refused")
         lessons = [_make_lesson("cut: x. added: y")]
         result = synthesise_principle_llm(
-            lessons, "content", api_key="sk-test", api_base="https://api.example.com/v1",
+            lessons,
+            "content",
+            api_key="sk-test",
+            api_base="https://api.example.com/v1",
         )
         assert result is None
 
@@ -102,36 +112,29 @@ class TestSynthesiseLLMMocked:
         mock_urlopen.return_value = mock_resp
         lessons = [_make_lesson("cut: x. added: y")]
         result = synthesise_principle_llm(
-            lessons, "content", api_key="sk-test", api_base="https://api.example.com/v1",
+            lessons,
+            "content",
+            api_key="sk-test",
+            api_base="https://api.example.com/v1",
         )
         assert result is None
 
 
-class TestMetaRulesLLMIntegration:
-    """Test that merge_into_meta falls back correctly."""
+class TestMetaRulesDeterministic:
+    """merge_into_meta is deterministic — LLM synthesis is driven separately
+    by ``rule_synthesizer`` at session close, not from inside merge_into_meta.
+    """
 
-    def test_merge_without_api_key_uses_regex(self):
+    def test_merge_produces_principle(self):
         from gradata.enhancements.meta_rules import merge_into_meta
+
         lessons = [
-            _make_lesson("cut: following, checking. added: infrastructure", "CONTENT"),
-            _make_lesson("cut: following, perhaps. added: modernization", "CONTENT"),
-            _make_lesson("cut: following, maybe. added: specific", "CONTENT"),
+            _make_lesson(
+                "Use specific infrastructure terms instead of follow-up phrasing", "CONTENT"
+            ),
+            _make_lesson("Replace hedging with concrete modernization language", "CONTENT"),
+            _make_lesson("Swap vague openers for precise technical references", "CONTENT"),
         ]
         meta = merge_into_meta(lessons, theme_override="content", session=1)
-        # Should use regex synthesis (no api_key), producing word-list style
         assert meta.principle
         assert meta.id.startswith("META-")
-
-    @pytest.mark.skip(reason="Meta-rule synthesis requires Gradata Cloud")
-    @patch("gradata.enhancements.llm_synthesizer.synthesise_principle_llm", return_value=None)
-    def test_merge_with_llm_failure_falls_back(self, mock_llm):
-        from gradata.enhancements.meta_rules import merge_into_meta
-        lessons = [
-            _make_lesson("cut: x. added: y", "TONE"),
-            _make_lesson("cut: a. added: b", "TONE"),
-            _make_lesson("cut: c. added: d", "TONE"),
-        ]
-        meta = merge_into_meta(lessons, theme_override="tone", session=1, api_key="sk-test")
-        # LLM returned None, should fall back to regex
-        assert meta.principle
-        mock_llm.assert_called_once()

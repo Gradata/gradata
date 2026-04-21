@@ -17,8 +17,7 @@ from gradata.enhancements.meta_rules import (
 )
 
 
-def _make_lesson(desc: str, category: str, confidence: float = 0.91,
-                 fire_count: int = 5) -> Lesson:
+def _make_lesson(desc: str, category: str, confidence: float = 0.91, fire_count: int = 5) -> Lesson:
     return Lesson(
         date="2026-04-03",
         description=desc,
@@ -29,8 +28,9 @@ def _make_lesson(desc: str, category: str, confidence: float = 0.91,
     )
 
 
-def _make_meta(principle: str, categories: list[str], confidence: float = 0.85,
-               scope: dict | None = None) -> MetaRule:
+def _make_meta(
+    principle: str, categories: list[str], confidence: float = 0.85, scope: dict | None = None
+) -> MetaRule:
     return MetaRule(
         id=f"META-test-{hash(principle) % 10000}",
         principle=principle,
@@ -60,13 +60,21 @@ class TestMetaRuleDiscoveryFromRelatedLessons:
         # (all share precision/specificity theme)
         assert len(metas) >= 0  # May or may not meet threshold depending on theme detection
 
-    @pytest.mark.skip(reason="Meta-rule discovery requires Gradata Cloud")
     def test_same_category_meta_rule(self):
         """3+ CONTENT lessons should definitely form a meta-rule."""
         lessons = [
-            _make_lesson("cut: following. added: infrastructure", "CONTENT"),
-            _make_lesson("cut: checking. added: modernization", "CONTENT"),
-            _make_lesson("cut: perhaps. added: specific", "CONTENT"),
+            _make_lesson(
+                "Use infrastructure-specific language instead of generic follow-up phrasing",
+                "CONTENT",
+            ),
+            _make_lesson(
+                "Replace hedging words with concrete modernization terms",
+                "CONTENT",
+            ),
+            _make_lesson(
+                "Swap vague openers for specific technical references",
+                "CONTENT",
+            ),
         ]
         metas = discover_meta_rules(lessons, min_group_size=3)
         assert len(metas) >= 1
@@ -122,10 +130,7 @@ class TestMetaRulePromptFormatting:
         assert len(formatted) < 50
 
     def test_rank_respects_max_rules(self):
-        metas = [
-            _make_meta(f"Rule number {i}", ["CONTENT"])
-            for i in range(20)
-        ]
+        metas = [_make_meta(f"Rule number {i}", ["CONTENT"]) for i in range(20)]
         ranked = rank_meta_rules_by_context(metas, max_rules=5)
         assert len(ranked) <= 5
 

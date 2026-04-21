@@ -5,8 +5,11 @@ Redis (cache), Kafka (queue), Elasticsearch (search), and Pinecone
 (vectors) for gradata-cloud workloads — no new vendors.
 
 Design goal: one Postgres instance, RLS-isolated per tenant, carrying
-every cloud-side workload the SDK needs. Local SQLite stays the source
-of truth for writes; cloud is the pushable reflection + shared surface.
+the cloud-side visualization and sharing workloads. Local SQLite stays
+the source of truth and runs graduation, synthesis, and rule-to-hook
+promotion locally. Cloud is a downstream reflection — it mirrors events
+and rules for dashboards, team sharing, and managed backups, but does
+not gate or re-run the learning loop.
 
 ## What v2 adds
 

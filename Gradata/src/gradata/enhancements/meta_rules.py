@@ -1,15 +1,30 @@
 """
 Meta-Rule Emergence — compound learning through principle discovery.
 ====================================================================
-Meta-rule discovery and synthesis require Gradata Cloud.  The open-source
-SDK preserves the full data model, formatting, ranking, validation, and
-storage API so that cloud-generated meta-rules work seamlessly.
+Fully local-first. No cloud service is required to discover, synthesize,
+or rank meta-rules.
 
-Discovery, grouping, and synthesis are no-ops in the open-source build.
+Algorithm:
+  1. Filter graduated lessons to RULE/PATTERN state. RULE lessons below
+     ``_SYNTHESIS_CONF_FLOOR`` (0.90) are treated as decayed "zombies"
+     and excluded — they were shown (2026-04-14 ablation) to regress
+     small-model correctness when their principles entered synthesis.
+  2. Group by category (cheap pre-filter).
+  3. Small groups (<= 2 * min_group_size) treat the category as the
+     cluster. Large groups sub-cluster by greedy semantic similarity.
+  4. Each cluster of size >= min_group_size becomes a ``MetaRule``
+     via :func:`merge_into_meta` (count/(count+3) confidence smoothing).
+  5. Meta-rules not reinforced within ``_DECAY_WINDOW`` sessions lose
+     ``_DECAY_RATE`` confidence per session, dropping out below
+     ``_DECAY_MIN_CONFIDENCE``.
 
-Public API is fully preserved here via re-exports from:
+Ranking, validation, formatting, and persistence are in:
   - ``meta_rules_storage`` (SQLite persistence)
   - ``super_meta_rules`` (tier-2/3 logic)
+
+LLM-assisted distillation of the principle text is handled separately
+by ``rule_synthesizer`` at session close, using the user's own provider
+credentials (Anthropic SDK or Claude Code Max OAuth via ``claude -p``).
 """
 
 from __future__ import annotations
@@ -19,11 +34,12 @@ import json
 import logging
 import re
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from gradata._env import env_str
 from gradata._http import require_https
-from gradata._types import Lesson, LessonState, RuleTransferScope
+from gradata._types import ELIGIBLE_STATES, Lesson, LessonState, RuleTransferScope
+from gradata.enhancements.similarity import semantic_similarity
 
 _log = logging.getLogger(__name__)
 
@@ -44,8 +60,9 @@ class MetaRule:
       - ``"deterministic"`` (default): produced by token-frequency / cluster
         heuristics. Empirically (2026-04-14 ablation) these regress
         correctness when injected into prompts. Excluded from injection.
-      - ``"llm_synth"``: produced by cloud-side LLM synthesis from the
-        source rules. Eligible for injection.
+      - ``"llm_synth"``: produced by local LLM synthesis (user's own
+        Anthropic key or Claude Code Max OAuth via rule_synthesizer.py).
+        Eligible for injection.
       - ``"human_curated"``: hand-written or human-edited principle. Always
         eligible for injection.
     """
@@ -198,8 +215,131 @@ def _classify_meta_transfer_scope(rule_text: str) -> RuleTransferScope:
 
 
 # ---------------------------------------------------------------------------
-# Discovery (requires Gradata Cloud)
+# Discovery — local clustering by category + semantic similarity
 # ---------------------------------------------------------------------------
+#
+# Algorithm (ported from the prior cloud-only impl, now local-first):
+#   1. Filter lessons to RULE/PATTERN state at or above SYNTHESIS_CONF_FLOOR.
+#      "Zombie" RULE-state lessons whose confidence has decayed below 0.90
+#      were shown (2026-04-14 ablation) to regress small-model correctness
+#      when their principles entered synthesis — filter before clustering.
+#   2. Group by category (cheap pre-filter).
+#   3. Small groups (<= 2 * min_group_size) treat the category as the cluster.
+#      Large groups sub-cluster by greedy semantic similarity.
+#   4. Each cluster of size >= min_group_size becomes a MetaRule.
+#   5. Meta-rules not reinforced in DECAY_WINDOW sessions lose confidence.
+
+# Maps a correction category to the task type injected via applies_when.
+_CATEGORY_TASK_MAP = {
+    "DRAFTING": "drafting",
+    "PROCESS": "sales",
+    "TONE": "drafting",
+    "POSITIONING": "sales",
+    "LEADS": "prospecting",
+    "DEMO_PREP": "sales",
+    "TOOL": "system",
+    "ARCHITECTURE": "system",
+    "DATA_INTEGRITY": "sales",
+    "CONTEXT": "system",
+    "THOROUGHNESS": "general",
+    "PRICING": "sales",
+    "ACCURACY": "general",
+    "SESSION_CORRECTION": "general",
+    "GENERAL": "general",
+    "CODE": "system",
+    "CONTENT": "drafting",
+}
+
+_SYNTHESIS_CONF_FLOOR = 0.90
+_DECAY_WINDOW = 20
+_DECAY_RATE = 0.05
+_DECAY_MIN_CONFIDENCE = 0.10
+
+# Noise filter — word-diff summaries that slip into lesson descriptions but
+# are not human corrections. Excluded from synthesis input.
+_NOISE_PATTERNS = (
+    "content change (",
+    "cut:",
+    "added:",
+    "quality_gates,",
+    "no explicit corrections",
+    "list or heading structure",
+    "structure changed",
+)
+
+
+def _apply_decay(metas: list[MetaRule], current_session: int) -> list[MetaRule]:
+    """Drop or decay meta-rules that haven't been reinforced recently.
+
+    Returns a new list of (possibly replaced) meta-rules. Does not mutate
+    the inputs — ``refresh_meta_rules`` passes existing persisted metas
+    through this function and relies on them being unchanged on disk.
+    """
+    result: list[MetaRule] = []
+    for meta in metas:
+        gap = current_session - meta.last_validated_session
+        if gap <= _DECAY_WINDOW:
+            result.append(meta)
+            continue
+        penalty = (gap - _DECAY_WINDOW) * _DECAY_RATE
+        decayed = max(0.0, meta.confidence - penalty)
+        if decayed >= _DECAY_MIN_CONFIDENCE:
+            result.append(replace(meta, confidence=round(decayed, 2)))
+    return result
+
+
+def _cluster_by_similarity(
+    lessons: list[Lesson],
+    threshold: float = 0.35,
+) -> list[list[Lesson]]:
+    """Greedy single-pass clustering by semantic similarity.
+
+    Picks the first unclustered lesson as centroid, pulls in anything above
+    ``threshold``, repeats on the remainder. Good enough for the cluster
+    sizes we see (tens of lessons, not thousands).
+    """
+    unclustered = list(lessons)
+    clusters: list[list[Lesson]] = []
+    while unclustered:
+        centroid = unclustered.pop(0)
+        cluster = [centroid]
+        remaining: list[Lesson] = []
+        for lesson in unclustered:
+            if semantic_similarity(centroid.description, lesson.description) >= threshold:
+                cluster.append(lesson)
+            else:
+                remaining.append(lesson)
+        clusters.append(cluster)
+        unclustered = remaining
+    return clusters
+
+
+def _build_principle(category: str, best_text: str) -> str:
+    """Turn a representative correction into a prompt-ready principle."""
+    task_type = _CATEGORY_TASK_MAP.get(category, "working")
+    text = re.sub(r"^(?:User corrected:\s*|AI produced.*?:\s*)", "", best_text).strip()
+    # Strip a name-prefix like `Owner: "text"` — generic, not owner-specific.
+    text = re.sub(r'^[A-Za-z][A-Za-z ]{1,30}:\s*["\u201c](.+?)["\u201d]\s*', r"\1", text).strip()
+    text = re.sub(r'^["\u201c\u201d]+|["\u201c\u201d]+$', "", text).strip()
+    if not text:
+        text = best_text
+    action_starters = (
+        "always",
+        "never",
+        "don't",
+        "do not",
+        "use",
+        "avoid",
+        "check",
+        "run",
+        "load",
+        "no ",
+        "include",
+    )
+    lower = text.lower().strip()
+    if any(lower.startswith(s) for s in action_starters):
+        return f"When {task_type}: {text}"
+    return text
 
 
 def discover_meta_rules(
@@ -208,22 +348,52 @@ def discover_meta_rules(
     current_session: int = 0,
     **kwargs: object,
 ) -> list[MetaRule]:
-    """Scan graduated lessons for emergent meta-rules.
-
-    Meta-rule discovery requires Gradata Cloud.  This open-source
-    build returns an empty list.
+    """Cluster graduated lessons into emergent meta-rules.
 
     Args:
         lessons: All lessons (active + archived).
-        min_group_size: Minimum group size to form a meta-rule.
-        current_session: Current session number for timestamping.
-        **kwargs: Accepts additional keyword arguments for compatibility.
+        min_group_size: Minimum group size to form a meta-rule. Default 3.
+        current_session: Current session number, used for decay timestamps.
+        **kwargs: Accepted for forward compatibility.
 
     Returns:
-        Empty list (discovery requires Gradata Cloud).
+        Meta-rules sorted by confidence descending. Empty list when no
+        cluster reaches ``min_group_size``.
     """
-    _log.info("Meta-rule discovery requires Gradata Cloud")
-    return []
+    # Zombie filter only applies to RULE state: a RULE-tier lesson whose
+    # confidence has decayed below 0.90 is a "zombie" (graduated once, now
+    # failing in practice) and was empirically shown to regress synthesis.
+    # PATTERN-state lessons are accepted at their native confidence range.
+    state_eligible = [l for l in lessons if l.state in ELIGIBLE_STATES]
+    eligible = [
+        l
+        for l in state_eligible
+        if (l.state != LessonState.RULE or l.confidence >= _SYNTHESIS_CONF_FLOOR)
+        and not any(p in l.description.lower() for p in _NOISE_PATTERNS)
+    ]
+
+    by_category: dict[str, list[Lesson]] = defaultdict(list)
+    for lesson in eligible:
+        by_category[lesson.category].append(lesson)
+
+    metas: list[MetaRule] = []
+    for group in by_category.values():
+        if len(group) < min_group_size:
+            continue
+        if len(group) <= min_group_size * 2:
+            metas.append(merge_into_meta(group, session=current_session))
+            continue
+        # threshold=0.20 is intentionally looser than the helper's 0.35
+        # default: the by-category pre-filter above already removes most
+        # noise, so recall matters more than precision here.
+        for cluster in _cluster_by_similarity(group, threshold=0.20):
+            if len(cluster) >= min_group_size:
+                metas.append(merge_into_meta(cluster, session=current_session))
+
+    metas = _apply_decay(metas, current_session)
+    metas.sort(key=lambda m: m.confidence, reverse=True)
+    _log.info("Discovered %d meta-rules from %d eligible lessons", len(metas), len(eligible))
+    return metas
 
 
 def merge_into_meta(
@@ -232,34 +402,52 @@ def merge_into_meta(
     session: int = 0,
     **kwargs: object,
 ) -> MetaRule:
-    """Synthesise a group of related rules into one meta-rule.
+    """Synthesise a cluster of graduated lessons into a single meta-rule.
 
-    Full principle synthesis requires Gradata Cloud.  This open-source
-    build returns a placeholder meta-rule with correct IDs, categories,
-    and confidence but no synthesised principle.
-
-    Args:
-        rules: The grouped lessons.
-        theme_override: Theme label (unused in open-source build).
-        session: Current session number.
-        **kwargs: Accepts additional keyword arguments for compatibility.
-
-    Returns:
-        A :class:`MetaRule` with placeholder principle.
+    Principle text is built from the highest-confidence lesson in the
+    cluster. The ``rule_synthesizer`` module handles the separate LLM
+    distillation used at session close; this function is the deterministic
+    building block that feeds it.
     """
-    _log.info("Meta-rule synthesis requires Gradata Cloud")
     lesson_ids = [_lesson_id(l) for l in rules]
     mid = _meta_id(lesson_ids)
-    categories = sorted(set(l.category for l in rules))
-    avg_conf = min(1.0, round(sum(l.confidence for l in rules) / len(rules), 2)) if rules else 0.0
+    categories = sorted({l.category for l in rules})
+
+    if not rules:
+        return MetaRule(
+            id=mid,
+            principle="",
+            source_categories=categories,
+            source_lesson_ids=lesson_ids,
+            confidence=0.0,
+            created_session=session,
+            last_validated_session=session,
+        )
+
+    best = max(rules, key=lambda l: l.confidence)
+    principle = _build_principle(best.category, best.description)
+
+    count = float(len(rules))
+    confidence = min(1.0, round(count / (count + 3.0), 2))
+
+    primary_cat = categories[0] if categories else "GENERAL"
+    task_type = _CATEGORY_TASK_MAP.get(primary_cat, "general")
+    applies_when = [f"task_type={task_type}"]
+    context_weights = {task_type: 2.0, "default": 0.8}
+    examples = [f"[{l.category}] {l.description}" for l in rules[:5]]
+
     return MetaRule(
         id=mid,
-        principle="(requires Gradata Cloud)",
+        principle=principle,
         source_categories=categories,
         source_lesson_ids=lesson_ids,
-        confidence=avg_conf,
+        confidence=confidence,
         created_session=session,
         last_validated_session=session,
+        applies_when=applies_when,
+        context_weights=context_weights,
+        examples=examples,
+        scope={"task_type": task_type},
     )
 
 
@@ -381,7 +569,9 @@ def format_meta_rules_for_prompt(
     # otherwise apply the cap after the fact (no ranking case).
     if context:
         metas = rank_meta_rules_by_context(
-            metas, context, max_rules=limit if limit is not None else len(metas),
+            metas,
+            context,
+            max_rules=limit if limit is not None else len(metas),
         )
     elif limit is not None:
         metas = metas[:limit]
@@ -634,10 +824,12 @@ def _call_gemma_native(prompt: str, creds: str, model: str, timeout: float = 15.
     import urllib.request
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    payload = json.dumps({
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": 200, "temperature": 0.3},
-    }).encode()
+    payload = json.dumps(
+        {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"maxOutputTokens": 200, "temperature": 0.3},
+        }
+    ).encode()
     headers = {"Content-Type": "application/json", "x-goog-api-key": creds}
     try:
         req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
@@ -647,8 +839,14 @@ def _call_gemma_native(prompt: str, creds: str, model: str, timeout: float = 15.
         if 15 <= len(text) <= 500:
             return text
         return None
-    except (urllib.error.URLError, urllib.error.HTTPError, OSError, KeyError,
-            json.JSONDecodeError, IndexError) as exc:
+    except (
+        urllib.error.URLError,
+        urllib.error.HTTPError,
+        OSError,
+        KeyError,
+        json.JSONDecodeError,
+        IndexError,
+    ) as exc:
         _log.debug("Gemma native call failed: %s", exc)
         return None
 
@@ -901,10 +1099,7 @@ def _gather_graduated_rules(
     min_confidence: float = MIN_SOURCE_CONFIDENCE,
 ) -> list[Lesson]:
     """Phase 1 (forced): Retrieve graduated rules above confidence threshold."""
-    return [
-        l for l in lessons
-        if l.state == LessonState.RULE and l.confidence >= min_confidence
-    ]
+    return [l for l in lessons if l.state == LessonState.RULE and l.confidence >= min_confidence]
 
 
 def _gather_correction_history(
@@ -913,14 +1108,16 @@ def _gather_correction_history(
     """Phase 2 (forced): Gather correction history for graduated rules."""
     history = []
     for rule in rules:
-        history.append({
-            "rule_id": _lesson_id(rule),
-            "category": rule.category,
-            "description": rule.description,
-            "confidence": rule.confidence,
-            "fire_count": getattr(rule, "fire_count", 0),
-            "correction_count": len(getattr(rule, "correction_event_ids", []) or []),
-        })
+        history.append(
+            {
+                "rule_id": _lesson_id(rule),
+                "category": rule.category,
+                "description": rule.description,
+                "confidence": rule.confidence,
+                "fire_count": getattr(rule, "fire_count", 0),
+                "correction_count": len(getattr(rule, "correction_event_ids", []) or []),
+            }
+        )
     return history
 
 
@@ -985,7 +1182,8 @@ def synthesize_meta_rules_agentic(
     if len(evidence.graduated_rules) < min_group_size:
         _log.debug(
             "Agentic synthesis: only %d graduated rules (need %d), skipping",
-            len(evidence.graduated_rules), min_group_size,
+            len(evidence.graduated_rules),
+            min_group_size,
         )
         return []
 
@@ -1030,15 +1228,28 @@ def synthesize_meta_rules_agentic(
         # Prefer LLM-synthesized behavioral principle when credentials available.
         # Empirically (2026-04-14 ablation) deterministic principles regress
         # correctness; LLM principles are injectable, deterministic are not.
+        # Without creds we emit deterministic meta-rules that are stored but
+        # never injected (INJECTABLE_META_SOURCES excludes them) — warn loudly
+        # so the capability gap is visible instead of silent 100% discard.
         llm_principle = _try_llm_principle(rules, category)
         if llm_principle:
             principle = llm_principle
             source = "llm_synth"
         else:
-            principle = f"Across {len(rules)} corrections in {category}: " + "; ".join(descriptions[:5])
+            principle = f"Across {len(rules)} corrections in {category}: " + "; ".join(
+                descriptions[:5]
+            )
             if len(descriptions) > 5:
                 principle += f" (and {len(descriptions) - 5} more)"
             source = "deterministic"
+            _log.warning(
+                "meta-rule synthesis degraded to deterministic for '%s' (%d rules) — "
+                "no LLM creds. Resulting meta-rule will be stored but not injected. "
+                "Set GRADATA_LLM_KEY+GRADATA_LLM_BASE or GRADATA_GEMMA_API_KEY to "
+                "enable injectable LLM synthesis.",
+                category,
+                len(rules),
+            )
 
         meta = MetaRule(
             id=mid,
@@ -1059,13 +1270,17 @@ def synthesize_meta_rules_agentic(
     # Rules appearing in 3+ domains are universal principle candidates.
     if evidence.iteration < max_iterations:
         cross_domain = detect_cross_domain_candidates(
-            evidence.graduated_rules, min_domains=3,
+            evidence.graduated_rules,
+            min_domains=3,
         )
         for candidate in cross_domain:
             if evidence.iteration >= max_iterations:
                 break
-            cd_ids = [_lesson_id(r) for r in evidence.graduated_rules
-                      if r.description.strip() == candidate["description"]]
+            cd_ids = [
+                _lesson_id(r)
+                for r in evidence.graduated_rules
+                if r.description.strip() == candidate["description"]
+            ]
             validated_cd = _validate_citations(cd_ids, evidence.rule_ids_retrieved)
             if len(validated_cd) < 3:
                 continue
@@ -1089,7 +1304,9 @@ def synthesize_meta_rules_agentic(
 
     _log.info(
         "Agentic synthesis: %d new meta-rules from %d groups + cross-domain (%d iterations)",
-        len(new_metas), len(groups), evidence.iteration,
+        len(new_metas),
+        len(groups),
+        evidence.iteration,
     )
     return new_metas
 

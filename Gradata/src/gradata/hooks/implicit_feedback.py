@@ -16,7 +16,11 @@ HOOK_META = {
     "timeout": 5000,
 }
 
-# Pattern categories with compiled regexes
+# Pattern categories with compiled regexes.
+# Shorthand forms ("r" for "are", "u" for "you", missing apostrophes in
+# "dont"/"cant") are intentionally matched — real user corrections arrive
+# in text-speak and dropping them produces silent false-negatives on the
+# core "learn from any correction" promise.
 NEGATION_PATTERNS = [
     re.compile(r"\bno[,.\s]", re.I),
     re.compile(r"\bnot like that\b", re.I),
@@ -24,16 +28,25 @@ NEGATION_PATTERNS = [
     re.compile(r"\bincorrect\b", re.I),
     re.compile(r"\bthat'?s not (right|correct|what)\b", re.I),
     re.compile(r"\bstop doing\b", re.I),
+    re.compile(r"\bdon'?t\b", re.I),
+    re.compile(r"\bdont\b", re.I),
+    re.compile(r"\bcan'?t\b", re.I),
+    re.compile(r"\bcant\b", re.I),
+    re.compile(r"\bshouldn'?t\b", re.I),
+    re.compile(r"\bshouldnt\b", re.I),
+    re.compile(r"\bnever\b", re.I),
 ]
 
 REMINDER_PATTERNS = [
     re.compile(r"\bI told you\b", re.I),
     re.compile(r"\bI said\b", re.I),
     re.compile(r"\bdon'?t forget\b", re.I),
+    re.compile(r"\bdont forget\b", re.I),
     re.compile(r"\bmake sure\b", re.I),
     re.compile(r"\bremember (to|that)\b", re.I),
     re.compile(r"\bI already\b", re.I),
     re.compile(r"\bas I (said|mentioned)\b", re.I),
+    re.compile(r"\bagain\.?\.?\b", re.I),
 ]
 
 CHALLENGE_PATTERNS = [
@@ -42,7 +55,11 @@ CHALLENGE_PATTERNS = [
     re.compile(r"\bthat'?s not right\b", re.I),
     re.compile(r"\bI don'?t think (so|that)\b", re.I),
     re.compile(r"\bactually[,]?\s", re.I),
-    re.compile(r"\bwhy (did|would|are) you\b", re.I),
+    re.compile(r"\bwhy (did|would|are|r) (you|u)\b", re.I),
+    re.compile(r"\bwhy (not|r|are|is|does|would)\b", re.I),
+    re.compile(r"\bwhy\s+\w+\.\.", re.I),
+    re.compile(r"\bhow come\b", re.I),
+    re.compile(r"\byou (didn'?t|didnt|missed|forgot|failed)\b", re.I),
 ]
 
 APPROVAL_PATTERNS = [

@@ -4,13 +4,16 @@ Wiki-aware mode: when brain/wiki/concepts/rule-*.md pages exist,
 uses qmd semantic search to find rules relevant to the current
 session context instead of brute-force top-10 by confidence.
 """
+
 from __future__ import annotations
 
 import logging
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 from gradata.hooks._base import resolve_brain_dir, run_hook
@@ -38,6 +41,9 @@ except ImportError:
 
 _log = logging.getLogger(__name__)
 
+# One-shot flag so the qmd-bash-missing warning only fires once per process.
+_QMD_BASH_WARNED = False
+
 HOOK_META = {
     "event": "SessionStart",
     "profile": Profile.MINIMAL,
@@ -48,6 +54,46 @@ MAX_RULES = int(os.environ.get("GRADATA_MAX_RULES", "10"))
 MIN_CONFIDENCE = float(os.environ.get("GRADATA_MIN_CONFIDENCE", "0.60"))
 # Meta-rules are high-level principles — separate cap from MAX_RULES.
 MAX_META_RULES = int(os.environ.get("GRADATA_MAX_META_RULES", "5"))
+MAX_BRAIN_PROMPT_CHARS = int(os.environ.get("GRADATA_MAX_BRAIN_PROMPT_CHARS", "4000"))
+
+# Sentinel written by inject_handoff when a handoff carries a rules snapshot.
+# When present, we compare mtime(lessons.md) vs. snapshot_ts and skip the
+# ranked <brain-rules> block if nothing has graduated since — the handoff
+# already carries the prior agent's operating rules implicitly.
+_HANDOFF_ACTIVE_FILE = ".handoff_active.json"
+
+
+def _should_skip_ranked_rules(brain_dir: Path, lessons_path: Path) -> bool:
+    """Return True when a fresh handoff carries the current rule snapshot.
+
+    Consumes the sentinel on read so subsequent sessions re-inject normally
+    unless a new handoff was produced. Any parse/IO error returns False so
+    injection behaves exactly as before — this is a pure optimization layer.
+    """
+    if os.environ.get("GRADATA_HANDOFF_RULES_DELTA", "1") != "1":
+        return False
+    sentinel = brain_dir / _HANDOFF_ACTIVE_FILE
+    if not sentinel.is_file():
+        return False
+    try:
+        import json as _json
+
+        payload = _json.loads(sentinel.read_text(encoding="utf-8"))
+        snapshot_iso = str(payload.get("rules_snapshot_ts") or "")
+        if not snapshot_iso:
+            return False
+        snapshot = datetime.fromisoformat(snapshot_iso)
+        lessons_mtime = datetime.fromtimestamp(lessons_path.stat().st_mtime, tz=UTC)
+        unchanged = lessons_mtime <= snapshot
+    except (OSError, ValueError, KeyError) as exc:
+        _log.debug("handoff sentinel parse failed (%s) — falling back", exc)
+        return False
+    finally:
+        try:
+            sentinel.unlink()
+        except OSError:
+            pass
+    return unchanged
 
 
 def _score(lesson) -> float:
@@ -64,21 +110,64 @@ def _score(lesson) -> float:
     return 0.4 * state_bonus + 0.3 * conf_norm + 0.3 * conf
 
 
-def _lesson_to_rule_dict(lesson) -> dict:
+_BRAIN_PROMPT_MARKER = "AUTO-GENERATED"
+
+
+def _read_brain_prompt(brain_dir: Path) -> str | None:
+    """Return the `<brain-wisdom>`-wrapped brain_prompt.md body, or None.
+
+    Accepts the file only when it carries the AUTO-GENERATED marker written
+    by session_close._refresh_brain_prompt — files without the marker are
+    assumed to be stale hand-edits or test fixtures and are ignored. Wraps
+    the body in `<brain-wisdom>` if not already present. Returns None on
+    missing file, missing marker, empty body, or read error.
+    """
+    bp = brain_dir / "brain_prompt.md"
+    if not bp.is_file():
+        return None
+    try:
+        text = bp.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        _log.debug("brain_prompt.md read failed (%s) — falling back", exc)
+        return None
+    if not text or _BRAIN_PROMPT_MARKER not in text[:400]:
+        return None
+    # Truncate inner body BEFORE wrapping so the XML tags remain intact.
+    if len(text) > MAX_BRAIN_PROMPT_CHARS:
+        text = text[:MAX_BRAIN_PROMPT_CHARS] + "\n<!-- truncated -->"
+    if "<brain-wisdom>" not in text:
+        text = f"<brain-wisdom>\n{text}\n</brain-wisdom>"
+    return text
+
+
+def _lesson_to_rule_dict(lesson, current_session: int = 0) -> dict:
     """Flatten a Lesson object (or dict) into the shape rank_rules expects.
 
     Carries Beta posterior fields (alpha / beta_param) through so Thompson
     sampling works when ``GRADATA_THOMPSON_RANKING=1``.
+
+    ``last_session`` is derived as ``current_session - sessions_since_fire``
+    when both are known — rule_ranker._recency_score expects absolute session
+    numbers, and before this we were hard-coding 0 which killed the recency
+    component of the ranker entirely. Falls back to 0 (neutral) when the
+    caller doesn't pass current_session or sessions_since_fire is unset.
     """
     if isinstance(lesson, dict):
-        return dict(lesson)
+        d = dict(lesson)
+        d.setdefault("last_session", 0)
+        return d
+    sessions_since = int(getattr(lesson, "sessions_since_fire", 0) or 0)
+    if current_session > 0 and sessions_since >= 0:
+        last_session = max(0, current_session - sessions_since)
+    else:
+        last_session = 0
     return {
         "id": getattr(lesson, "description", ""),
         "description": getattr(lesson, "description", ""),
         "category": getattr(lesson, "category", ""),
         "confidence": float(getattr(lesson, "confidence", 0.5)),
         "fire_count": int(getattr(lesson, "fire_count", 0)),
-        "last_session": 0,  # not tracked on Lesson — recency degrades gracefully
+        "last_session": last_session,
         "alpha": float(getattr(lesson, "alpha", 1.0)),
         "beta_param": float(getattr(lesson, "beta_param", 1.0)),
         "state": lesson.state.name if hasattr(lesson, "state") else "PATTERN",
@@ -101,12 +190,27 @@ def _wiki_categories(context: str) -> set[str]:
         if git_bash:
             cmd = [git_bash, "-c", f'qmd search "{context}" -c brain -n 10']
         else:
-            return set()  # no bash = no qmd on Windows
+            # Loud fallback: wiki-aware routing is silently disabled without
+            # Git Bash on Windows, and a silent failure hides a real capability
+            # gap. Emit once per process via a module-level flag.
+            global _QMD_BASH_WARNED
+            if not _QMD_BASH_WARNED:
+                _log.warning(
+                    "qmd wiki-aware routing disabled: Git Bash not found at "
+                    "C:/Program Files/Git/bin. Install Git for Windows or set "
+                    "PATH, or category routing will fall back to brute-force."
+                )
+                _QMD_BASH_WARNED = True
+            return set()
     else:
         cmd = ["qmd", "search", context, "-c", "brain", "-n", "10"]
     try:
         proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=2, encoding="utf-8",
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=2,
+            encoding="utf-8",
         )
         if proc.returncode != 0:
             return set()
@@ -151,7 +255,8 @@ def main(data: dict) -> dict | None:
     text = lessons_path.read_text(encoding="utf-8")
     all_lessons = parse_lessons(text)
     filtered = [
-        lesson for lesson in all_lessons
+        lesson
+        for lesson in all_lessons
         if lesson.state.name in ("RULE", "PATTERN") and lesson.confidence >= MIN_CONFIDENCE
     ]
     # Phase 5 rule-to-hook auto-promotion: rules enforced by an installed
@@ -164,19 +269,23 @@ def main(data: dict) -> dict | None:
     if not filtered:
         return None
 
+    # Handoff-delta optimization: when a fresh handoff carried a rules
+    # snapshot timestamp and lessons.md has not changed since, the prior
+    # agent already operated under these rules — suppress the ranked block
+    # to avoid re-paying the injection cost. Mandatory / disposition /
+    # meta-rules / brain_prompt paths still fire as normal.
+    skip_ranked_rules = _should_skip_ranked_rules(Path(brain_dir), lessons_path)
+
     # Wiki-aware selection: find categories relevant to session context
-    context = (
-        data.get("session_type", "")
-        or data.get("task_type", "")
-        or Path.cwd().name
-    )
+    context = data.get("session_type", "") or data.get("task_type", "") or Path.cwd().name
     wiki_cats = _wiki_categories(context)
 
     # Route everything through the unified rule_ranker. Wiki-matched categories
     # become a wiki_boost signal (+0.3 on context component) rather than a
     # hard pre-filter, so BM25 + Thompson can still surface strong cross-
     # category matches when the wiki miss-matches.
-    rule_dicts = [_lesson_to_rule_dict(lesson) for lesson in filtered]
+    current_session_number = int(data.get("session_number") or 0)
+    rule_dicts = [_lesson_to_rule_dict(lesson, current_session_number) for lesson in filtered]
     wiki_boost: dict[str, float] = {}
     if wiki_cats:
         for rd in rule_dicts:
@@ -184,7 +293,8 @@ def main(data: dict) -> dict | None:
                 wiki_boost[rd["id"]] = 0.3
 
     context_keywords = [
-        kw for kw in (
+        kw
+        for kw in (
             data.get("session_type", ""),
             data.get("task_type", ""),
             context,
@@ -221,7 +331,8 @@ def main(data: dict) -> dict | None:
             scored.append(lesson)
     _log.debug(
         "Unified injection: %d ranked (wiki_boost=%d)",
-        len(scored), len(wiki_boost),
+        len(scored),
+        len(wiki_boost),
     )
 
     # Cluster-level injection: replace groups of related rules with summaries.
@@ -250,9 +361,7 @@ def main(data: dict) -> dict | None:
             for m in cached_metas:
                 if getattr(m, "source", "deterministic") in INJECTABLE_META_SOURCES:
                     meta_covered_categories.update(getattr(m, "source_categories", []))
-                    meta_covered_lesson_ids.update(
-                        getattr(m, "source_lesson_ids", []) or []
-                    )
+                    meta_covered_lesson_ids.update(getattr(m, "source_lesson_ids", []) or [])
         except Exception as exc:
             _log.debug("meta-rule mutex pre-pass failed (%s) — clusters will fire", exc)
             cached_metas = None
@@ -264,9 +373,7 @@ def main(data: dict) -> dict | None:
     injection_manifest: dict[str, dict] = {}
     # Build lookup from the cluster member_ids string format back to Lesson.
     # Format matches clustering.py: f"{l.category}:{l.description[:40]}".
-    _lesson_by_member_id = {
-        f"{l.category}:{l.description[:40]}": l for l in filtered
-    }
+    _lesson_by_member_id = {f"{l.category}:{l.description[:40]}": l for l in filtered}
 
     def _anchor_for(lesson) -> str | None:
         """4-char stable anchor for a Lesson. None if _lesson_id unavailable."""
@@ -281,6 +388,7 @@ def main(data: dict) -> dict | None:
     cluster_lines: list[str] = []
     try:
         from gradata.enhancements.clustering import cluster_rules
+
         clusters = cluster_rules(filtered, min_cluster_size=3)
         for cluster in clusters:
             if cluster.category in meta_covered_categories:
@@ -308,9 +416,7 @@ def main(data: dict) -> dict | None:
                         "state": member_lesson.state.name,
                         "cluster_category": cluster.category,
                     }
-                anchor_suffix = (
-                    f" r:{','.join(member_anchors)}" if member_anchors else ""
-                )
+                anchor_suffix = f" r:{','.join(member_anchors)}" if member_anchors else ""
                 cluster_lines.append(
                     f"[CLUSTER:{cluster.cluster_confidence:.2f}|×{cluster.size}"
                     f"{anchor_suffix}] {safe_category}: {safe_summary}"
@@ -321,7 +427,8 @@ def main(data: dict) -> dict | None:
 
     _log.debug(
         "Cluster injection: %d clusters replaced %d individual rules",
-        len(cluster_lines), len(cluster_injected_ids),
+        len(cluster_lines),
+        len(cluster_injected_ids),
     )
 
     # Individual rules: only those NOT already covered by a qualifying cluster
@@ -347,8 +454,11 @@ def main(data: dict) -> dict | None:
         rule_id = f"{r.category}:{r.description[:40]}"
         if rule_id in cluster_injected_ids:
             continue
-        if meta_mutex_enabled and lesson_id_fn is not None \
-                and lesson_id_fn(r) in meta_covered_lesson_ids:
+        if (
+            meta_mutex_enabled
+            and lesson_id_fn is not None
+            and lesson_id_fn(r) in meta_covered_lesson_ids
+        ):
             suppressed_by_meta += 1
             continue
         safe_desc = sanitize_lesson_content(r.description, "xml")
@@ -373,7 +483,10 @@ def main(data: dict) -> dict | None:
         )
 
     lines = cluster_lines + individual_lines
-    rules_block = "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
+    if skip_ranked_rules:
+        rules_block = ""
+    else:
+        rules_block = "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
 
     # Persist injection manifest so correction-capture can attribute misfires
     # to specific rules (Meta-Harness A). Silent failure: missing manifest
@@ -381,6 +494,7 @@ def main(data: dict) -> dict | None:
     if injection_manifest:
         try:
             import json as _json
+
             manifest_path = Path(brain_dir) / ".last_injection.json"
             manifest_path.write_text(
                 _json.dumps(
@@ -393,15 +507,62 @@ def main(data: dict) -> dict | None:
         except Exception as exc:
             _log.debug("injection manifest write failed: %s", exc)
 
+    # lesson_applications PENDING rows — one per injected rule/cluster member.
+    # Closes the compound-quality audit gap: without these, no row proves a
+    # graduated rule ever fired. session_close resolves them to
+    # CONFIRMED/REJECTED based on correction activity in the same session.
+    if (
+        injection_manifest
+        and db_path.is_file()
+        and lesson_id_fn is not None
+        and not skip_ranked_rules
+    ):
+        try:
+            import json as _json
+
+            from gradata._db import get_connection
+
+            applied_at = datetime.now(UTC).isoformat()
+            session_num = int(data.get("session_number") or 0)
+            task_context = (context or "")[:200]
+            rows = []
+            for entry in injection_manifest.values():
+                ctx_blob = _json.dumps(
+                    {
+                        "category": entry.get("category", ""),
+                        "description": entry.get("description", "")[:200],
+                        "task": task_context,
+                    }
+                )
+                rows.append((entry["full_id"], session_num, applied_at, ctx_blob, "PENDING", 1))
+            if rows:
+                conn = get_connection(db_path)
+                try:
+                    conn.executemany(
+                        "INSERT INTO lesson_applications "
+                        "(lesson_id, session, applied_at, context, outcome, success) "
+                        "VALUES (?, ?, ?, ?, ?, ?)",
+                        rows,
+                    )
+                    conn.commit()
+                finally:
+                    conn.close()
+        except sqlite3.OperationalError as exc:
+            _log.warning("lesson_applications write failed (schema issue?): %s", exc)
+        except Exception as exc:
+            _log.debug("lesson_applications write failed: %s", exc)
+
     # Inject disposition (behavioral tendencies evolved from corrections)
     disposition_block = ""
     try:
         from gradata.enhancements.behavioral_engine import DispositionTracker
+
         tracker = DispositionTracker()
         # Load disposition from brain dir if persisted
         disp_path = Path(brain_dir) / "disposition.json"
         if disp_path.is_file():
             import json as _json
+
             tracker = DispositionTracker.from_dict(
                 _json.loads(disp_path.read_text(encoding="utf-8"))
             )
@@ -410,9 +571,7 @@ def main(data: dict) -> dict | None:
         instructions = disp.behavioral_instructions()
         if instructions:
             disposition_block = (
-                "\n<brain-disposition>\n"
-                + disp.format_for_prompt()
-                + "\n</brain-disposition>"
+                "\n<brain-disposition>\n" + disp.format_for_prompt() + "\n</brain-disposition>"
             )
     except ImportError:
         pass
@@ -425,15 +584,14 @@ def main(data: dict) -> dict | None:
     # Mandatory rules are intentionally NOT excluded from ranked scoring above —
     # they appear in both mandatory block and may appear in brain-rules.
     mandatory = [
-        lesson for lesson in all_lessons
+        lesson
+        for lesson in all_lessons
         if lesson.state.name == "RULE"
         and lesson.confidence >= 0.90
         and getattr(lesson, "fire_count", 0) >= 10
     ]
-    if mandatory:
-        mandatory_lines = [
-            f"[MANDATORY] {r.category}: {r.description}" for r in mandatory
-        ]
+    mandatory_lines: list[str] = [f"[MANDATORY] {r.category}: {r.description}" for r in mandatory]
+    if mandatory_lines:
         mandatory_block = (
             "<mandatory-directives>\n"
             "## NON-NEGOTIABLE DIRECTIVES\n"
@@ -463,8 +621,7 @@ def main(data: dict) -> dict | None:
             # DB open. Fall back to a fresh load if the pre-pass failed.
             metas = cached_metas if cached_metas is not None else load_meta_rules(db_path)
             injectable = [
-                m for m in metas
-                if getattr(m, "source", "deterministic") in INJECTABLE_META_SOURCES
+                m for m in metas if getattr(m, "source", "deterministic") in INJECTABLE_META_SOURCES
             ]
             if injectable:
                 # Build a sanitized condition_context from the hook payload so
@@ -491,11 +648,7 @@ def main(data: dict) -> dict | None:
                     limit=MAX_META_RULES,
                 )
                 if formatted:
-                    meta_block = (
-                        "\n<brain-meta-rules>\n"
-                        + formatted
-                        + "\n</brain-meta-rules>"
-                    )
+                    meta_block = "\n<brain-meta-rules>\n" + formatted + "\n</brain-meta-rules>"
             elif metas:
                 _log.debug(
                     "Skipped meta-rule injection: %d metas in DB, none with "
@@ -504,9 +657,20 @@ def main(data: dict) -> dict | None:
                 )
         except Exception as exc:
             _log.debug(
-                "meta-rule pipeline failed (%s) — degrading to rules-only", exc,
+                "meta-rule pipeline failed (%s) — degrading to rules-only",
+                exc,
             )
             meta_block = ""
+
+    # Persistent brain-prompt: if brain/brain_prompt.md exists AND was written
+    # by session_close._refresh_brain_prompt (identified by the AUTO-GENERATED
+    # header), inject it verbatim and skip the fragmented composition.
+    # Synthesis never runs in the injection hook — that path was slow (CLI
+    # round-trip) and non-deterministic. The session_close hook is the only
+    # place we call the LLM; injection is pure read-compose.
+    bp_text = _read_brain_prompt(Path(brain_dir))
+    if bp_text:
+        return {"result": bp_text}
 
     return {"result": mandatory_block + disposition_block + rules_block + meta_block}
 

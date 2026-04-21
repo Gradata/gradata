@@ -41,7 +41,7 @@ def _normalize_pattern_description(text: str) -> str:
     text = text.strip()
     for prefix in ("User corrected: ", "[AUTO] "):
         if text.startswith(prefix):
-            text = text[len(prefix):]
+            text = text[len(prefix) :]
     return text
 
 
@@ -91,7 +91,9 @@ def _patterns_to_graduated_lessons(
 
     try:
         candidates = query_graduation_candidates(
-            db_path, min_sessions=min_sessions, min_score=min_score,
+            db_path,
+            min_sessions=min_sessions,
+            min_score=min_score,
         )
     except Exception as exc:
         _log.debug("_patterns_to_graduated_lessons: query failed: %s", exc)
@@ -115,14 +117,16 @@ def _patterns_to_graduated_lessons(
         first_seen = str(row.get("first_seen") or "")[:10] or "2026-01-01"
         distinct_sessions = int(row.get("distinct_sessions") or 2)
         state, confidence = _state_for_sessions(distinct_sessions)
-        lessons.append(Lesson(
-            date=first_seen,
-            state=state,
-            confidence=confidence,
-            category=category,
-            description=desc,
-            fire_count=distinct_sessions,
-        ))
+        lessons.append(
+            Lesson(
+                date=first_seen,
+                state=state,
+                confidence=confidence,
+                category=category,
+                description=desc,
+                fire_count=distinct_sessions,
+            )
+        )
     return lessons
 
 
@@ -179,11 +183,11 @@ def _generate_skill_file(
 
     content = f"""---
 name: {lesson.description[:60]}
-description: Auto-graduated from correction-driven learning (confidence {lesson.confidence:.2f}, fired {getattr(lesson, 'fire_count', 0)} times)
+description: Auto-graduated from correction-driven learning (confidence {lesson.confidence:.2f}, fired {getattr(lesson, "fire_count", 0)} times)
 source: gradata-behavioral-engine
 confidence: {lesson.confidence}
 category: {lesson.category}
-graduated_at_session: {getattr(lesson, 'created_session', 0)}
+graduated_at_session: {getattr(lesson, "created_session", 0)}
 updated_at: {updated_at}
 ---
 
@@ -191,7 +195,7 @@ updated_at: {updated_at}
 
 **Category**: {lesson.category}
 **Confidence**: {lesson.confidence:.2f}
-**Times Applied**: {getattr(lesson, 'fire_count', 0)}
+**Times Applied**: {getattr(lesson, "fire_count", 0)}
 
 ## Directive
 
@@ -290,10 +294,6 @@ def run_rule_pipeline(
         PipelineResult with all changes made.
     """
     from gradata.enhancements.self_improvement import (
-        MIN_APPLICATIONS_FOR_PATTERN,
-        MIN_APPLICATIONS_FOR_RULE,
-        PATTERN_THRESHOLD,
-        RULE_THRESHOLD,
         format_lessons,
         parse_lessons,
     )
@@ -367,6 +367,7 @@ def run_rule_pipeline(
     # Must run after Phase 1 so all_lessons is already populated for dedup.
     try:
         from gradata._db import get_connection
+
         if db_path.is_file():
             conn = get_connection(db_path)
             rows = conn.execute(
@@ -377,6 +378,7 @@ def run_rule_pipeline(
             conn.close()
 
             import json as _json
+
             for row in rows:
                 try:
                     vdata = _json.loads(row[0]) if isinstance(row[0], str) else row[0]
@@ -388,14 +390,14 @@ def run_rule_pipeline(
                     continue
                 desc = f"Violated: {rule_desc}"
                 already_exists = any(
-                    l.category == cat and l.description == desc
-                    for l in all_lessons
+                    l.category == cat and l.description == desc for l in all_lessons
                 )
                 if already_exists:
                     continue
                 from datetime import date as _date
 
                 from gradata._types import Lesson as _Lesson
+
                 candidate = _Lesson(
                     date=_date.today().isoformat(),
                     state=LessonState.INSTINCT,
@@ -426,21 +428,18 @@ def run_rule_pipeline(
         result.errors.append(f"Phase 1.6: pattern lift: {exc}")
 
     # ── Phase 2: Atomic writes ────────────────────────────────────────────────
-    # Graduate rules, update confidence, create meta-rules.
+    # Graduate via the canonical promoter: strict `>` for INSTINCT→PATTERN
+    # (H1 fix — blocks promotion from spawn), `>=` for PATTERN→RULE, plus
+    # dedup / contradiction / paraphrase gates and rule-to-hook promotion.
+    from gradata.enhancements.self_improvement._graduation import graduate as _graduate
+
+    pre_states = {id(l): l.state for l in all_lessons}
+    _graduate(all_lessons)
     for lesson in all_lessons:
-        if (
-            lesson.state.name == "INSTINCT"
-            and lesson.confidence >= PATTERN_THRESHOLD
-            and lesson.fire_count >= MIN_APPLICATIONS_FOR_PATTERN
+        if pre_states.get(id(lesson)) != lesson.state and lesson.state in (
+            LessonState.PATTERN,
+            LessonState.RULE,
         ):
-            lesson.state = LessonState.PATTERN
-            result.graduated.append(f"{lesson.category}:{lesson.description[:30]}")
-        elif (
-            lesson.state.name == "PATTERN"
-            and lesson.confidence >= RULE_THRESHOLD
-            and lesson.fire_count >= MIN_APPLICATIONS_FOR_RULE
-        ):
-            lesson.state = LessonState.RULE
             result.graduated.append(f"{lesson.category}:{lesson.description[:30]}")
 
     # Synthesize meta-rules from graduated rules
@@ -481,6 +480,7 @@ def run_rule_pipeline(
     # Hook promotion for newly graduated RULE-state lessons
     try:
         from gradata.enhancements.rule_to_hook import classify_rule, promote  # type: ignore[import]
+        from gradata.enhancements.self_improvement._confidence import RULE_THRESHOLD
 
         for lesson in all_lessons:
             if lesson.state.name == "RULE" and lesson.confidence >= RULE_THRESHOLD:
@@ -510,6 +510,7 @@ def run_rule_pipeline(
         disp_path = lessons_path.parent / "disposition.json"
         if disp_path.is_file():
             import json as _json
+
             tracker = DispositionTracker.from_dict(
                 _json.loads(disp_path.read_text(encoding="utf-8"))
             )
@@ -527,8 +528,10 @@ def run_rule_pipeline(
         if result.disposition_updates:
             try:
                 import json as _json
+
                 disp_path.write_text(
-                    _json.dumps(tracker.to_dict(), indent=2), encoding="utf-8",
+                    _json.dumps(tracker.to_dict(), indent=2),
+                    encoding="utf-8",
                 )
             except Exception as exc:
                 result.errors.append(f"Phase 3: disposition write: {exc}")
@@ -564,14 +567,19 @@ def run_rule_pipeline(
     if os.environ.get("GRADATA_RULE_VERIFIER") and corrections and db_path.is_file():
         try:
             from gradata.enhancements.rule_verifier import log_verification, verify_rules
-            applied_rules = [{"category": l.category, "description": l.description} for l in all_lessons]
+
+            applied_rules = [
+                {"category": l.category, "description": l.description} for l in all_lessons
+            ]
             for correction in corrections:
                 output = correction.get("draft", "")
                 if not output:
                     continue
                 verifications = verify_rules(output, applied_rules)
                 if verifications:
-                    log_verification(session=current_session, results=verifications, db_path=db_path)
+                    log_verification(
+                        session=current_session, results=verifications, db_path=db_path
+                    )
         except Exception as exc:
             result.errors.append(f"Phase 3: rule verification: {exc}")
 
@@ -623,18 +631,21 @@ def build_knowledge_graph(lessons_path: Path, db_path: Path) -> dict:
 
     # Nodes: each lesson is a node
     for lesson in lessons:
-        graph["nodes"].append({
-            "id": f"{lesson.category}:{lesson.description[:40]}",
-            "description": lesson.description,
-            "category": lesson.category,
-            "confidence": lesson.confidence,
-            "state": lesson.state.name,
-            "fire_count": getattr(lesson, "fire_count", 0),
-        })
+        graph["nodes"].append(
+            {
+                "id": f"{lesson.category}:{lesson.description[:40]}",
+                "description": lesson.description,
+                "category": lesson.category,
+                "confidence": lesson.confidence,
+                "state": lesson.state.name,
+                "fire_count": getattr(lesson, "fire_count", 0),
+            }
+        )
 
     # Clusters
     try:
         from gradata.enhancements.clustering import cluster_rules  # type: ignore[import]
+
         graph["clusters"] = [
             {
                 "cluster_id": c.cluster_id,
@@ -652,10 +663,10 @@ def build_knowledge_graph(lessons_path: Path, db_path: Path) -> dict:
     # Contradictions (across graduated rules)
     try:
         from gradata.enhancements.clustering import detect_contradictions  # type: ignore[import]
+
         graduated = [l for l in lessons if l.state.name in ("RULE", "PATTERN")]
         graph["contradictions"] = [
-            {"rule_a": a, "rule_b": b}
-            for a, b in detect_contradictions(graduated)
+            {"rule_a": a, "rule_b": b} for a, b in detect_contradictions(graduated)
         ]
     except (ImportError, Exception):
         pass
@@ -665,6 +676,7 @@ def build_knowledge_graph(lessons_path: Path, db_path: Path) -> dict:
         from gradata.enhancements.meta_rules import (
             detect_cross_domain_candidates,  # type: ignore[import]
         )
+
         graph["cross_domain"] = detect_cross_domain_candidates(lessons)
     except (ImportError, Exception):
         pass

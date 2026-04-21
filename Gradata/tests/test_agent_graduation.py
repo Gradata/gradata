@@ -1,4 +1,5 @@
 """Tests for agent graduation — compounding behavioral adaptation for agents."""
+
 import json
 import pytest
 from pathlib import Path
@@ -99,8 +100,7 @@ class TestApprovalGateGraduation:
 class TestAgentLessonGraduation:
     def test_edit_creates_instinct_lesson(self, tracker):
         tracker.record_outcome(
-            "research", "test output", "edited",
-            edits="Should cite primary sources, not blog posts"
+            "research", "test output", "edited", edits="Should cite primary sources, not blog posts"
         )
         profile = tracker._load_profile("research")
         assert len(profile.lessons) == 1
@@ -108,58 +108,32 @@ class TestAgentLessonGraduation:
 
     def test_lesson_confidence_increases_on_approval(self, tracker):
         # Create a lesson via edit
-        tracker.record_outcome(
-            "research", "output 1", "edited",
-            edits="Need primary sources"
-        )
+        tracker.record_outcome("research", "output 1", "edited", edits="Need primary sources")
         initial_confidence = tracker._load_profile("research").lessons[0].confidence
 
         # Approve several times (lesson survives)
         for i in range(5):
-            tracker.record_outcome("research", f"output {i+2}", "approved")
+            tracker.record_outcome("research", f"output {i + 2}", "approved")
 
         final_confidence = tracker._load_profile("research").lessons[0].confidence
         assert final_confidence > initial_confidence
 
-    @pytest.mark.xfail(
-        reason=(
-            "API drift from cloud_backup snapshot. Test expects ACCEPTANCE_BONUS=0.05 "
-            "(old backup constant) but SDK self_improvement.py uses ACCEPTANCE_BONUS=0.20. "
-            "Reconcile in v0.7: either update graduation thresholds to match new confidence math, "
-            "or update this test's expected delta."
-        ),
-        strict=True,
-    )
     def test_lesson_graduates_to_pattern(self, tracker):
-        # Create lesson (starts at confidence 0.30)
-        tracker.record_outcome(
-            "research", "output", "edited",
-            edits="Always cite 3+ sources"
-        )
-        # Need confidence >= 0.60 and fire_count >= 3
-        # Each approval gives +0.05 acceptance bonus
-        # 0.30 + (0.05 * 7) = 0.65 >= 0.60 threshold
-        # Plus fire_count increments each time
+        # Lesson starts at confidence 0.30, plus SURVIVAL_BONUS on the edit.
+        tracker.record_outcome("research", "output", "edited", edits="Always cite 3+ sources")
+        # ACCEPTANCE_BONUS=0.20 and 8 approvals push confidence well past both
+        # PATTERN (0.60) and RULE (0.90) thresholds, with fire_count past the
+        # RULE minimum. Final graduated state is RULE (stricter than PATTERN).
         for i in range(8):
             tracker.record_outcome("research", f"output {i}", "approved")
 
         profile = tracker._load_profile("research")
-        # Should have graduated from INSTINCT to PATTERN
-        assert any(l.state == LessonState.PATTERN for l in profile.lessons)
-
-    @pytest.mark.xfail(
-        reason=(
-            "API drift from cloud_backup snapshot. Rejection path in SDK self_improvement.py "
-            "uses different sign conventions than backup — produces confidence INCREASE where "
-            "test expects decrease. Reconcile in v0.7: verify rejection-path semantics in "
-            "agent_graduation vs self_improvement."
-        ),
-        strict=True,
-    )
-    def test_rejection_decreases_confidence(self, tracker):
-        tracker.record_outcome(
-            "research", "output", "edited", edits="Bad pattern"
+        assert any(l.state in (LessonState.PATTERN, LessonState.RULE) for l in profile.lessons), (
+            "lesson should have graduated out of INSTINCT"
         )
+
+    def test_rejection_decreases_confidence(self, tracker):
+        tracker.record_outcome("research", "output", "edited", edits="Bad pattern")
         initial = tracker._load_profile("research").lessons[0].confidence
 
         tracker.record_outcome("research", "output", "rejected")
@@ -175,10 +149,7 @@ class TestDistillation:
 
     def test_distill_returns_graduated_lessons(self, tracker):
         # Create and graduate a lesson
-        tracker.record_outcome(
-            "research", "output", "edited",
-            edits="Always verify sources"
-        )
+        tracker.record_outcome("research", "output", "edited", edits="Always verify sources")
         # Push it to PATTERN level
         for i in range(20):
             tracker.record_outcome("research", f"output {i}", "approved")
@@ -207,10 +178,7 @@ class TestPersistence:
         assert len(lines) == 2
 
     def test_lessons_file_created(self, tracker):
-        tracker.record_outcome(
-            "research", "output", "edited",
-            edits="Need better sources"
-        )
+        tracker.record_outcome("research", "output", "edited", edits="Need better sources")
         lessons_path = tracker._agent_dir("research") / "lessons.md"
         assert lessons_path.exists()
         content = lessons_path.read_text(encoding="utf-8")
@@ -228,10 +196,7 @@ class TestAgentRules:
 
     def test_get_context_includes_graduated_rules(self, tracker):
         # Build up a graduated lesson
-        tracker.record_outcome(
-            "research", "output", "edited",
-            edits="Always cite sources"
-        )
+        tracker.record_outcome("research", "output", "edited", edits="Always cite sources")
         for i in range(20):
             tracker.record_outcome("research", f"output {i}", "approved")
 
@@ -285,8 +250,11 @@ class TestDeterministicRules:
     def test_compile_positioning_rule(self):
         """POSITIONING rule with 'agency pricing' should compile to regex guard."""
         from gradata.enhancements.self_improvement import Lesson
+
         lesson = Lesson(
-            date="2026-03-25", state=LessonState.RULE, confidence=0.95,
+            date="2026-03-25",
+            state=LessonState.RULE,
+            confidence=0.95,
             category="POSITIONING",
             description="Never use 'agency pricing' — it implies expensive retainers",
             fire_count=10,
@@ -304,8 +272,11 @@ class TestDeterministicRules:
     def test_compile_non_enforceable_returns_none(self):
         """DRAFTING rules can't be enforced deterministically."""
         from gradata.enhancements.self_improvement import Lesson
+
         lesson = Lesson(
-            date="2026-03-25", state=LessonState.RULE, confidence=0.95,
+            date="2026-03-25",
+            state=LessonState.RULE,
+            confidence=0.95,
             category="DRAFTING",
             description="Lead with empathy in follow-up emails",
             fire_count=10,
@@ -316,8 +287,11 @@ class TestDeterministicRules:
     def test_compile_requires_rule_tier(self):
         """Only RULE-tier lessons can be compiled."""
         from gradata.enhancements.self_improvement import Lesson
+
         lesson = Lesson(
-            date="2026-03-25", state=LessonState.PATTERN, confidence=0.75,
+            date="2026-03-25",
+            state=LessonState.PATTERN,
+            confidence=0.75,
             category="POSITIONING",
             description="Never use 'agency pricing'",
             fire_count=5,
@@ -328,8 +302,11 @@ class TestDeterministicRules:
     def test_data_integrity_rule(self):
         """DATA_INTEGRITY rule compiles and has owner_only check."""
         from gradata.enhancements.self_improvement import Lesson
+
         lesson = Lesson(
-            date="2026-03-25", state=LessonState.RULE, confidence=0.95,
+            date="2026-03-25",
+            state=LessonState.RULE,
+            confidence=0.95,
             category="DATA_INTEGRITY",
             description="owner_only — never include other users' data",
             fire_count=10,
@@ -345,8 +322,11 @@ class TestDeterministicRules:
     def test_pricing_rule(self):
         """PRICING rule blocks starter tier multi-account claims."""
         from gradata.enhancements.self_improvement import Lesson
+
         lesson = Lesson(
-            date="2026-03-25", state=LessonState.RULE, confidence=0.95,
+            date="2026-03-25",
+            state=LessonState.RULE,
+            confidence=0.95,
             category="PRICING",
             description="Starter tier multi-brand not supported, only one account",
             fire_count=10,
@@ -361,12 +341,17 @@ class TestDeterministicRules:
         # Manually create a profile with a RULE lesson
         profile = tracker._load_profile("writer")
         from gradata.enhancements.self_improvement import Lesson
-        profile.lessons.append(Lesson(
-            date="2026-03-25", state=LessonState.RULE, confidence=0.95,
-            category="POSITIONING",
-            description="Never use 'agency pricing' — it implies expensive retainers",
-            fire_count=10,
-        ))
+
+        profile.lessons.append(
+            Lesson(
+                date="2026-03-25",
+                state=LessonState.RULE,
+                confidence=0.95,
+                category="POSITIONING",
+                description="Never use 'agency pricing' — it implies expensive retainers",
+                fire_count=10,
+            )
+        )
         tracker._save_profile(profile)
 
         result = tracker.enforce_rules("writer", "Check out our agency pricing model")
@@ -378,12 +363,17 @@ class TestDeterministicRules:
         """enforce_rules() passes clean output."""
         profile = tracker._load_profile("writer")
         from gradata.enhancements.self_improvement import Lesson
-        profile.lessons.append(Lesson(
-            date="2026-03-25", state=LessonState.RULE, confidence=0.95,
-            category="POSITIONING",
-            description="Never use 'agency pricing'",
-            fire_count=10,
-        ))
+
+        profile.lessons.append(
+            Lesson(
+                date="2026-03-25",
+                state=LessonState.RULE,
+                confidence=0.95,
+                category="POSITIONING",
+                description="Never use 'agency pricing'",
+                fire_count=10,
+            )
+        )
         tracker._save_profile(profile)
 
         result = tracker.enforce_rules("writer", "Flat monthly rate, cancel anytime")
@@ -401,6 +391,7 @@ class TestDeterministicRules:
 # ---------------------------------------------------------------------------
 # Regression: Bug H2 — fire_count incremented for all lessons on any approval
 # ---------------------------------------------------------------------------
+
 
 class TestAgentFireCountGate:
     """Regression for H2: agent _update_lesson_confidence must gate fire_count
@@ -440,7 +431,9 @@ class TestAgentFireCountGate:
 
         # Record an approved outcome with edit_category="TONE"
         tracker.record_outcome(
-            "writer", "sample output", "approved",
+            "writer",
+            "sample output",
+            "approved",
             edit_category="TONE",
             session=1,
         )
@@ -463,12 +456,22 @@ class TestAgentFireCountGate:
 
         profile = tracker._load_profile("writer")
         profile.lessons = [
-            Lesson(date="2026-04-01", state=LessonState.INSTINCT,
-                   confidence=INITIAL_CONFIDENCE, category="TONE",
-                   description="lesson A", fire_count=0),
-            Lesson(date="2026-04-01", state=LessonState.INSTINCT,
-                   confidence=INITIAL_CONFIDENCE, category="DRAFTING",
-                   description="lesson B", fire_count=0),
+            Lesson(
+                date="2026-04-01",
+                state=LessonState.INSTINCT,
+                confidence=INITIAL_CONFIDENCE,
+                category="TONE",
+                description="lesson A",
+                fire_count=0,
+            ),
+            Lesson(
+                date="2026-04-01",
+                state=LessonState.INSTINCT,
+                confidence=INITIAL_CONFIDENCE,
+                category="DRAFTING",
+                description="lesson B",
+                fire_count=0,
+            ),
         ]
         tracker._save_profile(profile)
 

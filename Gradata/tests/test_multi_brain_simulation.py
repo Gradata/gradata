@@ -544,7 +544,6 @@ def test_persona_graduation_divergence(graduated_lessons_per_brain: list[list[Le
 # Test 2: Correction-to-meta-rule pipeline
 # ---------------------------------------------------------------------------
 
-@pytest.mark.skip(reason="Meta-rule discovery requires Gradata Cloud")
 def test_correction_to_meta_rule_pipeline(graduated_lessons_per_brain: list[list[Lesson]]) -> None:
     """Every persona should produce at least 1 meta-rule after 50 sessions.
 
@@ -583,7 +582,6 @@ def test_correction_to_meta_rule_pipeline(graduated_lessons_per_brain: list[list
 # Test 3: Cross-brain rule isolation
 # ---------------------------------------------------------------------------
 
-@pytest.mark.skip(reason="Meta-rule discovery requires Gradata Cloud")
 def test_cross_brain_rule_isolation(tmp_path: Path) -> None:
     """Corrections applied to brain A must not affect brain B.
 
@@ -748,7 +746,6 @@ def test_rule_injection_scaling() -> None:
 # Test 6: Meta-rule emergence threshold
 # ---------------------------------------------------------------------------
 
-@pytest.mark.skip(reason="Meta-rule discovery requires Gradata Cloud")
 def test_meta_rule_emergence_threshold() -> None:
     """Meta-rules emerge at >= 3 eligible lessons; fewer than 3 produce none.
 

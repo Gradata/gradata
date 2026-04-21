@@ -4,6 +4,7 @@ Covers PipelineResult and run_rule_pipeline with unit-level isolation —
 optional dependencies (freshness, retrieval_fusion, behavioral_engine,
 meta_rules, rule_to_hook) are mocked or suppressed via import patching.
 """
+
 from __future__ import annotations
 
 import json
@@ -106,7 +107,35 @@ def test_pipeline_empty_lessons_returns_empty_result(tmp_path: Path) -> None:
 
 
 def test_pipeline_graduates_instinct_to_pattern(tmp_path: Path) -> None:
-    """INSTINCT lesson at 0.60 confidence with >= 3 fires graduates to PATTERN."""
+    """INSTINCT lesson above 0.60 confidence with >= 3 fires graduates to PATTERN.
+
+    H1 semantics: canonical graduation uses strict `>` for INSTINCT→PATTERN.
+    A lesson born at INITIAL_CONFIDENCE (0.60) must earn at least one bonus
+    to clear the threshold — it cannot graduate purely on initial state.
+    """
+    lesson = _make_lesson(
+        state=LessonState.INSTINCT,
+        confidence=0.65,
+        fire_count=3,
+    )
+    lessons_path = tmp_path / "lessons.md"
+    _write_lessons(lessons_path, [lesson])
+    db_path = tmp_path / "system.db"
+
+    run_rule_pipeline(lessons_path, db_path, current_session=5)
+
+    # Verify the file was actually updated to PATTERN
+    updated_text = lessons_path.read_text(encoding="utf-8")
+    assert "PATTERN" in updated_text
+
+
+def test_pipeline_does_not_graduate_at_exact_pattern_threshold(tmp_path: Path) -> None:
+    """INSTINCT at exactly 0.60 (initial) must NOT graduate under canonical `>`.
+
+    This is the H1 fix — blocks "promotion from spawn" where a freshly-minted
+    INSTINCT could clear PATTERN_THRESHOLD without ever earning a confidence
+    bonus.
+    """
     lesson = _make_lesson(
         state=LessonState.INSTINCT,
         confidence=0.60,
@@ -116,14 +145,11 @@ def test_pipeline_graduates_instinct_to_pattern(tmp_path: Path) -> None:
     _write_lessons(lessons_path, [lesson])
     db_path = tmp_path / "system.db"
 
-    result = run_rule_pipeline(lessons_path, db_path, current_session=5)
+    run_rule_pipeline(lessons_path, db_path, current_session=5)
 
-    assert len(result.graduated) == 1
-    assert "FORMATTING" in result.graduated[0]
-
-    # Verify the file was actually updated
     updated_text = lessons_path.read_text(encoding="utf-8")
-    assert "PATTERN" in updated_text
+    assert "INSTINCT" in updated_text
+    assert "PATTERN" not in updated_text
 
 
 def test_pipeline_does_not_graduate_instinct_below_threshold(tmp_path: Path) -> None:
@@ -385,7 +411,9 @@ def test_phase0_marks_pending_approval(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _make_rule_lesson(description: str = "Use colons not dashes", confidence: float = 0.95) -> Lesson:
+def _make_rule_lesson(
+    description: str = "Use colons not dashes", confidence: float = 0.95
+) -> Lesson:
     return Lesson(
         date="2026-01-01",
         state=LessonState.RULE,
@@ -532,6 +560,7 @@ def test_build_knowledge_graph_includes_clusters(tmp_path: Path) -> None:
 def _seed_correction_patterns(db_path: Path, rows: list[tuple]) -> None:
     """Insert raw rows into correction_patterns; schema created on first call."""
     from gradata.enhancements.meta_rules_storage import ensure_pattern_table
+
     ensure_pattern_table(db_path)
     conn = sqlite3.connect(str(db_path))
     try:
@@ -552,12 +581,47 @@ def test_patterns_to_graduated_lessons_lifts_qualifying_clusters(tmp_path):
     from gradata.enhancements.rule_pipeline import _patterns_to_graduated_lessons
 
     db_path = tmp_path / "system.db"
-    _seed_correction_patterns(db_path, [
-        ("h1", "LEADS", "Don't give prospects a way out when interest is stated", 10, "major", 2.0, "2026-04-01"),
-        ("h1", "LEADS", "Don't give prospects a way out when interest is stated", 11, "major", 2.0, "2026-04-02"),
-        ("h2", "DEMO_PREP", "Always trigger post-demo workflow", 10, "major", 2.0, "2026-04-01"),
-        ("h2", "DEMO_PREP", "Always trigger post-demo workflow", 11, "major", 2.0, "2026-04-02"),
-    ])
+    _seed_correction_patterns(
+        db_path,
+        [
+            (
+                "h1",
+                "LEADS",
+                "Don't give prospects a way out when interest is stated",
+                10,
+                "major",
+                2.0,
+                "2026-04-01",
+            ),
+            (
+                "h1",
+                "LEADS",
+                "Don't give prospects a way out when interest is stated",
+                11,
+                "major",
+                2.0,
+                "2026-04-02",
+            ),
+            (
+                "h2",
+                "DEMO_PREP",
+                "Always trigger post-demo workflow",
+                10,
+                "major",
+                2.0,
+                "2026-04-01",
+            ),
+            (
+                "h2",
+                "DEMO_PREP",
+                "Always trigger post-demo workflow",
+                11,
+                "major",
+                2.0,
+                "2026-04-02",
+            ),
+        ],
+    )
 
     lessons = _patterns_to_graduated_lessons(db_path, current_session=12)
     assert len(lessons) == 2
@@ -577,13 +641,19 @@ def test_patterns_to_graduated_lessons_session_count_drives_state(tmp_path):
     rows: list[tuple] = []
     # 2-session pattern → PATTERN @ 0.70
     for sid in (10, 11):
-        rows.append(("hA", "LEADS", "weak evidence pattern", sid, "major", 2.0, f"2026-04-{sid:02d}"))
+        rows.append(
+            ("hA", "LEADS", "weak evidence pattern", sid, "major", 2.0, f"2026-04-{sid:02d}")
+        )
     # 3-session pattern → PATTERN @ 0.80
     for sid in (20, 21, 22):
-        rows.append(("hB", "TONE", "moderate evidence pattern", sid, "major", 2.0, f"2026-04-{sid:02d}"))
+        rows.append(
+            ("hB", "TONE", "moderate evidence pattern", sid, "major", 2.0, f"2026-04-{sid:02d}")
+        )
     # 5-session pattern → RULE @ 0.92
     for sid in (30, 31, 32, 33, 34):
-        rows.append(("hC", "DRAFTING", "strong evidence pattern", sid, "major", 2.0, f"2026-04-{sid:02d}"))
+        rows.append(
+            ("hC", "DRAFTING", "strong evidence pattern", sid, "major", 2.0, f"2026-04-{sid:02d}")
+        )
     _seed_correction_patterns(db_path, rows)
 
     lessons = {l.category: l for l in _patterns_to_graduated_lessons(db_path, current_session=40)}
@@ -600,14 +670,33 @@ def test_patterns_to_graduated_lessons_strips_noise(tmp_path):
     from gradata.enhancements.rule_pipeline import _patterns_to_graduated_lessons
 
     db_path = tmp_path / "system.db"
-    _seed_correction_patterns(db_path, [
-        ("h1", "ACCURACY", "[AUTO] heuristic evaluator output", 10, "minor", 2.0, "2026-04-01"),
-        ("h1", "ACCURACY", "[AUTO] heuristic evaluator output", 11, "minor", 2.0, "2026-04-02"),
-        ("h2", "LEADS", "User corrected: Use reply CTAs not booking links", 10, "major", 2.0, "2026-04-01"),
-        ("h2", "LEADS", "User corrected: Use reply CTAs not booking links", 11, "major", 2.0, "2026-04-02"),
-        ("h3", "LEADS", "Use reply CTAs not booking links", 12, "major", 2.0, "2026-04-03"),
-        ("h3", "LEADS", "Use reply CTAs not booking links", 13, "major", 2.0, "2026-04-04"),
-    ])
+    _seed_correction_patterns(
+        db_path,
+        [
+            ("h1", "ACCURACY", "[AUTO] heuristic evaluator output", 10, "minor", 2.0, "2026-04-01"),
+            ("h1", "ACCURACY", "[AUTO] heuristic evaluator output", 11, "minor", 2.0, "2026-04-02"),
+            (
+                "h2",
+                "LEADS",
+                "User corrected: Use reply CTAs not booking links",
+                10,
+                "major",
+                2.0,
+                "2026-04-01",
+            ),
+            (
+                "h2",
+                "LEADS",
+                "User corrected: Use reply CTAs not booking links",
+                11,
+                "major",
+                2.0,
+                "2026-04-02",
+            ),
+            ("h3", "LEADS", "Use reply CTAs not booking links", 12, "major", 2.0, "2026-04-03"),
+            ("h3", "LEADS", "Use reply CTAs not booking links", 13, "major", 2.0, "2026-04-04"),
+        ],
+    )
 
     lessons = _patterns_to_graduated_lessons(db_path, current_session=14)
     assert len(lessons) == 1
