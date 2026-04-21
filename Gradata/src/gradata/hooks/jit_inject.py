@@ -350,9 +350,12 @@ def main(data: dict) -> dict | None:
         if norm_desc in seen_descs:
             continue
         seen_descs.add(norm_desc)
+        # Drop the category label: the description is self-explanatory and the
+        # category label costs 2-4 tokens per rule with no added LLM signal.
+        # Confidence + description is sufficient for the model to act on the rule.
         lines.append(
             f"[{_STATE_ABBREV.get(r.state.name, r.state.name)}{round(r.confidence * 100):02d}]"
-            f" {r.category}: {r.description}"
+            f" {r.description}"
         )
     # Drop the separate `[jit]` section header: the [P83]/[I83]/[R83] markers
     # already identify these as JIT rule injections. Saves 3 tokens per firing turn
