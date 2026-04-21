@@ -59,12 +59,16 @@ def generate_manifest(*, domain: str = "General", ctx: "BrainContext | None" = N
 
     # Cross-check session count: prefer DB max if higher than VERSION.md
     try:
+        import contextlib as _ctxlib
+
         db = ctx.db_path if ctx else _p.DB_PATH
-        conn = get_connection(db)
-        db_max = conn.execute(
-            "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
-        ).fetchone()[0] or 0
-        conn.close()
+        with _ctxlib.closing(get_connection(db)) as conn:
+            db_max = (
+                conn.execute(
+                    "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
+                ).fetchone()[0]
+                or 0
+            )
         if db_max > version_info["sessions_trained"]:
             version_info["sessions_trained"] = db_max
     except Exception:
@@ -110,10 +114,22 @@ def generate_manifest(*, domain: str = "General", ctx: "BrainContext | None" = N
             },
         },
         "bootstrap": [
-            {"step": "set_env_vars", "desc": "Set BRAIN_DIR, WORKING_DIR, DOMAIN_DIR", "required": True},
+            {
+                "step": "set_env_vars",
+                "desc": "Set BRAIN_DIR, WORKING_DIR, DOMAIN_DIR",
+                "required": True,
+            },
             {"step": "init_db", "command": "python start.py init", "required": True},
-            {"step": "embed_brain", "command": "python embed.py --full", "required": rag.get("active", False)},
-            {"step": "rebuild_fts", "command": "python -c \"from query import fts_rebuild; fts_rebuild()\"", "required": True},
+            {
+                "step": "embed_brain",
+                "command": "python embed.py --full",
+                "required": rag.get("active", False),
+            },
+            {
+                "step": "rebuild_fts",
+                "command": 'python -c "from query import fts_rebuild; fts_rebuild()"',
+                "required": True,
+            },
             {"step": "validate", "command": "python config_validator.py", "required": False},
         ],
         "compatibility": {

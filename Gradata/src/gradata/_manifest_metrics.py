@@ -30,18 +30,27 @@ if TYPE_CHECKING:
     from gradata._paths import BrainContext
 
 
-def _lesson_distribution(ctx: "BrainContext | None" = None) -> dict[str, int]:
-    """Count lessons by state from lessons.md."""
+def _lesson_distribution(
+    ctx: "BrainContext | None" = None,
+    lessons_text: str | None = None,
+) -> dict[str, int]:
+    """Count lessons by state from lessons.md.
+
+    If ``lessons_text`` is provided, it is used directly — avoids a second
+    read_text() in the manifest generation path (see _quality_metrics).
+    """
     dist: dict[str, int] = {}
-    lessons_file = ctx.lessons_file if ctx else _p.LESSONS_FILE
     try:
-        if lessons_file.exists():
-            text = lessons_file.read_text(encoding="utf-8")
+        text = lessons_text
+        if text is None:
+            lessons_file = ctx.lessons_file if ctx else _p.LESSONS_FILE
+            if lessons_file.exists():
+                text = lessons_file.read_text(encoding="utf-8")
+        if text:
             for state in ("INSTINCT", "PATTERN", "RULE", "UNTESTABLE"):
-                count = len(re.findall(
-                    rf"^\[20\d{{2}}-\d{{2}}-\d{{2}}\]\s+\[{state}",
-                    text, re.MULTILINE
-                ))
+                count = len(
+                    re.findall(rf"^\[20\d{{2}}-\d{{2}}-\d{{2}}\]\s+\[{state}", text, re.MULTILINE)
+                )
                 if count > 0:
                     dist[state] = count
     except Exception:
@@ -61,14 +70,20 @@ def _correction_rate_trend(ctx: "BrainContext | None" = None, window: int = 10) 
             return None
 
         def _cro(min_s, max_s):
-            outputs = conn.execute(
-                "SELECT COUNT(*) FROM events WHERE type='OUTPUT' AND session BETWEEN ? AND ?",
-                (min_s, max_s)
-            ).fetchone()[0] or 0
-            corrections = conn.execute(
-                "SELECT COUNT(*) FROM events WHERE type='CORRECTION' AND session BETWEEN ? AND ?",
-                (min_s, max_s)
-            ).fetchone()[0] or 0
+            outputs = (
+                conn.execute(
+                    "SELECT COUNT(*) FROM events WHERE type='OUTPUT' AND session BETWEEN ? AND ?",
+                    (min_s, max_s),
+                ).fetchone()[0]
+                or 0
+            )
+            corrections = (
+                conn.execute(
+                    "SELECT COUNT(*) FROM events WHERE type='CORRECTION' AND session BETWEEN ? AND ?",
+                    (min_s, max_s),
+                ).fetchone()[0]
+                or 0
+            )
             return round(corrections / outputs, 4) if outputs > 0 else None
 
         current = _cro(max_session - window + 1, max_session)
@@ -78,7 +93,11 @@ def _correction_rate_trend(ctx: "BrainContext | None" = None, window: int = 10) 
         if current is None or baseline is None:
             return None
 
-        direction = "improving" if current < baseline else ("stable" if current == baseline else "degrading")
+        direction = (
+            "improving"
+            if current < baseline
+            else ("stable" if current == baseline else "degrading")
+        )
         return {
             "current_window": current,
             "baseline_window": baseline,
@@ -137,7 +156,14 @@ def _temporal_provenance(ctx: "BrainContext | None" = None) -> dict:
                 pass
 
         # Query 2: source counts grouped -- filter in Python, no second query
-        internal_prefixes = ("event:", "correction_detector", "brain", "session", "gate", "supersede")
+        internal_prefixes = (
+            "event:",
+            "correction_detector",
+            "brain",
+            "session",
+            "gate",
+            "supersede",
+        )
         source_rows = conn.execute("""
             SELECT source, COUNT(*) as cnt FROM events
             WHERE source IS NOT NULL AND source != ''
@@ -161,11 +187,12 @@ def _temporal_provenance(ctx: "BrainContext | None" = None) -> dict:
             ORDER BY session
         """).fetchall()
         if len(session_starts) >= 2:
-
             gaps = []
             for i in range(1, len(session_starts)):
                 try:
-                    t0 = datetime.fromisoformat(str(session_starts[i - 1][0]).replace("Z", "+00:00"))
+                    t0 = datetime.fromisoformat(
+                        str(session_starts[i - 1][0]).replace("Z", "+00:00")
+                    )
                     t1 = datetime.fromisoformat(str(session_starts[i][0]).replace("Z", "+00:00"))
                     gaps.append((t1 - t0).total_seconds() / 3600)
                 except (ValueError, TypeError):
@@ -185,8 +212,12 @@ def _temporal_provenance(ctx: "BrainContext | None" = None) -> dict:
         gap_score = min(1.0, result["avg_gap_hours"] / 8) if result["avg_gap_hours"] > 0 else 0.0
 
         result["provenance_score"] = round(
-            0.25 * day_score + 0.20 * spread_score + 0.20 * external_score
-            + 0.15 * ratio_score + 0.20 * gap_score, 3
+            0.25 * day_score
+            + 0.20 * spread_score
+            + 0.20 * external_score
+            + 0.15 * ratio_score
+            + 0.20 * gap_score,
+            3,
         )
 
     except Exception:
@@ -218,7 +249,6 @@ def _outcome_correlation(ctx: "BrainContext | None" = None, window: int = 20) ->
         if len(rows) < 5:
             return None
 
-        [r[0] for r in rows]
         values = [float(r[1]) for r in rows]
 
         # Compute trend direction for outcomes
@@ -234,7 +264,9 @@ def _outcome_correlation(ctx: "BrainContext | None" = None, window: int = 20) ->
         if sx == 0 or sy == 0:
             r = 0.0
         else:
-            r = sum((xi - mx) * (vi - my) for xi, vi in zip(x, values, strict=False)) / ((n - 1) * sx * sy)
+            r = sum((xi - mx) * (vi - my) for xi, vi in zip(x, values, strict=False)) / (
+                (n - 1) * sx * sy
+            )
 
         return {
             "outcome_trend_slope": round(slope, 4),
@@ -279,22 +311,31 @@ def _quality_metrics(ctx: "BrainContext | None" = None) -> dict:
         # Use top-N real sessions (by event count) to avoid phantom session IDs
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = get_connection(db)
-        recent_sessions = [r[0] for r in conn.execute("""
+        recent_sessions = [
+            r[0]
+            for r in conn.execute("""
             SELECT session FROM events
             WHERE typeof(session)='integer'
             GROUP BY session HAVING COUNT(*) >= 2
             ORDER BY session DESC LIMIT 10
-        """).fetchall()]
+        """).fetchall()
+        ]
         if recent_sessions:
             placeholders = ",".join("?" * len(recent_sessions))
-            total_corrections = conn.execute(
-                f"SELECT COUNT(*) FROM events WHERE type='CORRECTION' AND session IN ({placeholders})",
-                recent_sessions
-            ).fetchone()[0] or 0
-            total_outputs = conn.execute(
-                f"SELECT COUNT(*) FROM events WHERE type='OUTPUT' AND session IN ({placeholders})",
-                recent_sessions
-            ).fetchone()[0] or 0
+            total_corrections = (
+                conn.execute(
+                    f"SELECT COUNT(*) FROM events WHERE type='CORRECTION' AND session IN ({placeholders})",
+                    recent_sessions,
+                ).fetchone()[0]
+                or 0
+            )
+            total_outputs = (
+                conn.execute(
+                    f"SELECT COUNT(*) FROM events WHERE type='OUTPUT' AND session IN ({placeholders})",
+                    recent_sessions,
+                ).fetchone()[0]
+                or 0
+            )
             if total_outputs > 0:
                 result["correction_rate"] = round(total_corrections / total_outputs, 3)
         conn.close()
@@ -310,39 +351,52 @@ def _quality_metrics(ctx: "BrainContext | None" = None) -> dict:
     # Correction rate trend
     result["correction_rate_trend"] = _correction_rate_trend(ctx=ctx)
 
-    # Count lessons -- date-prefix pattern avoids matching format descriptions
+    # Count lessons -- date-prefix pattern avoids matching format descriptions.
+    # Read lessons.md once and reuse the text for _lesson_distribution below.
     lessons_file = ctx.lessons_file if ctx else _p.LESSONS_FILE
     brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
     archive_file = brain_dir / "lessons-archive.md"
+    lessons_text: str | None = None
     try:
         if lessons_file.exists():
-            text = lessons_file.read_text(encoding="utf-8")
-            result["lessons_active"] = len(re.findall(
-                r"^\[20\d{2}-\d{2}-\d{2}\]\s+\[(?:PATTERN|INSTINCT):", text, re.MULTILINE
-            ))
+            lessons_text = lessons_file.read_text(encoding="utf-8")
+            result["lessons_active"] = len(
+                re.findall(
+                    r"^\[20\d{2}-\d{2}-\d{2}\]\s+\[(?:PATTERN|INSTINCT):",
+                    lessons_text,
+                    re.MULTILINE,
+                )
+            )
         if archive_file.exists():
             text = archive_file.read_text(encoding="utf-8")
-            result["lessons_graduated"] = len(re.findall(
-                r"^\[20\d{2}-\d{2}-\d{2}\]", text, re.MULTILINE
-            ))
+            result["lessons_graduated"] = len(
+                re.findall(r"^\[20\d{2}-\d{2}-\d{2}\]", text, re.MULTILINE)
+            )
     except Exception:
         pass
 
-    # Lesson distribution
-    result["lesson_distribution"] = _lesson_distribution(ctx=ctx)
+    # Lesson distribution — reuse already-read text (avoids second disk read).
+    result["lesson_distribution"] = _lesson_distribution(ctx=ctx, lessons_text=lessons_text)
 
     # Get sessions count for compound score
     try:
+        import contextlib as _ctxlib
+
         db = ctx.db_path if ctx else _p.DB_PATH
-        conn = get_connection(db)
-        sessions_trained = conn.execute(
-            "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
-        ).fetchone()[0] or 0
-        if total_corrections == 0:
-            total_corrections = conn.execute(
-                "SELECT COUNT(*) FROM events WHERE type='CORRECTION'"
-            ).fetchone()[0] or 0
-        conn.close()
+        with _ctxlib.closing(get_connection(db)) as conn:
+            sessions_trained = (
+                conn.execute(
+                    "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
+                ).fetchone()[0]
+                or 0
+            )
+            if total_corrections == 0:
+                total_corrections = (
+                    conn.execute("SELECT COUNT(*) FROM events WHERE type='CORRECTION'").fetchone()[
+                        0
+                    ]
+                    or 0
+                )
     except Exception:
         pass
 
@@ -368,9 +422,7 @@ def _quality_metrics(ctx: "BrainContext | None" = None) -> dict:
         transfer=transfer,
     )
 
-    result["score_confidence"] = _score_confidence(
-        result["compound_score"], sessions_trained
-    )
+    result["score_confidence"] = _score_confidence(result["compound_score"], sessions_trained)
     result["outcome_correlation"] = _outcome_correlation(ctx=ctx)
     result["counterfactual"] = _counterfactual_percentile(
         result["compound_score"], sessions_trained, ctx=ctx
@@ -430,12 +482,16 @@ def _memory_composition(ctx: "BrainContext | None" = None) -> dict:
 def _rag_status(ctx: "BrainContext | None" = None) -> dict:
     """RAG status. Chunks counted from SQLite brain_embeddings table."""
     result = {
-        "active": False, "provider": "unknown", "model": "unknown",
-        "dimensions": 0, "chunks_indexed": 0,
+        "active": False,
+        "provider": "unknown",
+        "model": "unknown",
+        "dimensions": 0,
+        "chunks_indexed": 0,
         "fts5_enabled": True,
     }
     try:
         from gradata._config import EMBEDDING_DIMS, EMBEDDING_MODEL, EMBEDDING_PROVIDER, RAG_ACTIVE
+
         result["active"] = RAG_ACTIVE
         result["provider"] = EMBEDDING_PROVIDER
         result["model"] = EMBEDDING_MODEL

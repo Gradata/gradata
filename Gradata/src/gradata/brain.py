@@ -422,8 +422,8 @@ class Brain(BrainInspectionMixin):
             # be defensive in case the schema changes.
             if not dry_run and result and result.get("graduated"):
                 _telemetry.send_once("first_graduation")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("telemetry send_once failed: %s", e)
 
         return result
 
@@ -1244,16 +1244,17 @@ class Brain(BrainInspectionMixin):
         if not self.db_path.is_file():
             return []
         try:
+            import contextlib
             import sqlite3
 
             from gradata._db import get_connection
 
-            conn = get_connection(self.db_path)
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                "SELECT * FROM pending_approvals WHERE resolution IS NULL ORDER BY created_at DESC"
-            ).fetchall()
-            conn.close()
+            with contextlib.closing(get_connection(self.db_path)) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    "SELECT * FROM pending_approvals "
+                    "WHERE resolution IS NULL ORDER BY created_at DESC"
+                ).fetchall()
             return [dict(r) for r in rows]
         except Exception as e:
             logger.debug("review_pending query failed: %s", e)
