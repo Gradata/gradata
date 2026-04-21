@@ -164,6 +164,17 @@ def _read_brain_prompt(brain_dir: Path) -> str | None:
             result.append(line)
             i += 1
     text = "\n".join(result)
+    # Strip lower-priority sections (Active guidance, Current disposition).
+    # Non-negotiables are the hardest constraints and are sufficient for session
+    # context; the guidance/disposition sections are ~140 tokens of softer context
+    # that the JIT hook covers per-prompt when relevant. Saves ~140 tok/session.
+    # Opt back in with GRADATA_WISDOM_FULL=1 for ablation.
+    if os.environ.get("GRADATA_WISDOM_FULL", "0") != "1":
+        for marker in ("Active guidance", "Current disposition"):
+            idx = text.find(marker)
+            if idx != -1:
+                text = text[:idx].rstrip()
+                break
     # Truncate body before wrapping.
     if len(text) > MAX_BRAIN_PROMPT_CHARS:
         text = text[:MAX_BRAIN_PROMPT_CHARS] + "\n[trunc]"
