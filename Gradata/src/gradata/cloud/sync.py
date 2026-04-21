@@ -1,6 +1,6 @@
 """Cloud sync client — opt-in telemetry of metrics to Gradata Cloud dashboard.
 
-Wire protocol: POST https://api.gradata.ai/v1/telemetry/metrics
+Wire protocol: POST https://api.gradata.ai/api/v1/telemetry/metrics
 Auth: Bearer <GRADATA_API_TOKEN>
 Payload: aggregated metrics (NOT correction content)
 
@@ -13,6 +13,7 @@ Privacy model:
   - Separate opt-in for corpus contribution (anonymized corrections for
     cross-user meta-rule synthesis). See `CloudClient.contribute_corpus()`.
 """
+
 from __future__ import annotations
 
 import json
@@ -28,7 +29,7 @@ from gradata._http import require_https
 
 log = logging.getLogger(__name__)
 
-_DEFAULT_API_BASE = os.environ.get("GRADATA_CLOUD_API_BASE", "https://api.gradata.ai")
+_DEFAULT_API_BASE = os.environ.get("GRADATA_CLOUD_API_BASE", "https://api.gradata.ai/api/v1")
 _CONFIG_FILE_NAME = "cloud-config.json"
 
 
@@ -151,7 +152,7 @@ class CloudClient:
         """
         if not self.enabled:
             return False
-        result = self._post("/v1/telemetry/metrics", asdict(payload))
+        result = self._post("/telemetry/metrics", asdict(payload))
         if result is not None:
             self.config.last_sync_at = payload.sent_at
             save_config(self.brain_dir, self.config)
@@ -167,7 +168,7 @@ class CloudClient:
         """
         if not self.enabled or not self.config.contribute_corpus:
             return False
-        result = self._post("/v1/corpus/contribute", {"patterns": anonymized_patterns})
+        result = self._post("/corpus/contribute", {"patterns": anonymized_patterns})
         return result is not None
 
 

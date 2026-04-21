@@ -19,45 +19,53 @@ import pytest
 
 # Short fake credential values — intentionally under 8 chars so the
 # secret scanner does not flag them as real credentials.
-_FK = "sk-test"   # fake key, 7 chars
-_FT = "brr-x"    # fake bearer, 5 chars
+_FK = "sk-test"  # fake key, 7 chars
+_FT = "brr-x"  # fake bearer, 5 chars
 
 
 # ---------------------------------------------------------------------------
 # Shared helper: require_https
 # ---------------------------------------------------------------------------
 
+
 class TestRequireHttps:
     """Unit tests for the shared _http.require_https helper."""
 
     def test_https_passes(self):
         from gradata._http import require_https
+
         require_https("https://api.example.com/v1", "test")
 
     def test_http_localhost_passes(self):
         from gradata._http import require_https
+
         require_https("http://localhost:11434/v1", "test")
 
     def test_http_127_passes(self):
         from gradata._http import require_https
+
         require_https("http://127.0.0.1:8080/v1", "test")
 
     def test_http_ipv6_loopback_passes(self):
         from gradata._http import require_https
+
         # RFC 2732: IPv6 literals in URLs must be bracketed
         require_https("http://[::1]:8080/v1", "test")
 
     def test_empty_url_passes(self):
         from gradata._http import require_https
+
         require_https("", "test")
 
     def test_http_remote_raises(self):
         from gradata._http import require_https
+
         with pytest.raises(ValueError, match="HTTPS"):
             require_https("http://evil.com/steal", "test")
 
     def test_label_appears_in_error(self):
         from gradata._http import require_https
+
         with pytest.raises(ValueError, match="GRADATA_LLM_BASE"):
             require_https("http://attacker.internal/v1", "GRADATA_LLM_BASE")
 
@@ -65,6 +73,7 @@ class TestRequireHttps:
 # ---------------------------------------------------------------------------
 # C1a — llm_synthesizer
 # ---------------------------------------------------------------------------
+
 
 class TestLLMSynthesizerHttpsGuard:
     """C1a: synthesise_principle_llm refuses HTTP to non-local hosts."""
@@ -76,6 +85,7 @@ class TestLLMSynthesizerHttpsGuard:
 
     def test_http_remote_returns_none(self):
         from gradata.enhancements.llm_synthesizer import synthesise_principle_llm
+
         result = synthesise_principle_llm(
             self._make_lessons(),
             theme="style",
@@ -138,11 +148,13 @@ class TestLLMSynthesizerHttpsGuard:
 # C1b — meta_rules._call_llm_for_synthesis
 # ---------------------------------------------------------------------------
 
+
 class TestMetaRulesHttpsGuard:
     """C1b: _call_llm_for_synthesis raises for HTTP non-local base."""
 
     def test_http_remote_raises(self, monkeypatch):
         from gradata.enhancements import meta_rules
+
         monkeypatch.setenv("GRADATA_LLM_KEY", _FK)
         monkeypatch.setenv("GRADATA_LLM_BASE", "http://attacker.internal/v1")
         monkeypatch.setenv("GRADATA_LLM_MODEL", "gpt-4o-mini")
@@ -152,6 +164,7 @@ class TestMetaRulesHttpsGuard:
 
     def test_https_remote_allowed(self, monkeypatch):
         from gradata.enhancements import meta_rules
+
         monkeypatch.setenv("GRADATA_LLM_KEY", _FK)
         monkeypatch.setenv("GRADATA_LLM_BASE", "https://api.openai.com/v1")
         monkeypatch.setenv("GRADATA_LLM_MODEL", "gpt-4o-mini")
@@ -159,9 +172,7 @@ class TestMetaRulesHttpsGuard:
         # _call_llm_for_synthesis parses body["choices"][0]["message"]["content"]
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_resp = MagicMock()
-            mock_resp.read.return_value = (
-                b'{"choices":[{"message":{"content":"[{\\"directive\\":\\"Be concise.\\",\\"confidence\\":0.9}]"}}]}'
-            )
+            mock_resp.read.return_value = b'{"choices":[{"message":{"content":"[{\\"directive\\":\\"Be concise.\\",\\"confidence\\":0.9}]"}}]}'
             mock_resp.__enter__ = lambda s: s
             mock_resp.__exit__ = MagicMock(return_value=False)
             mock_urlopen.return_value = mock_resp
@@ -174,26 +185,31 @@ class TestMetaRulesHttpsGuard:
 # C1c — llm_provider.GenericHTTPProvider
 # ---------------------------------------------------------------------------
 
+
 class TestGenericHTTPProviderHttpsGuard:
     """C1c: GenericHTTPProvider raises ValueError at construction for HTTP non-local."""
 
     def test_http_remote_raises_on_init(self):
         from gradata.enhancements.llm_provider import GenericHTTPProvider
+
         with pytest.raises(ValueError, match="HTTPS"):
             GenericHTTPProvider(base_url="http://evil.com/v1")
 
     def test_http_localhost_allowed(self):
         from gradata.enhancements.llm_provider import GenericHTTPProvider
+
         provider = GenericHTTPProvider(base_url="http://localhost:11434/v1")
         assert "localhost" in provider.base_url
 
     def test_https_remote_allowed(self):
         from gradata.enhancements.llm_provider import GenericHTTPProvider
+
         provider = GenericHTTPProvider(base_url="https://api.together.xyz/v1")
         assert "together" in provider.base_url
 
     def test_env_var_http_remote_raises(self, monkeypatch):
         from gradata.enhancements import llm_provider
+
         monkeypatch.setenv("GRADATA_LLM_BASE_URL", "http://attacker.com/v1")
         with pytest.raises(ValueError, match="HTTPS"):
             llm_provider.GenericHTTPProvider()
@@ -203,11 +219,13 @@ class TestGenericHTTPProviderHttpsGuard:
 # H1 — cloud/sync.CloudClient._post
 # ---------------------------------------------------------------------------
 
+
 class TestSyncClientHttpsGuard:
     """H1: sync.CloudClient refuses HTTP non-local api_base at construction and in _post."""
 
     def _make_client(self, api_base: str, tmp_path: Path):
         from gradata.cloud.sync import CloudClient, CloudConfig
+
         cfg = CloudConfig(sync_enabled=True, api_base=api_base)
         cfg.token = _FT  # noqa: S105 — intentionally short fake value
         return CloudClient(brain_dir=tmp_path, config=cfg)
@@ -215,6 +233,7 @@ class TestSyncClientHttpsGuard:
     def test_http_remote_post_returns_none(self, tmp_path):
         # Constructor now raises before _post is ever reached — stronger guard.
         from gradata.cloud.sync import CloudClient, CloudConfig
+
         cfg = CloudConfig(sync_enabled=True, api_base="http://evil.com")
         cfg.token = _FT
         with pytest.raises(ValueError, match="HTTPS"):
@@ -229,14 +248,14 @@ class TestSyncClientHttpsGuard:
             mock_resp.__exit__ = MagicMock(return_value=False)
             mock_urlopen.return_value = mock_resp
 
-            result = client._post("/v1/telemetry/metrics", {"x": 1})
+            result = client._post("/telemetry/metrics", {"x": 1})
         assert result == {"ok": True}
 
     def test_http_localhost_post_attempts_request(self, tmp_path):
         client = self._make_client("http://localhost:8080", tmp_path)
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_resp = MagicMock()
-            mock_resp.read.return_value = b'{}'
+            mock_resp.read.return_value = b"{}"
             mock_resp.__enter__ = lambda s: s
             mock_resp.__exit__ = MagicMock(return_value=False)
             mock_urlopen.return_value = mock_resp
@@ -249,26 +268,31 @@ class TestSyncClientHttpsGuard:
 # REF — cloud/client.CloudClient constructor
 # ---------------------------------------------------------------------------
 
+
 class TestCloudClientHttpsGuard:
     """REF: cloud/client.CloudClient refuses HTTP endpoint at construction."""
 
     def test_http_remote_raises(self, tmp_path):
         from gradata.cloud.client import CloudClient
+
         with pytest.raises(ValueError, match="HTTPS"):
             CloudClient(brain_dir=tmp_path, endpoint="http://evil.com/v1")
 
     def test_https_remote_accepted(self, tmp_path):
         from gradata.cloud.client import CloudClient
+
         client = CloudClient(brain_dir=tmp_path, endpoint="https://api.gradata.com/v1")
         assert client.endpoint == "https://api.gradata.com/v1"
 
     def test_http_localhost_accepted(self, tmp_path):
         from gradata.cloud.client import CloudClient
+
         client = CloudClient(brain_dir=tmp_path, endpoint="http://localhost:9000/v1")
         assert "localhost" in client.endpoint
 
     def test_env_var_http_remote_raises(self, tmp_path, monkeypatch):
         from gradata.cloud import client as cloud_client_mod
+
         monkeypatch.setenv("GRADATA_ENDPOINT", "http://attacker.com/v1")
         with pytest.raises(ValueError, match="HTTPS"):
             cloud_client_mod.CloudClient(brain_dir=tmp_path)
@@ -277,6 +301,7 @@ class TestCloudClientHttpsGuard:
 # ---------------------------------------------------------------------------
 # HIGH — _core._cloud_sync_session api_url guard
 # ---------------------------------------------------------------------------
+
 
 class TestCoreSyncSessionHttpsGuard:
     """HIGH: _cloud_sync_session returns early when api_url is HTTP non-local."""
@@ -314,7 +339,4 @@ class TestCoreSyncSessionHttpsGuard:
                     # SyncClient must NOT be instantiated — sync was aborted
                     mock_sync.assert_not_called()
 
-        assert any(
-            "HTTPS" in r.message or "aborted" in r.message
-            for r in caplog.records
-        )
+        assert any("HTTPS" in r.message or "aborted" in r.message for r in caplog.records)
