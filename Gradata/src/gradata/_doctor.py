@@ -21,6 +21,7 @@ import socket
 import sqlite3
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -333,15 +334,20 @@ def _check_cloud_reachable():
     """Can we reach the cloud API host? Low-cost TCP probe."""
     cfg = _read_cloud_config()
     api_url = _resolve_doctor_endpoint(cfg)
-    host = api_url.split("://", 1)[-1].split("/", 1)[0]
+    # Parse the endpoint so overrides like ``https://host:8443/api/v1`` probe
+    # the actual port instead of always dialing :443 and reporting a working
+    # override as unreachable.
+    parts = urllib.parse.urlsplit(api_url)
+    host = parts.hostname or api_url.split("://", 1)[-1].split("/", 1)[0]
+    port = parts.port or (443 if parts.scheme == "https" else 80)
     try:
-        socket.create_connection((host, 443), timeout=_CLOUD_PROBE_TIMEOUT).close()
-        return {"name": "cloud_reachable", "status": "ok", "detail": f"{host}:443 reachable"}
+        socket.create_connection((host, port), timeout=_CLOUD_PROBE_TIMEOUT).close()
+        return {"name": "cloud_reachable", "status": "ok", "detail": f"{host}:{port} reachable"}
     except OSError as e:
         return {
             "name": "cloud_reachable",
             "status": "fail",
-            "detail": f"{host}:443 unreachable ({e.__class__.__name__})",
+            "detail": f"{host}:{port} unreachable ({e.__class__.__name__})",
         }
 
 

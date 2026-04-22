@@ -40,6 +40,20 @@ _log = logging.getLogger(__name__)
 # Spec default; overridable via `cloud-config.json`.
 CONFLICT_THRESHOLD: float = 0.15
 
+# Event types the materializer is allowed to fold into winner/conflict state.
+# Other types pulled alongside (CORRECTION, OUTPUT_ACCEPTED, IMPLICIT_FEEDBACK,
+# etc.) are out of scope per docs/specs/merge-semantics.md §2 and must not
+# advance graduation state even if they carry a (category, pattern_hash) key.
+_MATERIALIZABLE_EVENT_TYPES: frozenset[str] = frozenset(
+    {
+        "RULE_GRADUATED",
+        "RULE_DEMOTED",
+        "RULE_OVERRIDE",
+        "RULE_CONFLICT_RESOLVED",
+        "META_RULE_SYNTHESIZED",
+    }
+)
+
 
 @dataclass(frozen=True)
 class MaterializedRule:
@@ -222,6 +236,21 @@ def materialize(
     for evt in events:
         result.events_consumed += 1
         etype = str(evt.get("type") or "")
+        if etype not in _MATERIALIZABLE_EVENT_TYPES:
+            # Non-graduation events share the /events/pull stream (corrections,
+            # output telemetry, implicit feedback). Per spec §2 they must not
+            # influence winner selection even if they carry a category hash.
+            result.events_skipped += 1
+            continue
+        if etype == "META_RULE_SYNTHESIZED":
+            # Per spec §4: meta-rules must wait for all source lessons to
+            # clear any Tier 2 hold before materializing. Phase 2 doesn't
+            # track per-source lineage through this loop, so hold the
+            # event rather than risk materializing a meta-rule on top of
+            # unresolved source disagreement. Dashboard surfaces the block
+            # via the MATERIALIZE_SKIPPED count + event recording elsewhere.
+            result.events_skipped += 1
+            continue
         if etype == "RULE_OVERRIDE":
             # Tier 3: Phase 3 feature. Recorded as winner unconditionally
             # but flagged so callers know this path ran.

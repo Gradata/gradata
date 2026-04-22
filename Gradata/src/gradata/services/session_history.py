@@ -29,21 +29,32 @@ class SessionHistory:
 
     # ── Event handlers ───────────────────────────────────────────
 
-    def on_rules_injected(self, payload: dict) -> None:
+    def on_rules_injected(self, payload: dict | None) -> None:
         """Record rule IDs from a rules.injected event."""
-        for rule in payload.get("rules", []):
+        if not isinstance(payload, dict):
+            return
+        rules = payload.get("rules") or []
+        if not isinstance(rules, list):
+            return
+        for rule in rules:
+            if not isinstance(rule, dict):
+                continue
             rule_id = rule.get("id")
             if rule_id:
                 self.injected_this_session.add(rule_id)
 
-    def on_correction_created(self, payload: dict) -> None:
+    def on_correction_created(self, payload: dict | None) -> None:
         """Mark a rule as corrected if it was injected this session."""
-        lesson = payload.get("lesson", {})
+        if not isinstance(payload, dict):
+            return
+        lesson = payload.get("lesson") or {}
+        if not isinstance(lesson, dict):
+            return
         rule_id = lesson.get("rule_id")
         if rule_id and rule_id in self.injected_this_session:
             self.corrected_this_session.add(rule_id)
 
-    def on_session_ended(self, payload: dict) -> None:
+    def on_session_ended(self, payload: dict | None) -> None:
         """Attach effectiveness scores to the session-end payload and reset.
 
         Side effect: mutates ``payload`` in place by adding the
@@ -52,11 +63,16 @@ class SessionHistory:
         The in-place mutation is intentional so the bus broadcast sees
         the enriched payload without an extra round-trip.
 
-        Resets session state after computing effectiveness so the next
-        session starts clean (prevents cross-session state leakage).
+        Session state is reset in a ``finally`` clause so a malformed
+        payload that raises during enrichment cannot leave stale rule IDs
+        leaking into the next session.
         """
-        payload["rule_effectiveness"] = self.compute_effectiveness()
-        self.reset()
+        effectiveness = self.compute_effectiveness()
+        try:
+            if isinstance(payload, dict):
+                payload["rule_effectiveness"] = effectiveness
+        finally:
+            self.reset()
 
     # ── Public API ───────────────────────────────────────────────
 

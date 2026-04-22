@@ -46,6 +46,15 @@ __all__ = [
 ]
 
 
+# Legacy module IDs renamed in 0.6.x. Keep user profiles / state files
+# resolving by canonicalizing inbound IDs through this single mapping so
+# ``is_installed()`` and ``InstallManifest._resolve()`` never disagree.
+_LEGACY_MODULE_ALIASES: dict[str, str] = {
+    "carl": "behavioral-engine",
+    "integrations": "middleware",
+}
+
+
 class ModuleCost(Enum):
     """Resource cost tag for modules."""
 
@@ -157,9 +166,7 @@ class InstallState:
 
     def is_installed(self, module_id: str) -> bool:
         """Check if a module is currently installed."""
-        # Backward compat: "carl" was renamed to "behavioral-engine"
-        if module_id == "carl":
-            module_id = "behavioral-engine"
+        module_id = _LEGACY_MODULE_ALIASES.get(module_id, module_id)
         return module_id in self.installed_modules
 
 
@@ -433,11 +440,7 @@ class InstallManifest:
         def _resolve(mid: str) -> None:
             # Backward compat: accept deprecated module ids that were
             # renamed so existing user profiles / state files keep resolving.
-            legacy_aliases = {
-                "carl": "behavioral-engine",
-                "integrations": "middleware",
-            }
-            mid = legacy_aliases.get(mid, mid)
+            mid = _LEGACY_MODULE_ALIASES.get(mid, mid)
             if mid in seen:
                 return
             if mid in visiting:

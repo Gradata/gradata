@@ -253,16 +253,27 @@ def pull_events(
         # other devices would never advance the cursor and the next pull
         # would re-fetch the same stream indefinitely.
         watermark = summary.get("watermark")
+        persisted = True
         if watermark:
             try:
-                update_pull_cursor(
-                    db,
-                    tenant_id=base_params["brain_id"],
-                    device_id=base_params["device_id"],
-                    cursor=str(watermark),
+                persisted = bool(
+                    update_pull_cursor(
+                        db,
+                        tenant_id=base_params["brain_id"],
+                        device_id=base_params["device_id"],
+                        cursor=str(watermark),
+                    )
                 )
             except Exception as exc:
                 log.debug("events/pull: watermark persist failed: %s", exc)
+                persisted = False
+            if not persisted:
+                # Surface the failure so callers don't treat the run as a
+                # clean success and schedule follow-ups based on a cursor
+                # that never landed. Skip the success telemetry too.
+                summary["status"] = "error"
+                summary["reason"] = "watermark_persist_failed"
+                return summary
 
         try:
             from gradata._events import emit as _emit

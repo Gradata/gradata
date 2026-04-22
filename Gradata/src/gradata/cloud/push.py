@@ -120,7 +120,7 @@ def _read_watermark(
     """Return ``sync_state.last_push_event_id`` scoped to (tenant, device)."""
     try:
         row = conn.execute(
-            "SELECT last_push_event_id FROM sync_state WHERE brain_id = ? AND device_id = ?",
+            "SELECT last_push_event_id FROM sync_state WHERE tenant_id = ? AND device_id = ?",
             (tenant_id, device_id),
         ).fetchone()
     except sqlite3.OperationalError:
@@ -275,7 +275,7 @@ def push_pending_events(
                 "device_id": device_id,
                 "events": events,
             }
-            ok, _resp = _post_batch(
+            ok, resp = _post_batch(
                 url,
                 resolved,
                 body,
@@ -289,6 +289,25 @@ def push_pending_events(
                 summary["events_pushed"] = pushed
                 summary["batches"] = batches
                 summary["last_event_id"] = last_id
+                return summary
+
+            # Advance watermark only when the server accepted every event in
+            # the batch. A partial 2xx (rejected list, or accepted < sent)
+            # would otherwise permanently skip rejected rows on the next run.
+            resp_dict = resp or {}
+            rejected = list(resp_dict.get("rejected") or [])
+            accepted_raw = resp_dict.get("accepted")
+            try:
+                accepted = int(accepted_raw) if accepted_raw is not None else len(events)
+            except (TypeError, ValueError):
+                accepted = -1
+            if rejected or accepted != len(events):
+                summary["status"] = "error"
+                summary["reason"] = "batch_rejected"
+                summary["events_pushed"] = pushed
+                summary["batches"] = batches
+                summary["last_event_id"] = last_id
+                summary["rejected"] = rejected
                 return summary
 
             batches += 1

@@ -87,12 +87,18 @@ def _ensure_schema(conn: sqlite3.Connection, db_path: Path) -> None:
 def _connect(db_path: Path) -> sqlite3.Connection | None:
     if not db_path.is_file():
         return None
+    conn: sqlite3.Connection | None = None
     try:
         conn = sqlite3.connect(str(db_path))
         conn.execute("PRAGMA busy_timeout=5000")
         _ensure_schema(conn, db_path)
         return conn
     except sqlite3.Error as exc:
+        # Close the handle on schema-init failure so repeated probes don't
+        # leak file descriptors or hold an advisory lock open.
+        if conn is not None:
+            with contextlib.suppress(sqlite3.Error):
+                conn.close()
         _log.debug("sync_state connect failed: %s", exc)
         return None
 

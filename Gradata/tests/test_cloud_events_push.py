@@ -133,7 +133,11 @@ def _make_brain(
 
 
 class _FakeResp:
-    def __init__(self, body: bytes = b'{"accepted": 0}'):
+    # Default to an empty JSON body so callers that don't assert partial-
+    # acceptance semantics don't accidentally signal "accepted=0 of N". The
+    # push client treats a missing ``accepted`` key as "server didn't report
+    # counts; trust the 2xx", which matches pre-0.7.0 server behavior.
+    def __init__(self, body: bytes = b"{}"):
         self._body = body
 
     def read(self) -> bytes:

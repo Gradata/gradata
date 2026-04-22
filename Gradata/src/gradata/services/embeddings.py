@@ -12,6 +12,7 @@ import json
 import logging
 import math
 import os
+import threading
 from collections import OrderedDict
 from urllib.request import Request, urlopen
 
@@ -112,7 +113,7 @@ def cluster_lessons_by_similarity(lessons, threshold=0.7, client=None):
         return []
     if client is None:
         client = get_client()
-    vectors = [client.embed(l["description"]) for l in lessons]
+    vectors = [client.embed(l.get("description", "")) for l in lessons]
     parent = list(range(len(lessons)))
     rank = [0] * len(lessons)
 
@@ -149,7 +150,11 @@ def cluster_lessons_by_similarity(lessons, threshold=0.7, client=None):
 
 
 # Embedding cache: LRU-style OrderedDict, capped at _CACHE_MAX_SIZE.
+# Handlers run in the EventBus thread pool (async_handler=True); protect the
+# OrderedDict with a lock so concurrent move_to_end / __setitem__ / popitem
+# calls cannot corrupt its internal doubly-linked list.
 _embedding_cache: OrderedDict[str, list[float]] = OrderedDict()
+_embedding_cache_lock = threading.Lock()
 
 
 def subscribe_to_bus(bus):
@@ -166,17 +171,21 @@ def subscribe_to_bus(bus):
                 desc = payload.get("lesson", {}).get("description", "")
             if not desc:
                 return
-            if desc in _embedding_cache:
-                # Refresh recency on hit so genuinely hot descriptions are
-                # not evicted before colder entries. Without this the
-                # OrderedDict behaves FIFO, not LRU, despite the label.
-                _embedding_cache.move_to_end(desc)
-                return
+            # Refresh recency on hit so hot descriptions are not evicted
+            # before colder entries (otherwise OrderedDict behaves FIFO).
+            # The lock is released around the embed() call so a single slow
+            # backend request does not serialize the whole thread pool.
+            with _embedding_cache_lock:
+                if desc in _embedding_cache:
+                    _embedding_cache.move_to_end(desc)
+                    return
             vec = get_client().embed(desc)
             if vec:
-                _embedding_cache[desc] = vec
-                while len(_embedding_cache) > _CACHE_MAX_SIZE:
-                    _embedding_cache.popitem(last=False)
+                with _embedding_cache_lock:
+                    _embedding_cache[desc] = vec
+                    _embedding_cache.move_to_end(desc)
+                    while len(_embedding_cache) > _CACHE_MAX_SIZE:
+                        _embedding_cache.popitem(last=False)
         except Exception:
             logger.warning("Failed to embed payload", exc_info=True)
 

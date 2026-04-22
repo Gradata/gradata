@@ -121,7 +121,9 @@ def create_index_if_missing(
         existing_sql = (row[0] or "") if row else ""
         if "UNIQUE" in existing_sql.upper():
             return False
-        conn.execute(f"DROP INDEX {index}")
+        # IF EXISTS closes the TOCTOU window between index_exists() and the
+        # drop — a concurrent migration could have dropped the index first.
+        conn.execute(f"DROP INDEX IF EXISTS {index}")
     kw = "UNIQUE INDEX" if unique else "INDEX"
     conn.execute(f"CREATE {kw} {index} ON {table} ({columns})")
     return True
