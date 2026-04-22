@@ -1,23 +1,20 @@
 # Middleware
 
-Middleware adapters wrap common LLM clients (OpenAI, Anthropic) and agent frameworks (LangChain, CrewAI) so Gradata can:
+Gradata's hooks only fire inside Claude Code. For direct-SDK agents (raw OpenAI, raw Anthropic, LangChain, CrewAI) the `gradata.middleware` subpackage provides runtime wrappers that:
 
 1. **Inject** graduated rules and meta-rules into the system prompt.
-2. **Capture** the AI output for correction tracking.
-3. **Observe** the conversation for fact extraction.
+2. **Enforce** RULE-tier patterns on outputs via `check_output`.
+3. **Fail open** — if the brain is unavailable or `GRADATA_BYPASS=1` is set, the underlying client runs normally.
 
-All adapters are non-destructive: they wrap the underlying client rather than subclass or monkeypatch it globally. If the brain directory is unavailable, adapters fall back to the original behavior — your app keeps working.
+All wrappers share a common `RuleSource` that reads the same `lessons.md` + brain database the Claude Code hooks use, so behaviour is consistent across environments.
 
 ## OpenAI
 
-`gradata.integrations.openai_adapter.patch_openai(client, brain_dir="./brain")`
-
 ```python
 from openai import OpenAI
-from gradata.integrations.openai_adapter import patch_openai
+from gradata.middleware import wrap_openai
 
-client = OpenAI()
-client = patch_openai(client, brain_dir="./my-brain")
+client = wrap_openai(OpenAI(), brain_path="./my-brain")
 
 response = client.chat.completions.create(
     model="gpt-4",
@@ -25,23 +22,15 @@ response = client.chat.completions.create(
 )
 ```
 
-The patched `chat.completions.create()` automatically:
-
-1. Calls `brain.apply_brain_rules(task)` with the user message as the task.
-2. Prepends the resulting `<brain-rules>` block to the `messages` list as a system message.
-3. Captures the conversation via `brain.observe()` for fact extraction.
-4. Logs the assistant response via `brain.log_output()` so future corrections can be attributed.
+`wrap_openai` patches the instance (not the module) so other OpenAI clients in the same process are untouched. Brain rules are prepended to `messages` as a system message, and the assistant response is passed through `check_output` before being returned.
 
 ## Anthropic
 
-`gradata.integrations.anthropic_adapter.patch_anthropic(client, brain_dir="./brain")`
-
 ```python
 from anthropic import Anthropic
-from gradata.integrations.anthropic_adapter import patch_anthropic
+from gradata.middleware import wrap_anthropic
 
-client = Anthropic()
-client = patch_anthropic(client, brain_dir="./my-brain")
+client = wrap_anthropic(Anthropic(), brain_path="./my-brain")
 
 response = client.messages.create(
     model="claude-sonnet-4-6",
@@ -50,69 +39,42 @@ response = client.messages.create(
 )
 ```
 
-The patched `messages.create()` does the same three things. For Anthropic, brain rules are injected into the `system` parameter (not as a pseudo system message inside `messages`) so they count as proper system prompts.
+For Anthropic, brain rules are injected into the `system` parameter so they count as proper system prompts.
 
 ## LangChain
 
-`gradata.integrations.langchain_adapter.BrainMemory(brain_dir="./brain")`
-
-Implements LangChain's `BaseMemory` interface.
-
 ```python
-from langchain.chains import ConversationChain
 from langchain_openai import ChatOpenAI
-from gradata.integrations.langchain_adapter import BrainMemory
+from gradata.middleware import LangChainCallback
 
-memory = BrainMemory(brain_dir="./my-brain")
+callback = LangChainCallback(brain_path="./my-brain")
 
-chain = ConversationChain(
-    llm=ChatOpenAI(model="gpt-4"),
-    memory=memory,
-)
-
-chain.predict(input="Draft an email to the CFO")
+llm = ChatOpenAI(model="gpt-4", callbacks=[callback])
+llm.invoke("Draft an email to the CFO")
 ```
 
-`BrainMemory`:
-
-- `memory_variables` — exposes a single combined prompt variable, `brain_context`, that contains both relevant rules and facts joined together. The variable name is configurable via the `memory_key` argument (default `"brain_context"`).
-- `load_memory_variables(inputs)` — returns `{memory_key: <rules + facts as text>}` for the current input.
-- `save_context(inputs, outputs)` — logs the exchange and captures any implicit feedback.
-- `clear()` — does not delete brain data, only clears in-memory cache.
+`LangChainCallback` implements `BaseCallbackHandler` — attach it to any LangChain chain, agent, or LLM.
 
 ## CrewAI
 
-`gradata.integrations.crewai_adapter.BrainCrewMemory(brain_dir="./brain")`
-
-Implements CrewAI's memory provider protocol.
-
 ```python
 from crewai import Agent, Task, Crew
-from gradata.integrations.crewai_adapter import BrainCrewMemory
+from gradata.middleware import CrewAIGuard
 
-memory = BrainCrewMemory(brain_dir="./my-brain")
+guard = CrewAIGuard(brain_path="./my-brain")
 
 researcher = Agent(
     role="Research Analyst",
     goal="Find relevant market data",
-    backstory="Rigorous quantitative analyst",
-    memory=memory,
+    guardrail=guard,
 )
-
-crew = Crew(agents=[researcher], tasks=[...], memory=memory)
-crew.kickoff()
 ```
 
-`BrainCrewMemory`:
-
-- `save(value, metadata=None, agent=None)` — persist an agent output.
-- `search(query, limit=5)` — retrieve relevant memory entries.
-- `reset()` — reset the in-memory cache.
-- `get_rules(task, context=None)` — pull rules for a task (the injection call).
+`CrewAIGuard` plugs into CrewAI's standard guardrail protocol.
 
 ## MCP
 
-For MCP-compatible hosts (Claude Code, Cursor, VS Code), use the MCP server directly instead of a Python adapter:
+For MCP-compatible hosts (Claude Code, Cursor, VS Code), use the MCP server directly instead of a Python wrapper:
 
 ```bash
 npx -y @gradata/mcp-installer --client claude
@@ -126,35 +88,37 @@ If your LLM client is not supported, the pattern is the same for any wrapper:
 
 ```python
 from gradata import Brain
+from gradata.middleware import RuleSource, check_output, build_brain_rules_block
 
 brain = Brain("./my-brain")
+source = RuleSource(brain_path="./my-brain")
 
 def my_wrapped_call(user_message: str) -> str:
-    # 1. Inject
-    rules = brain.apply_brain_rules(user_message)
+    rules = build_brain_rules_block(source.rules_for(user_message))
     system = f"{rules}\n\n{MY_BASE_SYSTEM_PROMPT}"
 
-    # 2. Call your LLM
     response = llm.chat(system=system, user=user_message)
 
-    # 3. Capture
+    check_output(response, source=source)  # raises RuleViolation on breach
     brain.log_output(response, output_type="chat")
-    brain.observe([
-        {"role": "user", "content": user_message},
-        {"role": "assistant", "content": response},
-    ])
-
     return response
 ```
 
 When the user edits the response, call `brain.correct(draft=response, final=edited)` and the learning loop completes.
 
-## Safety
+## Environment overrides
 
-All adapters:
+- `GRADATA_BYPASS=1` — disables all injection and enforcement (emergency kill switch).
 
-- **Fail open.** If the brain is missing or corrupted, the underlying client runs normally. Errors are logged but not raised.
-- **Are non-global.** `patch_openai(client)` patches the instance, not the module. Other OpenAI clients in the same process are untouched.
-- **Respect PII scope.** The `observe()` pipeline honors the brain's taxonomy and drops fields tagged as PII.
+## Optional dependencies
+
+| Wrapper | Requires |
+|---|---|
+| `wrap_anthropic` / `AnthropicMiddleware` | `anthropic` |
+| `wrap_openai` / `OpenAIMiddleware` | `openai` |
+| `LangChainCallback` | `langchain-core` |
+| `CrewAIGuard` | works with plain CrewAI guardrails |
+
+Importing a wrapper without its optional dep raises a clear `ImportError` with the install hint.
 
 See [Concepts → Corrections](../concepts/corrections.md) for what happens after capture.

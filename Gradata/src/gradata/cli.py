@@ -21,7 +21,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import contextlib
 import json
 import logging
 import sys
@@ -530,205 +529,6 @@ def cmd_demo(args):
     shutil.copytree(demo_src, target)
     print(f"Demo brain copied to {target}")
     print(f"Try: gradata convergence --brain-dir {target}")
-
-
-def _gradata_config_path(args=None) -> Path:
-    """Return path to the Gradata cloud config file.
-
-    Precedence: --config arg > GRADATA_CONFIG env > ~/.gradata/config.toml
-    """
-    import os
-
-    explicit = getattr(args, "config", None) if args else None
-    if explicit:
-        return Path(explicit)
-    env = os.environ.get("GRADATA_CONFIG")
-    if env:
-        return Path(env)
-    return Path.home() / ".gradata" / "config.toml"
-
-
-def _sanitize_toml_value(val: str) -> str:
-    """Finding 12: strip characters that could inject TOML structure."""
-    # Remove newlines, brackets, and unbalanced quotes to prevent injection
-    return (
-        val.replace("\n", "")
-        .replace("\r", "")
-        .replace("[", "")
-        .replace("]", "")
-        .replace('"', "")
-        .replace("\\", "")
-        .strip()
-    )
-
-
-def _check_config_permissions(config_path: Path) -> None:
-    """Finding 4: warn if config file is world-readable (Unix only)."""
-    import os
-    import stat
-
-    try:
-        st = os.stat(config_path)
-        # Check if group or others have any permissions
-        if st.st_mode & (stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH):
-            print(
-                f"  WARNING: {config_path} has overly permissive permissions "
-                f"({oct(st.st_mode & 0o777)}). Run: chmod 600 {config_path}"
-            )
-    except (OSError, AttributeError):
-        pass  # Windows or permission check not available
-
-
-def cmd_login(args):
-    """Device authentication flow: connect SDK to app.gradata.ai.
-
-    Deprecated in favor of `gradata cloud enable`. The notice prints before
-    the device flow starts so users pick up the new command even when the
-    API is unreachable.
-    """
-    import json as _json
-    import os
-    import time
-    import webbrowser
-    from urllib.error import HTTPError, URLError
-    from urllib.request import Request, urlopen
-
-    print(
-        "Notice: `gradata login` is deprecated. "
-        "Use `gradata cloud enable --key gk_live_...` instead."
-    )
-
-    api_url = env_str("GRADATA_API_URL", "https://api.gradata.ai/api/v1")
-
-    # Finding 5: reject non-HTTPS API URLs (allow localhost for development)
-    if not api_url.startswith("https://") and not (
-        api_url.startswith("http://localhost") or api_url.startswith("http://127.0.0.1")
-    ):
-        print(f"Error: GRADATA_API_URL must use HTTPS (got: {api_url})")
-        print("  HTTP is only allowed for localhost/127.0.0.1 during development.")
-        sys.exit(1)
-
-    # Step 1: Request a device code
-    try:
-        req = Request(
-            f"{api_url}/auth/device/code",
-            data=b"{}",
-            headers={"Content-Type": "application/json", "User-Agent": "gradata-sdk/0.6"},
-            method="POST",
-        )
-        with urlopen(req, timeout=15) as resp:
-            code_data = _json.loads(resp.read())
-    except (URLError, HTTPError) as exc:
-        print(f"Error: could not reach {api_url} ({exc})")
-        sys.exit(1)
-
-    user_code = code_data["user_code"]
-    device_code = code_data["device_code"]
-    expires_in = code_data.get("expires_in", 600)
-    interval = code_data.get("interval", 2)
-    verification_url = code_data.get("verification_url", "https://app.gradata.ai/connect")
-
-    # Format with dash for readability: ABCD-EF
-    formatted = f"{user_code[:4]}-{user_code[4:]}" if len(user_code) > 4 else user_code
-    print(f"\n  Your pairing code is: {formatted}\n")
-    print("  Opening browser to confirm...")
-
-    try:
-        webbrowser.open(verification_url)
-    except Exception:
-        print(f"  Could not open browser. Go to: {verification_url}")
-
-    print("  Waiting for confirmation...\n")
-
-    # Step 2: Poll for confirmation
-    deadline = time.monotonic() + expires_in
-    while time.monotonic() < deadline:
-        time.sleep(interval)
-        try:
-            poll_req = Request(
-                f"{api_url}/auth/device/token",
-                data=_json.dumps({"device_code": device_code}).encode(),
-                headers={"Content-Type": "application/json", "User-Agent": "gradata-sdk/0.6"},
-                method="POST",
-            )
-            with urlopen(poll_req, timeout=10) as resp:
-                token_data = _json.loads(resp.read())
-        except HTTPError as exc:
-            if exc.code == 404:
-                print("Error: device code not found. Try again with `gradata login`.")
-                sys.exit(1)
-            continue
-        except URLError:
-            continue
-
-        status = token_data.get("status")
-        if status == "complete":
-            api_key = token_data["api_key"]
-            brain_id = token_data.get("brain_id", "")
-            cloud_url = token_data.get("api_url", api_url)
-
-            # Save to config file
-            config_path = _gradata_config_path(args)
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Finding 4: restrict directory permissions (Unix)
-            # Windows — os.chmod has limited effect, suppress the error
-            with contextlib.suppress(OSError, AttributeError):
-                os.chmod(config_path.parent, 0o700)
-
-            # Finding 12: sanitize values before writing TOML
-            safe_key = _sanitize_toml_value(api_key)
-            safe_brain = _sanitize_toml_value(brain_id)
-            safe_url = _sanitize_toml_value(cloud_url)
-
-            config_path.write_text(
-                f"# Gradata cloud config (auto-generated by `gradata login`)\n"
-                f"[cloud]\n"
-                f'api_key = "{safe_key}"\n'
-                f'brain_id = "{safe_brain}"\n'
-                f'api_url = "{safe_url}"\n',
-                encoding="utf-8",
-            )
-
-            # Finding 4: restrict file permissions (Unix)
-            # Windows — os.chmod has limited effect, suppress the error
-            with contextlib.suppress(OSError, AttributeError):
-                os.chmod(config_path, 0o600)
-
-            # Also set in the environment for the current process (so
-            # subsequent brain operations in the same shell can auto-sync)
-            os.environ["GRADATA_API_KEY"] = api_key
-
-            print("  Connected! Your brain will sync to app.gradata.ai")
-            print(f"  Config saved to {config_path}")
-
-            # Finding 4: check permissions on startup
-            _check_config_permissions(config_path)
-            return
-
-        if status == "expired":
-            print("  Code expired. Run `gradata login` again.")
-            sys.exit(1)
-
-        # status == "pending" — keep polling
-        pass
-
-    print("  Timed out waiting for confirmation. Run `gradata login` again.")
-    sys.exit(1)
-
-
-def cmd_logout(args):
-    """Clear stored cloud credentials."""
-    config_path = _gradata_config_path(args)
-    if config_path.exists():
-        config_path.unlink()
-        print(f"Logged out. Removed {config_path}")
-    else:
-        print("Not logged in (no config file found).")
-
-    import os
-
-    os.environ.pop("GRADATA_API_KEY", None)
 
 
 def _resolve_brain_root(args):
@@ -1360,16 +1160,6 @@ def main():
     p_demo = sub.add_parser("demo", help="Copy pre-trained demo brain to a directory")
     p_demo.add_argument("target", nargs="?", default="./demo-brain", help="Target directory")
 
-    # login / logout — device auth flow for cloud sync
-    sub.add_parser("login", help="Connect SDK to app.gradata.ai (device auth flow)")
-    p_logout = sub.add_parser("logout", help="Disconnect SDK from cloud")
-    p_logout.add_argument(
-        "--config",
-        type=str,
-        default=None,
-        help="Path to config file (default: ~/.gradata/config.toml)",
-    )
-
     p_hooks = sub.add_parser("hooks", help="Manage Claude Code hook integration")
     p_hooks.add_argument("action", choices=["install", "uninstall", "status"], help="Hook action")
     p_hooks.add_argument(
@@ -1475,8 +1265,6 @@ def main():
 
     commands["convergence"] = cmd_convergence
     commands["demo"] = cmd_demo
-    commands["login"] = cmd_login
-    commands["logout"] = cmd_logout
     commands["hooks"] = cmd_hooks
     commands["rule"] = cmd_rule
     commands["seed"] = cmd_seed

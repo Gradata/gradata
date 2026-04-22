@@ -256,14 +256,14 @@ def _check_cloud_config():
         return {
             "name": "cloud_config",
             "status": "missing",
-            "detail": f"{path} not found — run `gradata login`",
+            "detail": f"{path} not found — run `gradata cloud enable --key gk_live_...`",
         }
     cfg = _read_cloud_config()
     if not cfg.get("api_key"):
         return {
             "name": "cloud_config",
             "status": "fail",
-            "detail": f"{path} missing [cloud] credentials — re-run `gradata login`",
+            "detail": f"{path} missing [cloud] credentials — re-run `gradata cloud enable`",
         }
     brain_id = cfg.get("brain_id", "") or "(unset)"
     return {
@@ -361,7 +361,7 @@ def _check_cloud_auth():
         return {
             "name": "cloud_auth",
             "status": "fail",
-            "detail": f"HTTP {code} — token rejected; re-run `gradata login`",
+            "detail": f"HTTP {code} — token rejected; re-run `gradata cloud enable`",
         }
     if code == 404:
         return {

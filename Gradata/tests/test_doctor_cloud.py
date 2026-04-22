@@ -41,7 +41,7 @@ def _write_config(
 def test_cloud_config_missing(isolated_config):
     result = _doctor._check_cloud_config()
     assert result["status"] == "missing"
-    assert "gradata login" in result["detail"]
+    assert "gradata cloud enable" in result["detail"]
 
 
 def test_cloud_config_missing_credential(isolated_config):

@@ -178,20 +178,3 @@ def test_cloud_sync_pull_dry_run_prints_summary(_isolate, monkeypatch, capsys):
 
     after = lessons_md.read_text(encoding="utf-8") if lessons_md.is_file() else None
     assert after == before
-
-
-def test_login_prints_deprecation_notice(_isolate, monkeypatch, capsys):
-    """`gradata login` must emit a deprecation note pointing at cloud enable."""
-    # Short-circuit the device flow by making urlopen fail immediately.
-    import urllib.error
-    import urllib.request
-
-    def _boom(*_a, **_kw):
-        raise urllib.error.URLError("network disabled in test")
-
-    monkeypatch.setattr(urllib.request, "urlopen", _boom)
-    with pytest.raises(SystemExit):
-        _run(monkeypatch, "login")
-    out = capsys.readouterr().out
-    assert "deprecated" in out.lower()
-    assert "cloud enable" in out

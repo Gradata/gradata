@@ -2,6 +2,26 @@
 
 The canonical changelog lives in [`CHANGELOG.md`](https://github.com/Gradata/gradata/blob/main/CHANGELOG.md) in the repo. A mirror is below for convenience.
 
+## [0.7.0] — 2026-04-22
+
+### BREAKING
+
+- `gradata.patterns` shim removed (deprecated in 0.6.1). Import from `gradata.contrib.patterns` or `gradata.rules`.
+- `gradata.enhancements.carl` shim removed. Import from `gradata.enhancements.behavioral_engine`.
+- `gradata.enhancements.profiling.tone_profile` removed (orphan, no production callers).
+- `gradata.integrations.{anthropic,openai,langchain,crewai}_adapter` removed (deprecation warning fired since 0.6.x). Use `gradata.middleware.{wrap_anthropic, wrap_openai, LangChainCallback, CrewAIGuard}`.
+- `gradata login` / `gradata logout` CLI commands removed. Use `gradata cloud enable --key gk_live_...` for API-key auth.
+
+### Changed
+
+- `gradata.integrations.embeddings` → `gradata.services.embeddings` (forwarding shim kept through v0.9.0).
+- `gradata.integrations.session_history` → `gradata.services.session_history` (forwarding shim kept through v0.9.0).
+
+### Added
+
+- `CLOUD_SYNC_COMPLETED` telemetry event emitted after successful cloud pull + watermark persist, with sync_status tag enrichment (ok/error/skipped).
+- `docs/contributing/deprecation-policy.md` codifying the two-minor-version carry rule.
+
 ## [0.6.1] — 2026-04-19
 
 ### Added

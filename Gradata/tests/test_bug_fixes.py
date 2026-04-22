@@ -352,80 +352,37 @@ class TestBug9MissingClasses:
         assert LessonState is not None
         assert __version__ is not None
 
-    def test_pattern_exports_from_submodule(self):
-        """Pattern symbols importable from gradata.patterns (deprecated shim).
+    def test_pattern_exports_from_contrib(self):
+        """Pattern symbols importable from gradata.contrib.patterns and gradata.rules."""
+        from gradata.contrib.patterns import (
+            SmartRAG,
+            NaiveRAG,
+            HumanLoopGate,
+            Pipeline,
+            Stage,
+            ParallelBatch,
+            EpisodicMemory,
+            InputGuard,
+            OutputGuard,
+            MCPBridge,
+            Delegation,
+        )
+        from gradata.rules.rule_tracker import RuleApplication
+        from gradata.rules.scope import AudienceTier
 
-        The shim forwards to gradata.contrib.patterns and emits a
-        DeprecationWarning on first access. This test validates both the
-        forwarding behavior and that the warning fires.
-        """
-        import warnings
-
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            from gradata.patterns import (
-                SmartRAG,
-                NaiveRAG,
-                HumanLoopGate,
-                RuleApplication,
-                Pipeline,
-                Stage,
-                ParallelBatch,
-                EpisodicMemory,
-                InputGuard,
-                OutputGuard,
-                MCPBridge,
-                Delegation,
-                AudienceTier,
-            )
-
-            for sym in (
-                SmartRAG,
-                NaiveRAG,
-                HumanLoopGate,
-                RuleApplication,
-                Pipeline,
-                Stage,
-                ParallelBatch,
-                EpisodicMemory,
-                InputGuard,
-                OutputGuard,
-                MCPBridge,
-                Delegation,
-                AudienceTier,
-            ):
-                assert sym is not None
-            # DeprecationWarning may already have fired earlier in the session
-            # (module-level _WARNED flag), so we don't strictly require it here —
-            # the forwarding correctness is the invariant this test guards.
-            del caught
-
-    def test_patterns_shim_emits_deprecation_warning(self):
-        """First access through gradata.patterns must emit DeprecationWarning.
-
-        Guards against the runtime warning being silently removed — users who
-        don't read changelogs need the in-process signal before v0.8.0 ships
-        and the shim is removed entirely.
-        """
-        import importlib
-        import sys
-        import warnings
-
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            # Reset inside the recording context so _WARNED is False when the
-            # import fires and the warning is captured.
-            sys.modules.pop("gradata.patterns", None)
-            importlib.import_module("gradata.patterns")
-            from gradata.patterns import Pipeline
-
-            assert Pipeline is not None
-
-        shim_warnings = [
-            w
-            for w in caught
-            if issubclass(w.category, DeprecationWarning)
-            and "gradata.contrib.patterns" in str(w.message)
-        ]
-        assert shim_warnings, "expected shim-specific DeprecationWarning on first access"
-        assert "v0.8.0" in str(shim_warnings[0].message)
+        for sym in (
+            SmartRAG,
+            NaiveRAG,
+            HumanLoopGate,
+            RuleApplication,
+            Pipeline,
+            Stage,
+            ParallelBatch,
+            EpisodicMemory,
+            InputGuard,
+            OutputGuard,
+            MCPBridge,
+            Delegation,
+            AudienceTier,
+        ):
+            assert sym is not None

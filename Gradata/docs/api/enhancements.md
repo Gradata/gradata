@@ -91,7 +91,7 @@ for alert in alerts:
 ## CARL
 
 ```python
-from gradata.enhancements.carl import ContractRegistry, BehavioralContract
+from gradata.enhancements.behavioral_engine import ContractRegistry, BehavioralContract
 
 registry = ContractRegistry()
 registry.register(BehavioralContract(

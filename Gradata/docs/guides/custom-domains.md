@@ -42,7 +42,7 @@ Now when the brain encounters "draft a ticket response", it correctly scopes it 
 CARL (Contracts for Agent Reinforcement Learning) lets you define behavioral rules per domain:
 
 ```python
-from gradata.enhancements.carl import BehavioralContract
+from gradata.enhancements.behavioral_engine import BehavioralContract
 
 support_contract = BehavioralContract(
     name="support_rules",

@@ -2,7 +2,7 @@
 
 import pytest
 
-from gradata.integrations.embeddings import EmbeddingClient
+from gradata.services.embeddings import EmbeddingClient
 
 
 class TestSemanticSimilarity:
