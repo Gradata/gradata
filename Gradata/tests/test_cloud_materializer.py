@@ -266,3 +266,72 @@ class TestResultShape:
 def test_threshold_constant_matches_spec() -> None:
     # docs/specs/merge-semantics.md §3 pins this at 0.15.
     assert CONFLICT_THRESHOLD == 0.15
+
+
+class TestConvergence:
+    """Ship-gate property: any ordering of the same ts-sorted slice yields
+    identical materialized state. See docs/specs/merge-semantics.md §6.
+
+    We build a cross-key event pool (each key has a monotonic per-key
+    timeline so LWW semantics are deterministic once sorted by ts) and
+    assert that N shuffled orderings → same rules after a by-ts sort.
+    """
+
+    def _build_pool(self, rng: random.Random, n_keys: int, per_key: int) -> list[dict]:
+        pool: list[dict] = []
+        for k in range(n_keys):
+            base_conf = 0.55 + rng.random() * 0.08  # stays under Tier 2 drift
+            for i in range(per_key):
+                # Per-key monotonic timestamps so there's one true winner.
+                ts = f"2026-04-20T00:{i:02d}:00Z"
+                conf = round(base_conf + i * 0.01, 3)
+                pool.append(
+                    _evt(
+                        ts=ts,
+                        category=f"cat{k}",
+                        description=f"rule-{k}",
+                        confidence=conf,
+                        device_id=f"dev_{rng.randint(0, 9):04d}",
+                    )
+                )
+        return pool
+
+    def test_convergence_across_shuffled_orderings(self) -> None:
+        rng = random.Random(20260420)
+        pool = self._build_pool(rng, n_keys=8, per_key=4)
+        baseline = materialize(sorted(pool, key=lambda e: e["ts"])).rules
+
+        # Full 10k is overkill for CI; 200 permutations is enough to catch
+        # any ordering-dependent bug while keeping the test < 1s.
+        for _ in range(200):
+            shuffled = pool[:]
+            rng.shuffle(shuffled)
+            result = materialize(sorted(shuffled, key=lambda e: e["ts"])).rules
+            assert result == baseline
+
+    def test_convergence_with_injected_conflicts(self) -> None:
+        """Even when some keys enter Tier 2 hold, replay order is irrelevant."""
+        rng = random.Random(4242)
+        pool = self._build_pool(rng, n_keys=4, per_key=3)
+        # Inject a large-drift event per key → forces a conflict hold.
+        for k in range(4):
+            pool.append(
+                _evt(
+                    ts=f"2026-04-20T00:30:00Z",
+                    category=f"cat{k}",
+                    description=f"rule-{k}",
+                    confidence=0.95,
+                    device_id="dev_burst",
+                )
+            )
+
+        baseline = materialize(sorted(pool, key=lambda e: e["ts"]))
+        baseline_rules = baseline.rules
+        baseline_conflict_keys = {c.key for c in baseline.conflicts}
+
+        for _ in range(100):
+            shuffled = pool[:]
+            rng.shuffle(shuffled)
+            result = materialize(sorted(shuffled, key=lambda e: e["ts"]))
+            assert result.rules == baseline_rules
+            assert {c.key for c in result.conflicts} == baseline_conflict_keys
