@@ -384,7 +384,7 @@ class TestConvergence:
         for k in range(4):
             pool.append(
                 _evt(
-                    ts=f"2026-04-20T00:30:00Z",
+                    ts="2026-04-20T00:30:00Z",
                     category=f"cat{k}",
                     description=f"rule-{k}",
                     confidence=0.95,
@@ -402,3 +402,48 @@ class TestConvergence:
             result = materialize(sorted(shuffled, key=lambda e: e["ts"]))
             assert result.rules == baseline_rules
             assert {c.key for c in result.conflicts} == baseline_conflict_keys
+
+
+def test_independent_confidence_parse_still_detects_drift():
+    """A malformed confidence on one side must not zero *both* sides.
+
+    Regression for CodeRabbit finding: the paired ``try`` previously reset
+    ``e_conf = i_conf = 0.0`` whenever either cast failed, silently masking
+    a legitimate Tier 2 drift as zero-delta Tier 1.
+    """
+    e_left = _evt(
+        ts="2026-04-21T00:00:00Z",
+        category="style",
+        description="use active voice",
+        confidence=0.20,
+        device_id="dev_a",
+    )
+    # Right side carries junk in confidence but is otherwise a large drift.
+    # Without independent parse, both sides collapse to 0.0 and the delta
+    # (|0.0 - 0.0| = 0.0) falls under CONFLICT_THRESHOLD → Tier 1.
+    e_right = _evt(
+        ts="2026-04-21T00:00:01Z",
+        category="style",
+        description="use active voice",
+        confidence=0.90,
+        device_id="dev_b",
+    )
+    e_right["data"]["confidence"] = "not-a-number"
+
+    result = materialize([e_left, e_right])
+    # The left side still has a valid 0.20; right parses to 0.0. Delta 0.20
+    # >= threshold 0.15 → conflict (independent parse).
+    assert len(result.conflicts) == 1
+    assert result.conflicts[0].reason == "confidence_drift"
+
+
+def test_materialize_survives_non_numeric_confidence_on_winner():
+    """A graduation event with junk ``confidence`` must not crash the pass."""
+    evt = _evt(ts="2026-04-21T00:00:00Z")
+    evt["data"]["confidence"] = "oops"
+    evt["data"]["fire_count"] = None
+    result = materialize([evt])
+    assert len(result.rules) == 1
+    rule = next(iter(result.rules.values()))
+    assert rule.confidence == 0.0
+    assert rule.fire_count == 0

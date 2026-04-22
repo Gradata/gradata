@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
+from gradata import __version__ as _sdk_version
 from gradata._http import require_https
 from gradata._migrations.device_uuid import get_or_create_device_id
 from gradata._tenant import tenant_for
@@ -154,7 +155,7 @@ def pull_events(
             headers={
                 "Authorization": f"Bearer {resolved}",
                 "Accept": "application/json",
-                "User-Agent": "gradata-sdk/0.6",
+                "User-Agent": f"gradata-sdk/{_sdk_version}",
             },
         )
 

@@ -32,7 +32,7 @@ import logging
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
+from collections.abc import Iterable
 
 _log = logging.getLogger(__name__)
 
@@ -138,11 +138,17 @@ def _apply_tier(
     i_data = incoming.get("data") or {}
     e_state = str(e_data.get("new_state") or "")
     i_state = str(i_data.get("new_state") or "")
+    # Parse each side independently — coupling them with a single try/except
+    # would silently zero out a valid confidence whenever the *other* side
+    # was malformed, converting a legitimate update into a Tier 2 bypass.
     try:
         e_conf = float(e_data.get("confidence") or 0.0)
+    except (TypeError, ValueError):
+        e_conf = 0.0
+    try:
         i_conf = float(i_data.get("confidence") or 0.0)
     except (TypeError, ValueError):
-        e_conf = i_conf = 0.0
+        i_conf = 0.0
 
     delta = abs(i_conf - e_conf)
     state_disagrees = bool(e_state and i_state and e_state != i_state)
@@ -161,17 +167,9 @@ def _apply_tier(
     return winner, None
 
 
-_MATERIALIZER_EVENT_TYPES: tuple[str, ...] = (
-    "RULE_GRADUATED",
-    "RULE_DEMOTED",
-    "RULE_OVERRIDE",
-    "RULE_CONFLICT_RESOLVED",
-)
-
-
 def _load_events_from_db(
     db_path: Path,
-    event_types: Iterable[str] = _MATERIALIZER_EVENT_TYPES,
+    event_types: Iterable[str] | None = None,
 ) -> list[dict]:
     """Load candidate events from system.db in ts-ASC order.
 
@@ -180,7 +178,11 @@ def _load_events_from_db(
     """
     if not db_path.exists():
         return []
-    types = tuple(event_types)
+    # Default to the materializable set (minus META_RULE_SYNTHESIZED which
+    # the pass currently always skips). Keeping the default a single source
+    # of truth removes the old _MATERIALIZER_EVENT_TYPES / _MATERIALIZABLE_
+    # EVENT_TYPES drift CodeRabbit flagged.
+    types = tuple(event_types if event_types is not None else _MATERIALIZABLE_EVENT_TYPES)
     placeholders = ",".join(["?"] * len(types))
     query = (
         f"SELECT ts, type, source, data_json FROM events "
@@ -354,12 +356,24 @@ def materialize(
 
     for key, evt in winners.items():
         data = evt.get("data") or {}
+        # Defensive numeric coercion — a graduation event with a non-numeric
+        # confidence/fire_count (seen in hand-edited test fixtures and very
+        # old DB rows) would otherwise raise deep inside the dataclass
+        # constructor and kill the entire materialization pass.
+        try:
+            confidence = float(data.get("confidence") or 0.0)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        try:
+            fire_count = int(data.get("fire_count") or 0)
+        except (TypeError, ValueError):
+            fire_count = 0
         result.rules[key] = MaterializedRule(
             category=key[0],
             description=str(data.get("description") or ""),
             state=str(data.get("new_state") or ""),
-            confidence=float(data.get("confidence") or 0.0),
-            fire_count=int(data.get("fire_count") or 0),
+            confidence=confidence,
+            fire_count=fire_count,
             winning_event_ts=str(evt.get("ts") or ""),
             winning_device_id=str(data.get("device_id") or ""),
         )

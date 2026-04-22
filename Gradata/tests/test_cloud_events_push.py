@@ -407,3 +407,110 @@ def test_partial_2xx_count_mismatch_does_not_advance_watermark(tmp_path, monkeyp
     with sqlite3.connect(str(brain / "system.db")) as conn:
         row = conn.execute("SELECT last_push_event_id FROM sync_state").fetchone()
     assert row is None or row[0] is None
+
+
+def test_invalid_tunables_return_summary_without_raising(tmp_path, monkeypatch):
+    """Negative retries / zero timeout should short-circuit cleanly."""
+    brain = _make_brain(tmp_path, events=[{"event_id": "01HN" + "0" * 22}])
+    # Any of these on their own should be rejected; bundle one to keep the
+    # test compact.
+    summary = push_mod.push_pending_events(brain, max_retries=-1)
+    assert summary["status"] == "error"
+    assert summary["reason"] == "invalid_params"
+
+    summary = push_mod.push_pending_events(brain, timeout=0)
+    assert summary["status"] == "error"
+    assert summary["reason"] == "invalid_params"
+
+    summary = push_mod.push_pending_events(brain, backoff_base=-1.5)
+    assert summary["status"] == "error"
+    assert summary["reason"] == "invalid_params"
+
+    summary = push_mod.push_pending_events(brain, chunk_size=0)
+    assert summary["status"] == "error"
+    assert summary["reason"] == "invalid_params"
+
+
+def test_other_tenant_rows_are_not_pushed(tmp_path, monkeypatch):
+    """Rows with a foreign tenant_id must not be uploaded under current tenant."""
+    mine = "11111111-2222-3333-4444-555555555555"
+    other = "99999999-8888-7777-6666-555555555555"
+    events_mine = [{"event_id": "01HN00000000000000000000M1"}]
+    brain = _make_brain(tmp_path, events=events_mine, tenant_id=mine)
+
+    # Inject a row from another tenant with a higher event_id so, without
+    # the tenant filter, it would be picked up by the cursor scan.
+    with sqlite3.connect(str(brain / "system.db")) as conn:
+        conn.execute(
+            """
+            INSERT INTO events (event_id, type, source, session, ts, data_json,
+                                tags_json, device_id, content_hash, tenant_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "01HN00000000000000000000X9",
+                "CORRECTION",
+                "test",
+                1,
+                "2026-04-21T00:00:00+00:00",
+                "{}",
+                "[]",
+                "dev_other",
+                "h" * 64,
+                other,
+            ),
+        )
+        conn.commit()
+
+    captured: dict[str, Any] = {}
+
+    def fake_urlopen(req, timeout):  # noqa: ARG001
+        captured["body"] = json.loads(req.data.decode("utf-8"))
+        return _FakeResp(b'{"accepted": 1, "rejected": []}')
+
+    monkeypatch.setattr(push_mod.urllib.request, "urlopen", fake_urlopen)
+    summary = push_mod.push_pending_events(brain)
+    assert summary["status"] == "ok"
+    assert summary["events_pushed"] == 1
+    sent_ids = [e["event_id"] for e in captured["body"]["events"]]
+    assert sent_ids == ["01HN00000000000000000000M1"]
+    assert captured["body"]["brain_id"] == mine
+
+
+def test_legacy_null_tenant_rows_still_pushed(tmp_path, monkeypatch):
+    """Pre-tenant-tagging rows (tenant_id NULL) should still upload under the
+    current tenant so no pending work is stranded after migration."""
+    brain = _make_brain(tmp_path, events=[])
+
+    with sqlite3.connect(str(brain / "system.db")) as conn:
+        conn.execute(
+            """
+            INSERT INTO events (event_id, type, source, session, ts, data_json,
+                                tags_json, device_id, content_hash, tenant_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+            """,
+            (
+                "01HN00000000000000000000L0",
+                "CORRECTION",
+                "test",
+                1,
+                "2026-04-21T00:00:00+00:00",
+                "{}",
+                "[]",
+                "dev_legacy",
+                "h" * 64,
+            ),
+        )
+        conn.commit()
+
+    captured: dict[str, Any] = {}
+
+    def fake_urlopen(req, timeout):  # noqa: ARG001
+        captured["body"] = json.loads(req.data.decode("utf-8"))
+        return _FakeResp(b'{"accepted": 1, "rejected": []}')
+
+    monkeypatch.setattr(push_mod.urllib.request, "urlopen", fake_urlopen)
+    summary = push_mod.push_pending_events(brain)
+    assert summary["status"] == "ok"
+    sent_ids = [e["event_id"] for e in captured["body"]["events"]]
+    assert sent_ids == ["01HN00000000000000000000L0"]

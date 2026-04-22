@@ -65,7 +65,19 @@ class EmbeddingClient:
         req = Request(str(self.api_url), data=body, headers=headers, method="POST")
         with urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
-        return data["embedding"]
+        # Validate response shape so a misbehaving backend can't poison the
+        # cache with None / strings / wrong-dimensioned vectors — callers
+        # assume the returned list is numeric and exactly ``self.dim`` wide
+        # for cosine math. On any mismatch, surface it as an exception so
+        # the outer ``try`` in ``embed()`` falls back to the local path.
+        if not isinstance(data, dict):
+            raise ValueError("embedding API returned non-object JSON")
+        vec = data.get("embedding")
+        if not isinstance(vec, list) or len(vec) != self.dim:
+            raise ValueError("embedding API returned malformed 'embedding' field")
+        if not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in vec):
+            raise ValueError("embedding API returned non-numeric vector entries")
+        return [float(v) for v in vec]
 
     def _embed_local(self, text):
         vec = [0.0] * self.dim
@@ -86,7 +98,7 @@ class EmbeddingClient:
 
     def semantic_similarity(self, text_a: str, text_b: str) -> float:
         """Cosine similarity between embeddings of two texts.
-        Returns 0.0 if either text is empty, otherwise [0.0, 1.0].
+        Returns 0.0 if either text is empty, otherwise [-1.0, 1.0].
         """
         if not text_a or not text_b:
             return 0.0
@@ -113,7 +125,13 @@ def cluster_lessons_by_similarity(lessons, threshold=0.7, client=None):
         return []
     if client is None:
         client = get_client()
-    vectors = [client.embed(l.get("description", "")) for l in lessons]
+    # Skip blank descriptions — embedding an empty string yields a zero
+    # vector whose cosine similarity with everything is 0.0, which is
+    # harmless for clustering but burns an embed() call per blank row.
+    vectors: list[list[float] | None] = [
+        client.embed(desc) if (desc := (l.get("description") or "").strip()) else None
+        for l in lessons
+    ]
     parent = list(range(len(lessons)))
     rank = [0] * len(lessons)
 
@@ -136,11 +154,15 @@ def cluster_lessons_by_similarity(lessons, threshold=0.7, client=None):
                 rank[px] += 1
 
     for i in range(len(lessons)):
+        vi = vectors[i]
+        if vi is None:
+            continue
         for j in range(i + 1, len(lessons)):
-            if vectors[i] is not None and vectors[j] is not None:
-                sim = cosine_similarity(vectors[i], vectors[j])
-                if sim >= threshold:
-                    union(i, j)
+            vj = vectors[j]
+            if vj is None:
+                continue
+            if cosine_similarity(vi, vj) >= threshold:
+                union(i, j)
 
     clusters = {}
     for i, lesson in enumerate(lessons):

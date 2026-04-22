@@ -112,6 +112,16 @@ def create_index_if_missing(
     if not table_exists(conn, table):
         return False
     if index_exists(conn, index):
+        # Confirm the index belongs to the target table before touching it.
+        # Without this, an index of the same name on a different table would
+        # be silently dropped below (since PRAGMA index_list is scoped to
+        # ``table`` and wouldn't report it as UNIQUE).
+        owner_row = conn.execute(
+            "SELECT tbl_name FROM sqlite_master WHERE type='index' AND name = ?",
+            (index,),
+        ).fetchone()
+        if owner_row and owner_row[0] != table:
+            return False
         if not unique:
             return False
         # Ask SQLite directly whether the existing index is UNIQUE rather

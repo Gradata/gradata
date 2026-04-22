@@ -35,6 +35,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from gradata import __version__ as _sdk_version
 from gradata._http import require_https
 from gradata._migrations.device_uuid import get_or_create_device_id
 from gradata._tenant import tenant_for
@@ -53,10 +54,18 @@ def _fetch_events_since(
     conn: sqlite3.Connection,
     last_event_id: str | None,
     limit: int,
+    tenant_id: str,
 ) -> list[dict[str, Any]]:
-    """Return up to ``limit`` rows from ``events`` with event_id > watermark."""
+    """Return up to ``limit`` rows from ``events`` with event_id > watermark.
+
+    Rows are scoped to the caller's ``tenant_id`` (plus legacy rows written
+    before tenant tagging, where ``tenant_id IS NULL``). Without this filter,
+    a brain that ever held rows from another tenant would upload them under
+    the current tenant's identity — the request body stamps the whole batch
+    with ``tenant_id`` regardless of each row's origin.
+    """
     cursor_clause = ""
-    params: list[Any] = []
+    params: list[Any] = [tenant_id]
     if last_event_id:
         cursor_clause = "AND event_id > ?"
         params.append(last_event_id)
@@ -65,7 +74,9 @@ def _fetch_events_since(
         SELECT event_id, type, source, session, ts, data_json, tags_json,
                device_id, content_hash, correction_chain_id, origin_agent
         FROM events
-        WHERE event_id IS NOT NULL {cursor_clause}
+        WHERE event_id IS NOT NULL
+          AND (tenant_id = ? OR tenant_id IS NULL)
+          {cursor_clause}
         ORDER BY event_id ASC
         LIMIT ?
     """
@@ -172,7 +183,7 @@ def _post_batch(
     headers = {
         "Authorization": f"Bearer {credential}",
         "Content-Type": "application/json",
-        "User-Agent": "gradata-sdk/events-push",
+        "User-Agent": f"gradata-sdk/{_sdk_version} events-push",
     }
 
     for attempt in range(max_retries + 1):
@@ -214,6 +225,24 @@ def push_pending_events(
         "batches": 0,
         "last_event_id": None,
     }
+
+    # Validate tunables up front — negative backoff or retries would either
+    # spin forever, hammer the endpoint, or pass a negative delay to
+    # ``time.sleep`` (raises). The public contract is "return a summary,
+    # never raise", so reject garbage inputs explicitly.
+    try:
+        chunk_size_i = int(chunk_size)
+        max_retries_i = int(max_retries)
+        backoff_base_f = float(backoff_base)
+        timeout_f = float(timeout)
+    except (TypeError, ValueError):
+        summary["status"] = "error"
+        summary["reason"] = "invalid_params"
+        return summary
+    if chunk_size_i < 1 or max_retries_i < 0 or backoff_base_f < 0 or timeout_f <= 0:
+        summary["status"] = "error"
+        summary["reason"] = "invalid_params"
+        return summary
 
     brain = Path(brain_dir).resolve()
     db = brain / "system.db"
@@ -273,7 +302,7 @@ def push_pending_events(
         pushed = 0
         last_id = watermark
         while True:
-            events = _fetch_events_since(conn, last_id, chunk_size)
+            events = _fetch_events_since(conn, last_id, chunk_size_i, tenant_id)
             if not events:
                 break
             body = {
@@ -285,9 +314,9 @@ def push_pending_events(
                 url,
                 resolved,
                 body,
-                timeout=timeout,
-                max_retries=max_retries,
-                backoff_base=backoff_base,
+                timeout=timeout_f,
+                max_retries=max_retries_i,
+                backoff_base=backoff_base_f,
             )
             if not ok:
                 summary["status"] = "error"
