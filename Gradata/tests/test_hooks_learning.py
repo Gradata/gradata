@@ -544,9 +544,7 @@ def test_read_brain_prompt_truncates_at_cap(tmp_path):
             _mod.MAX_BRAIN_PROMPT_CHARS = orig
 
     assert result is not None
-    assert "<!-- truncated -->" in result
-    # Wrapper tags must remain intact (truncation happened before wrapping)
-    assert result.startswith("<brain-wisdom>")
-    assert result.endswith("</brain-wisdom>")
-    # The raw body should be capped — no 200 trailing x's
+    # Autoresearch token-compression dropped the <brain-wisdom> wrapper and
+    # <!-- truncated --> sentinel - test validates the character cap directly.
     assert "x" * 200 not in result
+    assert len(result) <= 50

@@ -228,7 +228,7 @@ def test_context_inject_returns_context(tmp_path):
         )
 
     assert result is not None
-    assert "brain context:" in result["result"]
+    assert "ctx:" in result["result"]
     assert "Relevant brain knowledge" in result["result"]
 
 
@@ -439,23 +439,37 @@ def test_session_persist_no_brain():
 from gradata.hooks.implicit_feedback import main as feedback_main
 
 
-def test_implicit_feedback_detects_negation():
-    result = feedback_main({"message": "No, that's wrong. Do it differently."})
-    assert result is not None
-    assert "IMPLICIT FEEDBACK" in result["result"]
-    assert "negation" in result["result"]
+def test_implicit_feedback_detects_negation(tmp_path, monkeypatch):
+    monkeypatch.setenv("GRADATA_BRAIN_DIR", str(tmp_path))
+    with patch("gradata.hooks.implicit_feedback.emit_hook_event") as mock_emit:
+        result = feedback_main({"message": "No, that's wrong. Do it differently."})
+    assert result is None
+    event_types = [call.args[0] for call in mock_emit.call_args_list]
+    assert "IMPLICIT_FEEDBACK" in event_types
+    signals = mock_emit.call_args_list[0].args[2]["signals"]
+    assert "negation" in signals
 
 
-def test_implicit_feedback_detects_reminder():
-    result = feedback_main({"message": "I told you to always plan first before building."})
-    assert result is not None
-    assert "reminder" in result["result"]
+def test_implicit_feedback_detects_reminder(tmp_path, monkeypatch):
+    monkeypatch.setenv("GRADATA_BRAIN_DIR", str(tmp_path))
+    with patch("gradata.hooks.implicit_feedback.emit_hook_event") as mock_emit:
+        result = feedback_main({"message": "I told you to always plan first before building."})
+    assert result is None
+    event_types = [call.args[0] for call in mock_emit.call_args_list]
+    assert "IMPLICIT_FEEDBACK" in event_types
+    signals = mock_emit.call_args_list[0].args[2]["signals"]
+    assert "reminder" in signals
 
 
-def test_implicit_feedback_detects_challenge():
-    result = feedback_main({"message": "Are you sure that's correct? It doesn't look right."})
-    assert result is not None
-    assert "challenge" in result["result"]
+def test_implicit_feedback_detects_challenge(tmp_path, monkeypatch):
+    monkeypatch.setenv("GRADATA_BRAIN_DIR", str(tmp_path))
+    with patch("gradata.hooks.implicit_feedback.emit_hook_event") as mock_emit:
+        result = feedback_main({"message": "Are you sure that's correct? It doesn't look right."})
+    assert result is None
+    event_types = [call.args[0] for call in mock_emit.call_args_list]
+    assert "IMPLICIT_FEEDBACK" in event_types
+    signals = mock_emit.call_args_list[0].args[2]["signals"]
+    assert "challenge" in signals
 
 
 def test_implicit_feedback_ignores_neutral():
@@ -466,12 +480,12 @@ def test_implicit_feedback_ignores_neutral():
 def test_implicit_feedback_emits_event(tmp_path):
     with (
         patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}),
-        patch("gradata._events.emit") as mock_emit,
+        patch("gradata.hooks.implicit_feedback.emit_hook_event") as mock_emit,
     ):
         result = feedback_main({"message": "I told you not to do that, are you sure?"})
-    assert result is not None
-    mock_emit.assert_called_once()
-    assert mock_emit.call_args[0][0] == "IMPLICIT_FEEDBACK"
+    assert result is None
+    event_types = [call.args[0] for call in mock_emit.call_args_list]
+    assert "IMPLICIT_FEEDBACK" in event_types
 
 
 def test_implicit_feedback_empty_message():
