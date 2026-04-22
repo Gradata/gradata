@@ -1,0 +1,297 @@
+"""Client for the unified ``POST /events/push`` endpoint.
+
+Reads rows from the local ``events`` table that have not yet been pushed for
+this device, chunks them into batches, and POSTs each batch with exponential
+backoff. Watermark advances via ``sync_state.last_push_event_id`` on success.
+
+The endpoint contract (per Phase-1 plan):
+
+    POST {api_base}/events/push
+    Authorization: Bearer <credential>
+    Body:
+      {
+        "brain_id": "<tenant_id>",
+        "device_id": "dev_<32hex>",
+        "events": [ {event_id, ...}, ... ]
+      }
+    Response 2xx: {"accepted": <int>, "rejected": [...]}
+
+Safety properties:
+  - Never raises from ``push_pending_events``: returns a summary dict.
+  - Honours ``_credentials.kill_switch_set()`` — exits early when on.
+  - Skips entirely when cloud sync is disabled or no credential resolves.
+  - Advances watermark only after every batch of a run succeeds.
+"""
+
+from __future__ import annotations
+
+import datetime as _dt
+import json
+import logging
+import sqlite3
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+from gradata._http import require_https
+from gradata._migrations.device_uuid import get_or_create_device_id
+from gradata._tenant import tenant_for
+from gradata.cloud import _credentials as _creds
+from gradata.cloud.sync import load_config
+
+log = logging.getLogger(__name__)
+
+DEFAULT_CHUNK_SIZE = 500
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_BACKOFF_BASE = 1.0
+
+
+def _fetch_events_since(
+    conn: sqlite3.Connection,
+    last_event_id: str | None,
+    limit: int,
+) -> list[dict[str, Any]]:
+    """Return up to ``limit`` rows from ``events`` with event_id > watermark."""
+    cursor_clause = ""
+    params: list[Any] = []
+    if last_event_id:
+        cursor_clause = "AND event_id > ?"
+        params.append(last_event_id)
+
+    sql = f"""
+        SELECT event_id, type, source, session, ts, data_json, tags_json,
+               device_id, content_hash, correction_chain_id, origin_agent
+        FROM events
+        WHERE event_id IS NOT NULL {cursor_clause}
+        ORDER BY event_id ASC
+        LIMIT ?
+    """
+    params.append(limit)
+    rows = conn.execute(sql, params).fetchall()
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        (
+            ev_id,
+            ev_type,
+            source,
+            session,
+            ts,
+            data_json,
+            tags_json,
+            device_id,
+            content_hash,
+            corr_chain,
+            origin_agent,
+        ) = row
+        try:
+            data = json.loads(data_json) if data_json else None
+        except (TypeError, json.JSONDecodeError):
+            data = None
+        try:
+            tags = json.loads(tags_json) if tags_json else []
+        except (TypeError, json.JSONDecodeError):
+            tags = []
+        out.append(
+            {
+                "event_id": ev_id,
+                "type": ev_type,
+                "source": source,
+                "session": session,
+                "ts": ts,
+                "data": data,
+                "tags": tags,
+                "device_id": device_id,
+                "content_hash": content_hash,
+                "correction_chain_id": corr_chain,
+                "origin_agent": origin_agent,
+            }
+        )
+    return out
+
+
+def _read_watermark(
+    conn: sqlite3.Connection,
+    tenant_id: str,
+    device_id: str,
+) -> str | None:
+    """Return ``sync_state.last_push_event_id`` scoped to (tenant, device)."""
+    try:
+        row = conn.execute(
+            "SELECT last_push_event_id FROM sync_state WHERE brain_id = ? AND device_id = ?",
+            (tenant_id, device_id),
+        ).fetchone()
+    except sqlite3.OperationalError:
+        return None
+    return row[0] if row and row[0] else None
+
+
+def _write_watermark(
+    conn: sqlite3.Connection,
+    tenant_id: str,
+    device_id: str,
+    new_event_id: str,
+    now_iso: str,
+) -> None:
+    """Upsert ``sync_state`` for (tenant, device) with the new watermark."""
+    conn.execute(
+        """
+        INSERT INTO sync_state (brain_id, device_id, tenant_id,
+                                last_push_event_id, last_push_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(brain_id) DO UPDATE SET
+            device_id = excluded.device_id,
+            tenant_id = excluded.tenant_id,
+            last_push_event_id = excluded.last_push_event_id,
+            last_push_at = excluded.last_push_at,
+            updated_at = excluded.updated_at
+        """,
+        (tenant_id, device_id, tenant_id, new_event_id, now_iso, now_iso),
+    )
+    conn.commit()
+
+
+def _post_batch(
+    url: str,
+    credential: str,
+    body: dict[str, Any],
+    timeout: float,
+    max_retries: int,
+    backoff_base: float,
+) -> tuple[bool, dict[str, Any] | None]:
+    """POST a single batch with exponential backoff. Returns (ok, response)."""
+    data = json.dumps(body).encode("utf-8")
+    headers = {
+        "Authorization": f"Bearer {credential}",
+        "Content-Type": "application/json",
+        "User-Agent": "gradata-sdk/events-push",
+    }
+
+    for attempt in range(max_retries + 1):
+        try:
+            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read().decode("utf-8") if resp else ""
+                parsed = json.loads(raw) if raw else {}
+                return True, parsed
+        except urllib.error.HTTPError as e:
+            if 400 <= e.code < 500:
+                log.warning("events/push rejected (HTTP %s): %s", e.code, e.reason)
+                return False, None
+            log.debug("events/push transient HTTP %s (attempt %s)", e.code, attempt + 1)
+        except (urllib.error.URLError, OSError, json.JSONDecodeError) as e:
+            log.debug("events/push transport error (attempt %s): %s", attempt + 1, e)
+
+        if attempt < max_retries:
+            time.sleep(backoff_base * (2**attempt))
+
+    return False, None
+
+
+def push_pending_events(
+    brain_dir: str | Path,
+    *,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+    backoff_base: float = DEFAULT_BACKOFF_BASE,
+    timeout: float = 30.0,
+) -> dict[str, Any]:
+    """Push all pending events for this device to the cloud.
+
+    Returns a summary dict.
+    """
+    summary: dict[str, Any] = {
+        "status": "ok",
+        "events_pushed": 0,
+        "batches": 0,
+        "last_event_id": None,
+    }
+
+    brain = Path(brain_dir).resolve()
+    db = brain / "system.db"
+    if not db.is_file():
+        summary["status"] = "error"
+        summary["reason"] = "no_db"
+        return summary
+
+    if _creds.kill_switch_set():
+        summary["status"] = "kill_switch"
+        return summary
+
+    try:
+        config = load_config(brain)
+    except Exception as exc:
+        log.debug("events/push: config load failed: %s", exc)
+        summary["status"] = "error"
+        summary["reason"] = "config_load_failed"
+        return summary
+
+    if not config.sync_enabled:
+        summary["status"] = "disabled"
+        return summary
+
+    resolved = config.token.strip() or _creds.resolve_credential()
+    if not resolved:
+        summary["status"] = "no_credential"
+        return summary
+
+    api_base = (config.api_base or "").rstrip("/")
+    try:
+        require_https(api_base, "api_base")
+    except ValueError as exc:
+        log.error("events/push refused — %s", exc)
+        summary["status"] = "error"
+        summary["reason"] = "https_required"
+        return summary
+
+    url = f"{api_base}/events/push"
+    tenant_id = tenant_for(brain)
+    device_id = get_or_create_device_id(brain)
+    now_iso = _dt.datetime.now(_dt.UTC).isoformat()
+
+    conn = sqlite3.connect(str(db))
+    try:
+        watermark = _read_watermark(conn, tenant_id, device_id)
+        batches = 0
+        pushed = 0
+        last_id = watermark
+        while True:
+            events = _fetch_events_since(conn, last_id, chunk_size)
+            if not events:
+                break
+            body = {
+                "brain_id": tenant_id,
+                "device_id": device_id,
+                "events": events,
+            }
+            ok, _resp = _post_batch(
+                url,
+                resolved,
+                body,
+                timeout=timeout,
+                max_retries=max_retries,
+                backoff_base=backoff_base,
+            )
+            if not ok:
+                summary["status"] = "error"
+                summary["reason"] = "batch_failed_after_retries"
+                summary["events_pushed"] = pushed
+                summary["batches"] = batches
+                summary["last_event_id"] = last_id
+                return summary
+
+            batches += 1
+            pushed += len(events)
+            last_id = events[-1]["event_id"]
+            _write_watermark(conn, tenant_id, device_id, last_id, now_iso)
+
+        summary["events_pushed"] = pushed
+        summary["batches"] = batches
+        summary["last_event_id"] = last_id
+        return summary
+    finally:
+        conn.close()
+
+
+__all__ = ["push_pending_events"]

@@ -227,7 +227,16 @@ def _transform_row(table: str, row: dict[str, Any], tenant_id: str) -> dict[str,
 
 
 def enabled() -> bool:
-    """True when the env flag is set AND both URL/key are present."""
+    """True when the env flag is set AND both URL/key are present.
+
+    The GRADATA_CLOUD_SYNC_DISABLE kill switch short-circuits to False even
+    when everything else is configured — Council-mandated escape hatch so
+    operators can kill cloud writes without redeploying.
+    """
+    from gradata.cloud._credentials import kill_switch_set
+
+    if kill_switch_set():
+        return False
     if os.environ.get(ENV_ENABLED, "").strip() not in ("1", "true", "yes"):
         return False
     return bool(_env_url() and _env_key())
