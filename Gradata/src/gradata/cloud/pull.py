@@ -279,6 +279,10 @@ def pull_events(
         from gradata.cloud._sync_state import update_pull_cursor
         from gradata.enhancements.self_improvement import format_lessons, parse_lessons
 
+        # Default so the summary schema is stable across empty-delta and
+        # non-empty-delta apply paths — callers can unconditionally read
+        # ``summary["conflict_events_emitted"]`` instead of ``.get(..., 0)``.
+        summary["conflict_events_emitted"] = 0
         if mat.rules or mat.conflicts:
             lessons_path = brain / "lessons.md"
             existing = (

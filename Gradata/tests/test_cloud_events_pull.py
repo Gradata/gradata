@@ -241,6 +241,9 @@ def test_apply_true_on_empty_delta_still_reports_applied(brain):
     assert result["applied"] is True
     assert result["rules_materialized"] == 0
     assert result["conflicts"] == 0
+    # Summary schema must be stable across empty-delta and non-empty-delta
+    # apply paths: the key is always present, never missing.
+    assert result["conflict_events_emitted"] == 0
     # No lessons.md write happened, but the watermark must have advanced so
     # the next pull doesn't re-fetch the same empty page.
     from gradata._migrations.device_uuid import get_or_create_device_id
