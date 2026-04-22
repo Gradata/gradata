@@ -177,6 +177,7 @@ def pull_events(
             apply_to_lessons,
             emit_conflict_events,
         )
+        from gradata.cloud._sync_state import update_pull_cursor
         from gradata.enhancements.self_improvement import format_lessons, parse_lessons
 
         lessons_path = brain / "lessons.md"
@@ -196,5 +197,20 @@ def pull_events(
             return summary
 
         summary["conflict_events_emitted"] = emit_conflict_events(mat)
+
+        # Persist the pull watermark so the next call can resume
+        # incrementally. Never fatal — losing the cursor just means the
+        # next pull re-downloads events that dedup will then skip.
+        watermark = summary.get("watermark")
+        if watermark:
+            try:
+                update_pull_cursor(
+                    db,
+                    tenant_id=params["brain_id"],
+                    device_id=params["device_id"],
+                    cursor=str(watermark),
+                )
+            except Exception as exc:
+                log.debug("events/pull: watermark persist failed: %s", exc)
 
     return summary

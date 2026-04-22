@@ -143,9 +143,17 @@ def _apply_tier(
     return winner, None
 
 
+_MATERIALIZER_EVENT_TYPES: tuple[str, ...] = (
+    "RULE_GRADUATED",
+    "RULE_DEMOTED",
+    "RULE_OVERRIDE",
+    "RULE_CONFLICT_RESOLVED",
+)
+
+
 def _load_events_from_db(
     db_path: Path,
-    event_types: Iterable[str] = ("RULE_GRADUATED", "RULE_DEMOTED", "RULE_OVERRIDE"),
+    event_types: Iterable[str] = _MATERIALIZER_EVENT_TYPES,
 ) -> list[dict]:
     """Load candidate events from system.db in ts-ASC order.
 
@@ -201,6 +209,12 @@ def materialize(
     conflict_holds: dict[tuple[str, str], Conflict] = {}
     result = MaterializeResult()
 
+    # Index graduation events by ts so RULE_CONFLICT_RESOLVED can re-apply
+    # the winning side once adjudication lands. The spec names a winning
+    # event_id; we fall back to (ts, device_id) because the Phase 1 event
+    # schema doesn't expose event_id on the materializer input.
+    graduation_history: dict[tuple[str, str], list[dict]] = {}
+
     for evt in events:
         result.events_consumed += 1
         etype = str(evt.get("type") or "")
@@ -215,10 +229,42 @@ def materialize(
             conflict_holds.pop(key, None)
             continue
 
+        if etype == "RULE_CONFLICT_RESOLVED":
+            # User adjudicated a held Tier 2 conflict. Clear the hold and
+            # materialize the picked side. The resolver event carries
+            # `winning_ts` (ISO) pointing at the graduation event to apply.
+            key = _rule_key(evt)
+            if key is None:
+                result.events_skipped += 1
+                continue
+            data = evt.get("data") or {}
+            winning_ts = str(data.get("winning_ts") or "")
+            winning_device = str(data.get("winning_device_id") or "")
+            picked: dict | None = None
+            for hist in graduation_history.get(key, []):
+                ht = str(hist.get("ts") or "")
+                hd = str((hist.get("data") or {}).get("device_id") or "")
+                if ht == winning_ts and (not winning_device or hd == winning_device):
+                    picked = hist
+                    break
+            conflict_holds.pop(key, None)
+            if picked is not None:
+                winners[key] = picked
+            else:
+                # No matching history — caller passed a partial stream.
+                # Leave the hold cleared; state will catch up on next pull.
+                result.events_skipped += 1
+            continue
+
         key = _rule_key(evt)
         if key is None:
             result.events_skipped += 1
             continue
+
+        # Record every graduation in history for later RULE_CONFLICT_RESOLVED
+        # lookup. Accumulates regardless of conflict state so a resolver
+        # that names a held event can still find it.
+        graduation_history.setdefault(key, []).append(evt)
 
         if key in conflict_holds:
             # Spec §3 Tier 2: a held conflict stays held until a
@@ -237,6 +283,12 @@ def materialize(
             continue
         if winner is not None:
             winners[key] = winner
+
+    # Prune conflicts that were resolved later in the same stream so
+    # callers don't emit stale RULE_CONFLICT events for keys already
+    # adjudicated.
+    if result.conflicts:
+        result.conflicts = [c for c in result.conflicts if c.key in conflict_holds]
 
     for key, evt in winners.items():
         data = evt.get("data") or {}

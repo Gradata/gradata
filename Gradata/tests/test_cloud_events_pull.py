@@ -184,6 +184,28 @@ def test_server_200_apply_writes_lessons(brain):
     assert "use active voice" in text
 
 
+def test_apply_persists_pull_watermark(brain):
+    """After a successful apply, sync_state.last_pull_cursor records the watermark."""
+    from gradata._migrations.device_uuid import get_or_create_device_id
+    from gradata._tenant import tenant_for
+    from gradata.cloud._sync_state import get_pull_cursor
+
+    _save_cfg(brain.dir)
+    with patch(
+        "urllib.request.urlopen",
+        return_value=_FakeResp(_graduation_body(watermark="01JN_RESUME_ME")),
+    ):
+        result = pull_events(brain.dir, apply=True)
+
+    assert result["applied"] is True
+    persisted = get_pull_cursor(
+        brain.dir / "system.db",
+        tenant_id=tenant_for(brain.dir),
+        device_id=get_or_create_device_id(brain.dir),
+    )
+    assert persisted == "01JN_RESUME_ME"
+
+
 def test_server_200_malformed_json_returns_error(brain):
     _save_cfg(brain.dir)
 

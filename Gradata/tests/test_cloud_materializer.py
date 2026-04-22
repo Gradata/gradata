@@ -128,6 +128,52 @@ class TestTier2Conflict:
         assert result.events_skipped >= 1
 
 
+class TestConflictResolved:
+    def test_resolved_event_clears_hold_and_applies_winner(self) -> None:
+        stream = [
+            _evt(ts="2026-04-20T00:00:00Z", confidence=0.62, device_id="dev_a"),
+            _evt(ts="2026-04-20T00:01:00Z", confidence=0.90, device_id="dev_b"),  # conflict
+            {
+                "ts": "2026-04-20T00:02:00Z",
+                "type": "RULE_CONFLICT_RESOLVED",
+                "source": "dashboard",
+                "data": {
+                    "category": "style",
+                    "description": "use active voice",
+                    "winning_ts": "2026-04-20T00:01:00Z",
+                    "winning_device_id": "dev_b",
+                },
+            },
+        ]
+        result = materialize(stream)
+        rule = next(iter(result.rules.values()))
+        assert rule.winning_device_id == "dev_b"
+        assert rule.confidence == pytest.approx(0.90)
+        # Conflict was adjudicated — no stale RULE_CONFLICT should remain.
+        assert result.conflicts == []
+
+    def test_resolved_without_matching_history_clears_hold_only(self) -> None:
+        stream = [
+            _evt(ts="2026-04-20T00:00:00Z", confidence=0.62, device_id="dev_a"),
+            _evt(ts="2026-04-20T00:01:00Z", confidence=0.90, device_id="dev_b"),
+            {
+                "ts": "2026-04-20T00:02:00Z",
+                "type": "RULE_CONFLICT_RESOLVED",
+                "source": "dashboard",
+                "data": {
+                    "category": "style",
+                    "description": "use active voice",
+                    "winning_ts": "9999-01-01T00:00:00Z",  # doesn't match history
+                },
+            },
+            _evt(ts="2026-04-20T00:03:00Z", confidence=0.75, device_id="dev_c"),
+        ]
+        result = materialize(stream)
+        # Hold cleared, but the next graduation after it now materializes.
+        rule = next(iter(result.rules.values()))
+        assert rule.winning_device_id == "dev_c"
+
+
 class TestTier3Override:
     def test_rule_override_clears_conflict_hold(self) -> None:
         stream = [
