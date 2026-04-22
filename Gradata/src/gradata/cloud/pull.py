@@ -172,7 +172,8 @@ def pull_events(
 
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
-                body = resp.read().decode("utf-8")
+                raw_body = resp.read()
+            body = raw_body.decode("utf-8")
         except urllib.error.HTTPError as e:
             if e.code == 501:
                 summary["status"] = "disabled_server_side"
@@ -189,6 +190,14 @@ def pull_events(
             log.debug("events/pull transport error: %s", exc)
             summary["status"] = "error"
             summary["reason"] = "transport"
+            return summary
+        except UnicodeDecodeError as exc:
+            # A non-UTF-8 body would otherwise escape the transport/HTTP guards
+            # and crash the caller — public contract is "never raise". Treat
+            # garbage bytes as a malformed response.
+            log.warning("events/pull: response body is not valid UTF-8: %s", exc)
+            summary["status"] = "error"
+            summary["reason"] = "malformed_response"
             return summary
 
         try:
@@ -217,9 +226,24 @@ def pull_events(
             return summary
         all_events.extend(page_events)
         page_watermark = parsed.get("watermark")
+        # Reject the wrong types outright — ``bool()`` would coerce the string
+        # ``"false"`` to True, and a dict/list watermark would later be
+        # ``str(...)``-ified and persisted as garbage. Force the caller onto
+        # the malformed_response path instead.
+        if page_watermark is not None and not isinstance(page_watermark, str):
+            log.warning("events/pull: watermark field is not a string")
+            summary["status"] = "error"
+            summary["reason"] = "malformed_response"
+            return summary
+        page_end_of_stream = parsed.get("end_of_stream", True)
+        if not isinstance(page_end_of_stream, bool):
+            log.warning("events/pull: end_of_stream field is not a boolean")
+            summary["status"] = "error"
+            summary["reason"] = "malformed_response"
+            return summary
         if page_watermark:
             final_watermark = page_watermark
-        end_of_stream = bool(parsed.get("end_of_stream", True))
+        end_of_stream = page_end_of_stream
         pages_fetched += 1
 
         if end_of_stream:

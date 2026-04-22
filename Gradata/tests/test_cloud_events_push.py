@@ -212,9 +212,8 @@ def test_happy_path_pushes_events_and_advances_watermark(tmp_path, monkeypatch):
     assert captured[0]["device_id"].startswith("dev_")
     assert len(captured[0]["events"]) == 3
 
-    conn = sqlite3.connect(brain / "system.db")
-    wm = conn.execute("SELECT last_push_event_id FROM sync_state").fetchone()
-    conn.close()
+    with sqlite3.connect(brain / "system.db") as conn:
+        wm = conn.execute("SELECT last_push_event_id FROM sync_state").fetchone()
     assert wm[0] == "01HN000000000000000000000C"
 
 

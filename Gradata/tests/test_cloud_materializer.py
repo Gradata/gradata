@@ -447,3 +447,50 @@ def test_materialize_survives_non_numeric_confidence_on_winner():
     rule = next(iter(result.rules.values()))
     assert rule.confidence == 0.0
     assert rule.fire_count == 0
+
+
+def test_load_events_from_db_skips_non_dict_data(tmp_path):
+    """A legacy row whose ``data_json`` decodes to a scalar/list must be dropped
+    before it reaches ``materialize()`` — downstream code calls
+    ``evt["data"].get(...)`` and would crash on a non-mapping."""
+    import sqlite3
+
+    from gradata.cloud.materializer import _load_events_from_db
+
+    db = tmp_path / "events.db"
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "CREATE TABLE events (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "ts TEXT, type TEXT, source TEXT, data_json TEXT)"
+        )
+        # A well-formed RULE_GRADUATED row alongside three malformed ones.
+        import json as _json
+
+        conn.executemany(
+            "INSERT INTO events (ts, type, source, data_json) VALUES (?, ?, ?, ?)",
+            [
+                (
+                    "2026-04-21T00:00:00Z",
+                    "RULE_GRADUATED",
+                    "graduate",
+                    _json.dumps(
+                        {
+                            "category": "style",
+                            "description": "use active voice",
+                            "new_state": "PATTERN",
+                            "confidence": 0.62,
+                            "fire_count": 3,
+                            "device_id": "dev_aaaa",
+                        }
+                    ),
+                ),
+                ("2026-04-21T00:00:01Z", "RULE_GRADUATED", "graduate", "42"),  # scalar
+                ("2026-04-21T00:00:02Z", "RULE_GRADUATED", "graduate", "[1,2,3]"),  # list
+                ("2026-04-21T00:00:03Z", "RULE_GRADUATED", "graduate", '"hi"'),  # string
+            ],
+        )
+        conn.commit()
+
+    rows = _load_events_from_db(db)
+    assert len(rows) == 1
+    assert rows[0]["data"]["description"] == "use active voice"

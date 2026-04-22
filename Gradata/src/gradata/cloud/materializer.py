@@ -203,6 +203,11 @@ def _load_events_from_db(
             data = json.loads(data_json) if data_json else {}
         except json.JSONDecodeError:
             continue
+        # Skip non-object payloads — downstream helpers (_rule_key,
+        # materialize()) call evt["data"].get(...), which would crash on a
+        # scalar / list decoded from a legacy row.
+        if not isinstance(data, dict):
+            continue
         out.append({"ts": ts, "type": etype, "source": source, "data": data})
     return out
 

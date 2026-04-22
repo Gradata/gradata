@@ -228,6 +228,42 @@ def test_server_200_malformed_json_returns_error(brain):
     assert result["reason"] == "malformed_response"
 
 
+def test_server_200_non_utf8_body_returns_malformed_response(brain):
+    """A response body that isn't valid UTF-8 is treated as malformed, not a crash."""
+    _save_cfg(brain.dir)
+
+    # 0xFF is never valid as a standalone UTF-8 byte.
+    with patch("urllib.request.urlopen", return_value=_FakeResp(b"\xff\xfe\xfd")):
+        result = pull_events(brain.dir)
+
+    assert result["status"] == "error"
+    assert result["reason"] == "malformed_response"
+
+
+def test_server_200_non_string_watermark_is_rejected(brain):
+    """A dict/list watermark must not be stringified and persisted — fail loudly."""
+    _save_cfg(brain.dir)
+    body = json.dumps({"events": [], "watermark": {"x": 1}, "end_of_stream": True}).encode()
+
+    with patch("urllib.request.urlopen", return_value=_FakeResp(body)):
+        result = pull_events(brain.dir)
+
+    assert result["status"] == "error"
+    assert result["reason"] == "malformed_response"
+
+
+def test_server_200_non_bool_end_of_stream_is_rejected(brain):
+    """The string ``"false"`` must not be coerced to True by bool() — fail loudly."""
+    _save_cfg(brain.dir)
+    body = json.dumps({"events": [], "watermark": "01JN0", "end_of_stream": "false"}).encode()
+
+    with patch("urllib.request.urlopen", return_value=_FakeResp(body)):
+        result = pull_events(brain.dir)
+
+    assert result["status"] == "error"
+    assert result["reason"] == "malformed_response"
+
+
 def test_request_includes_brain_and_device_id(brain):
     """Contract: every pull request carries brain_id and device_id as query params."""
     import urllib.error
