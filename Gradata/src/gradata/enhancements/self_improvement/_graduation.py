@@ -31,6 +31,23 @@ from gradata.enhancements.self_improvement._confidence import (
 _log = logging.getLogger(__name__)
 
 
+def _ensure_slot(lesson: Lesson) -> None:
+    """Classify and assign a Preston-Rhodes slot when graduating.
+
+    Idempotent: skipped when the lesson already carries a slot. Any
+    classifier error is swallowed — slot is optional metadata and a
+    missing slot falls back to category inference at render time.
+    """
+    if getattr(lesson, "slot", ""):
+        return
+    try:
+        from gradata.enhancements.prompt_synthesizer import classify_slot
+
+        lesson.slot = classify_slot(lesson)
+    except Exception:  # pragma: no cover - classifier is best-effort
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Graduation
 # ---------------------------------------------------------------------------
@@ -317,6 +334,7 @@ def graduate(
                     lesson.description = result.best.content
             except Exception:
                 pass  # ToT is optional; graduate with original wording
+            _ensure_slot(lesson)
             lesson.state = transition(lesson.state, "promote")
 
             # Rule-to-hook graduation: attempt to install a deterministic
@@ -365,6 +383,7 @@ def graduate(
             and lesson.confidence > eff_pattern_threshold
             and lesson.fire_count >= MIN_APPLICATIONS_FOR_PATTERN
         ):
+            _ensure_slot(lesson)
             lesson.state = transition(lesson.state, "promote")
             continue
 
