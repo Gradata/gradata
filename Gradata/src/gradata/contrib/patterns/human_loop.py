@@ -6,31 +6,9 @@ SDK LAYER: Pure logic, stdlib only. No domain-specific content.
 Provides three primitives for inserting human oversight into agentic
 pipelines based on the risk level of a proposed action:
 
-``assess_risk``
-    Classify an action string into ``"low"``, ``"medium"``, or ``"high"``
-    risk using keyword matching.  Keywords are domain-agnostic; callers
-    may extend the classification by passing a ``context`` dict.
-
-``gate``
-    Decide whether an action requires human approval.  Low-risk actions
-    may be auto-approved; medium and high-risk actions always surface an
-    ``ApprovalRequest`` to the caller.
-
-``preview_action``
-    Produce a human-readable summary of what the action will do and
-    which entities it will affect, so the reviewer can make an informed
-    decision without reading raw code or API payloads.
-
-Design principles
------------------
-- Zero domain assumptions.  Keyword lists cover generic computing verbs;
-  callers layer domain context on top via ``context`` dicts.
-- No I/O.  All functions are pure transforms over plain Python dicts and
-  strings.  Persistence, UI rendering, and approval collection are the
-  host's responsibility.
-- Reversibility is a first-class signal.  The ``RiskAssessment.reversible``
-  flag is derived automatically and exposed so downstream logic can use it
-  independently of the tier.
+Three primitives: ``assess_risk`` (low/medium/high keyword classification),
+``gate`` (approval decision), ``preview_action`` (human-readable summary).
+Zero domain assumptions; no I/O — all pure transforms.
 """
 
 from __future__ import annotations
@@ -358,8 +336,7 @@ def assess_risk(
         return RiskAssessment(
             tier="high",
             reason=(
-                f"Action contains high-risk keyword(s): "
-                f"{', '.join(sorted(set(matched_high)))}."
+                f"Action contains high-risk keyword(s): {', '.join(sorted(set(matched_high)))}."
             ),
             affected=affected,
             reversible=reversible,
@@ -371,8 +348,7 @@ def assess_risk(
         return RiskAssessment(
             tier="medium",
             reason=(
-                f"Action contains medium-risk keyword(s): "
-                f"{', '.join(sorted(set(matched_medium)))}."
+                f"Action contains medium-risk keyword(s): {', '.join(sorted(set(matched_medium)))}."
             ),
             affected=affected,
             reversible=reversible,
@@ -383,10 +359,7 @@ def assess_risk(
     if matched_low:
         return RiskAssessment(
             tier="low",
-            reason=(
-                f"Action contains low-risk keyword(s): "
-                f"{', '.join(sorted(set(matched_low)))}."
-            ),
+            reason=(f"Action contains low-risk keyword(s): {', '.join(sorted(set(matched_low)))}."),
             affected=affected,
             reversible=reversible,
         )
@@ -460,15 +433,17 @@ def preview_action(
     ]
 
     if affected:
-        entity_str = ", ".join(affected) if len(affected) <= 5 else (
-            ", ".join(affected[:5]) + f" ... (+{len(affected) - 5} more)"
+        entity_str = (
+            ", ".join(affected)
+            if len(affected) <= 5
+            else (", ".join(affected[:5]) + f" ... (+{len(affected) - 5} more)")
         )
         lines.append(f"Affects:      {entity_str}")
     else:
         lines.append("Affects:      (entities not specified)")
 
-    reversibility = "Yes — can be undone." if risk.reversible else (
-        "No — this action cannot be reversed."
+    reversibility = (
+        "Yes — can be undone." if risk.reversible else ("No — this action cannot be reversed.")
     )
     lines.append(f"Reversible:   {reversibility}")
 
@@ -478,6 +453,7 @@ def preview_action(
 # ---------------------------------------------------------------------------
 # Convenience class wrapper
 # ---------------------------------------------------------------------------
+
 
 class HumanLoopGate:
     """OOP wrapper around ``assess_risk`` and ``gate`` for approval workflows.
@@ -502,11 +478,7 @@ class HumanLoopGate:
         """Full gate check: assess risk, request approval if needed."""
         request = gate(action)
         if request is None:
-            return ApprovalResult(
-                approved=True, feedback="auto_approved_low_risk"
-            )
+            return ApprovalResult(approved=True, feedback="auto_approved_low_risk")
         if approver is not None:
             return approver(request)
-        return ApprovalResult(
-            approved=False, feedback="requires_human_review"
-        )
+        return ApprovalResult(approved=False, feedback="requires_human_review")

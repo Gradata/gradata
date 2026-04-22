@@ -8,31 +8,8 @@ brain operations. Each middleware can hook into before/after execution
 points. Middlewares are ordered via anchor-based positioning (Next/Prev)
 with circular dependency detection.
 
-This is architecturally cleaner than a flat hooks list because:
-- Middlewares declare their relative position (not absolute index)
-- Circular dependencies are detected at registration time
-- Each middleware is a self-contained class with typed lifecycle hooks
-
-Usage::
-
-    from gradata.contrib.patterns.middleware import (
-        Middleware, MiddlewareChain, MiddlewareContext,
-    )
-
-    class LoggingMiddleware(Middleware):
-        name = "logging"
-
-        def before(self, ctx: MiddlewareContext) -> MiddlewareContext:
-            print(f"Before: {ctx.operation}")
-            return ctx
-
-        def after(self, ctx: MiddlewareContext) -> MiddlewareContext:
-            print(f"After: {ctx.operation}, result={ctx.result}")
-            return ctx
-
-    chain = MiddlewareChain()
-    chain.add(LoggingMiddleware())
-    result = chain.execute("correct", data={"draft": "...", "final": "..."})
+Middlewares declare relative position (not absolute index); circular
+dependencies are detected at registration time.
 """
 
 from __future__ import annotations
@@ -50,6 +27,7 @@ __all__ = [
 
 class MiddlewareError(Exception):
     """Raised when middleware chain has configuration errors."""
+
     pass
 
 
@@ -68,6 +46,7 @@ class MiddlewareContext:
         metadata: Middleware-contributed metadata.
         errors: Errors collected during chain execution.
     """
+
     operation: str = ""
     data: dict[str, Any] = field(default_factory=dict)
     result: Any = None
@@ -88,8 +67,9 @@ class Middleware:
         before_middleware: Name of middleware this should precede.
         If neither is set, middleware is appended to the end.
     """
+
     name: str = "unnamed"
-    after_middleware: str = ""   # Insert after this middleware
+    after_middleware: str = ""  # Insert after this middleware
     before_middleware: str = ""  # Insert before this middleware
 
     def before(self, ctx: MiddlewareContext) -> MiddlewareContext:
@@ -148,9 +128,7 @@ class MiddlewareChain:
             MiddlewareError: If anchors reference unknown or circular deps.
         """
         if middleware.name in self._name_index:
-            raise MiddlewareError(
-                f"Middleware '{middleware.name}' already registered"
-            )
+            raise MiddlewareError(f"Middleware '{middleware.name}' already registered")
 
         if middleware.after_middleware and middleware.before_middleware:
             raise MiddlewareError(
@@ -263,6 +241,4 @@ class MiddlewareChain:
 
     def _rebuild_index(self) -> None:
         """Rebuild the name-to-index mapping."""
-        self._name_index = {
-            mw.name: i for i, mw in enumerate(self._middlewares)
-        }
+        self._name_index = {mw.name: i for i, mw in enumerate(self._middlewares)}
