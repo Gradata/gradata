@@ -257,4 +257,24 @@ def pull_events(
             except Exception as exc:
                 log.debug("events/pull: watermark persist failed: %s", exc)
 
+        try:
+            from gradata._events import emit as _emit
+
+            _emit(
+                "CLOUD_SYNC_COMPLETED",
+                "cloud_pull",
+                {
+                    "events_pulled": summary["events_pulled"],
+                    "rules_materialized": summary["rules_materialized"],
+                    "conflicts": summary["conflicts"],
+                    "pages_fetched": summary["pages_fetched"],
+                    "conflict_threshold": summary["conflict_threshold"],
+                    "watermark": summary.get("watermark") or "",
+                    "status": summary["status"],
+                },
+                [],
+            )
+        except Exception as exc:
+            log.debug("CLOUD_SYNC_COMPLETED emit failed: %s", exc)
+
     return summary

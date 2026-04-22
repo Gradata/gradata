@@ -488,3 +488,48 @@ def test_credential_resolves_from_keyfile_when_config_token_empty(brain):
 
     assert result["status"] == "disabled_server_side"
     assert captured["auth"] == "Bearer gk_live_from_keyfile"
+
+
+def test_cloud_sync_completed_event_emitted_on_apply(brain):
+    """A successful apply emits CLOUD_SYNC_COMPLETED with the summary counters."""
+    _save_cfg(brain.dir)
+
+    captured: list[tuple] = []
+
+    def recorder(event_type, source, payload, tags):
+        captured.append((event_type, source, payload, tags))
+
+    with (
+        patch("urllib.request.urlopen", return_value=_FakeResp(_graduation_body())),
+        patch("gradata._events.emit", side_effect=recorder),
+    ):
+        result = pull_events(brain.dir, apply=True)
+
+    assert result["applied"] is True
+    sync_events = [c for c in captured if c[0] == "CLOUD_SYNC_COMPLETED"]
+    assert len(sync_events) == 1
+    payload = sync_events[0][2]
+    assert payload["events_pulled"] == result["events_pulled"]
+    assert payload["rules_materialized"] == result["rules_materialized"]
+    assert payload["conflicts"] == result["conflicts"]
+    assert payload["pages_fetched"] == result["pages_fetched"]
+    assert payload["conflict_threshold"] == result["conflict_threshold"]
+    assert payload["status"] == "ok"
+
+
+def test_cloud_sync_completed_not_emitted_on_dry_run(brain):
+    """Dry-run (apply=False) must not emit the sync-completed event."""
+    _save_cfg(brain.dir)
+
+    captured: list[tuple] = []
+
+    def recorder(event_type, source, payload, tags):
+        captured.append((event_type, source, payload, tags))
+
+    with (
+        patch("urllib.request.urlopen", return_value=_FakeResp(_graduation_body())),
+        patch("gradata._events.emit", side_effect=recorder),
+    ):
+        pull_events(brain.dir, apply=False)
+
+    assert not any(c[0] == "CLOUD_SYNC_COMPLETED" for c in captured)

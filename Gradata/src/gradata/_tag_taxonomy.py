@@ -80,6 +80,12 @@ _CORE_TAXONOMY = {
         "values": {"confidence_drift", "state_disagreement"},
         "required_on": ["RULE_CONFLICT"],
     },
+    "sync_status": {
+        "desc": "Outcome of a cloud sync pull/apply cycle.",
+        "mode": "closed",
+        "values": {"ok", "error", "skipped"},
+        "required_on": [],
+    },
 }
 
 # ── Rosch 6-Category Hierarchy ───────────────────────────────────────
@@ -412,6 +418,10 @@ def enrich_tags(
         reason = data.get("reason") or ""
         if reason:
             enriched.append(f"conflict_reason:{reason}")
+    if event_type == "CLOUD_SYNC_COMPLETED" and "sync_status" not in prefixes:
+        status = (data.get("status") or "").lower()
+        if status:
+            enriched.append(f"sync_status:{status}")
 
     if event_type == "CORRECTION" and "cognitive_load" not in prefixes:
         cat = data.get("category", "").upper()
