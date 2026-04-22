@@ -71,8 +71,7 @@ def pull_events(
     brain = Path(brain_dir).resolve()
     db = brain / "system.db"
     if not db.is_file():
-        summary["status"] = "error"
-        summary["reason"] = "no_db"
+        summary["status"] = "no_db"
         return summary
 
     if _creds.kill_switch_set():
@@ -96,7 +95,12 @@ def pull_events(
         summary["status"] = "no_credential"
         return summary
 
-    api_base = (config.api_base or "").rstrip("/")
+    # Route through the shared endpoint resolver so ``GRADATA_ENDPOINT`` /
+    # ``GRADATA_CLOUD_API_BASE`` env overrides take effect for pull the same
+    # way they do for push and the CLI. Prior to this, pull only honored
+    # ``config.api_base``, which meant env-only deployments silently targeted
+    # an outdated endpoint.
+    api_base = _creds.resolve_endpoint(fallback=config.api_base or "").rstrip("/")
     try:
         require_https(api_base, "api_base")
     except ValueError as exc:
@@ -215,7 +219,7 @@ def pull_events(
     summary["conflicts"] = len(mat.conflicts)
     summary["applied"] = False
 
-    if apply and (mat.rules or mat.conflicts):
+    if apply:
         from gradata._db import write_lessons_safe
         from gradata.cloud._apply_materialized import (
             apply_to_lessons,
@@ -224,27 +228,30 @@ def pull_events(
         from gradata.cloud._sync_state import update_pull_cursor
         from gradata.enhancements.self_improvement import format_lessons, parse_lessons
 
-        lessons_path = brain / "lessons.md"
-        existing = (
-            parse_lessons(lessons_path.read_text(encoding="utf-8"))
-            if lessons_path.is_file()
-            else []
-        )
-        merged = apply_to_lessons(existing, mat)
-        try:
-            write_lessons_safe(lessons_path, format_lessons(merged))
-            summary["applied"] = True
-        except Exception as exc:
-            log.error("events/pull: lessons write failed: %s", exc)
-            summary["status"] = "error"
-            summary["reason"] = "lessons_write_failed"
-            return summary
+        if mat.rules or mat.conflicts:
+            lessons_path = brain / "lessons.md"
+            existing = (
+                parse_lessons(lessons_path.read_text(encoding="utf-8"))
+                if lessons_path.is_file()
+                else []
+            )
+            merged = apply_to_lessons(existing, mat)
+            try:
+                write_lessons_safe(lessons_path, format_lessons(merged))
+                summary["applied"] = True
+            except Exception as exc:
+                log.error("events/pull: lessons write failed: %s", exc)
+                summary["status"] = "error"
+                summary["reason"] = "lessons_write_failed"
+                return summary
 
-        summary["conflict_events_emitted"] = emit_conflict_events(mat)
+            summary["conflict_events_emitted"] = emit_conflict_events(mat)
 
-        # Persist the pull watermark so the next call can resume
-        # incrementally. Never fatal — losing the cursor just means the
-        # next pull re-downloads events that dedup will then skip.
+        # Persist the pull watermark whenever the caller committed to an
+        # apply pass — even if the page contained no rules or conflicts.
+        # Without this, a pull that returned only tombstones or events from
+        # other devices would never advance the cursor and the next pull
+        # would re-fetch the same stream indefinitely.
         watermark = summary.get("watermark")
         if watermark:
             try:

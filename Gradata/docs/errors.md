@@ -68,7 +68,7 @@ Redaction is fail-closed — if the redactor raises, **neither** the raw side-lo
 
 | Code | Surface | Cause | Remediation |
 |---|---|---|---|
-| `CONFLICT_TIER2_HOLD` | Dashboard banner + `RULE_CONFLICT` event | Two devices graduated the same rule with `|Δconfidence| >= 0.15` or opposite directions. | Resolve in dashboard: "Device A says X, Device B says Y." |
+| `CONFLICT_TIER2_HOLD` | Dashboard banner + `RULE_CONFLICT` event | Two devices graduated the same rule with `\|Δconfidence\| >= 0.15` or opposite directions. | Resolve in dashboard: "Device A says X, Device B says Y." |
 | `CONFLICT_META_BLOCKED` | `META_RULE_BLOCKED` event | A source lesson is in conflict hold. | Resolve the underlying rule conflict first. |
 
 ---

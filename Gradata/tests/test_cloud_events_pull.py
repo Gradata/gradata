@@ -32,8 +32,21 @@ def _isolate_keyfile(tmp_path, monkeypatch):
     fake = tmp_path / ".gradata_test_key"
     monkeypatch.setattr(_creds, "KEYFILE_PATH", fake)
     monkeypatch.setattr(_creds, "KEYFILE_DIR", fake.parent)
-    monkeypatch.delenv("GRADATA_API_KEY", raising=False)
-    monkeypatch.delenv("GRADATA_CLOUD_SYNC_DISABLE", raising=False)
+    # Clear every cloud-sync env var the runner might have inherited so
+    # _save_cfg() remains the single source of truth for endpoint /
+    # credential / enabled state. Otherwise these contract tests are
+    # non-hermetic and can hide env-precedence regressions locally.
+    for var in (
+        "GRADATA_API_KEY",
+        "GRADATA_CLOUD_SYNC_DISABLE",
+        "GRADATA_CLOUD_URL",
+        "GRADATA_CLOUD_KEY",
+        "GRADATA_CLOUD_SYNC",
+        "GRADATA_ENDPOINT",
+        "GRADATA_CLOUD_API_BASE",
+        "GRADATA_API_URL",
+    ):
+        monkeypatch.delenv(var, raising=False)
     yield
 
 
@@ -49,10 +62,9 @@ def _save_cfg(
     save_config(brain_dir, cfg)
 
 
-def test_no_db_returns_error(tmp_path):
+def test_no_db_returns_no_db_status(tmp_path):
     result = pull_events(tmp_path)
-    assert result["status"] == "error"
-    assert result["reason"] == "no_db"
+    assert result["status"] == "no_db"
 
 
 def test_kill_switch_short_circuits(brain, monkeypatch):

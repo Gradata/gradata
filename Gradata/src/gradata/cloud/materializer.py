@@ -81,7 +81,11 @@ def _rule_key(event: dict) -> tuple[str, str] | None:
     to trimmed description for pre-hash events.
     """
     data = event.get("data") or {}
-    category = str(data.get("category") or "").strip()
+    # Normalize category to lowercase so rules emitted with mixed casing
+    # (e.g. "Security" vs "security") converge on a single materialized row
+    # instead of fragmenting into duplicates that later trigger spurious
+    # conflicts during merge.
+    category = str(data.get("category") or "").strip().lower()
     pattern_hash = str(data.get("pattern_hash") or "").strip()
     description = str(data.get("description") or "").strip()
     ident = pattern_hash or description

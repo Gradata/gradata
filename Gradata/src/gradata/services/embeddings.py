@@ -48,8 +48,9 @@ class EmbeddingClient:
         parsed = urlparse(url)
         if parsed.hostname in ("localhost", "127.0.0.1"):
             return True
+        host = parsed.hostname or ""
         return bool(
-            parsed.scheme == "https" and parsed.hostname and parsed.hostname.endswith("gradata.ai")
+            parsed.scheme == "https" and (host == "gradata.ai" or host.endswith(".gradata.ai"))
         )
 
     def _embed_api(self, text):
@@ -163,13 +164,19 @@ def subscribe_to_bus(bus):
                     break
             if not desc:
                 desc = payload.get("lesson", {}).get("description", "")
-            if desc and desc not in _embedding_cache:
-                vec = get_client().embed(desc)
-                if vec:
-                    _embedding_cache[desc] = vec
-                    # Evict oldest entries when cache exceeds max size
-                    while len(_embedding_cache) > _CACHE_MAX_SIZE:
-                        _embedding_cache.popitem(last=False)
+            if not desc:
+                return
+            if desc in _embedding_cache:
+                # Refresh recency on hit so genuinely hot descriptions are
+                # not evicted before colder entries. Without this the
+                # OrderedDict behaves FIFO, not LRU, despite the label.
+                _embedding_cache.move_to_end(desc)
+                return
+            vec = get_client().embed(desc)
+            if vec:
+                _embedding_cache[desc] = vec
+                while len(_embedding_cache) > _CACHE_MAX_SIZE:
+                    _embedding_cache.popitem(last=False)
         except Exception:
             logger.warning("Failed to embed payload", exc_info=True)
 

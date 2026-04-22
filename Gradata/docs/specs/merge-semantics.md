@@ -36,7 +36,7 @@ When two graduation events share `(category, pattern_hash)` and disagree on `new
 
 Rationale: graduation is monotonic in the user's experience. The later correction reflects the user's most recent judgment. `device_id` tiebreak is arbitrary but deterministic — critical for convergence.
 
-**Applies when:** `|Δconfidence| < 0.15` AND `new_state` agrees (both PATTERN or both RULE).
+**Applies when:** `|Δconfidence| < conflict_threshold` (default `0.15`) AND `new_state` agrees (both PATTERN or both RULE). The boundary is strict-less-than: a delta of exactly `conflict_threshold` routes to Tier 2.
 
 ### Tier 2 — Conflict queue: surface to user
 
@@ -84,7 +84,7 @@ This is the property test that ships with the materializer (Phase 2).
 - [ ] `RULE_CONFLICT_RESOLVED` event type added
 - [ ] Materializer treats Tier 2 conflicts as "hold"
 - [ ] Dashboard conflict-queue UI
-- [ ] Property test: `apply(device_A, stream) == apply(device_B, stream)` across 10k shuffled orderings
+- [ ] Property test: `apply(device_A, stream) == apply(device_B, stream)` across shuffled orderings (Phase 2 ships 200+ orderings in CI; 10k orderings remains the stretch target once the corpus grows large enough to stay under the ~90s CI budget)
 - [ ] Ship-gate: zero materializer divergence across 30 days of simulated sync
 
 ---

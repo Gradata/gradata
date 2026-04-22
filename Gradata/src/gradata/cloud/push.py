@@ -39,6 +39,7 @@ from gradata._http import require_https
 from gradata._migrations.device_uuid import get_or_create_device_id
 from gradata._tenant import tenant_for
 from gradata.cloud import _credentials as _creds
+from gradata.cloud._sync_state import _ensure_schema as _ensure_sync_state_schema
 from gradata.cloud.sync import load_config
 
 log = logging.getLogger(__name__)
@@ -134,20 +135,26 @@ def _write_watermark(
     new_event_id: str,
     now_iso: str,
 ) -> None:
-    """Upsert ``sync_state`` for (tenant, device) with the new watermark."""
+    """Upsert ``sync_state`` for (tenant, device) with the new watermark.
+
+    ``brain_id`` is encoded as ``"{tenant_id}:{device_id}"`` so the legacy
+    PRIMARY KEY on ``brain_id`` naturally scopes per-device. The ON CONFLICT
+    target is the composite ``(tenant_id, device_id)`` unique index so two
+    devices on the same tenant never overwrite each other's watermarks.
+    """
+    composite_brain_id = f"{tenant_id}:{device_id}"
     conn.execute(
         """
         INSERT INTO sync_state (brain_id, device_id, tenant_id,
                                 last_push_event_id, last_push_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(brain_id) DO UPDATE SET
-            device_id = excluded.device_id,
-            tenant_id = excluded.tenant_id,
+        ON CONFLICT(tenant_id, device_id) DO UPDATE SET
+            brain_id = excluded.brain_id,
             last_push_event_id = excluded.last_push_event_id,
             last_push_at = excluded.last_push_at,
             updated_at = excluded.updated_at
         """,
-        (tenant_id, device_id, tenant_id, new_event_id, now_iso, now_iso),
+        (composite_brain_id, device_id, tenant_id, new_event_id, now_iso, now_iso),
     )
     conn.commit()
 
@@ -236,7 +243,9 @@ def push_pending_events(
         summary["status"] = "no_credential"
         return summary
 
-    api_base = (config.api_base or "").rstrip("/")
+    # Use the shared endpoint resolver so env overrides (``GRADATA_ENDPOINT``
+    # / ``GRADATA_CLOUD_API_BASE``) apply symmetrically to push and pull.
+    api_base = _creds.resolve_endpoint(fallback=config.api_base or "").rstrip("/")
     try:
         require_https(api_base, "api_base")
     except ValueError as exc:
@@ -252,6 +261,7 @@ def push_pending_events(
 
     conn = sqlite3.connect(str(db))
     try:
+        _ensure_sync_state_schema(conn, db)
         watermark = _read_watermark(conn, tenant_id, device_id)
         batches = 0
         pushed = 0

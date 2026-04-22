@@ -55,6 +55,31 @@ def _ensure_schema(conn: sqlite3.Connection, db_path: Path) -> None:
             conn.execute(f"ALTER TABLE sync_state ADD COLUMN {col} {decl}")
         except sqlite3.OperationalError:
             pass  # column already present
+
+    # ON CONFLICT(tenant_id, device_id) requires a UNIQUE constraint on the
+    # composite key. If a non-UNIQUE index exists from an older run, upgrade
+    # it in place after deduping any accidental duplicates.
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='index' AND name = 'idx_sync_state_tenant_device'"
+    ).fetchone()
+    existing_sql = (row[0] or "") if row else ""
+    needs_unique = (row is None) or ("UNIQUE" not in existing_sql.upper())
+    if needs_unique:
+        conn.execute(
+            """
+            DELETE FROM sync_state
+            WHERE rowid NOT IN (
+                SELECT MIN(rowid) FROM sync_state
+                GROUP BY tenant_id, device_id
+            )
+            """
+        )
+        if row is not None:
+            conn.execute("DROP INDEX idx_sync_state_tenant_device")
+        conn.execute(
+            "CREATE UNIQUE INDEX idx_sync_state_tenant_device ON sync_state (tenant_id, device_id)"
+        )
+
     conn.commit()
     _SCHEMA_ENSURED.add(key)
 
@@ -86,19 +111,19 @@ def update_pull_cursor(
     if conn is None:
         return False
     now = datetime.now(UTC).isoformat()
+    composite_brain_id = f"{tenant_id}:{device_id}"
     try:
         with contextlib.closing(conn):
             conn.execute(
                 """
                 INSERT INTO sync_state (brain_id, tenant_id, device_id, last_pull_cursor, updated_at)
                 VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(brain_id) DO UPDATE SET
-                    tenant_id = excluded.tenant_id,
-                    device_id = excluded.device_id,
+                ON CONFLICT(tenant_id, device_id) DO UPDATE SET
+                    brain_id = excluded.brain_id,
                     last_pull_cursor = excluded.last_pull_cursor,
                     updated_at = excluded.updated_at
                 """,
-                (tenant_id, tenant_id, device_id, cursor, now),
+                (composite_brain_id, tenant_id, device_id, cursor, now),
             )
             conn.commit()
         return True

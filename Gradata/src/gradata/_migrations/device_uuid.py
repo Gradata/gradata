@@ -44,10 +44,15 @@ def get_or_create_device_id(brain_dir: str | Path) -> str:
     brain.mkdir(parents=True, exist_ok=True)
     fpath = brain / DEVICE_FILE
 
+    existing_invalid = False
     if fpath.exists():
         did = fpath.read_text(encoding="utf-8").strip()
         if _is_valid(did):
             return did
+        # A corrupt/legacy ``.device_id`` must be overwritten, otherwise every
+        # call re-enters the create branch, tmp files pile up, and downstream
+        # code keeps seeing invalid ids.
+        existing_invalid = True
 
     new_did = _new_device_id()
     tmp = brain / f".device_id.tmp.{os.getpid()}"
@@ -61,10 +66,16 @@ def get_or_create_device_id(brain_dir: str | Path) -> str:
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 fh.write(new_did)
-            if not fpath.exists():
+            # Replace unconditionally if the current file is invalid or
+            # missing; skip only when a valid file appeared concurrently.
+            if not fpath.exists() or existing_invalid:
                 os.replace(tmp, fpath)
             else:
-                os.unlink(tmp)
+                current = fpath.read_text(encoding="utf-8").strip()
+                if _is_valid(current):
+                    os.unlink(tmp)
+                else:
+                    os.replace(tmp, fpath)
         except Exception:
             with contextlib.suppress(OSError):
                 os.unlink(tmp)

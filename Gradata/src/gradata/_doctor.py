@@ -273,17 +273,44 @@ def _check_cloud_config():
     }
 
 
+def _resolve_doctor_endpoint(cfg: dict) -> str:
+    """Resolve the endpoint doctor probes should target.
+
+    Honors the same precedence chain as the rest of the SDK
+    (``gradata.cloud._credentials.resolve_endpoint``): explicit config
+    value → ``GRADATA_ENDPOINT`` → ``GRADATA_CLOUD_API_BASE`` → legacy
+    ``GRADATA_API_URL`` → hard-coded default. Keeps every doctor check
+    pointed at the same host so a single env override flips all probes.
+    """
+    fallback = (
+        cfg.get("api_url") or os.environ.get("GRADATA_API_URL") or "https://api.gradata.ai/api/v1"
+    )
+    try:
+        from gradata.cloud._credentials import resolve_endpoint
+
+        return resolve_endpoint(fallback=fallback).rstrip("/")
+    except Exception:
+        return str(fallback).rstrip("/")
+
+
 def _check_cloud_env_vars():
     """Report cloud-sync env-var state (without leaking values)."""
     key_set = bool(os.environ.get("GRADATA_API_KEY"))
     endpoint_set = bool(
         os.environ.get("GRADATA_ENDPOINT") or os.environ.get("GRADATA_CLOUD_API_BASE")
     )
-    disabled = os.environ.get("GRADATA_CLOUD_SYNC_DISABLE", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    )
+    try:
+        from gradata.cloud._credentials import kill_switch_set
+
+        disabled = kill_switch_set()
+    except Exception:
+        # Conservative fallback: match the canonical parser's truthy set.
+        disabled = os.environ.get("GRADATA_CLOUD_SYNC_DISABLE", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
     if disabled:
         return {
             "name": "cloud_env",
@@ -305,9 +332,7 @@ def _check_cloud_env_vars():
 def _check_cloud_reachable():
     """Can we reach the cloud API host? Low-cost TCP probe."""
     cfg = _read_cloud_config()
-    api_url = (
-        cfg.get("api_url") or os.environ.get("GRADATA_API_URL") or "https://api.gradata.ai/api/v1"
-    )
+    api_url = _resolve_doctor_endpoint(cfg)
     host = api_url.split("://", 1)[-1].split("/", 1)[0]
     try:
         socket.create_connection((host, 443), timeout=_CLOUD_PROBE_TIMEOUT).close()
@@ -349,7 +374,7 @@ def _check_cloud_auth():
     bearer = cfg.get("api_key") or ""
     if not bearer:
         return {"name": "cloud_auth", "status": "skip", "detail": "no credential — skip"}
-    api_url = cfg.get("api_url", "https://api.gradata.ai/api/v1").rstrip("/")
+    api_url = _resolve_doctor_endpoint(cfg)
     brain_id = cfg.get("brain_id", "")
     probe_url = f"{api_url}/brains/{brain_id}" if brain_id else f"{api_url}/auth/whoami"
     code, body = _probe_api(probe_url, bearer)
@@ -380,7 +405,7 @@ def _check_cloud_has_data():
     brain_id = cfg.get("brain_id")
     if not (bearer and brain_id):
         return {"name": "cloud_has_data", "status": "skip", "detail": "not logged in — skip"}
-    api_url = cfg.get("api_url", "https://api.gradata.ai/api/v1").rstrip("/")
+    api_url = _resolve_doctor_endpoint(cfg)
     code, body = _probe_api(f"{api_url}/brains/{brain_id}/analytics", bearer)
     if code == 0:
         return {"name": "cloud_has_data", "status": "error", "detail": f"network: {body[:80]}"}

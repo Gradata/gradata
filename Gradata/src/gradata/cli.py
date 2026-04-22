@@ -671,8 +671,20 @@ def cmd_cloud(args):
 
     subcmd = getattr(args, "cloud_cmd", None)
 
-    brain_root = _resolve_brain_root(args)
-    brain_root.mkdir(parents=True, exist_ok=True)
+    # Use the same resolution precedence as every other CLI command
+    # (env GRADATA_BRAIN > --brain-dir > cwd) so `gradata cloud ...` and,
+    # say, `gradata export` always target the same brain. The older
+    # ``_resolve_brain_root`` helper defaulted to a relative ``./brain``
+    # which diverged from ``_get_brain`` and caused cloud config to land
+    # in a different directory than the rest of the CLI operated on.
+    brain_root = Path(
+        env_str("GRADATA_BRAIN") or getattr(args, "brain_dir", None) or Path.cwd()
+    ).resolve()
+    # Only create the brain dir for write-side subcommands. ``status``
+    # and ``disconnect`` should be safe to run without side-effecting the
+    # filesystem of a nonexistent target.
+    if subcmd in ("enable", "rotate-key", "sync-pull"):
+        brain_root.mkdir(parents=True, exist_ok=True)
 
     if subcmd == "enable":
         cred = args.key.strip()

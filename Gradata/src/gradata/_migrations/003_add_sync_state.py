@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _runner import (  # type: ignore[import-not-found]
     add_column_if_missing,
     create_index_if_missing,
+    ensure_migrations_table,
     has_applied,
     mark_applied,
     resolve_brain_db,
@@ -64,7 +65,7 @@ def plan(conn: sqlite3.Connection) -> dict:
         ):
             actions.append(f"ALTER sync_state ADD {col} {decl}")
     actions.append("ensure index idx_sync_state_device(device_id)")
-    actions.append("ensure index idx_sync_state_tenant_device(tenant_id, device_id)")
+    actions.append("ensure UNIQUE index idx_sync_state_tenant_device(tenant_id, device_id)")
     return {"actions": actions}
 
 
@@ -96,11 +97,27 @@ def up(conn: sqlite3.Connection, tenant_id: str) -> dict:
 
     if create_index_if_missing(conn, "idx_sync_state_device", "sync_state", "device_id"):
         summary["indexes_created"].append("idx_sync_state_device")
+
+    # Dedup any legacy duplicate (tenant_id, device_id) rows before upgrading
+    # the composite index to UNIQUE. The pre-fix writer keyed rows on
+    # brain_id=tenant_id, so at most one row per tenant existed; this guard
+    # covers brains that saw the non-UNIQUE window in phase-1.
+    conn.execute(
+        """
+        DELETE FROM sync_state
+        WHERE rowid NOT IN (
+            SELECT MIN(rowid) FROM sync_state
+            GROUP BY tenant_id, device_id
+        )
+        """
+    )
+
     if create_index_if_missing(
         conn,
         "idx_sync_state_tenant_device",
         "sync_state",
         "tenant_id, device_id",
+        unique=True,
     ):
         summary["indexes_created"].append("idx_sync_state_tenant_device")
 
@@ -125,6 +142,11 @@ def _main() -> int:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=5000")
     try:
+        # ``has_applied`` treats a missing ``migrations`` table as "not
+        # applied", so on a fresh brain we'd otherwise fall through to
+        # ``mark_applied`` with no tracker table existing. Create it up front
+        # so idempotency is preserved across re-runs on greenfield databases.
+        ensure_migrations_table(conn)
         if has_applied(conn, NAME) and not args.dry_run:
             print(f"Already applied: {NAME} (no-op)")
             return 0

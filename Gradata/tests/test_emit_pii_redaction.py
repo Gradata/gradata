@@ -100,7 +100,11 @@ def test_redactor_failure_aborts_write(tmp_path, monkeypatch):
 
     monkeypatch.setattr(_ev, "_redact_payload", _boom)
 
-    with pytest.raises(Exception):  # EventPersistenceError or the raw RuntimeError
+    # ``emit`` may wrap the redactor blow-up in EventPersistenceError or let
+    # the raw RuntimeError escape depending on how the error path is routed.
+    # Assert the concrete tuple so unrelated exceptions cannot make this
+    # test pass silently.
+    with pytest.raises((EventPersistenceError, RuntimeError)):
         brain.emit("SHOULD_NOT_LAND", "test", {"note": SECRET_EMAIL}, [])
 
     # Canonical log must not contain the event.
@@ -128,7 +132,3 @@ def test_raw_side_log_failure_does_not_block_canonical_write(tmp_path, monkeypat
     brain.emit("STILL_LANDS", "test", {"note": "hi"}, [])
     canon = _events_jsonl_lines(brain)
     assert any(e["type"] == "STILL_LANDS" for e in canon)
-
-
-# Keep unused-import check honest: silence the ``EventPersistenceError`` noise.
-_ = EventPersistenceError

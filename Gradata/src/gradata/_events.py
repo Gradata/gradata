@@ -703,10 +703,15 @@ class RetainOrchestrator:
         # Defense-in-depth: redact PII on every event's data/tags before
         # persistence. emit() already redacts upstream, so this is a safety
         # net if a caller queues raw events without going through emit().
+        # Scalar payloads (``data="alice@example.com"``) must also route
+        # through ``_redact_payload`` — previously we only redacted when
+        # data/tags were already dict/list, which let scalar strings sneak
+        # past the safety net entirely. ``_redact_payload`` no-ops on
+        # types it does not understand, so it is safe to always call.
         for _evt in new_events:
-            if isinstance(_evt.get("data"), (dict, list)):
+            if "data" in _evt:
                 _evt["data"] = _redact_payload(_evt["data"])
-            if isinstance(_evt.get("tags"), list):
+            if "tags" in _evt:
                 _evt["tags"] = _redact_payload(_evt["tags"])
         try:
             # 2a: Append to events.jsonl — one locked batch append to prevent

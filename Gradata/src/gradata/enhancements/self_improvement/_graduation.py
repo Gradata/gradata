@@ -73,13 +73,18 @@ def _emit_rule_graduated(
         "fire_count": int(getattr(lesson, "fire_count", 0)),
         "reason": reason,
     }
-    try:
-        if brain is not None and hasattr(brain, "emit"):
+    if brain is not None and hasattr(brain, "emit"):
+        try:
             brain.emit("RULE_GRADUATED", "graduate", payload, [])
-            return
-    except Exception as exc:
-        _log.debug("brain.emit(RULE_GRADUATED) failed: %s", exc)
-    # Fallback path for graduate(brain=None) callers.
+        except Exception as exc:
+            # Do NOT fall through to the module-level emit here. ``brain.emit``
+            # may have partially persisted (event written but bus publish
+            # failed); a second emit would append a duplicate RULE_GRADUATED
+            # row and corrupt the transition stream. Surface the failure to
+            # debug logs and leave reconciliation to the brain's retry path.
+            _log.debug("brain.emit(RULE_GRADUATED) failed: %s", exc)
+        return
+    # Fallback path only when no brain emitter is available.
     try:
         from gradata._events import emit as _events_emit
 

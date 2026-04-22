@@ -590,7 +590,11 @@ def brain_correct(
                                 "action": "created",
                                 "lesson_category": cat,
                                 "lesson_description": desc[:200],
-                                "initial_confidence": INITIAL_CONFIDENCE,
+                                # Report the real seed used for this lesson
+                                # (0.0 when approval-gated, INITIAL_CONFIDENCE
+                                # otherwise) so provenance/audit events match
+                                # the row actually written to disk.
+                                "initial_confidence": init_conf,
                                 "source_correction_id": event.get("id"),
                             },
                             [f"category:{cat}", "provenance"],
@@ -937,6 +941,7 @@ def brain_end_session(
                 with get_connection(brain.db_path) as conn:
                     with _ctx_mod2.suppress(_sqlite3_mod2.OperationalError):
                         conn.execute("ALTER TABLE lesson_transitions ADD COLUMN tenant_id TEXT")
+                    current_session = getattr(brain, "session", None)
                     for lesson, old_state, new_state in transitions:
                         conn.execute(
                             "INSERT INTO lesson_transitions "
@@ -949,7 +954,9 @@ def brain_end_session(
                                 new_state,
                                 lesson.confidence,
                                 lesson.fire_count,
-                                None,
+                                # Previously hard-coded None, which dropped
+                                # session lineage for every transition row.
+                                current_session,
                                 now,
                                 _tid,
                             ),

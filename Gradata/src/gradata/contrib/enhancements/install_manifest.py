@@ -431,9 +431,13 @@ class InstallManifest:
         visiting: set[str] = set()  # Detect circular deps
 
         def _resolve(mid: str) -> None:
-            # Backward compat: "carl" was renamed to "behavioral-engine"
-            if mid == "carl":
-                mid = "behavioral-engine"
+            # Backward compat: accept deprecated module ids that were
+            # renamed so existing user profiles / state files keep resolving.
+            legacy_aliases = {
+                "carl": "behavioral-engine",
+                "integrations": "middleware",
+            }
+            mid = legacy_aliases.get(mid, mid)
             if mid in seen:
                 return
             if mid in visiting:

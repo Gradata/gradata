@@ -41,11 +41,16 @@ def ulid_from_iso(iso_ts: str) -> str:
     Used by Migration 002 to backfill event_id on historical rows so the
     leading 10 chars still sort-align with the original ``events.ts``.
     """
-    from datetime import datetime
+    from datetime import UTC, datetime
 
     try:
         dt = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
     except (ValueError, TypeError):
         return new_ulid()
+    # Naive ISO strings (no tzinfo) yield local-time ts on ``dt.timestamp()``,
+    # which makes ULID backfill non-deterministic across machines. Treat
+    # missing tzinfo as UTC — matches how the events pipeline stores ``ts``.
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
     ts_ms = int(dt.timestamp() * 1000)
     return new_ulid(ts_ms=ts_ms)

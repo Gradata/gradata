@@ -8,10 +8,13 @@ prevented the mistake). A rule that was corrected is *not effective*
 (the agent still made the mistake despite the rule).
 
 Usage:
-    from gradata.integrations.session_history import SessionHistory
+    from gradata.services.session_history import SessionHistory
 
     sh = SessionHistory()
     sh.subscribe_to_bus(bus)  # auto-wires to event bus
+
+    # ``gradata.integrations.session_history`` still resolves via a
+    # deprecation shim through v0.9.0 but should not be used in new code.
 """
 
 from __future__ import annotations
@@ -42,6 +45,12 @@ class SessionHistory:
 
     def on_session_ended(self, payload: dict) -> None:
         """Attach effectiveness scores to the session-end payload and reset.
+
+        Side effect: mutates ``payload`` in place by adding the
+        ``rule_effectiveness`` key. Callers who plan to reuse ``payload``
+        elsewhere after this handler runs should pass a shallow copy.
+        The in-place mutation is intentional so the bus broadcast sees
+        the enriched payload without an extra round-trip.
 
         Resets session state after computing effectiveness so the next
         session starts clean (prevents cross-session state leakage).
