@@ -370,6 +370,7 @@ def parse_lessons(text: str) -> list[Lesson]:
         tree_level = 0
         alpha = 1.0
         beta_param_val = 1.0
+        slot = ""
         j = i + 1
         while j < len(lines) and lines[j].startswith("  "):
             meta_line = lines[j].strip()
@@ -406,6 +407,8 @@ def parse_lessons(text: str) -> list[Lesson]:
                     domain_scores = json.loads(meta_line[len("Domain scores:") :].strip())
                 except json.JSONDecodeError:
                     domain_scores = {}
+            elif meta_line.startswith("Slot:"):
+                slot = meta_line[len("Slot:") :].strip().lower()
             elif meta_line.startswith("Path:"):
                 path = meta_line[len("Path:") :].strip()
             elif meta_line.startswith("Secondary categories:"):
@@ -464,6 +467,7 @@ def parse_lessons(text: str) -> list[Lesson]:
             climb_count=climb_count,
             last_climb_session=last_climb_session,
             tree_level=tree_level,
+            slot=slot,
         )
         if metadata_obj is not None:
             _lesson.metadata = metadata_obj
@@ -1109,6 +1113,9 @@ def format_lessons(lessons: list[Lesson]) -> str:
             lines.append(
                 f"  Beta params: {json.dumps({'alpha': lesson.alpha, 'beta': lesson.beta_param})}"
             )
+
+        if getattr(lesson, "slot", ""):
+            lines.append(f"  Slot: {lesson.slot}")
 
         if lesson.path:
             lines.append(f"  Path: {lesson.path}")

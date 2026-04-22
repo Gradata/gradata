@@ -1,35 +1,33 @@
-"""Meta-Harness D — synthesized prompt injection with inline rule anchors.
+"""Brain-injection synthesis with inline rule anchors.
 
-Instead of injecting a flat list of 10-20 tagged rules and clusters, this
-module collapses them into compact prose grouped by category. Each rule
-still carries a 4-char anchor inline (``r:a1f9``) so the live hook
-``capture_learning.py`` can attribute a later user correction to the
+Two entry points:
+
+* :func:`synthesize_rules_prompt` — category-grouped synthesis. Legacy.
+* :func:`synthesize_brain_injection` — slot-grouped synthesis ordered by
+  Preston Rhodes' 6-step prompt checklist (task → context → examples →
+  persona → format → tone). Token-budgeted. This is the canonical
+  session-start output.
+
+Both preserve a 4-char ``r:xxxx`` anchor inline per rule so
+``capture_learning.py`` can attribute a later user correction back to the
 originating rule via token-overlap matching.
-
-Two modes:
-
-* **Template mode** (default) — deterministic, offline. Groups rules by
-  category and emits one sentence per group with anchors preserved.
-* **LLM mode** — ``GRADATA_SYNTHESIZE_WITH_LLM`` env var truthy. Calls
-  ``synthesize_with_llm`` (provided by caller or no-op fallback) to produce
-  natural prose; we re-insert anchors afterward so the caller's LLM doesn't
-  need to know about them.
 
 Output shape::
 
     SynthesizedPrompt(
-        text="Drafting: never attribute quotes prospects didn't say r:a1f9; "
-             "use writer+critic for sequences r:b2c3. Tone: start with empathy r:c3d4.",
-        anchors_used=["a1f9", "b2c3", "c3d4"],
+        text="Task: keep diffs small r:a1f9. Tone: lead with empathy r:b2c3.",
+        anchors_used=["a1f9", "b2c3"],
         anchor_to_rule_id={"a1f9": "a1f92b3c4d5e", ...},
     )
 """
+
 from __future__ import annotations
 
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Callable, Iterable
+from pathlib import Path
+from typing import Any, Callable, Iterable
 
 
 @dataclass
@@ -43,6 +41,88 @@ class SynthesizedPrompt:
         return len(self.text.split())
 
 
+# ---------------------------------------------------------------------------
+# Slot inference (Preston Rhodes 6-step)
+# ---------------------------------------------------------------------------
+
+SLOT_ORDER: tuple[str, ...] = (
+    "task",
+    "context",
+    "examples",
+    "persona",
+    "format",
+    "tone",
+)
+
+SLOT_LABELS: dict[str, str] = {
+    "task": "Task",
+    "context": "Context",
+    "examples": "Examples",
+    "persona": "Persona",
+    "format": "Format",
+    "tone": "Tone",
+}
+
+_CATEGORY_SLOT: dict[str, str] = {
+    "PROCESS": "task",
+    "EXECUTION": "task",
+    "EXECUTION-DISCIPLINE": "task",
+    "EXECUTION_DISCIPLINE": "task",
+    "WORKFLOW": "task",
+    "CODE": "task",
+    "ACCURACY": "context",
+    "DATA-INTEGRITY": "context",
+    "DATA_INTEGRITY": "context",
+    "LEAD-HANDLING": "context",
+    "LEAD_HANDLING": "context",
+    "RESEARCH": "context",
+    "SAFETY": "context",
+    "DRAFTING": "format",
+    "STRUCTURE": "format",
+    "FORMAT": "format",
+    "TONE": "tone",
+    "VOICE": "tone",
+    "PERSONA": "persona",
+    "IDENTITY": "persona",
+}
+_DEFAULT_SLOT = "context"
+
+
+def _get(item: Any, key: str) -> Any:
+    if isinstance(item, dict):
+        return item.get(key)
+    return getattr(item, key, None)
+
+
+def classify_slot(item: Any) -> str:
+    """Infer a Preston-Rhodes slot for a Lesson or rule-shaped dict.
+
+    Resolution order: explicit ``slot`` → example-pair presence → category
+    lookup → ``context`` catchall.
+    """
+    explicit = _get(item, "slot")
+    if explicit:
+        slot = str(explicit).strip().lower()
+        if slot in SLOT_LABELS:
+            return slot
+
+    if _get(item, "example_draft") or _get(item, "example_corrected"):
+        return "examples"
+
+    cat = str(_get(item, "category") or "").strip().upper()
+    if cat in _CATEGORY_SLOT:
+        return _CATEGORY_SLOT[cat]
+    cat_norm = cat.replace("-", "_")
+    if cat_norm in _CATEGORY_SLOT:
+        return _CATEGORY_SLOT[cat_norm]
+    return _DEFAULT_SLOT
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+
 def _anchor_of(rule_id: str) -> str:
     """First 4 chars of the stable lesson id, matching inject_brain_rules."""
     return (rule_id or "")[:4]
@@ -53,9 +133,34 @@ def _clean_description(desc: str) -> str:
     text = (desc or "").strip()
     for prefix in ("User corrected: ", "[AUTO] ", "[hooked] "):
         if text.startswith(prefix):
-            text = text[len(prefix):]
-    # Remove trailing period so rule concatenation with ; reads cleanly.
+            text = text[len(prefix) :]
     return text.rstrip(".;,").strip()
+
+
+def _rule_id_of(item: Any) -> str:
+    for key in ("rule_id", "lesson_id", "id"):
+        val = _get(item, key)
+        if val:
+            return str(val)
+    return ""
+
+
+def _as_rule_dict(item: Any) -> dict:
+    if isinstance(item, dict):
+        return item
+    return {
+        "category": getattr(item, "category", "") or "",
+        "description": getattr(item, "description", "") or "",
+        "rule_id": _rule_id_of(item),
+        "slot": getattr(item, "slot", "") or "",
+        "example_draft": getattr(item, "example_draft", None),
+        "example_corrected": getattr(item, "example_corrected", None),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Category-grouped synthesis (legacy, kept for back-compat)
+# ---------------------------------------------------------------------------
 
 
 def _group_by_category(rules: Iterable[dict]) -> dict[str, list[dict]]:
@@ -74,20 +179,8 @@ def synthesize_rules_prompt(
 ) -> SynthesizedPrompt:
     """Collapse a list of rules into a compact, anchor-preserving prompt.
 
-    Args:
-        rules: List of dicts with keys ``category``, ``description``,
-            ``rule_id`` (full hex id). ``rule_id`` is used to derive the
-            inline 4-char anchor.
-        max_per_category: Cap on rules per category group so a dominant
-            category can't drown out the rest.
-        llm_fn: Optional callable that takes a template prompt and returns
-            LLM-synthesized prose. Only consulted when
-            ``GRADATA_SYNTHESIZE_WITH_LLM`` is truthy. Anchors are re-
-            attached after the LLM returns — the LLM itself does not need
-            to know about them.
-
-    Returns:
-        A :class:`SynthesizedPrompt`. Empty input → empty prompt.
+    Legacy category-grouped form. New callers should prefer
+    :func:`synthesize_brain_injection` which groups by Preston-Rhodes slot.
     """
     if not rules:
         return SynthesizedPrompt(text="")
@@ -128,9 +221,142 @@ def synthesize_rules_prompt(
     )
 
 
+# ---------------------------------------------------------------------------
+# Slot-grouped synthesis (canonical brain injection)
+# ---------------------------------------------------------------------------
+
+
+DEFAULT_BUDGET_TOKENS = 400
+_PERSONA_BASELINE_CHARS = 800
+
+
+def _budget_from_env(override: int | None) -> int:
+    if override is not None and override > 0:
+        return int(override)
+    raw = os.environ.get("GRADATA_SYNTH_BUDGET", "").strip()
+    if raw:
+        try:
+            val = int(raw)
+            if val > 0:
+                return val
+        except ValueError:
+            pass
+    return DEFAULT_BUDGET_TOKENS
+
+
+def _load_persona_baseline(source: str | Path | None) -> str:
+    """Return a compact baseline string for the persona slot.
+
+    Accepts a raw multi-line string, a path to a markdown file (e.g.
+    ``domain/soul.md``), or None. Returns ``""`` on any read error.
+    """
+    if source is None:
+        return ""
+    if isinstance(source, str):
+        return source.strip()[:_PERSONA_BASELINE_CHARS]
+    if not isinstance(source, Path):
+        return ""
+    if not source.is_file():
+        return ""
+    try:
+        text = source.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+    lines = [
+        ln for ln in text.splitlines() if ln.strip() and not ln.lstrip().startswith(("#", ">"))
+    ]
+    compact = " ".join(ln.strip().lstrip("*-").strip() for ln in lines)
+    return compact[:_PERSONA_BASELINE_CHARS]
+
+
+def synthesize_brain_injection(
+    lessons: Iterable[Any],
+    *,
+    budget_tokens: int | None = None,
+    max_per_slot: int = 3,
+    persona_baseline: str | Path | None = None,
+    llm_fn: Callable[[str], str] | None = None,
+) -> SynthesizedPrompt:
+    """Produce the single synthesized brain-injection prompt.
+
+    Groups rules by :func:`classify_slot` into Preston-Rhodes 6-step order
+    (task → context → examples → persona → format → tone). One sentence per
+    non-empty slot. Token budget enforced by dropping lowest-priority slots
+    first once the running total would exceed ``budget_tokens``.
+    """
+    budget = _budget_from_env(budget_tokens)
+    baseline = _load_persona_baseline(persona_baseline)
+    normalized = [_as_rule_dict(x) for x in lessons if x is not None]
+
+    slot_items: dict[str, list[dict]] = {s: [] for s in SLOT_ORDER}
+    for item in normalized:
+        slot = classify_slot(item)
+        slot_items.setdefault(slot, []).append(item)
+
+    anchors_used: list[str] = []
+    anchor_to_rule_id: dict[str, str] = {}
+    sentences: list[tuple[str, str]] = []
+
+    for slot in SLOT_ORDER:
+        items = slot_items.get(slot, [])[:max_per_slot]
+        clauses: list[str] = []
+        for item in items:
+            rule_id = item.get("rule_id") or ""
+            anchor = _anchor_of(rule_id)
+            desc = _clean_description(item.get("description", ""))
+            if not desc:
+                continue
+            if anchor and anchor not in anchor_to_rule_id:
+                anchors_used.append(anchor)
+                anchor_to_rule_id[anchor] = rule_id
+            suffix = f" r:{anchor}" if anchor else ""
+            clauses.append(f"{desc}{suffix}")
+
+        if slot == "persona" and baseline:
+            sentence = f"Persona: {baseline}"
+            if clauses:
+                sentence += ". Overrides: " + "; ".join(clauses)
+            sentence += "."
+            sentences.append((slot, sentence))
+            continue
+
+        if not clauses:
+            continue
+        label = SLOT_LABELS[slot]
+        sentences.append((slot, f"{label}: " + "; ".join(clauses) + "."))
+
+    def _render(pairs: list[tuple[str, str]]) -> str:
+        return " ".join(s for _, s in pairs)
+
+    while sentences and len(_render(sentences).split()) > budget:
+        sentences.pop()
+
+    text = _render(sentences)
+
+    if _llm_enabled() and llm_fn is not None and text:
+        text = _apply_llm(text, anchors_used, llm_fn)
+
+    final_anchors = [a for a in anchors_used if f"r:{a}" in text or a in text]
+    final_map = {a: anchor_to_rule_id[a] for a in final_anchors if a in anchor_to_rule_id}
+
+    return SynthesizedPrompt(
+        text=text,
+        anchors_used=final_anchors,
+        anchor_to_rule_id=final_map,
+    )
+
+
+# ---------------------------------------------------------------------------
+# LLM hook + anchor helpers
+# ---------------------------------------------------------------------------
+
+
 def _llm_enabled() -> bool:
     return os.environ.get("GRADATA_SYNTHESIZE_WITH_LLM", "").strip().lower() in (
-        "1", "true", "yes", "on",
+        "1",
+        "true",
+        "yes",
+        "on",
     )
 
 
@@ -142,23 +368,15 @@ def _apply_llm(
     anchors_used: list[str],
     llm_fn: Callable[[str], str],
 ) -> str:
-    """Hand the anchor-stripped text to the LLM, then reattach anchors.
-
-    The LLM produces prose. We attempt to match each anchor's original
-    context word back into the new prose. If matching fails we append the
-    anchors in a trailing sweep ``[ref: a1f9,b2c3]`` so attribution still
-    works even when the LLM reshuffled clauses.
-    """
     stripped = _ANCHOR_RE.sub("", template_text)
     try:
         new_text = llm_fn(stripped).strip()
     except Exception:
-        return template_text  # fall back to the template on any LLM error
+        return template_text
 
     if not new_text:
         return template_text
 
-    # Conservative reattach: append a ref sweep so every anchor is present.
     refs = ",".join(anchors_used)
     return f"{new_text} [ref: {refs}]" if refs else new_text
 
@@ -168,14 +386,12 @@ def extract_anchors(text: str) -> list[str]:
     if not text:
         return []
     anchors = _ANCHOR_RE.findall(text)
-    # also catch trailing sweep [ref: a,b,c]
     sweep = re.search(r"\[ref:\s*([0-9a-f,\s]+)\]", text)
     if sweep:
         for tok in sweep.group(1).split(","):
             tok = tok.strip()
             if re.fullmatch(r"[0-9a-f]{4}", tok):
                 anchors.append(tok)
-    # dedup, preserve first-seen order
     seen: set[str] = set()
     ordered: list[str] = []
     for a in anchors:

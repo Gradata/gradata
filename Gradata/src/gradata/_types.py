@@ -176,12 +176,18 @@ class Lesson:
     tree_level: int = 0  # Current depth: 0=leaf, 1=branch, 2=trunk
     # Transient runtime state (not persisted to lessons.md) — self_improvement
     # / rule_evolution decay confidence once this crosses a threshold.
-    _contradiction_streak: int = 0  # Consecutive contradictions; triggers self-correction / penalty acceleration
+    _contradiction_streak: int = (
+        0  # Consecutive contradictions; triggers self-correction / penalty acceleration
+    )
     stale: bool = False  # True = demoted via TTL (sessions_since_fire >= ttl); flagged for review
     # Phase 5 council hook: optional registry slot for AST-class promotion routing.
     # Unset today (rule_to_hook uses the regex-matched DETERMINISTIC_PATTERNS table).
     # Reserved for a future AST-transform registry (shell substitution, path enforcement, etc.).
     determinism_class: str | None = None
+    # Preston-Rhodes synthesis slot: task / context / examples / persona / format / tone.
+    # Assigned at graduation time by prompt_synthesizer.classify_slot. Empty on legacy
+    # lessons; the synthesizer falls back to category-based inference at render time.
+    slot: str = ""
 
     def __post_init__(self) -> None:
         self.confidence = round(max(0.0, min(1.0, self.confidence)), 2)
