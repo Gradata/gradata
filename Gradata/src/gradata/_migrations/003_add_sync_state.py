@@ -1,23 +1,17 @@
 # ruff: noqa: N999  # numbered migration module — digit prefix is intentional
 """Migration 003: sync_state table + per-device watermark columns.
 
-Creates ``sync_state`` if it does not already exist (today it is created
-ad-hoc inside ``_cloud_sync.py`` tests and assumed to exist in prod) and
-adds the three watermark columns the Phase 1 push/pull client needs:
+Creates ``sync_state`` if it does not already exist and adds the three
+watermark columns the ``gradata.cloud`` push/pull client needs:
 
 - ``device_id``           — which machine this row belongs to. Pairs with
                             ``tenant_id`` (added by Migration 001) so the
-                            future composite key ``(tenant_id, device_id)``
-                            scopes watermarks per machine.
+                            composite key ``(tenant_id, device_id)`` scopes
+                            watermarks per machine.
 - ``last_push_event_id``  — highest ULID this device has successfully
                             shipped to ``/events/push``. Resume point.
 - ``last_pull_cursor``    — opaque cursor returned by ``/events/pull``.
                             Used to avoid re-downloading own events.
-
-Backward compat: the existing ``brain_id`` primary key stays untouched so
-``_cloud_sync.py``'s ``_mark_push`` / ``_last_push_at`` calls keep working.
-Task 7 will switch push logic to the composite key or delete
-``_cloud_sync.py`` entirely — whichever the Phase 1 cleanup chooses.
 """
 
 from __future__ import annotations

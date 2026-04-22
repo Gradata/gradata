@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from gradata.integrations.embeddings import (
+from gradata.services.embeddings import (
     EmbeddingClient,
     cosine_similarity,
     cluster_lessons_by_similarity,
@@ -26,22 +26,22 @@ class TestEmbeddingClient:
 
     def test_embed_returns_list_of_floats(self):
         client = EmbeddingClient(api_url=None)
-        with patch.object(client, '_embed_local', return_value=[0.1, 0.2, 0.3]):
+        with patch.object(client, "_embed_local", return_value=[0.1, 0.2, 0.3]):
             result = client.embed("test")
             assert result == [0.1, 0.2, 0.3]
 
     def test_api_preferred_over_local(self):
         client = EmbeddingClient(api_url="https://example.com/embed", api_token="tok")
-        with patch.object(client, '_embed_api', return_value=[0.5, 0.6]) as mock_api:
-            with patch.object(client, '_embed_local') as mock_local:
+        with patch.object(client, "_embed_api", return_value=[0.5, 0.6]) as mock_api:
+            with patch.object(client, "_embed_local") as mock_local:
                 client.embed("test")
                 mock_api.assert_called_once()
                 mock_local.assert_not_called()
 
     def test_api_failure_falls_back_to_local(self):
         client = EmbeddingClient(api_url="https://example.com/embed", api_token="tok")
-        with patch.object(client, '_embed_api', side_effect=Exception("down")):
-            with patch.object(client, '_embed_local', return_value=[0.1]) as mock_local:
+        with patch.object(client, "_embed_api", side_effect=Exception("down")):
+            with patch.object(client, "_embed_local", return_value=[0.1]) as mock_local:
                 client.embed("test")
                 mock_local.assert_called_once()
 

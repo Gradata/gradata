@@ -102,18 +102,18 @@ def test_key_prefix_matches_live_scheme():
     assert _creds.KEY_PREFIX == "gk_live_"
 
 
-def test_kill_switch_disables_row_push(monkeypatch):
-    """The kill switch flips gradata._cloud_sync.enabled() to False even when
-    GRADATA_CLOUD_SYNC=1 and URL/key are set."""
-    import gradata._cloud_sync as row_push
+def test_kill_switch_short_circuits_push(tmp_path, monkeypatch):
+    """Kill switch causes cloud.push.push_events() to return status=kill_switch
+    without consulting config or credentials."""
+    from gradata.cloud.push import push_pending_events
 
-    monkeypatch.setenv("GRADATA_CLOUD_SYNC", "1")
-    monkeypatch.setenv("GRADATA_CLOUD_URL", "https://cloud.example.com")
-    monkeypatch.setenv("GRADATA_CLOUD_KEY", "k")
-    assert row_push.enabled() is True
+    brain = tmp_path / "brain"
+    brain.mkdir()
+    (brain / "system.db").write_bytes(b"")  # existence check only
 
     monkeypatch.setenv("GRADATA_CLOUD_SYNC_DISABLE", "1")
-    assert row_push.enabled() is False
+    result = push_pending_events(brain)
+    assert result["status"] == "kill_switch"
 
 
 def test_cloudclient_consults_keyfile_when_config_token_empty(tmp_path):

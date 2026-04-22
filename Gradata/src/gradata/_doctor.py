@@ -274,32 +274,32 @@ def _check_cloud_config():
 
 
 def _check_cloud_env_vars():
-    """Report which cloud-sync env vars are set (without leaking values)."""
-    enabled = os.environ.get("GRADATA_CLOUD_SYNC", "").strip() in ("1", "true", "yes")
-    url_set = bool(os.environ.get("GRADATA_CLOUD_URL") or os.environ.get("GRADATA_SUPABASE_URL"))
-    key_set = bool(
-        os.environ.get("GRADATA_CLOUD_KEY") or os.environ.get("GRADATA_SUPABASE_SERVICE_KEY")
+    """Report cloud-sync env-var state (without leaking values)."""
+    key_set = bool(os.environ.get("GRADATA_API_KEY"))
+    endpoint_set = bool(
+        os.environ.get("GRADATA_ENDPOINT") or os.environ.get("GRADATA_CLOUD_API_BASE")
     )
-    if not (enabled or url_set or key_set):
+    disabled = os.environ.get("GRADATA_CLOUD_SYNC_DISABLE", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if disabled:
+        return {
+            "name": "cloud_env",
+            "status": "warn",
+            "detail": "GRADATA_CLOUD_SYNC_DISABLE is set — cloud sync kill switch active",
+        }
+    if not key_set:
         return {
             "name": "cloud_env",
             "status": "skip",
-            "detail": "GRADATA_CLOUD_SYNC not enabled (optional Supabase push path)",
+            "detail": "GRADATA_API_KEY not set (cloud sync uses keyfile or config.toml)",
         }
-    missing = []
-    if not url_set:
-        missing.append("GRADATA_CLOUD_URL / GRADATA_SUPABASE_URL")
-    if not key_set:
-        missing.append("GRADATA_CLOUD_KEY / GRADATA_SUPABASE_SERVICE_KEY")
-    if missing:
-        return {
-            "name": "cloud_env",
-            "status": "fail",
-            "detail": f"GRADATA_CLOUD_SYNC=1 but missing: {', '.join(missing)}",
-        }
-    status = "ok" if enabled else "warn"
-    detail = "enabled, URL+key set" if enabled else "URL+key set but GRADATA_CLOUD_SYNC!=1"
-    return {"name": "cloud_env", "status": status, "detail": detail}
+    detail = "GRADATA_API_KEY set"
+    if endpoint_set:
+        detail += " + GRADATA_ENDPOINT/GRADATA_CLOUD_API_BASE"
+    return {"name": "cloud_env", "status": "ok", "detail": detail}
 
 
 def _check_cloud_reachable():
