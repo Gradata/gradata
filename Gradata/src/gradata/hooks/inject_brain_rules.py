@@ -551,11 +551,44 @@ def main(data: dict) -> dict | None:
             suppressed_by_meta,
         )
 
-    lines = cluster_lines + individual_lines
+    # Feed the selected rules into the slot-grouped synthesizer (Preston-Rhodes
+    # 6-step: task -> context -> examples -> persona -> format -> tone). Emits
+    # inline r:xxxx anchors whose 4-char keys match injection_manifest, so
+    # capture_learning.py attribution still works.
     if skip_ranked_rules:
         rules_block = ""
     else:
-        rules_block = "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
+        synth_input: list[dict] = []
+        for r in scored[:MAX_RULES]:
+            if (
+                meta_mutex_enabled
+                and lesson_id_fn is not None
+                and lesson_id_fn(r) in meta_covered_lesson_ids
+            ):
+                continue
+            rid = lesson_id_fn(r) if lesson_id_fn is not None else ""
+            synth_input.append(
+                {
+                    "category": r.category,
+                    "description": sanitize_lesson_content(r.description, "xml"),
+                    "rule_id": rid,
+                    "slot": getattr(r, "slot", "") or "",
+                    "example_draft": getattr(r, "example_draft", None),
+                    "example_corrected": getattr(r, "example_corrected", None),
+                }
+            )
+
+        if synth_input:
+            from gradata.enhancements.prompt_synthesizer import synthesize_brain_injection
+
+            persona_path = Path(brain_dir).parent / "domain" / "soul.md"
+            synth = synthesize_brain_injection(
+                synth_input,
+                persona_baseline=persona_path if persona_path.is_file() else None,
+            )
+            rules_block = f"<brain-rules>\n{synth.text}\n</brain-rules>" if synth.text else ""
+        else:
+            rules_block = ""
 
     # Persist injection manifest so correction-capture can attribute misfires
     # to specific rules (Meta-Harness A). Silent failure: missing manifest
