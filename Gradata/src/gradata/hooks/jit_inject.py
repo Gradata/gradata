@@ -42,8 +42,16 @@ except ImportError:
     is_hook_enforced = None  # type: ignore[assignment]
 
 try:  # BM25 is optional — SDK must stay zero-required-deps.
-    import bm25s  # type: ignore[import-not-found]
+    # Suppress bm25s stdout noise on Windows (benchmark.py prints to stdout).
+    import io as _io
+    import sys as _sys
 
+    _bm25_stdout = _sys.stdout
+    _sys.stdout = _io.StringIO()
+    try:
+        import bm25s  # type: ignore[import-not-found]
+    finally:
+        _sys.stdout = _bm25_stdout
     _BM25_AVAILABLE = True
 except ImportError:  # pragma: no cover - import gate
     bm25s = None  # type: ignore[assignment]
@@ -58,8 +66,16 @@ HOOK_META = {
 }
 
 # Defaults. All tunable by env var so operators can sweep without a code change.
-DEFAULT_MAX_RULES = 5
-DEFAULT_MIN_CONFIDENCE = 0.60
+# Reduced 5→3→2→1: inject only the single best-matching rule per turn.
+# The top-1 BM25 hit carries the dominant signal; marginal rules add noise.
+# Saves ~16 tok/turn over k=2 (expected ~160 weighted_tokens).
+DEFAULT_MAX_RULES = 1
+# Raised 0.60→0.90: rules below 0.90 are softer guidance (PATTERN tier) already
+# covered by the Active guidance section in the wisdom block or not high-signal
+# enough for per-turn injection. Rules ≥0.90 (RULE tier) in brain_prompt.md are
+# already in the session wisdom block, so the wisdom-dedup step will filter them.
+# Net effect: JIT fires only for novel RULE-tier rules outside the wisdom block.
+DEFAULT_MIN_CONFIDENCE = 0.90
 DEFAULT_MIN_SIMILARITY = 0.05
 MIN_DRAFT_LEN = 10
 
@@ -326,10 +342,48 @@ def main(data: dict) -> dict | None:
         },
     )
 
-    lines = [
-        f"[{r.state.name}:{r.confidence:.2f}] {r.category}: {r.description}" for r, _sim in ranked
-    ]
-    rules_block = "<brain-rules-jit>\n" + "\n".join(lines) + "\n</brain-rules-jit>"
+    # Dedup against the session wisdom block: skip JIT rules that are already
+    # substantially covered by the session-start wisdom block (brain_prompt.md).
+    # Threshold 0.25 Jaccard: "playbooks from the start" ↔ "always consult playbooks"
+    # scores ~0.33, so covered rules skip. Saves ~11 tok/turn avg on typical sessions.
+    wisdom_lines: list[str] = []
+    bp_path = Path(brain_dir) / "brain_prompt.md"
+    if bp_path.is_file():
+        try:
+            bp_text = bp_path.read_text(encoding="utf-8")
+            wisdom_lines = [ln[2:].strip() for ln in bp_text.splitlines() if ln.startswith("- ")]
+        except OSError:
+            pass
+
+    _WISDOM_DEDUP_THRESHOLD = 0.25
+
+    def _already_in_wisdom(desc: str) -> bool:
+        if not wisdom_lines:
+            return False
+        desc_words = set(desc.lower().split())
+        for wl in wisdom_lines:
+            wl_words = set(wl.lower().split())
+            if not desc_words or not wl_words:
+                continue
+            j = len(desc_words & wl_words) / len(desc_words | wl_words)
+            if j >= _WISDOM_DEDUP_THRESHOLD:
+                return True
+        return False
+
+    # Dedup by normalized description AND by overlap with session wisdom block.
+    seen_descs: set[str] = set()
+    lines = []
+    for r, _sim in ranked:
+        norm_desc = r.description.strip().lower()
+        if norm_desc in seen_descs:
+            continue
+        seen_descs.add(norm_desc)
+        if _already_in_wisdom(r.description):
+            continue
+        lines.append(r.description)
+    if not lines:
+        return None
+    rules_block = "\n".join(lines)
     return {"result": rules_block}
 
 

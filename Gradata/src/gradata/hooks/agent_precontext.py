@@ -206,11 +206,17 @@ def main(data: dict) -> dict | None:
             if parent_ids:
                 top = [r for r in top if _compute_lesson_id(r) not in parent_ids]
 
+        if not top:
+            return None
+
+        _STATE_ABBREV = {"PATTERN": "P", "INSTINCT": "I", "RULE": "R"}
         lines = []
         for r in top:
-            lines.append(f"[{r.state.name}:{r.confidence:.2f}] {r.category}: {r.description}")
+            abbrev = _STATE_ABBREV.get(r.state.name, r.state.name)
+            lines.append(f"[{abbrev}:{r.confidence:.2f}] {r.category}: {r.description}")
 
-        block = "<agent-rules>\n" + "\n".join(lines) + "\n</agent-rules>"
+        # Compact header saves ~10 tokens vs XML open/close wrapper.
+        block = "[agent-rules]\n" + "\n".join(lines)
         return {"result": block}
     except Exception:
         return None

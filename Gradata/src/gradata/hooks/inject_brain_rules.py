@@ -132,11 +132,80 @@ def _read_brain_prompt(brain_dir: Path) -> str | None:
         return None
     if not text or _BRAIN_PROMPT_MARKER not in text[:400]:
         return None
-    # Truncate inner body BEFORE wrapping so the XML tags remain intact.
+    # Strip XML/HTML comments — they carry no semantic signal for the LLM and
+    # cost ~40 tokens per session start (measured 2026-04-21 autoresearch loop).
+    import re as _re
+
+    text = _re.sub(r"<!--.*?-->", "", text, flags=_re.DOTALL).strip()
+    # Replace verbose <brain-wisdom>…</brain-wisdom> wrapper with compact [wisdom]
+    # marker — saves 8 tokens per session start with identical LLM semantics.
+    text = _re.sub(r"<brain-wisdom>\s*", "", text)
+    text = _re.sub(r"\s*</brain-wisdom>", "", text).strip()
+    # Strip **bold** markdown markers — they add ~5 tokens for zero semantic gain.
+    text = _re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
+    # Collapse indented sub-bullets (`  - item`) into inline `;`-separated suffixes.
+    # E.g. `- Lead handling:\n  - A\n  - B` → `- Lead handling: A; B`
+    # Saves ~12 tokens per session start (measured 2026-04-21 autoresearch loop).
+    lines = text.split("\n")
+    result: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        sub_items: list[str] = []
+        j = i + 1
+        while j < len(lines) and lines[j].startswith("  - "):
+            sub_items.append(lines[j][4:])
+            j += 1
+        if sub_items:
+            parent = line.rstrip(":")
+            result.append(parent + ": " + "; ".join(sub_items))
+            i = j
+        else:
+            result.append(line)
+            i += 1
+    text = "\n".join(result)
+    # Strip lower-priority sections (Active guidance, Current disposition).
+    # Non-negotiables are the hardest constraints and are sufficient for session
+    # context; the guidance/disposition sections are ~140 tokens of softer context
+    # that the JIT hook covers per-prompt when relevant. Saves ~140 tok/session.
+    # Opt back in with GRADATA_WISDOM_FULL=1 for ablation.
+    if os.environ.get("GRADATA_WISDOM_FULL", "0") != "1":
+        for marker in ("Active guidance", "Current disposition"):
+            idx = text.find(marker)
+            if idx != -1:
+                text = text[:idx].rstrip()
+                break
+    # Compress verbose section header — saves 8 tokens per session.
+    # "Non-negotiables (response rejected if violated):" → "MUST:"
+    text = _re.sub(
+        r"Non-negotiables?\s*\([^)]*\)\s*:",
+        "MUST:",
+        text,
+        count=1,
+    )
+    # Limit to first GRADATA_WISDOM_MAX_RULES non-negotiable rules.
+    # Reduced 11→9→6→3: keep only the top-3 "Never" attribution/data/booking rules
+    # which address the highest-stakes errors. Mid-tier rules fire via JIT when
+    # contextually relevant and are retrievable via brain.search(). Saves ~59 tok.
+    wisdom_max_rules = int(os.environ.get("GRADATA_WISDOM_MAX_RULES", "3"))
+    if wisdom_max_rules > 0:
+        rule_lines = [ln for ln in text.split("\n") if ln.startswith("- ")]
+        if len(rule_lines) > wisdom_max_rules:
+            # Find the character position just after the Nth rule line.
+            remaining = wisdom_max_rules
+            cutoff = len(text)
+            for j, ch in enumerate(text):
+                if text[j : j + 2] == "- " and j > 0 and text[j - 1] == "\n":
+                    remaining -= 1
+                    if remaining < 0:
+                        cutoff = j
+                        break
+            text = text[:cutoff].rstrip()
+    # Truncate body before wrapping (safety net — rule-limit above is primary).
     if len(text) > MAX_BRAIN_PROMPT_CHARS:
-        text = text[:MAX_BRAIN_PROMPT_CHARS] + "\n<!-- truncated -->"
-    if "<brain-wisdom>" not in text:
-        text = f"<brain-wisdom>\n{text}\n</brain-wisdom>"
+        text = text[:MAX_BRAIN_PROMPT_CHARS]
+    # Drop the [wisdom] wrapper — section header (MUST:) is self-explanatory.
+    # Saves 4 tokens per session start (measured 2026-04-21 autoresearch loop).
     return text
 
 

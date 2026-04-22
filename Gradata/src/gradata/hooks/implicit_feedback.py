@@ -202,9 +202,9 @@ def main(data: dict) -> dict | None:
                 {"mode": "tacit", "message_preview": message[:200]},
             )
 
-        if signals:
-            signal_names = ", ".join(s["type"] for s in signals)
-            return {"result": f"IMPLICIT FEEDBACK: [{signal_names}]"}
+        # Feedback signals are logged via emit_hook_event above; no inline
+        # context injection needed — the learning pipeline reads events.jsonl.
+        # Suppressing the [fb:neg,rem] result saves ~1.75 tok/turn avg.
         return None
     except Exception as exc:
         _log.debug("implicit_feedback hook error: %s", exc)

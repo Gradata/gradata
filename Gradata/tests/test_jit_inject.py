@@ -204,10 +204,11 @@ class TestMainHookFlagOn:
     def test_relevant_prompt_injects(self, brain: Path) -> None:
         result = main({"prompt": "Update the pipedrive deal for the CEO today"})
         assert result is not None
-        assert "<brain-rules-jit>" in result["result"]
-        assert "PIPEDRIVE" in result["result"]
-        # PROSE rule is unrelated; must not appear.
-        assert "PROSE" not in result["result"]
+        # Autoresearch token-compression dropped the <brain-rules-jit> wrapper
+        # AND the CATEGORY: prefix - output is now bare description text.
+        assert "pipedrive" in result["result"].lower()
+        # PROSE rule description mentions em dashes - unrelated; must not appear.
+        assert "em dashes" not in result["result"].lower()
 
     def test_irrelevant_prompt_returns_none(self, brain: Path) -> None:
         result = main({"prompt": "Deploy the kubernetes cluster to aws"})
@@ -237,9 +238,10 @@ class TestMainHookFlagOn:
         monkeypatch.setenv("GRADATA_JIT_MAX_RULES", "1")
         result = main({"prompt": "Update the pipedrive deal for the CEO today"})
         assert result is not None
-        # Exactly one rule line between the tags
+        # Exactly one rule line in the bare rules block (wrapper + [..] prefix
+        # dropped by autoresearch token-compression).
         body = result["result"]
-        rule_lines = [ln for ln in body.splitlines() if ln.startswith("[")]
+        rule_lines = [ln for ln in body.splitlines() if ln.strip()]
         assert len(rule_lines) == 1
 
 
