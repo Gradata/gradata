@@ -443,7 +443,7 @@ def test_implicit_feedback_detects_negation(tmp_path, monkeypatch):
     monkeypatch.setenv("GRADATA_BRAIN_DIR", str(tmp_path))
     with patch("gradata.hooks.implicit_feedback.emit_hook_event") as mock_emit:
         result = feedback_main({"message": "No, that's wrong. Do it differently."})
-    assert result is None
+    assert result == {"result": "[fb:neg]"}
     event_types = [call.args[0] for call in mock_emit.call_args_list]
     assert "IMPLICIT_FEEDBACK" in event_types
     signals = mock_emit.call_args_list[0].args[2]["signals"]
@@ -454,7 +454,7 @@ def test_implicit_feedback_detects_reminder(tmp_path, monkeypatch):
     monkeypatch.setenv("GRADATA_BRAIN_DIR", str(tmp_path))
     with patch("gradata.hooks.implicit_feedback.emit_hook_event") as mock_emit:
         result = feedback_main({"message": "I told you to always plan first before building."})
-    assert result is None
+    assert result == {"result": "[fb:rem]"}
     event_types = [call.args[0] for call in mock_emit.call_args_list]
     assert "IMPLICIT_FEEDBACK" in event_types
     signals = mock_emit.call_args_list[0].args[2]["signals"]
@@ -465,7 +465,7 @@ def test_implicit_feedback_detects_challenge(tmp_path, monkeypatch):
     monkeypatch.setenv("GRADATA_BRAIN_DIR", str(tmp_path))
     with patch("gradata.hooks.implicit_feedback.emit_hook_event") as mock_emit:
         result = feedback_main({"message": "Are you sure that's correct? It doesn't look right."})
-    assert result is None
+    assert result is not None and "chal" in result["result"]
     event_types = [call.args[0] for call in mock_emit.call_args_list]
     assert "IMPLICIT_FEEDBACK" in event_types
     signals = mock_emit.call_args_list[0].args[2]["signals"]
@@ -483,7 +483,7 @@ def test_implicit_feedback_emits_event(tmp_path):
         patch("gradata.hooks.implicit_feedback.emit_hook_event") as mock_emit,
     ):
         result = feedback_main({"message": "I told you not to do that, are you sure?"})
-    assert result is None
+    assert result is not None and result["result"].startswith("[fb:")
     event_types = [call.args[0] for call in mock_emit.call_args_list]
     assert "IMPLICIT_FEEDBACK" in event_types
 

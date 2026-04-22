@@ -66,16 +66,8 @@ HOOK_META = {
 }
 
 # Defaults. All tunable by env var so operators can sweep without a code change.
-# Reduced 5→3→2→1: inject only the single best-matching rule per turn.
-# The top-1 BM25 hit carries the dominant signal; marginal rules add noise.
-# Saves ~16 tok/turn over k=2 (expected ~160 weighted_tokens).
-DEFAULT_MAX_RULES = 1
-# Raised 0.60→0.90: rules below 0.90 are softer guidance (PATTERN tier) already
-# covered by the Active guidance section in the wisdom block or not high-signal
-# enough for per-turn injection. Rules ≥0.90 (RULE tier) in brain_prompt.md are
-# already in the session wisdom block, so the wisdom-dedup step will filter them.
-# Net effect: JIT fires only for novel RULE-tier rules outside the wisdom block.
-DEFAULT_MIN_CONFIDENCE = 0.90
+DEFAULT_MAX_RULES = 5
+DEFAULT_MIN_CONFIDENCE = 0.60
 DEFAULT_MIN_SIMILARITY = 0.05
 MIN_DRAFT_LEN = 10
 
@@ -371,6 +363,10 @@ def main(data: dict) -> dict | None:
         return False
 
     # Dedup by normalized description AND by overlap with session wisdom block.
+    # Emit as `[P83] description` — state abbreviation (P=PATTERN, I=INSTINCT,
+    # R=RULE) + confidence percent. Keeps state+confidence signal for the model
+    # while remaining compact (~3 tok/rule overhead).
+    _STATE_ABBREV = {"PATTERN": "P", "INSTINCT": "I", "RULE": "R"}
     seen_descs: set[str] = set()
     lines = []
     for r, _sim in ranked:
@@ -380,7 +376,8 @@ def main(data: dict) -> dict | None:
         seen_descs.add(norm_desc)
         if _already_in_wisdom(r.description):
             continue
-        lines.append(r.description)
+        prefix = f"[{_STATE_ABBREV.get(r.state.name, r.state.name)}{round(r.confidence * 100):02d}]"
+        lines.append(f"{prefix} {r.description}")
     if not lines:
         return None
     rules_block = "\n".join(lines)

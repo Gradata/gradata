@@ -164,12 +164,10 @@ def _read_brain_prompt(brain_dir: Path) -> str | None:
             result.append(line)
             i += 1
     text = "\n".join(result)
-    # Strip lower-priority sections (Active guidance, Current disposition).
-    # Non-negotiables are the hardest constraints and are sufficient for session
-    # context; the guidance/disposition sections are ~140 tokens of softer context
-    # that the JIT hook covers per-prompt when relevant. Saves ~140 tok/session.
-    # Opt back in with GRADATA_WISDOM_FULL=1 for ablation.
-    if os.environ.get("GRADATA_WISDOM_FULL", "0") != "1":
+    # Active guidance + Current disposition sections kept by default — they
+    # carry softer behavioral context the model needs at session start. Set
+    # GRADATA_WISDOM_FULL=0 to strip them (ablation only).
+    if os.environ.get("GRADATA_WISDOM_FULL", "1") != "1":
         for marker in ("Active guidance", "Current disposition"):
             idx = text.find(marker)
             if idx != -1:
@@ -184,10 +182,7 @@ def _read_brain_prompt(brain_dir: Path) -> str | None:
         count=1,
     )
     # Limit to first GRADATA_WISDOM_MAX_RULES non-negotiable rules.
-    # Reduced 11→9→6→3: keep only the top-3 "Never" attribution/data/booking rules
-    # which address the highest-stakes errors. Mid-tier rules fire via JIT when
-    # contextually relevant and are retrievable via brain.search(). Saves ~59 tok.
-    wisdom_max_rules = int(os.environ.get("GRADATA_WISDOM_MAX_RULES", "3"))
+    wisdom_max_rules = int(os.environ.get("GRADATA_WISDOM_MAX_RULES", "9"))
     if wisdom_max_rules > 0:
         rule_lines = [ln for ln in text.split("\n") if ln.startswith("- ")]
         if len(rule_lines) > wisdom_max_rules:
