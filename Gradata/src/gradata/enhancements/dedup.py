@@ -12,18 +12,8 @@ into the fire_count / confidence pipeline.
 
 Public API
 ----------
-    from gradata.enhancements.dedup import (
-        observation_fingerprint,
-        is_duplicate,
-        register_observation,
-    )
-
-    fp = observation_fingerprint("Don't use em-dashes.", category="FORMAT")
-    if is_duplicate(db_path, fp, recent_window_sessions=10):
-        # suppress — already seen in recent window
-        ...
-    else:
-        register_observation(db_path, fp, session=42)
+See ``observation_fingerprint``, ``is_duplicate``, ``register_observation``,
+``check_and_register``, and ``annotate_event_with_dedup`` (ingestion seam).
 
 Semantics
 ---------
