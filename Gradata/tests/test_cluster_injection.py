@@ -1,9 +1,13 @@
-"""Tests for cluster-level rule injection in inject_brain_rules.main().
+"""Tests for rule injection in inject_brain_rules.main().
 
-Verifies that qualifying clusters replace individual rules in the brain-rules
-block, reducing injection slot usage, while non-qualifying rules still appear
-individually.
+Legacy cluster-summary + per-rule-line output is replaced by a single
+slot-grouped synthesized prompt (Preston-Rhodes 6-step). The manifest
+still records per-rule anchors for capture_learning attribution; the
+visible block is prose with inline r:xxxx anchors. Tests below assert
+the new contract (category/description presence in prose, anchor
+survival, manifest structure) instead of the obsolete line format.
 """
+
 from __future__ import annotations
 
 import json
@@ -16,6 +20,7 @@ import pytest
 # ---------------------------------------------------------------------------
 # Helpers to build minimal Lesson-like objects accepted by inject_brain_rules
 # ---------------------------------------------------------------------------
+
 
 def _make_lesson(
     description: str,
@@ -46,6 +51,7 @@ def _make_lesson(
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def three_qualifying_lessons():
     """Three RULE-tier lessons in the same category, high confidence — will form a cluster."""
@@ -69,6 +75,7 @@ def two_unrelated_lessons():
 # Helper: run main() with mocked dependencies
 # ---------------------------------------------------------------------------
 
+
 def _run_main(lessons: list, data: dict | None = None) -> dict | None:
     """Invoke inject_brain_rules.main() with the given lessons pre-loaded."""
     from gradata.hooks import inject_brain_rules as inj
@@ -89,51 +96,62 @@ def _run_main(lessons: list, data: dict | None = None) -> dict | None:
         return inj.main(data)
 
 
+import re
+
+_ANCHOR_RE = re.compile(r"(?<![0-9a-zA-Z])r:([0-9a-f]{4})")
+
+
+def _anchors(block: str) -> list[str]:
+    return _ANCHOR_RE.findall(block)
+
+
 # ---------------------------------------------------------------------------
-# Test 1: qualifying cluster replaces member rules with a summary line
+# Test 1: qualifying rules surface in the synthesized prose with anchors
 # ---------------------------------------------------------------------------
+
 
 def test_qualifying_cluster_injects_summary(three_qualifying_lessons):
     result = _run_main(three_qualifying_lessons)
     assert result is not None
     block = result["result"]
-    # Summary line must be present
-    assert "[CLUSTER:" in block
-    assert "VALIDATION" in block
-    # The raw individual descriptions should NOT appear as [RULE:...] lines
-    # (they may appear inside the summary text, but not as standalone rule lines)
-    rule_lines = [
-        line for line in block.splitlines()
-        if line.startswith("[RULE:") or line.startswith("[PATTERN:")
+    # Synthesizer output replaces cluster summary lines — category + rule
+    # content still has to be represented via inline anchors.
+    assert "<brain-rules>" in block and "</brain-rules>" in block
+    assert len(_anchors(block)) == 3
+    # At least one rule description survives the synthesis
+    descriptions = [
+        "validate input at boundaries",
+        "sanitize user input",
+        "reject requests missing required fields",
     ]
-    validation_rule_lines = [l for l in rule_lines if "VALIDATION" in l]
-    assert len(validation_rule_lines) == 0, (
-        f"Individual VALIDATION rules leaked through: {validation_rule_lines}"
-    )
+    assert any(any(token in block.lower() for token in d.lower().split()) for d in descriptions)
 
 
 # ---------------------------------------------------------------------------
-# Test 2: rules NOT in any cluster appear individually
+# Test 2: rules across multiple categories all reach the prompt
 # ---------------------------------------------------------------------------
 
-def test_non_cluster_rules_injected_individually(
-    three_qualifying_lessons, two_unrelated_lessons
-):
-    all_lessons = three_qualifying_lessons + two_unrelated_lessons
-    result = _run_main(all_lessons)
+
+def test_non_cluster_rules_injected_individually():
+    lessons = [
+        _make_lesson("always validate input at boundaries", "VALIDATION", confidence=0.88),
+        _make_lesson("use absolute paths only", "PATHS", confidence=0.80),
+        _make_lesson("never use relative imports", "IMPORTS", confidence=0.78),
+    ]
+    result = _run_main(lessons)
     assert result is not None
     block = result["result"]
-    # Individual PATHS and IMPORTS rules must appear
-    assert "PATHS" in block or "IMPORTS" in block
+    # All three unique anchors must make it into the prose
+    assert len(_anchors(block)) == 3
 
 
 # ---------------------------------------------------------------------------
-# Test 3: clusters with contradictions are NOT used — members injected individually
+# Test 3: contradicting rules still appear — contradictions matter for
+# graduation, not for session-start synthesis
 # ---------------------------------------------------------------------------
+
 
 def test_contradicting_cluster_not_used():
-    # Two rules that will trigger contradiction detection (same tokens + negation difference)
-    # Plus a third to meet size >= 3
     lessons = [
         _make_lesson("always validate user input carefully", "SAFETY", confidence=0.85),
         _make_lesson("never validate user input in tests", "SAFETY", confidence=0.85),
@@ -142,23 +160,16 @@ def test_contradicting_cluster_not_used():
     result = _run_main(lessons)
     assert result is not None
     block = result["result"]
-    # If cluster has contradictions, no CLUSTER: line should appear for SAFETY
-    # (cluster injection is skipped; individual rules take over)
-    safety_cluster_lines = [
-        l for l in block.splitlines()
-        if "[CLUSTER:" in l and "SAFETY" in l
-    ]
-    # Either no cluster for SAFETY, OR if there's a cluster it must have no contradictions
-    # (we just verify individual SAFETY lines are present when cluster is skipped)
-    if not safety_cluster_lines:
-        # Individual lines present
-        individual_safety = [l for l in block.splitlines() if "SAFETY" in l]
-        assert len(individual_safety) > 0
+    # All three rules selected for injection (manifest proves it elsewhere);
+    # here we just check that the synthesizer produced a non-empty block.
+    assert "<brain-rules>" in block
+    assert len(_anchors(block)) >= 1
 
 
 # ---------------------------------------------------------------------------
 # Test 4: clusters below confidence threshold are not used
 # ---------------------------------------------------------------------------
+
 
 def test_low_confidence_cluster_not_injected():
     # Three lessons with low confidence — cluster avg will be < 0.75
@@ -171,34 +182,33 @@ def test_low_confidence_cluster_not_injected():
     assert result is not None
     block = result["result"]
     # No cluster line should appear for LOW_CONF
-    low_conf_cluster_lines = [
-        l for l in block.splitlines()
-        if "[CLUSTER:" in l and "LOW_CONF" in l
-    ]
+    low_conf_cluster_lines = [l for l in block.splitlines() if "[CLUSTER:" in l and "LOW_CONF" in l]
     assert len(low_conf_cluster_lines) == 0
 
 
 # ---------------------------------------------------------------------------
-# Test 5: total injection count decreases when clusters are used
+# Test 5: synthesizer collapses N rules into a single prose block
 # ---------------------------------------------------------------------------
 
+
 def test_cluster_reduces_injection_count(three_qualifying_lessons):
-    """One CLUSTER line replaces three individual rule lines — net count is lower."""
-    # Baseline: count lines without clustering (individual only)
-    # Clustered: count lines with clustering active
+    """Three rules collapse into one synthesized prose block bounded by the tags."""
     result = _run_main(three_qualifying_lessons)
     assert result is not None
     block = result["result"]
     inner = block.replace("<brain-rules>", "").replace("</brain-rules>", "").strip()
-    injected_lines = [l for l in inner.splitlines() if l.strip()]
-    # 3 lessons -> 1 cluster summary -> 1 line total (not 3)
-    assert len(injected_lines) == 1
-    assert injected_lines[0].startswith("[CLUSTER:")
+    # The whole prose is one contiguous block — no per-rule line format anymore.
+    assert inner
+    assert "[CLUSTER:" not in inner
+    assert "[RULE:" not in inner
+    # All 3 anchors should still be present for attribution.
+    assert len(_anchors(inner)) == 3
 
 
 # ---------------------------------------------------------------------------
 # Test 6: empty lessons → no clusters, normal injection path returns None
 # ---------------------------------------------------------------------------
+
 
 def test_empty_lessons_returns_none():
     from gradata.hooks import inject_brain_rules as inj
@@ -218,32 +228,17 @@ def test_empty_lessons_returns_none():
 # Test 7: cluster summary includes category and rule count
 # ---------------------------------------------------------------------------
 
+
 def test_cluster_summary_format(three_qualifying_lessons):
+    """The synthesized prose must carry at least one Preston-Rhodes slot label."""
     result = _run_main(three_qualifying_lessons)
     assert result is not None
     block = result["result"]
-    cluster_lines = [l for l in block.splitlines() if "[CLUSTER:" in l]
-    assert len(cluster_lines) == 1
-    line = cluster_lines[0]
-    # Must contain the confidence score, rule count marker, and category.
-    # Marker may be followed by a ` r:<anchors>` suffix for Meta-Harness A
-    # attribution, so accept both the bare `×3]`/`|3]` and `×3 r:...]`/`|3 r:...]`.
-    assert (
-        "\u00d73]" in line or "|3]" in line
-        or "\u00d73 r:" in line or "|3 r:" in line
-    ), f"Missing size marker in: {line!r}"
-    assert "VALIDATION" in line
-    # Confidence value should be in [0, 1] range formatted as float
-    import re
-    m = re.search(r"\[CLUSTER:(\d+\.\d+)\|", line)
-    assert m is not None, f"Cluster line missing confidence: {line!r}"
-    conf = float(m.group(1))
-    assert 0.75 <= conf <= 1.0
+    slot_labels = ("Task:", "Context:", "Examples:", "Persona:", "Format:", "Tone:")
+    assert any(lbl in block for lbl in slot_labels), (
+        f"Missing slot label in synthesized block: {block!r}"
+    )
 
-
-# ---------------------------------------------------------------------------
-# Test 8: meta-rule mutex — cluster suppressed when meta-rule covers category
-# ---------------------------------------------------------------------------
 
 def test_meta_rule_suppresses_cluster_for_same_category(three_qualifying_lessons):
     """When an injectable meta-rule exists for a category, the cluster summary
@@ -272,11 +267,12 @@ def test_meta_rule_suppresses_cluster_for_same_category(three_qualifying_lessons
 
     assert result is not None
     block = result["result"]
-    cluster_lines = [l for l in block.splitlines() if "[CLUSTER:" in l]
-    assert len(cluster_lines) == 0, (
-        f"Mutex failed: cluster fired despite meta-rule covering VALIDATION. "
-        f"Block: {block}"
-    )
+    # The old cluster-summary path is gone; the meta covers the category-level
+    # principle while individual rules still fire as concrete examples in the
+    # synthesized prose. Both blocks coexist without a cluster summary.
+    assert "[CLUSTER:" not in block
+    assert "<brain-meta-rules>" in block
+    assert "<brain-rules>" in block
 
 
 def test_meta_rule_does_not_suppress_other_category_clusters(three_qualifying_lessons):
@@ -304,10 +300,13 @@ def test_meta_rule_does_not_suppress_other_category_clusters(three_qualifying_le
 
     assert result is not None
     block = result["result"]
-    cluster_lines = [l for l in block.splitlines() if "[CLUSTER:" in l]
-    assert len(cluster_lines) == 1, (
-        f"Mutex over-fired: cluster suppressed despite meta-rule covering different category. "
-        f"Block: {block}"
+    import re as _re
+
+    # Mutex must NOT suppress a different-category meta — all 3 VALIDATION anchors survive.
+    anchors = _re.findall(r"(?<![0-9a-zA-Z])r:([0-9a-f]{4})", block)
+    assert len(anchors) == 3, (
+        f"Mutex over-fired: expected 3 anchors for VALIDATION rules when meta covers "
+        f"a different category. Got {len(anchors)}. Block: {block}"
     )
 
 
@@ -337,9 +336,13 @@ def test_deterministic_meta_rule_does_not_suppress_cluster(three_qualifying_less
 
     assert result is not None
     block = result["result"]
-    cluster_lines = [l for l in block.splitlines() if "[CLUSTER:" in l]
-    assert len(cluster_lines) == 1, (
-        "Deterministic meta-rules must not suppress clusters (they are not injected)."
+    import re as _re
+
+    # Deterministic meta-rules are not injected, so they must not suppress anything.
+    anchors = _re.findall(r"(?<![0-9a-zA-Z])r:([0-9a-f]{4})", block)
+    assert len(anchors) == 3, (
+        "Deterministic meta-rules must not suppress rule synthesis "
+        f"(expected 3 anchors, got {len(anchors)})."
     )
 
 
@@ -347,37 +350,29 @@ def test_deterministic_meta_rule_does_not_suppress_cluster(three_qualifying_less
 # Meta-Harness A: per-rule attribution anchors + .last_injection.json manifest
 # ---------------------------------------------------------------------------
 
+
 def test_cluster_line_carries_member_anchors(three_qualifying_lessons):
-    """Cluster injection lines must include `r:<anchor,anchor,...>` for each member."""
+    """Synthesized prose must carry one r:xxxx anchor per selected rule."""
     result = _run_main(three_qualifying_lessons)
     assert result is not None
     block = result["result"]
-    cluster_lines = [l for l in block.splitlines() if "[CLUSTER:" in l]
-    assert len(cluster_lines) == 1
-    line = cluster_lines[0]
-    import re
-    m = re.search(r"r:([0-9a-f,]+)\]", line)
-    assert m is not None, f"Cluster line missing anchor suffix: {line!r}"
-    anchors = m.group(1).split(",")
-    assert len(anchors) == 3, f"Expected 3 member anchors, got {anchors}"
+    anchors = _anchors(block)
+    assert len(anchors) == 3, f"Expected 3 anchors in synth block, got {anchors}"
     for a in anchors:
         assert len(a) == 4, f"Anchor must be 4 chars: {a!r}"
 
 
 def test_individual_line_carries_anchor():
-    """Non-clustered RULE lines must include ` r:<anchor>` before the closing `]`."""
+    """Single-rule injection must include its r:xxxx anchor inline."""
     lessons = [
         _make_lesson("use absolute paths only", "PATHS", confidence=0.80),
     ]
     result = _run_main(lessons)
     assert result is not None
     block = result["result"]
-    rule_lines = [l for l in block.splitlines() if l.startswith("[RULE:")]
-    assert len(rule_lines) == 1
-    import re
-    assert re.search(r"\[RULE:[\d.]+\s+r:[0-9a-f]{4}\]", rule_lines[0]), (
-        f"Individual line missing anchor: {rule_lines[0]!r}"
-    )
+    anchors = _anchors(block)
+    assert len(anchors) == 1, f"Expected 1 anchor in synth block, got {anchors}"
+    assert len(anchors[0]) == 4
 
 
 def test_injection_manifest_written(three_qualifying_lessons, tmp_path):
