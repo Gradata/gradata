@@ -6,28 +6,8 @@ Implements the Reflection agentic pattern: an output is repeatedly
 critiqued against a structured checklist and refined until all
 required criteria pass or the cycle budget is exhausted.
 
-Typical usage::
-
-    from gradata.contrib.patterns.reflection import (
-        reflect,
-        EMAIL_CHECKLIST,
-        CriterionScore,
-        default_evaluator,
-    )
-
-    def my_refiner(output, failed):
-        # call your LLM here
-        return improved_output
-
-    result = reflect(
-        output=draft_email,
-        checklist=EMAIL_CHECKLIST,
-        evaluator=default_evaluator,
-        refiner=my_refiner,
-        max_cycles=3,
-    )
-    print(result.final_output)
-    print(result.converged)
+See ``reflect(output, checklist, evaluator, refiner, max_cycles)`` →
+``ReflectionResult``. Pre-built: ``EMAIL_CHECKLIST``, ``default_evaluator``.
 """
 
 from __future__ import annotations

@@ -1182,36 +1182,4 @@ def compute_learning_velocity(
     }
 
 
-# ---------------------------------------------------------------------------
-# Backward-compat re-exports (symbols moved to focused modules)
-# ---------------------------------------------------------------------------
-
-
-def __getattr__(name: str):  # type: ignore[return]
-    _PIPELINE_NAMES = {
-        "PipelineResult",
-        "run_rule_pipeline",
-        "_generate_skill_file",
-        "review_generated_skill",
-    }
-    _CAUSAL_NAMES = {"CausalRelation", "CausalLink", "CausalChain"}
-    _CLUSTER_NAMES = {
-        "RuleCluster",
-        "detect_contradictions",
-        "cluster_rules",
-        "promote_instinct_clusters",
-    }
-
-    if name in _PIPELINE_NAMES:
-        from gradata.enhancements import rule_pipeline
-
-        return getattr(rule_pipeline, name)
-    if name in _CAUSAL_NAMES:
-        from gradata.enhancements import causal_chains
-
-        return getattr(causal_chains, name)
-    if name in _CLUSTER_NAMES:
-        from gradata.enhancements import clustering
-
-        return getattr(clustering, name)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+# Backward-compat re-exports live in the package __init__.py only.

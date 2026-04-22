@@ -22,34 +22,6 @@ The predefined ``QUALITY_DIMENSIONS`` list provides a reasonable generic
 starting point that can be overridden or extended for any domain.
 
 Stdlib only — no third-party dependencies.
-
-Example
--------
-    from gradata.contrib.patterns.evaluator import (
-        evaluate_optimize_loop,
-        QUALITY_DIMENSIONS,
-    )
-
-    def my_generator(task, feedback=None):
-        # call an LLM, run a template, anything...
-        return generated_text
-
-    def my_evaluator(output, dimension):
-        # call an LLM judge, run heuristics, anything...
-        score = ...
-        rationale = ...
-        return score, rationale
-
-    result = evaluate_optimize_loop(
-        generator=my_generator,
-        evaluator=my_evaluator,
-        task="Summarize the quarterly results",
-        dimensions=QUALITY_DIMENSIONS,
-        threshold=8.0,
-        max_iterations=4,
-    )
-    print(result.final_output)
-    print(result.converged)
 """
 
 from __future__ import annotations
@@ -335,9 +307,7 @@ def evaluate(
     else:
         verdict = _VERDICT_MAJOR_REVISION
 
-    regression = (
-        previous_result is not None and average < previous_result.average
-    )
+    regression = previous_result is not None and average < previous_result.average
 
     if regression and previous_result is not None:
         logger.warning(
@@ -400,13 +370,9 @@ def evaluate_optimize_loop(
             is less than 1.
     """
     if not (0.0 < threshold <= 10.0):
-        raise ValueError(
-            f"threshold must be in (0, 10]; got {threshold!r}."
-        )
+        raise ValueError(f"threshold must be in (0, 10]; got {threshold!r}.")
     if max_iterations < 1:
-        raise ValueError(
-            f"max_iterations must be >= 1; got {max_iterations!r}."
-        )
+        raise ValueError(f"max_iterations must be >= 1; got {max_iterations!r}.")
 
     iteration_results: list[EvalResult] = []
     current_output: Any = None
@@ -486,9 +452,11 @@ def dimensions_from_graduated_rules(task_type: str = "") -> list[EvalDimension]:
 
     dims = []
     for rule in rules:
-        dims.append(EvalDimension(
-            name=f"rule_{rule.category.lower()}_{len(dims)}",
-            weight=rule.confidence,
-            description=f"Check: {rule.principle}",
-        ))
+        dims.append(
+            EvalDimension(
+                name=f"rule_{rule.category.lower()}_{len(dims)}",
+                weight=rule.confidence,
+                description=f"Check: {rule.principle}",
+            )
+        )
     return dims

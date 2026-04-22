@@ -20,21 +20,8 @@ creating trained agents that compound over time. Three mechanisms:
    Cross-agent patterns (discovered by one agent, useful to others) propagate
    through the brain layer.
 
-Usage:
-    tracker = AgentGraduationTracker(brain_dir)
-
-    # Record agent output quality
-    tracker.record_outcome("research", output, "approved", edits=None)
-    tracker.record_outcome("writer", output, "edited", edits="rewrote intro")
-
-    # Check if an agent needs human approval
-    gate = tracker.approval_gate("research")  # "auto" | "preview" | "confirm"
-
-    # Get agent's graduated lessons for prompt injection
-    rules = tracker.get_agent_rules("research")
-
-    # Distill proven agent lessons up to brain level
-    distilled = tracker.distill_upward()
+See ``AgentGraduationTracker`` for the public API (record_outcome,
+approval_gate, get_agent_rules, distill_upward).
 
 Research backing:
     - Same constants as user-level graduation (Brown et al. 2024, NIST Bayesian)

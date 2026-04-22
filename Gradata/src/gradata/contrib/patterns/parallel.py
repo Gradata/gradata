@@ -22,12 +22,8 @@ Provides two execution strategies:
     (highest-ranked successful result), or ``"synthesize"``
     (structured summary dict).
 
-Note on "concurrent" semantics
--------------------------------
-This SDK version is synchronous. Tasks in the same wave are called one
-after another. The graph guarantees *logical* parallelism — tasks that
-have no dependency relationship between them will never block each other
-from being scheduled together if the caller adds true concurrency on top.
+SDK version is synchronous; logical parallelism only — add real concurrency
+on top if needed.
 """
 
 from __future__ import annotations

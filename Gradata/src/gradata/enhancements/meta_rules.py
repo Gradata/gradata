@@ -204,16 +204,6 @@ def _tokenise(text: str) -> set[str]:
     return set(re.findall(r"[a-z]{3,}", text.lower()))
 
 
-def _detect_themes(text: str) -> dict[str, int]:
-    """Theme detection requires Gradata Cloud."""
-    return {}
-
-
-def _classify_meta_transfer_scope(rule_text: str) -> RuleTransferScope:
-    """Transfer scope classification requires Gradata Cloud."""
-    return RuleTransferScope.PERSONAL
-
-
 # ---------------------------------------------------------------------------
 # Discovery — local clustering by category + semantic similarity
 # ---------------------------------------------------------------------------

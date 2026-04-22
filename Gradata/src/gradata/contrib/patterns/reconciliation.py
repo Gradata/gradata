@@ -7,23 +7,8 @@ Enforces mandatory reconciliation after every execution phase.
 Compares planned outcomes against actual results, scores deviations,
 and produces structured summaries.
 
-Usage::
-
-    from gradata.contrib.patterns.reconciliation import (
-        Reconciler, PlanItem, ActualResult,
-        DeviationScore, ReconciliationSummary,
-    )
-
-    plan = [
-        PlanItem(id="AC-1", description="User can log in", criteria="200 OK on /login"),
-        PlanItem(id="AC-2", description="Token stored", criteria="JWT in localStorage"),
-    ]
-    actuals = [
-        ActualResult(plan_id="AC-1", achieved=True, evidence="curl returns 200"),
-        ActualResult(plan_id="AC-2", achieved=False, evidence="Token in cookie, not localStorage"),
-    ]
-    summary = Reconciler().reconcile(plan, actuals)
-    print(summary.overall_score)  # DeviationScore.GAP
+See ``Reconciler().reconcile(plan, actuals)`` → ``ReconciliationSummary``
+(overall_score: PASS/GAP/DRIFT, deviations, format_summary).
 """
 
 from __future__ import annotations
@@ -44,9 +29,10 @@ __all__ = [
 
 class DeviationScore(Enum):
     """Qualification score for plan-vs-actual comparison."""
-    PASS = "pass"       # Actual matches plan exactly
-    GAP = "gap"         # Partial achievement, missing elements
-    DRIFT = "drift"     # Achieved something different than planned
+
+    PASS = "pass"  # Actual matches plan exactly
+    GAP = "gap"  # Partial achievement, missing elements
+    DRIFT = "drift"  # Achieved something different than planned
 
 
 @dataclass
@@ -59,6 +45,7 @@ class PlanItem:
         criteria: How to verify achievement (executable check preferred).
         files: Optional list of files expected to be modified.
     """
+
     id: str
     description: str
     criteria: str = ""
@@ -76,6 +63,7 @@ class ActualResult:
         deviation: Description of how actual differed from plan (if any).
         files_modified: Actual files that were modified.
     """
+
     plan_id: str
     achieved: bool
     evidence: str = ""
@@ -95,6 +83,7 @@ class DeviationDetail:
         impact: How the deviation affects the overall goal.
         classification: Root cause type (intent/spec/code).
     """
+
     plan_id: str
     score: DeviationScore
     what_differed: str = ""
@@ -120,6 +109,7 @@ class ReconciliationSummary:
         decisions: Key decisions made during execution.
         metadata: Arbitrary metadata from the reconciliation.
     """
+
     plan_items: list[PlanItem]
     actual_results: list[ActualResult]
     deviations: list[DeviationDetail]
@@ -190,12 +180,14 @@ class Reconciler:
         for item in plan:
             actual = actual_map.get(item.id)
             if actual is None:
-                deviations.append(DeviationDetail(
-                    plan_id=item.id,
-                    score=DeviationScore.GAP,
-                    what_differed="No result provided for this plan item.",
-                    impact="Plan item was not addressed.",
-                ))
+                deviations.append(
+                    DeviationDetail(
+                        plan_id=item.id,
+                        score=DeviationScore.GAP,
+                        what_differed="No result provided for this plan item.",
+                        impact="Plan item was not addressed.",
+                    )
+                )
                 gap_count += 1
                 continue
 
@@ -286,10 +278,22 @@ class Reconciler:
         combined = evidence_lower + " " + deviation_lower
 
         # Heuristic classification
-        intent_signals = ("wrong approach", "should not have", "requirements changed",
-                         "misunderstood", "wrong goal", "different requirement")
-        spec_signals = ("criteria wrong", "spec incorrect", "acceptance criteria",
-                       "test was wrong", "wrong assertion", "bad criteria")
+        intent_signals = (
+            "wrong approach",
+            "should not have",
+            "requirements changed",
+            "misunderstood",
+            "wrong goal",
+            "different requirement",
+        )
+        spec_signals = (
+            "criteria wrong",
+            "spec incorrect",
+            "acceptance criteria",
+            "test was wrong",
+            "wrong assertion",
+            "bad criteria",
+        )
 
         if any(s in combined for s in intent_signals):
             return "intent"

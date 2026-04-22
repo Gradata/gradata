@@ -8,26 +8,7 @@ times before the pipeline halts.
 SDK LAYER: Pure logic, stdlib only.  No file I/O, no imports from brain
 internals.  Callers wire logging/event emission externally if desired.
 
-Usage::
-
-    from gradata.contrib.patterns.pipeline import Pipeline, Stage, GateResult, gate
-
-    def research(query: str) -> dict:
-        return {"findings": f"Research on {query}"}
-
-    def draft(data: dict) -> str:
-        return f"Email based on {data['findings']}"
-
-    @gate
-    def quality_check(text: str) -> bool:
-        return len(text) > 10
-
-    pipe = Pipeline(
-        Stage("research", research),
-        Stage("draft", draft, gate=quality_check),
-    )
-    result = pipe.run("pricing strategy")
-    print(result.success, result.stages_completed)
+See ``Pipeline``, ``Stage``, ``gate`` decorator, ``PipelineResult``.
 """
 
 from __future__ import annotations
@@ -60,9 +41,7 @@ class GateResult:
 
     def __post_init__(self) -> None:
         if self.score is not None and not (0.0 <= self.score <= 1.0):
-            raise ValueError(
-                f"GateResult.score must be in [0.0, 1.0], got {self.score!r}"
-            )
+            raise ValueError(f"GateResult.score must be in [0.0, 1.0], got {self.score!r}")
 
 
 @dataclass
@@ -241,10 +220,7 @@ class Stage:
 
     def __repr__(self) -> str:
         gate_label = self.gate.__name__ if self.gate is not None else "none"
-        return (
-            f"Stage(name={self.name!r}, gate={gate_label!r}, "
-            f"max_retries={self.max_retries!r})"
-        )
+        return f"Stage(name={self.name!r}, gate={gate_label!r}, max_retries={self.max_retries!r})"
 
 
 # ---------------------------------------------------------------------------

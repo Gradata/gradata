@@ -9,19 +9,8 @@ DONE, DONE_WITH_CONCERNS, NEEDS_CONTEXT, BLOCKED.
 Prevents silent uncertainty by making "I finished but I'm not sure"
 an explicit, first-class outcome.
 
-Usage::
-
-    from gradata.contrib.patterns.task_escalation import (
-        TaskStatus, TaskOutcome, report_outcome,
-        is_actionable, requires_human,
-    )
-
-    outcome = report_outcome(
-        status=TaskStatus.DONE_WITH_CONCERNS,
-        description="Implemented auth endpoint",
-        concerns=["JWT expiry not tested with edge cases"],
-    )
-    assert requires_human(outcome)  # True — concerns need review
+See ``report_outcome``, ``is_actionable``, ``requires_human``,
+``TaskStatus`` (DONE/DONE_WITH_CONCERNS/NEEDS_CONTEXT/BLOCKED).
 """
 
 from __future__ import annotations
@@ -51,6 +40,7 @@ class TaskStatus(Enum):
     BLOCKED: Cannot complete — structural impediment. Stops
         execution and reports what blocks progress.
     """
+
     DONE = "done"
     DONE_WITH_CONCERNS = "done_with_concerns"
     NEEDS_CONTEXT = "needs_context"
@@ -72,6 +62,7 @@ class TaskOutcome:
         files_modified: Files changed during execution.
         metadata: Arbitrary metadata.
     """
+
     status: TaskStatus
     task_id: str = ""
     description: str = ""
@@ -123,8 +114,7 @@ def report_outcome(
 
     if status == TaskStatus.DONE_WITH_CONCERNS and not concerns:
         raise ValueError(
-            "DONE_WITH_CONCERNS requires at least one concern. "
-            "Use DONE if there are no concerns."
+            "DONE_WITH_CONCERNS requires at least one concern. Use DONE if there are no concerns."
         )
 
     if status == TaskStatus.NEEDS_CONTEXT and not missing_context:
@@ -134,10 +124,7 @@ def report_outcome(
         )
 
     if status == TaskStatus.BLOCKED and not blockers:
-        raise ValueError(
-            "BLOCKED requires at least one blocker. "
-            "Specify what prevents progress."
-        )
+        raise ValueError("BLOCKED requires at least one blocker. Specify what prevents progress.")
 
     return TaskOutcome(
         status=status,

@@ -82,6 +82,16 @@ def _open_db(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
+# Shared SQL used by both correction_tracking and brain_scores fallback.
+_SQL_CORRECTION_OUTPUT_TOTALS = """
+    SELECT
+        SUM(CASE WHEN type = 'CORRECTION' THEN 1 ELSE 0 END),
+        SUM(CASE WHEN type = 'OUTPUT'     THEN 1 ELSE 0 END)
+    FROM events
+    WHERE session >= ?
+    """
+
+
 def _session_densities(
     conn: sqlite3.Connection,
     min_session: int,
@@ -196,9 +206,7 @@ def compute_half_life(densities: list[float]) -> float:
 
     # Build (t, ln(d)) pairs, skipping zero densities
     log_pairs: list[tuple[float, float]] = [
-        (float(i), math.log(d))
-        for i, d in enumerate(densities)
-        if d > 0.0
+        (float(i), math.log(d)) for i, d in enumerate(densities) if d > 0.0
     ]
 
     if len(log_pairs) < 2:
@@ -210,7 +218,7 @@ def compute_half_life(densities: list[float]) -> float:
     sum_tt = sum(p[0] ** 2 for p in log_pairs)
     sum_ty = sum(p[0] * p[1] for p in log_pairs)
 
-    denom = n * sum_tt - sum_t ** 2
+    denom = n * sum_tt - sum_t**2
     if denom == 0.0:
         return math.inf
 
@@ -261,10 +269,7 @@ def compute_mtbf_mttr(
     if n == 1:
         mtbf = float(total_sessions)
     else:
-        gaps = [
-            unique_sessions[i + 1] - unique_sessions[i]
-            for i in range(n - 1)
-        ]
+        gaps = [unique_sessions[i + 1] - unique_sessions[i] for i in range(n - 1)]
         mtbf = sum(gaps) / len(gaps)
 
     # MTTR: identify maximal consecutive streaks
@@ -311,28 +316,14 @@ def compute_correction_profile(
         min_session = max(0, max_session - (window - 1))
 
         # --- Total corrections and outputs in window ---
-        totals = conn.execute(
-            """
-            SELECT
-                SUM(CASE WHEN type = 'CORRECTION' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN type = 'OUTPUT'     THEN 1 ELSE 0 END)
-            FROM events
-            WHERE session >= ?
-            """,
-            (min_session,),
-        ).fetchone()
+        totals = conn.execute(_SQL_CORRECTION_OUTPUT_TOTALS, (min_session,)).fetchone()
         total_corrections: int = int(totals[0] or 0)
         total_outputs: int = int(totals[1] or 0)
-        correction_rate = (
-            total_corrections / total_outputs if total_outputs > 0 else 0.0
-        )
+        correction_rate = total_corrections / total_outputs if total_outputs > 0 else 0.0
 
         # --- Per-session densities ---
         session_density_map = _session_densities(conn, min_session)
-        density_per_session = [
-            session_density_map[s]
-            for s in sorted(session_density_map)
-        ]
+        density_per_session = [session_density_map[s] for s in sorted(session_density_map)]
 
         # --- Trend ---
         density_trend, density_pct_change = _split_half_trend(density_per_session)
@@ -351,9 +342,7 @@ def compute_correction_profile(
         ).fetchall()
         correction_session_list = [r[0] for r in correction_session_rows]
         total_sessions_in_window = max(1, max_session - min_session + 1)
-        mtbf, mttr = compute_mtbf_mttr(
-            correction_session_list, total_sessions_in_window
-        )
+        mtbf, mttr = compute_mtbf_mttr(correction_session_list, total_sessions_in_window)
 
         # --- Category breakdown ---
         import json
@@ -414,9 +403,7 @@ def format_correction_profile(profile: CorrectionProfile) -> str:
     if profile.half_life_sessions == math.inf:
         lines.append("Half-life         : N/A (no decay detected)")
     else:
-        lines.append(
-            f"Half-life         : {profile.half_life_sessions:.1f} sessions"
-        )
+        lines.append(f"Half-life         : {profile.half_life_sessions:.1f} sessions")
 
     lines += [
         f"MTBF              : {profile.mtbf:.1f} sessions",
@@ -448,6 +435,7 @@ def compute_density(db_path: Path | None = None, window: int = 20) -> float:
     """
     if db_path is None:
         from gradata._paths import resolve_brain_dir
+
         db_path = resolve_brain_dir() / "system.db"
     profile = compute_correction_profile(db_path=db_path, window=window)
     return profile.correction_rate

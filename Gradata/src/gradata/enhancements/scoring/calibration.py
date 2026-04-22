@@ -14,13 +14,8 @@ fire correctly or misfire?) and computes:
 - Reliability diagram data (binned calibration curve)
 - Sharpness (how spread out the predictions are)
 
-Usage:
-    tracker = CalibrationTracker()
-    tracker.record(predicted=0.80, outcome=True)   # lesson fired correctly
-    tracker.record(predicted=0.80, outcome=False)   # lesson misfired
-    report = tracker.compute()
-    print(report.brier_score)       # 0.12 (lower is better)
-    print(report.calibration_error) # 0.05 (how far off from perfect)
+See ``CalibrationTracker`` (record, compute) → ``CalibrationReport``
+(brier_score, calibration_error, sharpness, reliability_diagram).
 
 Reference: Brier (1950), "Verification of Forecasts Expressed in Terms
 of Probability." Monthly Weather Review.
@@ -38,12 +33,13 @@ class CalibrationBin:
     Groups predictions by confidence range and compares predicted
     probability against observed frequency.
     """
+
     bin_start: float
     bin_end: float
-    predicted_mean: float     # Average confidence in this bin
+    predicted_mean: float  # Average confidence in this bin
     observed_frequency: float  # Fraction that actually succeeded
-    count: int                 # Number of predictions in this bin
-    gap: float                 # |predicted_mean - observed_frequency|
+    count: int  # Number of predictions in this bin
+    gap: float  # |predicted_mean - observed_frequency|
 
 
 @dataclass
@@ -62,6 +58,7 @@ class CalibrationReport:
         overconfident: True if system predicts higher than observed outcomes
             (most common failure mode).
     """
+
     brier_score: float
     calibration_error: float
     sharpness: float
@@ -117,16 +114,13 @@ class CalibrationTracker:
             )
 
         # Brier score: mean squared error
-        brier = sum(
-            (pred - (1.0 if outcome else 0.0)) ** 2
-            for pred, outcome in self._predictions
-        ) / n
+        brier = (
+            sum((pred - (1.0 if outcome else 0.0)) ** 2 for pred, outcome in self._predictions) / n
+        )
 
         # Sharpness: variance of predictions
         mean_pred = sum(p for p, _ in self._predictions) / n
-        sharpness = sum(
-            (p - mean_pred) ** 2 for p, _ in self._predictions
-        ) / n
+        sharpness = sum((p - mean_pred) ** 2 for p, _ in self._predictions) / n
 
         # Reliability diagram: bin predictions by confidence
         bin_width = 1.0 / self._n_bins
@@ -138,7 +132,8 @@ class CalibrationTracker:
             bin_end = (i + 1) * bin_width
 
             in_bin = [
-                (p, o) for p, o in self._predictions
+                (p, o)
+                for p, o in self._predictions
                 if bin_start <= p < bin_end or (i == self._n_bins - 1 and p == 1.0)
             ]
 
@@ -149,14 +144,16 @@ class CalibrationTracker:
             obs_freq = sum(1 for _, o in in_bin if o) / len(in_bin)
             gap = abs(pred_mean - obs_freq)
 
-            bins.append(CalibrationBin(
-                bin_start=round(bin_start, 2),
-                bin_end=round(bin_end, 2),
-                predicted_mean=round(pred_mean, 4),
-                observed_frequency=round(obs_freq, 4),
-                count=len(in_bin),
-                gap=round(gap, 4),
-            ))
+            bins.append(
+                CalibrationBin(
+                    bin_start=round(bin_start, 2),
+                    bin_end=round(bin_end, 2),
+                    predicted_mean=round(pred_mean, 4),
+                    observed_frequency=round(obs_freq, 4),
+                    count=len(in_bin),
+                    gap=round(gap, 4),
+                )
+            )
 
             total_gap_weighted += gap * len(in_bin)
 

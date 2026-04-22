@@ -15,35 +15,10 @@ The 15 base patterns below come from established agentic-systems literature.
 The Gradata treats them as primitives; domain logic (CARL rules,
 gates, voice) enhances *on top* of these primitives without replacing them.
 
-The 15 base patterns
---------------------
-1.  reflection          — Self-evaluation and quality checking
-2.  tool_use            — Calling external tools / APIs
-3.  planning            — Goal decomposition and step sequencing
-4.  memory              — Storing / retrieving past context
-5.  multi_agent         — Spawning or coordinating sub-agents
-6.  chain_of_thought    — Step-by-step reasoning
-7.  react               — Reason + Act interleaved loops
-8.  retrieval           — Fetching relevant knowledge (RAG)
-9.  summarization       — Condensing large inputs
-10. generation          — Open-ended content production
-11. classification      — Labelling or routing inputs
-12. extraction          — Pulling structured data from unstructured text
-13. transformation      — Reformatting or translating existing content
-14. validation          — Checking outputs against a rubric or schema
-15. orchestration       — Coordinating a pipeline of the above patterns
-
-Example::
-
-    from gradata.contrib.patterns.orchestrator import classify_request
-
-    result = classify_request("review this pull request")
-    print(result.intent)            # code_review
-    print(result.selected_pattern)  # reflection
-
-    result = classify_request("prepare for the upcoming meeting")
-    print(result.intent)            # meeting_prep
-    print(result.selected_pattern)  # retrieval
+The 15 base patterns (reflection, tool_use, planning, memory, multi_agent,
+chain_of_thought, react, retrieval, summarization, generation, classification,
+extraction, transformation, validation, orchestration) are treated as
+primitives; domain logic enhances on top without replacing them.
 """
 
 from __future__ import annotations

@@ -13,7 +13,6 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
-import re
 import sqlite3
 from datetime import UTC, datetime
 from enum import Enum
@@ -39,116 +38,15 @@ class RuleRelationType(Enum):
 
 
 # ---------------------------------------------------------------------------
-# Contradiction detection patterns (reused from contradiction_detector)
+# Contradiction detection patterns (imported from contradiction_detector)
 # ---------------------------------------------------------------------------
 
-_POLARITY_PAIRS: list[tuple[str, str]] = [
-    ("always", "never"),
-    ("must", "must not"),
-    ("must", "never"),
-    ("required", "forbidden"),
-    ("mandatory", "optional"),
-]
-
-_ACTION_OPPOSITES: list[tuple[str, str]] = [
-    ("use", "avoid"),
-    ("use", "don't use"),
-    ("use", "do not use"),
-    ("include", "exclude"),
-    ("include", "remove"),
-    ("include", "omit"),
-    ("add", "remove"),
-    ("add", "don't add"),
-    ("add", "do not add"),
-    ("enable", "disable"),
-    ("prefer", "avoid"),
-    ("keep", "remove"),
-    ("keep", "drop"),
-    ("keep", "delete"),
-    ("show", "hide"),
-    ("allow", "block"),
-    ("allow", "deny"),
-    ("accept", "reject"),
-]
-
-_STOPWORDS = {
-    "a",
-    "an",
-    "the",
-    "is",
-    "are",
-    "was",
-    "were",
-    "be",
-    "been",
-    "being",
-    "have",
-    "has",
-    "had",
-    "do",
-    "does",
-    "did",
-    "will",
-    "would",
-    "could",
-    "should",
-    "may",
-    "might",
-    "shall",
-    "can",
-    "to",
-    "of",
-    "in",
-    "for",
-    "on",
-    "with",
-    "at",
-    "by",
-    "from",
-    "as",
-    "into",
-    "through",
-    "during",
-    "it",
-    "its",
-    "this",
-    "that",
-    "these",
-    "those",
-    "i",
-    "we",
-    "you",
-    "they",
-    "he",
-    "she",
-    "and",
-    "but",
-    "or",
-    "not",
-    "no",
-    "if",
-    "then",
-    "else",
-    "when",
-    "while",
-    "so",
-    "than",
-    "too",
-    "very",
-    "just",
-    "also",
-    "all",
-    "each",
-    "every",
-    "any",
-    "some",
-    "only",
-}
-
-
-def _normalize(text: str) -> str:
-    """Lowercase and strip punctuation for matching."""
-    return re.sub(r"[^\w\s]", " ", text.lower()).strip()
+from gradata.enhancements.contradiction_detector import (  # noqa: E402
+    _ACTION_OPPOSITES,
+    _POLARITY_PAIRS,
+    _normalize,
+)
+from gradata.enhancements.similarity import _STOP_WORDS as _STOPWORDS  # noqa: E402
 
 
 def _extract_keywords(text: str) -> set[str]:

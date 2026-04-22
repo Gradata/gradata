@@ -12,43 +12,17 @@ into the fire_count / confidence pipeline.
 
 Public API
 ----------
-    from gradata.enhancements.dedup import (
-        observation_fingerprint,
-        is_duplicate,
-        register_observation,
-    )
-
-    fp = observation_fingerprint("Don't use em-dashes.", category="FORMAT")
-    if is_duplicate(db_path, fp, recent_window_sessions=10):
-        # suppress — already seen in recent window
-        ...
-    else:
-        register_observation(db_path, fp, session=42)
+See ``observation_fingerprint``, ``is_duplicate``, ``register_observation``,
+``check_and_register``, and ``annotate_event_with_dedup`` (ingestion seam).
 
 Semantics
 ---------
-Default = **DROP** within the recent-session window. `seen_count` is tracked
-on the persisted row so MERGE semantics (bump fire_count by seen_count at
-window rollover) can be wired in later without losing evidence.
-
-MERGE vs DROP is a policy decision flagged for polyclaude — see the task brief
-for wt-observation-dedup. The current codebase cannot wire seen_count into
-`update_confidence` without editing `self_improvement.py`, which is off-limits
-for this worktree.
+Default = **DROP** within the recent-session window. `seen_count` tracks
+total sightings for future MERGE semantics (bump fire_count at rollover).
 
 Storage
 -------
-A single table in system.db:
-
-    observation_dedup(
-        fingerprint TEXT PRIMARY KEY,
-        category    TEXT NOT NULL,
-        first_session INTEGER NOT NULL,
-        last_session  INTEGER NOT NULL,
-        seen_count    INTEGER NOT NULL DEFAULT 1,
-        first_seen_ts TEXT NOT NULL,
-        last_seen_ts  TEXT NOT NULL
-    )
+A single table in system.db (schema: see ``_CREATE_SQL`` constant).
 
 Normalization
 -------------
@@ -196,8 +170,7 @@ def register_observation(
     conn = _open(db_path)
     try:
         existing = conn.execute(
-            "SELECT seen_count, first_session FROM observation_dedup "
-            "WHERE fingerprint = ?",
+            "SELECT seen_count, first_session FROM observation_dedup WHERE fingerprint = ?",
             (fingerprint,),
         ).fetchone()
         if existing is None:
@@ -246,7 +219,8 @@ def check_and_register(
     """
     fp = observation_fingerprint(text, category=category)
     dup = is_duplicate(
-        db_path, fp,
+        db_path,
+        fp,
         current_session=session,
         recent_window_sessions=recent_window_sessions,
     )
@@ -283,8 +257,10 @@ def annotate_event_with_dedup(
     try:
         dedup_text = f"{(draft or '')[:500]}||{(final or '')[:500]}"
         info = check_and_register(
-            db_path, dedup_text,
-            category=(category or "UNKNOWN"), session=session,
+            db_path,
+            dedup_text,
+            category=(category or "UNKNOWN"),
+            session=session,
         )
         event["observation_fingerprint"] = info["fingerprint"]
         event["observation_seen_count"] = info["seen_count"]

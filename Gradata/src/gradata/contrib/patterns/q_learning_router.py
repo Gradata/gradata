@@ -12,20 +12,8 @@ Key adaptations for Gradata:
 - Persistence to brain vault
 - Integration with orchestrator.py route_by_keywords
 
-Usage::
-
-    from gradata.contrib.patterns.q_learning_router import (
-        QLearningRouter, RouterConfig, RouteDecision,
-    )
-
-    router = QLearningRouter()
-    decision = router.route("review this pull request for security issues")
-    print(decision.agent)       # "code_reviewer"
-    print(decision.confidence)  # 0.85
-    print(decision.exploiting)  # True (vs exploring)
-
-    # After task completes, feed reward
-    router.update_reward(decision, reward=0.9)
+See ``QLearningRouter`` (route, update_reward) → ``RouteDecision``
+(agent, confidence, exploiting).
 """
 
 from __future__ import annotations

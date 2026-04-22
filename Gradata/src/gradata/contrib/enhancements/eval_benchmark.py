@@ -8,25 +8,8 @@ Three benchmark dimensions:
 2. Rule Precision: Do graduated rules actually prevent re-occurrence?
 3. Graduation Accuracy: Are INSTINCT→PATTERN→RULE promotions correct?
 
-Usage::
-
-    from gradata.contrib.enhancements.eval_benchmark import (
-        LearningBenchmark, BenchmarkResult, BenchmarkCase,
-    )
-
-    bench = LearningBenchmark()
-    bench.add_case(BenchmarkCase(
-        correction_text="Changed formal to casual",
-        category="TONE",
-        severity="moderate",
-        expected_rule=True,       # Should this graduate to RULE?
-        expected_category="TONE", # Expected category detection
-    ))
-    result = bench.run()
-    print(result.overall_score)         # 0.0-1.0
-    print(result.correction_recall)     # Precision on retrieval
-    print(result.rule_precision)        # Precision on graduated rules
-    print(result.graduation_accuracy)   # Accuracy on promotion decisions
+See ``LearningBenchmark`` (add_case, run) → ``BenchmarkResult``
+(overall_score, correction_recall, rule_precision, graduation_accuracy).
 """
 
 from __future__ import annotations
@@ -57,6 +40,7 @@ class BenchmarkCase:
         task_type: Task type context.
         tags: Arbitrary tags for filtering.
     """
+
     correction_text: str = ""
     category: str = ""
     severity: str = "moderate"
@@ -81,6 +65,7 @@ class CaseResult:
         discriminator_confidence: Confidence from discriminator.
         error: Error message if case failed to run.
     """
+
     case: BenchmarkCase
     category_correct: bool = False
     severity_correct: bool = True
@@ -114,6 +99,7 @@ class BenchmarkResult:
         total_cases: Number of cases run.
         passed_cases: Number of cases that passed all assertions.
     """
+
     cases: list[CaseResult] = field(default_factory=list)
     correction_recall: float = 0.0
     rule_precision: float = 0.0
@@ -160,6 +146,7 @@ class LearningBenchmark:
         # Import discriminator
         try:
             from gradata.enhancements.lesson_discriminator import LessonDiscriminator
+
             discriminator = LessonDiscriminator()
         except ImportError:
             discriminator = None
@@ -168,6 +155,7 @@ class LearningBenchmark:
         try:
             from gradata.enhancements.diff_engine import compute_diff
             from gradata.enhancements.edit_classifier import classify_edits
+
             has_classifier = True
         except ImportError:
             has_classifier = False
@@ -205,9 +193,7 @@ class LearningBenchmark:
                     cr.discriminator_confidence = verdict.confidence
 
                     if case.expected_high_value is not None:
-                        cr.high_value_correct = (
-                            verdict.is_high_value == case.expected_high_value
-                        )
+                        cr.high_value_correct = verdict.is_high_value == case.expected_high_value
 
             except Exception as e:
                 cr.error = str(e)
@@ -222,29 +208,26 @@ class LearningBenchmark:
         category_cases = [cr for cr in case_results if cr.case.expected_category]
         correction_recall = (
             sum(1 for cr in category_cases if cr.category_correct) / len(category_cases)
-            if category_cases else 1.0
+            if category_cases
+            else 1.0
         )
 
         # Rule precision: of cases expected to be rules, how many flagged high-value
         rule_cases = [cr for cr in case_results if cr.case.expected_rule]
         rule_precision = (
             sum(1 for cr in rule_cases if cr.predicted_high_value is True) / len(rule_cases)
-            if rule_cases else 1.0
+            if rule_cases
+            else 1.0
         )
 
         # Graduation accuracy: all high-value predictions matching expected
         hv_cases = [cr for cr in case_results if cr.high_value_correct is not None]
         graduation_accuracy = (
-            sum(1 for cr in hv_cases if cr.high_value_correct) / len(hv_cases)
-            if hv_cases else 1.0
+            sum(1 for cr in hv_cases if cr.high_value_correct) / len(hv_cases) if hv_cases else 1.0
         )
 
         # Overall: weighted average (rule precision most important)
-        overall = (
-            correction_recall * 0.25
-            + rule_precision * 0.45
-            + graduation_accuracy * 0.30
-        )
+        overall = correction_recall * 0.25 + rule_precision * 0.45 + graduation_accuracy * 0.30
 
         return BenchmarkResult(
             cases=case_results,
@@ -265,40 +248,54 @@ STANDARD_BENCHMARK: list[BenchmarkCase] = [
     # High severity, should graduate
     BenchmarkCase(
         correction_text="Complete rewrite of email tone from formal to casual",
-        category="TONE", severity="rewrite",
-        expected_rule=True, expected_high_value=True,
+        category="TONE",
+        severity="rewrite",
+        expected_rule=True,
+        expected_high_value=True,
     ),
     BenchmarkCase(
         correction_text="Fixed incorrect pricing in proposal",
-        category="ACCURACY", severity="major",
-        expected_rule=True, expected_high_value=True,
+        category="ACCURACY",
+        severity="major",
+        expected_rule=True,
+        expected_high_value=True,
     ),
     BenchmarkCase(
         correction_text="Restructured entire email flow",
-        category="STRUCTURE", severity="major",
-        expected_rule=True, expected_high_value=True,
+        category="STRUCTURE",
+        severity="major",
+        expected_rule=True,
+        expected_high_value=True,
     ),
     # Low severity, should not graduate
     BenchmarkCase(
         correction_text="Fixed typo in greeting",
-        category="TONE", severity="trivial",
-        expected_rule=False, expected_high_value=False,
+        category="TONE",
+        severity="trivial",
+        expected_rule=False,
+        expected_high_value=False,
     ),
     BenchmarkCase(
         correction_text="Adjusted spacing in signature",
-        category="STYLE", severity="trivial",
-        expected_rule=False, expected_high_value=False,
+        category="STYLE",
+        severity="trivial",
+        expected_rule=False,
+        expected_high_value=False,
     ),
     # Moderate, borderline
     BenchmarkCase(
         correction_text="Changed call-to-action from link to button",
-        category="CONTENT", severity="moderate",
-        expected_rule=False, expected_high_value=None,  # Don't assert
+        category="CONTENT",
+        severity="moderate",
+        expected_rule=False,
+        expected_high_value=None,  # Don't assert
     ),
     BenchmarkCase(
         correction_text="Replaced em dash with colon",
-        category="STYLE", severity="minor",
-        expected_rule=False, expected_high_value=False,
+        category="STYLE",
+        severity="minor",
+        expected_rule=False,
+        expected_high_value=False,
     ),
 ]
 

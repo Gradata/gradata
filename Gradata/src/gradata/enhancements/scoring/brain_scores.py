@@ -22,6 +22,10 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from gradata.enhancements.scoring.correction_tracking import (
+    _SQL_CORRECTION_OUTPUT_TOTALS,
+)
+
 # ---------------------------------------------------------------------------
 # Data model
 # ---------------------------------------------------------------------------
@@ -101,9 +105,7 @@ def _fallback_brain_scores(
         conn.row_factory = sqlite3.Row
 
         # Determine session window
-        max_row = conn.execute(
-            "SELECT COALESCE(MAX(session), 0) FROM events"
-        ).fetchone()
+        max_row = conn.execute("SELECT COALESCE(MAX(session), 0) FROM events").fetchone()
         max_session: int = int(max_row[0]) if max_row else 0
         min_session = max(0, max_session - (last_n_sessions - 1))
 
@@ -122,21 +124,10 @@ def _fallback_brain_scores(
         gate_sessions = int(gate_sessions_row[0]) if gate_sessions_row else 0
 
         if total_sessions > 0:
-            system_health = round(
-                min(100.0, (gate_sessions / total_sessions) * 100.0), 1
-            )
+            system_health = round(min(100.0, (gate_sessions / total_sessions) * 100.0), 1)
 
         # --- AI quality: inverse of correction density ---
-        totals = conn.execute(
-            """
-            SELECT
-                SUM(CASE WHEN type = 'CORRECTION' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN type = 'OUTPUT'     THEN 1 ELSE 0 END)
-            FROM events
-            WHERE session >= ?
-            """,
-            (min_session,),
-        ).fetchone()
+        totals = conn.execute(_SQL_CORRECTION_OUTPUT_TOTALS, (min_session,)).fetchone()
         corrections = int(totals[0] or 0)
         outputs = int(totals[1] or 0)
         total_signal = corrections + outputs
@@ -233,9 +224,7 @@ def compute_brain_scores(
         _fn = getattr(_events, "compute_brain_scores", None)
         if _fn is None:
             raise AttributeError("compute_brain_scores not available")
-        raw: dict = _fn(
-            last_n_prospect_sessions=last_n_prospect_sessions
-        )
+        raw: dict = _fn(last_n_prospect_sessions=last_n_prospect_sessions)
         return _reshape(raw)
 
     except Exception:
