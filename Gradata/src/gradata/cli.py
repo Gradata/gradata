@@ -947,6 +947,8 @@ def cmd_cloud(args):
         print(f"pages_fetched:      {result.get('pages_fetched', 0)}")
         print(f"rules_materialized: {result.get('rules_materialized', 0)}")
         print(f"conflicts:          {result.get('conflicts', 0)}")
+        if (th := result.get("conflict_threshold")) is not None:
+            print(f"threshold:          {th}")
         print(f"applied:            {result.get('applied', False)}")
         if not apply_flag and result.get("rules_materialized"):
             print("dry-run — re-run with --apply to merge into lessons.md")

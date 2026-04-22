@@ -404,6 +404,72 @@ def test_pagination_stops_if_server_omits_watermark(brain):
     assert result["pages_fetched"] == 1
 
 
+def test_configurable_conflict_threshold_is_honored(brain):
+    """A lower threshold in cloud-config.json promotes a drift into a conflict."""
+    # Two events |Δconf| = 0.08 — default 0.15 → LWW (no conflict).
+    # Override to 0.05 → Tier 2 hold instead.
+    _save_cfg(brain.dir)
+    # Mutate the persisted config to set a tighter threshold.
+    import json as _json
+
+    cfg_path = brain.dir / "cloud-config.json"
+    data = _json.loads(cfg_path.read_text(encoding="utf-8"))
+    data["conflict_threshold"] = 0.05
+    cfg_path.write_text(_json.dumps(data), encoding="utf-8")
+
+    body = json.dumps(
+        {
+            "events": [
+                {
+                    "event_id": "e1",
+                    "ts": "2026-04-20T00:00:00Z",
+                    "type": "RULE_GRADUATED",
+                    "source": "graduate",
+                    "data": {
+                        "category": "style",
+                        "description": "use active voice",
+                        "new_state": "PATTERN",
+                        "confidence": 0.62,
+                        "fire_count": 3,
+                        "device_id": "dev_a",
+                    },
+                },
+                {
+                    "event_id": "e2",
+                    "ts": "2026-04-20T00:01:00Z",
+                    "type": "RULE_GRADUATED",
+                    "source": "graduate",
+                    "data": {
+                        "category": "style",
+                        "description": "use active voice",
+                        "new_state": "PATTERN",
+                        "confidence": 0.70,
+                        "fire_count": 5,
+                        "device_id": "dev_b",
+                    },
+                },
+            ],
+            "watermark": "wm-tight",
+            "end_of_stream": True,
+        }
+    ).encode()
+
+    with patch("urllib.request.urlopen", return_value=_FakeResp(body)):
+        result = pull_events(brain.dir)
+
+    assert result["status"] == "ok"
+    assert result["conflict_threshold"] == pytest.approx(0.05)
+    assert result["conflicts"] == 1  # tighter threshold flips this into Tier 2
+
+
+def test_default_threshold_when_config_unset(brain):
+    """With no override, the SDK default (0.15) flows through."""
+    _save_cfg(brain.dir)
+    with patch("urllib.request.urlopen", return_value=_FakeResp(_graduation_body())):
+        result = pull_events(brain.dir)
+    assert result["conflict_threshold"] == pytest.approx(0.15)
+
+
 def test_credential_resolves_from_keyfile_when_config_token_empty(brain):
     """Keyfile flows to Authorization header even when config.token is empty."""
     import urllib.error

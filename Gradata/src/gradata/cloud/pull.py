@@ -206,9 +206,11 @@ def pull_events(
 
     # Materialize regardless of apply — gives the caller a preview of
     # state/conflict counts without writing anything.
-    from gradata.cloud.materializer import materialize
+    from gradata.cloud.materializer import CONFLICT_THRESHOLD, materialize
 
-    mat = materialize(all_events)
+    threshold = config.conflict_threshold or CONFLICT_THRESHOLD
+    mat = materialize(all_events, threshold=threshold)
+    summary["conflict_threshold"] = threshold
     summary["rules_materialized"] = len(mat.rules)
     summary["conflicts"] = len(mat.conflicts)
     summary["applied"] = False

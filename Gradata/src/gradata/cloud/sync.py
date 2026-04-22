@@ -60,10 +60,29 @@ class CloudConfig:
     contribute_corpus: bool = False  # Separate, stricter opt-in
     last_sync_at: str = ""
     key_scope: str = ""  # Optional scope tag recorded at `gradata cloud enable`
+    # Override the materializer's Tier 2 conflict threshold (|Δconfidence|).
+    # 0.0 means "use the compiled default from cloud.materializer". Values
+    # outside [0.0, 1.0] are clamped at load time.
+    conflict_threshold: float = 0.0
 
 
 def _config_path(brain_dir: Path) -> Path:
     return brain_dir / _CONFIG_FILE_NAME
+
+
+def _coerce_threshold(raw) -> float:
+    """Parse the persisted conflict_threshold; 0.0 sentinel = use SDK default.
+
+    Out-of-range / unparsable values collapse to the sentinel so a broken
+    config never silently changes merge behavior.
+    """
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return 0.0
+    if value < 0.0 or value > 1.0:
+        return 0.0
+    return value
 
 
 def load_config(brain_dir: Path) -> CloudConfig:
@@ -80,6 +99,7 @@ def load_config(brain_dir: Path) -> CloudConfig:
             contribute_corpus=bool(data.get("contribute_corpus", False)),
             last_sync_at=str(data.get("last_sync_at", "")),
             key_scope=str(data.get("key" + "_scope", "")),
+            conflict_threshold=_coerce_threshold(data.get("conflict_threshold", 0.0)),
         )
     except Exception as e:
         log.debug("cloud config load failed: %s", e)
