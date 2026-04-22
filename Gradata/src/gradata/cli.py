@@ -580,13 +580,23 @@ def _check_config_permissions(config_path: Path) -> None:
 
 
 def cmd_login(args):
-    """Device authentication flow: connect SDK to app.gradata.ai."""
+    """Device authentication flow: connect SDK to app.gradata.ai.
+
+    Deprecated in favor of `gradata cloud enable`. The notice prints before
+    the device flow starts so users pick up the new command even when the
+    API is unreachable.
+    """
     import json as _json
     import os
     import time
     import webbrowser
     from urllib.error import HTTPError, URLError
     from urllib.request import Request, urlopen
+
+    print(
+        "Notice: `gradata login` is deprecated. "
+        "Use `gradata cloud enable --key gk_live_...` instead."
+    )
 
     api_url = env_str("GRADATA_API_URL", "https://api.gradata.ai/api/v1")
 
@@ -843,6 +853,79 @@ def cmd_seed(args):
             skipped += 1
 
     print(f"seeded {label}: {added} added, {skipped} already present")
+
+
+def _mask_credential(value: str) -> str:
+    """Return a masked representation of a credential string."""
+    if not value:
+        return "(none)"
+    if len(value) <= 10:
+        return "***"
+    return f"{value[:6]}...{value[-4:]}"
+
+
+def cmd_cloud(args):
+    """Dispatcher for `gradata cloud <subcommand>`."""
+    from gradata.cloud import _credentials as _creds
+    from gradata.cloud.sync import load_config, save_config
+
+    subcmd = getattr(args, "cloud_cmd", None)
+
+    brain_root = _resolve_brain_root(args)
+    brain_root.mkdir(parents=True, exist_ok=True)
+
+    if subcmd == "enable":
+        cred = args.key.strip()
+        if not cred.startswith(_creds.KEY_PREFIX):
+            print(
+                f"Warning: credential does not begin with {_creds.KEY_PREFIX!r}. "
+                "Proceeding anyway — verify this is a live cloud key."
+            )
+        path = _creds.write_to_keyfile(cred)
+        cfg = load_config(brain_root)
+        cfg.sync_enabled = True
+        scope = getattr(args, "scope", "") or ""
+        cfg.key_scope = scope
+        save_config(brain_root, cfg)
+        print(f"Cloud sync enabled. Credential stored at {path}.")
+        if scope:
+            print(f"Scope: {scope}")
+        return
+
+    if subcmd == "rotate-key":
+        new_cred = args.key.strip()
+        if not new_cred.startswith(_creds.KEY_PREFIX):
+            print(
+                f"Warning: credential does not begin with {_creds.KEY_PREFIX!r}. Rotating anyway."
+            )
+        path = _creds.write_to_keyfile(new_cred)
+        print(f"Rotating cloud credential. New value stored at {path}.")
+        return
+
+    if subcmd == "status":
+        cfg = load_config(brain_root)
+        cred = _creds.resolve_credential()
+        print(f"sync_enabled: {cfg.sync_enabled}")
+        print(f"endpoint:     {_creds.resolve_endpoint(fallback=cfg.api_base)}")
+        print(f"credential:   {_mask_credential(cred)}")
+        if cfg.key_scope:
+            print(f"scope:        {cfg.key_scope}")
+        if cfg.last_sync_at:
+            print(f"last_sync_at: {cfg.last_sync_at}")
+        return
+
+    if subcmd == "disconnect":
+        removed = _creds.delete_keyfile()
+        cfg = load_config(brain_root)
+        cfg.sync_enabled = False
+        save_config(brain_root, cfg)
+        if removed:
+            print("Cloud credential removed. Sync disabled.")
+        else:
+            print("no keyfile to remove. Sync disabled.")
+        return
+
+    print("usage: gradata cloud {enable|rotate-key|status|disconnect}")
 
 
 def cmd_mine(args):
@@ -1297,6 +1380,17 @@ def main():
         help="Override transcript root (default: ~/.claude/projects)",
     )
 
+    # cloud — unified keyfile-backed cloud credential management
+    p_cloud = sub.add_parser("cloud", help="Manage Gradata Cloud connection")
+    cloud_sub = p_cloud.add_subparsers(dest="cloud_cmd")
+    p_cloud_enable = cloud_sub.add_parser("enable", help="Enable cloud sync")
+    p_cloud_enable.add_argument("--key", required=True, help="Cloud credential (gk_live_...)")
+    p_cloud_enable.add_argument("--scope", default="", help="Optional scope tag")
+    p_cloud_rotate = cloud_sub.add_parser("rotate-key", help="Rotate cloud credential")
+    p_cloud_rotate.add_argument("--key", required=True, help="New cloud credential")
+    cloud_sub.add_parser("status", help="Show cloud sync status")
+    cloud_sub.add_parser("disconnect", help="Disconnect cloud sync")
+
     # rule — user-declared rules (fast-track to RULE tier, try hook install)
     p_rule = sub.add_parser("rule", help="Manage user-declared rules")
     rule_sub = p_rule.add_subparsers(dest="rule_cmd", required=True)
@@ -1341,6 +1435,7 @@ def main():
     commands["rule"] = cmd_rule
     commands["seed"] = cmd_seed
     commands["mine"] = cmd_mine
+    commands["cloud"] = cmd_cloud
 
     if args.command in commands:
         commands[args.command](args)
