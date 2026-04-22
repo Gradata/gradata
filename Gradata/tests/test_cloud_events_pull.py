@@ -109,34 +109,89 @@ def test_server_410_surfaces_rewind_error(brain):
     assert result["reason"] == "rewind_beyond_retention"
 
 
-def test_server_200_raises_not_implemented(brain):
-    """Phase 1 MUST NOT merge pulled events — raises loudly to prevent silent corruption."""
-    _save_cfg(brain.dir)
+class _FakeResp:
+    def __init__(self, data):
+        self._data = data
 
-    body = json.dumps(
+    def read(self):
+        return self._data
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def _graduation_body(watermark: str = "01JN000000001") -> bytes:
+    """Realistic 200 payload: one PATTERN graduation for 'style / use active voice'."""
+    return json.dumps(
         {
-            "events": [{"event_id": "01JN...", "type": "TEST"}],
-            "watermark": "01JN...",
+            "events": [
+                {
+                    "event_id": "01JN0000000001",
+                    "ts": "2026-04-20T00:00:00Z",
+                    "type": "RULE_GRADUATED",
+                    "source": "graduate",
+                    "data": {
+                        "category": "style",
+                        "description": "use active voice",
+                        "new_state": "PATTERN",
+                        "confidence": 0.62,
+                        "fire_count": 3,
+                        "device_id": "dev_remote",
+                    },
+                }
+            ],
+            "watermark": watermark,
             "end_of_stream": True,
         }
     ).encode()
 
-    class FakeResp:
-        def __init__(self, data):
-            self._data = data
 
-        def read(self):
-            return self._data
+def test_server_200_dry_run_materializes_without_writing(brain):
+    """Default apply=False: summary shows counts; lessons.md untouched."""
+    _save_cfg(brain.dir)
+    lessons_md = brain.dir / "lessons.md"
+    before = lessons_md.read_text(encoding="utf-8") if lessons_md.is_file() else None
 
-        def __enter__(self):
-            return self
+    with patch("urllib.request.urlopen", return_value=_FakeResp(_graduation_body())):
+        result = pull_events(brain.dir)
 
-        def __exit__(self, *a):
-            return False
+    assert result["status"] == "ok"
+    assert result["events_pulled"] == 1
+    assert result["rules_materialized"] == 1
+    assert result["applied"] is False
+    after = lessons_md.read_text(encoding="utf-8") if lessons_md.is_file() else None
+    assert after == before  # no mutation
 
-    with patch("urllib.request.urlopen", return_value=FakeResp(body)):
-        with pytest.raises(NotImplementedError, match="Phase 2"):
-            pull_events(brain.dir)
+
+def test_server_200_apply_writes_lessons(brain):
+    """apply=True merges materialized state into lessons.md."""
+    _save_cfg(brain.dir)
+
+    with patch("urllib.request.urlopen", return_value=_FakeResp(_graduation_body())):
+        result = pull_events(brain.dir, apply=True)
+
+    assert result["status"] == "ok"
+    assert result["applied"] is True
+    assert result["conflicts"] == 0
+    assert result["conflict_events_emitted"] == 0
+
+    lessons_md = brain.dir / "lessons.md"
+    assert lessons_md.is_file()
+    text = lessons_md.read_text(encoding="utf-8")
+    assert "use active voice" in text
+
+
+def test_server_200_malformed_json_returns_error(brain):
+    _save_cfg(brain.dir)
+
+    with patch("urllib.request.urlopen", return_value=_FakeResp(b"not json")):
+        result = pull_events(brain.dir)
+
+    assert result["status"] == "error"
+    assert result["reason"] == "malformed_response"
 
 
 def test_request_includes_brain_and_device_id(brain):

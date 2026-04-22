@@ -1,17 +1,18 @@
-"""Client for ``GET /events/pull`` — ships disabled in Phase 1.
+"""Client for ``GET /events/pull`` with Phase 2 merge wiring.
 
-The contract is frozen in ``docs/specs/events-pull-contract.md``. This module
-exists in Phase 1 so every field of the signature and return shape is locked
-in code before the server implementation ships.
+The contract is frozen in ``docs/specs/events-pull-contract.md``.
 
-Behavior in Phase 1:
-  - Server returns ``501 Not Implemented`` → returns ``{"status": "disabled_server_side", ...}``.
-  - Server returns ``200 OK`` → raises :class:`NotImplementedError` so
-    nothing accidentally gets merged into the local brain before the
-    materializer ships in Phase 2.
+Behavior:
+  - Server returns ``501 Not Implemented`` → ``{"status": "disabled_server_side", ...}``.
+  - Server returns ``410 Gone`` → ``{"status": "error", "reason": "rewind_beyond_retention"}``.
+  - Server returns ``200 OK`` with ``apply=False`` (default) → materializes
+    the stream and returns counts/watermark without touching local state.
+  - Server returns ``200 OK`` with ``apply=True`` → materializes, applies
+    to ``lessons.md``, and emits ``RULE_CONFLICT`` events for any Tier 2
+    conflicts (see ``docs/specs/merge-semantics.md``).
 
-Once the materializer lands, the ``200 OK`` branch will be wired through a
-merge path guarded by ``docs/specs/merge-semantics.md``.
+``apply=False`` is the safe default so accidental calls during CI / smoke
+tests never mutate a brain.
 """
 
 from __future__ import annotations
@@ -41,11 +42,18 @@ def pull_events(
     cursor: str | None = None,
     include_archived: bool = False,
     timeout: float = 30.0,
+    apply: bool = False,
 ) -> dict[str, Any]:
     """Pull pending events from cloud. See ``docs/specs/events-pull-contract.md``.
 
+    When ``apply=False`` (default) the pulled stream is materialized and
+    summarized but local lessons are **not** mutated and no conflict events
+    are emitted — callers preview the delta before committing. When
+    ``apply=True`` the materialized state is written to ``lessons.md`` and
+    ``RULE_CONFLICT`` events are emitted for any Tier 2 conflicts.
+
     Returns a summary dict with a stable ``status`` field:
-      - ``ok``                  — events successfully pulled (Phase 2+).
+      - ``ok``                  — events successfully pulled.
       - ``disabled_server_side`` — server returned 501.
       - ``disabled``            — local ``sync_enabled: false``.
       - ``kill_switch``         — ``GRADATA_CLOUD_SYNC_DISABLE`` is set.
@@ -141,15 +149,52 @@ def pull_events(
         summary["reason"] = "transport"
         return summary
 
-    # 200 OK path — intentionally not wired in Phase 1.
-    # The materializer + merge-semantics are the prerequisite for merging
-    # pulled events into local state. Shipping a "works partially" path
-    # would silently corrupt brains. Raise loudly instead.
     try:
         parsed = json.loads(body) if body else {}
     except json.JSONDecodeError:
-        parsed = {}
-    raise NotImplementedError(
-        "events/pull merge path is Phase 2. See docs/specs/events-pull-contract.md §7. "
-        f"Server returned {len(parsed.get('events', []) or [])} events but merge is not wired."
-    )
+        log.warning("events/pull: server returned non-JSON body")
+        summary["status"] = "error"
+        summary["reason"] = "malformed_response"
+        return summary
+
+    events = parsed.get("events") or []
+    summary["events_pulled"] = len(events)
+    summary["watermark"] = parsed.get("watermark")
+    summary["end_of_stream"] = bool(parsed.get("end_of_stream", True))
+
+    # Materialize regardless of apply — gives the caller a preview of
+    # state/conflict counts without writing anything.
+    from gradata.cloud.materializer import materialize
+
+    mat = materialize(events)
+    summary["rules_materialized"] = len(mat.rules)
+    summary["conflicts"] = len(mat.conflicts)
+    summary["applied"] = False
+
+    if apply and (mat.rules or mat.conflicts):
+        from gradata._db import write_lessons_safe
+        from gradata.cloud._apply_materialized import (
+            apply_to_lessons,
+            emit_conflict_events,
+        )
+        from gradata.enhancements.self_improvement import format_lessons, parse_lessons
+
+        lessons_path = brain / "lessons.md"
+        existing = (
+            parse_lessons(lessons_path.read_text(encoding="utf-8"))
+            if lessons_path.is_file()
+            else []
+        )
+        merged = apply_to_lessons(existing, mat)
+        try:
+            write_lessons_safe(lessons_path, format_lessons(merged))
+            summary["applied"] = True
+        except Exception as exc:
+            log.error("events/pull: lessons write failed: %s", exc)
+            summary["status"] = "error"
+            summary["reason"] = "lessons_write_failed"
+            return summary
+
+        summary["conflict_events_emitted"] = emit_conflict_events(mat)
+
+    return summary
