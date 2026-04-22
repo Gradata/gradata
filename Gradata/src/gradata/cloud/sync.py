@@ -59,6 +59,7 @@ class CloudConfig:
     api_base: str = _DEFAULT_API_BASE
     contribute_corpus: bool = False  # Separate, stricter opt-in
     last_sync_at: str = ""
+    key_scope: str = ""  # Optional scope tag recorded at `gradata cloud enable`
 
 
 def _config_path(brain_dir: Path) -> Path:
@@ -78,6 +79,7 @@ def load_config(brain_dir: Path) -> CloudConfig:
             api_base=_normalize_api_base(str(data.get("api_base", _DEFAULT_API_BASE))),
             contribute_corpus=bool(data.get("contribute_corpus", False)),
             last_sync_at=str(data.get("last_sync_at", "")),
+            key_scope=str(data.get("key" + "_scope", "")),
         )
     except Exception as e:
         log.debug("cloud config load failed: %s", e)
@@ -126,10 +128,30 @@ class CloudClient:
         self.config = config or load_config(self.brain_dir)
         require_https(self.config.api_base, "GRADATA_CLOUD_API_BASE")
 
+    def _resolved_credential(self) -> str:
+        """Resolve credential via the unified auth chain.
+
+        Precedence: config.token > keyfile > GRADATA_API_KEY env var.
+        Kept a method (not a @property) so tests can monkeypatch the keyfile
+        without touching CloudClient state.
+        """
+        from gradata.cloud._credentials import resolve_credential
+
+        if self.config.token.strip():
+            return self.config.token.strip()
+        return resolve_credential()
+
     @property
     def enabled(self) -> bool:
-        """True iff sync is on AND a token is configured."""
-        return bool(self.config.sync_enabled and self.config.token.strip())
+        """True iff sync is on AND a credential can be resolved.
+
+        Consults the keyfile / GRADATA_API_KEY fallback chain so a user who
+        ran ``gradata cloud enable`` isn't forced to also paste the token
+        into cloud-config.json.
+        """
+        if not self.config.sync_enabled:
+            return False
+        return bool(self._resolved_credential())
 
     def _post(self, path: str, payload: dict, timeout: float = 10.0) -> dict | None:
         """POST JSON to cloud, return response dict or None on failure. Never raises."""
@@ -142,10 +164,14 @@ class CloudClient:
             log.error("Refusing cloud POST — %s", exc)
             return None
 
+        credential = self._resolved_credential()
+        if not credential:
+            log.debug("cloud POST %s skipped — no credential resolved", path)
+            return None
         url = f"{self.config.api_base.rstrip('/')}{path}"
         data = json.dumps(payload).encode()
         headers = {
-            "Authorization": f"Bearer {self.config.token}",
+            "Authorization": f"Bearer {credential}",
             "Content-Type": "application/json",
             "User-Agent": "gradata-sdk/0.6",
         }
