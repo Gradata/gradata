@@ -110,9 +110,20 @@ def pull_events(
         summary["reason"] = "https_required"
         return summary
 
+    # Mirror push.py: identity resolution can raise OSError on a corrupted
+    # brain dir, and the public contract is "never raise — return summary".
+    try:
+        resolved_tenant = tenant_for(brain)
+        resolved_device = get_or_create_device_id(brain)
+    except OSError as exc:
+        log.debug("events/pull: identity resolution failed: %s", exc)
+        summary["status"] = "error"
+        summary["reason"] = "identity_error"
+        return summary
+
     base_params: dict[str, Any] = {
-        "brain_id": tenant_for(brain),
-        "device_id": get_or_create_device_id(brain),
+        "brain_id": resolved_tenant,
+        "device_id": resolved_device,
         "limit": max(1, min(int(limit), 1000)),
     }
 

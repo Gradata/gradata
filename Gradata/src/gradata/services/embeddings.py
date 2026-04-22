@@ -108,15 +108,24 @@ class EmbeddingClient:
 
 
 _default_client = None
+_default_client_lock = threading.Lock()
 
 
 def get_client():
+    """Return the process-wide default ``EmbeddingClient``.
+
+    Uses double-checked locking so async event-bus handlers racing on the
+    first call can't create two clients (benign today — there's no mutable
+    shared state — but cheap insurance against future fields being added).
+    """
     global _default_client
     if _default_client is None:
-        _default_client = EmbeddingClient(
-            api_url=os.environ.get("GRADATA_API_URL"),
-            api_token=os.environ.get("GRADATA_API_TOKEN"),
-        )
+        with _default_client_lock:
+            if _default_client is None:
+                _default_client = EmbeddingClient(
+                    api_url=os.environ.get("GRADATA_API_URL"),
+                    api_token=os.environ.get("GRADATA_API_TOKEN"),
+                )
     return _default_client
 
 

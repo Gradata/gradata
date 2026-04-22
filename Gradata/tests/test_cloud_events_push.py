@@ -514,3 +514,16 @@ def test_legacy_null_tenant_rows_still_pushed(tmp_path, monkeypatch):
     assert summary["status"] == "ok"
     sent_ids = [e["event_id"] for e in captured["body"]["events"]]
     assert sent_ids == ["01HN00000000000000000000L0"]
+
+
+def test_identity_resolution_oserror_returns_summary(tmp_path, monkeypatch):
+    """Contract: a broken tenant/device file must return summary, not raise."""
+    brain = _make_brain(tmp_path, events=[{"event_id": "01HN" + "0" * 22}])
+
+    def boom(_):
+        raise OSError("brain dir corrupted")
+
+    monkeypatch.setattr(push_mod, "tenant_for", boom)
+    summary = push_mod.push_pending_events(brain)
+    assert summary["status"] == "error"
+    assert summary["reason"] == "identity_error"

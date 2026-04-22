@@ -95,11 +95,14 @@ def _rule_key(event: dict) -> tuple[str, str] | None:
     to trimmed description for pre-hash events.
     """
     data = event.get("data") or {}
-    # Normalize category to lowercase so rules emitted with mixed casing
+    # Normalize category to uppercase so rules emitted with mixed casing
     # (e.g. "Security" vs "security") converge on a single materialized row
     # instead of fragmenting into duplicates that later trigger spurious
-    # conflicts during merge.
-    category = str(data.get("category") or "").strip().lower()
+    # conflicts during merge. Uppercase matches the apply path
+    # (_apply_materialized.py) and the convention in lessons.md, so any
+    # caller comparing MaterializedRule.category against a Lesson.category
+    # sees the same token without needing to re-normalize.
+    category = str(data.get("category") or "").strip().upper()
     pattern_hash = str(data.get("pattern_hash") or "").strip()
     description = str(data.get("description") or "").strip()
     ident = pattern_hash or description
@@ -383,7 +386,7 @@ def materialize(
 __all__ = [
     "CONFLICT_THRESHOLD",
     "Conflict",
-    "MaterializedRule",
     "MaterializeResult",
+    "MaterializedRule",
     "materialize",
 ]

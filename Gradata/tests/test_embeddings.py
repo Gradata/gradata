@@ -102,3 +102,31 @@ def test_cluster_skips_blank_descriptions():
     # merged into real rows); the two identical descriptions cluster.
     sizes = sorted(len(c) for c in clusters)
     assert sizes == [1, 1, 2]
+
+
+def test_get_client_is_threadsafe_singleton(monkeypatch):
+    """Double-checked locking must hand out the same instance to concurrent callers."""
+    import threading
+
+    import gradata.services.embeddings as emb
+
+    monkeypatch.setattr(emb, "_default_client", None)
+
+    start = threading.Event()
+    instances: list[object] = []
+    lock = threading.Lock()
+
+    def worker():
+        start.wait()
+        client = emb.get_client()
+        with lock:
+            instances.append(client)
+
+    threads = [threading.Thread(target=worker) for _ in range(16)]
+    for t in threads:
+        t.start()
+    start.set()
+    for t in threads:
+        t.join()
+
+    assert len({id(c) for c in instances}) == 1

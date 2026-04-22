@@ -284,8 +284,17 @@ def push_pending_events(
         return summary
 
     url = f"{api_base}/events/push"
-    tenant_id = tenant_for(brain)
-    device_id = get_or_create_device_id(brain)
+    # Identity resolution touches the brain dir (tenant file, device_uuid
+    # migration). The public contract is "never raise", so catch OSError
+    # from corrupted/inaccessible brains instead of letting it escape.
+    try:
+        tenant_id = tenant_for(brain)
+        device_id = get_or_create_device_id(brain)
+    except OSError as exc:
+        log.debug("events/push: identity resolution failed: %s", exc)
+        summary["status"] = "error"
+        summary["reason"] = "identity_error"
+        return summary
     now_iso = _dt.datetime.now(_dt.UTC).isoformat()
 
     try:
