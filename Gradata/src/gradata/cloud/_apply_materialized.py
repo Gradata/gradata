@@ -56,7 +56,12 @@ def apply_to_lessons(
       do not overwrite local state. Callers should emit ``RULE_CONFLICT``
       events separately (see :func:`emit_conflict_events`).
     """
-    by_key: dict[tuple[str, str], Lesson] = {(l.category, l.description): l for l in lessons}
+    # Match case-insensitively on category — lessons.md uppercases on
+    # serialize, while events carry the raw emitted case. Without
+    # normalization, a second apply would duplicate every row.
+    by_key: dict[tuple[str, str], Lesson] = {
+        (l.category.upper(), l.description): l for l in lessons
+    }
 
     # Skip any key currently in conflict — local state stands until
     # user adjudicates via RULE_CONFLICT_RESOLVED.
@@ -70,7 +75,7 @@ def apply_to_lessons(
         if new_state is None:
             continue
 
-        lesson_key = (rule.category, rule.description)
+        lesson_key = (rule.category.upper(), rule.description)
         existing = by_key.get(lesson_key)
         if existing is not None:
             existing.state = new_state
@@ -86,7 +91,7 @@ def apply_to_lessons(
             date=rule.winning_event_ts[:10] if rule.winning_event_ts else "",
             state=new_state,
             confidence=rule.confidence,
-            category=rule.category,
+            category=rule.category.upper(),
             description=rule.description,
             fire_count=rule.fire_count,
         )

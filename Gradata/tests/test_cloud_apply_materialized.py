@@ -67,7 +67,9 @@ class TestApplyToLessons:
         )
         updated = apply_to_lessons([], result)
         assert len(updated) == 1
-        assert updated[0].category == "structure"
+        # Category is normalized to uppercase on persist so replays land in
+        # the same row format the lessons.md serializer produces.
+        assert updated[0].category == "STRUCTURE"
         assert updated[0].state == LessonState.RULE
         assert updated[0].date == "2026-04-20"
 
