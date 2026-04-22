@@ -74,6 +74,12 @@ _CORE_TAXONOMY = {
         "values": {"intrinsic", "extraneous", "germane"},
         "required_on": [],
     },
+    "conflict_reason": {
+        "desc": "Why a cloud rule merge entered Tier 2 hold (see cloud/materializer.py).",
+        "mode": "closed",
+        "values": {"confidence_drift", "state_disagreement"},
+        "required_on": ["RULE_CONFLICT"],
+    },
 }
 
 # ── Rosch 6-Category Hierarchy ───────────────────────────────────────
@@ -388,6 +394,25 @@ def enrich_tags(
         }
         if activity in channel_map:
             enriched.append(f"channel:{channel_map[activity]}")
+    # Cloud rule lifecycle events — surface category + conflict reason
+    # automatically so queries can filter by them without the emitter
+    # having to hand-build tag lists.
+    _RULE_EVENTS = {
+        "RULE_GRADUATED",
+        "RULE_DEMOTED",
+        "RULE_OVERRIDE",
+        "RULE_CONFLICT",
+        "RULE_CONFLICT_RESOLVED",
+    }
+    if event_type in _RULE_EVENTS and "category" not in prefixes:
+        cat = (data.get("category") or "").upper()
+        if cat:
+            enriched.append(f"category:{cat}")
+    if event_type == "RULE_CONFLICT" and "conflict_reason" not in prefixes:
+        reason = data.get("reason") or ""
+        if reason:
+            enriched.append(f"conflict_reason:{reason}")
+
     if event_type == "CORRECTION" and "cognitive_load" not in prefixes:
         cat = data.get("category", "").upper()
         _COGNITIVE_LOAD_MAP = {
