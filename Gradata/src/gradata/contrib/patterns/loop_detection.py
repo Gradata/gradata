@@ -11,25 +11,8 @@ in a sliding window. Progressive intervention:
 The hash is computed from normalized (tool_name, sorted_args) tuples,
 making it resistant to argument reordering.
 
-Usage::
-
-    from gradata.contrib.patterns.loop_detection import (
-        LoopDetector, LoopAction, LoopEvent,
-    )
-
-    detector = LoopDetector()
-    action = detector.record("Bash", {"command": "pytest"})
-    assert action == LoopAction.ALLOW
-
-    # After 3 identical calls:
-    for _ in range(2):
-        detector.record("Bash", {"command": "pytest"})
-    action = detector.record("Bash", {"command": "pytest"})
-    assert action == LoopAction.WARN
-
-    # After 5:
-    action = detector.record("Bash", {"command": "pytest"})
-    assert action == LoopAction.STOP
+See ``LoopDetector.record(tool_name, args)`` → ``LoopAction``
+(ALLOW / WARN at 3 repeats / STOP at 5 repeats).
 """
 
 from __future__ import annotations
