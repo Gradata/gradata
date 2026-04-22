@@ -11,20 +11,8 @@ When enough data is collected (50+ rated outputs), the system can
 recommend a calibrated threshold that maximizes the F1 score of
 pass/fail decisions relative to the human's accept/reject ground truth.
 
-Usage:
-    calibrator = GateCalibrator()
-
-    # Collect data over sessions
-    calibrator.record(auto_score=8.2, human_accepted=True)
-    calibrator.record(auto_score=7.5, human_accepted=False)
-    calibrator.record(auto_score=7.8, human_accepted=True)
-    ...
-
-    # When enough data, compute optimal threshold
-    result = calibrator.compute_optimal_threshold()
-    print(result.recommended_threshold)  # e.g., 7.6
-    print(result.f1_at_recommended)      # e.g., 0.84
-    print(result.current_f1)             # e.g., 0.71 (at 8.0)
+See ``GateCalibrator`` (record, compute_optimal_threshold) →
+``CalibrationResult`` (recommended_threshold, f1_at_recommended, current_f1).
 
 Reference: Anthropic, "Demystifying Evals for AI Agents" (2025).
 """
@@ -37,10 +25,11 @@ from dataclasses import dataclass
 @dataclass
 class ThresholdCandidate:
     """Analysis of a specific threshold value."""
+
     threshold: float
-    precision: float       # Of those predicted pass, how many were actually accepted?
-    recall: float          # Of those actually accepted, how many were predicted pass?
-    f1: float              # Harmonic mean of precision and recall
+    precision: float  # Of those predicted pass, how many were actually accepted?
+    recall: float  # Of those actually accepted, how many were predicted pass?
+    f1: float  # Harmonic mean of precision and recall
     true_positives: int
     false_positives: int
     true_negatives: int
@@ -50,15 +39,16 @@ class ThresholdCandidate:
 @dataclass
 class CalibrationResult:
     """Result of ROC-based threshold optimization."""
+
     recommended_threshold: float
     f1_at_recommended: float
     current_threshold: float
     current_f1: float
     n_samples: int
-    sufficient_data: bool       # True if n_samples >= min_samples
+    sufficient_data: bool  # True if n_samples >= min_samples
     candidates: list[ThresholdCandidate]
-    human_accept_rate: float    # Fraction of outputs the human accepted
-    auto_pass_rate: float       # Fraction that pass at current threshold
+    human_accept_rate: float  # Fraction of outputs the human accepted
+    auto_pass_rate: float  # Fraction that pass at current threshold
 
 
 class GateCalibrator:
@@ -142,9 +132,7 @@ class GateCalibrator:
 
             # On tie: prefer higher threshold (fewer false positives)
             if candidate.f1 > best_f1 or (
-                candidate.f1 == best_f1
-                and self._prefer_higher_on_tie
-                and t > best_threshold
+                candidate.f1 == best_f1 and self._prefer_higher_on_tie and t > best_threshold
             ):
                 best_f1 = candidate.f1
                 best_threshold = t
@@ -184,10 +172,7 @@ class GateCalibrator:
 
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
         recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-        f1 = (
-            2 * precision * recall / (precision + recall)
-            if (precision + recall) > 0 else 0.0
-        )
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
 
         return ThresholdCandidate(
             threshold=round(threshold, 1),

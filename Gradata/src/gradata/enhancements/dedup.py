@@ -17,14 +17,8 @@ See ``observation_fingerprint``, ``is_duplicate``, ``register_observation``,
 
 Semantics
 ---------
-Default = **DROP** within the recent-session window. `seen_count` is tracked
-on the persisted row so MERGE semantics (bump fire_count by seen_count at
-window rollover) can be wired in later without losing evidence.
-
-MERGE vs DROP is a policy decision flagged for polyclaude — see the task brief
-for wt-observation-dedup. The current codebase cannot wire seen_count into
-`update_confidence` without editing `self_improvement.py`, which is off-limits
-for this worktree.
+Default = **DROP** within the recent-session window. `seen_count` tracks
+total sightings for future MERGE semantics (bump fire_count at rollover).
 
 Storage
 -------

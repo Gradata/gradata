@@ -11,21 +11,7 @@ cross-machine identification. Feeds into the graduation engine.
 Unlike probabilistic sampling, this fires on 100% of tool calls
 to ensure no patterns are missed.
 
-Usage::
-
-    from gradata.enhancements.observation_hooks import (
-        ObservationStore, Observation, ProjectDetector,
-        observe_tool_use, get_project_id,
-    )
-
-    store = ObservationStore(base_dir=Path("~/.gradata/observations"))
-    obs = observe_tool_use(
-        tool_name="Bash",
-        input_data={"command": "pytest"},
-        output_data={"exit_code": 0},
-        session_id="s42",
-    )
-    store.append(obs)
+See ``observe_tool_use``, ``ObservationStore``, ``get_project_id``.
 """
 
 from __future__ import annotations
@@ -59,6 +45,7 @@ class Observation:
         success: Whether the tool call succeeded.
         metadata: Arbitrary metadata.
     """
+
     timestamp: float
     tool_name: str
     input_summary: str = ""
@@ -78,12 +65,12 @@ import re as _re
 
 # PII patterns to redact from observations before storage
 _PII_PATTERNS = [
-    (_re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'), '[EMAIL]'),
-    (_re.compile(r'(?:\+?1[\s\-.]?)?\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}\b'), '[PHONE]'),
-    (_re.compile(r'\b(?:sk-|api[_-]?key[=:]\s*)[A-Za-z0-9_-]{10,}\b', _re.I), '[API_KEY]'),
-    (_re.compile(r'\b(?:token[=:]\s*|bearer\s+)[A-Za-z0-9_.-]{10,}\b', _re.I), '[TOKEN]'),
-    (_re.compile(r'\b(?:password[=:]\s*|passwd[=:]\s*)\S+', _re.I), '[PASSWORD]'),
-    (_re.compile(r'-----BEGIN [A-Z ]+-----'), '[PRIVATE_KEY]'),
+    (_re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"), "[EMAIL]"),
+    (_re.compile(r"(?:\+?1[\s\-.]?)?\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}\b"), "[PHONE]"),
+    (_re.compile(r"\b(?:sk-|api[_-]?key[=:]\s*)[A-Za-z0-9_-]{10,}\b", _re.I), "[API_KEY]"),
+    (_re.compile(r"\b(?:token[=:]\s*|bearer\s+)[A-Za-z0-9_.-]{10,}\b", _re.I), "[TOKEN]"),
+    (_re.compile(r"\b(?:password[=:]\s*|passwd[=:]\s*)\S+", _re.I), "[PASSWORD]"),
+    (_re.compile(r"-----BEGIN [A-Z ]+-----"), "[PRIVATE_KEY]"),
 ]
 
 
@@ -126,6 +113,7 @@ def observe_tool_use(
     Returns:
         A structured Observation.
     """
+
     def _summarize(data: Any) -> str:
         if data is None:
             return ""
@@ -145,7 +133,6 @@ def observe_tool_use(
         duration_ms=duration_ms,
         success=success,
     )
-
 
 
 class ObservationStore:

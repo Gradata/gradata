@@ -12,20 +12,8 @@ Enforces a disciplined execute-then-verify loop:
 
 The key insight: never trust memory. Always re-read files after execution.
 
-Usage::
-
-    from gradata.contrib.patterns.execute_qualify import (
-        ExecuteQualifyLoop, QualifyResult, FailureClassification,
-    )
-
-    loop = ExecuteQualifyLoop(max_attempts=3)
-    result = loop.run(
-        executor=my_executor,
-        qualifier=my_qualifier,
-        task_spec="Implement login endpoint",
-    )
-    print(result.passed)        # True/False
-    print(result.attempts_used) # 1-3
+See ``ExecuteQualifyLoop.run(executor, qualifier, task_spec)`` →
+``ExecuteQualifyResult`` (passed, attempts_used, failure_classification).
 """
 
 from __future__ import annotations
@@ -50,6 +38,7 @@ __all__ = [
 
 class QualifyScore(Enum):
     """Qualification score from fresh verification."""
+
     PASS = "pass"
     GAP = "gap"
     DRIFT = "drift"
@@ -63,6 +52,7 @@ class FailureClassification(Enum):
     - SPEC: The acceptance criteria were wrong. Fix plan first, then code.
     - CODE: Implementation doesn't match correct plan. Fix code in place.
     """
+
     INTENT = "intent"
     SPEC = "spec"
     CODE = "code"
@@ -78,6 +68,7 @@ class QualifyResult:
         classification: Root cause if score != PASS.
         concerns: Issues found during qualification.
     """
+
     score: QualifyScore
     evidence: str = ""
     classification: FailureClassification | None = None
@@ -100,14 +91,13 @@ class ExecuteQualifyResult:
         final_qualify: The last QualifyResult from verification.
         attempt_history: Full history of (outcome, qualify) pairs.
     """
+
     passed: bool
     attempts_used: int
     max_attempts: int
     final_outcome: TaskOutcome | None = None
     final_qualify: QualifyResult | None = None
-    attempt_history: list[tuple[TaskOutcome, QualifyResult | None]] = field(
-        default_factory=list
-    )
+    attempt_history: list[tuple[TaskOutcome, QualifyResult | None]] = field(default_factory=list)
 
 
 # Type aliases for callables
