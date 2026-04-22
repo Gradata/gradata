@@ -925,7 +925,34 @@ def cmd_cloud(args):
             print("no keyfile to remove. Sync disabled.")
         return
 
-    print("usage: gradata cloud {enable|rotate-key|status|disconnect}")
+    if subcmd == "sync-pull":
+        from gradata.cloud.pull import pull_events
+
+        apply_flag = bool(getattr(args, "apply", False))
+        rebuild_from = getattr(args, "rebuild_from", None) or None
+        limit = int(getattr(args, "limit", 500) or 500)
+
+        result = pull_events(
+            brain_root,
+            apply=apply_flag,
+            rebuild_from=rebuild_from,
+            limit=limit,
+        )
+        status = result.get("status")
+        print(f"status:             {status}")
+        if reason := result.get("reason"):
+            print(f"reason:             {reason}")
+            return
+        print(f"events_pulled:      {result.get('events_pulled', 0)}")
+        print(f"pages_fetched:      {result.get('pages_fetched', 0)}")
+        print(f"rules_materialized: {result.get('rules_materialized', 0)}")
+        print(f"conflicts:          {result.get('conflicts', 0)}")
+        print(f"applied:            {result.get('applied', False)}")
+        if not apply_flag and result.get("rules_materialized"):
+            print("dry-run — re-run with --apply to merge into lessons.md")
+        return
+
+    print("usage: gradata cloud {enable|rotate-key|status|disconnect|sync-pull}")
 
 
 def cmd_mine(args):
@@ -1390,6 +1417,23 @@ def main():
     p_cloud_rotate.add_argument("--key", required=True, help="New cloud credential")
     cloud_sub.add_parser("status", help="Show cloud sync status")
     cloud_sub.add_parser("disconnect", help="Disconnect cloud sync")
+    p_cloud_pull = cloud_sub.add_parser(
+        "sync-pull", help="Pull pending cloud events (dry-run by default)"
+    )
+    p_cloud_pull.add_argument(
+        "--apply",
+        action="store_true",
+        help="Merge materialized state into lessons.md and emit RULE_CONFLICT events",
+    )
+    p_cloud_pull.add_argument(
+        "--rebuild-from",
+        dest="rebuild_from",
+        default=None,
+        help="Force-resume from a specific watermark (bypasses persisted cursor)",
+    )
+    p_cloud_pull.add_argument(
+        "--limit", type=int, default=500, help="Max events per page (1..1000)"
+    )
 
     # rule — user-declared rules (fast-track to RULE tier, try hook install)
     p_rule = sub.add_parser("rule", help="Manage user-declared rules")

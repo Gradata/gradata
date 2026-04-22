@@ -107,6 +107,79 @@ def test_cloud_disconnect_idempotent(_isolate, monkeypatch, capsys):
     assert "no keyfile" in out.lower()
 
 
+def test_cloud_sync_pull_errors_without_db(_isolate, monkeypatch, capsys):
+    """Fresh brain (no system.db) surfaces no_db via the CLI."""
+    _run(monkeypatch, "cloud", "sync-pull")
+    out = capsys.readouterr().out
+    assert "status:" in out
+    assert "no_db" in out
+
+
+def test_cloud_sync_pull_dry_run_prints_summary(_isolate, monkeypatch, capsys):
+    """Mocked 200 response — default is dry-run; lessons.md is untouched."""
+    import json
+    from unittest.mock import patch
+
+    from gradata import Brain
+    from gradata.cloud.sync import CloudConfig, save_config
+
+    brain = Brain(_isolate)
+    brain.emit("SEED", "test", {"x": 1}, [])
+
+    cfg = CloudConfig(sync_enabled=True, api_base="https://api.example.com")
+    _tok = "gk_live_testkey_abcdef123456"
+    cfg.token = _tok
+    save_config(_isolate, cfg)
+
+    payload = {
+        "events": [
+            {
+                "event_id": "fake-id-1",
+                "ts": "2026-04-20T00:00:00Z",
+                "type": "RULE_GRADUATED",
+                "source": "graduate",
+                "data": {
+                    "category": "style",
+                    "description": "use active voice",
+                    "new_state": "PATTERN",
+                    "confidence": 0.62,
+                    "fire_count": 3,
+                    "device_id": "dev_remote",
+                },
+            }
+        ],
+        "watermark": "watermark-1",
+        "end_of_stream": True,
+    }
+    body = json.dumps(payload).encode()
+
+    class _Resp:
+        def read(self):
+            return body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    lessons_md = _isolate / "lessons.md"
+    before = lessons_md.read_text(encoding="utf-8") if lessons_md.is_file() else None
+
+    with patch("urllib.request.urlopen", return_value=_Resp()):
+        _run(monkeypatch, "cloud", "sync-pull")
+
+    out = capsys.readouterr().out
+    assert "status:             ok" in out
+    assert "events_pulled:      1" in out
+    assert "rules_materialized: 1" in out
+    assert "applied:            False" in out
+    assert "dry-run" in out
+
+    after = lessons_md.read_text(encoding="utf-8") if lessons_md.is_file() else None
+    assert after == before
+
+
 def test_login_prints_deprecation_notice(_isolate, monkeypatch, capsys):
     """`gradata login` must emit a deprecation note pointing at cloud enable."""
     # Short-circuit the device flow by making urlopen fail immediately.
