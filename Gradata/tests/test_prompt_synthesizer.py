@@ -1,9 +1,14 @@
 """Tests for Meta-Harness D synthesized prompt injection."""
+
 from __future__ import annotations
 
 from gradata.enhancements.prompt_synthesizer import (
+    DEFAULT_BUDGET_TOKENS,
+    SLOT_ORDER,
     SynthesizedPrompt,
+    classify_slot,
     extract_anchors,
+    synthesize_brain_injection,
     synthesize_rules_prompt,
 )
 
@@ -20,10 +25,11 @@ def test_empty_rules_yields_empty_prompt():
 
 
 def test_single_rule_gets_inline_anchor():
-    out = synthesize_rules_prompt([
-        _rule("DRAFTING", "never attribute quotes prospects didn't say",
-              "a1f92b3c4d5e"),
-    ])
+    out = synthesize_rules_prompt(
+        [
+            _rule("DRAFTING", "never attribute quotes prospects didn't say", "a1f92b3c4d5e"),
+        ]
+    )
     assert "r:a1f9" in out.text
     assert "a1f9" in out.anchors_used
     assert out.anchor_to_rule_id["a1f9"] == "a1f92b3c4d5e"
@@ -58,10 +64,7 @@ def test_strips_noise_prefixes():
 
 
 def test_max_per_category_caps_output():
-    rules = [
-        _rule("DRAFTING", f"rule number {i}", f"{i:04x}00000000")
-        for i in range(10)
-    ]
+    rules = [_rule("DRAFTING", f"rule number {i}", f"{i:04x}00000000") for i in range(10)]
     out = synthesize_rules_prompt(rules, max_per_category=3)
     # 3 anchors max from the capped category
     assert len(out.anchors_used) == 3
@@ -70,15 +73,11 @@ def test_max_per_category_caps_output():
 def test_token_saving_vs_flat_list():
     """Sanity check — synthesized form fits in fewer tokens than the
     equivalent ``[RULE:0.92] {cat}: {desc}`` flat list it replaces."""
-    rules = [
-        _rule("DRAFTING", f"directive {i}", f"{i:04x}abcdef01")
-        for i in range(8)
-    ]
+    rules = [_rule("DRAFTING", f"directive {i}", f"{i:04x}abcdef01") for i in range(8)]
     out = synthesize_rules_prompt(rules, max_per_category=8)
 
     flat = "\n".join(
-        f"[RULE:0.92] {r['category']}: {r['description']} r:{r['rule_id'][:4]}"
-        for r in rules
+        f"[RULE:0.92] {r['category']}: {r['description']} r:{r['rule_id'][:4]}" for r in rules
     )
     # Synthesis should produce fewer tokens than the flat dump.
     assert out.token_count_estimate() < len(flat.split())
@@ -157,3 +156,174 @@ def test_llm_failure_falls_back_to_template(monkeypatch):
     # Falls back to template, which still has the inline anchor
     assert "r:a1f9" in out.text
     assert "keep diffs small" in out.text
+
+
+# ---------------------------------------------------------------------------
+# Slot classification + slot-grouped (brain-injection) synthesis
+# ---------------------------------------------------------------------------
+
+
+def test_classify_slot_explicit_wins():
+    assert classify_slot({"slot": "tone", "category": "DRAFTING"}) == "tone"
+
+
+def test_classify_slot_example_pair_is_examples():
+    item = {
+        "category": "DRAFTING",
+        "description": "prefer concise tone",
+        "example_draft": "before",
+        "example_corrected": "after",
+    }
+    assert classify_slot(item) == "examples"
+
+
+def test_classify_slot_category_mapping():
+    assert classify_slot({"category": "DRAFTING"}) == "format"
+    assert classify_slot({"category": "TONE"}) == "tone"
+    assert classify_slot({"category": "PROCESS"}) == "task"
+    assert classify_slot({"category": "ACCURACY"}) == "context"
+    # Hyphen/underscore variants both resolve.
+    assert classify_slot({"category": "EXECUTION-DISCIPLINE"}) == "task"
+    assert classify_slot({"category": "DATA_INTEGRITY"}) == "context"
+
+
+def test_classify_slot_unknown_category_defaults_to_context():
+    assert classify_slot({"category": "ZEBRA"}) == "context"
+
+
+def test_brain_injection_empty_is_empty():
+    out = synthesize_brain_injection([])
+    assert isinstance(out, SynthesizedPrompt)
+    assert out.text == ""
+    assert out.anchors_used == []
+
+
+def test_brain_injection_orders_slots_per_preston():
+    rules = [
+        _rule("TONE", "lead with empathy", "c3d41a2b3c4d"),
+        _rule("DRAFTING", "tight copy under 150 words", "a1f92b3c4d5e"),
+        _rule("PROCESS", "plan before implementing", "b2c31a2b3c4d"),
+    ]
+    out = synthesize_brain_injection(rules)
+    # Task comes before Format which comes before Tone.
+    task_idx = out.text.index("Task:")
+    format_idx = out.text.index("Format:")
+    tone_idx = out.text.index("Tone:")
+    assert task_idx < format_idx < tone_idx
+    # All anchors preserved.
+    for anchor in ("a1f9", "b2c3", "c3d4"):
+        assert f"r:{anchor}" in out.text
+
+
+def test_brain_injection_persona_baseline_seeded():
+    rules = [_rule("PERSONA", "never attribute unverified quotes", "d4e51a2b3c4d")]
+    baseline = "Direct, consultative, curious tone. Never em dashes."
+    out = synthesize_brain_injection(rules, persona_baseline=baseline)
+    assert "Persona:" in out.text
+    assert "Direct, consultative" in out.text
+    assert "Overrides:" in out.text
+    assert "r:d4e5" in out.text
+
+
+def test_brain_injection_persona_baseline_without_rules_still_emits():
+    baseline = "Empathetic, playbook-driven."
+    out = synthesize_brain_injection([], persona_baseline=baseline)
+    assert "Persona: Empathetic, playbook-driven." in out.text
+
+
+def test_brain_injection_loads_persona_from_path(tmp_path):
+    soul = tmp_path / "soul.md"
+    soul.write_text(
+        "# Voice\n\n> ignored blockquote\n\n* Direct, not aggressive.\n* No em dashes anywhere.\n",
+        encoding="utf-8",
+    )
+    out = synthesize_brain_injection([], persona_baseline=soul)
+    assert "Direct, not aggressive." in out.text
+    assert "No em dashes anywhere." in out.text
+    # Header and blockquote stripped.
+    assert "# Voice" not in out.text
+    assert "ignored blockquote" not in out.text
+
+
+def test_brain_injection_missing_persona_path_is_silent(tmp_path):
+    missing = tmp_path / "does_not_exist.md"
+    out = synthesize_brain_injection(
+        [_rule("DRAFTING", "concise", "a1f92b3c4d5e")],
+        persona_baseline=missing,
+    )
+    # Falls back gracefully — no Persona block, format block still emitted.
+    assert "Persona:" not in out.text
+    assert "Format:" in out.text
+
+
+def test_brain_injection_default_budget_respects_env(monkeypatch):
+    monkeypatch.delenv("GRADATA_SYNTH_BUDGET", raising=False)
+    assert DEFAULT_BUDGET_TOKENS == 400
+
+    monkeypatch.setenv("GRADATA_SYNTH_BUDGET", "50")
+    # Build enough rules to blow past 50 tokens.
+    rules = [
+        _rule(cat, f"rule {i} with some padding text here", f"{i:04x}{i:04x}{i:04x}")
+        for i, cat in enumerate(["PROCESS", "ACCURACY", "DRAFTING", "TONE", "PERSONA", "RESEARCH"])
+    ]
+    out = synthesize_brain_injection(rules)
+    # Under budget: token count estimate fits.
+    assert out.token_count_estimate() <= 50
+
+
+def test_brain_injection_budget_drops_lowest_priority_first():
+    rules = [
+        _rule("PROCESS", "task rule lorem ipsum dolor", "aaaa11112222"),
+        _rule("TONE", "tone rule lorem ipsum dolor sit amet", "bbbb11112222"),
+    ]
+    # Squeeze budget so only one slot fits: task sentence is ~7 tokens,
+    # tone sentence is ~8 — budget 10 keeps task, drops tone.
+    out = synthesize_brain_injection(rules, budget_tokens=10)
+    # Task (high priority) survives, Tone (low priority) dropped.
+    assert "Task:" in out.text
+    assert "Tone:" not in out.text
+    # Only task anchor retained.
+    assert "aaaa" in out.anchors_used
+    assert "bbbb" not in out.anchors_used
+
+
+def test_brain_injection_examples_slot_triggered_by_example_fields():
+    rules = [
+        {
+            "category": "DRAFTING",
+            "description": "prefer short subject lines",
+            "rule_id": "e5e51a2b3c4d",
+            "example_draft": "Quick chat about growth",
+            "example_corrected": "Chat?",
+        }
+    ]
+    out = synthesize_brain_injection(rules)
+    assert "Examples:" in out.text
+    assert "Format:" not in out.text
+
+
+def test_brain_injection_accepts_lesson_like_objects():
+    class FakeLesson:
+        category = "TONE"
+        description = "be curious"
+        slot = "tone"
+        example_draft = None
+        example_corrected = None
+
+        def __init__(self, rid: str) -> None:
+            self.rule_id = rid
+
+    out = synthesize_brain_injection([FakeLesson("f0f01a2b3c4d")])
+    assert "Tone: be curious" in out.text
+    assert "r:f0f0" in out.text
+
+
+def test_brain_injection_max_per_slot_caps():
+    rules = [_rule("PROCESS", f"rule {i}", f"{i:04x}00000000") for i in range(6)]
+    out = synthesize_brain_injection(rules, max_per_slot=2, budget_tokens=1000)
+    # Only two task rules rendered.
+    assert out.text.count("rule ") == 2
+
+
+def test_slot_order_is_preston_rhodes():
+    assert SLOT_ORDER == ("task", "context", "examples", "persona", "format", "tone")
