@@ -105,68 +105,110 @@ def pull_events(
         summary["reason"] = "https_required"
         return summary
 
-    params: dict[str, Any] = {
+    base_params: dict[str, Any] = {
         "brain_id": tenant_for(brain),
         "device_id": get_or_create_device_id(brain),
         "limit": max(1, min(int(limit), 1000)),
     }
-    if rebuild_from:
-        params["rebuild_from"] = rebuild_from
-    if cursor:
-        params["cursor"] = cursor
-    if include_archived:
-        params["include_archived"] = "true"
 
-    url = f"{api_base}/events/pull?{urlencode(params)}"
-    req = urllib.request.Request(
-        url,
-        method="GET",
-        headers={
-            "Authorization": f"Bearer {resolved}",
-            "Accept": "application/json",
-            "User-Agent": "gradata-sdk/0.6",
-        },
-    )
+    # Auto-resume: when the caller didn't pin a rewind point or cursor,
+    # pick up from the last persisted watermark so successive pulls
+    # stream incrementally without re-downloading history.
+    if not rebuild_from and not cursor:
+        from gradata.cloud._sync_state import get_pull_cursor
 
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read().decode("utf-8")
-    except urllib.error.HTTPError as e:
-        if e.code == 501:
-            summary["status"] = "disabled_server_side"
-            return summary
-        if e.code == 410:
+        persisted = get_pull_cursor(
+            db,
+            tenant_id=base_params["brain_id"],
+            device_id=base_params["device_id"],
+        )
+        if persisted:
+            cursor = persisted
+
+    all_events: list[dict[str, Any]] = []
+    final_watermark: str | None = None
+    end_of_stream = True
+    pages_fetched = 0
+    PAGE_CAP = 50  # bound for runaway servers; 50 × 1000 = 50k events/call
+
+    next_cursor = cursor
+    pending_rebuild_from = rebuild_from
+    while pages_fetched < PAGE_CAP:
+        page_params = dict(base_params)
+        if pending_rebuild_from:
+            page_params["rebuild_from"] = pending_rebuild_from
+            pending_rebuild_from = None  # only sent on the first page
+        if next_cursor:
+            page_params["cursor"] = next_cursor
+        if include_archived:
+            page_params["include_archived"] = "true"
+
+        url = f"{api_base}/events/pull?{urlencode(page_params)}"
+        req = urllib.request.Request(
+            url,
+            method="GET",
+            headers={
+                "Authorization": f"Bearer {resolved}",
+                "Accept": "application/json",
+                "User-Agent": "gradata-sdk/0.6",
+            },
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                body = resp.read().decode("utf-8")
+        except urllib.error.HTTPError as e:
+            if e.code == 501:
+                summary["status"] = "disabled_server_side"
+                return summary
+            if e.code == 410:
+                summary["status"] = "error"
+                summary["reason"] = "rewind_beyond_retention"
+                return summary
+            log.warning("events/pull HTTP %s: %s", e.code, e.reason)
             summary["status"] = "error"
-            summary["reason"] = "rewind_beyond_retention"
+            summary["reason"] = f"http_{e.code}"
             return summary
-        log.warning("events/pull HTTP %s: %s", e.code, e.reason)
-        summary["status"] = "error"
-        summary["reason"] = f"http_{e.code}"
-        return summary
-    except (urllib.error.URLError, OSError) as exc:
-        log.debug("events/pull transport error: %s", exc)
-        summary["status"] = "error"
-        summary["reason"] = "transport"
-        return summary
+        except (urllib.error.URLError, OSError) as exc:
+            log.debug("events/pull transport error: %s", exc)
+            summary["status"] = "error"
+            summary["reason"] = "transport"
+            return summary
 
-    try:
-        parsed = json.loads(body) if body else {}
-    except json.JSONDecodeError:
-        log.warning("events/pull: server returned non-JSON body")
-        summary["status"] = "error"
-        summary["reason"] = "malformed_response"
-        return summary
+        try:
+            parsed = json.loads(body) if body else {}
+        except json.JSONDecodeError:
+            log.warning("events/pull: server returned non-JSON body")
+            summary["status"] = "error"
+            summary["reason"] = "malformed_response"
+            return summary
 
-    events = parsed.get("events") or []
-    summary["events_pulled"] = len(events)
-    summary["watermark"] = parsed.get("watermark")
-    summary["end_of_stream"] = bool(parsed.get("end_of_stream", True))
+        page_events = parsed.get("events") or []
+        all_events.extend(page_events)
+        page_watermark = parsed.get("watermark")
+        if page_watermark:
+            final_watermark = page_watermark
+        end_of_stream = bool(parsed.get("end_of_stream", True))
+        pages_fetched += 1
+
+        if end_of_stream:
+            break
+        # Advance to the next page using the watermark as cursor; if the
+        # server forgot to send one, stop rather than spin forever.
+        if not page_watermark:
+            break
+        next_cursor = page_watermark
+
+    summary["events_pulled"] = len(all_events)
+    summary["watermark"] = final_watermark
+    summary["end_of_stream"] = end_of_stream
+    summary["pages_fetched"] = pages_fetched
 
     # Materialize regardless of apply — gives the caller a preview of
     # state/conflict counts without writing anything.
     from gradata.cloud.materializer import materialize
 
-    mat = materialize(events)
+    mat = materialize(all_events)
     summary["rules_materialized"] = len(mat.rules)
     summary["conflicts"] = len(mat.conflicts)
     summary["applied"] = False
@@ -206,8 +248,8 @@ def pull_events(
             try:
                 update_pull_cursor(
                     db,
-                    tenant_id=params["brain_id"],
-                    device_id=params["device_id"],
+                    tenant_id=base_params["brain_id"],
+                    device_id=base_params["device_id"],
                     cursor=str(watermark),
                 )
             except Exception as exc:

@@ -253,6 +253,157 @@ def test_limit_is_clamped(brain):
     assert "limit=1000" in captured["url"]
 
 
+def test_pull_uses_persisted_watermark_when_rebuild_from_absent(brain):
+    """Second call without rebuild_from picks up the watermark left by the first."""
+    import urllib.error
+
+    from gradata._migrations.device_uuid import get_or_create_device_id
+    from gradata._tenant import tenant_for
+    from gradata.cloud._sync_state import update_pull_cursor
+
+    _save_cfg(brain.dir)
+    # Seed a persisted watermark as though a prior apply had succeeded.
+    update_pull_cursor(
+        brain.dir / "system.db",
+        tenant_id=tenant_for(brain.dir),
+        device_id=get_or_create_device_id(brain.dir),
+        cursor="01JN_PRIOR_WATERMARK",
+    )
+
+    captured: dict = {}
+
+    def fake_urlopen(req, timeout=None):
+        captured["url"] = req.full_url
+        raise urllib.error.HTTPError(req.full_url, 501, "Not Implemented", {}, None)
+
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        pull_events(brain.dir)
+
+    assert "cursor=01JN_PRIOR_WATERMARK" in captured["url"]
+    # rebuild_from must NOT be sent — only cursor.
+    assert "rebuild_from=" not in captured["url"]
+
+
+def test_explicit_rebuild_from_overrides_persisted_watermark(brain):
+    """An explicit rebuild_from takes precedence over any persisted cursor."""
+    import urllib.error
+
+    from gradata._migrations.device_uuid import get_or_create_device_id
+    from gradata._tenant import tenant_for
+    from gradata.cloud._sync_state import update_pull_cursor
+
+    _save_cfg(brain.dir)
+    update_pull_cursor(
+        brain.dir / "system.db",
+        tenant_id=tenant_for(brain.dir),
+        device_id=get_or_create_device_id(brain.dir),
+        cursor="01JN_PRIOR_WATERMARK",
+    )
+
+    captured: dict = {}
+
+    def fake_urlopen(req, timeout=None):
+        captured["url"] = req.full_url
+        raise urllib.error.HTTPError(req.full_url, 501, "Not Implemented", {}, None)
+
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        pull_events(brain.dir, rebuild_from="01JN_EXPLICIT")
+
+    assert "rebuild_from=01JN_EXPLICIT" in captured["url"]
+    # Persisted watermark must not smuggle in as cursor when rebuilding.
+    assert "cursor=01JN_PRIOR_WATERMARK" not in captured["url"]
+
+
+def test_pagination_drains_until_end_of_stream(brain):
+    """Server returns end_of_stream=False then True — client keeps asking."""
+    _save_cfg(brain.dir)
+
+    page_one = json.dumps(
+        {
+            "events": [
+                {
+                    "event_id": "01JN_P1_E1",
+                    "ts": "2026-04-20T00:00:00Z",
+                    "type": "RULE_GRADUATED",
+                    "source": "graduate",
+                    "data": {
+                        "category": "style",
+                        "description": "use active voice",
+                        "new_state": "PATTERN",
+                        "confidence": 0.62,
+                        "fire_count": 3,
+                        "device_id": "dev_a",
+                    },
+                }
+            ],
+            "watermark": "01JN_PAGE1",
+            "end_of_stream": False,
+        }
+    ).encode()
+    page_two = json.dumps(
+        {
+            "events": [
+                {
+                    "event_id": "01JN_P2_E1",
+                    "ts": "2026-04-20T00:01:00Z",
+                    "type": "RULE_GRADUATED",
+                    "source": "graduate",
+                    "data": {
+                        "category": "structure",
+                        "description": "headings before prose",
+                        "new_state": "PATTERN",
+                        "confidence": 0.70,
+                        "fire_count": 4,
+                        "device_id": "dev_a",
+                    },
+                }
+            ],
+            "watermark": "01JN_PAGE2",
+            "end_of_stream": True,
+        }
+    ).encode()
+
+    responses = [_FakeResp(page_one), _FakeResp(page_two)]
+    urls_seen: list[str] = []
+
+    def fake_urlopen(req, timeout=None):
+        urls_seen.append(req.full_url)
+        return responses.pop(0)
+
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        result = pull_events(brain.dir, apply=True)
+
+    assert result["status"] == "ok"
+    assert result["events_pulled"] == 2
+    assert result["pages_fetched"] == 2
+    assert result["end_of_stream"] is True
+    assert result["watermark"] == "01JN_PAGE2"
+    # Second request carries the page-one watermark as cursor.
+    assert "cursor=01JN_PAGE1" in urls_seen[1]
+    # First request has no cursor yet.
+    assert "cursor=" not in urls_seen[0]
+
+
+def test_pagination_stops_if_server_omits_watermark(brain):
+    """Defensive: end_of_stream=False without a watermark must not spin."""
+    _save_cfg(brain.dir)
+
+    bad_page = json.dumps({"events": [], "watermark": None, "end_of_stream": False}).encode()
+
+    call_count = {"n": 0}
+
+    def fake_urlopen(req, timeout=None):
+        call_count["n"] += 1
+        return _FakeResp(bad_page)
+
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        result = pull_events(brain.dir)
+
+    assert call_count["n"] == 1  # stopped after the first page
+    assert result["status"] == "ok"
+    assert result["pages_fetched"] == 1
+
+
 def test_credential_resolves_from_keyfile_when_config_token_empty(brain):
     """Keyfile flows to Authorization header even when config.token is empty."""
     import urllib.error
