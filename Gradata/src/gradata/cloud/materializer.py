@@ -265,7 +265,10 @@ def materialize(
         if etype == "RULE_CONFLICT_RESOLVED":
             # User adjudicated a held Tier 2 conflict. Clear the hold and
             # materialize the picked side. The resolver event carries
-            # `winning_ts` (ISO) pointing at the graduation event to apply.
+            # `winning_ts` (ISO) pointing at the graduation event to apply
+            # and — when the emitter includes it — a full `winning_event`
+            # snapshot so incremental pulls that arrive alone (without the
+            # original graduation in the same batch) still resolve.
             key = _rule_key(evt)
             if key is None:
                 result.events_skipped += 1
@@ -280,12 +283,38 @@ def materialize(
                 if ht == winning_ts and (not winning_device or hd == winning_device):
                     picked = hist
                     break
+            if picked is None:
+                # Fallback A: the resolver may carry the full winner payload
+                # under ``winning_event``. This is what Phase 2 emitters are
+                # expected to populate so a standalone RULE_CONFLICT_RESOLVED
+                # in an incremental pull is self-sufficient.
+                embedded = data.get("winning_event")
+                if isinstance(embedded, dict):
+                    picked = embedded
+            if picked is None:
+                # Fallback B: the resolver may carry just the scalar winner
+                # fields (description/new_state/confidence/fire_count) under
+                # ``winning_snapshot``. Reconstruct a synthetic graduation
+                # event so the winner path below can fold it into state.
+                snapshot = data.get("winning_snapshot")
+                if isinstance(snapshot, dict):
+                    picked = {
+                        "type": "RULE_GRADUATED",
+                        "ts": winning_ts or str(evt.get("ts") or ""),
+                        "data": {
+                            "category": key[0],
+                            "pattern_hash": key[1],
+                            "device_id": winning_device,
+                            **snapshot,
+                        },
+                    }
             conflict_holds.pop(key, None)
             if picked is not None:
                 winners[key] = picked
             else:
-                # No matching history — caller passed a partial stream.
-                # Leave the hold cleared; state will catch up on next pull.
+                # No way to reconstruct the winner — caller passed a partial
+                # stream and the resolver carried no payload. Leave the hold
+                # cleared; state will catch up on the next full replay.
                 result.events_skipped += 1
             continue
 

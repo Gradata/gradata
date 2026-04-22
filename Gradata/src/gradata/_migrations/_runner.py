@@ -114,12 +114,19 @@ def create_index_if_missing(
     if index_exists(conn, index):
         if not unique:
             return False
-        row = conn.execute(
-            "SELECT sql FROM sqlite_master WHERE type='index' AND name = ?",
-            (index,),
-        ).fetchone()
-        existing_sql = (row[0] or "") if row else ""
-        if "UNIQUE" in existing_sql.upper():
+        # Ask SQLite directly whether the existing index is UNIQUE rather
+        # than substring-matching on the DDL — an index literally named
+        # ``idx_unique_name`` would otherwise spoof the check even when
+        # declared non-UNIQUE. ``PRAGMA index_list`` returns rows
+        # (seq, name, unique_flag, origin, partial).
+        existing_unique = False
+        for _, idx_name, is_unique, *_rest in conn.execute(
+            f"PRAGMA index_list({table})"
+        ).fetchall():
+            if idx_name == index:
+                existing_unique = bool(is_unique)
+                break
+        if existing_unique:
             return False
         # IF EXISTS closes the TOCTOU window between index_exists() and the
         # drop — a concurrent migration could have dropped the index first.

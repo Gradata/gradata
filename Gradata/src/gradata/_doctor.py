@@ -278,9 +278,11 @@ def _resolve_doctor_endpoint(cfg: dict) -> str:
     """Resolve the endpoint doctor probes should target.
 
     Honors the same precedence chain as the rest of the SDK
-    (``gradata.cloud._credentials.resolve_endpoint``): explicit config
-    value → ``GRADATA_ENDPOINT`` → ``GRADATA_CLOUD_API_BASE`` → legacy
-    ``GRADATA_API_URL`` → hard-coded default. Keeps every doctor check
+    (``gradata.cloud._credentials.resolve_endpoint``):
+    ``GRADATA_ENDPOINT`` → ``GRADATA_CLOUD_API_BASE`` → fallback chain
+    (config ``api_url`` → legacy ``GRADATA_API_URL`` → hard-coded default).
+    Env vars always win over the config value; the config value is only
+    consulted when neither env var is set. Keeps every doctor check
     pointed at the same host so a single env override flips all probes.
     """
     fallback = (

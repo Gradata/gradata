@@ -152,6 +152,73 @@ class TestConflictResolved:
         # Conflict was adjudicated — no stale RULE_CONFLICT should remain.
         assert result.conflicts == []
 
+    def test_resolved_with_embedded_winner_applies_without_history(self) -> None:
+        """Resolver carries ``winning_event`` — no in-batch graduation needed.
+
+        This models the incremental-pull case: a later pull contains only
+        ``RULE_CONFLICT_RESOLVED`` (the original graduation landed on an
+        earlier page or device) but the resolver is self-sufficient.
+        """
+        stream = [
+            {
+                "ts": "2026-04-22T00:00:00Z",
+                "type": "RULE_CONFLICT_RESOLVED",
+                "source": "dashboard",
+                "data": {
+                    "category": "style",
+                    "description": "use active voice",
+                    "winning_ts": "2026-04-20T00:01:00Z",
+                    "winning_device_id": "dev_b",
+                    "winning_event": {
+                        "type": "RULE_GRADUATED",
+                        "ts": "2026-04-20T00:01:00Z",
+                        "data": {
+                            "category": "style",
+                            "description": "use active voice",
+                            "new_state": "PATTERN",
+                            "confidence": 0.90,
+                            "fire_count": 5,
+                            "device_id": "dev_b",
+                        },
+                    },
+                },
+            },
+        ]
+        result = materialize(stream)
+        rule = next(iter(result.rules.values()))
+        assert rule.winning_device_id == "dev_b"
+        assert rule.confidence == pytest.approx(0.90)
+        assert rule.state == "PATTERN"
+        assert result.conflicts == []
+
+    def test_resolved_with_snapshot_reconstructs_synthetic_winner(self) -> None:
+        """Resolver carries only scalar winner fields under winning_snapshot."""
+        stream = [
+            {
+                "ts": "2026-04-22T00:00:00Z",
+                "type": "RULE_CONFLICT_RESOLVED",
+                "source": "dashboard",
+                "data": {
+                    "category": "style",
+                    "description": "use active voice",
+                    "winning_ts": "2026-04-20T00:01:00Z",
+                    "winning_device_id": "dev_b",
+                    "winning_snapshot": {
+                        "description": "use active voice",
+                        "new_state": "RULE",
+                        "confidence": 0.92,
+                        "fire_count": 7,
+                    },
+                },
+            },
+        ]
+        result = materialize(stream)
+        rule = next(iter(result.rules.values()))
+        assert rule.state == "RULE"
+        assert rule.confidence == pytest.approx(0.92)
+        assert rule.fire_count == 7
+        assert rule.winning_device_id == "dev_b"
+
     def test_resolved_without_matching_history_clears_hold_only(self) -> None:
         stream = [
             _evt(ts="2026-04-20T00:00:00Z", confidence=0.62, device_id="dev_a"),

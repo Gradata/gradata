@@ -259,7 +259,13 @@ def push_pending_events(
     device_id = get_or_create_device_id(brain)
     now_iso = _dt.datetime.now(_dt.UTC).isoformat()
 
-    conn = sqlite3.connect(str(db))
+    try:
+        conn = sqlite3.connect(str(db))
+    except sqlite3.Error as exc:
+        log.debug("events/push: sqlite connect failed: %s", exc)
+        summary["status"] = "error"
+        summary["reason"] = "db_error"
+        return summary
     try:
         _ensure_sync_state_schema(conn, db)
         watermark = _read_watermark(conn, tenant_id, device_id)
@@ -318,6 +324,15 @@ def push_pending_events(
         summary["events_pushed"] = pushed
         summary["batches"] = batches
         summary["last_event_id"] = last_id
+        return summary
+    except sqlite3.Error as exc:
+        # The public contract is "return a summary dict, never raise" — a
+        # locked or corrupted system.db shouldn't crash the caller. The
+        # watermark is only advanced after a successful _write_watermark,
+        # so partial progress through the loop is safe to report.
+        log.debug("events/push: sqlite workflow failed: %s", exc)
+        summary["status"] = "error"
+        summary["reason"] = "db_error"
         return summary
     finally:
         conn.close()

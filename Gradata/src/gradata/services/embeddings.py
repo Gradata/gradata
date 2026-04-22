@@ -182,8 +182,9 @@ def subscribe_to_bus(bus):
             vec = get_client().embed(desc)
             if vec:
                 with _embedding_cache_lock:
+                    # OrderedDict.__setitem__ already puts new keys at the
+                    # end, so no explicit move_to_end() is needed on inserts.
                     _embedding_cache[desc] = vec
-                    _embedding_cache.move_to_end(desc)
                     while len(_embedding_cache) > _CACHE_MAX_SIZE:
                         _embedding_cache.popitem(last=False)
         except Exception:

@@ -187,7 +187,22 @@ def pull_events(
             summary["reason"] = "malformed_response"
             return summary
 
+        # Validate shape — valid JSON in the wrong shape (``[]``, scalar,
+        # nested non-list events) would otherwise crash materialize() or
+        # silently skip events.
+        if not isinstance(parsed, dict):
+            log.warning("events/pull: server returned non-object JSON")
+            summary["status"] = "error"
+            summary["reason"] = "malformed_response"
+            return summary
         page_events = parsed.get("events") or []
+        if not isinstance(page_events, list) or any(
+            not isinstance(evt, dict) for evt in page_events
+        ):
+            log.warning("events/pull: events field is not a list of objects")
+            summary["status"] = "error"
+            summary["reason"] = "malformed_response"
+            return summary
         all_events.extend(page_events)
         page_watermark = parsed.get("watermark")
         if page_watermark:

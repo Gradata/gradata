@@ -28,6 +28,9 @@ def _isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(_creds, "KEYFILE_PATH", tmp_path / ".gradata" / "key")
     for v in (
         "GRADATA_API_KEY",
+        "GRADATA_ENDPOINT",
+        "GRADATA_CLOUD_API_BASE",
+        "GRADATA_API_URL",
         "GRADATA_CLOUD_SYNC_DISABLE",
         "GRADATA_CLOUD_SYNC",
         "GRADATA_CLOUD_URL",
@@ -350,3 +353,57 @@ def test_empty_events_table_returns_ok_noop(tmp_path, monkeypatch):
     assert summary["status"] == "ok"
     assert summary["events_pushed"] == 0
     assert summary["batches"] == 0
+
+
+def test_partial_2xx_does_not_advance_watermark(tmp_path, monkeypatch):
+    """Server returns 200 with rejected list → watermark must NOT advance.
+
+    Without this gate a rejected event would be permanently skipped on the
+    next run because the local cursor would have jumped past it.
+    """
+    events = [
+        {"event_id": "01HN000000000000000000000A"},
+        {"event_id": "01HN000000000000000000000B"},
+    ]
+    brain = _make_brain(tmp_path, events=events)
+
+    def fake_urlopen(req, timeout):  # noqa: ARG001
+        return _FakeResp(
+            b'{"accepted": 1, "rejected": [{"event_id": "01HN000000000000000000000B"}]}'
+        )
+
+    monkeypatch.setattr(push_mod.urllib.request, "urlopen", fake_urlopen)
+    summary = push_mod.push_pending_events(brain)
+
+    assert summary["status"] == "error"
+    assert summary["reason"] == "batch_rejected"
+    assert summary["rejected"] == [{"event_id": "01HN000000000000000000000B"}]
+
+    with sqlite3.connect(str(brain / "system.db")) as conn:
+        row = conn.execute("SELECT last_push_event_id FROM sync_state").fetchone()
+    # No sync_state row should have been inserted — the watermark only
+    # advances after a fully-accepted batch.
+    assert row is None or row[0] is None
+
+
+def test_partial_2xx_count_mismatch_does_not_advance_watermark(tmp_path, monkeypatch):
+    """Server returns accepted < len(events) with empty rejected list."""
+    events = [
+        {"event_id": "01HN000000000000000000000A"},
+        {"event_id": "01HN000000000000000000000B"},
+        {"event_id": "01HN000000000000000000000C"},
+    ]
+    brain = _make_brain(tmp_path, events=events)
+
+    def fake_urlopen(req, timeout):  # noqa: ARG001
+        return _FakeResp(b'{"accepted": 2, "rejected": []}')
+
+    monkeypatch.setattr(push_mod.urllib.request, "urlopen", fake_urlopen)
+    summary = push_mod.push_pending_events(brain)
+
+    assert summary["status"] == "error"
+    assert summary["reason"] == "batch_rejected"
+
+    with sqlite3.connect(str(brain / "system.db")) as conn:
+        row = conn.execute("SELECT last_push_event_id FROM sync_state").fetchone()
+    assert row is None or row[0] is None
