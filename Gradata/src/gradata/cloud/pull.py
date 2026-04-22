@@ -289,7 +289,6 @@ def pull_events(
             merged = apply_to_lessons(existing, mat)
             try:
                 write_lessons_safe(lessons_path, format_lessons(merged))
-                summary["applied"] = True
             except Exception as exc:
                 log.error("events/pull: lessons write failed: %s", exc)
                 summary["status"] = "error"
@@ -325,6 +324,14 @@ def pull_events(
                 summary["status"] = "error"
                 summary["reason"] = "watermark_persist_failed"
                 return summary
+
+        # ``applied`` reflects "the apply path ran end-to-end", not "the
+        # lessons write touched at least one byte". A pull that materialized
+        # to an empty delta still counts — callers need to distinguish that
+        # from ``apply=False`` preview mode. Set it only after every hard
+        # failure path (lessons_write_failed, watermark_persist_failed) has
+        # had its chance to short-circuit.
+        summary["applied"] = True
 
         try:
             from gradata._events import emit as _emit

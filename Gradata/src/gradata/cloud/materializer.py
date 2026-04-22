@@ -181,11 +181,17 @@ def _load_events_from_db(
     """
     if not db_path.exists():
         return []
-    # Default to the materializable set (minus META_RULE_SYNTHESIZED which
-    # the pass currently always skips). Keeping the default a single source
-    # of truth removes the old _MATERIALIZER_EVENT_TYPES / _MATERIALIZABLE_
-    # EVENT_TYPES drift CodeRabbit flagged.
-    types = tuple(event_types if event_types is not None else _MATERIALIZABLE_EVENT_TYPES)
+    # Default to the materializable set minus ``META_RULE_SYNTHESIZED``:
+    # the pass always skips that type (see ``materialize()`` loop), so
+    # fetching those rows would be pure I/O waste. Callers that want
+    # every type (e.g. exhaustive tests) can still pass ``event_types``
+    # explicitly to override.
+    if event_types is None:
+        types = tuple(_MATERIALIZABLE_EVENT_TYPES - {"META_RULE_SYNTHESIZED"})
+    else:
+        types = tuple(event_types)
+    if not types:
+        return []
     placeholders = ",".join(["?"] * len(types))
     query = (
         f"SELECT ts, type, source, data_json FROM events "

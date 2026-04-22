@@ -22,6 +22,10 @@ from gradata.cloud.sync import CloudConfig, save_config
 
 @pytest.fixture
 def brain(tmp_path):
+    """Minimal brain with one event. Cloud config is intentionally NOT saved
+    here — each test calls ``_save_cfg(b.dir, ...)`` with its own flags
+    (``enabled``, ``api_base``, ``tok``) so the fixture can also exercise
+    the unconfigured path (``test_no_db_returns_no_db_status``, etc.)."""
     b = Brain(tmp_path)
     b.emit("TEST", "src", {"x": 1}, [])
     return b
@@ -216,6 +220,39 @@ def test_apply_persists_pull_watermark(brain):
         device_id=get_or_create_device_id(brain.dir),
     )
     assert persisted == "01JN_RESUME_ME"
+
+
+def test_apply_true_on_empty_delta_still_reports_applied(brain):
+    """``applied=True`` must reflect "apply path ran", not "bytes were written".
+
+    Previously ``applied`` was only flipped inside the ``if mat.rules or
+    mat.conflicts:`` branch, so a pull that legitimately drained an empty
+    delta was indistinguishable from a pull that ran in preview mode.
+    """
+    _save_cfg(brain.dir)
+    empty_body = json.dumps(
+        {"events": [], "watermark": "01JN_EMPTY_OK", "end_of_stream": True}
+    ).encode()
+
+    with patch("urllib.request.urlopen", return_value=_FakeResp(empty_body)):
+        result = pull_events(brain.dir, apply=True)
+
+    assert result["status"] == "ok"
+    assert result["applied"] is True
+    assert result["rules_materialized"] == 0
+    assert result["conflicts"] == 0
+    # No lessons.md write happened, but the watermark must have advanced so
+    # the next pull doesn't re-fetch the same empty page.
+    from gradata._migrations.device_uuid import get_or_create_device_id
+    from gradata._tenant import tenant_for
+    from gradata.cloud._sync_state import get_pull_cursor
+
+    persisted = get_pull_cursor(
+        brain.dir / "system.db",
+        tenant_id=tenant_for(brain.dir),
+        device_id=get_or_create_device_id(brain.dir),
+    )
+    assert persisted == "01JN_EMPTY_OK"
 
 
 def test_server_200_malformed_json_returns_error(brain):

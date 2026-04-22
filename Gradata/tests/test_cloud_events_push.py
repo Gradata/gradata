@@ -81,6 +81,15 @@ def _make_brain(
         )
         """
     )
+    # NOTE: sync_state is deliberately created WITHOUT the
+    # ``UNIQUE(tenant_id, device_id)`` index that production upserts target
+    # in ``_write_watermark``'s ``ON CONFLICT`` clause. The push client
+    # calls ``_ensure_sync_state_schema(conn, db)`` before the first write,
+    # which adds the missing index in-place. Leaving it out here is the
+    # regression test for that migration — if the schema upgrade ever
+    # regresses, the first ``_write_watermark`` call will raise with
+    # "ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE
+    # constraint" and every push test fails.
     conn.execute(
         """
         CREATE TABLE sync_state (
