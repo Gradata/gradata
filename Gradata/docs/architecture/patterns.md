@@ -9,7 +9,7 @@ Layer 0 contains 15 reusable agentic patterns. These are the building blocks for
 Routes user requests to the appropriate pattern based on intent classification. Analyzes the message, determines task type, audience tier, and selects the best pattern to handle it.
 
 ```python
-from gradata.patterns.orchestrator import classify_request
+from gradata.contrib.patterns.orchestrator import classify_request
 
 result = classify_request("draft a follow-up email to the CFO")
 # ClassificationResult(intent='draft', pattern='pipeline', audience='executive')
@@ -20,7 +20,7 @@ result = classify_request("draft a follow-up email to the CFO")
 Sequential stages with quality gates. Each stage transforms input and must pass a gate before the next stage runs.
 
 ```python
-from gradata.patterns.pipeline import Pipeline, Stage
+from gradata.contrib.patterns.pipeline import Pipeline, Stage
 
 pipeline = Pipeline(
     Stage("research", research_fn, gate=quality_check),
@@ -35,7 +35,7 @@ result = pipeline.run(initial_input)
 Dependency graph execution with wave processing. Tasks with no unmet dependencies run concurrently.
 
 ```python
-from gradata.patterns.parallel import DependencyGraph, ParallelTask
+from gradata.contrib.patterns.parallel import DependencyGraph, ParallelTask
 
 graph = DependencyGraph([
     ParallelTask("enrich", "Enrich prospect data", enrich_fn),
@@ -63,7 +63,7 @@ print(result["cycles_used"])   # 1-3
 Score-gated optimization. Runs a scoring function and iterates until the score meets a threshold.
 
 ```python
-from gradata.patterns.evaluator import Evaluator
+from gradata.contrib.patterns.evaluator import Evaluator
 
 evaluator = Evaluator(
     scorer=score_fn,
@@ -84,7 +84,7 @@ Three memory types for different retention needs:
 | **Procedural** | Persistent | How-to knowledge, workflows, rules |
 
 ```python
-from gradata.patterns.memory import MemoryManager
+from gradata.contrib.patterns.memory import MemoryManager
 
 mm = MemoryManager()
 mm.store("semantic", "User prefers bullet points")

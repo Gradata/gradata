@@ -1,13 +1,18 @@
 import pytest
-from gradata.integrations.session_history import SessionHistory
+from gradata.services.session_history import SessionHistory
+
 
 class TestSessionHistory:
     def test_record_injected_rules(self):
         sh = SessionHistory()
-        sh.on_rules_injected({"rules": [
-            {"id": "r1", "description": "validate email"},
-            {"id": "r2", "description": "check imports"},
-        ]})
+        sh.on_rules_injected(
+            {
+                "rules": [
+                    {"id": "r1", "description": "validate email"},
+                    {"id": "r2", "description": "check imports"},
+                ]
+            }
+        )
         assert sh.injected_this_session == {"r1", "r2"}
 
     def test_record_correction_marks_rule(self):
@@ -18,11 +23,15 @@ class TestSessionHistory:
 
     def test_compute_effectiveness(self):
         sh = SessionHistory()
-        sh.on_rules_injected({"rules": [
-            {"id": "r1", "description": "x"},
-            {"id": "r2", "description": "y"},
-            {"id": "r3", "description": "z"},
-        ]})
+        sh.on_rules_injected(
+            {
+                "rules": [
+                    {"id": "r1", "description": "x"},
+                    {"id": "r2", "description": "y"},
+                    {"id": "r3", "description": "z"},
+                ]
+            }
+        )
         sh.on_correction_created({"lesson": {"rule_id": "r1"}})
         scores = sh.compute_effectiveness()
         assert scores["r1"]["effective"] is False

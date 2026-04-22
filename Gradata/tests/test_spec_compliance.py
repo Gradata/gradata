@@ -23,10 +23,10 @@ import pytest
 
 
 class TestArchitectureLayers:
-    """SPEC Section 2: patterns/ and enhancements/ packages exist."""
+    """SPEC Section 2: contrib.patterns/ and enhancements/ packages exist."""
 
     def test_patterns_package_importable(self):
-        importlib.import_module("gradata.patterns")
+        importlib.import_module("gradata.contrib.patterns")
 
     def test_enhancements_package_importable(self):
         importlib.import_module("gradata.enhancements")
@@ -74,7 +74,7 @@ class TestArchitectureLayers:
             "metrics",
             "quality_monitoring",
             "reporting",
-            "carl",
+            "behavioral_engine",
             "learning_pipeline",
         ],
     )
@@ -315,9 +315,11 @@ class TestZeroDeps:
 
     def test_patterns_import_no_deps(self):
         """All patterns are pure stdlib."""
-        from gradata.patterns import pipeline, reflection, guardrails
+        from gradata.contrib.patterns import pipeline, reflection, guardrails
 
         assert pipeline is not None
+        assert reflection is not None
+        assert guardrails is not None
 
 
 # ---------------------------------------------------------------------------

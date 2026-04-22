@@ -2,6 +2,26 @@
 
 The canonical changelog lives in [`CHANGELOG.md`](https://github.com/Gradata/gradata/blob/main/CHANGELOG.md) in the repo. A mirror is below for convenience.
 
+## [0.7.0] — 2026-04-22
+
+### BREAKING
+
+- `gradata.patterns` shim removed one release earlier than the 0.6.1 notice (which targeted v0.8.0) because the replacement surface at `gradata.contrib.patterns` / `gradata.rules` shipped stable in 0.6.1 and the carry rule's two-minor-version window closes at 0.8.0; we removed in 0.7.0 to avoid carrying the shim during the cloud-sync Phase 2 reorg. Import from `gradata.contrib.patterns` or `gradata.rules`.
+- `gradata.enhancements.carl` shim removed. Import from `gradata.enhancements.behavioral_engine`.
+- `gradata.enhancements.profiling.tone_profile` removed (orphan, no production callers).
+- `gradata.integrations.{anthropic,openai,langchain,crewai}_adapter` removed (deprecation warning fired since 0.6.x). Use `gradata.middleware.{wrap_anthropic, wrap_openai, LangChainCallback, CrewAIGuard}`.
+- `gradata login` / `gradata logout` CLI commands removed. Use `gradata cloud enable --key gk_live_...` for API-key auth.
+
+### Changed
+
+- `gradata.integrations.embeddings` → `gradata.services.embeddings` (forwarding shim kept through v0.9.0).
+- `gradata.integrations.session_history` → `gradata.services.session_history` (forwarding shim kept through v0.9.0).
+
+### Added
+
+- `CLOUD_SYNC_COMPLETED` telemetry event emitted after successful cloud pull + watermark persist, with sync_status tag enrichment (ok/error/skipped).
+- `docs/contributing/deprecation-policy.md` codifying the two-minor-version carry rule.
+
 ## [0.6.1] — 2026-04-19
 
 ### Added
@@ -17,7 +37,7 @@ The canonical changelog lives in [`CHANGELOG.md`](https://github.com/Gradata/gra
 
 ### Changed
 
-- `gradata.patterns` is **deprecated** — emits `DeprecationWarning` on first import. Migrate to `gradata.contrib.patterns` or `gradata.rules`. Will be removed in **v0.8.0**. (#110)
+- `gradata.patterns` is **deprecated** — emits `DeprecationWarning` on first import. Migrate to `gradata.contrib.patterns` or `gradata.rules`. Scheduled for removal in **v0.8.0** (actually removed in v0.7.0 — see the 0.7.0 entry above). (#110)
 - `Alert` canonical definition consolidated to `gradata.enhancements.quality_monitoring`; duplicate removed from `gradata.patterns`. (#109)
 - `integrations/` collapsed into `middleware/` with deprecation shims
 - `self_improvement.py` split into `_confidence` + `_graduation` submodules

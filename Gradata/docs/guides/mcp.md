@@ -68,7 +68,7 @@ The MCP server implements:
 ## Using the MCP Bridge Programmatically
 
 ```python
-from gradata.patterns.mcp import MCPBridge
+from gradata.contrib.patterns.mcp import MCPBridge
 
 bridge = MCPBridge("my-brain")  # string name, not Brain instance
 

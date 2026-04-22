@@ -46,17 +46,28 @@ __all__ = [
 ]
 
 
+# Legacy module IDs renamed in 0.6.x. Keep user profiles / state files
+# resolving by canonicalizing inbound IDs through this single mapping so
+# ``is_installed()`` and ``InstallManifest._resolve()`` never disagree.
+_LEGACY_MODULE_ALIASES: dict[str, str] = {
+    "carl": "behavioral-engine",
+    "integrations": "middleware",
+}
+
+
 class ModuleCost(Enum):
     """Resource cost tag for modules."""
-    LIGHT = "light"       # Minimal resource usage
-    MEDIUM = "medium"     # Moderate resource usage
-    HEAVY = "heavy"       # Significant resource usage
+
+    LIGHT = "light"  # Minimal resource usage
+    MEDIUM = "medium"  # Moderate resource usage
+    HEAVY = "heavy"  # Significant resource usage
 
 
 class ModuleStability(Enum):
     """Stability tag for modules."""
-    STABLE = "stable"     # Production-ready
-    BETA = "beta"         # Functional but evolving
+
+    STABLE = "stable"  # Production-ready
+    BETA = "beta"  # Functional but evolving
     EXPERIMENTAL = "experimental"  # Use with caution
 
 
@@ -75,6 +86,7 @@ class Module:
         stability: Stability tag.
         default_install: Whether to include in default installs.
     """
+
     id: str
     name: str
     description: str = ""
@@ -95,6 +107,7 @@ class Profile:
         description: What this profile is for.
         modules: Module IDs included in this profile.
     """
+
     name: str
     description: str = ""
     modules: list[str] = field(default_factory=list)
@@ -110,6 +123,7 @@ class InstallPlan:
         dependencies_added: Modules added automatically via dependencies.
         estimated_cost: Aggregate cost estimate.
     """
+
     profile: str = ""
     modules: list[Module] = field(default_factory=list)
     dependencies_added: list[str] = field(default_factory=list)
@@ -126,6 +140,7 @@ class InstallState:
 
     Enables idempotent installs — only apply changes since last install.
     """
+
     schema_version: int = 1
     installed_modules: list[str] = field(default_factory=list)
     profile: str = ""
@@ -151,9 +166,7 @@ class InstallState:
 
     def is_installed(self, module_id: str) -> bool:
         """Check if a module is currently installed."""
-        # Backward compat: "carl" was renamed to "behavioral-engine"
-        if module_id == "carl":
-            module_id = "behavioral-engine"
+        module_id = _LEGACY_MODULE_ALIASES.get(module_id, module_id)
         return module_id in self.installed_modules
 
 
@@ -168,10 +181,18 @@ DEFAULT_MODULES: list[Module] = [
         description="15 base agentic patterns (pipeline, RAG, reflection, etc.)",
         kind="pattern",
         components=[
-            "patterns.pipeline", "patterns.rag", "patterns.reflection",
-            "patterns.orchestrator", "patterns.parallel", "patterns.memory",
-            "patterns.guardrails", "patterns.human_loop", "patterns.scope",
-            "patterns.sub_agents", "patterns.evaluator", "patterns.tools",
+            "patterns.pipeline",
+            "patterns.rag",
+            "patterns.reflection",
+            "patterns.orchestrator",
+            "patterns.parallel",
+            "patterns.memory",
+            "patterns.guardrails",
+            "patterns.human_loop",
+            "patterns.scope",
+            "patterns.sub_agents",
+            "patterns.evaluator",
+            "patterns.tools",
         ],
         cost=ModuleCost.LIGHT,
         stability=ModuleStability.STABLE,
@@ -183,8 +204,10 @@ DEFAULT_MODULES: list[Module] = [
         description="Context brackets, reconciliation, task escalation, execute/qualify loop.",
         kind="pattern",
         components=[
-            "patterns.context_brackets", "patterns.reconciliation",
-            "patterns.task_escalation", "patterns.execute_qualify",
+            "patterns.context_brackets",
+            "patterns.reconciliation",
+            "patterns.task_escalation",
+            "patterns.execute_qualify",
         ],
         cost=ModuleCost.LIGHT,
         stability=ModuleStability.STABLE,
@@ -206,8 +229,10 @@ DEFAULT_MODULES: list[Module] = [
         description="INSTINCT->PATTERN->RULE graduation with severity-weighted confidence.",
         kind="enhancement",
         components=[
-            "enhancements.self_improvement", "enhancements.correction_tracking",
-            "enhancements.edit_classifier", "enhancements.pattern_extractor",
+            "enhancements.self_improvement",
+            "enhancements.correction_tracking",
+            "enhancements.edit_classifier",
+            "enhancements.pattern_extractor",
         ],
         dependencies=["quality-gates"],
         cost=ModuleCost.MEDIUM,
@@ -273,8 +298,10 @@ DEFAULT_MODULES: list[Module] = [
         description="HMAC signing, contradiction detection, rule verification.",
         kind="enhancement",
         components=[
-            "enhancements.rule_integrity", "enhancements.contradiction_detector",
-            "enhancements.rule_conflicts", "enhancements.rule_canary",
+            "enhancements.rule_integrity",
+            "enhancements.contradiction_detector",
+            "enhancements.rule_conflicts",
+            "enhancements.rule_canary",
         ],
         dependencies=["learning-pipeline"],
         cost=ModuleCost.MEDIUM,
@@ -292,13 +319,15 @@ DEFAULT_MODULES: list[Module] = [
         default_install=True,
     ),
     Module(
-        id="integrations",
-        name="LLM Integrations",
-        description="Adapters for Anthropic, OpenAI, LangChain, CrewAI.",
+        id="middleware",
+        name="LLM Middleware",
+        description="Runtime wrappers for Anthropic, OpenAI, LangChain, CrewAI.",
         kind="integration",
         components=[
-            "integrations.anthropic_adapter", "integrations.openai_adapter",
-            "integrations.langchain_adapter", "integrations.crewai_adapter",
+            "middleware.anthropic_adapter",
+            "middleware.openai_adapter",
+            "middleware.langchain_adapter",
+            "middleware.crewai_adapter",
         ],
         cost=ModuleCost.LIGHT,
         stability=ModuleStability.STABLE,
@@ -316,8 +345,13 @@ DEFAULT_PROFILES: list[Profile] = [
         name="standard",
         description="Recommended. Core + learning pipeline + behavioral engine + context management.",
         modules=[
-            "core-patterns", "context-management", "quality-gates",
-            "learning-pipeline", "behavioral-engine", "truth-protocol", "agent-modes",
+            "core-patterns",
+            "context-management",
+            "quality-gates",
+            "learning-pipeline",
+            "behavioral-engine",
+            "truth-protocol",
+            "agent-modes",
         ],
     ),
     Profile(
@@ -329,9 +363,16 @@ DEFAULT_PROFILES: list[Profile] = [
         name="research",
         description="Full pipeline + RL router + observation hooks for research.",
         modules=[
-            "core-patterns", "context-management", "quality-gates",
-            "learning-pipeline", "behavioral-engine", "truth-protocol", "agent-modes",
-            "observation-hooks", "q-learning-router", "meta-rules",
+            "core-patterns",
+            "context-management",
+            "quality-gates",
+            "learning-pipeline",
+            "behavioral-engine",
+            "truth-protocol",
+            "agent-modes",
+            "observation-hooks",
+            "q-learning-router",
+            "meta-rules",
             "rule-integrity",
         ],
     ),
@@ -341,6 +382,7 @@ DEFAULT_PROFILES: list[Profile] = [
 # ---------------------------------------------------------------------------
 # InstallManifest
 # ---------------------------------------------------------------------------
+
 
 class InstallManifest:
     """Registry of modules and profiles for selective installation.
@@ -357,16 +399,15 @@ class InstallManifest:
         self._modules: dict[str, Module] = {}
         self._profiles: dict[str, Profile] = {}
 
-        for m in (modules or []):
+        for m in modules or []:
             self._modules[m.id] = m
-        for p in (profiles or []):
+        for p in profiles or []:
             self._profiles[p.name] = p
 
     @classmethod
     def default(cls) -> InstallManifest:
         """Create a manifest with default modules and profiles."""
         return cls(modules=DEFAULT_MODULES, profiles=DEFAULT_PROFILES)
-
 
     @property
     def available_modules(self) -> list[Module]:
@@ -397,15 +438,14 @@ class InstallManifest:
         visiting: set[str] = set()  # Detect circular deps
 
         def _resolve(mid: str) -> None:
-            # Backward compat: "carl" was renamed to "behavioral-engine"
-            if mid == "carl":
-                mid = "behavioral-engine"
+            # Backward compat: accept deprecated module ids that were
+            # renamed so existing user profiles / state files keep resolving.
+            mid = _LEGACY_MODULE_ALIASES.get(mid, mid)
             if mid in seen:
                 return
             if mid in visiting:
                 raise ValueError(
-                    f"Circular dependency detected: {mid} is already "
-                    f"in the resolution chain"
+                    f"Circular dependency detected: {mid} is already in the resolution chain"
                 )
             visiting.add(mid)
             module = self._modules.get(mid)

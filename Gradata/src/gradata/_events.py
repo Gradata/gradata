@@ -10,6 +10,7 @@ import contextlib
 import json
 import logging
 import os
+import re
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,6 +27,30 @@ if TYPE_CHECKING:
     from gradata._paths import BrainContext
 
 _log = logging.getLogger("gradata.events")
+
+_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+
+
+def _redact_string(value: str) -> str:
+    return _EMAIL_RE.sub("[REDACTED_EMAIL]", value)
+
+
+def _redact_payload(obj):
+    """Return a PII-redacted deep copy of obj.
+
+    Emails are the baseline invariant (Council Skeptic #1). Walks dicts and
+    lists recursively so nested structures can't leak raw values to
+    cloud-syncable storage.
+    """
+    if isinstance(obj, str):
+        return _redact_string(obj)
+    if isinstance(obj, dict):
+        return {k: _redact_payload(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_redact_payload(v) for v in obj]
+    if isinstance(obj, tuple):
+        return tuple(_redact_payload(v) for v in obj)
+    return obj
 
 
 def _locked_append_many(path: Path, lines: list[str]) -> None:
@@ -181,7 +206,7 @@ def emit(
     except ImportError:
         pass
 
-    event = {
+    raw_event = {
         "ts": ts,
         "session": session,
         "type": event_type,
@@ -191,6 +216,29 @@ def emit(
         "valid_from": valid_from,
         "valid_until": valid_until,
     }
+
+    # Redact PII BEFORE any cloud-syncable storage. Fail-closed: if the
+    # redactor raises, no data (raw or canonical) may be persisted.
+    redacted_data = _redact_payload(data or {})
+    redacted_tags = _redact_payload(enriched_tags)
+    event = {
+        "ts": ts,
+        "session": session,
+        "type": event_type,
+        "source": source,
+        "data": redacted_data,
+        "tags": redacted_tags,
+        "valid_from": valid_from,
+        "valid_until": valid_until,
+    }
+
+    # Best-effort side-log of the unredacted original. Platform-locked,
+    # gitignored, never synced. Failure here must not break canonical writes.
+    raw_path = events_jsonl.parent / "events.raw.jsonl"
+    try:
+        _locked_append(raw_path, json.dumps(raw_event, ensure_ascii=False) + "\n")
+    except Exception as raw_exc:
+        _log.debug("raw side-log write failed: %s", raw_exc)
 
     # Dual-write: JSONL (portable) + SQLite (queryable).
     # At least ONE must succeed or we raise — learning data loss is unacceptable.
@@ -221,8 +269,8 @@ def emit(
                     session,
                     event_type,
                     source,
-                    json.dumps(data or {}),
-                    json.dumps(enriched_tags),
+                    json.dumps(redacted_data),
+                    json.dumps(redacted_tags),
                     valid_from,
                     valid_until,
                     _tid,
@@ -652,6 +700,19 @@ class RetainOrchestrator:
             return result
 
         # ── Phase 2: Atomic write ────────────────────────────────────────
+        # Defense-in-depth: redact PII on every event's data/tags before
+        # persistence. emit() already redacts upstream, so this is a safety
+        # net if a caller queues raw events without going through emit().
+        # Scalar payloads (``data="alice@example.com"``) must also route
+        # through ``_redact_payload`` — previously we only redacted when
+        # data/tags were already dict/list, which let scalar strings sneak
+        # past the safety net entirely. ``_redact_payload`` no-ops on
+        # types it does not understand, so it is safe to always call.
+        for _evt in new_events:
+            if "data" in _evt:
+                _evt["data"] = _redact_payload(_evt["data"])
+            if "tags" in _evt:
+                _evt["tags"] = _redact_payload(_evt["tags"])
         try:
             # 2a: Append to events.jsonl — one locked batch append to prevent
             # multi-process interleaving on Windows (msvcrt.locking) and POSIX

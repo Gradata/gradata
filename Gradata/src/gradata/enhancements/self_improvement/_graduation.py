@@ -48,6 +48,51 @@ def _ensure_slot(lesson: Lesson) -> None:
         pass
 
 
+def _emit_rule_graduated(
+    lesson: Lesson,
+    old_state: LessonState,
+    new_state: LessonState,
+    reason: str,
+    brain=None,
+) -> None:
+    """Emit a RULE_GRADUATED event for a state transition.
+
+    Unblocks Phase 2 materializer: graduation state must be derivable from
+    events alone, not only the SQLite lesson_transitions side-table.
+
+    Best-effort: never raises out of graduate(). When brain is None, falls
+    back to the module-level ``gradata._events.emit`` which uses globals
+    rewired by tests/conftest.
+    """
+    payload = {
+        "category": getattr(lesson, "category", "") or "",
+        "description": getattr(lesson, "description", "") or "",
+        "old_state": getattr(old_state, "name", str(old_state)),
+        "new_state": getattr(new_state, "name", str(new_state)),
+        "confidence": float(getattr(lesson, "confidence", 0.0)),
+        "fire_count": int(getattr(lesson, "fire_count", 0)),
+        "reason": reason,
+    }
+    if brain is not None and hasattr(brain, "emit"):
+        try:
+            brain.emit("RULE_GRADUATED", "graduate", payload, [])
+        except Exception as exc:
+            # Do NOT fall through to the module-level emit here. ``brain.emit``
+            # may have partially persisted (event written but bus publish
+            # failed); a second emit would append a duplicate RULE_GRADUATED
+            # row and corrupt the transition stream. Surface the failure to
+            # debug logs and leave reconciliation to the brain's retry path.
+            _log.debug("brain.emit(RULE_GRADUATED) failed: %s", exc)
+        return
+    # Fallback path only when no brain emitter is available.
+    try:
+        from gradata._events import emit as _events_emit
+
+        _events_emit("RULE_GRADUATED", "graduate", payload, [])
+    except Exception as exc:
+        _log.debug("fallback emit(RULE_GRADUATED) failed: %s", exc)
+
+
 # ---------------------------------------------------------------------------
 # Graduation
 # ---------------------------------------------------------------------------
@@ -221,18 +266,24 @@ def graduate(
         # UNTESTABLE lessons: check if they should be killed (enough idle sessions)
         if lesson.state == LessonState.UNTESTABLE:
             if lesson.sessions_since_fire >= kill_limit + 5:
+                _old = lesson.state
                 try:
                     lesson.state = transition(lesson.state, "kill")
                     lesson.kill_reason = f"untestable_expired: {lesson.sessions_since_fire} idle sessions (limit: {kill_limit + 5})"
+                    _emit_rule_graduated(
+                        lesson, _old, lesson.state, "untestable_expired", brain=brain
+                    )
                 except ValueError:
                     pass
             continue
 
         # Kill: confidence at zero
         if lesson.confidence <= 0.0:
+            _old = lesson.state
             try:
                 lesson.state = transition(lesson.state, "kill")
                 lesson.kill_reason = "zero_confidence: accumulated penalties drove confidence to 0"
+                _emit_rule_graduated(lesson, _old, lesson.state, "zero_confidence", brain=brain)
             except ValueError:
                 pass
             continue
@@ -240,15 +291,19 @@ def graduate(
         # Kill: untestable (too many sessions without a fire)
         if lesson.sessions_since_fire >= kill_limit:
             if lesson.state == LessonState.UNTESTABLE:
+                _old = lesson.state
                 try:
                     lesson.state = transition(lesson.state, "kill")
                     lesson.kill_reason = f"untestable_idle: {lesson.sessions_since_fire} sessions without firing (limit: {kill_limit})"
+                    _emit_rule_graduated(lesson, _old, lesson.state, "untestable_idle", brain=brain)
                 except ValueError:
                     pass
                 continue
             elif lesson.state in (LessonState.INSTINCT, LessonState.PATTERN):
+                _old = lesson.state
                 lesson.state = LessonState.UNTESTABLE
                 lesson.kill_reason = f"moved_to_untestable: {lesson.sessions_since_fire} sessions without firing (limit: {kill_limit})"
+                _emit_rule_graduated(lesson, _old, lesson.state, "moved_to_untestable", brain=brain)
                 continue
 
         # Promote PATTERN -> RULE (with adversarial gates + wording refinement)
@@ -335,7 +390,9 @@ def graduate(
             except Exception:
                 pass  # ToT is optional; graduate with original wording
             _ensure_slot(lesson)
+            _old = lesson.state
             lesson.state = transition(lesson.state, "promote")
+            _emit_rule_graduated(lesson, _old, lesson.state, "pattern_to_rule", brain=brain)
 
             # Rule-to-hook graduation: attempt to install a deterministic
             # PreToolUse hook for this newly-minted RULE. On success, mark
@@ -384,12 +441,16 @@ def graduate(
             and lesson.fire_count >= MIN_APPLICATIONS_FOR_PATTERN
         ):
             _ensure_slot(lesson)
+            _old = lesson.state
             lesson.state = transition(lesson.state, "promote")
+            _emit_rule_graduated(lesson, _old, lesson.state, "instinct_to_pattern", brain=brain)
             continue
 
         # Demote PATTERN -> INSTINCT
         if lesson.state == LessonState.PATTERN and lesson.confidence < eff_pattern_threshold:
+            _old = lesson.state
             lesson.state = transition(lesson.state, "demote")
+            _emit_rule_graduated(lesson, _old, lesson.state, "demoted_below_threshold", brain=brain)
             continue
 
     # Split into active vs graduated

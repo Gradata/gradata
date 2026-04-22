@@ -21,7 +21,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import contextlib
 import json
 import logging
 import sys
@@ -532,195 +531,6 @@ def cmd_demo(args):
     print(f"Try: gradata convergence --brain-dir {target}")
 
 
-def _gradata_config_path(args=None) -> Path:
-    """Return path to the Gradata cloud config file.
-
-    Precedence: --config arg > GRADATA_CONFIG env > ~/.gradata/config.toml
-    """
-    import os
-
-    explicit = getattr(args, "config", None) if args else None
-    if explicit:
-        return Path(explicit)
-    env = os.environ.get("GRADATA_CONFIG")
-    if env:
-        return Path(env)
-    return Path.home() / ".gradata" / "config.toml"
-
-
-def _sanitize_toml_value(val: str) -> str:
-    """Finding 12: strip characters that could inject TOML structure."""
-    # Remove newlines, brackets, and unbalanced quotes to prevent injection
-    return (
-        val.replace("\n", "")
-        .replace("\r", "")
-        .replace("[", "")
-        .replace("]", "")
-        .replace('"', "")
-        .replace("\\", "")
-        .strip()
-    )
-
-
-def _check_config_permissions(config_path: Path) -> None:
-    """Finding 4: warn if config file is world-readable (Unix only)."""
-    import os
-    import stat
-
-    try:
-        st = os.stat(config_path)
-        # Check if group or others have any permissions
-        if st.st_mode & (stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH):
-            print(
-                f"  WARNING: {config_path} has overly permissive permissions "
-                f"({oct(st.st_mode & 0o777)}). Run: chmod 600 {config_path}"
-            )
-    except (OSError, AttributeError):
-        pass  # Windows or permission check not available
-
-
-def cmd_login(args):
-    """Device authentication flow: connect SDK to app.gradata.ai."""
-    import json as _json
-    import os
-    import time
-    import webbrowser
-    from urllib.error import HTTPError, URLError
-    from urllib.request import Request, urlopen
-
-    api_url = env_str("GRADATA_API_URL", "https://api.gradata.ai/api/v1")
-
-    # Finding 5: reject non-HTTPS API URLs (allow localhost for development)
-    if not api_url.startswith("https://") and not (
-        api_url.startswith("http://localhost") or api_url.startswith("http://127.0.0.1")
-    ):
-        print(f"Error: GRADATA_API_URL must use HTTPS (got: {api_url})")
-        print("  HTTP is only allowed for localhost/127.0.0.1 during development.")
-        sys.exit(1)
-
-    # Step 1: Request a device code
-    try:
-        req = Request(
-            f"{api_url}/auth/device/code",
-            data=b"{}",
-            headers={"Content-Type": "application/json", "User-Agent": "gradata-sdk/0.6"},
-            method="POST",
-        )
-        with urlopen(req, timeout=15) as resp:
-            code_data = _json.loads(resp.read())
-    except (URLError, HTTPError) as exc:
-        print(f"Error: could not reach {api_url} ({exc})")
-        sys.exit(1)
-
-    user_code = code_data["user_code"]
-    device_code = code_data["device_code"]
-    expires_in = code_data.get("expires_in", 600)
-    interval = code_data.get("interval", 2)
-    verification_url = code_data.get("verification_url", "https://app.gradata.ai/connect")
-
-    # Format with dash for readability: ABCD-EF
-    formatted = f"{user_code[:4]}-{user_code[4:]}" if len(user_code) > 4 else user_code
-    print(f"\n  Your pairing code is: {formatted}\n")
-    print("  Opening browser to confirm...")
-
-    try:
-        webbrowser.open(verification_url)
-    except Exception:
-        print(f"  Could not open browser. Go to: {verification_url}")
-
-    print("  Waiting for confirmation...\n")
-
-    # Step 2: Poll for confirmation
-    deadline = time.monotonic() + expires_in
-    while time.monotonic() < deadline:
-        time.sleep(interval)
-        try:
-            poll_req = Request(
-                f"{api_url}/auth/device/token",
-                data=_json.dumps({"device_code": device_code}).encode(),
-                headers={"Content-Type": "application/json", "User-Agent": "gradata-sdk/0.6"},
-                method="POST",
-            )
-            with urlopen(poll_req, timeout=10) as resp:
-                token_data = _json.loads(resp.read())
-        except HTTPError as exc:
-            if exc.code == 404:
-                print("Error: device code not found. Try again with `gradata login`.")
-                sys.exit(1)
-            continue
-        except URLError:
-            continue
-
-        status = token_data.get("status")
-        if status == "complete":
-            api_key = token_data["api_key"]
-            brain_id = token_data.get("brain_id", "")
-            cloud_url = token_data.get("api_url", api_url)
-
-            # Save to config file
-            config_path = _gradata_config_path(args)
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Finding 4: restrict directory permissions (Unix)
-            # Windows — os.chmod has limited effect, suppress the error
-            with contextlib.suppress(OSError, AttributeError):
-                os.chmod(config_path.parent, 0o700)
-
-            # Finding 12: sanitize values before writing TOML
-            safe_key = _sanitize_toml_value(api_key)
-            safe_brain = _sanitize_toml_value(brain_id)
-            safe_url = _sanitize_toml_value(cloud_url)
-
-            config_path.write_text(
-                f"# Gradata cloud config (auto-generated by `gradata login`)\n"
-                f"[cloud]\n"
-                f'api_key = "{safe_key}"\n'
-                f'brain_id = "{safe_brain}"\n'
-                f'api_url = "{safe_url}"\n',
-                encoding="utf-8",
-            )
-
-            # Finding 4: restrict file permissions (Unix)
-            # Windows — os.chmod has limited effect, suppress the error
-            with contextlib.suppress(OSError, AttributeError):
-                os.chmod(config_path, 0o600)
-
-            # Also set in the environment for the current process (so
-            # subsequent brain operations in the same shell can auto-sync)
-            os.environ["GRADATA_API_KEY"] = api_key
-
-            print("  Connected! Your brain will sync to app.gradata.ai")
-            print(f"  Config saved to {config_path}")
-
-            # Finding 4: check permissions on startup
-            _check_config_permissions(config_path)
-            return
-
-        if status == "expired":
-            print("  Code expired. Run `gradata login` again.")
-            sys.exit(1)
-
-        # status == "pending" — keep polling
-        pass
-
-    print("  Timed out waiting for confirmation. Run `gradata login` again.")
-    sys.exit(1)
-
-
-def cmd_logout(args):
-    """Clear stored cloud credentials."""
-    config_path = _gradata_config_path(args)
-    if config_path.exists():
-        config_path.unlink()
-        print(f"Logged out. Removed {config_path}")
-    else:
-        print("Not logged in (no config file found).")
-
-    import os
-
-    os.environ.pop("GRADATA_API_KEY", None)
-
-
 def _resolve_brain_root(args):
     """Figure out where brain lives. Prefer env override for tests, then --brain-dir arg, then default."""
     override = env_str("GRADATA_BRAIN")
@@ -843,6 +653,120 @@ def cmd_seed(args):
             skipped += 1
 
     print(f"seeded {label}: {added} added, {skipped} already present")
+
+
+def _mask_credential(value: str) -> str:
+    """Return a masked representation of a credential string."""
+    if not value:
+        return "(none)"
+    if len(value) <= 10:
+        return "***"
+    return f"{value[:6]}...{value[-4:]}"
+
+
+def cmd_cloud(args):
+    """Dispatcher for `gradata cloud <subcommand>`."""
+    from gradata.cloud import _credentials as _creds
+    from gradata.cloud.sync import load_config, save_config
+
+    subcmd = getattr(args, "cloud_cmd", None)
+
+    # Use the same resolution precedence as every other CLI command
+    # (env GRADATA_BRAIN > --brain-dir > cwd) so `gradata cloud ...` and,
+    # say, `gradata export` always target the same brain. The older
+    # ``_resolve_brain_root`` helper defaulted to a relative ``./brain``
+    # which diverged from ``_get_brain`` and caused cloud config to land
+    # in a different directory than the rest of the CLI operated on.
+    brain_root = Path(
+        env_str("GRADATA_BRAIN") or getattr(args, "brain_dir", None) or Path.cwd()
+    ).resolve()
+    # Only create the brain dir for write-side subcommands. ``status``
+    # and ``disconnect`` should be safe to run without side-effecting the
+    # filesystem of a nonexistent target.
+    if subcmd in ("enable", "rotate-key", "sync-pull"):
+        brain_root.mkdir(parents=True, exist_ok=True)
+
+    if subcmd == "enable":
+        cred = args.key.strip()
+        if not cred.startswith(_creds.KEY_PREFIX):
+            print(
+                f"Warning: credential does not begin with {_creds.KEY_PREFIX!r}. "
+                "Proceeding anyway — verify this is a live cloud key."
+            )
+        path = _creds.write_to_keyfile(cred)
+        cfg = load_config(brain_root)
+        cfg.sync_enabled = True
+        scope = getattr(args, "scope", "") or ""
+        cfg.key_scope = scope
+        save_config(brain_root, cfg)
+        print(f"Cloud sync enabled. Credential stored at {path}.")
+        if scope:
+            print(f"Scope: {scope}")
+        return
+
+    if subcmd == "rotate-key":
+        new_cred = args.key.strip()
+        if not new_cred.startswith(_creds.KEY_PREFIX):
+            print(
+                f"Warning: credential does not begin with {_creds.KEY_PREFIX!r}. Rotating anyway."
+            )
+        path = _creds.write_to_keyfile(new_cred)
+        print(f"Rotating cloud credential. New value stored at {path}.")
+        return
+
+    if subcmd == "status":
+        cfg = load_config(brain_root)
+        cred = _creds.resolve_credential()
+        print(f"sync_enabled: {cfg.sync_enabled}")
+        print(f"endpoint:     {_creds.resolve_endpoint(fallback=cfg.api_base)}")
+        print(f"credential:   {_mask_credential(cred)}")
+        if cfg.key_scope:
+            print(f"scope:        {cfg.key_scope}")
+        if cfg.last_sync_at:
+            print(f"last_sync_at: {cfg.last_sync_at}")
+        return
+
+    if subcmd == "disconnect":
+        removed = _creds.delete_keyfile()
+        cfg = load_config(brain_root)
+        cfg.sync_enabled = False
+        save_config(brain_root, cfg)
+        if removed:
+            print("Cloud credential removed. Sync disabled.")
+        else:
+            print("no keyfile to remove. Sync disabled.")
+        return
+
+    if subcmd == "sync-pull":
+        from gradata.cloud.pull import pull_events
+
+        apply_flag = bool(getattr(args, "apply", False))
+        rebuild_from = getattr(args, "rebuild_from", None) or None
+        limit = int(getattr(args, "limit", 500) or 500)
+
+        result = pull_events(
+            brain_root,
+            apply=apply_flag,
+            rebuild_from=rebuild_from,
+            limit=limit,
+        )
+        status = result.get("status")
+        print(f"status:             {status}")
+        if reason := result.get("reason"):
+            print(f"reason:             {reason}")
+            return
+        print(f"events_pulled:      {result.get('events_pulled', 0)}")
+        print(f"pages_fetched:      {result.get('pages_fetched', 0)}")
+        print(f"rules_materialized: {result.get('rules_materialized', 0)}")
+        print(f"conflicts:          {result.get('conflicts', 0)}")
+        if (th := result.get("conflict_threshold")) is not None:
+            print(f"threshold:          {th}")
+        print(f"applied:            {result.get('applied', False)}")
+        if not apply_flag and result.get("rules_materialized"):
+            print("dry-run — re-run with --apply to merge into lessons.md")
+        return
+
+    print("usage: gradata cloud {enable|rotate-key|status|disconnect|sync-pull}")
 
 
 def cmd_mine(args):
@@ -1248,16 +1172,6 @@ def main():
     p_demo = sub.add_parser("demo", help="Copy pre-trained demo brain to a directory")
     p_demo.add_argument("target", nargs="?", default="./demo-brain", help="Target directory")
 
-    # login / logout — device auth flow for cloud sync
-    sub.add_parser("login", help="Connect SDK to app.gradata.ai (device auth flow)")
-    p_logout = sub.add_parser("logout", help="Disconnect SDK from cloud")
-    p_logout.add_argument(
-        "--config",
-        type=str,
-        default=None,
-        help="Path to config file (default: ~/.gradata/config.toml)",
-    )
-
     p_hooks = sub.add_parser("hooks", help="Manage Claude Code hook integration")
     p_hooks.add_argument("action", choices=["install", "uninstall", "status"], help="Hook action")
     p_hooks.add_argument(
@@ -1295,6 +1209,34 @@ def main():
         "--projects-root",
         default=None,
         help="Override transcript root (default: ~/.claude/projects)",
+    )
+
+    # cloud — unified keyfile-backed cloud credential management
+    p_cloud = sub.add_parser("cloud", help="Manage Gradata Cloud connection")
+    cloud_sub = p_cloud.add_subparsers(dest="cloud_cmd")
+    p_cloud_enable = cloud_sub.add_parser("enable", help="Enable cloud sync")
+    p_cloud_enable.add_argument("--key", required=True, help="Cloud credential (gk_live_...)")
+    p_cloud_enable.add_argument("--scope", default="", help="Optional scope tag")
+    p_cloud_rotate = cloud_sub.add_parser("rotate-key", help="Rotate cloud credential")
+    p_cloud_rotate.add_argument("--key", required=True, help="New cloud credential")
+    cloud_sub.add_parser("status", help="Show cloud sync status")
+    cloud_sub.add_parser("disconnect", help="Disconnect cloud sync")
+    p_cloud_pull = cloud_sub.add_parser(
+        "sync-pull", help="Pull pending cloud events (dry-run by default)"
+    )
+    p_cloud_pull.add_argument(
+        "--apply",
+        action="store_true",
+        help="Merge materialized state into lessons.md and emit RULE_CONFLICT events",
+    )
+    p_cloud_pull.add_argument(
+        "--rebuild-from",
+        dest="rebuild_from",
+        default=None,
+        help="Force-resume from a specific watermark (bypasses persisted cursor)",
+    )
+    p_cloud_pull.add_argument(
+        "--limit", type=int, default=500, help="Max events per page (1..1000)"
     )
 
     # rule — user-declared rules (fast-track to RULE tier, try hook install)
@@ -1335,12 +1277,11 @@ def main():
 
     commands["convergence"] = cmd_convergence
     commands["demo"] = cmd_demo
-    commands["login"] = cmd_login
-    commands["logout"] = cmd_logout
     commands["hooks"] = cmd_hooks
     commands["rule"] = cmd_rule
     commands["seed"] = cmd_seed
     commands["mine"] = cmd_mine
+    commands["cloud"] = cmd_cloud
 
     if args.command in commands:
         commands[args.command](args)

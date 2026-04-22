@@ -192,13 +192,13 @@ class Brain(BrainInspectionMixin):
 
         # Register built-in nervous system subscribers (lazy, never block init)
         try:
-            from gradata.integrations.embeddings import subscribe_to_bus as _embed_sub
+            from gradata.services.embeddings import subscribe_to_bus as _embed_sub
 
             _embed_sub(self.bus)
         except ImportError:
             pass
         try:
-            from gradata.integrations.session_history import SessionHistory as _SH
+            from gradata.services.session_history import SessionHistory as _SH
 
             self._session_history = _SH()
             self._session_history.subscribe_to_bus(self.bus)

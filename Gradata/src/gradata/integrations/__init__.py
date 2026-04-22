@@ -1,34 +1,17 @@
-"""Framework Integrations — DEPRECATED namespace.
+"""DEPRECATED namespace — ``gradata.integrations`` is going away.
 
-.. deprecated::
-    ``gradata.integrations`` is deprecated and will be removed in v0.8.0.
-    The canonical adapters now live in ``gradata.middleware``::
+.. deprecated:: 0.7.0
+    Adapter modules (``anthropic_adapter``, ``openai_adapter``,
+    ``langchain_adapter``, ``crewai_adapter``) were removed in 0.7.0 after
+    their deprecation warnings fired since 0.6.x. Use
+    :mod:`gradata.middleware` instead::
 
         from gradata.middleware import wrap_anthropic, wrap_openai
         from gradata.middleware import LangChainCallback, CrewAIGuard
 
     ``gradata.integrations.embeddings`` and
-    ``gradata.integrations.session_history`` are NOT deprecated — those
-    remain in this namespace (they have no middleware equivalent).
-
-    Adapter modules (anthropic_adapter, openai_adapter, langchain_adapter,
-    crewai_adapter) emit their own ``DeprecationWarning`` on import.
+    ``gradata.integrations.session_history`` now live in
+    :mod:`gradata.services` and are kept here as forwarding shims through
+    v0.9.0 (two-minor-version carry per
+    ``docs/contributing/deprecation-policy.md``).
 """
-
-import importlib as _importlib
-
-# Short-name aliases: gradata.integrations.openai -> gradata.integrations.openai_adapter
-_ADAPTER_ALIASES = {
-    "openai": "openai_adapter",
-    "anthropic": "anthropic_adapter",
-    "langchain": "langchain_adapter",
-    "crewai": "crewai_adapter",
-}
-
-
-def __getattr__(name: str):
-    """Lazy-load integration adapters with short-name aliases."""
-    target = _ADAPTER_ALIASES.get(name)
-    if target is not None:
-        return _importlib.import_module(f".{target}", __package__)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -41,7 +41,7 @@ def _write_config(
 def test_cloud_config_missing(isolated_config):
     result = _doctor._check_cloud_config()
     assert result["status"] == "missing"
-    assert "gradata login" in result["detail"]
+    assert "gradata cloud enable" in result["detail"]
 
 
 def test_cloud_config_missing_credential(isolated_config):
@@ -58,37 +58,31 @@ def test_cloud_config_ok(isolated_config):
     assert "brain-abc" in result["detail"]
 
 
-def test_cloud_env_vars_not_enabled(monkeypatch):
+def test_cloud_env_vars_not_set(monkeypatch):
     for var in (
-        "GRADATA_CLOUD_SYNC",
-        "GRADATA_CLOUD_URL",
-        "GRADATA_CLOUD_KEY",
-        "GRADATA_SUPABASE_URL",
-        "GRADATA_SUPABASE_SERVICE_KEY",
+        "GRADATA_API_KEY",
+        "GRADATA_ENDPOINT",
+        "GRADATA_CLOUD_API_BASE",
+        "GRADATA_CLOUD_SYNC_DISABLE",
     ):
         monkeypatch.delenv(var, raising=False)
     result = _doctor._check_cloud_env_vars()
     assert result["status"] == "skip"
 
 
-def test_cloud_env_vars_supabase_alias_accepted(monkeypatch):
-    monkeypatch.setenv("GRADATA_CLOUD_SYNC", "1")
-    monkeypatch.delenv("GRADATA_CLOUD_URL", raising=False)
-    monkeypatch.delenv("GRADATA_CLOUD_KEY", raising=False)
-    monkeypatch.setenv("GRADATA_SUPABASE_URL", "https://example.supabase.co")
-    monkeypatch.setenv("GRADATA_SUPABASE_SERVICE_KEY", "placeholder-value")
+def test_cloud_env_vars_api_key_set(monkeypatch):
+    monkeypatch.setenv("GRADATA_API_KEY", "gk_test_placeholder")
+    monkeypatch.delenv("GRADATA_CLOUD_SYNC_DISABLE", raising=False)
     result = _doctor._check_cloud_env_vars()
     assert result["status"] == "ok"
 
 
-def test_cloud_env_vars_missing_key(monkeypatch):
-    monkeypatch.setenv("GRADATA_CLOUD_SYNC", "1")
-    monkeypatch.setenv("GRADATA_CLOUD_URL", "https://example.supabase.co")
-    for k in ("GRADATA_CLOUD_KEY", "GRADATA_SUPABASE_SERVICE_KEY"):
-        monkeypatch.delenv(k, raising=False)
+def test_cloud_env_vars_kill_switch_warns(monkeypatch):
+    monkeypatch.setenv("GRADATA_API_KEY", "gk_test_placeholder")
+    monkeypatch.setenv("GRADATA_CLOUD_SYNC_DISABLE", "1")
     result = _doctor._check_cloud_env_vars()
-    assert result["status"] == "fail"
-    assert "GRADATA_CLOUD_KEY" in result["detail"]
+    assert result["status"] == "warn"
+    assert "kill switch" in result["detail"].lower()
 
 
 def test_cloud_auth_skips_when_not_logged_in(isolated_config):

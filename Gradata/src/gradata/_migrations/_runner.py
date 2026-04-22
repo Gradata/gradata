@@ -5,6 +5,7 @@ Single source of truth for:
 - ``has_applied`` / ``mark_applied``
 - Safe column / index existence checks for SQLite
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -39,9 +40,7 @@ def has_applied(conn: sqlite3.Connection, name: str) -> bool:
     ).fetchone()
     if row is None:
         return False
-    row = conn.execute(
-        "SELECT 1 FROM migrations WHERE name = ?", (name,)
-    ).fetchone()
+    row = conn.execute("SELECT 1 FROM migrations WHERE name = ?", (name,)).fetchone()
     return row is not None
 
 
@@ -100,18 +99,57 @@ def create_index_if_missing(
     index: str,
     table: str,
     columns: str,
+    *,
+    unique: bool = False,
 ) -> bool:
+    """Create an index, upgrading a non-UNIQUE version in place when needed.
+
+    When ``unique=True`` and a regular (non-UNIQUE) index with the same name
+    already exists, it is dropped and recreated as UNIQUE so ``ON CONFLICT``
+    clauses that target the indexed columns resolve correctly. SQLite requires
+    a UNIQUE constraint to back any ON CONFLICT target.
+    """
     if not table_exists(conn, table):
         return False
     if index_exists(conn, index):
-        return False
-    conn.execute(f"CREATE INDEX {index} ON {table} ({columns})")
+        # Confirm the index belongs to the target table before touching it.
+        # Without this, an index of the same name on a different table would
+        # be silently dropped below (since PRAGMA index_list is scoped to
+        # ``table`` and wouldn't report it as UNIQUE).
+        owner_row = conn.execute(
+            "SELECT tbl_name FROM sqlite_master WHERE type='index' AND name = ?",
+            (index,),
+        ).fetchone()
+        if owner_row and owner_row[0] != table:
+            return False
+        if not unique:
+            return False
+        # Ask SQLite directly whether the existing index is UNIQUE rather
+        # than substring-matching on the DDL — an index literally named
+        # ``idx_unique_name`` would otherwise spoof the check even when
+        # declared non-UNIQUE. ``PRAGMA index_list`` returns rows
+        # (seq, name, unique_flag, origin, partial).
+        existing_unique = False
+        for _, idx_name, is_unique, *_rest in conn.execute(
+            f"PRAGMA index_list({table})"
+        ).fetchall():
+            if idx_name == index:
+                existing_unique = bool(is_unique)
+                break
+        if existing_unique:
+            return False
+        # IF EXISTS closes the TOCTOU window between index_exists() and the
+        # drop — a concurrent migration could have dropped the index first.
+        conn.execute(f"DROP INDEX IF EXISTS {index}")
+    kw = "UNIQUE INDEX" if unique else "INDEX"
+    conn.execute(f"CREATE {kw} {index} ON {table} ({columns})")
     return True
 
 
 def resolve_brain_db(brain_arg: str | Path | None) -> Path:
     """Resolve the brain SQLite path from a CLI arg or env."""
     import os
+
     if brain_arg:
         p = Path(brain_arg).expanduser().resolve()
     else:

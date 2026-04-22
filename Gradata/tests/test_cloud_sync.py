@@ -64,6 +64,40 @@ class TestCloudConfig:
         cfg = load_config(tmp_path)
         assert cfg.sync_enabled is False  # falls back to defaults
 
+    def test_conflict_threshold_default_is_zero_sentinel(self):
+        """0.0 means 'use the SDK default'; only non-zero overrides."""
+        assert CloudConfig().conflict_threshold == 0.0
+
+    def test_conflict_threshold_persists(self, tmp_path: Path):
+        import json as _json
+
+        (tmp_path / "cloud-config.json").write_text(
+            _json.dumps({"conflict_threshold": 0.08}),
+            encoding="utf-8",
+        )
+        cfg = load_config(tmp_path)
+        assert cfg.conflict_threshold == 0.08
+
+    def test_conflict_threshold_out_of_range_falls_back(self, tmp_path: Path):
+        import json as _json
+
+        (tmp_path / "cloud-config.json").write_text(
+            _json.dumps({"conflict_threshold": 1.5}),
+            encoding="utf-8",
+        )
+        cfg = load_config(tmp_path)
+        assert cfg.conflict_threshold == 0.0  # sentinel → SDK default
+
+    def test_conflict_threshold_garbage_falls_back(self, tmp_path: Path):
+        import json as _json
+
+        (tmp_path / "cloud-config.json").write_text(
+            _json.dumps({"conflict_threshold": "not a number"}),
+            encoding="utf-8",
+        )
+        cfg = load_config(tmp_path)
+        assert cfg.conflict_threshold == 0.0
+
 
 class TestCloudClient:
     def test_client_disabled_by_default(self, tmp_path: Path):
