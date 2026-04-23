@@ -20,11 +20,14 @@ Split into 4 files for maintainability (<500 lines each):
 """
 
 import json
+import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import gradata._paths as _p
 from gradata._db import get_connection
+
+_log = logging.getLogger(__name__)
 
 # Re-export helpers so existing imports from _brain_manifest still work
 from gradata._manifest_helpers import (
@@ -61,14 +64,17 @@ def generate_manifest(*, domain: str = "General", ctx: "BrainContext | None" = N
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = get_connection(db)
-        db_max = conn.execute(
-            "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
-        ).fetchone()[0] or 0
+        db_max = (
+            conn.execute(
+                "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
+            ).fetchone()[0]
+            or 0
+        )
         conn.close()
         if db_max > version_info["sessions_trained"]:
             version_info["sessions_trained"] = db_max
-    except Exception:
-        pass
+    except Exception as e:
+        _log.debug("Session count DB cross-check failed (non-fatal): %s", e)
 
     quality = _quality_metrics(ctx=ctx)
     memory = _memory_composition(ctx=ctx)
@@ -110,10 +116,22 @@ def generate_manifest(*, domain: str = "General", ctx: "BrainContext | None" = N
             },
         },
         "bootstrap": [
-            {"step": "set_env_vars", "desc": "Set BRAIN_DIR, WORKING_DIR, DOMAIN_DIR", "required": True},
+            {
+                "step": "set_env_vars",
+                "desc": "Set BRAIN_DIR, WORKING_DIR, DOMAIN_DIR",
+                "required": True,
+            },
             {"step": "init_db", "command": "python start.py init", "required": True},
-            {"step": "embed_brain", "command": "python embed.py --full", "required": rag.get("active", False)},
-            {"step": "rebuild_fts", "command": "python -c \"from query import fts_rebuild; fts_rebuild()\"", "required": True},
+            {
+                "step": "embed_brain",
+                "command": "python embed.py --full",
+                "required": rag.get("active", False),
+            },
+            {
+                "step": "rebuild_fts",
+                "command": 'python -c "from query import fts_rebuild; fts_rebuild()"',
+                "required": True,
+            },
             {"step": "validate", "command": "python config_validator.py", "required": False},
         ],
         "compatibility": {

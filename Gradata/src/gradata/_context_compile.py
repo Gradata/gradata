@@ -5,10 +5,13 @@ Extracts entities from a user message, queries the brain,
 returns formatted context injection.
 """
 
+import logging
 import re
 from typing import TYPE_CHECKING
 
 import gradata._paths as _p
+
+_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from gradata._paths import BrainContext
@@ -88,8 +91,8 @@ def compile_context(
                     txt = r.get("text", "")[:100]
                     lines.append(f"- [{src}] {txt}")
                 return "\n".join(lines)
-        except Exception:
-            pass
+        except Exception as e:
+            _log.debug("Fallback keyword search failed (non-fatal): %s", e)
         return ""
 
     try:

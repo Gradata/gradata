@@ -143,8 +143,8 @@ class BrainContextState:
                 rules = self._brain.apply_brain_rules(task, context)
                 if rules:
                     parts.append(rules)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("apply_brain_rules failed (non-fatal): %s", e)
         elif self._rules_text:
             parts.append(self._rules_text)
 
@@ -154,11 +154,10 @@ class BrainContextState:
                 brain_ctx = self._brain.context_for(task)
                 if brain_ctx:
                     parts.append(brain_ctx)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("context_for failed (non-fatal): %s", e)
 
         return "\n\n".join(parts)
-
 
     def capture_response(self, response: str) -> None:
         """Capture the AI's response for tracking.

@@ -219,10 +219,8 @@ def _should_run_graduation(brain_dir: Path, lessons_path: Path) -> bool:
 
 
 def _update_graduation_state(brain_dir: Path) -> None:
-    try:
+    with contextlib.suppress(OSError):
         _throttle_state_path(brain_dir).write_text(datetime.now(UTC).isoformat(), encoding="utf-8")
-    except OSError:
-        pass
 
 
 # ── Waterfall steps ───────────────────────────────────────────────────────────
@@ -335,10 +333,8 @@ def _load_soul_mandatories(brain_dir: Path) -> list[str]:
         env_val = os.environ.get(env_key)
         if env_val:
             anchors.append(Path(env_val))
-    try:
+    with contextlib.suppress(OSError):
         anchors.append(Path.cwd())
-    except OSError:
-        pass
 
     for anchor in anchors:
         for rel in _SOUL_CANDIDATES:
@@ -389,9 +385,12 @@ def _refresh_brain_prompt(brain_dir: str, data: dict) -> None:
             return
 
         import anthropic
+
+        from gradata.enhancements.rule_synthesizer import (
+            _SYSTEM_PROMPT as _SYNTH_SYSTEM,
+        )
         from gradata.enhancements.rule_synthesizer import (
             MAX_OUTPUT_TOKENS,
-            _SYSTEM_PROMPT as _SYNTH_SYSTEM,
             _build_user_prompt,
             _compute_cache_key,
             _extract_wisdom_block,
@@ -493,10 +492,8 @@ def _refresh_loop_state(brain_dir: str, data: dict) -> None:
             if persist_dir.is_dir():
                 nums = []
                 for p in persist_dir.glob("session-*.json"):
-                    try:
+                    with contextlib.suppress(ValueError, IndexError):
                         nums.append(int(p.stem.split("-", 1)[1]))
-                    except (ValueError, IndexError):
-                        pass
                 if nums:
                     session_num = max(nums)
 
@@ -534,10 +531,8 @@ def _refresh_loop_state(brain_dir: str, data: dict) -> None:
             if val:
                 anchors.append(Path(val))
         anchors += [bd.parent, bd.parent.parent]
-        try:
+        with contextlib.suppress(OSError):
             anchors.append(Path.cwd())
-        except OSError:
-            pass
         for anchor in anchors:
             try:
                 result = subprocess.run(

@@ -14,6 +14,7 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
@@ -334,10 +335,8 @@ def _probe_api(url: str, bearer: str) -> tuple[int, str]:
             return resp.status, body
     except urllib.error.HTTPError as e:
         body = ""
-        try:
+        with contextlib.suppress(Exception):
             body = e.read(512).decode("utf-8", errors="replace")
-        except Exception:
-            pass
         return e.code, body
     except (urllib.error.URLError, OSError) as e:
         return 0, str(e)

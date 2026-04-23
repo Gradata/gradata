@@ -422,8 +422,8 @@ class Brain(BrainInspectionMixin):
             # be defensive in case the schema changes.
             if not dry_run and result and result.get("graduated"):
                 _telemetry.send_once("first_graduation")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Telemetry send_once failed (non-fatal): %s", e)
 
         return result
 
@@ -538,9 +538,7 @@ class Brain(BrainInspectionMixin):
         """
         from gradata.enhancements.self_healing import auto_heal_failures
 
-        result = auto_heal_failures(
-            self, failure_events=failure_events, max_patches=max_patches
-        )
+        result = auto_heal_failures(self, failure_events=failure_events, max_patches=max_patches)
         # Patching rewrites lessons.md; invalidate the in-memory rule cache
         # so subsequent apply_brain_rules() calls see the patched text
         # instead of a stale pre-patch prompt.
@@ -661,7 +659,9 @@ class Brain(BrainInspectionMixin):
                 # l.category may have arbitrary casing (parse_lessons preserves
                 # on-disk form); compare case-insensitively against the canonical
                 # upper-cased `category` we're inserting.
-                if (l.category or "").strip().upper() == category and _norm(l.description) == desc_norm:
+                if (l.category or "").strip().upper() == category and _norm(
+                    l.description
+                ) == desc_norm:
                     return {
                         "added": False,
                         "reason": "duplicate",
@@ -881,7 +881,10 @@ class Brain(BrainInspectionMixin):
             from gradata.rules.rule_engine import apply_rules_with_tree
 
             applied = apply_rules_with_tree(
-                lessons, scope, max_rules=max_rules, event_bus=_bus,
+                lessons,
+                scope,
+                max_rules=max_rules,
+                event_bus=_bus,
             )
         except (ImportError, Exception):
             applied = apply_rules(lessons, scope, max_rules=max_rules, bus=_bus)
@@ -891,23 +894,26 @@ class Brain(BrainInspectionMixin):
         # session's prompts. Fire-and-forget — never fails apply_brain_rules.
         if _bus is not None and applied:
             try:
-                _bus.emit("rules.injected", {
-                    "rules": [
-                        {
-                            "id": a.rule_id,
-                            "category": a.lesson.category,
-                            "confidence": a.lesson.confidence,
-                            "state": a.lesson.state.value,
-                        }
-                        for a in applied
-                    ],
-                    "scope": {
-                        "task_type": scope.task_type,
-                        "domain": scope.domain,
-                        "audience": scope.audience,
+                _bus.emit(
+                    "rules.injected",
+                    {
+                        "rules": [
+                            {
+                                "id": a.rule_id,
+                                "category": a.lesson.category,
+                                "confidence": a.lesson.confidence,
+                                "state": a.lesson.state.value,
+                            }
+                            for a in applied
+                        ],
+                        "scope": {
+                            "task_type": scope.task_type,
+                            "domain": scope.domain,
+                            "audience": scope.audience,
+                        },
+                        "task": task,
                     },
-                    "task": task,
-                })
+                )
             except Exception as e:
                 logger.debug("rules.injected emit failed: %s", e)
 

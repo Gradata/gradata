@@ -6,6 +6,7 @@ every Gradata user can bootstrap their brain from their own transcript history.
 
 Public entry point: run_mine(brain_root, projects_root, project, commit, dry_run).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -14,7 +15,7 @@ import re
 import sys
 import unicodedata
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # ── Pushback / reminder / gap / challenge regexes ──
@@ -58,35 +59,129 @@ SIGNAL_GROUPS = {
 # categorization the live hook produces. Order matters: specific categories
 # before broad ones (ACCURACY contains "wrong" which would swallow others).
 CATEGORY_KEYWORDS: dict[str, list[str]] = {
-    "DATA_INTEGRITY": ["filter", "owner", "oliver only", "anna", "shared",
-                       "duplicate", "overlap", "wrong person", "wrong deal"],
-    "ARCHITECTURE": ["import", "module", "class", "function", "refactor",
-                     "dependency", "structure", "script", "python", "def "],
-    "TOOL": ["tool", "api", "mcp", "install", "config", "command", "endpoint",
-             "token", "integration"],
-    "LEADS": ["lead", "prospect", "enrich", "csv", "campaign", "instantly",
-              "apollo", "linkedin", "icp"],
-    "PRICING": ["price", "cost", "pricing", "monthly", "annual", "$",
-                "starter", "standard", "plan"],
+    "DATA_INTEGRITY": [
+        "filter",
+        "owner",
+        "oliver only",
+        "anna",
+        "shared",
+        "duplicate",
+        "overlap",
+        "wrong person",
+        "wrong deal",
+    ],
+    "ARCHITECTURE": [
+        "import",
+        "module",
+        "class",
+        "function",
+        "refactor",
+        "dependency",
+        "structure",
+        "script",
+        "python",
+        "def ",
+    ],
+    "TOOL": [
+        "tool",
+        "api",
+        "mcp",
+        "install",
+        "config",
+        "command",
+        "endpoint",
+        "token",
+        "integration",
+    ],
+    "LEADS": [
+        "lead",
+        "prospect",
+        "enrich",
+        "csv",
+        "campaign",
+        "instantly",
+        "apollo",
+        "linkedin",
+        "icp",
+    ],
+    "PRICING": [
+        "price",
+        "cost",
+        "pricing",
+        "monthly",
+        "annual",
+        "$",
+        "starter",
+        "standard",
+        "plan",
+    ],
     "DEMO_PREP": ["demo", "cheat sheet", "battlecard", "prep"],
-    "DRAFTING": ["email", "draft", "subject line", "follow-up", "copy",
-                 "prose", "paragraph", "rewrite", "subject"],
-    "CONTEXT": ["session type", "startup context", "context window",
-                "already know", "load context", "you loaded"],
-    "PROCESS": ["skip", "forgot", "missing step", "workflow", "told you",
-                "step", "order"],
-    "THOROUGHNESS": ["incomplete", "all of them", "don't stop", "finish",
-                     "remaining", "rest of", "the rest"],
-    "POSITIONING": ["agency", "competitor", "frame", "position", "pitch",
-                    "messaging", "value prop"],
-    "COMMUNICATION": ["unclear", "ambiguous", "severity", "blocker",
-                      "too verbose", "verbose", "too long", "confusing"],
-    "TONE": ["tone", "aggressive", "pushy", "salesy", "formal", "casual",
-             "softer", "harsh"],
-    "ACCURACY": ["incorrect", "inaccurate", "verify", "hallucin", "fabricat",
-                 "made up", "not real", "doesn't exist", "never said",
-                 "misquot", "stale", "wrong number", "wrong data",
-                 "wrong name", "wrong company"],
+    "DRAFTING": [
+        "email",
+        "draft",
+        "subject line",
+        "follow-up",
+        "copy",
+        "prose",
+        "paragraph",
+        "rewrite",
+        "subject",
+    ],
+    "CONTEXT": [
+        "session type",
+        "startup context",
+        "context window",
+        "already know",
+        "load context",
+        "you loaded",
+    ],
+    "PROCESS": ["skip", "forgot", "missing step", "workflow", "told you", "step", "order"],
+    "THOROUGHNESS": [
+        "incomplete",
+        "all of them",
+        "don't stop",
+        "finish",
+        "remaining",
+        "rest of",
+        "the rest",
+    ],
+    "POSITIONING": [
+        "agency",
+        "competitor",
+        "frame",
+        "position",
+        "pitch",
+        "messaging",
+        "value prop",
+    ],
+    "COMMUNICATION": [
+        "unclear",
+        "ambiguous",
+        "severity",
+        "blocker",
+        "too verbose",
+        "verbose",
+        "too long",
+        "confusing",
+    ],
+    "TONE": ["tone", "aggressive", "pushy", "salesy", "formal", "casual", "softer", "harsh"],
+    "ACCURACY": [
+        "incorrect",
+        "inaccurate",
+        "verify",
+        "hallucin",
+        "fabricat",
+        "made up",
+        "not real",
+        "doesn't exist",
+        "never said",
+        "misquot",
+        "stale",
+        "wrong number",
+        "wrong data",
+        "wrong name",
+        "wrong company",
+    ],
 }
 
 
@@ -213,25 +308,30 @@ def _mine_session(path: Path) -> list[dict]:
         if not signals:
             continue
         unique = list(dict.fromkeys(signals))
-        snippet = re.sub(r'[\"\\\n]', " ", text[:100])
+        snippet = re.sub(r"[\"\\\n]", " ", text[:100])
         category = _classify_correction(text)
         session_uuid = msg.get("sessionId") or path.stem
-        events.append({
-            "ts": msg.get("timestamp") or datetime.now(timezone.utc).isoformat(),
-            "event": "IMPLICIT_FEEDBACK",
-            "source": "gradata.mine",
-            "category": category,
-            "session_uuid": session_uuid,
-            "text": text[:200],
-            "data": json.dumps({
-                "signals": ",".join(unique),
-                "snippet": snippet,
-                "session_id": session_uuid,
-                "uuid": msg.get("uuid", ""),
-                "project": path.parent.name,
+        events.append(
+            {
+                "ts": msg.get("timestamp") or datetime.now(UTC).isoformat(),
+                "event": "IMPLICIT_FEEDBACK",
+                "source": "gradata.mine",
                 "category": category,
-            }, ensure_ascii=False),
-        })
+                "session_uuid": session_uuid,
+                "text": text[:200],
+                "data": json.dumps(
+                    {
+                        "signals": ",".join(unique),
+                        "snippet": snippet,
+                        "session_id": session_uuid,
+                        "uuid": msg.get("uuid", ""),
+                        "project": path.parent.name,
+                        "category": category,
+                    },
+                    ensure_ascii=False,
+                ),
+            }
+        )
     return events
 
 
@@ -253,11 +353,9 @@ def run_mine(
         print(f"[err] transcript root not found: {root}", file=sys.stderr)
         return 1
 
-    project_dirs: list[Path]
-    if project:
-        project_dirs = [root / project]
-    else:
-        project_dirs = [p for p in root.iterdir() if p.is_dir()]
+    project_dirs: list[Path] = (
+        [root / project] if project else [p for p in root.iterdir() if p.is_dir()]
+    )
 
     total_sessions = 0
     total_events: list[dict] = []
@@ -308,6 +406,7 @@ def run_mine(
     # re-runs idempotent while preserving historical timestamps.
     from gradata._events import emit as _emit
     from gradata.brain import Brain
+
     brain = Brain(brain_root)  # ensures table + ctx setup
     written = 0
     skipped = 0
@@ -343,6 +442,7 @@ def run_mine(
         from gradata.enhancements.meta_rules_storage import (
             upsert_correction_patterns_batch,
         )
+
         db_path = brain.ctx.db_path
         batch: list[tuple[str, str, str, int, str]] = []
         seen: set[tuple[str, int]] = set()

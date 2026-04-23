@@ -6,12 +6,15 @@ Generates structured context briefs before agent spawn.
 
 import contextlib
 import json
+import logging
 import sqlite3
 from datetime import date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import gradata._paths as _p
+
+_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from gradata._paths import BrainContext
@@ -92,8 +95,8 @@ def _load_user_scope(ctx: "BrainContext | None" = None) -> dict:
             }
             for e in corrections
         ]
-    except Exception:
-        pass
+    except Exception as e:
+        _log.debug("user_scope: corrections query failed (non-fatal): %s", e)
     patterns_file = ctx.patterns_file if ctx else _p.PATTERNS_FILE
     if patterns_file.exists():
         result["frameworks"] = _safe_read_lines(patterns_file, 15)
@@ -126,8 +129,8 @@ def _load_prospect_context(prospect_name: str, ctx: "BrainContext | None" = None
             {"source": r.get("source", ""), "text": r.get("text", "")[:120]}
             for r in fts_results[:2]
         ]
-    except Exception:
-        pass
+    except Exception as e:
+        _log.debug("prospect FTS search failed (non-fatal): %s", e)
     try:
         from gradata._fact_extractor import query_facts
 
@@ -137,8 +140,8 @@ def _load_prospect_context(prospect_name: str, ctx: "BrainContext | None" = None
                 {"type": f["fact_type"], "value": f["fact_value"], "confidence": f["confidence"]}
                 for f in facts[:5]
             ]
-    except Exception:
-        pass
+    except Exception as e:
+        _log.debug("prospect fact query failed (non-fatal): %s", e)
     try:
         all_events = _events_query(limit=50)
         prospect_lower = prospect_name.lower()
@@ -156,8 +159,8 @@ def _load_prospect_context(prospect_name: str, ctx: "BrainContext | None" = None
                 if len(interactions) >= 2:
                     break
         result["recent_interactions"] = interactions
-    except Exception:
-        pass
+    except Exception as e:
+        _log.debug("prospect interaction query failed (non-fatal): %s", e)
     return result
 
 
@@ -173,8 +176,8 @@ def _load_drafting_context(ctx: "BrainContext | None" = None) -> dict:
                 if "[PROVEN]" in line or "[EMERGING]" in line
             ]
             result["patterns"] = "\n".join(relevant[:10])
-        except Exception:
-            pass
+        except Exception as e:
+            _log.debug("drafting patterns read failed (non-fatal): %s", e)
     domain_dir = ctx.domain_dir if ctx else _p.DOMAIN_DIR
     soul_path = domain_dir / "soul.md"
     result["voice_guidelines"] = _safe_read_lines(soul_path, 20)
@@ -189,8 +192,8 @@ def _load_debug_context(topic: str, ctx: "BrainContext | None" = None) -> dict:
             {"source": r.get("source", ""), "text": r.get("text", "")[:150]}
             for r in fts_results[:2]
         ]
-    except Exception:
-        pass
+    except Exception as e:
+        _log.debug("debug FTS search failed (non-fatal): %s", e)
     try:
         failures = _events_query(event_type="TOOL_FAILURE", limit=3)
         result["recent_failures"] = [
@@ -200,8 +203,8 @@ def _load_debug_context(topic: str, ctx: "BrainContext | None" = None) -> dict:
             }
             for e in failures
         ]
-    except Exception:
-        pass
+    except Exception as e:
+        _log.debug("debug failures query failed (non-fatal): %s", e)
     try:
         corrections = _events_query(event_type="CORRECTION", limit=10)
         topic_lower = topic.lower()
@@ -218,8 +221,8 @@ def _load_debug_context(topic: str, ctx: "BrainContext | None" = None) -> dict:
                 if len(related) >= 3:
                     break
         result["corrections"] = related
-    except Exception:
-        pass
+    except Exception as e:
+        _log.debug("debug corrections query failed (non-fatal): %s", e)
     return result
 
 
@@ -233,8 +236,8 @@ def _load_audit_context(session: int, ctx: "BrainContext | None" = None) -> dict
         if row:
             result["metrics"] = dict(row)
         conn.close()
-    except Exception:
-        pass
+    except Exception as e:
+        _log.debug("audit metrics query failed (non-fatal): %s", e)
     try:
         outputs = _events_query(event_type="OUTPUT", session=session, limit=20)
         result["outputs"] = [
@@ -247,8 +250,8 @@ def _load_audit_context(session: int, ctx: "BrainContext | None" = None) -> dict
             }
             for e in outputs
         ]
-    except Exception:
-        pass
+    except Exception as e:
+        _log.debug("audit outputs query failed (non-fatal): %s", e)
     try:
         gates = _events_query(event_type="GATE_RESULT", session=session, limit=20)
         result["gates"] = [
@@ -258,8 +261,8 @@ def _load_audit_context(session: int, ctx: "BrainContext | None" = None) -> dict
             }
             for e in gates
         ]
-    except Exception:
-        pass
+    except Exception as e:
+        _log.debug("audit gates query failed (non-fatal): %s", e)
     with contextlib.suppress(Exception):
         result["correction_rate"] = _correction_rate(last_n_sessions=5)
     return result
@@ -276,8 +279,8 @@ def _load_wrapup_context(session: int, ctx: "BrainContext | None" = None) -> dic
             }
             for e in events
         ]
-    except Exception:
-        pass
+    except Exception as e:
+        _log.debug("wrapup events query failed (non-fatal): %s", e)
     try:
         today_str = date.today().isoformat()
         prospects_dir = ctx.prospects_dir if ctx else _p.PROSPECTS_DIR
@@ -291,8 +294,8 @@ def _load_wrapup_context(session: int, ctx: "BrainContext | None" = None) -> dic
                         result["modified_prospects"].append(f.stem)
                 except Exception:
                     continue
-    except Exception:
-        pass
+    except Exception as e:
+        _log.debug("wrapup prospects scan failed (non-fatal): %s", e)
     loop_state = ctx.loop_state if ctx else _p.LOOP_STATE
     if loop_state.exists():
         result["current_loop_state"] = _safe_read(loop_state, limit_chars=500)
