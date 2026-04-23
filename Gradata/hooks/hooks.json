@@ -49,12 +49,12 @@
     ],
     "Stop": [
       {
-        "description": "Gradata: emit SESSION_END + run graduation sweep",
+        "description": "Gradata: gated graduation sweep (concurrency-locked, SDK-only synth, throttled)",
         "hooks": [
           {
             "type": "command",
             "command": "python -m gradata.hooks.session_close",
-            "timeout": 15000
+            "timeout": 90000
           }
         ]
       }

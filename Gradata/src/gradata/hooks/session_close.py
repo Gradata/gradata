@@ -19,13 +19,25 @@ Trigger event types (any new row since last_close_ts fires the waterfall):
 On first run (no stamp file) we wait until any trigger row exists and
 then run the waterfall against the full event history; the stamp file
 is written only after a successful pass.
+
+Safety guards added 2026-04-23 (prevents runaway subprocess fleet):
+    1. Concurrency lock  — TEMP/gradata-synthesizer.lock (PID-based).
+    2. Hard timeout      — GRADATA_GRADUATION_TIMEOUT (default 300 s).
+    3. SDK-only synth    — no claude CLI fallback; ANTHROPIC_API_KEY required.
+    4. Throttle          — GRADATA_GRADUATION_INTERVAL_MINUTES + THRESHOLD.
+    Kill switch          — GRADATA_DISABLE_GRADUATION=1 skips everything.
 """
 
 from __future__ import annotations
 
+import concurrent.futures
 import contextlib
+import errno as _errno
 import logging
+import os
 import sqlite3
+import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -51,6 +63,8 @@ TRIGGER_TYPES = (
     "AGENT_OUTCOME",
     "RULE_PATCHED",
 )
+
+# ── Stamp file (existing trigger-event gate) ─────────────────────────────────
 
 
 def _read_stamp(brain_dir: Path) -> str | None:
@@ -91,6 +105,127 @@ def _has_new_triggers(brain_dir: Path, since: str | None, until: str) -> bool:
     except sqlite3.Error as e:
         _log.debug("trigger check failed: %s", e)
         return False
+
+
+# ── Concurrency lock (guard #1) ──────────────────────────────────────────────
+
+
+def _lockfile_path() -> Path:
+    override = os.environ.get("GRADATA_LOCK_FILE")
+    if override:
+        return Path(override)
+    return Path(tempfile.gettempdir()) / "gradata-synthesizer.lock"
+
+
+def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        if sys.platform == "win32":
+            import ctypes
+
+            # SYNCHRONIZE access right — enough to test liveness, not to signal.
+            handle = ctypes.windll.kernel32.OpenProcess(1048576, False, pid)
+            if handle:
+                ctypes.windll.kernel32.CloseHandle(handle)
+                return True
+            return False
+        else:
+            os.kill(pid, 0)
+            return True
+    except OSError as exc:
+        # EPERM → process exists but we can't signal it (still alive).
+        return exc.errno == _errno.EPERM
+
+
+def _acquire_lock() -> bool:
+    """Return True if the lock was acquired, False if a live process holds it."""
+    lock_path = _lockfile_path()
+    if lock_path.is_file():
+        try:
+            pid_str = lock_path.read_text(encoding="utf-8").strip()
+            pid = int(pid_str)
+            if _pid_alive(pid):
+                return False  # Another live instance is running.
+            # Stale lock from a dead process — fall through to reclaim.
+        except (ValueError, OSError):
+            pass  # Corrupt lock file — fall through to reclaim.
+    try:
+        lock_path.write_text(str(os.getpid()), encoding="utf-8")
+        return True
+    except OSError:
+        return False
+
+
+def _release_lock() -> None:
+    with contextlib.suppress(OSError):
+        _lockfile_path().unlink(missing_ok=True)
+
+
+# ── Hard timeout (guard #2) ──────────────────────────────────────────────────
+
+
+def _run_with_timeout(fn, timeout_s: float) -> bool:
+    """Run *fn* in a thread. Return True if it completed, False if timed out."""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(fn)
+        try:
+            future.result(timeout=timeout_s)
+            return True
+        except concurrent.futures.TimeoutError:
+            _log.warning("graduation waterfall timed out after %.0fs", timeout_s)
+            return False
+
+
+# ── Throttle state (guard #4) ────────────────────────────────────────────────
+
+
+def _throttle_state_path(brain_dir: Path) -> Path:
+    state_dir = brain_dir / "state"
+    with contextlib.suppress(OSError):
+        state_dir.mkdir(parents=True, exist_ok=True)
+    return state_dir / "last_graduation.txt"
+
+
+def _should_run_graduation(brain_dir: Path, lessons_path: Path) -> bool:
+    """Return True if enough time has elapsed OR enough INSTINCT lessons are pending."""
+    interval_minutes = float(os.environ.get("GRADATA_GRADUATION_INTERVAL_MINUTES", "60"))
+    threshold = int(os.environ.get("GRADATA_GRADUATION_THRESHOLD", "20"))
+
+    # Fast path: enough pending INSTINCT lessons → run regardless of interval.
+    if lessons_path.is_file():
+        try:
+            from gradata.enhancements.self_improvement._confidence import parse_lessons
+
+            lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+            instinct_count = sum(1 for l in lessons if l.state.name == "INSTINCT")
+            if instinct_count >= threshold:
+                return True
+        except Exception:
+            pass
+
+    # Time-based gate.
+    state_path = _throttle_state_path(brain_dir)
+    if not state_path.is_file():
+        return True  # First run ever.
+    try:
+        last_ts = datetime.fromisoformat(state_path.read_text(encoding="utf-8").strip())
+        if last_ts.tzinfo is None:
+            last_ts = last_ts.replace(tzinfo=UTC)
+        elapsed_minutes = (datetime.now(UTC) - last_ts).total_seconds() / 60
+        return elapsed_minutes >= interval_minutes
+    except Exception:
+        return True
+
+
+def _update_graduation_state(brain_dir: Path) -> None:
+    try:
+        _throttle_state_path(brain_dir).write_text(datetime.now(UTC).isoformat(), encoding="utf-8")
+    except OSError:
+        pass
+
+
+# ── Waterfall steps ───────────────────────────────────────────────────────────
 
 
 def _run_graduation(brain_dir: str) -> None:
@@ -169,17 +304,100 @@ def _run_pipeline(brain_dir: str, data: dict) -> None:
         _log.debug("pipeline skipped: %s", e)
 
 
-def _refresh_brain_prompt(brain_dir: str, data: dict) -> None:
-    """Regenerate brain_prompt.md after graduation mutated lessons.md.
+_SOUL_CANDIDATES = (
+    "domain/soul.md",
+    "../Sprites/domain/soul.md",
+    "Sprites/domain/soul.md",
+)
 
-    Synthesizes a fresh <brain-wisdom> block via Opus on every close that
-    fired the pipeline (gated by the _has_new_triggers check in main()).
-    Failures log at debug level — injection falls back to fragmented format
-    if the file is stale or missing, so a failed refresh never breaks a
-    session start.
+
+def _load_soul_mandatories(brain_dir: Path) -> list[str]:
+    """Pull hard voice rules out of soul.md as [MANDATORY] VOICE: lines.
+
+    soul.md is the source of truth for HOW the agent communicates (em-dash
+    ban, opener format, humanizer check, banned phrases). These rules never
+    graduate through lessons.md — they're author-intent, not learned — so
+    they need a stable injection path into brain_prompt.md.
+
+    We prefer an explicit SOUL_MD env override, then probe a few known
+    locations relative to the brain dir and its parents. On miss we return
+    an empty list so the synthesizer falls back to lessons-only output.
+    """
+    import re
+
+    paths: list[Path] = []
+    override = os.environ.get("SOUL_MD")
+    if override:
+        paths.append(Path(override))
+
+    anchors: list[Path] = [brain_dir, brain_dir.parent, brain_dir.parent.parent]
+    for env_key in ("WORKING_DIR", "CLAUDE_PROJECT_DIR"):
+        env_val = os.environ.get(env_key)
+        if env_val:
+            anchors.append(Path(env_val))
+    try:
+        anchors.append(Path.cwd())
+    except OSError:
+        pass
+
+    for anchor in anchors:
+        for rel in _SOUL_CANDIDATES:
+            paths.append(anchor / rel)
+
+    soul_text: str | None = None
+    for candidate in paths:
+        try:
+            if candidate.is_file():
+                soul_text = candidate.read_text(encoding="utf-8")
+                break
+        except OSError:
+            continue
+
+    if not soul_text:
+        return []
+
+    lines: list[str] = []
+    seen: set[str] = set()
+    for raw in soul_text.splitlines():
+        stripped = raw.strip()
+        if not stripped.startswith(("*", "-")):
+            continue
+        body = re.sub(r"^[*\-]\s+", "", stripped)
+        body = re.sub(r"^\*\*([^*]+)\*\*:?\s*", r"\1: ", body)
+        body = body.strip().rstrip(".")
+        if len(body) < 12 or len(body) > 400:
+            continue
+        key = body.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        lines.append(f"[MANDATORY] VOICE: {body}")
+    return lines
+
+
+def _refresh_brain_prompt(brain_dir: str, data: dict) -> None:
+    """Regenerate brain_prompt.md via direct Anthropic SDK call (no CLI subprocess).
+
+    Uses GRADATA_SYNTHESIZER_MODEL (default claude-opus-4-7). The SDK reads
+    ANTHROPIC_API_KEY from the environment automatically. Silently skips if
+    the env var is absent or the SDK is not installed — injection falls back
+    to the fragmented format on miss.
     """
     try:
-        from gradata.enhancements.rule_synthesizer import synthesize_rules_block
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            _log.debug("brain_prompt refresh skipped: ANTHROPIC_API_KEY not set")
+            return
+
+        import anthropic
+        from gradata.enhancements.rule_synthesizer import (
+            MAX_OUTPUT_TOKENS,
+            _SYSTEM_PROMPT as _SYNTH_SYSTEM,
+            _build_user_prompt,
+            _compute_cache_key,
+            _extract_wisdom_block,
+            _read_cache,
+            _write_cache,
+        )
         from gradata.enhancements.self_improvement._confidence import parse_lessons
 
         bd = Path(brain_dir)
@@ -192,9 +410,11 @@ def _refresh_brain_prompt(brain_dir: str, data: dict) -> None:
             for l in lessons
             if l.state.name in ("RULE", "PATTERN") and (l.confidence or 0.0) >= 0.60
         ]
-        if not filtered:
+        soul_lines = _load_soul_mandatories(bd)
+        if not filtered and not soul_lines:
             return
-        mandatory_lines = [
+
+        mandatory_lines = list(soul_lines) + [
             f"[MANDATORY] {l.category}: {l.description}"
             for l in filtered
             if l.state.name == "RULE"
@@ -206,18 +426,35 @@ def _refresh_brain_prompt(brain_dir: str, data: dict) -> None:
             f"{(l.category or 'GENERAL').strip()}: {(l.description or '').strip()}"
             for l in filtered
         ]
-        block = synthesize_rules_block(
-            brain_dir=bd,
-            mandatory_lines=mandatory_lines,
-            cluster_lines=[],
-            individual_lines=individual_lines,
-            meta_block="",
-            disposition_block="",
-            task_type="general",
-            context="general",
+
+        model = os.environ.get("GRADATA_SYNTHESIZER_MODEL", "claude-opus-4-7")
+
+        # Cache by rule signatures so wording tweaks don't bust it.
+        cache_key = _compute_cache_key(
+            mandatory_lines, [], individual_lines, "", "", "general", model
         )
-        if not block:
-            return
+        cached = _read_cache(bd, cache_key)
+        if cached:
+            block = cached
+        else:
+            user_prompt = _build_user_prompt(
+                mandatory_lines, [], individual_lines, "", "", "general", "general"
+            )
+            # SDK reads ANTHROPIC_API_KEY from environment automatically.
+            client = anthropic.Anthropic(timeout=60.0)
+            msg = client.messages.create(
+                model=model,
+                max_tokens=MAX_OUTPUT_TOKENS,
+                system=_SYNTH_SYSTEM,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+            raw = msg.content[0].text.strip()  # type: ignore[union-attr]
+            block = _extract_wisdom_block(raw)
+            if not block or len(block) < 50:
+                _log.debug("synthesizer output malformed or too short")
+                return
+            _write_cache(bd, cache_key, block)
+
         content = block
         if content.startswith("<brain-wisdom>"):
             content = content[len("<brain-wisdom>") :].lstrip("\n")
@@ -232,6 +469,110 @@ def _refresh_brain_prompt(brain_dir: str, data: dict) -> None:
         _log.info("brain_prompt.md refreshed (%d chars)", len(content))
     except Exception as e:
         _log.debug("brain_prompt refresh skipped: %s", e)
+
+
+def _refresh_loop_state(brain_dir: str, data: dict) -> None:
+    """Regenerate loop-state.md with live stats from DB and lessons.md.
+
+    Read by _context_packet._load_wrapup_context on every sub-agent/wrapup
+    packet build. Failures are silenced — a stale file is preferable to a
+    broken session close.
+    """
+    try:
+        import subprocess
+        from datetime import date
+
+        from gradata.enhancements.self_improvement._confidence import parse_lessons
+
+        bd = Path(brain_dir)
+
+        # Session number: prefer data payload, fall back to persist dir scan.
+        session_num = int(data.get("session_number") or 0)
+        if not session_num:
+            persist_dir = bd / "sessions" / "persist"
+            if persist_dir.is_dir():
+                nums = []
+                for p in persist_dir.glob("session-*.json"):
+                    try:
+                        nums.append(int(p.stem.split("-", 1)[1]))
+                    except (ValueError, IndexError):
+                        pass
+                if nums:
+                    session_num = max(nums)
+
+        # Corrections this session from SQLite.
+        corrections = 0
+        db = bd / "system.db"
+        if db.is_file() and session_num:
+            try:
+                with sqlite3.connect(db) as conn:
+                    row = conn.execute(
+                        "SELECT COUNT(*) FROM events WHERE type = 'CORRECTION' AND session = ?",
+                        (session_num,),
+                    ).fetchone()
+                    corrections = row[0] if row else 0
+            except sqlite3.Error:
+                pass
+
+        # Rule / pattern counts from lessons.md.
+        patterns = 0
+        rules = 0
+        lessons_path = bd / "lessons.md"
+        if lessons_path.is_file():
+            try:
+                lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+                patterns = sum(1 for l in lessons if l.state.name == "PATTERN")
+                rules = sum(1 for l in lessons if l.state.name == "RULE")
+            except Exception:
+                pass
+
+        # Recent git commits — try known repo anchors in priority order.
+        commits = ""
+        anchors: list[Path] = []
+        for env_key in ("WORKING_DIR", "CLAUDE_PROJECT_DIR"):
+            val = os.environ.get(env_key)
+            if val:
+                anchors.append(Path(val))
+        anchors += [bd.parent, bd.parent.parent]
+        try:
+            anchors.append(Path.cwd())
+        except OSError:
+            pass
+        for anchor in anchors:
+            try:
+                result = subprocess.run(
+                    ["git", "-C", str(anchor), "log", "-5", "--oneline"],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=5,
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    commits = result.stdout.strip()
+                    break
+            except Exception:
+                continue
+
+        today = date.today().isoformat()
+        lines = [
+            "<!-- AUTO-GENERATED by session_close._refresh_loop_state -->",
+            "<!-- Source of truth: system.db + lessons.md. Do not edit directly. -->",
+            "",
+            f"# Loop State — Session {session_num}",
+            "",
+            f"## Last Session (Session {session_num})",
+            f"Date: {today}",
+            f"Corrections: {corrections} | Rules: {rules} | Patterns: {patterns}",
+            "",
+        ]
+        if commits:
+            lines += ["## Recent Commits", commits, ""]
+
+        (bd / "loop-state.md").write_text("\n".join(lines), encoding="utf-8")
+        _log.info("loop-state.md refreshed (session %d)", session_num)
+    except Exception as e:
+        _log.debug("loop-state refresh skipped: %s", e)
 
 
 def _resolve_pending_applications(brain_dir: str, data: dict) -> None:
@@ -331,7 +672,21 @@ def _flush_retain_queue(brain_dir: str) -> None:
         _log.debug("retain flush skipped: %s", e)
 
 
+def _run_waterfall(brain_dir_str: str, brain_dir: Path, data: dict, upper_bound: str) -> None:
+    _run_graduation(brain_dir_str)
+    _run_pipeline(brain_dir_str, data)
+    _run_tree_consolidation(brain_dir_str)
+    _resolve_pending_applications(brain_dir_str, data)
+    _refresh_brain_prompt(brain_dir_str, data)
+    _refresh_loop_state(brain_dir_str, data)
+    _write_stamp(brain_dir, upper_bound)
+
+
 def main(data: dict) -> dict | None:
+    # Kill switch — useful for debugging runaway hooks.
+    if os.environ.get("GRADATA_DISABLE_GRADUATION") == "1":
+        return None
+
     brain_dir_str = resolve_brain_dir()
     if not brain_dir_str:
         return None
@@ -341,19 +696,34 @@ def main(data: dict) -> dict | None:
     # Always flush: cheap and never idempotent from a data-loss standpoint.
     _flush_retain_queue(brain_dir_str)
 
-    # Gate the heavy waterfall on "did anything interesting happen?"
+    # Gate: new trigger events since last waterfall?
     last_ts = _read_stamp(brain_dir)
     upper_bound = datetime.now(UTC).isoformat()
     if not _has_new_triggers(brain_dir, last_ts, upper_bound):
         return None
 
-    _run_graduation(brain_dir_str)
-    _run_pipeline(brain_dir_str, data)
-    _run_tree_consolidation(brain_dir_str)
-    _resolve_pending_applications(brain_dir_str, data)
-    _refresh_brain_prompt(brain_dir_str, data)
+    # Gate: throttle (time elapsed or enough pending INSTINCT lessons).
+    lessons_path = brain_dir / "lessons.md"
+    if not _should_run_graduation(brain_dir, lessons_path):
+        _log.debug("graduation throttled: interval not elapsed and threshold not met")
+        return None
 
-    _write_stamp(brain_dir, upper_bound)
+    # Gate: concurrency lock (prevents stacked invocations).
+    if not _acquire_lock():
+        _log.debug("graduation skipped: lock held by a live process")
+        return None
+
+    try:
+        timeout_s = float(os.environ.get("GRADATA_GRADUATION_TIMEOUT", "300"))
+        completed = _run_with_timeout(
+            lambda: _run_waterfall(brain_dir_str, brain_dir, data, upper_bound),
+            timeout_s,
+        )
+        if completed:
+            _update_graduation_state(brain_dir)
+    finally:
+        _release_lock()
+
     return None
 
 
