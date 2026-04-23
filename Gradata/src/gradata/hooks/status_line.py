@@ -38,27 +38,26 @@ def _brain_dir() -> Path | None:
     return None
 
 
-def _claude_project_dir() -> Path | None:
-    """Find ~/.claude/projects/<hash>/ for the current working directory.
+def _claude_session_count() -> int | None:
+    """Count all JSONL session files across every project in ~/.claude/projects/.
 
-    Claude Code derives the project hash by replacing path separators, colons,
-    and spaces with dashes: ``C:\\Users\\foo\\My Project`` → ``C--Users-foo-My-Project``.
+    Each .jsonl file is one Claude Code session regardless of which project or
+    worktree it came from. Returns None if the projects directory doesn't exist
+    so the caller can fall back to the events DB.
     """
+    projects = Path.home() / ".claude" / "projects"
+    if not projects.is_dir():
+        return None
     try:
-        cwd = Path.cwd()
+        return sum(
+            1
+            for project_dir in projects.iterdir()
+            if project_dir.is_dir()
+            for f in project_dir.iterdir()
+            if f.suffix == ".jsonl"
+        )
     except OSError:
         return None
-    project_hash = str(cwd).replace(":", "-").replace("\\", "-").replace("/", "-").replace(" ", "-")
-    candidate = Path.home() / ".claude" / "projects" / project_hash
-    return candidate if candidate.is_dir() else None
-
-
-def _claude_session_count(project_dir: Path) -> int:
-    """Count JSONL session files — each file is one Claude Code session."""
-    try:
-        return sum(1 for f in project_dir.iterdir() if f.suffix == ".jsonl")
-    except OSError:
-        return 0
 
 
 def _fallback_session(db_path: Path) -> int:
@@ -95,10 +94,8 @@ def main() -> int:
         sys.stdout.write("gradata: no brain\n")
         return 0
 
-    project_dir = _claude_project_dir()
-    if project_dir:
-        session = _claude_session_count(project_dir)
-    else:
+    session = _claude_session_count()
+    if session is None:
         session = _fallback_session(brain / "system.db")
     rules, patterns = _rule_counts(brain / "lessons.md")
     sys.stdout.write(f"s{session} | {rules}R {patterns}P\n")
