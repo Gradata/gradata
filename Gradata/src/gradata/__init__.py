@@ -21,6 +21,7 @@ Quick start:
 try:
     from importlib.metadata import PackageNotFoundError as _PkgNotFound
     from importlib.metadata import version as _pkg_version
+
     try:
         __version__ = _pkg_version("gradata")
     except _PkgNotFound:
@@ -146,6 +147,7 @@ def __getattr__(name: str):
     if name in _PATTERN_IMPORTS:
         import importlib
         import warnings
+
         module_path, attr = _PATTERN_IMPORTS[name]
         warnings.warn(
             f"Importing {name} from 'gradata' is deprecated. "

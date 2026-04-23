@@ -18,6 +18,7 @@ when ``bm25s`` isn't installed, keeping the SDK zero-required-deps.
 Deterministic and under a few ms per call for the rule-tier volumes we
 see in practice (~100s of graduated rules max).
 """
+
 from __future__ import annotations
 
 import json
@@ -42,6 +43,7 @@ except ImportError:
 
 try:  # BM25 is optional — SDK must stay zero-required-deps.
     import bm25s  # type: ignore[import-not-found]
+
     _BM25_AVAILABLE = True
 except ImportError:  # pragma: no cover - import gate
     bm25s = None  # type: ignore[assignment]
@@ -63,11 +65,42 @@ MIN_DRAFT_LEN = 10
 
 # Tokens that appear in almost every draft and would swamp Jaccard similarity.
 # Kept tight on purpose: overfitting this list defeats the per-draft signal.
-_STOPWORDS = frozenset({
-    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has",
-    "have", "i", "in", "is", "it", "its", "of", "on", "or", "that", "the",
-    "this", "to", "was", "were", "will", "with", "you", "your", "we", "our",
-})
+_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "by",
+        "for",
+        "from",
+        "has",
+        "have",
+        "i",
+        "in",
+        "is",
+        "it",
+        "its",
+        "of",
+        "on",
+        "or",
+        "that",
+        "the",
+        "this",
+        "to",
+        "was",
+        "were",
+        "will",
+        "with",
+        "you",
+        "your",
+        "we",
+        "our",
+    }
+)
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
@@ -127,10 +160,14 @@ def _bm25_scores_for_draft(
         corpus_tokens = bm25s.tokenize(corpus, stopwords="en", show_progress=False)
         retriever.index(corpus_tokens, show_progress=False)
         query_tokens = bm25s.tokenize(
-            [draft_text], stopwords="en", show_progress=False,
+            [draft_text],
+            stopwords="en",
+            show_progress=False,
         )
         doc_ids, scores = retriever.retrieve(
-            query_tokens, k=len(corpus), show_progress=False,
+            query_tokens,
+            k=len(corpus),
+            show_progress=False,
         )
     except Exception as exc:  # pragma: no cover - defensive
         _log.debug("bm25 scoring failed (%s) — falling back to Jaccard", exc)
@@ -216,11 +253,14 @@ def _emit_event(brain_dir: str, payload: dict) -> None:
     """
     try:
         events_path = Path(brain_dir) / "events.jsonl"
-        line = json.dumps({
-            "type": "JIT_INJECTION",
-            "ts": time.time(),
-            **payload,
-        }, ensure_ascii=False)
+        line = json.dumps(
+            {
+                "type": "JIT_INJECTION",
+                "ts": time.time(),
+                **payload,
+            },
+            ensure_ascii=False,
+        )
         with events_path.open("a", encoding="utf-8") as f:
             f.write(line + "\n")
     except OSError:
@@ -272,20 +312,22 @@ def main(data: dict) -> dict | None:
         min_similarity=min_sim,
     )
 
-    _emit_event(brain_dir, {
-        "draft_len": len(message),
-        "candidates": len(lessons),
-        "injected": len(ranked),
-        "k": k,
-        "min_similarity": min_sim,
-    })
+    _emit_event(
+        brain_dir,
+        {
+            "draft_len": len(message),
+            "candidates": len(lessons),
+            "injected": len(ranked),
+            "k": k,
+            "min_similarity": min_sim,
+        },
+    )
 
     if not ranked:
         return None
 
     lines = [
-        f"[{r.state.name}:{r.confidence:.2f}] {r.category}: {r.description}"
-        for r, _sim in ranked
+        f"[{r.state.name}:{r.confidence:.2f}] {r.category}: {r.description}" for r, _sim in ranked
     ]
     rules_block = "<brain-rules-jit>\n" + "\n".join(lines) + "\n</brain-rules-jit>"
     return {"result": rules_block}

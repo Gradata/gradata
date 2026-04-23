@@ -12,6 +12,7 @@ The tenant UUID lives in a dotfile (not in system.db) so it survives
 DB rebuilds and can be read by tooling outside the SDK (cloud sync,
 migrations, diagnostics).
 """
+
 from __future__ import annotations
 
 import os

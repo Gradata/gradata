@@ -12,6 +12,7 @@ Usage (as module):
 CLI:
     python src/gradata/_migrations/tenant_uuid.py --brain C:/.../brain
 """
+
 from __future__ import annotations
 
 import argparse

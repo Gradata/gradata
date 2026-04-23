@@ -49,9 +49,10 @@ class RuleArm:
     alpha = successes + 1 (prior), beta = failures + 1 (prior).
     Starting at Beta(1,1) = uniform prior (no information).
     """
+
     rule_id: str
-    alpha: float = 1.0      # successes + prior
-    beta: float = 1.0       # failures + prior
+    alpha: float = 1.0  # successes + prior
+    beta: float = 1.0  # failures + prior
     total_pulls: int = 0
     context_scores: dict[str, float] = field(default_factory=dict)
 
@@ -68,9 +69,10 @@ class RuleArm:
 @dataclass
 class SelectionResult:
     """Result of bandit-based rule selection."""
-    selected_rules: list[str]           # Rule IDs selected
-    scores: dict[str, float]            # Rule ID -> Thompson sample score
-    was_exploration: dict[str, bool]    # Rule ID -> True if selected via exploration
+
+    selected_rules: list[str]  # Rule IDs selected
+    scores: dict[str, float]  # Rule ID -> Thompson sample score
+    was_exploration: dict[str, bool]  # Rule ID -> True if selected via exploration
 
 
 class RuleBandit:

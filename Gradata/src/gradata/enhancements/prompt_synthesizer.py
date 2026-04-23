@@ -24,12 +24,13 @@ Output shape::
         anchor_to_rule_id={"a1f9": "a1f92b3c4d5e", ...},
     )
 """
+
 from __future__ import annotations
 
 import os
 import re
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from typing import Callable, Iterable
 
 
 @dataclass
@@ -53,7 +54,7 @@ def _clean_description(desc: str) -> str:
     text = (desc or "").strip()
     for prefix in ("User corrected: ", "[AUTO] ", "[hooked] "):
         if text.startswith(prefix):
-            text = text[len(prefix):]
+            text = text[len(prefix) :]
     # Remove trailing period so rule concatenation with ; reads cleanly.
     return text.rstrip(".;,").strip()
 
@@ -130,7 +131,10 @@ def synthesize_rules_prompt(
 
 def _llm_enabled() -> bool:
     return os.environ.get("GRADATA_SYNTHESIZE_WITH_LLM", "").strip().lower() in (
-        "1", "true", "yes", "on",
+        "1",
+        "true",
+        "yes",
+        "on",
     )
 
 

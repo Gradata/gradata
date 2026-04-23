@@ -61,8 +61,14 @@ class AnthropicProvider(LLMProvider):
 
 
 def _openai_complete(
-    *, model: str, prompt: str, max_tokens: int, timeout: float,
-    api_key: str | None = None, base_url: str | None = None, log_label: str = "OpenAI",
+    *,
+    model: str,
+    prompt: str,
+    max_tokens: int,
+    timeout: float,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    log_label: str = "OpenAI",
 ) -> str | None:
     """Shared OpenAI-compatible chat completion. Returns text or None on any failure."""
     try:
@@ -93,16 +99,22 @@ def _openai_complete(
 class OpenAIProvider(LLMProvider):
     """OpenAI-compatible provider (works with OpenAI, Azure OpenAI)."""
 
-    def __init__(self, model: str = "gpt-4o-mini", auth_token: str | None = None,
-                 base_url: str | None = None):
+    def __init__(
+        self, model: str = "gpt-4o-mini", auth_token: str | None = None, base_url: str | None = None
+    ):
         self.model = model
         self._auth = auth_token
         self.base_url = base_url
 
     def complete(self, prompt: str, *, max_tokens: int = 100, timeout: float = 12.0) -> str | None:
         return _openai_complete(
-            model=self.model, prompt=prompt, max_tokens=max_tokens, timeout=timeout,
-            api_key=self._auth, base_url=self.base_url, log_label="OpenAI",
+            model=self.model,
+            prompt=prompt,
+            max_tokens=max_tokens,
+            timeout=timeout,
+            api_key=self._auth,
+            base_url=self.base_url,
+            log_label="OpenAI",
         )
 
 
@@ -115,9 +127,12 @@ class GenericHTTPProvider(LLMProvider):
         GRADATA_LLM_AUTH      (optional)
     """
 
-    def __init__(self, base_url: str | None = None, model: str | None = None,
-                 auth_token: str | None = None):
-        self.base_url = base_url or os.environ.get("GRADATA_LLM_BASE_URL", "http://localhost:11434/v1")
+    def __init__(
+        self, base_url: str | None = None, model: str | None = None, auth_token: str | None = None
+    ):
+        self.base_url = base_url or os.environ.get(
+            "GRADATA_LLM_BASE_URL", "http://localhost:11434/v1"
+        )
         self.model = model or env_str("GRADATA_LLM_MODEL", "llama3")
         self._auth = auth_token or os.environ.get("GRADATA_LLM_AUTH", "")
         # SSRF / bearer-key exfil guard: refuse HTTP to non-local hosts at construction time
@@ -126,8 +141,13 @@ class GenericHTTPProvider(LLMProvider):
     def complete(self, prompt: str, *, max_tokens: int = 100, timeout: float = 12.0) -> str | None:
         # openai SDK requires a key even for local — use placeholder if none set
         return _openai_complete(
-            model=self.model, prompt=prompt, max_tokens=max_tokens, timeout=timeout,
-            api_key=self._auth or "local", base_url=self.base_url, log_label="Generic HTTP",
+            model=self.model,
+            prompt=prompt,
+            max_tokens=max_tokens,
+            timeout=timeout,
+            api_key=self._auth or "local",
+            base_url=self.base_url,
+            log_label="Generic HTTP",
         )
 
 

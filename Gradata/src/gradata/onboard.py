@@ -296,8 +296,7 @@ def onboard(
 
     if brain_dir.exists() and (brain_dir / "brain.manifest.json").exists():
         raise FileExistsError(
-            f"Brain already exists at {brain_dir}. "
-            f"Use Brain('{brain_dir}') to open it."
+            f"Brain already exists at {brain_dir}. Use Brain('{brain_dir}') to open it."
         )
 
     # ── Collect answers ────────────────────────────────────────────────
@@ -347,28 +346,36 @@ def onboard(
         print("\nLet's set up your workflows so the brain starts smart.")
         print("(Press Enter to skip any question)\n")
 
-        workflow = _ask("What's your main AI workflow? (e.g., email drafting, code review, research)")
+        workflow = _ask(
+            "What's your main AI workflow? (e.g., email drafting, code review, research)"
+        )
         tone = _ask("Preferred tone? (e.g., casual, professional, direct)")
         avoid = _ask("Anything the AI should always avoid? (e.g., jargon, emojis, long paragraphs)")
 
         if tone:
-            seed_rules.append({
-                "category": "TONE",
-                "description": f"Use {tone} tone in all outputs",
-                "confidence": 0.60,
-            })
+            seed_rules.append(
+                {
+                    "category": "TONE",
+                    "description": f"Use {tone} tone in all outputs",
+                    "confidence": 0.60,
+                }
+            )
         if avoid:
-            seed_rules.append({
-                "category": "STYLE",
-                "description": f"Never use: {avoid}",
-                "confidence": 0.60,
-            })
+            seed_rules.append(
+                {
+                    "category": "STYLE",
+                    "description": f"Never use: {avoid}",
+                    "confidence": 0.60,
+                }
+            )
         if workflow:
-            seed_rules.append({
-                "category": "PROCESS",
-                "description": f"Primary workflow: {workflow}. Optimize outputs for this context.",
-                "confidence": 0.40,
-            })
+            seed_rules.append(
+                {
+                    "category": "PROCESS",
+                    "description": f"Primary workflow: {workflow}. Optimize outputs for this context.",
+                    "confidence": 0.40,
+                }
+            )
 
     # ── Build the brain ────────────────────────────────────────────────
 
@@ -430,8 +437,7 @@ def onboard(
     version_file = brain_dir / "VERSION.md"
     if not version_file.exists():
         version_file.write_text(
-            f"# {name}\n\nVersion: v0.1.0\n"
-            f"Domain: {domain}\nSession 0 — INFANT phase\n",
+            f"# {name}\n\nVersion: v0.1.0\nDomain: {domain}\nSession 0 — INFANT phase\n",
             encoding="utf-8",
         )
 
@@ -441,17 +447,22 @@ def onboard(
             from gradata._db import write_lessons_safe
             from gradata._types import Lesson, LessonState
             from gradata.enhancements.self_improvement import format_lessons
+
             lessons_path = brain_dir / "lessons.md"
             today = datetime.now(UTC).strftime("%Y-%m-%d")
             lessons = []
             for rule in seed_rules:
-                lessons.append(Lesson(
-                    date=today,
-                    state=LessonState.PATTERN if rule["confidence"] >= 0.60 else LessonState.INSTINCT,
-                    confidence=rule["confidence"],
-                    category=rule["category"],
-                    description=rule["description"],
-                ))
+                lessons.append(
+                    Lesson(
+                        date=today,
+                        state=LessonState.PATTERN
+                        if rule["confidence"] >= 0.60
+                        else LessonState.INSTINCT,
+                        confidence=rule["confidence"],
+                        category=rule["category"],
+                        description=rule["description"],
+                    )
+                )
             write_lessons_safe(lessons_path, format_lessons(lessons))
         except Exception:
             pass  # Seed rules are optional — don't block onboarding
@@ -462,7 +473,7 @@ def onboard(
 
     if interactive:
         stats = brain.stats()
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print(f"Brain '{name}' created at {brain_dir}")
         print(f"  Domain:    {domain}")
         print(f"  Embedding: {embedding}")
@@ -471,19 +482,19 @@ def onboard(
         print(f"  DB:        {stats['db_size_mb']} MB")
         if seed_rules:
             print(f"  Seed rules: {len(seed_rules)}")
-        print(f"{'='*50}")
+        print(f"{'=' * 50}")
         print("\nTwo things to try right now:")
         print()
         print("  1. CORRECT — teach the brain from a correction:")
-        print('     brain.correct(')
+        print("     brain.correct(")
         print('         draft="We are pleased to inform you about our product",')
         print('         final="Hey, here is what we built",')
         print('         category="TONE"')
-        print('     )')
+        print("     )")
         print()
         print("  2. APPLY — get learned rules for any task:")
         print('     rules = brain.apply_brain_rules("write an email")')
-        print('     # Returns XML rules block for prompt injection')
+        print("     # Returns XML rules block for prompt injection")
         print()
         print("  That's it. Correct -> graduate -> apply. The brain learns.")
         if embedding == "gemini":

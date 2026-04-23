@@ -4,6 +4,7 @@ Adapted from Hindsight's reciprocal rank fusion (RRF) algorithm.
 Merges results from multiple retrieval strategies into one ranked list,
 then applies correction-aware boosting (Gradata-unique).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

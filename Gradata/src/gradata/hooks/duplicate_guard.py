@@ -1,4 +1,5 @@
 """PreToolUse hook: block file creation when a similar file already exists."""
+
 from __future__ import annotations
 
 import logging
@@ -117,7 +118,7 @@ def main(data: dict) -> dict | None:
         return {
             "decision": "block",
             "reason": (
-                f"BLOCKED: You're creating \"{Path(file_path).name}\" but similar file(s) "
+                f'BLOCKED: You\'re creating "{Path(file_path).name}" but similar file(s) '
                 f"already exist: {names}. Read the existing file first. "
                 f"If it does what you need, edit it instead."
             ),

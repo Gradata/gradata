@@ -21,9 +21,12 @@ HIGH_SEVERITY = frozenset({"moderate", "major", "discarded"})
 
 def _session_window(conn, window: int = 20) -> tuple[int, int]:
     """Return (max_session, min_session) for a recent window. Shared helper."""
-    max_session = conn.execute(
-        "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
-    ).fetchone()[0] or 0
+    max_session = (
+        conn.execute("SELECT MAX(session) FROM events WHERE typeof(session)='integer'").fetchone()[
+            0
+        ]
+        or 0
+    )
     return max_session, max(1, max_session - window + 1)
 
 
@@ -66,7 +69,9 @@ def _get_tables(ctx: "BrainContext | None" = None) -> list[str]:
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = get_connection(db)
-        rows = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()
+        rows = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+        ).fetchall()
         conn.close()
         return [r[0] for r in rows]
     except Exception:
@@ -121,10 +126,21 @@ def _sdk_capabilities() -> dict:
         ("git_backfill", "gradata.enhancements.git_backfill", "gradata"),
         ("auto_correct_hook", "gradata.hooks.auto_correct", "gradata"),
         ("reporting", "gradata.enhancements.reporting", "fest.build-inspired+gradata"),
-        ("quality_monitoring", "gradata.enhancements.quality_monitoring", "jarvis-inspired+gradata"),
+        (
+            "quality_monitoring",
+            "gradata.enhancements.quality_monitoring",
+            "jarvis-inspired+gradata",
+        ),
     ]
 
-    all_modules = _paul_modules + _ruflo_modules + _deerflow_modules + _ecc_modules + _everos_modules + _core_modules
+    all_modules = (
+        _paul_modules
+        + _ruflo_modules
+        + _deerflow_modules
+        + _ecc_modules
+        + _everos_modules
+        + _core_modules
+    )
 
     for name, module_path, source in all_modules:
         try:
@@ -143,6 +159,7 @@ def _sdk_capabilities() -> dict:
 def _tag_taxonomy() -> dict:
     try:
         from gradata._tag_taxonomy import get_taxonomy_summary
+
         return get_taxonomy_summary()
     except ImportError:
         return {}

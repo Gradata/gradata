@@ -43,6 +43,7 @@ def bootstrap_rule_context(
     if lessons_path and lessons_path.is_file():
         try:
             from gradata.enhancements.self_improvement import parse_lessons
+
             text = lessons_path.read_text(encoding="utf-8")
             lessons = parse_lessons(text)
 
@@ -56,15 +57,17 @@ def bootstrap_rule_context(
                         scope = json.loads(lesson.scope_json)
 
                 rule_id = f"lesson:{lesson.category}:{lesson.description[:40]}"
-                ctx.publish(GraduatedRule(
-                    rule_id=rule_id,
-                    category=lesson.category,
-                    principle=lesson.description,
-                    confidence=lesson.confidence,
-                    scope=scope,
-                    source_type="lesson",
-                    agent_type=lesson.agent_type or "",
-                ))
+                ctx.publish(
+                    GraduatedRule(
+                        rule_id=rule_id,
+                        category=lesson.category,
+                        principle=lesson.description,
+                        confidence=lesson.confidence,
+                        scope=scope,
+                        source_type="lesson",
+                        agent_type=lesson.agent_type or "",
+                    )
+                )
                 count += 1
 
         except Exception as e:
@@ -74,12 +77,11 @@ def bootstrap_rule_context(
     if db_path and db_path.is_file():
         try:
             import sqlite3
+
             conn = sqlite3.connect(str(db_path))
             conn.row_factory = sqlite3.Row
             try:
-                rows = conn.execute(
-                    "SELECT * FROM meta_rules WHERE status = 'active'"
-                ).fetchall()
+                rows = conn.execute("SELECT * FROM meta_rules WHERE status = 'active'").fetchall()
             except sqlite3.OperationalError:
                 rows = []  # Table may not exist yet
             finally:
@@ -103,13 +105,15 @@ def bootstrap_rule_context(
                     principle = row["principle"] if "principle" in row else str(row)
                 except (KeyError, IndexError):
                     principle = str(row)
-                ctx.publish(GraduatedRule(
-                    rule_id=rule_id,
-                    category=category,
-                    principle=principle,
-                    confidence=0.95,
-                    source_type="meta_rule",
-                ))
+                ctx.publish(
+                    GraduatedRule(
+                        rule_id=rule_id,
+                        category=category,
+                        principle=principle,
+                        confidence=0.95,
+                        source_type="meta_rule",
+                    )
+                )
                 count += 1
 
         except Exception as e:
@@ -148,14 +152,15 @@ def on_graduation_event(event: dict) -> None:
 
     rule_id = f"lesson:{category}:{description[:40]}"
     ctx = get_rule_context()
-    ctx.publish(GraduatedRule(
-        rule_id=rule_id,
-        category=category,
-        principle=description,
-        confidence=confidence,
-        source_type="lesson",
-        agent_type=agent_type,
-    ))
+    ctx.publish(
+        GraduatedRule(
+            rule_id=rule_id,
+            category=category,
+            principle=description,
+            confidence=confidence,
+            source_type="lesson",
+            agent_type=agent_type,
+        )
+    )
 
     logger.debug("RuleContext: published %s [%s:%.2f]", category, new_state, confidence)
-

@@ -63,11 +63,12 @@ class MemoryType(Enum):
 
     Adapted from EverOS's episodic/eventlog/foresight/profile/group taxonomy.
     """
+
     CORRECTION_NARRATIVE = "correction_narrative"  # Full story of a correction
-    ATOMIC_FACT = "atomic_fact"                     # Individual extracted facts
-    PREDICTED_IMPACT = "predicted_impact"           # Forward-looking predictions
-    BRAIN_PROFILE = "brain_profile"                 # Accumulated characteristics
-    CROSS_BRAIN_PROFILE = "cross_brain_profile"     # Cross-brain shared patterns
+    ATOMIC_FACT = "atomic_fact"  # Individual extracted facts
+    PREDICTED_IMPACT = "predicted_impact"  # Forward-looking predictions
+    BRAIN_PROFILE = "brain_profile"  # Accumulated characteristics
+    CROSS_BRAIN_PROFILE = "cross_brain_profile"  # Cross-brain shared patterns
 
 
 @dataclass
@@ -83,7 +84,10 @@ class BaseMemoryUnit:
         vector: Optional embedding vector for similarity search.
         metadata: Arbitrary metadata.
     """
-    memory_type: MemoryType = MemoryType.CORRECTION_NARRATIVE  # Overridden by subclass __post_init__
+
+    memory_type: MemoryType = (
+        MemoryType.CORRECTION_NARRATIVE
+    )  # Overridden by subclass __post_init__
     timestamp: float = 0.0
     session_id: str = ""
     brain_id: str = ""
@@ -99,6 +103,7 @@ class BaseMemoryUnit:
 # ---------------------------------------------------------------------------
 # Type 1: CorrectionNarrative (Episodic)
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class CorrectionNarrative(BaseMemoryUnit):
@@ -116,6 +121,7 @@ class CorrectionNarrative(BaseMemoryUnit):
         corrected_output: What the correction changed it to.
         task_type: Type of task where correction happened.
     """
+
     subject: str = ""
     summary: str = ""
     episode: str = ""
@@ -133,6 +139,7 @@ class CorrectionNarrative(BaseMemoryUnit):
 # Type 2: AtomicFact (EventLog)
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AtomicFact(BaseMemoryUnit):
     """Individual fact extracted from a correction or session.
@@ -145,6 +152,7 @@ class AtomicFact(BaseMemoryUnit):
         source_type: Where this fact was extracted from (correction/session/rule).
         confidence: How confident we are in this fact (0.0-1.0).
     """
+
     facts: list[str] = field(default_factory=list)
     source_type: str = "correction"
     confidence: float = 1.0
@@ -161,6 +169,7 @@ class AtomicFact(BaseMemoryUnit):
 # ---------------------------------------------------------------------------
 # Type 3: PredictedImpact (Foresight) — Novel from EverOS
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class PredictedImpact(BaseMemoryUnit):
@@ -183,6 +192,7 @@ class PredictedImpact(BaseMemoryUnit):
         affected_rules: Rule IDs that this prediction relates to.
         realized: Whether the prediction has come true.
     """
+
     prediction: str = ""
     evidence: str = ""
     start_date: str = ""
@@ -202,6 +212,7 @@ class PredictedImpact(BaseMemoryUnit):
         if not self.start_date or not self.end_date:
             return True  # No bounds = always active
         from datetime import date
+
         today = date.today().isoformat()
         return self.start_date <= today <= self.end_date
 
@@ -211,12 +222,14 @@ class PredictedImpact(BaseMemoryUnit):
         if not self.end_date:
             return False
         from datetime import date
+
         return date.today().isoformat() > self.end_date
 
 
 # ---------------------------------------------------------------------------
 # Type 4: BrainProfile (Profile)
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ProfileField:
@@ -225,6 +238,7 @@ class ProfileField:
     Adapted from EverOS's profile field structure:
     {"value": "...", "evidences": ["date|session"], "level": "..."}
     """
+
     value: str
     level: str = ""  # "beginner", "intermediate", "advanced", "expert"
     evidences: list[str] = field(default_factory=list)
@@ -251,6 +265,7 @@ class BrainProfile(BaseMemoryUnit):
         correction_patterns: Recurring correction themes.
         preferred_patterns: Agentic patterns the brain defaults to.
     """
+
     strengths: list[ProfileField] = field(default_factory=list)
     weaknesses: list[ProfileField] = field(default_factory=list)
     tendencies: list[ProfileField] = field(default_factory=list)
@@ -298,6 +313,7 @@ class BrainProfile(BaseMemoryUnit):
 # Type 5: CrossBrainProfile (GroupProfile)
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SharedPattern:
     """A pattern observed across multiple brains.
@@ -308,6 +324,7 @@ class SharedPattern:
         confidence: How confident we are this is a real pattern.
         status: Discovery status (exploring/confirmed/promoted).
     """
+
     pattern: str
     brain_ids: list[str] = field(default_factory=list)
     confidence: float = 0.0
@@ -330,6 +347,7 @@ class CrossBrainProfile(BaseMemoryUnit):
         shared_rules: Rules that graduated in multiple brains.
         divergences: Where brains disagree or have conflicting rules.
     """
+
     shared_patterns: list[SharedPattern] = field(default_factory=list)
     shared_rules: list[str] = field(default_factory=list)
     divergences: list[str] = field(default_factory=list)
@@ -360,6 +378,7 @@ class CrossBrainProfile(BaseMemoryUnit):
 # Classification helper
 # ---------------------------------------------------------------------------
 
+
 def classify_memory_type(content: str) -> MemoryType:
     """Heuristic classifier for memory type based on content.
 
@@ -371,13 +390,33 @@ def classify_memory_type(content: str) -> MemoryType:
     """
     content_lower = content.lower()
 
-    prediction_signals = ("will ", "predict", "future", "expect", "likely",
-                         "forecast", "anticipate", "upcoming")
-    profile_signals = ("tends to", "usually", "pattern of", "strength",
-                      "weakness", "prefers", "characteristic")
+    prediction_signals = (
+        "will ",
+        "predict",
+        "future",
+        "expect",
+        "likely",
+        "forecast",
+        "anticipate",
+        "upcoming",
+    )
+    profile_signals = (
+        "tends to",
+        "usually",
+        "pattern of",
+        "strength",
+        "weakness",
+        "prefers",
+        "characteristic",
+    )
     fact_signals = ("fact:", "note:", "learned:", "observed:")
-    cross_signals = ("across brains", "shared pattern", "multiple brains",
-                    "cross-brain", "common to")
+    cross_signals = (
+        "across brains",
+        "shared pattern",
+        "multiple brains",
+        "cross-brain",
+        "common to",
+    )
 
     if any(s in content_lower for s in cross_signals):
         return MemoryType.CROSS_BRAIN_PROFILE

@@ -5,6 +5,7 @@ Single source of truth for:
 - ``has_applied`` / ``mark_applied``
 - Safe column / index existence checks for SQLite
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -39,9 +40,7 @@ def has_applied(conn: sqlite3.Connection, name: str) -> bool:
     ).fetchone()
     if row is None:
         return False
-    row = conn.execute(
-        "SELECT 1 FROM migrations WHERE name = ?", (name,)
-    ).fetchone()
+    row = conn.execute("SELECT 1 FROM migrations WHERE name = ?", (name,)).fetchone()
     return row is not None
 
 
@@ -112,6 +111,7 @@ def create_index_if_missing(
 def resolve_brain_db(brain_arg: str | Path | None) -> Path:
     """Resolve the brain SQLite path from a CLI arg or env."""
     import os
+
     if brain_arg:
         p = Path(brain_arg).expanduser().resolve()
     else:

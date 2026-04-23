@@ -33,14 +33,14 @@ class Delegation:
     and how to know if it succeeded.
     """
 
-    agent: str                          # agent type/name (e.g., "researcher", "writer", "critic")
-    objective: str                      # one-sentence goal
-    input_data: Any = None              # data to pass to the agent
-    output_format: str = "text"         # expected output type hint
-    success_criteria: str = ""          # how to evaluate success
+    agent: str  # agent type/name (e.g., "researcher", "writer", "critic")
+    objective: str  # one-sentence goal
+    input_data: Any = None  # data to pass to the agent
+    output_format: str = "text"  # expected output type hint
+    success_criteria: str = ""  # how to evaluate success
     depends_on: list[str] = field(default_factory=list)  # delegation IDs this depends on
     timeout_seconds: int = 300
-    id: str = ""                        # auto-assigned if empty
+    id: str = ""  # auto-assigned if empty
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -64,7 +64,7 @@ class OrchestratedResult:
     """Result of orchestrating multiple delegations."""
 
     success: bool
-    output: Any                         # synthesized final output
+    output: Any  # synthesized final output
     delegations_completed: int
     delegations_total: int
     delegation_results: list[DelegationResult] = field(default_factory=list)
@@ -84,10 +84,7 @@ def _topological_waves(delegations: list[Delegation]) -> list[list[Delegation]]:
     waves: list[list[Delegation]] = []
 
     while remaining:
-        wave = [
-            d for d in remaining
-            if all(dep in completed for dep in d.depends_on)
-        ]
+        wave = [d for d in remaining if all(dep in completed for dep in d.depends_on)]
         if not wave:
             # Circular dependency — break by taking first remaining
             wave = [remaining[0]]
@@ -137,35 +134,41 @@ def orchestrate(
             handler = handlers.get(delegation.agent, default_handler)
 
             if handler is None:
-                results.append(DelegationResult(
-                    delegation_id=delegation.id,
-                    agent=delegation.agent,
-                    success=False,
-                    error=f"No handler for agent '{delegation.agent}'",
-                ))
+                results.append(
+                    DelegationResult(
+                        delegation_id=delegation.id,
+                        agent=delegation.agent,
+                        success=False,
+                        error=f"No handler for agent '{delegation.agent}'",
+                    )
+                )
                 continue
 
             start = time.perf_counter()
             try:
                 output = handler(delegation, context)
                 duration = (time.perf_counter() - start) * 1000
-                results.append(DelegationResult(
-                    delegation_id=delegation.id,
-                    agent=delegation.agent,
-                    success=True,
-                    output=output,
-                    duration_ms=round(duration, 2),
-                ))
+                results.append(
+                    DelegationResult(
+                        delegation_id=delegation.id,
+                        agent=delegation.agent,
+                        success=True,
+                        output=output,
+                        duration_ms=round(duration, 2),
+                    )
+                )
                 context[delegation.id] = output
             except Exception as e:
                 duration = (time.perf_counter() - start) * 1000
-                results.append(DelegationResult(
-                    delegation_id=delegation.id,
-                    agent=delegation.agent,
-                    success=False,
-                    error=str(e),
-                    duration_ms=round(duration, 2),
-                ))
+                results.append(
+                    DelegationResult(
+                        delegation_id=delegation.id,
+                        agent=delegation.agent,
+                        success=False,
+                        error=str(e),
+                        duration_ms=round(duration, 2),
+                    )
+                )
 
         execution_order.append(wave_ids)
 
@@ -200,7 +203,6 @@ def orchestrate(
         total_duration_ms=round(total_duration, 2),
         qa_passed=qa_passed,
     )
-
 
 
 # ---------------------------------------------------------------------------
@@ -292,6 +294,7 @@ def load_agent_definition(
 # ---------------------------------------------------------------------------
 # Inter-agent handoff management (extracted from brain/scripts/spawn.py)
 # ---------------------------------------------------------------------------
+
 
 def create_handoff(
     task_id: str,

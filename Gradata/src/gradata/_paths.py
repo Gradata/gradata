@@ -7,6 +7,7 @@ No hardcoded user paths. No machine-specific references.
 For the original runtime: brain/scripts/paths.py (unchanged).
 This file is the SDK-portable equivalent.
 """
+
 from __future__ import annotations
 
 import os
@@ -22,6 +23,7 @@ class BrainContext:
     Pass a BrainContext to functions instead of relying on mutable global state.
     Enables multi-brain support (multiple Brain instances in one process).
     """
+
     brain_dir: Path
     db_path: Path
     events_jsonl: Path
@@ -40,7 +42,9 @@ class BrainContext:
     gates_dir: Path
 
     @classmethod
-    def from_brain_dir(cls, brain_dir: str | Path, working_dir: str | Path | None = None) -> BrainContext:
+    def from_brain_dir(
+        cls, brain_dir: str | Path, working_dir: str | Path | None = None
+    ) -> BrainContext:
         """Build a BrainContext from a brain directory path.
 
         Args:
@@ -48,7 +52,11 @@ class BrainContext:
             working_dir: Optional working directory. Falls back to WORKING_DIR env var or cwd.
         """
         bd = resolve_brain_dir(brain_dir)
-        wd = Path(working_dir).resolve() if working_dir else Path(os.environ.get("WORKING_DIR", ".")).resolve()
+        wd = (
+            Path(working_dir).resolve()
+            if working_dir
+            else Path(os.environ.get("WORKING_DIR", ".")).resolve()
+        )
         return cls(
             brain_dir=bd,
             db_path=bd / "system.db",
@@ -173,7 +181,6 @@ def set_brain_dir(brain_dir: str | Path, working_dir: str | Path | None = None):
 
     # Store immutable context for DI-aware modules
     _current_context = BrainContext.from_brain_dir(brain_dir, working_dir)
-
 
 
 # Module-level default context (None until set_brain_dir() is called)

@@ -17,7 +17,11 @@ from datetime import UTC, datetime
 
 
 def create_provenance_record(
-    *, user_id: str, correction_hash: str, session: int, salt: str,
+    *,
+    user_id: str,
+    correction_hash: str,
+    session: int,
+    salt: str,
 ) -> dict:
     """Create an HMAC-SHA256 signed provenance record for a correction.
 
@@ -41,7 +45,9 @@ def create_provenance_record(
     timestamp = datetime.now(UTC).isoformat()
     message = f"{user_id}|{correction_hash}|{session}|{timestamp}"
     signature = hmac.new(
-        salt.encode(), message.encode(), hashlib.sha256,
+        salt.encode(),
+        message.encode(),
+        hashlib.sha256,
     ).hexdigest()
     return {
         "user_id": user_id,
@@ -68,7 +74,9 @@ def verify_provenance(record: dict, salt: str) -> bool:
             f"|{record['session']}|{record['timestamp']}"
         )
         expected = hmac.new(
-            salt.encode(), message.encode(), hashlib.sha256,
+            salt.encode(),
+            message.encode(),
+            hashlib.sha256,
         ).hexdigest()
         return hmac.compare_digest(expected, record["hmac"])
     except (KeyError, TypeError):

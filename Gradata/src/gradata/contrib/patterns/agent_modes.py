@@ -29,25 +29,27 @@ from enum import Enum
 
 class AgentMode(Enum):
     """Available operating modes for Gradata agents."""
-    GODMODE = "godmode"     # Full autonomy, OODA loop, no permission checks
-    PLAN = "plan"           # Propose before executing, wait for approval
-    AUDIT = "audit"         # Read-only. Observe and report only.
-    CANARY = "canary"       # Build in isolation (worktree/branch), merge only if tests pass
-    SAFE = "safe"           # One file at a time, verify after each change
+
+    GODMODE = "godmode"  # Full autonomy, OODA loop, no permission checks
+    PLAN = "plan"  # Propose before executing, wait for approval
+    AUDIT = "audit"  # Read-only. Observe and report only.
+    CANARY = "canary"  # Build in isolation (worktree/branch), merge only if tests pass
+    SAFE = "safe"  # One file at a time, verify after each change
 
 
 @dataclass
 class ModeConfig:
     """Configuration and constraints for a single agent mode."""
+
     mode: AgentMode
-    can_write: bool                 # Can create/edit files
-    can_execute: bool               # Can run bash commands
-    can_spawn: bool                 # Can spawn sub-agents
-    can_commit: bool                # Can git commit
-    requires_approval: bool         # Must get approval before acting
-    max_files_per_action: int       # 0 = unlimited
-    must_verify_after_edit: bool    # Run py_compile/tests after every change
-    isolation: str                  # "none", "branch", "worktree"
+    can_write: bool  # Can create/edit files
+    can_execute: bool  # Can run bash commands
+    can_spawn: bool  # Can spawn sub-agents
+    can_commit: bool  # Can git commit
+    requires_approval: bool  # Must get approval before acting
+    max_files_per_action: int  # 0 = unlimited
+    must_verify_after_edit: bool  # Run py_compile/tests after every change
+    isolation: str  # "none", "branch", "worktree"
     description: str
 
 
@@ -57,37 +59,62 @@ class ModeConfig:
 
 MODE_CONFIGS: dict[AgentMode, ModeConfig] = {
     AgentMode.GODMODE: ModeConfig(
-        mode=AgentMode.GODMODE, can_write=True, can_execute=True,
-        can_spawn=True, can_commit=True, requires_approval=False,
-        max_files_per_action=0, must_verify_after_edit=False,
+        mode=AgentMode.GODMODE,
+        can_write=True,
+        can_execute=True,
+        can_spawn=True,
+        can_commit=True,
+        requires_approval=False,
+        max_files_per_action=0,
+        must_verify_after_edit=False,
         isolation="none",
         description="Full autonomy. OODA loop. Never pause.",
     ),
     AgentMode.PLAN: ModeConfig(
-        mode=AgentMode.PLAN, can_write=True, can_execute=True,
-        can_spawn=True, can_commit=True, requires_approval=True,
-        max_files_per_action=0, must_verify_after_edit=False,
+        mode=AgentMode.PLAN,
+        can_write=True,
+        can_execute=True,
+        can_spawn=True,
+        can_commit=True,
+        requires_approval=True,
+        max_files_per_action=0,
+        must_verify_after_edit=False,
         isolation="none",
         description="Propose plan, wait for approval before executing.",
     ),
     AgentMode.AUDIT: ModeConfig(
-        mode=AgentMode.AUDIT, can_write=False, can_execute=False,
-        can_spawn=False, can_commit=False, requires_approval=False,
-        max_files_per_action=0, must_verify_after_edit=False,
+        mode=AgentMode.AUDIT,
+        can_write=False,
+        can_execute=False,
+        can_spawn=False,
+        can_commit=False,
+        requires_approval=False,
+        max_files_per_action=0,
+        must_verify_after_edit=False,
         isolation="none",
         description="Read-only. Observe, analyze, report. Cannot modify.",
     ),
     AgentMode.CANARY: ModeConfig(
-        mode=AgentMode.CANARY, can_write=True, can_execute=True,
-        can_spawn=True, can_commit=True, requires_approval=False,
-        max_files_per_action=0, must_verify_after_edit=True,
+        mode=AgentMode.CANARY,
+        can_write=True,
+        can_execute=True,
+        can_spawn=True,
+        can_commit=True,
+        requires_approval=False,
+        max_files_per_action=0,
+        must_verify_after_edit=True,
         isolation="worktree",
         description="Build in isolation. Merge only if all tests pass.",
     ),
     AgentMode.SAFE: ModeConfig(
-        mode=AgentMode.SAFE, can_write=True, can_execute=True,
-        can_spawn=False, can_commit=True, requires_approval=False,
-        max_files_per_action=1, must_verify_after_edit=True,
+        mode=AgentMode.SAFE,
+        can_write=True,
+        can_execute=True,
+        can_spawn=False,
+        can_commit=True,
+        requires_approval=False,
+        max_files_per_action=1,
+        must_verify_after_edit=True,
         isolation="branch",
         description="One file at a time. Verify after every change.",
     ),
@@ -104,6 +131,7 @@ _ACTION_FIELD_MAP: dict[str, str] = {
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def get_mode(mode_name: str) -> ModeConfig:
     """Get mode config by name.  Defaults to GODMODE for unknown names."""
@@ -136,8 +164,7 @@ def check_permission(mode: ModeConfig, action: str) -> tuple[bool, str]:
     if allowed:
         return True, ""
     return False, (
-        f"Action '{action}' is not permitted in {mode.mode.value} mode. "
-        f"{mode.description}"
+        f"Action '{action}' is not permitted in {mode.mode.value} mode. {mode.description}"
     )
 
 
@@ -149,7 +176,7 @@ def format_mode_prompt(mode: AgentMode) -> str:
     """
     cfg = MODE_CONFIGS[mode]
     lines: list[str] = [
-        f"<agent-mode name=\"{mode.value}\">",
+        f'<agent-mode name="{mode.value}">',
         f"  Description: {cfg.description}",
     ]
 
@@ -163,8 +190,7 @@ def format_mode_prompt(mode: AgentMode) -> str:
         lines.append("  CONSTRAINT: Do NOT make git commits.")
     if cfg.requires_approval:
         lines.append(
-            "  CONSTRAINT: Propose your full plan FIRST. "
-            "Do NOT execute until the user approves."
+            "  CONSTRAINT: Propose your full plan FIRST. Do NOT execute until the user approves."
         )
     if cfg.max_files_per_action > 0:
         lines.append(

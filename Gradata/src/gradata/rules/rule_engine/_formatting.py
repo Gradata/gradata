@@ -393,7 +393,7 @@ def format_rule_constitutional(category: str, description: str) -> str:
     desc = description.strip()
     for prefix in _IMPERATIVE_PREFIXES:
         if desc.startswith(prefix):
-            desc = desc[len(prefix):]
+            desc = desc[len(prefix) :]
             break
 
     return f"<principle>You value {value} — {desc.lower()}</principle>"

@@ -39,9 +39,14 @@ APPLY_DECAY = "APPLY_DECAY"
 CONSOLIDATE_EVENTS = "CONSOLIDATE_EVENTS"
 DP_EXPORT = "DP_EXPORT"
 
-KNOWN_JOB_TYPES: frozenset[str] = frozenset({
-    SYNTHESIZE_META_RULES, APPLY_DECAY, CONSOLIDATE_EVENTS, DP_EXPORT,
-})
+KNOWN_JOB_TYPES: frozenset[str] = frozenset(
+    {
+        SYNTHESIZE_META_RULES,
+        APPLY_DECAY,
+        CONSOLIDATE_EVENTS,
+        DP_EXPORT,
+    }
+)
 
 _SCHEMA_SQL: tuple[str, ...] = (
     """
@@ -90,17 +95,19 @@ Handler = Callable[[Job], None]
 
 def _stub_handler(label: str) -> Handler:
     """Log-and-succeed stub. Follow-up PRs swap via ``WorkerPool.register``."""
+
     def _run(job: Job) -> None:
         logger.info("worker: would %s (job=%d)", label, job.id)
+
     return _run
 
 
 def default_handlers() -> dict[str, Handler]:
     return {
         SYNTHESIZE_META_RULES: _stub_handler("synthesize meta-rules"),
-        APPLY_DECAY:           _stub_handler("apply decay"),
-        CONSOLIDATE_EVENTS:    _stub_handler("consolidate events"),
-        DP_EXPORT:             _stub_handler("run DP export"),
+        APPLY_DECAY: _stub_handler("apply decay"),
+        CONSOLIDATE_EVENTS: _stub_handler("consolidate events"),
+        DP_EXPORT: _stub_handler("run DP export"),
     }
 
 
@@ -207,12 +214,18 @@ class WorkerPool:
         except json.JSONDecodeError:
             payload = {}
         return Job(
-            id=int(row["id"]), type=str(row["type"]),
-            payload=payload, created_at=float(row["created_at"]),
+            id=int(row["id"]),
+            type=str(row["type"]),
+            payload=payload,
+            created_at=float(row["created_at"]),
         )
 
     def _finalize(
-        self, conn: sqlite3.Connection, job_id: int, *, error: str | None = None,
+        self,
+        conn: sqlite3.Connection,
+        job_id: int,
+        *,
+        error: str | None = None,
     ) -> None:
         conn.execute(
             "UPDATE worker_jobs SET status=?, finished_at=?, error=? WHERE id=?",
@@ -251,9 +264,10 @@ class WorkerPool:
     def _has_pending(self) -> bool:
         conn = get_connection(self._db_path)
         try:
-            return conn.execute(
-                "SELECT 1 FROM worker_jobs WHERE status='pending' LIMIT 1"
-            ).fetchone() is not None
+            return (
+                conn.execute("SELECT 1 FROM worker_jobs WHERE status='pending' LIMIT 1").fetchone()
+                is not None
+            )
         finally:
             conn.close()
 
@@ -284,7 +298,9 @@ class WorkerPool:
         self._drain_deadline = None
         for i in range(self._n_workers):
             t = threading.Thread(
-                target=self._worker_loop, name=f"gradata-worker-{i}", daemon=True,
+                target=self._worker_loop,
+                name=f"gradata-worker-{i}",
+                daemon=True,
             )
             t.start()
             self._threads.append(t)
@@ -361,7 +377,9 @@ if __name__ == "__main__":
     parser.add_argument("--brain-dir", required=True, help="Path to the brain directory")
     parser.add_argument("--workers", type=int, default=1, help="Worker threads (default 1)")
     parser.add_argument(
-        "--drain-timeout", type=float, default=5.0,
+        "--drain-timeout",
+        type=float,
+        default=5.0,
         help="Seconds to let the queue drain on shutdown (default 5)",
     )
     parser.add_argument("--log-level", default="INFO")

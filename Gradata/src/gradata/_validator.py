@@ -10,6 +10,7 @@ Trust Dimensions:
     4. DATA_COMPLETENESS — Are events well-formed with required fields?
     5. BEHAVIORAL_COVERAGE — Do CARL rules cover declared capabilities?
 """
+
 from __future__ import annotations
 
 import json
@@ -35,6 +36,7 @@ __all__ = [
 
 # ── Dimension 1: Metric Integrity ─────────────────────────────────────
 
+
 def _verify_metrics(manifest: dict, conn: sqlite3.Connection) -> dict:
     """Compare claimed metrics against independently computed values."""
     results = []
@@ -47,13 +49,17 @@ def _verify_metrics(manifest: dict, conn: sqlite3.Connection) -> dict:
     except Exception:
         actual_events = 0
     claimed_events = db_meta.get("total_events", 0)
-    results.append({
-        "check": "total_events",
-        "claimed": claimed_events,
-        "actual": actual_events,
-        "pass": actual_events >= claimed_events,
-        "note": "actual >= claimed is valid (events accumulate)" if actual_events >= claimed_events else "claimed exceeds actual — inflation detected",
-    })
+    results.append(
+        {
+            "check": "total_events",
+            "claimed": claimed_events,
+            "actual": actual_events,
+            "pass": actual_events >= claimed_events,
+            "note": "actual >= claimed is valid (events accumulate)"
+            if actual_events >= claimed_events
+            else "claimed exceeds actual — inflation detected",
+        }
+    )
 
     # 1b. Event type count
     try:
@@ -61,67 +67,88 @@ def _verify_metrics(manifest: dict, conn: sqlite3.Connection) -> dict:
     except Exception:
         actual_types = 0
     claimed_types = db_meta.get("event_types", 0)
-    results.append({
-        "check": "event_types",
-        "claimed": claimed_types,
-        "actual": actual_types,
-        "pass": abs(actual_types - claimed_types) <= 2,
-        "note": "within tolerance" if abs(actual_types - claimed_types) <= 2 else "type count mismatch",
-    })
+    results.append(
+        {
+            "check": "event_types",
+            "claimed": claimed_types,
+            "actual": actual_types,
+            "pass": abs(actual_types - claimed_types) <= 2,
+            "note": "within tolerance"
+            if abs(actual_types - claimed_types) <= 2
+            else "type count mismatch",
+        }
+    )
 
     # 1c. Lessons graduated count
     graduated_claimed = claimed.get("lessons_graduated", 0)
     graduated_actual = _count_lessons_in_file(_p.BRAIN_DIR / "lessons-archive.md")
-    results.append({
-        "check": "lessons_graduated",
-        "claimed": graduated_claimed,
-        "actual": graduated_actual,
-        "pass": abs(graduated_actual - graduated_claimed) <= 5,
-        "note": "within tolerance" if abs(graduated_actual - graduated_claimed) <= 5 else "graduated count mismatch",
-    })
+    results.append(
+        {
+            "check": "lessons_graduated",
+            "claimed": graduated_claimed,
+            "actual": graduated_actual,
+            "pass": abs(graduated_actual - graduated_claimed) <= 5,
+            "note": "within tolerance"
+            if abs(graduated_actual - graduated_claimed) <= 5
+            else "graduated count mismatch",
+        }
+    )
 
     # 1d. Lessons active count
     active_claimed = claimed.get("lessons_active", 0)
     active_actual = _count_lessons_in_file(_p.LESSONS_FILE)
-    results.append({
-        "check": "lessons_active",
-        "claimed": active_claimed,
-        "actual": active_actual,
-        "pass": abs(active_actual - active_claimed) <= 3,
-        "note": "within tolerance" if abs(active_actual - active_claimed) <= 3 else "active count mismatch",
-    })
+    results.append(
+        {
+            "check": "lessons_active",
+            "claimed": active_claimed,
+            "actual": active_actual,
+            "pass": abs(active_actual - active_claimed) <= 3,
+            "note": "within tolerance"
+            if abs(active_actual - active_claimed) <= 3
+            else "active count mismatch",
+        }
+    )
 
     # 1e. Session count
     sessions_claimed = manifest.get("metadata", {}).get("sessions_trained", 0)
     try:
-        sessions_actual = conn.execute(
-            "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
-        ).fetchone()[0] or 0
+        sessions_actual = (
+            conn.execute(
+                "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
+            ).fetchone()[0]
+            or 0
+        )
     except Exception:
         sessions_actual = 0
-    results.append({
-        "check": "sessions_trained",
-        "claimed": sessions_claimed,
-        "actual": sessions_actual,
-        "pass": abs(sessions_actual - sessions_claimed) <= 3,
-        "note": "within tolerance" if abs(sessions_actual - sessions_claimed) <= 3 else "session count mismatch",
-    })
+    results.append(
+        {
+            "check": "sessions_trained",
+            "claimed": sessions_claimed,
+            "actual": sessions_actual,
+            "pass": abs(sessions_actual - sessions_claimed) <= 3,
+            "note": "within tolerance"
+            if abs(sessions_actual - sessions_claimed) <= 3
+            else "session count mismatch",
+        }
+    )
 
     # 1f. Table count
     claimed_tables = len(db_meta.get("tables", []))
     try:
-        actual_tables = len(conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall())
+        actual_tables = len(
+            conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        )
     except Exception:
         actual_tables = 0
-    results.append({
-        "check": "db_tables",
-        "claimed": claimed_tables,
-        "actual": actual_tables,
-        "pass": actual_tables >= claimed_tables,
-        "note": "ok" if actual_tables >= claimed_tables else "tables missing from DB",
-    })
+    results.append(
+        {
+            "check": "db_tables",
+            "claimed": claimed_tables,
+            "actual": actual_tables,
+            "pass": actual_tables >= claimed_tables,
+            "note": "ok" if actual_tables >= claimed_tables else "tables missing from DB",
+        }
+    )
 
     passed = sum(1 for r in results if r["pass"])
     return {
@@ -134,6 +161,7 @@ def _verify_metrics(manifest: dict, conn: sqlite3.Connection) -> dict:
 
 
 # ── Dimension 2: Training Depth ───────────────────────────────────────
+
 
 def _verify_training_depth(manifest: dict, conn: sqlite3.Connection) -> dict:
     """Is this brain genuinely trained or just padded with empty sessions?"""
@@ -154,18 +182,24 @@ def _verify_training_depth(manifest: dict, conn: sqlite3.Connection) -> dict:
         empty_sessions = sum(1 for c in counts if c <= 1)
         total_sessions = len(counts)
 
-        results.append({
-            "check": "avg_events_per_session",
-            "value": round(avg_events, 1),
-            "pass": avg_events >= 3,
-            "note": f"{avg_events:.1f} events/session (minimum useful: 3)" if avg_events >= 3 else "suspiciously low event density — padding?",
-        })
-        results.append({
-            "check": "empty_session_ratio",
-            "value": round(empty_sessions / total_sessions, 3) if total_sessions > 0 else 1.0,
-            "pass": (empty_sessions / total_sessions < 0.3) if total_sessions > 0 else False,
-            "note": f"{empty_sessions}/{total_sessions} sessions with <=1 event",
-        })
+        results.append(
+            {
+                "check": "avg_events_per_session",
+                "value": round(avg_events, 1),
+                "pass": avg_events >= 3,
+                "note": f"{avg_events:.1f} events/session (minimum useful: 3)"
+                if avg_events >= 3
+                else "suspiciously low event density — padding?",
+            }
+        )
+        results.append(
+            {
+                "check": "empty_session_ratio",
+                "value": round(empty_sessions / total_sessions, 3) if total_sessions > 0 else 1.0,
+                "pass": (empty_sessions / total_sessions < 0.3) if total_sessions > 0 else False,
+                "note": f"{empty_sessions}/{total_sessions} sessions with <=1 event",
+            }
+        )
 
     # 2b. Event type diversity (real training produces varied events)
     try:
@@ -177,12 +211,14 @@ def _verify_training_depth(manifest: dict, conn: sqlite3.Connection) -> dict:
 
     if type_counts:
         types_used = len(type_counts)
-        results.append({
-            "check": "event_type_diversity",
-            "value": types_used,
-            "pass": types_used >= 5,
-            "note": f"{types_used} distinct event types (minimum for real training: 5)",
-        })
+        results.append(
+            {
+                "check": "event_type_diversity",
+                "value": types_used,
+                "pass": types_used >= 5,
+                "note": f"{types_used} distinct event types (minimum for real training: 5)",
+            }
+        )
 
     # 2c. Temporal span (brain trained over real time, not one burst)
     try:
@@ -197,12 +233,16 @@ def _verify_training_depth(manifest: dict, conn: sqlite3.Connection) -> dict:
             first = datetime.fromisoformat(str(span[0]))
             last = datetime.fromisoformat(str(span[1]))
             days = (last - first).days
-            results.append({
-                "check": "training_span_days",
-                "value": days,
-                "pass": days >= 3,
-                "note": f"Trained over {days} days" if days >= 3 else "all training in <3 days — insufficient maturation",
-            })
+            results.append(
+                {
+                    "check": "training_span_days",
+                    "value": days,
+                    "pass": days >= 3,
+                    "note": f"Trained over {days} days"
+                    if days >= 3
+                    else "all training in <3 days — insufficient maturation",
+                }
+            )
         except Exception:
             pass
 
@@ -214,12 +254,14 @@ def _verify_training_depth(manifest: dict, conn: sqlite3.Connection) -> dict:
     except Exception:
         correction_count = 0
 
-    results.append({
-        "check": "corrections_exist",
-        "value": correction_count,
-        "pass": correction_count >= 3,
-        "note": f"{correction_count} corrections (minimum for credible training: 3)",
-    })
+    results.append(
+        {
+            "check": "corrections_exist",
+            "value": correction_count,
+            "pass": correction_count >= 3,
+            "note": f"{correction_count} corrections (minimum for credible training: 3)",
+        }
+    )
 
     passed = sum(1 for r in results if r["pass"])
     return {
@@ -232,6 +274,7 @@ def _verify_training_depth(manifest: dict, conn: sqlite3.Connection) -> dict:
 
 
 # ── Dimension 3: Learning Signal ──────────────────────────────────────
+
 
 def _verify_learning_signal(manifest: dict, conn: sqlite3.Connection) -> dict:
     """Does the brain actually learn? Corrections should decrease over time."""
@@ -254,19 +297,23 @@ def _verify_learning_signal(manifest: dict, conn: sqlite3.Connection) -> dict:
         second_half_avg = sum(counts[mid:]) / (len(counts) - mid) if (len(counts) - mid) > 0 else 0
 
         improving = second_half_avg <= first_half_avg
-        results.append({
-            "check": "correction_trend",
-            "first_half_avg": round(first_half_avg, 2),
-            "second_half_avg": round(second_half_avg, 2),
-            "pass": improving,
-            "note": f"Early avg: {first_half_avg:.1f}, Recent avg: {second_half_avg:.1f} — {'improving' if improving else 'NOT improving'}",
-        })
+        results.append(
+            {
+                "check": "correction_trend",
+                "first_half_avg": round(first_half_avg, 2),
+                "second_half_avg": round(second_half_avg, 2),
+                "pass": improving,
+                "note": f"Early avg: {first_half_avg:.1f}, Recent avg: {second_half_avg:.1f} — {'improving' if improving else 'NOT improving'}",
+            }
+        )
     else:
-        results.append({
-            "check": "correction_trend",
-            "pass": False,
-            "note": f"Insufficient correction data ({len(rows)} sessions with corrections, need 4+)",
-        })
+        results.append(
+            {
+                "check": "correction_trend",
+                "pass": False,
+                "note": f"Insufficient correction data ({len(rows)} sessions with corrections, need 4+)",
+            }
+        )
 
     # 3b. Lesson graduation rate (lessons should move from INSTINCT to PATTERN to RULE)
     lessons_file = _p.LESSONS_FILE
@@ -277,35 +324,43 @@ def _verify_learning_signal(manifest: dict, conn: sqlite3.Connection) -> dict:
 
     if total > 0:
         grad_rate = graduated / total
-        results.append({
-            "check": "graduation_rate",
-            "value": round(grad_rate, 3),
-            "active": active,
-            "graduated": graduated,
-            "pass": grad_rate >= 0.3,
-            "note": f"{graduated}/{total} lessons graduated ({grad_rate:.0%})" if grad_rate >= 0.3 else f"Low graduation rate ({grad_rate:.0%}) — brain retains but doesn't crystallize",
-        })
+        results.append(
+            {
+                "check": "graduation_rate",
+                "value": round(grad_rate, 3),
+                "active": active,
+                "graduated": graduated,
+                "pass": grad_rate >= 0.3,
+                "note": f"{graduated}/{total} lessons graduated ({grad_rate:.0%})"
+                if grad_rate >= 0.3
+                else f"Low graduation rate ({grad_rate:.0%}) — brain retains but doesn't crystallize",
+            }
+        )
     else:
-        results.append({
-            "check": "graduation_rate",
-            "pass": False,
-            "note": "No lessons found — brain has no learning pipeline",
-        })
+        results.append(
+            {
+                "check": "graduation_rate",
+                "pass": False,
+                "note": "No lessons found — brain has no learning pipeline",
+            }
+        )
 
     # 3c. Lesson application tracking (lessons are actually applied, not just stored)
     try:
-        app_count = conn.execute(
-            "SELECT COUNT(*) FROM lesson_applications"
-        ).fetchone()[0]
+        app_count = conn.execute("SELECT COUNT(*) FROM lesson_applications").fetchone()[0]
     except Exception:
         app_count = 0
 
-    results.append({
-        "check": "lesson_applications",
-        "value": app_count,
-        "pass": app_count >= 1,
-        "note": f"{app_count} lesson applications tracked" if app_count >= 1 else "No lesson applications — lessons exist but aren't applied",
-    })
+    results.append(
+        {
+            "check": "lesson_applications",
+            "value": app_count,
+            "pass": app_count >= 1,
+            "note": f"{app_count} lesson applications tracked"
+            if app_count >= 1
+            else "No lesson applications — lessons exist but aren't applied",
+        }
+    )
 
     passed = sum(1 for r in results if r["pass"])
     return {
@@ -318,6 +373,7 @@ def _verify_learning_signal(manifest: dict, conn: sqlite3.Connection) -> dict:
 
 
 # ── Dimension 4: Data Completeness ────────────────────────────────────
+
 
 def _verify_data_completeness(manifest: dict, conn: sqlite3.Connection) -> dict:
     """Are events well-formed with required fields?"""
@@ -334,12 +390,14 @@ def _verify_data_completeness(manifest: dict, conn: sqlite3.Connection) -> dict:
 
     if total > 0:
         ts_rate = with_ts / total
-        results.append({
-            "check": "timestamp_coverage",
-            "value": round(ts_rate, 3),
-            "pass": ts_rate >= 0.95,
-            "note": f"{ts_rate:.0%} of events have timestamps",
-        })
+        results.append(
+            {
+                "check": "timestamp_coverage",
+                "value": round(ts_rate, 3),
+                "pass": ts_rate >= 0.95,
+                "note": f"{ts_rate:.0%} of events have timestamps",
+            }
+        )
 
     # 4b. Events have session numbers
     try:
@@ -351,12 +409,14 @@ def _verify_data_completeness(manifest: dict, conn: sqlite3.Connection) -> dict:
 
     if total > 0:
         session_rate = with_session / total
-        results.append({
-            "check": "session_coverage",
-            "value": round(session_rate, 3),
-            "pass": session_rate >= 0.90,
-            "note": f"{session_rate:.0%} of events have session numbers",
-        })
+        results.append(
+            {
+                "check": "session_coverage",
+                "value": round(session_rate, 3),
+                "pass": session_rate >= 0.90,
+                "note": f"{session_rate:.0%} of events have session numbers",
+            }
+        )
 
     # 4c. Events have data payloads
     try:
@@ -368,12 +428,14 @@ def _verify_data_completeness(manifest: dict, conn: sqlite3.Connection) -> dict:
 
     if total > 0:
         data_rate = with_data / total
-        results.append({
-            "check": "data_coverage",
-            "value": round(data_rate, 3),
-            "pass": data_rate >= 0.80,
-            "note": f"{data_rate:.0%} of events have data payloads",
-        })
+        results.append(
+            {
+                "check": "data_coverage",
+                "value": round(data_rate, 3),
+                "pass": data_rate >= 0.80,
+                "note": f"{data_rate:.0%} of events have data payloads",
+            }
+        )
 
     # 4d. CORRECTION events have category tags
     try:
@@ -390,12 +452,14 @@ def _verify_data_completeness(manifest: dict, conn: sqlite3.Connection) -> dict:
 
     if corrections_total > 0:
         tag_rate = corrections_tagged / corrections_total
-        results.append({
-            "check": "correction_categorization",
-            "value": round(tag_rate, 3),
-            "pass": tag_rate >= 0.70,
-            "note": f"{tag_rate:.0%} of corrections are categorized",
-        })
+        results.append(
+            {
+                "check": "correction_categorization",
+                "value": round(tag_rate, 3),
+                "pass": tag_rate >= 0.70,
+                "note": f"{tag_rate:.0%} of corrections are categorized",
+            }
+        )
 
     # 4e. events.jsonl exists and is consistent with DB
     jsonl_count = 0
@@ -408,13 +472,15 @@ def _verify_data_completeness(manifest: dict, conn: sqlite3.Connection) -> dict:
 
     if total > 0:
         sync_ratio = jsonl_count / total if total > 0 else 0
-        results.append({
-            "check": "dual_write_consistency",
-            "db_count": total,
-            "jsonl_count": jsonl_count,
-            "pass": 0.8 <= sync_ratio <= 1.3,
-            "note": f"DB: {total}, JSONL: {jsonl_count} — {'consistent' if 0.8 <= sync_ratio <= 1.3 else 'drift detected'}",
-        })
+        results.append(
+            {
+                "check": "dual_write_consistency",
+                "db_count": total,
+                "jsonl_count": jsonl_count,
+                "pass": 0.8 <= sync_ratio <= 1.3,
+                "note": f"DB: {total}, JSONL: {jsonl_count} — {'consistent' if 0.8 <= sync_ratio <= 1.3 else 'drift detected'}",
+            }
+        )
 
     passed = sum(1 for r in results if r["pass"])
     return {
@@ -428,6 +494,7 @@ def _verify_data_completeness(manifest: dict, conn: sqlite3.Connection) -> dict:
 
 # ── Dimension 5: Behavioral Coverage ──────────────────────────────────
 
+
 def _verify_behavioral_coverage(manifest: dict, conn: sqlite3.Connection) -> dict:
     """Do CARL rules cover the brain's declared capabilities?"""
     results = []
@@ -435,44 +502,56 @@ def _verify_behavioral_coverage(manifest: dict, conn: sqlite3.Connection) -> dic
 
     # 5a. Safety rules exist
     safety = contract.get("safety_rules", 0)
-    results.append({
-        "check": "safety_rules",
-        "value": safety,
-        "pass": safety >= 3,
-        "note": f"{safety} safety rules" if safety >= 3 else "insufficient safety rules for marketplace distribution",
-    })
+    results.append(
+        {
+            "check": "safety_rules",
+            "value": safety,
+            "pass": safety >= 3,
+            "note": f"{safety} safety rules"
+            if safety >= 3
+            else "insufficient safety rules for marketplace distribution",
+        }
+    )
 
     # 5b. Global rules exist
     global_rules = contract.get("global_rules", 0)
-    results.append({
-        "check": "global_rules",
-        "value": global_rules,
-        "pass": global_rules >= 2,
-        "note": f"{global_rules} global rules",
-    })
+    results.append(
+        {
+            "check": "global_rules",
+            "value": global_rules,
+            "pass": global_rules >= 2,
+            "note": f"{global_rules} global rules",
+        }
+    )
 
     # 5c. Total rule coverage is proportional to training
     total_rules = contract.get("total", 0)
     sessions = manifest.get("metadata", {}).get("sessions_trained", 0)
     rule_density = total_rules / max(sessions, 1)
-    results.append({
-        "check": "rule_density",
-        "value": round(rule_density, 2),
-        "total_rules": total_rules,
-        "sessions": sessions,
-        "pass": rule_density >= 0.5,
-        "note": f"{total_rules} rules / {sessions} sessions = {rule_density:.1f} rules/session",
-    })
+    results.append(
+        {
+            "check": "rule_density",
+            "value": round(rule_density, 2),
+            "total_rules": total_rules,
+            "sessions": sessions,
+            "pass": rule_density >= 0.5,
+            "note": f"{total_rules} rules / {sessions} sessions = {rule_density:.1f} rules/session",
+        }
+    )
 
     # 5d. Tag taxonomy exists and has entries
     taxonomy = manifest.get("tag_taxonomy", {})
     tax_count = len(taxonomy)
-    results.append({
-        "check": "tag_taxonomy",
-        "value": tax_count,
-        "pass": tax_count >= 3,
-        "note": f"{tax_count} tag prefixes defined" if tax_count >= 3 else "insufficient tag vocabulary",
-    })
+    results.append(
+        {
+            "check": "tag_taxonomy",
+            "value": tax_count,
+            "pass": tax_count >= 3,
+            "note": f"{tax_count} tag prefixes defined"
+            if tax_count >= 3
+            else "insufficient tag vocabulary",
+        }
+    )
 
     passed = sum(1 for r in results if r["pass"])
     return {
@@ -485,6 +564,7 @@ def _verify_behavioral_coverage(manifest: dict, conn: sqlite3.Connection) -> dic
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
+
 
 def _count_lessons_in_file(filepath: Path) -> int:
     """Count lesson entries in a lessons file."""
@@ -535,18 +615,25 @@ def _compute_trust_score(dimensions: list[dict]) -> dict:
 
 # ── Main Validation ──────────────────────────────────────────────────
 
+
 def validate_brain(manifest_path: Path | None = None, ctx: BrainContext | None = None) -> dict:
     """Run full brain validation. Returns structured report."""
     brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
     path = manifest_path or (brain_dir / "brain.manifest.json")
 
     if not path.exists():
-        return {"error": f"Manifest not found: {path}", "trust": {"score": 0, "grade": "F", "verdict": "UNTRUSTED"}}
+        return {
+            "error": f"Manifest not found: {path}",
+            "trust": {"score": 0, "grade": "F", "verdict": "UNTRUSTED"},
+        }
 
     try:
         manifest = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
-        return {"error": f"Invalid manifest JSON: {e}", "trust": {"score": 0, "grade": "F", "verdict": "UNTRUSTED"}}
+        return {
+            "error": f"Invalid manifest JSON: {e}",
+            "trust": {"score": 0, "grade": "F", "verdict": "UNTRUSTED"},
+        }
 
     # Connect to DB
     db_path = path.parent / "system.db"
@@ -555,7 +642,10 @@ def validate_brain(manifest_path: Path | None = None, ctx: BrainContext | None =
     try:
         conn = sqlite3.connect(str(db_path))
     except Exception as e:
-        return {"error": f"Cannot open DB: {e}", "trust": {"score": 0, "grade": "F", "verdict": "UNTRUSTED"}}
+        return {
+            "error": f"Cannot open DB: {e}",
+            "trust": {"score": 0, "grade": "F", "verdict": "UNTRUSTED"},
+        }
 
     dimensions = [
         _verify_metrics(manifest, conn),
@@ -612,8 +702,12 @@ def print_report(report: dict):
     print("=" * 60)
     print(f"Brain:    {report.get('brain_version', '?')} ({report.get('domain', '?')})")
     print(f"Date:     {report.get('validated_at', '?')[:19]}")
-    print(f"Trust:    {trust.get('grade', '?')} ({trust.get('score', 0):.0%}) — {trust.get('verdict', '?')}")
-    print(f"Checks:   {summary.get('passed', 0)}/{summary.get('total_checks', 0)} passed ({summary.get('pass_rate', 0):.0%})")
+    print(
+        f"Trust:    {trust.get('grade', '?')} ({trust.get('score', 0):.0%}) — {trust.get('verdict', '?')}"
+    )
+    print(
+        f"Checks:   {summary.get('passed', 0)}/{summary.get('total_checks', 0)} passed ({summary.get('pass_rate', 0):.0%})"
+    )
     print()
 
     for dim in report.get("dimensions", []):
@@ -626,11 +720,14 @@ def print_report(report: dict):
         print()
 
     print("=" * 60)
-    print(f"VERDICT: {trust.get('verdict', 'UNKNOWN')} (Grade {trust.get('grade', '?')}, Score {trust.get('score', 0):.0%})")
+    print(
+        f"VERDICT: {trust.get('verdict', 'UNKNOWN')} (Grade {trust.get('grade', '?')}, Score {trust.get('score', 0):.0%})"
+    )
     print("=" * 60)
 
 
 # ── CLI ──────────────────────────────────────────────────────────────
+
 
 def main():
     """Standalone CLI entry point."""

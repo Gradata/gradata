@@ -60,13 +60,34 @@ logger = logging.getLogger("gradata.daemon")
 # ── Category detection from file extension ─────────────────────────────
 
 _EXT_CATEGORY: dict[str, str] = {
-    ".py": "CODE", ".js": "CODE", ".ts": "CODE", ".tsx": "CODE", ".jsx": "CODE",
-    ".rs": "CODE", ".go": "CODE", ".java": "CODE", ".rb": "CODE", ".c": "CODE",
-    ".cpp": "CODE", ".h": "CODE", ".cs": "CODE", ".swift": "CODE", ".kt": "CODE",
-    ".md": "CONTENT", ".txt": "CONTENT", ".rst": "CONTENT",
-    ".json": "CONFIG", ".yaml": "CONFIG", ".yml": "CONFIG", ".toml": "CONFIG",
-    ".ini": "CONFIG", ".env": "CONFIG",
-    ".html": "FRONTEND", ".css": "FRONTEND", ".scss": "FRONTEND", ".vue": "FRONTEND",
+    ".py": "CODE",
+    ".js": "CODE",
+    ".ts": "CODE",
+    ".tsx": "CODE",
+    ".jsx": "CODE",
+    ".rs": "CODE",
+    ".go": "CODE",
+    ".java": "CODE",
+    ".rb": "CODE",
+    ".c": "CODE",
+    ".cpp": "CODE",
+    ".h": "CODE",
+    ".cs": "CODE",
+    ".swift": "CODE",
+    ".kt": "CODE",
+    ".md": "CONTENT",
+    ".txt": "CONTENT",
+    ".rst": "CONTENT",
+    ".json": "CONFIG",
+    ".yaml": "CONFIG",
+    ".yml": "CONFIG",
+    ".toml": "CONFIG",
+    ".ini": "CONFIG",
+    ".env": "CONFIG",
+    ".html": "FRONTEND",
+    ".css": "FRONTEND",
+    ".scss": "FRONTEND",
+    ".vue": "FRONTEND",
     ".svelte": "FRONTEND",
 }
 
@@ -83,13 +104,16 @@ IDLE_TIMEOUT_SECONDS = 600  # 10 minutes
 
 # ── Threaded HTTP server ────────────────────────────────────────────────
 
+
 class _ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     """HTTPServer that handles each request in a new thread."""
+
     daemon_threads = True
     allow_reuse_address = True
 
 
 # ── Request handler ─────────────────────────────────────────────────────
+
 
 class _Handler(BaseHTTPRequestHandler):
     """Routes requests to the parent GradataDaemon instance."""
@@ -156,21 +180,21 @@ class _Handler(BaseHTTPRequestHandler):
         d = self.daemon
         with d._brain_lock:
             lessons = d._brain._load_lessons()
-            rules_count = sum(
-                1 for lesson in lessons if lesson.state.name == "RULE"
-            )
+            rules_count = sum(1 for lesson in lessons if lesson.state.name == "RULE")
             lessons_count = len(lessons)
 
         uptime = time.monotonic() - d._started_mono
-        self._send_json({
-            "status": "ok",
-            "sdk_version": gradata.__version__,
-            "brain_dir": str(d._brain.dir),
-            "uptime_seconds": round(uptime, 2),
-            "active_sessions": len(d._sessions),
-            "rules_count": rules_count,
-            "lessons_count": lessons_count,
-        })
+        self._send_json(
+            {
+                "status": "ok",
+                "sdk_version": gradata.__version__,
+                "brain_dir": str(d._brain.dir),
+                "uptime_seconds": round(uptime, 2),
+                "active_sessions": len(d._sessions),
+                "rules_count": rules_count,
+                "lessons_count": lessons_count,
+            }
+        )
 
     def _handle_apply_rules(self) -> None:
         self.daemon._reset_idle_timer()
@@ -202,13 +226,15 @@ class _Handler(BaseHTTPRequestHandler):
         rules_out = []
         fired_ids = []
         for ar in applied:
-            rules_out.append({
-                "rule_id": ar.rule_id,
-                "tier": ar.lesson.state.value,
-                "category": ar.lesson.category,
-                "instruction": ar.instruction,
-                "relevance": ar.relevance,
-            })
+            rules_out.append(
+                {
+                    "rule_id": ar.rule_id,
+                    "tier": ar.lesson.state.value,
+                    "category": ar.lesson.category,
+                    "instruction": ar.instruction,
+                    "relevance": ar.relevance,
+                }
+            )
             fired_ids.append(ar.rule_id)
 
         # Store fired rule IDs and instruction tokens for acceptance tracking
@@ -220,13 +246,15 @@ class _Handler(BaseHTTPRequestHandler):
 
         mode, mode_conf = classify_mode(prompt)
 
-        self._send_json({
-            "rules": rules_out,
-            "injection_text": injection_text,
-            "mode_detected": mode,
-            "mode_confidence": mode_conf,
-            "fired_rule_ids": fired_ids,
-        })
+        self._send_json(
+            {
+                "rules": rules_out,
+                "injection_text": injection_text,
+                "mode_detected": mode,
+                "mode_confidence": mode_conf,
+                "fired_rule_ids": fired_ids,
+            }
+        )
 
     def _handle_correct(self) -> None:
         self.daemon._reset_idle_timer()
@@ -307,18 +335,20 @@ class _Handler(BaseHTTPRequestHandler):
                     break
 
         # Build response
-        self._send_json({
-            "captured": True,
-            "severity": result.get("severity", "unknown"),
-            "instruction_extracted": result.get("instruction", ""),
-            "lesson_created": result.get("lesson_created", False),
-            "lesson_state": result.get("lesson_state", "INSTINCT"),
-            "misfired_rules": misfired,
-            "accepted_rules": [],
-            "addition_detected": addition_detected,
-            "addition_lesson": addition_lesson,
-            "correction_conflict": correction_conflict,
-        })
+        self._send_json(
+            {
+                "captured": True,
+                "severity": result.get("severity", "unknown"),
+                "instruction_extracted": result.get("instruction", ""),
+                "lesson_created": result.get("lesson_created", False),
+                "lesson_state": result.get("lesson_state", "INSTINCT"),
+                "misfired_rules": misfired,
+                "accepted_rules": [],
+                "addition_detected": addition_detected,
+                "addition_lesson": addition_lesson,
+                "correction_conflict": correction_conflict,
+            }
+        )
 
     def _handle_detect(self) -> None:
         self.daemon._reset_idle_timer()
@@ -333,7 +363,8 @@ class _Handler(BaseHTTPRequestHandler):
         try:
             with d._brain_lock:
                 result = d._brain.detect_implicit_feedback(
-                    user_message, session=session_num,
+                    user_message,
+                    session=session_num,
                 )
         except Exception as exc:
             logger.warning("detect_implicit_feedback failed: %s", exc)
@@ -348,16 +379,18 @@ class _Handler(BaseHTTPRequestHandler):
 
         mode, mode_conf = classify_mode(user_message)
 
-        self._send_json({
-            "implicit_feedback": {
-                "detected": detected,
-                "signals": signals,
-                "related_rules": related_rules,
-                "action_taken": "logged" if detected else None,
-            },
-            "mode": mode,
-            "mode_confidence": mode_conf,
-        })
+        self._send_json(
+            {
+                "implicit_feedback": {
+                    "detected": detected,
+                    "signals": signals,
+                    "related_rules": related_rules,
+                    "action_taken": "logged" if detected else None,
+                },
+                "mode": mode,
+                "mode_confidence": mode_conf,
+            }
+        )
 
     def _handle_end_session(self) -> None:
         self.daemon._reset_idle_timer()
@@ -389,14 +422,16 @@ class _Handler(BaseHTTPRequestHandler):
         except Exception:
             convergence = {}
 
-        self._send_json({
-            "corrections_captured": result.get("corrections_captured", 0),
-            "instructions_extracted": result.get("instructions_extracted", 0),
-            "lessons_graduated": result.get("lessons_graduated", 0),
-            "meta_rules_synthesized": result.get("meta_rules_synthesized", 0),
-            "convergence": convergence,
-            "cross_project_candidates": [],
-        })
+        self._send_json(
+            {
+                "corrections_captured": result.get("corrections_captured", 0),
+                "instructions_extracted": result.get("instructions_extracted", 0),
+                "lessons_graduated": result.get("lessons_graduated", 0),
+                "meta_rules_synthesized": result.get("meta_rules_synthesized", 0),
+                "convergence": convergence,
+                "cross_project_candidates": [],
+            }
+        )
 
     # ── Extended endpoint handlers ─────────────────────────────────────
 
@@ -424,11 +459,13 @@ class _Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 logger.exception("brain-recall search failed: %s", e)
 
-        self._send_json({
-            "context": "\n".join(context_parts),
-            "relevant_rules": relevant_rules,
-            "relevant_corrections": [],
-        })
+        self._send_json(
+            {
+                "context": "\n".join(context_parts),
+                "relevant_rules": relevant_rules,
+                "relevant_corrections": [],
+            }
+        )
 
     def _handle_enforce_rules(self) -> None:
         self.daemon._reset_idle_timer()
@@ -452,16 +489,20 @@ class _Handler(BaseHTTPRequestHandler):
                         keywords = [w for w in never_what.split() if len(w) > 3]
                         if any(kw in content_lower for kw in keywords):
                             desc_hash = hashlib.sha256(rule.description.encode()).hexdigest()[:8]
-                            violations.append({
-                                "rule_id": f"{rule.category}:{desc_hash}",
-                                "description": rule.description,
-                                "severity": "warn",
-                            })
+                            violations.append(
+                                {
+                                    "rule_id": f"{rule.category}:{desc_hash}",
+                                    "description": rule.description,
+                                    "severity": "warn",
+                                }
+                            )
 
-        self._send_json({
-            "violations": violations,
-            "pass": len(violations) == 0,
-        })
+        self._send_json(
+            {
+                "violations": violations,
+                "pass": len(violations) == 0,
+            }
+        )
 
     def _handle_log_event(self) -> None:
         self.daemon._reset_idle_timer()
@@ -530,20 +571,31 @@ class _Handler(BaseHTTPRequestHandler):
         try:
             with d._brain_lock:
                 lessons = d._brain._load_lessons()
-                pending = sum(1 for le in lessons
-                              if le.state in (LessonState.INSTINCT, LessonState.PATTERN))
-                d._brain.emit("CHECKPOINT", "plugin.pre_compact", {
-                    "session_id": session_id, "reason": reason, "pending_lessons": pending,
-                })
+                pending = sum(
+                    1 for le in lessons if le.state in (LessonState.INSTINCT, LessonState.PATTERN)
+                )
+                d._brain.emit(
+                    "CHECKPOINT",
+                    "plugin.pre_compact",
+                    {
+                        "session_id": session_id,
+                        "reason": reason,
+                        "pending_lessons": pending,
+                    },
+                )
         except Exception as e:
-            logger.exception("checkpoint failed for session_id=%s, reason=%s: %s", session_id, reason, e)
+            logger.exception(
+                "checkpoint failed for session_id=%s, reason=%s: %s", session_id, reason, e
+            )
             checkpointed = False
 
-        self._send_json({
-            "checkpointed": checkpointed,
-            "pending_lessons": pending,
-            "unsaved_corrections": 0,
-        })
+        self._send_json(
+            {
+                "checkpointed": checkpointed,
+                "pending_lessons": pending,
+                "unsaved_corrections": 0,
+            }
+        )
 
     def _handle_maintain(self) -> None:
         self.daemon._reset_idle_timer()
@@ -574,14 +626,17 @@ class _Handler(BaseHTTPRequestHandler):
                 failed.append(task_name)
 
         duration_ms = round((time.monotonic() - start) * 1000)
-        self._send_json({
-            "completed": completed,
-            "failed": failed,
-            "duration_ms": duration_ms,
-        })
+        self._send_json(
+            {
+                "completed": completed,
+                "failed": failed,
+                "duration_ms": duration_ms,
+            }
+        )
 
 
 # ── Main daemon class ──────────────────────────────────────────────────
+
 
 class GradataDaemon:
     """Long-lived HTTP daemon that holds a Brain in memory.
@@ -749,7 +804,9 @@ class GradataDaemon:
         except FileNotFoundError:
             return
 
-        if not re.search(r"^\s*telemetry\s*=\s*true\s*$", config_text, re.IGNORECASE | re.MULTILINE):
+        if not re.search(
+            r"^\s*telemetry\s*=\s*true\s*$", config_text, re.IGNORECASE | re.MULTILINE
+        ):
             return
 
         match = re.search(r'telemetry_last_sent\s*=\s*"([^"]+)"', config_text)
@@ -764,6 +821,7 @@ class GradataDaemon:
         def _send() -> None:
             import platform
             import urllib.request
+
             rules_count = 0
             lessons_count = 0
             try:
@@ -773,13 +831,15 @@ class GradataDaemon:
                     rules_count = sum(1 for lesson in lessons if lesson.state.name == "RULE")
             except Exception as e:
                 logger.exception("telemetry: failed to load lessons: %s", e)
-            payload = json.dumps({
-                "sdk_version": gradata.__version__,
-                "rules_count": rules_count,
-                "lessons_count": lessons_count,
-                "os": platform.system().lower(),
-                "python_version": platform.python_version(),
-            }).encode()
+            payload = json.dumps(
+                {
+                    "sdk_version": gradata.__version__,
+                    "rules_count": rules_count,
+                    "lessons_count": lessons_count,
+                    "os": platform.system().lower(),
+                    "python_version": platform.python_version(),
+                }
+            ).encode()
             try:
                 req = urllib.request.Request(
                     "https://api.gradata.com/telemetry",
@@ -815,12 +875,14 @@ class GradataDaemon:
 
 # ── Port allocation ─────────────────────────────────────────────────────
 
+
 def _pick_port(brain_dir_str: str) -> int:
     """Deterministic port from brain_dir hash: hash % 16383 + 49152."""
     return abs(hash(brain_dir_str)) % 16383 + 49152
 
 
 # ── PID file ────────────────────────────────────────────────────────────
+
 
 def _write_pid_file(
     pid_file: Path,
@@ -842,6 +904,7 @@ def _write_pid_file(
 
 # ── Logging setup ───────────────────────────────────────────────────────
 
+
 def _setup_logging(brain_dir: Path) -> None:
     log_dir = brain_dir / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -851,9 +914,7 @@ def _setup_logging(brain_dir: Path) -> None:
         backupCount=3,
         encoding="utf-8",
     )
-    handler.setFormatter(logging.Formatter(
-        "%(asctime)s %(levelname)s %(name)s: %(message)s"
-    ))
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
     root_logger = logging.getLogger("gradata")
     root_logger.addHandler(handler)
     root_logger.setLevel(logging.DEBUG)
@@ -861,8 +922,10 @@ def _setup_logging(brain_dir: Path) -> None:
 
 # ── Signal handling ─────────────────────────────────────────────────────
 
+
 def _register_signal_handler(daemon: GradataDaemon) -> None:
     """Register SIGTERM to cleanly shut down the daemon."""
+
     def _handler(signum: int, _frame: object) -> None:
         logger.info("Received signal %d, shutting down.", signum)
         daemon.stop()
@@ -878,6 +941,7 @@ def _register_signal_handler(daemon: GradataDaemon) -> None:
 
 
 # ── CLI entrypoint ──────────────────────────────────────────────────────
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Gradata daemon HTTP server")

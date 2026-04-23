@@ -9,6 +9,7 @@ Sub-agents inherit scope from the parent brain through two channels:
 
 Falls back to keyword inference when no explicit scope is set.
 """
+
 from __future__ import annotations
 
 import os
@@ -118,7 +119,11 @@ def main(data: dict) -> dict | None:
 
         text = lessons_path.read_text(encoding="utf-8")
         all_lessons = parse_lessons(text)
-        filtered = [lesson for lesson in all_lessons if lesson.state.name in ("RULE", "PATTERN") and lesson.confidence >= MIN_CONFIDENCE]
+        filtered = [
+            lesson
+            for lesson in all_lessons
+            if lesson.state.name in ("RULE", "PATTERN") and lesson.confidence >= MIN_CONFIDENCE
+        ]
         if not filtered:
             return None
 

@@ -42,6 +42,7 @@ def _resolve_events_path() -> Path | None:
     """Best-effort events.jsonl resolution (None when no brain is configured)."""
     try:
         from gradata import _paths as _p
+
         p = Path(_p.EVENTS_JSONL)
         return p if p.is_file() else None
     except Exception:
@@ -141,8 +142,7 @@ def _passes_empirical_gate(lesson) -> tuple[bool, str]:
     fire_count = int(getattr(lesson, "fire_count", 0) or 0)
     if fire_count < PROMOTION_MIN_FIRE_COUNT:
         return False, (
-            f"fire_count {fire_count} < {PROMOTION_MIN_FIRE_COUNT} "
-            "(council empirical gate)"
+            f"fire_count {fire_count} < {PROMOTION_MIN_FIRE_COUNT} (council empirical gate)"
         )
     sessions = count_distinct_sessions(lesson)
     if sessions < PROMOTION_MIN_DISTINCT_SESSIONS:
@@ -153,6 +153,7 @@ def _passes_empirical_gate(lesson) -> tuple[bool, str]:
     # Derive the rule_id the same way rule_engine does.
     try:
         from gradata.rules.rule_engine import _make_rule_id
+
         rule_id = _make_rule_id(lesson)
     except Exception:
         rule_id = ""
@@ -195,7 +196,9 @@ class HookCandidate:
     enforcement: EnforcementType
     hook_template: str  # Template name or inline script
     reason: str  # Why this rule is/isn't promotable
-    template_arg: str | None = None  # Template-specific argument: regex literal, line count, sentinel, etc.
+    template_arg: str | None = (
+        None  # Template-specific argument: regex literal, line count, sentinel, etc.
+    )
 
 
 # Shared secret detection regex (API keys, tokens, private keys)
@@ -212,20 +215,70 @@ DETERMINISTIC_PATTERNS: list[tuple[re.Pattern[str], DeterminismCheck, str, str |
     (re.compile(r"never use em.?dash"), DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
     (re.compile(r"no em.?dash"), DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
     (re.compile(r"don.t use em.?dash"), DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
-    (re.compile(r"(avoid|prefer not to use) em.?dash"), DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
-    (re.compile(r"em.?dash.+(banned|forbidden|not allowed)"), DeterminismCheck.REGEX_PATTERN, "regex_replace", "\u2014"),
+    (
+        re.compile(r"(avoid|prefer not to use) em.?dash"),
+        DeterminismCheck.REGEX_PATTERN,
+        "regex_replace",
+        "\u2014",
+    ),
+    (
+        re.compile(r"em.?dash.+(banned|forbidden|not allowed)"),
+        DeterminismCheck.REGEX_PATTERN,
+        "regex_replace",
+        "\u2014",
+    ),
     # File size check — capture group 1 holds the line limit
-    (re.compile(r"keep files? under (\d+) lines?"), DeterminismCheck.FILE_CHECK, "file_size_check", None),
-    (re.compile(r"files? must be under (\d+) lines?"), DeterminismCheck.FILE_CHECK, "file_size_check", None),
-    (re.compile(r"no files? over (\d+) lines?"), DeterminismCheck.FILE_CHECK, "file_size_check", None),
-    (re.compile(r"files? under (\d+) lines?"), DeterminismCheck.FILE_CHECK, "file_size_check", None),
+    (
+        re.compile(r"keep files? under (\d+) lines?"),
+        DeterminismCheck.FILE_CHECK,
+        "file_size_check",
+        None,
+    ),
+    (
+        re.compile(r"files? must be under (\d+) lines?"),
+        DeterminismCheck.FILE_CHECK,
+        "file_size_check",
+        None,
+    ),
+    (
+        re.compile(r"no files? over (\d+) lines?"),
+        DeterminismCheck.FILE_CHECK,
+        "file_size_check",
+        None,
+    ),
+    (
+        re.compile(r"files? under (\d+) lines?"),
+        DeterminismCheck.FILE_CHECK,
+        "file_size_check",
+        None,
+    ),
     # Secret scan
-    (re.compile(r"never (commit|push) secret"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
-    (re.compile(r"no (hardcod|hardcode).+secret"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
+    (
+        re.compile(r"never (commit|push) secret"),
+        DeterminismCheck.COMMAND_BLOCK,
+        "secret_scan",
+        _SECRET_REGEX,
+    ),
+    (
+        re.compile(r"no (hardcod|hardcode).+secret"),
+        DeterminismCheck.COMMAND_BLOCK,
+        "secret_scan",
+        _SECRET_REGEX,
+    ),
     # Tighter variant: require an anchoring preposition + target noun so generic
     # phrases like "there's no secret sauce" don't collide with the secret rule.
-    (re.compile(r"\bno secrets?\b.*\b(in|to|into)\b.*\b(code|commit|commits|repo|source)\b"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
-    (re.compile(r"no hardcoded api key|never hardcode api key|no api key in code"), DeterminismCheck.COMMAND_BLOCK, "secret_scan", _SECRET_REGEX),
+    (
+        re.compile(r"\bno secrets?\b.*\b(in|to|into)\b.*\b(code|commit|commits|repo|source)\b"),
+        DeterminismCheck.COMMAND_BLOCK,
+        "secret_scan",
+        _SECRET_REGEX,
+    ),
+    (
+        re.compile(r"no hardcoded api key|never hardcode api key|no api key in code"),
+        DeterminismCheck.COMMAND_BLOCK,
+        "secret_scan",
+        _SECRET_REGEX,
+    ),
     # Auto test — PostToolUse, runs pytest against test_<basename>.py after edits.
     # template_arg is a sentinel ("auto_test") because render_hook gates on
     # template_arg being non-None; the template itself ignores it.
@@ -235,27 +288,115 @@ DETERMINISTIC_PATTERNS: list[tuple[re.Pattern[str], DeterminismCheck, str, str |
     (re.compile(r"read.+before edit"), DeterminismCheck.FILE_CHECK, "read_before_edit", None),
     (re.compile(r"always read.+before"), DeterminismCheck.FILE_CHECK, "read_before_edit", None),
     # Destructive command blocks
-    (re.compile(r"never (rm|delete|remove).+-?rf"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"rm\s+-[rf]+|rm\s+.*-[rf]+"),
-    (re.compile(r"never force.?push|don.t force.?push|no force push"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"git\s+push.*--force|git\s+push.*-f\b|git\s+push.*\+"),
-    (re.compile(r"never drop.*table|no drop table"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"DROP\s+TABLE"),
-    (re.compile(r"never kubectl delete|don.t kubectl delete"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"kubectl\s+delete"),
-    (re.compile(r"never reset.+hard|no git reset.*hard"), DeterminismCheck.COMMAND_BLOCK, "destructive_block", r"git\s+reset.*--hard"),
+    (
+        re.compile(r"never (rm|delete|remove).+-?rf"),
+        DeterminismCheck.COMMAND_BLOCK,
+        "destructive_block",
+        r"rm\s+-[rf]+|rm\s+.*-[rf]+",
+    ),
+    (
+        re.compile(r"never force.?push|don.t force.?push|no force push"),
+        DeterminismCheck.COMMAND_BLOCK,
+        "destructive_block",
+        r"git\s+push.*--force|git\s+push.*-f\b|git\s+push.*\+",
+    ),
+    (
+        re.compile(r"never drop.*table|no drop table"),
+        DeterminismCheck.COMMAND_BLOCK,
+        "destructive_block",
+        r"DROP\s+TABLE",
+    ),
+    (
+        re.compile(r"never kubectl delete|don.t kubectl delete"),
+        DeterminismCheck.COMMAND_BLOCK,
+        "destructive_block",
+        r"kubectl\s+delete",
+    ),
+    (
+        re.compile(r"never reset.+hard|no git reset.*hard"),
+        DeterminismCheck.COMMAND_BLOCK,
+        "destructive_block",
+        r"git\s+reset.*--hard",
+    ),
     # f-string block
-    (re.compile(r"never.*format.*f.?string.*python.?-c"), DeterminismCheck.COMMAND_BLOCK, "fstring_block", r"python\s+-c\s+[\"\'][^\"\']*f[\"\']"),
-    (re.compile(r"never.*python.?-c.*f.?string"), DeterminismCheck.COMMAND_BLOCK, "fstring_block", r"python\s+-c\s+[\"\'][^\"\']*f[\"\']"),
+    (
+        re.compile(r"never.*format.*f.?string.*python.?-c"),
+        DeterminismCheck.COMMAND_BLOCK,
+        "fstring_block",
+        r"python\s+-c\s+[\"\'][^\"\']*f[\"\']",
+    ),
+    (
+        re.compile(r"never.*python.?-c.*f.?string"),
+        DeterminismCheck.COMMAND_BLOCK,
+        "fstring_block",
+        r"python\s+-c\s+[\"\'][^\"\']*f[\"\']",
+    ),
     # Root-file save
-    (re.compile(r"never save.+root|no files? (in|at) root|don.t save.+root"), DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
-    (re.compile(r"(keep|put) (files|scripts) in (subfolder|subdir)"), DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
-    (re.compile(r"never commit.+to root|no commits to root"), DeterminismCheck.FILE_CHECK, "root_file_save", _ROOT_FILE_REGEX),
+    (
+        re.compile(r"never save.+root|no files? (in|at) root|don.t save.+root"),
+        DeterminismCheck.FILE_CHECK,
+        "root_file_save",
+        _ROOT_FILE_REGEX,
+    ),
+    (
+        re.compile(r"(keep|put) (files|scripts) in (subfolder|subdir)"),
+        DeterminismCheck.FILE_CHECK,
+        "root_file_save",
+        _ROOT_FILE_REGEX,
+    ),
+    (
+        re.compile(r"never commit.+to root|no commits to root"),
+        DeterminismCheck.FILE_CHECK,
+        "root_file_save",
+        _ROOT_FILE_REGEX,
+    ),
     # Positive session directives — "always use X", "use X before Y", "start with X"
-    (re.compile(r"(always |must )?(use|run|invoke|apply|start with|begin with) (superpowers|council|worktree|brainstorm|parallel)"), DeterminismCheck.SESSION_DIRECTIVE, "session_directive", "positive_directive"),
-    (re.compile(r"before (building|implementing|coding|creating|planning).*(use|run|invoke|apply)"), DeterminismCheck.SESSION_DIRECTIVE, "session_directive", "positive_directive"),
-    (re.compile(r"(use|run|invoke|apply).*(before|prior to) (building|implementing|coding|creating|planning)"), DeterminismCheck.SESSION_DIRECTIVE, "session_directive", "positive_directive"),
+    (
+        re.compile(
+            r"(always |must )?(use|run|invoke|apply|start with|begin with) (superpowers|council|worktree|brainstorm|parallel)"
+        ),
+        DeterminismCheck.SESSION_DIRECTIVE,
+        "session_directive",
+        "positive_directive",
+    ),
+    (
+        re.compile(
+            r"before (building|implementing|coding|creating|planning).*(use|run|invoke|apply)"
+        ),
+        DeterminismCheck.SESSION_DIRECTIVE,
+        "session_directive",
+        "positive_directive",
+    ),
+    (
+        re.compile(
+            r"(use|run|invoke|apply).*(before|prior to) (building|implementing|coding|creating|planning)"
+        ),
+        DeterminismCheck.SESSION_DIRECTIVE,
+        "session_directive",
+        "positive_directive",
+    ),
     # OODA / autonomous mode
-    (re.compile(r"(ooda|godmode|autonomous|never stop to ask|never ask permission|keep building)"), DeterminismCheck.SESSION_DIRECTIVE, "session_directive", "positive_directive"),
+    (
+        re.compile(
+            r"(ooda|godmode|autonomous|never stop to ask|never ask permission|keep building)"
+        ),
+        DeterminismCheck.SESSION_DIRECTIVE,
+        "session_directive",
+        "positive_directive",
+    ),
     # Parallel agents
-    (re.compile(r"(spawn|use) parallel (agents?|tasks?|workers?)"), DeterminismCheck.SESSION_DIRECTIVE, "session_directive", "positive_directive"),
-    (re.compile(r"never work sequential"), DeterminismCheck.SESSION_DIRECTIVE, "session_directive", "positive_directive"),
+    (
+        re.compile(r"(spawn|use) parallel (agents?|tasks?|workers?)"),
+        DeterminismCheck.SESSION_DIRECTIVE,
+        "session_directive",
+        "positive_directive",
+    ),
+    (
+        re.compile(r"never work sequential"),
+        DeterminismCheck.SESSION_DIRECTIVE,
+        "session_directive",
+        "positive_directive",
+    ),
 ]
 
 
@@ -381,9 +522,7 @@ def render_hook(candidate: HookCandidate) -> str | None:
 
         # Neutralize prompt-injection markers in the text that will surface to
         # the LLM via the mandatory-directive wrapper.
-        clean_description = sanitize_lesson_content(
-            candidate.rule_description, "llm_prompt"
-        )
+        clean_description = sanitize_lesson_content(candidate.rule_description, "llm_prompt")
         # json.dumps produces a valid JSON string literal including surrounding
         # quotes.  Then strip residual template-literal / script-breakout
         # characters that json.dumps does not touch.
@@ -414,26 +553,21 @@ def render_hook(candidate: HookCandidate) -> str | None:
         return None
 
     safe_text = (
-        candidate.rule_description
-        .replace("\\", "\\\\")
-        .replace('"', '\\"')
-        .replace("\n", " ")
+        candidate.rule_description.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")
     )
 
     # file_size_check: template_arg holds the line limit as a string
     if candidate.hook_template == "file_size_check":
         limit = candidate.template_arg or "500"
         return (
-            tmpl
-            .replace("{{LINE_LIMIT}}", limit)
+            tmpl.replace("{{LINE_LIMIT}}", limit)
             .replace("{{RULE_TEXT}}", safe_text)
             .replace("{{SOURCE_HASH}}", _source_hash(candidate.rule_description))
         )
 
     pattern_literal = f"new RegExp({json.dumps(candidate.template_arg)})"
     return (
-        tmpl
-        .replace("{{PATTERN_LITERAL}}", pattern_literal)
+        tmpl.replace("{{PATTERN_LITERAL}}", pattern_literal)
         .replace("{{RULE_TEXT}}", safe_text)
         .replace("{{SOURCE_HASH}}", _source_hash(candidate.rule_description))
     )
@@ -585,18 +719,26 @@ def _log_outcome(brain, source: str, candidate: HookCandidate, result: Generatio
         return
     try:
         if result.installed:
-            brain.emit("RULE_TO_HOOK_INSTALLED", source, {
-                "slug": result.hook_path.stem if result.hook_path else "",
-                "rule_text": candidate.rule_description,
-                "template": candidate.hook_template,
-                "hook_path": str(result.hook_path) if result.hook_path else None,
-            })
+            brain.emit(
+                "RULE_TO_HOOK_INSTALLED",
+                source,
+                {
+                    "slug": result.hook_path.stem if result.hook_path else "",
+                    "rule_text": candidate.rule_description,
+                    "template": candidate.hook_template,
+                    "hook_path": str(result.hook_path) if result.hook_path else None,
+                },
+            )
         else:
-            brain.emit("RULE_TO_HOOK_FAILED", source, {
-                "rule_text": candidate.rule_description,
-                "template": candidate.hook_template,
-                "reason": result.reason,
-            })
+            brain.emit(
+                "RULE_TO_HOOK_FAILED",
+                source,
+                {
+                    "rule_text": candidate.rule_description,
+                    "template": candidate.hook_template,
+                    "reason": result.reason,
+                },
+            )
     except Exception:
         pass  # never fail graduation on a logging error
 
@@ -678,20 +820,28 @@ def demote(slug: str, *, brain=None, source: str = "demote") -> GenerationResult
                 )
             if brain is not None:
                 with contextlib.suppress(Exception):
-                    brain.emit("RULE_TO_HOOK_REMOVED", source, {
-                        "slug": slug,
-                        "hook_path": str(target),
-                    })
+                    brain.emit(
+                        "RULE_TO_HOOK_REMOVED",
+                        source,
+                        {
+                            "slug": slug,
+                            "hook_path": str(target),
+                        },
+                    )
                 # Mirror the removal as a HOOK_DEMOTED event so the
                 # empirical gate's reversal counter can see it. rule_id
                 # is unknown at this layer (callers that have it should
                 # emit RULE_PATCH_REVERTED separately); we tag with slug
                 # so CLI-level emits can correlate.
                 with contextlib.suppress(Exception):
-                    brain.emit(HOOK_DEMOTED, source, {
-                        "slug": slug,
-                        "hook_path": str(target),
-                    })
+                    brain.emit(
+                        HOOK_DEMOTED,
+                        source,
+                        {
+                            "slug": slug,
+                            "hook_path": str(target),
+                        },
+                    )
             return GenerationResult(
                 installed=True,
                 reason=f"removed {target}",
@@ -762,7 +912,9 @@ def _compute_generation(
             tool_name = "Write"
             tool_input_key = "content"
 
-        if not self_test(rendered, positive=positive, tool_name=tool_name, tool_input_key=tool_input_key):
+        if not self_test(
+            rendered, positive=positive, tool_name=tool_name, tool_input_key=tool_input_key
+        ):
             return GenerationResult(
                 installed=False,
                 reason=f"self-test did not block positive example: {positive!r}",

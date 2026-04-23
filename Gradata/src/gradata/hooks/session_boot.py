@@ -11,6 +11,7 @@ This hook fires only on matcher=``startup`` (fresh claude-code launches).
 The bump is a single SESSION_BOOT event written with ``session = MAX+1``.
 No parsing, no stamp files — the event itself is the ground truth.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -36,8 +37,7 @@ def _next_session(db_path: Path) -> int:
     try:
         with contextlib.closing(sqlite3.connect(str(db_path))) as conn:
             row = conn.execute(
-                "SELECT MAX(CAST(session AS INTEGER)) FROM events "
-                "WHERE session IS NOT NULL"
+                "SELECT MAX(CAST(session AS INTEGER)) FROM events WHERE session IS NOT NULL"
             ).fetchone()
             current = int(row[0]) if row and row[0] is not None else 0
     except sqlite3.Error:

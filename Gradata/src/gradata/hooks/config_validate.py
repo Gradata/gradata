@@ -1,4 +1,5 @@
 """SessionStart hook: validate Claude Code settings.json configuration."""
+
 from __future__ import annotations
 
 import json
@@ -57,9 +58,10 @@ def _validate_json(path: Path) -> list[str]:
                     continue
                 command = hook.get("command", "")
                 if " -m gradata.hooks." in command:
-                    module_name = command.split("gradata.hooks.")[-1].split()[0].strip('"\'')
+                    module_name = command.split("gradata.hooks.")[-1].split()[0].strip("\"'")
                     try:
                         import gradata.hooks as hooks_pkg
+
                         hooks_dir = Path(hooks_pkg.__file__).parent
                         module_path = hooks_dir / f"{module_name}.py"
                         if not module_path.is_file():

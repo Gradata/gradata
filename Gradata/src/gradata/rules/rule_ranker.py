@@ -39,6 +39,7 @@ from typing import Any
 
 try:  # BM25 is optional — SDK must stay zero-required-deps.
     import bm25s  # type: ignore[import-not-found]
+
     _BM25_AVAILABLE = True
 except ImportError:  # pragma: no cover - import gate
     bm25s = None  # type: ignore[assignment]
@@ -152,7 +153,10 @@ def _score_rule(
         confidence = float(rule.get("confidence", 0.5))
 
     context = _context_component(
-        rule, idx=idx, keywords=context_keywords, bm25_scores=bm25_scores,
+        rule,
+        idx=idx,
+        keywords=context_keywords,
+        bm25_scores=bm25_scores,
     )
     if wiki_boost:
         rule_id = rule.get("id") or rule.get("description", "")
@@ -205,10 +209,7 @@ def _bm25_context_scores(
         tags = rule.get("tags", "")
         if isinstance(tags, (list, tuple)):
             tags = " ".join(str(t) for t in tags)
-        doc = " ".join(
-            str(rule.get(field, ""))
-            for field in ("category", "description")
-        )
+        doc = " ".join(str(rule.get(field, "")) for field in ("category", "description"))
         corpus.append(f"{doc} {tags}".strip())
 
     # BM25 wants at least one non-empty doc.
@@ -220,10 +221,14 @@ def _bm25_context_scores(
         corpus_tokens = bm25s.tokenize(corpus, stopwords="en", show_progress=False)
         retriever.index(corpus_tokens, show_progress=False)
         query_tokens = bm25s.tokenize(
-            [" ".join(query_terms)], stopwords="en", show_progress=False,
+            [" ".join(query_terms)],
+            stopwords="en",
+            show_progress=False,
         )
         doc_ids, scores = retriever.retrieve(
-            query_tokens, k=len(corpus), show_progress=False,
+            query_tokens,
+            k=len(corpus),
+            show_progress=False,
         )
     except Exception as exc:  # pragma: no cover - defensive; bm25s is fiddly
         _log.debug("bm25 scoring failed (%s) — falling back to keyword scorer", exc)

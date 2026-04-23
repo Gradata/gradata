@@ -26,18 +26,100 @@ from collections import Counter
 # Tokenization
 # ---------------------------------------------------------------------------
 
-_STOP_WORDS = frozenset({
-    "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
-    "should", "may", "can", "could", "might", "to", "of", "in", "for",
-    "on", "with", "at", "by", "from", "as", "into", "about", "that",
-    "this", "it", "its", "and", "or", "but", "not", "no", "if", "so",
-    "than", "too", "very", "just", "also", "then", "now", "here",
-    "i", "you", "we", "they", "he", "she", "me", "my", "your", "our",
-    "their", "his", "her", "us", "them", "up", "out", "all", "am",
-    "make", "more", "less", "get", "put", "use", "new", "old", "way",
-    "change", "changed", "content", "added", "cut", "edit", "edits",
-})
+_STOP_WORDS = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "may",
+        "can",
+        "could",
+        "might",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "about",
+        "that",
+        "this",
+        "it",
+        "its",
+        "and",
+        "or",
+        "but",
+        "not",
+        "no",
+        "if",
+        "so",
+        "than",
+        "too",
+        "very",
+        "just",
+        "also",
+        "then",
+        "now",
+        "here",
+        "i",
+        "you",
+        "we",
+        "they",
+        "he",
+        "she",
+        "me",
+        "my",
+        "your",
+        "our",
+        "their",
+        "his",
+        "her",
+        "us",
+        "them",
+        "up",
+        "out",
+        "all",
+        "am",
+        "make",
+        "more",
+        "less",
+        "get",
+        "put",
+        "use",
+        "new",
+        "old",
+        "way",
+        "change",
+        "changed",
+        "content",
+        "added",
+        "cut",
+        "edit",
+        "edits",
+    }
+)
 
 
 def _tokenize(text: str) -> list[str]:
@@ -49,6 +131,7 @@ def _tokenize(text: str) -> list[str]:
 # ---------------------------------------------------------------------------
 # TF-IDF Cosine Similarity (zero deps)
 # ---------------------------------------------------------------------------
+
 
 def _tf(tokens: list[str]) -> dict[str, float]:
     """Term frequency: count / total."""
@@ -63,12 +146,11 @@ def _cosine(v1: dict[str, float], v2: dict[str, float]) -> float:
     if not common:
         return 0.0
     dot = sum(v1[k] * v2[k] for k in common)
-    mag1 = math.sqrt(sum(v ** 2 for v in v1.values()))
-    mag2 = math.sqrt(sum(v ** 2 for v in v2.values()))
+    mag1 = math.sqrt(sum(v**2 for v in v1.values()))
+    mag2 = math.sqrt(sum(v**2 for v in v2.values()))
     if mag1 == 0 or mag2 == 0:
         return 0.0
     return dot / (mag1 * mag2)
-
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +162,9 @@ _SYNONYM_GROUPS: list[frozenset[str]] = [
     frozenset({"direct", "blunt", "concise", "short", "brief", "terse", "tight"}),
     frozenset({"formal", "formalized", "professional", "polished", "proper"}),
     frozenset({"casual", "casualized", "informal", "relaxed", "conversational"}),
-    frozenset({"hedge", "hedging", "might", "maybe", "perhaps", "probably", "possibly", "potentially"}),
+    frozenset(
+        {"hedge", "hedging", "might", "maybe", "perhaps", "probably", "possibly", "potentially"}
+    ),
     frozenset({"fluff", "filler", "wordy", "verbose", "bloated", "long", "lengthy"}),
     frozenset({"specific", "concrete", "precise", "exact", "detailed", "measurable"}),
     frozenset({"vague", "generic", "abstract", "unclear", "ambiguous"}),
@@ -99,10 +183,14 @@ _SYNONYM_GROUPS: list[frozenset[str]] = [
 # NOT same-intent pairs. They must NOT be mapped together or contradictory
 # corrections will silently reinforce each other.
 _INTENT_PAIRS: list[tuple[frozenset[str], frozenset[str]]] = [
-    (frozenset({"hedging", "hedge", "perhaps", "maybe", "might"}),
-     frozenset({"direct", "blunt", "assertive"})),
-    (frozenset({"fluff", "filler", "wordy", "verbose", "long"}),
-     frozenset({"short", "brief", "tight", "concise", "terse"})),
+    (
+        frozenset({"hedging", "hedge", "perhaps", "maybe", "might"}),
+        frozenset({"direct", "blunt", "assertive"}),
+    ),
+    (
+        frozenset({"fluff", "filler", "wordy", "verbose", "long"}),
+        frozenset({"short", "brief", "tight", "concise", "terse"}),
+    ),
 ]
 
 _SYNONYM_MAP: dict[str, str] = {}
@@ -152,13 +240,13 @@ _OLLAMA_BASE: str | None = None
 _EMBED_MODEL: str = "nomic-embed-text"
 
 
-
 def _get_embedding(text: str) -> list[float] | None:
     """Get embedding vector from Ollama (returns None if unavailable)."""
     if not _OLLAMA_BASE:
         return None
     try:
         import requests
+
         resp = requests.post(
             f"{_OLLAMA_BASE}/api/embed",
             json={"model": _EMBED_MODEL, "input": text},

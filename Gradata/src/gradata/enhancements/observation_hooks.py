@@ -59,6 +59,7 @@ class Observation:
         success: Whether the tool call succeeded.
         metadata: Arbitrary metadata.
     """
+
     timestamp: float
     tool_name: str
     input_summary: str = ""
@@ -78,12 +79,12 @@ import re as _re
 
 # PII patterns to redact from observations before storage
 _PII_PATTERNS = [
-    (_re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'), '[EMAIL]'),
-    (_re.compile(r'(?:\+?1[\s\-.]?)?\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}\b'), '[PHONE]'),
-    (_re.compile(r'\b(?:sk-|api[_-]?key[=:]\s*)[A-Za-z0-9_-]{10,}\b', _re.I), '[API_KEY]'),
-    (_re.compile(r'\b(?:token[=:]\s*|bearer\s+)[A-Za-z0-9_.-]{10,}\b', _re.I), '[TOKEN]'),
-    (_re.compile(r'\b(?:password[=:]\s*|passwd[=:]\s*)\S+', _re.I), '[PASSWORD]'),
-    (_re.compile(r'-----BEGIN [A-Z ]+-----'), '[PRIVATE_KEY]'),
+    (_re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"), "[EMAIL]"),
+    (_re.compile(r"(?:\+?1[\s\-.]?)?\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}\b"), "[PHONE]"),
+    (_re.compile(r"\b(?:sk-|api[_-]?key[=:]\s*)[A-Za-z0-9_-]{10,}\b", _re.I), "[API_KEY]"),
+    (_re.compile(r"\b(?:token[=:]\s*|bearer\s+)[A-Za-z0-9_.-]{10,}\b", _re.I), "[TOKEN]"),
+    (_re.compile(r"\b(?:password[=:]\s*|passwd[=:]\s*)\S+", _re.I), "[PASSWORD]"),
+    (_re.compile(r"-----BEGIN [A-Z ]+-----"), "[PRIVATE_KEY]"),
 ]
 
 
@@ -126,6 +127,7 @@ def observe_tool_use(
     Returns:
         A structured Observation.
     """
+
     def _summarize(data: Any) -> str:
         if data is None:
             return ""
@@ -145,7 +147,6 @@ def observe_tool_use(
         duration_ms=duration_ms,
         success=success,
     )
-
 
 
 class ObservationStore:

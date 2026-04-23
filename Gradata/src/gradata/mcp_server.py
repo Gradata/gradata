@@ -318,11 +318,7 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
             query = arguments.get("query", "")
             top_k = int(arguments.get("top_k", 5))
             results = brain.search(query, top_k=top_k)
-            return {
-                "content": [
-                    {"type": "text", "text": json.dumps(results, ensure_ascii=False)}
-                ]
-            }
+            return {"content": [{"type": "text", "text": json.dumps(results, ensure_ascii=False)}]}
 
         elif tool_name == "brain_correct":
             draft = arguments.get("draft", "")
@@ -339,11 +335,7 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
                 "summary": data.get("summary", ""),
                 "ts": result.get("ts", ""),
             }
-            return {
-                "content": [
-                    {"type": "text", "text": json.dumps(summary, ensure_ascii=False)}
-                ]
-            }
+            return {"content": [{"type": "text", "text": json.dumps(summary, ensure_ascii=False)}]}
 
         elif tool_name == "brain_log_output":
             text = arguments.get("text", "")
@@ -355,38 +347,22 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
                 for k, v in result.items()
                 if isinstance(v, (str, int, float, bool, list, dict, type(None)))
             }
-            return {
-                "content": [
-                    {"type": "text", "text": json.dumps(safe, ensure_ascii=False)}
-                ]
-            }
+            return {"content": [{"type": "text", "text": json.dumps(safe, ensure_ascii=False)}]}
 
         elif tool_name == "brain_manifest":
             manifest = brain.manifest()
-            return {
-                "content": [
-                    {"type": "text", "text": json.dumps(manifest, ensure_ascii=False)}
-                ]
-            }
+            return {"content": [{"type": "text", "text": json.dumps(manifest, ensure_ascii=False)}]}
 
         elif tool_name == "brain_health":
             health = brain.health()
-            return {
-                "content": [
-                    {"type": "text", "text": json.dumps(health, ensure_ascii=False)}
-                ]
-            }
+            return {"content": [{"type": "text", "text": json.dumps(health, ensure_ascii=False)}]}
 
         elif tool_name == "brain_pipeline_stats":
             if hasattr(brain, "_learning_pipeline") and brain._learning_pipeline:
                 stats = brain._learning_pipeline.stats()
             else:
                 stats = {"error": "Learning pipeline not initialized"}
-            return {
-                "content": [
-                    {"type": "text", "text": json.dumps(stats, ensure_ascii=False)}
-                ]
-            }
+            return {"content": [{"type": "text", "text": json.dumps(stats, ensure_ascii=False)}]}
 
         elif tool_name == "brain_context_bracket":
             if hasattr(brain, "_learning_pipeline") and brain._learning_pipeline:
@@ -403,9 +379,7 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
             else:
                 bracket_info = {"bracket": "fresh", "remaining_ratio": 1.0}
             return {
-                "content": [
-                    {"type": "text", "text": json.dumps(bracket_info, ensure_ascii=False)}
-                ]
+                "content": [{"type": "text", "text": json.dumps(bracket_info, ensure_ascii=False)}]
             }
 
         elif tool_name == "brain_route_suggest":
@@ -425,28 +399,24 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
             else:
                 route_info = {"error": "Learning pipeline not initialized"}
             return {
-                "content": [
-                    {"type": "text", "text": json.dumps(route_info, ensure_ascii=False)}
-                ]
+                "content": [{"type": "text", "text": json.dumps(route_info, ensure_ascii=False)}]
             }
 
         elif tool_name == "brain_capabilities":
             try:
                 from gradata._brain_manifest import _sdk_capabilities
+
                 caps = _sdk_capabilities()
             except ImportError:
                 caps = {"error": "Manifest module not available"}
-            return {
-                "content": [
-                    {"type": "text", "text": json.dumps(caps, ensure_ascii=False)}
-                ]
-            }
+            return {"content": [{"type": "text", "text": json.dumps(caps, ensure_ascii=False)}]}
 
         elif tool_name == "brain_benchmark":
             try:
                 import dataclasses
 
                 from gradata.contrib.enhancements.eval_benchmark import run_standard_benchmark
+
                 result = run_standard_benchmark()
                 result_dict = dataclasses.asdict(result)
                 # Remove individual case details for MCP response size
@@ -459,18 +429,19 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
             except ImportError:
                 return {
                     "content": [
-                        {"type": "text", "text": json.dumps({"error": "Benchmark not available"}, ensure_ascii=False)}
+                        {
+                            "type": "text",
+                            "text": json.dumps(
+                                {"error": "Benchmark not available"}, ensure_ascii=False
+                            ),
+                        }
                     ]
                 }
 
         elif tool_name == "brain_briefing":
             try:
                 md = brain.briefing()
-                return {
-                    "content": [
-                        {"type": "text", "text": md}
-                    ]
-                }
+                return {"content": [{"type": "text", "text": md}]}
             except Exception as exc:
                 return {"error": str(exc)}
 
@@ -508,9 +479,7 @@ def _handle_tools_list(req_id: Any) -> dict[str, Any]:
     return _ok(req_id, {"tools": _TOOL_SCHEMAS})
 
 
-def _handle_tools_call(
-    req_id: Any, params: dict[str, Any], brain: Any
-) -> dict[str, Any]:
+def _handle_tools_call(req_id: Any, params: dict[str, Any], brain: Any) -> dict[str, Any]:
     """Dispatch a tool call and wrap the result."""
     tool_name = params.get("name", "")
     arguments = params.get("arguments") or {}
@@ -555,6 +524,7 @@ def run_server(brain_dir: str | Path | None, *, stdin=None, stdout=None) -> None
     # Auto-detect brain dir if not provided
     if brain_dir is None:
         import os
+
         brain_dir = os.environ.get("BRAIN_DIR")
         if brain_dir is None:
             # Default: ~/.gradata/brain

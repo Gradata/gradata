@@ -64,9 +64,7 @@ class Criterion:
 
     def __post_init__(self) -> None:
         if self.weight <= 0:
-            raise ValueError(
-                f"Criterion '{self.name}': weight must be > 0, got {self.weight}"
-            )
+            raise ValueError(f"Criterion '{self.name}': weight must be > 0, got {self.weight}")
 
 
 @dataclass
@@ -89,8 +87,7 @@ class CriterionScore:
     def __post_init__(self) -> None:
         if self.score is not None and not (0.0 <= self.score <= 10.0):
             raise ValueError(
-                f"CriterionScore '{self.name}': score must be in [0, 10], "
-                f"got {self.score}"
+                f"CriterionScore '{self.name}': score must be in [0, 10], got {self.score}"
             )
 
 
@@ -174,9 +171,7 @@ class CritiqueChecklist:
         names = [c.name for c in criteria]
         duplicates = {n for n in names if names.count(n) > 1}
         if duplicates:
-            raise ValueError(
-                f"CritiqueChecklist: duplicate criterion names: {duplicates}"
-            )
+            raise ValueError(f"CritiqueChecklist: duplicate criterion names: {duplicates}")
         self._criteria: tuple[Criterion, ...] = criteria
 
     # ------------------------------------------------------------------
@@ -213,11 +208,7 @@ class CritiqueChecklist:
             criterion_score = evaluator(output, criterion)
             scores[criterion.name] = criterion_score
 
-        all_required_passed = all(
-            scores[c.name].passed
-            for c in self._criteria
-            if c.required
-        )
+        all_required_passed = all(scores[c.name].passed for c in self._criteria if c.required)
         overall_score = _weighted_average(self._criteria, scores)
 
         return CritiqueResult(
@@ -302,9 +293,7 @@ def reflect(
             )
 
         # Collect failing scores to guide the refiner
-        failed: list[CriterionScore] = [
-            s for s in critique.scores.values() if not s.passed
-        ]
+        failed: list[CriterionScore] = [s for s in critique.scores.values() if not s.passed]
 
         # Only refine if there are cycles remaining
         if cycle < max_cycles:
@@ -366,20 +355,26 @@ def default_evaluator(output: Any, criterion: Criterion) -> CriterionScore:
 
     if name == "has_subject":
         passed = "subject:" in text.lower()
-        reason = (
-            "Found 'Subject:' header." if passed
-            else "No 'Subject:' header detected."
-        )
+        reason = "Found 'Subject:' header." if passed else "No 'Subject:' header detected."
 
     elif name == "has_cta":
         cta_phrases = (
-            "book", "schedule", "reply", "click", "visit",
-            "call", "download", "sign up", "learn more", "get started",
+            "book",
+            "schedule",
+            "reply",
+            "click",
+            "visit",
+            "call",
+            "download",
+            "sign up",
+            "learn more",
+            "get started",
         )
         matched = next((p for p in cta_phrases if p in text.lower()), None)
         passed = matched is not None
         reason = (
-            f"Call-to-action phrase found: '{matched}'." if passed
+            f"Call-to-action phrase found: '{matched}'."
+            if passed
             else "No recognisable call-to-action phrase found."
         )
 
@@ -387,30 +382,30 @@ def default_evaluator(output: Any, criterion: Criterion) -> CriterionScore:
         word_count = len(text.split())
         passed = word_count < 200
         reason = (
-            f"Word count {word_count} is within the 200-word limit." if passed
+            f"Word count {word_count} is within the 200-word limit."
+            if passed
             else f"Word count {word_count} exceeds the 200-word limit."
         )
 
     elif name == "no_jargon":
         jargon_tokens = (
-            "synergy", "leverage", "paradigm", "disruptive",
-            "holistic", "bandwidth", "circle back", "deep dive",
+            "synergy",
+            "leverage",
+            "paradigm",
+            "disruptive",
+            "holistic",
+            "bandwidth",
+            "circle back",
+            "deep dive",
         )
         found = [j for j in jargon_tokens if j in text.lower()]
         passed = len(found) == 0
-        reason = (
-            "No jargon detected." if passed
-            else f"Jargon detected: {found}."
-        )
+        reason = "No jargon detected." if passed else f"Jargon detected: {found}."
 
     else:
         # Generic fallback: non-empty string
         passed = isinstance(output, str) and len(output.strip()) > 0
-        reason = (
-            "Output is a non-empty string."
-            if passed
-            else "Output is empty or not a string."
-        )
+        reason = "Output is a non-empty string." if passed else "Output is empty or not a string."
 
     return CriterionScore(
         name=criterion.name,
@@ -418,7 +413,6 @@ def default_evaluator(output: Any, criterion: Criterion) -> CriterionScore:
         reason=reason,
         score=10.0 if passed else 0.0,
     )
-
 
 
 # ---------------------------------------------------------------------------
@@ -530,10 +524,12 @@ def criteria_from_graduated_rules(task_type: str = "") -> list[Criterion]:
 
     criteria = []
     for rule in rules:
-        criteria.append(Criterion(
-            name=f"rule_{rule.category.lower()}_{len(criteria)}",
-            question=f"Does the output follow this rule: {rule.principle}?",
-            required=rule.is_rule_tier,  # RULE tier = required, PATTERN = optional
-            weight=rule.confidence,
-        ))
+        criteria.append(
+            Criterion(
+                name=f"rule_{rule.category.lower()}_{len(criteria)}",
+                question=f"Does the output follow this rule: {rule.principle}?",
+                required=rule.is_rule_tier,  # RULE tier = required, PATTERN = optional
+                weight=rule.confidence,
+            )
+        )
     return criteria

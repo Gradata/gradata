@@ -1,4 +1,5 @@
 """UserPromptSubmit hook: inject relevant brain context for user messages."""
+
 from __future__ import annotations
 
 import os
@@ -39,6 +40,7 @@ def main(data: dict) -> dict | None:
 
         try:
             from gradata.brain import Brain
+
             brain = Brain(brain_dir)
             results = brain.search(message, top_k=3)
         except Exception:

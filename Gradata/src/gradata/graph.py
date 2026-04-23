@@ -44,6 +44,7 @@ class GraphNode:
         state: Current lesson state (e.g. "INSTINCT", "PATTERN", "RULE").
         size: Visual size weight (based on confidence and fire_count).
     """
+
     id: str
     type: str
     label: str
@@ -70,6 +71,7 @@ class GraphEdge:
             - "same_category": weak link between same-category lessons
         weight: Edge weight for layout (higher = closer nodes).
     """
+
     source: str
     target: str
     relation: str
@@ -165,31 +167,37 @@ def build_learning_graph(
         for state_nodes in [instincts, patterns, rules]:
             for j in range(len(state_nodes)):
                 for k in range(j + 1, min(j + 3, len(state_nodes))):
-                    edges.append(GraphEdge(
-                        source=state_nodes[j],
-                        target=state_nodes[k],
-                        relation="same_category",
-                        weight=0.3,
-                    ))
+                    edges.append(
+                        GraphEdge(
+                            source=state_nodes[j],
+                            target=state_nodes[k],
+                            relation="same_category",
+                            weight=0.3,
+                        )
+                    )
 
         # Graduation edges: PATTERN nodes link to RULE nodes in same category
         for p_id in patterns:
             for r_id in rules:
-                edges.append(GraphEdge(
-                    source=p_id,
-                    target=r_id,
-                    relation="graduated_from",
-                    weight=0.8,
-                ))
+                edges.append(
+                    GraphEdge(
+                        source=p_id,
+                        target=r_id,
+                        relation="graduated_from",
+                        weight=0.8,
+                    )
+                )
 
         for i_id in instincts:
             for p_id in patterns[:2]:  # Limit connections
-                edges.append(GraphEdge(
-                    source=i_id,
-                    target=p_id,
-                    relation="graduated_from",
-                    weight=0.5,
-                ))
+                edges.append(
+                    GraphEdge(
+                        source=i_id,
+                        target=p_id,
+                        relation="graduated_from",
+                        weight=0.5,
+                    )
+                )
 
     # Build meta-rule nodes and edges
     for mr in meta_rules:
@@ -218,24 +226,28 @@ def build_learning_graph(
             for i, lesson in enumerate(lessons):
                 lesson_key = f"{lesson.date}_{lesson.category}_{lesson.description[:20]}"
                 if src_id == lesson_key or src_id == lesson_id_map.get(i):
-                    edges.append(GraphEdge(
-                        source=lesson_id_map[i],
-                        target=mr_id,
-                        relation="merged_into",
-                        weight=1.0,
-                    ))
+                    edges.append(
+                        GraphEdge(
+                            source=lesson_id_map[i],
+                            target=mr_id,
+                            relation="merged_into",
+                            weight=1.0,
+                        )
+                    )
                     break
 
         # If no source lessons matched by ID, connect by category
         if not any(e.target == mr_id for e in edges):
             for cat in mr.get("source_categories", []):
                 for nid in category_groups.get(cat, [])[:3]:
-                    edges.append(GraphEdge(
-                        source=nid,
-                        target=mr_id,
-                        relation="merged_into",
-                        weight=0.6,
-                    ))
+                    edges.append(
+                        GraphEdge(
+                            source=nid,
+                            target=mr_id,
+                            relation="merged_into",
+                            weight=0.6,
+                        )
+                    )
 
     return nodes, edges
 
@@ -293,16 +305,19 @@ def to_mermaid(
 
     # Node shapes by type
     shape_map = {
-        "lesson": ("([", "])",),     # Stadium shape
-        "rule": ("[[", "]]"),        # Subroutine shape
-        "meta_rule": ("{{", "}}"),   # Hexagon
-        "archived": ("(", ")"),      # Rounded
+        "lesson": (
+            "([",
+            "])",
+        ),  # Stadium shape
+        "rule": ("[[", "]]"),  # Subroutine shape
+        "meta_rule": ("{{", "}}"),  # Hexagon
+        "archived": ("(", ")"),  # Rounded
     }
 
     for node in sorted_nodes:
         open_b, close_b = shape_map.get(node.type, ("([", "])"))
         safe_label = node.label.replace('"', "'")[:40]
-        lines.append(f"    {node.id}{open_b}\"{safe_label}\"{close_b}")
+        lines.append(f'    {node.id}{open_b}"{safe_label}"{close_b}')
 
     # Render edges between visible nodes only
     style_map = {

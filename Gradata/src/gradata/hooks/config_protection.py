@@ -1,4 +1,5 @@
 """PreToolUse hook: block modifications to linter/formatter config files."""
+
 from __future__ import annotations
 
 import os
@@ -15,15 +16,30 @@ HOOK_META = {
 }
 
 PROTECTED_FILES = {
-    ".eslintrc", ".eslintrc.js", ".eslintrc.json", ".eslintrc.yml", ".eslintrc.yaml",
-    "eslint.config.js", "eslint.config.mjs", "eslint.config.cjs",
-    ".prettierrc", ".prettierrc.js", ".prettierrc.json", ".prettierrc.yml",
-    "prettier.config.js", "prettier.config.mjs",
-    "biome.json", "biome.jsonc",
-    "ruff.toml", ".ruff.toml", "pyproject.toml",
+    ".eslintrc",
+    ".eslintrc.js",
+    ".eslintrc.json",
+    ".eslintrc.yml",
+    ".eslintrc.yaml",
+    "eslint.config.js",
+    "eslint.config.mjs",
+    "eslint.config.cjs",
+    ".prettierrc",
+    ".prettierrc.js",
+    ".prettierrc.json",
+    ".prettierrc.yml",
+    "prettier.config.js",
+    "prettier.config.mjs",
+    "biome.json",
+    "biome.jsonc",
+    "ruff.toml",
+    ".ruff.toml",
+    "pyproject.toml",
     ".shellcheckrc",
-    ".stylelintrc", ".stylelintrc.json",
-    ".markdownlint.json", ".markdownlintrc",
+    ".stylelintrc",
+    ".stylelintrc.json",
+    ".markdownlint.json",
+    ".markdownlintrc",
 }
 
 

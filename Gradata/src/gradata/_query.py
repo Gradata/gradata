@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 
 # ── FTS5 Full-Text Search ────────────────────────────────────────────────
 
+
 def _ensure_fts_table(conn: sqlite3.Connection):
     conn.execute("""
         CREATE TABLE IF NOT EXISTS brain_fts_content (
@@ -59,8 +60,9 @@ def _ensure_fts_table(conn: sqlite3.Connection):
     conn.commit()
 
 
-def fts_index(source: str, file_type: str, text: str, embed_date: str = "",
-              ctx: "BrainContext | None" = None):
+def fts_index(
+    source: str, file_type: str, text: str, embed_date: str = "", ctx: "BrainContext | None" = None
+):
     db = ctx.db_path if ctx else _p.DB_PATH
     _brain_dir = ctx.brain_dir if ctx else Path(db).parent
     _tid = tenant_for(_brain_dir)
@@ -129,8 +131,10 @@ def fts_rebuild(ctx: "BrainContext | None" = None):
             embed_date = datetime.fromtimestamp(fpath.stat().st_mtime).strftime("%Y-%m-%d")
             chunk_size = MAX_TOKENS_PER_CHUNK * 4
             for i in range(0, len(text), chunk_size):
-                chunk = text[i:i + chunk_size]
-                docs.append({"source": rel, "file_type": file_type, "text": chunk, "embed_date": embed_date})
+                chunk = text[i : i + chunk_size]
+                docs.append(
+                    {"source": rel, "file_type": file_type, "text": chunk, "embed_date": embed_date}
+                )
 
     if docs:
         _tid = tenant_for(brain_path)
@@ -149,8 +153,12 @@ def fts_rebuild(ctx: "BrainContext | None" = None):
     return len(docs)
 
 
-def fts_search(query_text: str, file_type: str | None = None, top_k: int = 10,
-               ctx: "BrainContext | None" = None) -> list[dict]:
+def fts_search(
+    query_text: str,
+    file_type: str | None = None,
+    top_k: int = 10,
+    ctx: "BrainContext | None" = None,
+) -> list[dict]:
     db = ctx.db_path if ctx else _p.DB_PATH
     conn = sqlite3.connect(str(db))
     _ensure_fts_table(conn)
@@ -177,15 +185,21 @@ def fts_search(query_text: str, file_type: str | None = None, top_k: int = 10,
     conn.close()
     results = []
     for r in rows:
-        results.append({
-            "rowid": r[0], "source": r[1] or "", "file_type": r[2] or "general",
-            "text": (r[3] or "")[:500], "embed_date": r[4] or "",
-            "fts_rank": abs(r[5]) if r[5] else 0,
-        })
+        results.append(
+            {
+                "rowid": r[0],
+                "source": r[1] or "",
+                "file_type": r[2] or "general",
+                "text": (r[3] or "")[:500],
+                "embed_date": r[4] or "",
+                "fts_rank": abs(r[5]) if r[5] else 0,
+            }
+        )
     return results
 
 
 # ── Query Routing ────────────────────────────────────────────────────────
+
 
 def detect_query_mode(query_text: str) -> str:
     if query_text.startswith('"') and query_text.endswith('"'):
@@ -222,7 +236,6 @@ def reciprocal_rank_fusion(ranked_lists: list[list[dict]], k: int = 60) -> list[
     return output
 
 
-
 def compute_recency_weight(embed_date: str) -> float:
     try:
         doc_date = datetime.strptime(embed_date, "%Y-%m-%d")
@@ -248,19 +261,37 @@ def classify_confidence(score: float) -> str:
 
 def infer_memory_type(file_type: str, source: str = "") -> str:
     source_lower = source.lower().replace("\\", "/")
-    for pat in ["competitive-intelligence", "competitor-adaptations",
-                "gap-analysis", "sdk-north-star", "sdk-improvements",
-                "sdk-v2-improvements", "forecasting", "competitive-audit"]:
+    for pat in [
+        "competitive-intelligence",
+        "competitor-adaptations",
+        "gap-analysis",
+        "sdk-north-star",
+        "sdk-improvements",
+        "sdk-v2-improvements",
+        "forecasting",
+        "competitive-audit",
+    ]:
         if pat in source_lower:
             return "strategic"
-    for pat in ["follow-up-cadence", "prospecting-tools", "versioning-protocol",
-                "patterns.md", "protocol.md"]:
+    for pat in [
+        "follow-up-cadence",
+        "prospecting-tools",
+        "versioning-protocol",
+        "patterns.md",
+        "protocol.md",
+    ]:
         if pat in source_lower:
             return "procedural"
-    for pat in ["judgment-calibration", "outcome-retrospectives",
-                "calibration-audit", "outreach-analytics",
-                "loop-state", "signals", "follow-up tracker",
-                "experiment tracker"]:
+    for pat in [
+        "judgment-calibration",
+        "outcome-retrospectives",
+        "calibration-audit",
+        "outreach-analytics",
+        "loop-state",
+        "signals",
+        "follow-up tracker",
+        "experiment tracker",
+    ]:
         if pat in source_lower:
             return "episodic"
     return MEMORY_TYPE_MAP.get(file_type, "semantic")
@@ -274,10 +305,15 @@ def get_memory_weight(memory_type: str, task) -> float:
 
 
 def brain_search(
-    query: str, file_type: str | None = None, domain: str = "default",
-    top_k: int = DEFAULT_TOP_K, threshold: float = SIMILARITY_THRESHOLD,
-    use_recency: bool = True, memory_type: str | None = None,
-    mode: str | None = None, ctx: "BrainContext | None" = None,
+    query: str,
+    file_type: str | None = None,
+    domain: str = "default",
+    top_k: int = DEFAULT_TOP_K,
+    threshold: float = SIMILARITY_THRESHOLD,
+    use_recency: bool = True,
+    memory_type: str | None = None,
+    mode: str | None = None,
+    ctx: "BrainContext | None" = None,
 ) -> list[dict]:
     """Search the brain using FTS5.
 
@@ -299,7 +335,9 @@ def brain_search(
         mem_type = infer_memory_type(r.get("file_type", ""), r.get("source", ""))
         memory_w = get_memory_weight(mem_type, memory_type)
         r["score"] = round(r.get("fts_rank", 0) * recency_w * memory_w, 4)
-        r["confidence"] = "keyword_match" if mode == "keyword" else classify_confidence(min(r["score"], 1.0))
+        r["confidence"] = (
+            "keyword_match" if mode == "keyword" else classify_confidence(min(r["score"], 1.0))
+        )
         r["recency_weight"] = round(recency_w, 3)
         r["memory_weight"] = round(memory_w, 3)
         r["memory_type"] = mem_type

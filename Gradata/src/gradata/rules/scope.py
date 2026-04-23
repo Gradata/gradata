@@ -34,6 +34,7 @@ from enum import StrEnum
 # Audience Tiers
 # ---------------------------------------------------------------------------
 
+
 class AudienceTier(StrEnum):
     """Who the output is primarily written for.
 
@@ -42,59 +43,98 @@ class AudienceTier(StrEnum):
     """
 
     # Organizational hierarchy (applicable to any domain)
-    C_SUITE = "c_suite"          # CEO, CTO, CPO, Founder, Partner
-    VP = "vp"                    # VP-level, Head of …
-    DIRECTOR = "director"        # Director, Senior Director
-    MANAGER = "manager"          # Manager, Team Lead, Tech Lead
-    IC = "ic"                    # Individual contributor (engineer, analyst, etc.)
+    C_SUITE = "c_suite"  # CEO, CTO, CPO, Founder, Partner
+    VP = "vp"  # VP-level, Head of …
+    DIRECTOR = "director"  # Director, Senior Director
+    MANAGER = "manager"  # Manager, Team Lead, Tech Lead
+    IC = "ic"  # Individual contributor (engineer, analyst, etc.)
 
     # Recruiting / hiring
-    CANDIDATE = "candidate"      # Job applicant
+    CANDIDATE = "candidate"  # Job applicant
     INTERVIEWER = "interviewer"  # Hiring-side participant
 
     # Broad / cross-functional
     STAKEHOLDER = "stakeholder"  # Sponsor, approver, or any governance role
-    END_USER = "end_user"        # Direct consumer of the product or output
-    PEER = "peer"                # Same-level colleague or collaborator
+    END_USER = "end_user"  # Direct consumer of the product or output
+    PEER = "peer"  # Same-level colleague or collaborator
 
     # Fallback
-    UNKNOWN = "unknown"          # Could not determine audience
+    UNKNOWN = "unknown"  # Could not determine audience
 
 
 # Keyword sets used by classify_scope to detect audience from the raw query.
 _AUDIENCE_KEYWORDS: dict[AudienceTier, list[str]] = {
     AudienceTier.C_SUITE: [
-        "ceo", "cto", "cpo", "coo", "cfo", "founder", "co-founder", "owner",
-        "president", "partner", "executive", "c-suite", "board",
+        "ceo",
+        "cto",
+        "cpo",
+        "coo",
+        "cfo",
+        "founder",
+        "co-founder",
+        "owner",
+        "president",
+        "partner",
+        "executive",
+        "c-suite",
+        "board",
     ],
     AudienceTier.VP: [
-        "vp", "vice president", "head of", "svp", "evp",
+        "vp",
+        "vice president",
+        "head of",
+        "svp",
+        "evp",
     ],
     AudienceTier.DIRECTOR: [
-        "director", "senior director",
+        "director",
+        "senior director",
     ],
     AudienceTier.MANAGER: [
-        "manager", "team lead", "tech lead", "engineering manager",
-        "product manager", "project manager",
+        "manager",
+        "team lead",
+        "tech lead",
+        "engineering manager",
+        "product manager",
+        "project manager",
     ],
     AudienceTier.CANDIDATE: [
-        "candidate", "applicant", "interviewee", "job seeker",
+        "candidate",
+        "applicant",
+        "interviewee",
+        "job seeker",
     ],
     AudienceTier.INTERVIEWER: [
-        "interviewer", "hiring manager", "panel",
+        "interviewer",
+        "hiring manager",
+        "panel",
     ],
     AudienceTier.STAKEHOLDER: [
-        "stakeholder", "sponsor", "approver", "client", "customer",
+        "stakeholder",
+        "sponsor",
+        "approver",
+        "client",
+        "customer",
     ],
     AudienceTier.END_USER: [
-        "end user", "user", "consumer",
+        "end user",
+        "user",
+        "consumer",
     ],
     AudienceTier.PEER: [
-        "peer", "colleague", "teammate", "coworker",
+        "peer",
+        "colleague",
+        "teammate",
+        "coworker",
     ],
     AudienceTier.IC: [
-        "engineer", "developer", "analyst", "designer", "scientist",
-        "specialist", "contributor",
+        "engineer",
+        "developer",
+        "analyst",
+        "designer",
+        "scientist",
+        "specialist",
+        "contributor",
     ],
 }
 
@@ -102,6 +142,7 @@ _AUDIENCE_KEYWORDS: dict[AudienceTier, list[str]] = {
 # ---------------------------------------------------------------------------
 # Task Types
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class TaskType:
@@ -137,8 +178,12 @@ DEFAULT_TASK_TYPES: list[TaskType] = [
     TaskType(
         name="interview_prep",
         keywords=[
-            "prepare for interview", "prep for interview", "interview prep",
-            "practice interview", "mock interview", "interview questions",
+            "prepare for interview",
+            "prep for interview",
+            "interview prep",
+            "practice interview",
+            "mock interview",
+            "interview questions",
             "before the interview",
         ],
         domain_hint="recruiting",
@@ -146,18 +191,25 @@ DEFAULT_TASK_TYPES: list[TaskType] = [
     TaskType(
         name="demo_prep",
         keywords=[
-            "prepare for demo", "prep for demo", "prep the demo",
-            "demo prep", "before the demo", "get ready for demo",
+            "prepare for demo",
+            "prep for demo",
+            "prep the demo",
+            "demo prep",
+            "before the demo",
+            "get ready for demo",
         ],
         domain_hint="sales",
     ),
-
     # ── Generic / cross-domain ──────────────────────────────────────────────
     TaskType(
         name="meeting_prep",
         keywords=[
-            "upcoming meeting", "meeting prep", "before the meeting",
-            "before the call", "ready for the call", "prepare for the meeting",
+            "upcoming meeting",
+            "meeting prep",
+            "before the meeting",
+            "before the call",
+            "ready for the call",
+            "prepare for the meeting",
             "prep for the meeting",
         ],
         domain_hint="",
@@ -165,24 +217,39 @@ DEFAULT_TASK_TYPES: list[TaskType] = [
     TaskType(
         name="research",
         keywords=[
-            "research", "look up", "find information", "gather info",
-            "background on", "learn about", "investigate",
+            "research",
+            "look up",
+            "find information",
+            "gather info",
+            "background on",
+            "learn about",
+            "investigate",
         ],
         domain_hint="",
     ),
     TaskType(
         name="content_creation",
         keywords=[
-            "write a post", "create content", "draft article", "blog post",
-            "social media", "newsletter", "write content", "create a draft",
+            "write a post",
+            "create content",
+            "draft article",
+            "blog post",
+            "social media",
+            "newsletter",
+            "write content",
+            "create a draft",
         ],
         domain_hint="",
     ),
     TaskType(
         name="report_generation",
         keywords=[
-            "generate report", "create report", "weekly report",
-            "monthly report", "status report", "write a report",
+            "generate report",
+            "create report",
+            "weekly report",
+            "monthly report",
+            "status report",
+            "write a report",
             "produce report",
         ],
         domain_hint="",
@@ -190,123 +257,184 @@ DEFAULT_TASK_TYPES: list[TaskType] = [
     TaskType(
         name="data_analysis",
         keywords=[
-            "analyze data", "analyse data", "data analysis", "run analysis",
-            "look at the data", "crunch", "trends in", "metrics",
-            "dashboard", "visualize",
+            "analyze data",
+            "analyse data",
+            "data analysis",
+            "run analysis",
+            "look at the data",
+            "crunch",
+            "trends in",
+            "metrics",
+            "dashboard",
+            "visualize",
         ],
         domain_hint="",
     ),
     TaskType(
         name="documentation",
         keywords=[
-            "write docs", "documentation", "document this", "update readme",
-            "api docs", "write up", "document the", "add docstring",
+            "write docs",
+            "documentation",
+            "document this",
+            "update readme",
+            "api docs",
+            "write up",
+            "document the",
+            "add docstring",
         ],
         domain_hint="",
     ),
     TaskType(
         name="summary",
         keywords=[
-            "summarize", "tldr", "tl;dr", "give me the highlights",
-            "key points", "brief overview",
+            "summarize",
+            "tldr",
+            "tl;dr",
+            "give me the highlights",
+            "key points",
+            "brief overview",
         ],
         domain_hint="",
     ),
     TaskType(
         name="planning",
         keywords=[
-            "plan", "roadmap", "strategy", "prioritize", "schedule",
-            "sprint", "backlog",
+            "plan",
+            "roadmap",
+            "strategy",
+            "prioritize",
+            "schedule",
+            "sprint",
+            "backlog",
         ],
         domain_hint="",
     ),
-
     # ── Engineering / developer ─────────────────────────────────────────────
     TaskType(
         name="code_review",
         keywords=[
-            "code review", "review this pr", "review the pr",
-            "review this pull request", "review pull request",
-            "look at this code", "check my code", "review code",
+            "code review",
+            "review this pr",
+            "review the pr",
+            "review this pull request",
+            "review pull request",
+            "look at this code",
+            "check my code",
+            "review code",
         ],
         domain_hint="engineering",
     ),
     TaskType(
         name="debugging",
         keywords=[
-            "debug", "fix this bug", "error", "traceback", "exception",
-            "not working", "broken", "failing test", "stack trace",
+            "debug",
+            "fix this bug",
+            "error",
+            "traceback",
+            "exception",
+            "not working",
+            "broken",
+            "failing test",
+            "stack trace",
         ],
         domain_hint="engineering",
     ),
     TaskType(
         name="design_review",
         keywords=[
-            "design review", "review the design", "architecture review",
-            "review this design", "system design", "erd", "schema review",
+            "design review",
+            "review the design",
+            "architecture review",
+            "review this design",
+            "system design",
+            "erd",
+            "schema review",
         ],
         domain_hint="engineering",
     ),
     TaskType(
         name="refactoring",
         keywords=[
-            "refactor", "clean up", "clean this up", "improve readability",
-            "simplify", "restructure",
+            "refactor",
+            "clean up",
+            "clean this up",
+            "improve readability",
+            "simplify",
+            "restructure",
         ],
         domain_hint="engineering",
     ),
-
     # ── Recruiting / talent ─────────────────────────────────────────────────
     # Note: interview_prep is defined earlier (before meeting_prep) to ensure
     # "prepare for interview" is matched before the generic "prepare for" group.
     TaskType(
         name="candidate_search",
         keywords=[
-            "find candidates", "search for candidates", "source candidates",
-            "research candidates", "look for talent", "talent search",
+            "find candidates",
+            "search for candidates",
+            "source candidates",
+            "research candidates",
+            "look for talent",
+            "talent search",
         ],
         domain_hint="recruiting",
     ),
     TaskType(
         name="job_description",
         keywords=[
-            "job description", "write jd", "write a jd", "job posting",
-            "job req", "job requisition",
+            "job description",
+            "write jd",
+            "write a jd",
+            "job posting",
+            "job req",
+            "job requisition",
         ],
         domain_hint="recruiting",
     ),
-
     # ── Sales (preserved for backward compatibility) ────────────────────────
     # Note: demo_prep is defined earlier (before meeting_prep) to ensure
     # "prepare for demo" is matched before the generic meeting-prep group.
     TaskType(
         name="email_draft",
         keywords=[
-            "draft email", "write email", "compose email",
-            "draft a message", "write outreach",
+            "draft email",
+            "write email",
+            "compose email",
+            "draft a message",
+            "write outreach",
         ],
         domain_hint="sales",
     ),
     TaskType(
         name="research",
         keywords=[
-            "find entities", "find items", "entity list",
-            "build a list", "identify targets",
+            "find entities",
+            "find items",
+            "entity list",
+            "build a list",
+            "identify targets",
         ],
         domain_hint="",
     ),
     TaskType(
         name="resistance_handling",
         keywords=[
-            "objection", "push back", "they said no", "handle objection",
-            "overcome", "rebuttal",
+            "objection",
+            "push back",
+            "they said no",
+            "handle objection",
+            "overcome",
+            "rebuttal",
         ],
         domain_hint="",
     ),
     TaskType(
         name="follow_up",
         keywords=[
-            "follow up", "check in", "touch base", "follow-up email",
+            "follow up",
+            "check in",
+            "touch base",
+            "follow-up email",
             "circle back",
         ],
         domain_hint="sales",
@@ -314,8 +442,12 @@ DEFAULT_TASK_TYPES: list[TaskType] = [
     TaskType(
         name="system_update",
         keywords=[
-            "update crm", "log a note", "crm note", "update system",
-            "update records", "deal note",
+            "update crm",
+            "log a note",
+            "crm note",
+            "update system",
+            "update records",
+            "deal note",
         ],
         domain_hint="",
     ),
@@ -372,10 +504,10 @@ def register_task_type(
         _REGISTERED_TASK_TYPES.append(entry)
 
 
-
 # ---------------------------------------------------------------------------
 # Classification helpers
 # ---------------------------------------------------------------------------
+
 
 def _detect_task_type(query_lower: str) -> str:
     """Return the name of the first matching TaskType, or ``"general"``."""
@@ -398,6 +530,7 @@ def _detect_audience(query_lower: str) -> AudienceTier:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def classify_scope(query: str) -> tuple[str, AudienceTier]:
     """Classify a raw query into a task type name and an audience tier.

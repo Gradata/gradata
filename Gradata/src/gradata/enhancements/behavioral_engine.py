@@ -47,6 +47,7 @@ class RulePriority(Enum):
     - SHOULD: Warning. Violation is logged but execution continues.
     - MAY: Suggestion. Informational only.
     """
+
     MUST = "must"
     SHOULD = "should"
     MAY = "may"
@@ -61,6 +62,7 @@ class PrioritizedConstraint:
         priority: Enforcement level (MUST/SHOULD/MAY).
         rationale: Why this constraint exists (helps edge-case judgment).
     """
+
     rule: str
     priority: RulePriority = RulePriority.SHOULD
     rationale: str = ""
@@ -78,6 +80,7 @@ class ConstraintViolation:
         context: What triggered the violation.
         blocking: Whether this violation should stop execution.
     """
+
     constraint: PrioritizedConstraint
     context: str = ""
 
@@ -94,6 +97,7 @@ class Directive:
     Supports both legacy string constraints and new PrioritizedConstraint
     objects. Legacy strings are auto-wrapped as SHOULD priority.
     """
+
     name: str
     domain: str
     trigger_keywords: list[str] = field(default_factory=list)
@@ -205,14 +209,12 @@ class DirectiveRegistry:
         constraints.sort(key=lambda c: priority_order[c.priority])
         return constraints
 
-
     def has_blocking_violations(self, task: str) -> bool:
         """Check whether any MUST constraints apply to this task.
 
         Returns True if any applicable MUST constraints exist for this task.
         """
         return bool(self.get_prioritized_constraints(task, min_priority=RulePriority.MUST))
-
 
     def format_constraints_prompt(self, task: str) -> str:
         """Format applicable constraints as a prompt injection block.
@@ -257,6 +259,7 @@ class Disposition:
     Unlike Hindsight's static manual scales, Gradata dispositions evolve
     from corrections. Each scale maps to concrete behavioral instructions.
     """
+
     skepticism: float = 3.0
     literalism: float = 3.0
     empathy: float = 3.0
@@ -270,13 +273,19 @@ class Disposition:
         """Map disposition values to concrete prompt instructions."""
         instructions: list[str] = []
         if self.skepticism >= 4.0:
-            instructions.append("Cross-reference claims across multiple sources before stating them.")
+            instructions.append(
+                "Cross-reference claims across multiple sources before stating them."
+            )
         elif self.skepticism <= 2.0:
             instructions.append("Trust provided context without excessive verification.")
         if self.literalism >= 4.0:
-            instructions.append("Stick to explicitly stated facts. Do not infer beyond what is written.")
+            instructions.append(
+                "Stick to explicitly stated facts. Do not infer beyond what is written."
+            )
         elif self.literalism <= 2.0:
-            instructions.append("Synthesize and infer between the lines. Read intent, not just words.")
+            instructions.append(
+                "Synthesize and infer between the lines. Read intent, not just words."
+            )
         if self.empathy >= 4.0:
             instructions.append("Acknowledge emotional context and adjust tone accordingly.")
         elif self.empathy <= 2.0:
@@ -285,7 +294,9 @@ class Disposition:
 
     def format_for_prompt(self) -> str:
         """Format disposition as a prompt injection block."""
-        lines = [f"Disposition: skepticism={self.skepticism:.1f}, literalism={self.literalism:.1f}, empathy={self.empathy:.1f}"]
+        lines = [
+            f"Disposition: skepticism={self.skepticism:.1f}, literalism={self.literalism:.1f}, empathy={self.empathy:.1f}"
+        ]
         instructions = self.behavioral_instructions()
         if instructions:
             lines.extend(f"  - {inst}" for inst in instructions)
@@ -327,7 +338,10 @@ class DispositionTracker:
         return self._dispositions[domain]
 
     def update_from_correction(
-        self, domain: str, category: str, severity: str = "minor",
+        self,
+        domain: str,
+        category: str,
+        severity: str = "minor",
     ) -> Disposition:
         """Update disposition based on a correction category and severity."""
         disp = self.get(domain)

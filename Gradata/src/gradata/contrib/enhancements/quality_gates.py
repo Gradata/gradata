@@ -52,9 +52,7 @@ class QualityRubric:
         if self.weight <= 0:
             raise ValueError(f"QualityRubric '{self.name}': weight must be > 0")
         if not (0.0 <= self.threshold <= 10.0):
-            raise ValueError(
-                f"QualityRubric '{self.name}': threshold must be in [0, 10]"
-            )
+            raise ValueError(f"QualityRubric '{self.name}': threshold must be in [0, 10]")
 
 
 @dataclass
@@ -250,16 +248,10 @@ class QualityGate:
             raw = scorer(output, rubric)
             dimension_scores[rubric.name] = round(min(10.0, max(0.0, float(raw))), 2)
 
-        overall = sum(
-            dimension_scores[r.name] * r.weight for r in self.rubrics
-        ) / total_weight
+        overall = sum(dimension_scores[r.name] * r.weight for r in self.rubrics) / total_weight
         overall = round(overall, 2)
 
-        failures = [
-            r.name
-            for r in self.rubrics
-            if dimension_scores[r.name] < r.threshold
-        ]
+        failures = [r.name for r in self.rubrics if dimension_scores[r.name] < r.threshold]
 
         passed = overall >= self.threshold and len(failures) == 0
 
@@ -325,6 +317,7 @@ class QualityGate:
 @dataclass
 class SuccessCondition:
     """A single success condition evaluation."""
+
     name: str
     met: bool = False
     value: float = 0.0
@@ -335,13 +328,16 @@ class SuccessCondition:
 @dataclass
 class SuccessConditionsReport:
     """Result of evaluating all 6 success conditions."""
+
     all_met: bool = False
     conditions: list[SuccessCondition] = field(default_factory=list)
     window_size: int = 20
     sessions_evaluated: int = 0
 
 
-def evaluate_success_conditions(db_path=None, window: int = 20, ctx=None) -> SuccessConditionsReport:
+def evaluate_success_conditions(
+    db_path=None, window: int = 20, ctx=None
+) -> SuccessConditionsReport:
     """Evaluate the 6 SPEC success conditions over a session window."""
     report = SuccessConditionsReport(window_size=window)
     conditions = [
@@ -355,10 +351,16 @@ def evaluate_success_conditions(db_path=None, window: int = 20, ctx=None) -> Suc
     try:
         import sqlite3
         from pathlib import Path as _Path
+
         db = _Path(db_path) if db_path else (_Path(ctx.brain_dir) / "system.db" if ctx else None)
         if db and db.exists():
             conn = sqlite3.connect(str(db))
-            max_session = conn.execute("SELECT MAX(session) FROM events WHERE typeof(session)='integer'").fetchone()[0] or 0
+            max_session = (
+                conn.execute(
+                    "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
+                ).fetchone()[0]
+                or 0
+            )
             report.sessions_evaluated = max_session
             conn.close()
     except Exception:

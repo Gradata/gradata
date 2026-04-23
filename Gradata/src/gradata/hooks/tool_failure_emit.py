@@ -1,4 +1,5 @@
 """PostToolUse hook: detect tool failures and emit TOOL_FAILURE event."""
+
 from __future__ import annotations
 
 import re
@@ -20,7 +21,10 @@ ERROR_PATTERNS = [
     re.compile(r"\btraceback\b", re.I),
     re.compile(r"\bException\b"),
     re.compile(r"\bHTTP\s+[45]\d{2}\b"),
-    re.compile(r"\b[45]\d{2}\s+(Bad Request|Unauthorized|Forbidden|Not Found|Internal Server Error|Bad Gateway|Service Unavailable)\b", re.I),
+    re.compile(
+        r"\b[45]\d{2}\s+(Bad Request|Unauthorized|Forbidden|Not Found|Internal Server Error|Bad Gateway|Service Unavailable)\b",
+        re.I,
+    ),
     re.compile(r"\bECONNREFUSED\b"),
     re.compile(r"\brate limit\b", re.I),
 ]
@@ -73,6 +77,7 @@ def main(data: dict) -> dict | None:
         if brain_dir:
             from gradata._events import emit
             from gradata._paths import BrainContext
+
             ctx = BrainContext.from_brain_dir(brain_dir)
             command = data.get("tool_input", {}).get("command", "")[:200]
             emit(

@@ -30,32 +30,50 @@ class BrainInspectionMixin:
     bus: Any
 
     def _find_lessons_path(self) -> Path | None: ...
-    def emit(self, event_type: str, source: str, data: dict | None = None,
-             tags: list | None = None, session: int | None = None) -> dict: ...
+    def emit(
+        self,
+        event_type: str,
+        source: str,
+        data: dict | None = None,
+        tags: list | None = None,
+        session: int | None = None,
+    ) -> dict: ...
 
     # ── Rule Inspection API ────────────────────────────────────────────
 
     def rules(self, *, include_all: bool = False, category: str | None = None) -> list[dict]:
         """List graduated brain rules. See gradata.inspection.list_rules."""
         from gradata.inspection import list_rules
-        return list_rules(db_path=self.db_path,
-                          lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
-                          include_all=include_all, category=category)
+
+        return list_rules(
+            db_path=self.db_path,
+            lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
+            include_all=include_all,
+            category=category,
+        )
 
     def explain(self, rule_id: str) -> dict:
         """Trace a rule to its source corrections. See gradata.inspection.explain_rule."""
         from gradata.inspection import explain_rule
-        return explain_rule(db_path=self.db_path,
-                            events_path=self.ctx.events_jsonl if hasattr(self.ctx, "events_jsonl") else self.dir / "events.jsonl",
-                            rule_id=rule_id,
-                            lessons_path=self._find_lessons_path() or self.dir / "lessons.md")
+
+        return explain_rule(
+            db_path=self.db_path,
+            events_path=self.ctx.events_jsonl
+            if hasattr(self.ctx, "events_jsonl")
+            else self.dir / "events.jsonl",
+            rule_id=rule_id,
+            lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
+        )
 
     def trace(self, rule_id: str) -> dict:
         """Trace a rule's full provenance chain. See gradata.audit.trace_rule."""
         from gradata.audit import trace_rule
+
         return trace_rule(
             db_path=self.db_path,
-            events_path=self.ctx.events_jsonl if hasattr(self.ctx, "events_jsonl") else self.dir / "events.jsonl",
+            events_path=self.ctx.events_jsonl
+            if hasattr(self.ctx, "events_jsonl")
+            else self.dir / "events.jsonl",
             lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
             rule_id=rule_id,
         )
@@ -63,9 +81,12 @@ class BrainInspectionMixin:
     def export_data(self, *, output_format: str = "json") -> str:
         """Export rules as JSON or YAML. See gradata.inspection.export_rules."""
         from gradata.inspection import export_rules
-        return export_rules(db_path=self.db_path,
-                            lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
-                            output_format=output_format)
+
+        return export_rules(
+            db_path=self.db_path,
+            lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
+            output_format=output_format,
+        )
 
     # ── Batch Approval at Session End ─────────────────────────────────
 
@@ -76,6 +97,7 @@ class BrainInspectionMixin:
         Returns list of rule dicts with id, category, state, confidence, etc.
         """
         from gradata.inspection import list_rules
+
         return list_rules(
             db_path=self.db_path,
             lessons_path=self._find_lessons_path() or self.dir / "lessons.md",
@@ -108,13 +130,17 @@ class BrainInspectionMixin:
         write_lessons_safe(lessons_path, format_lessons(lessons))
 
         try:
-            self.emit("PROMOTION_APPROVED", "brain.approve_promotion", {
-                "rule_id": rule_id,
-                "category": target.category,
-                "description": target.description[:200],
-                "state": target.state.value,
-                "confidence": target.confidence,
-            })
+            self.emit(
+                "PROMOTION_APPROVED",
+                "brain.approve_promotion",
+                {
+                    "rule_id": rule_id,
+                    "category": target.category,
+                    "description": target.description[:200],
+                    "state": target.state.value,
+                    "confidence": target.confidence,
+                },
+            )
         except Exception as e:
             logger.debug("promotion.approved emit failed: %s", e)
 
@@ -154,14 +180,18 @@ class BrainInspectionMixin:
         write_lessons_safe(lessons_path, format_lessons(lessons))
 
         try:
-            self.emit("PROMOTION_REJECTED", "brain.reject_promotion", {
-                "rule_id": rule_id,
-                "category": target.category,
-                "description": target.description[:200],
-                "demoted_from": old_state,
-                "new_state": "INSTINCT",
-                "confidence": 0.40,
-            })
+            self.emit(
+                "PROMOTION_REJECTED",
+                "brain.reject_promotion",
+                {
+                    "rule_id": rule_id,
+                    "category": target.category,
+                    "description": target.description[:200],
+                    "demoted_from": old_state,
+                    "new_state": "INSTINCT",
+                    "confidence": 0.40,
+                },
+            )
         except Exception as e:
             logger.debug("promotion.rejected emit failed: %s", e)
 

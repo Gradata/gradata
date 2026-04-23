@@ -40,13 +40,15 @@ from typing import Any
 # Formal markers (boost formality score)
 _FORMAL_MARKERS = re.compile(
     r"\b(?:regarding|furthermore|additionally|consequently|therefore|"
-    r"pursuant|sincerely|respectfully|accordingly|herein)\b", re.I
+    r"pursuant|sincerely|respectfully|accordingly|herein)\b",
+    re.I,
 )
 
 # Casual markers (reduce formality score)
 _CASUAL_MARKERS = re.compile(
     r"\b(?:hey|yeah|gonna|wanna|btw|fyi|lol|haha|nope|yep|cool|"
-    r"awesome|super|totally|honestly|basically|literally)\b", re.I
+    r"awesome|super|totally|honestly|basically|literally)\b",
+    re.I,
 )
 
 # Greeting patterns
@@ -89,14 +91,14 @@ class ToneFeatures:
     """
 
     avg_sentence_length: float = 0.0
-    formality: float = 0.5          # 0.0 = very casual, 1.0 = very formal
-    greeting_style: str = "none"    # hey, hi, hello, dear, none
-    cta_style: str = "none"         # question, imperative, link, soft-close, none
-    opener_type: str = "direct"     # empathy, direct, context, question
+    formality: float = 0.5  # 0.0 = very casual, 1.0 = very formal
+    greeting_style: str = "none"  # hey, hi, hello, dear, none
+    cta_style: str = "none"  # question, imperative, link, soft-close, none
+    opener_type: str = "direct"  # empathy, direct, context, question
     em_dash_count: int = 0
     colon_count: int = 0
     exclamation_count: int = 0
-    bullet_density: float = 0.0     # fraction of lines that are bullets
+    bullet_density: float = 0.0  # fraction of lines that are bullets
     paragraph_count: int = 1
     word_count: int = 0
 
@@ -144,8 +146,7 @@ def extract_tone(text: str) -> ToneFeatures:
     sentences = _SENTENCE_SPLIT.split(text.strip())
     sentences = [s for s in sentences if s.strip()]
     avg_sentence_length = (
-        sum(len(s.split()) for s in sentences) / len(sentences)
-        if sentences else 0.0
+        sum(len(s.split()) for s in sentences) / len(sentences) if sentences else 0.0
     )
 
     # Formality
@@ -153,8 +154,7 @@ def extract_tone(text: str) -> ToneFeatures:
     casual_count = len(_CASUAL_MARKERS.findall(text))
     total_markers = formal_count + casual_count
     formality = (
-        formal_count / total_markers if total_markers > 0
-        else 0.5  # neutral default
+        formal_count / total_markers if total_markers > 0 else 0.5  # neutral default
     )
 
     # Greeting
@@ -333,17 +333,12 @@ def build_tone_profile(
             alpha * features.avg_sentence_length
             + (1 - alpha) * existing.features.avg_sentence_length
         )
-        features.formality = (
-            alpha * features.formality
-            + (1 - alpha) * existing.features.formality
-        )
+        features.formality = alpha * features.formality + (1 - alpha) * existing.features.formality
         features.bullet_density = (
-            alpha * features.bullet_density
-            + (1 - alpha) * existing.features.bullet_density
+            alpha * features.bullet_density + (1 - alpha) * existing.features.bullet_density
         )
         features.word_count = round(
-            alpha * features.word_count
-            + (1 - alpha) * existing.features.word_count
+            alpha * features.word_count + (1 - alpha) * existing.features.word_count
         )
         # Categoricals: keep new mode if it differs from existing (correction signal)
         # Otherwise keep existing (stability)
@@ -370,10 +365,10 @@ class ToneDiff:
     Used to generate tone lessons that graduate through the pipeline.
     """
 
-    field: str           # which feature changed (e.g., "formality", "greeting_style")
-    draft_value: Any     # value in the draft
-    final_value: Any     # value after the user's edit
-    delta: float = 0.0   # numeric delta (0 for categoricals)
+    field: str  # which feature changed (e.g., "formality", "greeting_style")
+    draft_value: Any  # value in the draft
+    final_value: Any  # value after the user's edit
+    delta: float = 0.0  # numeric delta (0 for categoricals)
     significance: str = "minor"  # "minor" | "major"
 
 
@@ -396,12 +391,12 @@ def compute_tone_diff(draft: str, final: str) -> list[ToneDiff]:
 
     # Numeric features with thresholds
     numeric_checks = [
-        ("avg_sentence_length", 3.0),   # 3+ words difference is meaningful
-        ("formality", 0.15),             # 15% shift is meaningful
-        ("bullet_density", 0.10),        # 10% shift
-        ("word_count", 20),              # 20+ words added/removed
-        ("em_dash_count", 1),            # any em dash change
-        ("exclamation_count", 1),        # any exclamation change
+        ("avg_sentence_length", 3.0),  # 3+ words difference is meaningful
+        ("formality", 0.15),  # 15% shift is meaningful
+        ("bullet_density", 0.10),  # 10% shift
+        ("word_count", 20),  # 20+ words added/removed
+        ("em_dash_count", 1),  # any em dash change
+        ("exclamation_count", 1),  # any exclamation change
     ]
 
     for field_name, threshold in numeric_checks:
@@ -411,13 +406,15 @@ def compute_tone_diff(draft: str, final: str) -> list[ToneDiff]:
 
         if abs(delta) >= threshold:
             significance = "major" if abs(delta) >= threshold * 2 else "minor"
-            diffs.append(ToneDiff(
-                field=field_name,
-                draft_value=draft_val,
-                final_value=final_val,
-                delta=round(delta, 2),
-                significance=significance,
-            ))
+            diffs.append(
+                ToneDiff(
+                    field=field_name,
+                    draft_value=draft_val,
+                    final_value=final_val,
+                    delta=round(delta, 2),
+                    significance=significance,
+                )
+            )
 
     # Categorical features (any change is meaningful)
     categorical_checks = ["greeting_style", "cta_style", "opener_type"]
@@ -425,12 +422,14 @@ def compute_tone_diff(draft: str, final: str) -> list[ToneDiff]:
         draft_val = getattr(draft_features, field_name)
         final_val = getattr(final_features, field_name)
         if draft_val != final_val:
-            diffs.append(ToneDiff(
-                field=field_name,
-                draft_value=draft_val,
-                final_value=final_val,
-                significance="major",
-            ))
+            diffs.append(
+                ToneDiff(
+                    field=field_name,
+                    draft_value=draft_val,
+                    final_value=final_val,
+                    significance="major",
+                )
+            )
 
     return diffs
 
@@ -455,7 +454,9 @@ def tone_diff_to_lesson(diffs: list[ToneDiff], task_type: str) -> str | None:
     for d in major_diffs:
         if isinstance(d.draft_value, (int, float)):
             direction = "increase" if d.delta > 0 else "decrease"
-            parts.append(f"{direction} {d.field} (was {d.draft_value}, corrected to {d.final_value})")
+            parts.append(
+                f"{direction} {d.field} (was {d.draft_value}, corrected to {d.final_value})"
+            )
         else:
             parts.append(f"change {d.field} from '{d.draft_value}' to '{d.final_value}'")
 
@@ -498,14 +499,18 @@ def generate_tone_prompt(profile: ToneProfile) -> str:
     else:
         verb, neg = "Consider using", "Consider avoiding"
 
-    lines = [f"# Tone Profile ({profile.task_type}, {profile.sample_count} samples, confidence {confidence:.0%})"]
+    lines = [
+        f"# Tone Profile ({profile.task_type}, {profile.sample_count} samples, confidence {confidence:.0%})"
+    ]
 
     # Sentence length
     if f.avg_sentence_length > 0:
         if f.avg_sentence_length < 12:
             lines.append(f"- {verb} short sentences (~{f.avg_sentence_length:.0f} words)")
         elif f.avg_sentence_length > 20:
-            lines.append(f"- {verb} longer, detailed sentences (~{f.avg_sentence_length:.0f} words)")
+            lines.append(
+                f"- {verb} longer, detailed sentences (~{f.avg_sentence_length:.0f} words)"
+            )
 
     # Formality
     if f.formality < 0.3:

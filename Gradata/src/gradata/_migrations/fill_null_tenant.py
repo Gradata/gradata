@@ -13,6 +13,7 @@ Usage:
     python src/gradata/_migrations/fill_null_tenant.py --brain C:/.../brain
     python src/gradata/_migrations/fill_null_tenant.py --brain C:/.../brain --dry-run
 """
+
 from __future__ import annotations
 
 import argparse
@@ -108,9 +109,7 @@ def main() -> int:
                 continue
             if not column_exists(conn, t, "tenant_id"):
                 continue
-            cnt = conn.execute(
-                f"SELECT COUNT(*) FROM {t} WHERE tenant_id IS NULL"
-            ).fetchone()[0]
+            cnt = conn.execute(f"SELECT COUNT(*) FROM {t} WHERE tenant_id IS NULL").fetchone()[0]
             if not cnt:
                 continue
             if args.dry_run:

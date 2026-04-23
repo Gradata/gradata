@@ -55,6 +55,7 @@ class ClusterConfig:
         max_time_gap_days: Maximum temporal distance to consider clustering.
         min_cluster_size: Minimum items before a cluster is considered stable.
     """
+
     similarity_threshold: float = 0.65
     max_time_gap_days: float = 7.0
     min_cluster_size: int = 2
@@ -78,6 +79,7 @@ class ClusterState:
         assignments: Mapping of item_id -> cluster_id.
         next_cluster_idx: Counter for generating cluster IDs.
     """
+
     centroids: dict[str, list[float]] = field(default_factory=dict)
     counts: dict[str, int] = field(default_factory=dict)
     last_timestamps: dict[str, float] = field(default_factory=dict)
@@ -125,6 +127,7 @@ class ClusterAssignment:
         similarity: Cosine similarity to the assigned cluster (0 if new).
         cluster_size: Number of items in the cluster after assignment.
     """
+
     item_id: str
     cluster_id: str
     is_new: bool
@@ -141,6 +144,7 @@ from gradata._math import cosine_similarity
 # ---------------------------------------------------------------------------
 # Cluster Manager
 # ---------------------------------------------------------------------------
+
 
 class ClusterManager:
     """Incremental centroid clustering with temporal gating.
@@ -267,8 +271,7 @@ class ClusterManager:
         count = state.counts[cluster_id]
 
         new_centroid = [
-            (old_centroid[i] * count + vector[i]) / (count + 1)
-            for i in range(len(vector))
+            (old_centroid[i] * count + vector[i]) / (count + 1) for i in range(len(vector))
         ]
 
         state.centroids[cluster_id] = new_centroid
@@ -284,17 +287,11 @@ class ClusterManager:
         cluster_id: str,
     ) -> list[str]:
         """Get all item IDs in a cluster."""
-        return [
-            item_id for item_id, cid in state.assignments.items()
-            if cid == cluster_id
-        ]
+        return [item_id for item_id, cid in state.assignments.items() if cid == cluster_id]
 
     def get_stable_clusters(self, state: ClusterState) -> list[str]:
         """Get cluster IDs that meet the minimum size threshold."""
-        return [
-            cid for cid, count in state.counts.items()
-            if count >= self.config.min_cluster_size
-        ]
+        return [cid for cid, count in state.counts.items() if count >= self.config.min_cluster_size]
 
     def stats(self, state: ClusterState) -> dict[str, Any]:
         """Get clustering statistics."""

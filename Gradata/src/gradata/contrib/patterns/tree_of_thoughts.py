@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 @dataclass
 class Thought:
     """A single candidate in the exploration tree."""
+
     content: str
     score: float = 0.0
     rationale: str = ""
@@ -28,6 +29,7 @@ class Thought:
 @dataclass
 class ToTResult:
     """Result of Tree of Thoughts exploration."""
+
     best: Thought
     alternatives: list[Thought]
     depth: int
@@ -120,6 +122,7 @@ def evaluate_rule_candidates(
     """
     effective_scorer: Callable[[str], tuple[float, str]]
     if scorer is None:
+
         def _default_scorer(candidate: str) -> tuple[float, str]:
             # Heuristic: shorter, more specific rules score higher
             words = candidate.split()
@@ -131,7 +134,11 @@ def evaluate_rule_candidates(
                 if len(common) > 5:
                     overlap_penalty += 0.2
             score = round(length_score - overlap_penalty, 4)
-            return (max(0.0, min(1.0, score)), f"length={len(words)}, overlap_penalty={overlap_penalty:.2f}")
+            return (
+                max(0.0, min(1.0, score)),
+                f"length={len(words)}, overlap_penalty={overlap_penalty:.2f}",
+            )
+
         effective_scorer = _default_scorer
     else:
         effective_scorer = scorer

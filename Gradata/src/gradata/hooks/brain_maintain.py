@@ -1,4 +1,5 @@
 """Stop hook: run brain maintenance tasks at session end."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -17,6 +18,7 @@ def _rebuild_fts(brain_dir: str, ctx=None) -> None:
     """Rebuild FTS index from brain content files."""
     try:
         from gradata._query import fts_index
+
         brain_path = Path(brain_dir)
 
         # Index lessons.md
@@ -42,6 +44,7 @@ def _generate_manifest(ctx=None) -> None:
     """Generate brain manifest for quality tracking."""
     try:
         from gradata._brain_manifest import generate_manifest, write_manifest
+
         manifest = generate_manifest(ctx=ctx)
         write_manifest(manifest, ctx=ctx)
     except Exception:
@@ -55,6 +58,7 @@ def main(data: dict) -> dict | None:
             return None
 
         from gradata._paths import BrainContext
+
         ctx = BrainContext.from_brain_dir(brain_dir)
 
         _rebuild_fts(brain_dir, ctx=ctx)

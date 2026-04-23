@@ -50,6 +50,7 @@ __all__ = [
 
 class QualifyScore(Enum):
     """Qualification score from fresh verification."""
+
     PASS = "pass"
     GAP = "gap"
     DRIFT = "drift"
@@ -63,6 +64,7 @@ class FailureClassification(Enum):
     - SPEC: The acceptance criteria were wrong. Fix plan first, then code.
     - CODE: Implementation doesn't match correct plan. Fix code in place.
     """
+
     INTENT = "intent"
     SPEC = "spec"
     CODE = "code"
@@ -78,6 +80,7 @@ class QualifyResult:
         classification: Root cause if score != PASS.
         concerns: Issues found during qualification.
     """
+
     score: QualifyScore
     evidence: str = ""
     classification: FailureClassification | None = None
@@ -100,14 +103,13 @@ class ExecuteQualifyResult:
         final_qualify: The last QualifyResult from verification.
         attempt_history: Full history of (outcome, qualify) pairs.
     """
+
     passed: bool
     attempts_used: int
     max_attempts: int
     final_outcome: TaskOutcome | None = None
     final_qualify: QualifyResult | None = None
-    attempt_history: list[tuple[TaskOutcome, QualifyResult | None]] = field(
-        default_factory=list
-    )
+    attempt_history: list[tuple[TaskOutcome, QualifyResult | None]] = field(default_factory=list)
 
 
 # Type aliases for callables

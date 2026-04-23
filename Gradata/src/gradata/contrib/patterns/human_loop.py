@@ -358,8 +358,7 @@ def assess_risk(
         return RiskAssessment(
             tier="high",
             reason=(
-                f"Action contains high-risk keyword(s): "
-                f"{', '.join(sorted(set(matched_high)))}."
+                f"Action contains high-risk keyword(s): {', '.join(sorted(set(matched_high)))}."
             ),
             affected=affected,
             reversible=reversible,
@@ -371,8 +370,7 @@ def assess_risk(
         return RiskAssessment(
             tier="medium",
             reason=(
-                f"Action contains medium-risk keyword(s): "
-                f"{', '.join(sorted(set(matched_medium)))}."
+                f"Action contains medium-risk keyword(s): {', '.join(sorted(set(matched_medium)))}."
             ),
             affected=affected,
             reversible=reversible,
@@ -383,10 +381,7 @@ def assess_risk(
     if matched_low:
         return RiskAssessment(
             tier="low",
-            reason=(
-                f"Action contains low-risk keyword(s): "
-                f"{', '.join(sorted(set(matched_low)))}."
-            ),
+            reason=(f"Action contains low-risk keyword(s): {', '.join(sorted(set(matched_low)))}."),
             affected=affected,
             reversible=reversible,
         )
@@ -460,15 +455,17 @@ def preview_action(
     ]
 
     if affected:
-        entity_str = ", ".join(affected) if len(affected) <= 5 else (
-            ", ".join(affected[:5]) + f" ... (+{len(affected) - 5} more)"
+        entity_str = (
+            ", ".join(affected)
+            if len(affected) <= 5
+            else (", ".join(affected[:5]) + f" ... (+{len(affected) - 5} more)")
         )
         lines.append(f"Affects:      {entity_str}")
     else:
         lines.append("Affects:      (entities not specified)")
 
-    reversibility = "Yes — can be undone." if risk.reversible else (
-        "No — this action cannot be reversed."
+    reversibility = (
+        "Yes — can be undone." if risk.reversible else ("No — this action cannot be reversed.")
     )
     lines.append(f"Reversible:   {reversibility}")
 
@@ -478,6 +475,7 @@ def preview_action(
 # ---------------------------------------------------------------------------
 # Convenience class wrapper
 # ---------------------------------------------------------------------------
+
 
 class HumanLoopGate:
     """OOP wrapper around ``assess_risk`` and ``gate`` for approval workflows.
@@ -502,11 +500,7 @@ class HumanLoopGate:
         """Full gate check: assess risk, request approval if needed."""
         request = gate(action)
         if request is None:
-            return ApprovalResult(
-                approved=True, feedback="auto_approved_low_risk"
-            )
+            return ApprovalResult(approved=True, feedback="auto_approved_low_risk")
         if approver is not None:
             return approver(request)
-        return ApprovalResult(
-            approved=False, feedback="requires_human_review"
-        )
+        return ApprovalResult(approved=False, feedback="requires_human_review")

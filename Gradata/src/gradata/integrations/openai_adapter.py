@@ -77,9 +77,7 @@ def patch_openai(client: Any, brain_dir: str | Path = "./brain") -> Any:
             if ai_content:
                 brain.log_output(ai_content, output_type="chat")
                 if hasattr(brain, "observe"):
-                    brain.observe(
-                        [*messages, {"role": "assistant", "content": ai_content}]
-                    )
+                    brain.observe([*messages, {"role": "assistant", "content": ai_content}])
         except Exception as e:
             logger.debug("Response capture skipped: %s", e)
 

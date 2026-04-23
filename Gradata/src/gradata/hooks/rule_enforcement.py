@@ -13,6 +13,7 @@ always included (preserves prior behavior). When *every* rule is filtered
 out, the hook returns ``None`` and saves the entire injection budget for
 that edit.
 """
+
 from __future__ import annotations
 
 import fnmatch
@@ -36,6 +37,7 @@ HOOK_META = {
     "timeout": 5000,
 }
 
+
 def _env_int(name: str, default: int, *, minimum: int = 0) -> int:
     """Parse int env var with fallback on invalid input; clamp to >= minimum."""
     raw = os.environ.get(name)
@@ -50,13 +52,50 @@ def _env_int(name: str, default: int, *, minimum: int = 0) -> int:
 
 MAX_REMINDERS = _env_int("GRADATA_MAX_REMINDERS", 5, minimum=0)
 
-_CODE_EXTS = frozenset({
-    ".py", ".pyi", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
-    ".rs", ".go", ".java", ".kt", ".scala", ".rb", ".php", ".swift",
-    ".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".cs", ".m", ".mm",
-    ".sh", ".bash", ".zsh", ".fish", ".lua", ".vue", ".svelte",
-    ".sql", ".dart", ".ex", ".exs", ".clj", ".cljs", ".hs", ".ml",
-})
+_CODE_EXTS = frozenset(
+    {
+        ".py",
+        ".pyi",
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx",
+        ".mjs",
+        ".cjs",
+        ".rs",
+        ".go",
+        ".java",
+        ".kt",
+        ".scala",
+        ".rb",
+        ".php",
+        ".swift",
+        ".c",
+        ".cc",
+        ".cpp",
+        ".cxx",
+        ".h",
+        ".hpp",
+        ".cs",
+        ".m",
+        ".mm",
+        ".sh",
+        ".bash",
+        ".zsh",
+        ".fish",
+        ".lua",
+        ".vue",
+        ".svelte",
+        ".sql",
+        ".dart",
+        ".ex",
+        ".exs",
+        ".clj",
+        ".cljs",
+        ".hs",
+        ".ml",
+    }
+)
 _PROSE_EXTS = frozenset({".md", ".mdx", ".rst", ".txt", ".org"})
 _DATA_EXTS = frozenset({".json", ".yaml", ".yml", ".toml", ".csv", ".tsv", ".xml"})
 
@@ -154,7 +193,8 @@ def main(data: dict) -> dict | None:
         rule_lessons = [lesson for lesson in rule_lessons if not is_hook_enforced(lesson)]
     else:
         rule_lessons = [
-            lesson for lesson in rule_lessons
+            lesson
+            for lesson in rule_lessons
             if not lesson.description.lstrip().startswith("[hooked]")
         ]
 

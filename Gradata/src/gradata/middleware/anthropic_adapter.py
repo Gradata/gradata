@@ -128,5 +128,8 @@ def wrap_anthropic(
 ) -> AnthropicMiddleware:
     """Convenience constructor — see :class:`AnthropicMiddleware`."""
     return AnthropicMiddleware(
-        client, brain_path=brain_path, source=source, strict=strict,
+        client,
+        brain_path=brain_path,
+        source=source,
+        strict=strict,
     )

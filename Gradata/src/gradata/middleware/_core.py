@@ -48,8 +48,7 @@ class RuleViolation(Exception):  # noqa: N818 — public API name specified in s
         self.pattern_name = pattern_name
         self.output = output
         super().__init__(
-            f"RuleViolation: output matched '{pattern_name}' "
-            f"(rule: {rule_description!r})"
+            f"RuleViolation: output matched '{pattern_name}' (rule: {rule_description!r})"
         )
 
 
@@ -155,7 +154,8 @@ class RuleSource:
                 # Malformed caller-supplied lessons (e.g. confidence="high")
                 # must not abort the whole injection/enforcement path.
                 _log.debug(
-                    "Skipping lesson with non-numeric confidence %r", raw_conf,
+                    "Skipping lesson with non-numeric confidence %r",
+                    raw_conf,
                 )
                 continue
             category = str(lesson.get("category", "") or "")
@@ -175,11 +175,11 @@ class RuleSource:
     def load(self) -> list[_ScoredLesson]:
         """Return eligible lessons (RULE/PATTERN only, above min_confidence)."""
         lessons = (
-            self._load_from_dicts() if self._static_lessons is not None
-            else self._load_from_brain()
+            self._load_from_dicts() if self._static_lessons is not None else self._load_from_brain()
         )
         return [
-            l for l in lessons
+            l
+            for l in lessons
             if l.state in ("RULE", "PATTERN") and l.confidence >= self.min_confidence
         ]
 
@@ -253,10 +253,7 @@ def build_brain_rules_block(source: RuleSource) -> str:
     selected = source.select()
     if not selected:
         return ""
-    lines = [
-        f"[{l.state}:{l.confidence:.2f}] {l.category}: {l.description}"
-        for l in selected
-    ]
+    lines = [f"[{l.state}:{l.confidence:.2f}] {l.category}: {l.description}" for l in selected]
     return "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
 
 
@@ -293,7 +290,9 @@ def check_output(source: RuleSource, text: str, *, strict: bool = False) -> list
             if strict:
                 raise v
             _log.warning(
-                "Gradata rule violation (%s): %s", name, lesson.description,
+                "Gradata rule violation (%s): %s",
+                name,
+                lesson.description,
             )
             violations.append(v)
     return violations

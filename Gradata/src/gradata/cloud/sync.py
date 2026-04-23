@@ -13,6 +13,7 @@ Privacy model:
   - Separate opt-in for corpus contribution (anonymized corrections for
     cross-user meta-rule synthesis). See `CloudClient.contribute_corpus()`.
 """
+
 from __future__ import annotations
 
 import json

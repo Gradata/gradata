@@ -60,9 +60,7 @@ class GateResult:
 
     def __post_init__(self) -> None:
         if self.score is not None and not (0.0 <= self.score <= 1.0):
-            raise ValueError(
-                f"GateResult.score must be in [0.0, 1.0], got {self.score!r}"
-            )
+            raise ValueError(f"GateResult.score must be in [0.0, 1.0], got {self.score!r}")
 
 
 @dataclass
@@ -241,10 +239,7 @@ class Stage:
 
     def __repr__(self) -> str:
         gate_label = self.gate.__name__ if self.gate is not None else "none"
-        return (
-            f"Stage(name={self.name!r}, gate={gate_label!r}, "
-            f"max_retries={self.max_retries!r})"
-        )
+        return f"Stage(name={self.name!r}, gate={gate_label!r}, max_retries={self.max_retries!r})"
 
 
 # ---------------------------------------------------------------------------

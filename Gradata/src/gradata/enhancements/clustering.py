@@ -172,7 +172,7 @@ def promote_instinct_clusters(
         confs = [m.confidence for m in members]
         mean_conf = sum(confs) / len(confs)
         variance = sum((c - mean_conf) ** 2 for c in confs) / len(confs)
-        std_dev = variance ** 0.5
+        std_dev = variance**0.5
 
         if std_dev > (1.0 - coherence_threshold):
             continue  # Too much variance

@@ -56,6 +56,7 @@ def _mutate_lessons(brain: Brain, mutator_fn) -> bool:
 # 1. Reflection → Graduation
 # ---------------------------------------------------------------------------
 
+
 def process_reflection_result(
     brain: Brain,
     result: ReflectionResult,
@@ -131,11 +132,13 @@ def process_guardrail_result(
                 if keyword in guard_name.lower():
                     category = cat
                     break
-            correction_data = [{
-                "category": category,
-                "severity_label": "moderate",
-                "description": f"Guardrail violation: {guard_name} - {guard_detail or ''}",
-            }]
+            correction_data = [
+                {
+                    "category": category,
+                    "severity_label": "moderate",
+                    "description": f"Guardrail violation: {guard_name} - {guard_detail or ''}",
+                }
+            ]
             update_confidence(lessons, correction_data)
 
     if not _mutate_lessons(brain, _apply):
@@ -146,6 +149,7 @@ def process_guardrail_result(
 # ---------------------------------------------------------------------------
 # 3. Q-Learning Router ← Correction severity
 # ---------------------------------------------------------------------------
+
 
 def feed_q_router(
     brain: Brain,
@@ -167,6 +171,7 @@ def feed_q_router(
     try:
         reward = router.reward_from_severity(severity)
         from gradata.contrib.patterns.q_learning_router import RouteDecision
+
         decision = RouteDecision(
             agent=agent_type or "default",
             state_hash=str(hash(task_type) & 0xFFFFFFFF),
@@ -183,6 +188,7 @@ def feed_q_router(
 # ---------------------------------------------------------------------------
 # 7. Loop Detection → Graduation
 # ---------------------------------------------------------------------------
+
 
 def process_loop_event(
     brain: Brain,
@@ -201,11 +207,16 @@ def process_loop_event(
     severity = "minor" if action == "WARN" else "major"
 
     def _apply(lessons):
-        update_confidence(lessons, [{
-            "category": "PROCESS",
-            "severity_label": severity,
-            "description": f"Loop detected on {tool_name}: {action}",
-        }])
+        update_confidence(
+            lessons,
+            [
+                {
+                    "category": "PROCESS",
+                    "severity_label": severity,
+                    "description": f"Loop detected on {tool_name}: {action}",
+                }
+            ],
+        )
 
     if not _mutate_lessons(brain, _apply):
         return {"processed": False}
@@ -215,6 +226,7 @@ def process_loop_event(
 # ---------------------------------------------------------------------------
 # 8. Parallel Failures → Graduation
 # ---------------------------------------------------------------------------
+
 
 def process_parallel_failures(
     brain: Brain,
@@ -234,11 +246,16 @@ def process_parallel_failures(
     severity = "major" if failure_rate > 0.5 else "moderate" if failure_rate > 0.2 else "minor"
 
     def _apply(lessons):
-        update_confidence(lessons, [{
-            "category": "PROCESS",
-            "severity_label": severity,
-            "description": f"Parallel failures: {len(failed_tasks)}/{total_tasks} tasks failed",
-        }])
+        update_confidence(
+            lessons,
+            [
+                {
+                    "category": "PROCESS",
+                    "severity_label": severity,
+                    "description": f"Parallel failures: {len(failed_tasks)}/{total_tasks} tasks failed",
+                }
+            ],
+        )
 
     if not _mutate_lessons(brain, _apply):
         return {"processed": False}
@@ -248,6 +265,7 @@ def process_parallel_failures(
 # ---------------------------------------------------------------------------
 # 9. Task Escalation → Graduation
 # ---------------------------------------------------------------------------
+
 
 def process_escalation(
     brain: Brain,
@@ -263,11 +281,16 @@ def process_escalation(
 
     def _apply(lessons):
         for concern in concerns:
-            update_confidence(lessons, [{
-                "category": category.upper(),
-                "severity_label": "minor",
-                "description": f"Self-assessment concern: {concern}",
-            }])
+            update_confidence(
+                lessons,
+                [
+                    {
+                        "category": category.upper(),
+                        "severity_label": "minor",
+                        "description": f"Self-assessment concern: {concern}",
+                    }
+                ],
+            )
 
     if not _mutate_lessons(brain, _apply):
         return {"processed": False}
@@ -285,6 +308,7 @@ def process_escalation(
 # 10. Pipeline — PROCESS rules become suggested pipeline gates
 # ---------------------------------------------------------------------------
 
+
 def gates_from_graduated_rules() -> list[dict]:
     """Return PROCESS rules as pipeline gate suggestions.
 
@@ -298,13 +322,16 @@ def gates_from_graduated_rules() -> list[dict]:
 
     ctx = get_rule_context()
     rules = ctx.query(category="PROCESS", min_confidence=0.60, limit=5)
-    return [{"name": f"rule_gate_{i}", "rule": r.principle, "confidence": r.confidence}
-            for i, r in enumerate(rules)]
+    return [
+        {"name": f"rule_gate_{i}", "rule": r.principle, "confidence": r.confidence}
+        for i, r in enumerate(rules)
+    ]
 
 
 # ---------------------------------------------------------------------------
 # 11. Orchestrator — correction density adjusts routing
 # ---------------------------------------------------------------------------
+
 
 def routing_adjustments() -> dict[str, float]:
     """Return correction density per category for routing decisions.
@@ -327,6 +354,7 @@ def routing_adjustments() -> dict[str, float]:
 # 12. Memory — rule categories define importance for reinforcement
 # ---------------------------------------------------------------------------
 
+
 def importance_categories() -> set[str]:
     """Return categories that have graduated rules (high importance).
 
@@ -346,6 +374,7 @@ def importance_categories() -> set[str]:
 # 13. Sub-agents — agent-specific rules for delegation criteria
 # ---------------------------------------------------------------------------
 
+
 def delegation_criteria_for_agent(agent_type: str) -> list[str]:
     """Return graduated rule principles scoped to a specific agent.
 
@@ -364,6 +393,7 @@ def delegation_criteria_for_agent(agent_type: str) -> list[str]:
 # ---------------------------------------------------------------------------
 # 14. Agent Modes — correction rate determines mode safety level
 # ---------------------------------------------------------------------------
+
 
 def suggested_mode_override() -> str | None:
     """Suggest a safer mode if correction density is high.
@@ -395,6 +425,7 @@ def suggested_mode_override() -> str | None:
 # 15. Tools — register brain operations as discoverable tools
 # ---------------------------------------------------------------------------
 
+
 def register_brain_tools(brain: Brain) -> int:
     """Register brain.correct() and brain.apply_brain_rules() in ToolRegistry.
 
@@ -411,22 +442,26 @@ def register_brain_tools(brain: Brain) -> int:
     count = 0
 
     if brain.tools.get("brain_correct") is None:
-        brain.tools.register(ToolSpec(
-            name="brain_correct",
-            description="Log a user correction for the learning pipeline",
-            category="learning",
-            parameters={"draft": "str", "final": "str"},
-        ))
+        brain.tools.register(
+            ToolSpec(
+                name="brain_correct",
+                description="Log a user correction for the learning pipeline",
+                category="learning",
+                parameters={"draft": "str", "final": "str"},
+            )
+        )
         count += 1
 
     if brain.tools.get("brain_apply_rules") is None:
-        brain.tools.register(ToolSpec(
-            name="brain_apply_rules",
-            description="Get graduated rules for prompt injection",
-            category="learning",
-            parameters={"task": "str"},
-            returns="str",
-        ))
+        brain.tools.register(
+            ToolSpec(
+                name="brain_apply_rules",
+                description="Get graduated rules for prompt injection",
+                category="learning",
+                parameters={"task": "str"},
+                returns="str",
+            )
+        )
         count += 1
 
     return count
@@ -435,6 +470,7 @@ def register_brain_tools(brain: Brain) -> int:
 # ---------------------------------------------------------------------------
 # 16. MCP — additional tool schemas for rule management
 # ---------------------------------------------------------------------------
+
 
 def mcp_rule_tools() -> list[dict]:
     """Return MCP tool schemas for rule management.
@@ -464,6 +500,7 @@ def mcp_rule_tools() -> list[dict]:
 # 17. Scope — rule density refines scope matching
 # ---------------------------------------------------------------------------
 
+
 def scope_confidence_boost(category: str) -> float:
     """Return a confidence boost for scope matching in categories with rules.
 
@@ -484,6 +521,7 @@ def scope_confidence_boost(category: str) -> float:
 # 18. RAG — rule categories boost topic retrieval relevance
 # ---------------------------------------------------------------------------
 
+
 def topic_boosts_from_rules() -> dict[str, float]:
     """Return category-based boost multipliers for RAG retrieval.
 
@@ -503,10 +541,10 @@ def topic_boosts_from_rules() -> dict[str, float]:
     return {cat: round(1.0 + (count / total) * 0.5, 2) for cat, count in categories.items()}
 
 
-
 # ---------------------------------------------------------------------------
 # 20. Middleware — graduation middleware wraps operations
 # ---------------------------------------------------------------------------
+
 
 def create_graduation_middleware():
     """Create a Middleware that injects rules before and observes results after.
@@ -521,6 +559,7 @@ def create_graduation_middleware():
 
     class GraduationMiddleware(Middleware):
         """Injects graduated rules into context before execution."""
+
         name: str = "graduation"
 
         def before(self, ctx: MiddlewareContext) -> MiddlewareContext:
@@ -544,6 +583,7 @@ def create_graduation_middleware():
 # ---------------------------------------------------------------------------
 # 21. Loop Detection — PROCESS rules lower thresholds
 # ---------------------------------------------------------------------------
+
 
 def loop_threshold_adjustment() -> dict[str, int]:
     """Return adjusted loop detection thresholds based on PROCESS rules.
@@ -572,6 +612,7 @@ def loop_threshold_adjustment() -> dict[str, int]:
 # ---------------------------------------------------------------------------
 # 22. Reconciliation — rule categories define strict deviation thresholds
 # ---------------------------------------------------------------------------
+
 
 def strict_categories_from_rules() -> set[str]:
     """Return categories where deviations should be scored as DRIFT not GAP.

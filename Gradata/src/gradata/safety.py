@@ -13,30 +13,32 @@ import re
 # Order matters: API keys before emails to avoid partial matches on key prefixes.
 _PII_PATTERNS: list[tuple[str, str, re.Pattern[str]]] = [
     # API keys / secrets
-    ("openai_api_key", "[REDACTED_OPENAI_KEY]",
-     re.compile(r"sk-(?:proj-)?[A-Za-z0-9_-]{20,}")),
-    ("github_token", "[REDACTED_GITHUB_TOKEN]",
-     re.compile(r"(?:ghp_|github_pat_)[A-Za-z0-9_]{20,}")),
-    ("slack_token", "[REDACTED_SLACK_TOKEN]",
-     re.compile(r"(?:xoxb|xoxp|xapp|xwfp)-[A-Za-z0-9\-]{20,}")),
-    ("aws_access_key", "[REDACTED_AWS_KEY]",
-     re.compile(r"AKIA[A-Z0-9]{16}")),
-    ("google_api_key", "[REDACTED_GOOGLE_KEY]",
-     re.compile(r"AIza[A-Za-z0-9_-]{35}")),
-    ("gitlab_token", "[REDACTED_GITLAB_TOKEN]",
-     re.compile(r"glpat-[A-Za-z0-9_-]{20,}")),
+    ("openai_api_key", "[REDACTED_OPENAI_KEY]", re.compile(r"sk-(?:proj-)?[A-Za-z0-9_-]{20,}")),
+    (
+        "github_token",
+        "[REDACTED_GITHUB_TOKEN]",
+        re.compile(r"(?:ghp_|github_pat_)[A-Za-z0-9_]{20,}"),
+    ),
+    (
+        "slack_token",
+        "[REDACTED_SLACK_TOKEN]",
+        re.compile(r"(?:xoxb|xoxp|xapp|xwfp)-[A-Za-z0-9\-]{20,}"),
+    ),
+    ("aws_access_key", "[REDACTED_AWS_KEY]", re.compile(r"AKIA[A-Z0-9]{16}")),
+    ("google_api_key", "[REDACTED_GOOGLE_KEY]", re.compile(r"AIza[A-Za-z0-9_-]{35}")),
+    ("gitlab_token", "[REDACTED_GITLAB_TOKEN]", re.compile(r"glpat-[A-Za-z0-9_-]{20,}")),
     # Credit card numbers (4-4-4-4 grouped format only to avoid false positives)
-    ("credit_card", "[REDACTED_CC]",
-     re.compile(r"\b(?:\d{4}[- ]){3}\d{4}\b")),
+    ("credit_card", "[REDACTED_CC]", re.compile(r"\b(?:\d{4}[- ]){3}\d{4}\b")),
     # SSN (xxx-xx-xxxx)
-    ("ssn", "[REDACTED_SSN]",
-     re.compile(r"\b\d{3}-\d{2}-\d{4}\b")),
+    ("ssn", "[REDACTED_SSN]", re.compile(r"\b\d{3}-\d{2}-\d{4}\b")),
     # Phone numbers (various formats)
-    ("phone", "[REDACTED_PHONE]",
-     re.compile(r"(?<!\d)(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}(?!\d)")),
+    (
+        "phone",
+        "[REDACTED_PHONE]",
+        re.compile(r"(?<!\d)(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}(?!\d)"),
+    ),
     # Email addresses (last to avoid clashing with API key patterns)
-    ("email", "[REDACTED_EMAIL]",
-     re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")),
+    ("email", "[REDACTED_EMAIL]", re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")),
 ]
 
 

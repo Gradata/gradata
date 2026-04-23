@@ -29,6 +29,7 @@ from gradata.enhancements.metrics import MetricsWindow
 # Data model
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Alert:
     """A single failure signal emitted by a detector.
@@ -50,6 +51,7 @@ class Alert:
 # ---------------------------------------------------------------------------
 # Individual detectors
 # ---------------------------------------------------------------------------
+
 
 def detect_being_ignored(
     current: MetricsWindow,
@@ -186,8 +188,7 @@ def detect_overfitting(
             detector="overfitting",
             severity=severity,
             message=(
-                "Rule misfire rate increased. "
-                "New rules may be overfitting to specific sessions."
+                "Rule misfire rate increased. New rules may be overfitting to specific sessions."
             ),
             evidence={
                 "misfire_delta": round(misfire_delta, 4),
@@ -253,6 +254,7 @@ def detect_regression_to_mean(
 # Aggregator
 # ---------------------------------------------------------------------------
 
+
 def detect_failures(
     current: MetricsWindow,
     previous: MetricsWindow | None = None,
@@ -281,6 +283,7 @@ def detect_failures(
 # ---------------------------------------------------------------------------
 # Formatter
 # ---------------------------------------------------------------------------
+
 
 def format_alerts(alerts: list[Alert]) -> str:
     """Format a list of alerts as a human-readable string.

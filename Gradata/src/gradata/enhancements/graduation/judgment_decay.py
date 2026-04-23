@@ -249,7 +249,10 @@ def compute_batch_decay(
         sessions_since = current_session - last_applied if last_applied > 0 else 0
 
         result = compute_decay(
-            lesson, sessions_since, applied_this, total_idle,
+            lesson,
+            sessions_since,
+            applied_this,
+            total_idle,
             session_type=session_type,
         )
         results.append(result)

@@ -6,6 +6,7 @@ Domain-specific values (FILE_TYPE_MAP, MEMORY_TYPE_MAP, MEMORY_TYPE_WEIGHTS)
 are defaults that can be overridden by brain/taxonomy.json. See reload_config()
 and the _tag_taxonomy.py reload mechanism.
 """
+
 from __future__ import annotations
 
 import json
@@ -179,7 +180,13 @@ def reload_config(brain_dir: str | Path | None = None) -> None:
         # Always preserve the "default" fallback
         new_weights = data["memory_type_weights"]
         if "default" not in new_weights:
-            new_weights["default"] = MEMORY_TYPE_WEIGHTS.get("default", {
-                "episodic": 1.0, "semantic": 1.0, "procedural": 1.0, "strategic": 1.0,
-            })
+            new_weights["default"] = MEMORY_TYPE_WEIGHTS.get(
+                "default",
+                {
+                    "episodic": 1.0,
+                    "semantic": 1.0,
+                    "procedural": 1.0,
+                    "strategic": 1.0,
+                },
+            )
         MEMORY_TYPE_WEIGHTS.update(new_weights)

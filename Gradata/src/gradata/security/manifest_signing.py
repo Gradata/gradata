@@ -46,6 +46,5 @@ def verify_manifest(manifest: dict, salt: str) -> bool:
 
 def _canonical_payload(manifest: dict) -> bytes:
     """Produce canonical JSON bytes, excluding ``signature`` and ``signed_at``."""
-    filtered = {k: v for k, v in manifest.items()
-                if k not in ("signature", "signed_at")}
+    filtered = {k: v for k, v in manifest.items() if k not in ("signature", "signed_at")}
     return json.dumps(filtered, sort_keys=True, separators=(",", ":")).encode()

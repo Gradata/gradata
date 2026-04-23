@@ -51,9 +51,10 @@ __all__ = [
 
 class LoopAction(Enum):
     """Action to take based on loop detection."""
-    ALLOW = "allow"    # No loop detected, proceed normally
-    WARN = "warn"      # Loop pattern detected, log warning but continue
-    STOP = "stop"      # Hard loop detected, halt execution
+
+    ALLOW = "allow"  # No loop detected, proceed normally
+    WARN = "warn"  # Loop pattern detected, log warning but continue
+    STOP = "stop"  # Hard loop detected, halt execution
 
 
 @dataclass
@@ -66,6 +67,7 @@ class LoopEvent:
         action: The action determined by the detector.
         repeat_count: How many times this exact call has been seen in window.
     """
+
     tool_name: str
     call_hash: str
     action: LoopAction
@@ -81,6 +83,7 @@ class LoopDetectorConfig:
         warn_threshold: Number of identical calls before warning.
         stop_threshold: Number of identical calls before hard stop.
     """
+
     window_size: int = 20
     warn_threshold: int = 3
     stop_threshold: int = 5
@@ -210,10 +213,7 @@ def _normalize_args(args: dict[str, Any]) -> dict[str, Any]:
         if isinstance(val, dict):
             result[key] = _normalize_args(val)
         elif isinstance(val, (list, tuple)):
-            result[key] = [
-                _normalize_args(v) if isinstance(v, dict) else v
-                for v in val
-            ]
+            result[key] = [_normalize_args(v) if isinstance(v, dict) else v for v in val]
         else:
             result[key] = val
     return result

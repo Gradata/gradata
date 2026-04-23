@@ -8,6 +8,7 @@ Every hook module follows this pattern:
     def main(data: dict) -> dict | None: ...
     if __name__ == "__main__": run_hook(main, HOOK_META)
 """
+
 from __future__ import annotations
 
 import json
@@ -99,12 +100,14 @@ def _record_telemetry(meta: dict, hook_name: str, payload: str | None) -> None:
             return
         import time
 
-        line = json.dumps({
-            "ts": time.time(),
-            "event": meta.get("event", "?"),
-            "hook": hook_name,
-            "bytes": len(payload or ""),
-        })
+        line = json.dumps(
+            {
+                "ts": time.time(),
+                "event": meta.get("event", "?"),
+                "hook": hook_name,
+                "bytes": len(payload or ""),
+            }
+        )
         log_path = Path(brain_dir) / "telemetry.jsonl"
         with log_path.open("a", encoding="utf-8") as fh:
             fh.write(line + "\n")

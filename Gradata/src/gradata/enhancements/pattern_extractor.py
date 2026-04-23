@@ -20,19 +20,68 @@ if TYPE_CHECKING:
     from gradata.enhancements.edit_classifier import EditClassification
 
 INITIAL_CONFIDENCE = 0.40  # Aligned with self_improvement.py (authoritative)
-_STOPWORDS = frozenset({
-    "a", "an", "the", "is", "was", "are", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "could",
-    "should", "may", "might", "shall", "can", "to", "of", "in", "for",
-    "on", "with", "at", "by", "from", "as", "into", "through", "during",
-    "before", "after", "and", "but", "or", "nor", "not", "so", "yet",
-    "it", "its", "this", "that", "these", "those",
-})
+_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "is",
+        "was",
+        "are",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "shall",
+        "can",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "and",
+        "but",
+        "or",
+        "nor",
+        "not",
+        "so",
+        "yet",
+        "it",
+        "its",
+        "this",
+        "that",
+        "these",
+        "those",
+    }
+)
 
 
 @dataclass
 class ExtractedPattern:
     """A detected repeating pattern from classified edits."""
+
     category: str
     description: str
     confidence: float
@@ -108,16 +157,17 @@ def extract_patterns(
                 common = keyword_sets[cluster[0]]
                 for k in cluster[1:]:
                     common = common & keyword_sets[k]
-                desc = (
-                    f"Repeated {category.lower()} pattern"
-                    + (f" involving: {', '.join(sorted(common)[:5])}" if common else "")
+                desc = f"Repeated {category.lower()} pattern" + (
+                    f" involving: {', '.join(sorted(common)[:5])}" if common else ""
                 )
-                patterns.append(ExtractedPattern(
-                    category=category,
-                    description=desc,
-                    confidence=min(0.50, 0.20 + 0.10 * len(cluster)),
-                    edits=cluster_edits,
-                ))
+                patterns.append(
+                    ExtractedPattern(
+                        category=category,
+                        description=desc,
+                        confidence=min(0.50, 0.20 + 0.10 * len(cluster)),
+                        edits=cluster_edits,
+                    )
+                )
 
     return patterns
 
@@ -178,15 +228,17 @@ def patterns_to_lessons(patterns: list[ExtractedPattern]) -> list[Lesson]:
         if pattern.confidence < 0.25:
             continue
 
-        lessons.append(Lesson(
-            date=today,
-            state=LessonState.INSTINCT,
-            confidence=INITIAL_CONFIDENCE,
-            category=pattern.category.upper(),
-            description=pattern.description,
-            correction_type=_CATEGORY_TYPE_MAP.get(
-                pattern.category.upper(), CorrectionType.BEHAVIORAL
-            ),
-        ))
+        lessons.append(
+            Lesson(
+                date=today,
+                state=LessonState.INSTINCT,
+                confidence=INITIAL_CONFIDENCE,
+                category=pattern.category.upper(),
+                description=pattern.description,
+                correction_type=_CATEGORY_TYPE_MAP.get(
+                    pattern.category.upper(), CorrectionType.BEHAVIORAL
+                ),
+            )
+        )
 
     return lessons

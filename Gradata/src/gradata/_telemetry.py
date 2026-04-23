@@ -40,6 +40,7 @@ Activation events fire at most once per machine per SDK install (tracked
 in the same config file). Heartbeat/recurring events are not this module's
 concern.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -81,6 +82,7 @@ def _config_dir() -> Path:
 def _config_path() -> Path:
     """Shared resolver for the telemetry config file."""
     return _config_dir() / _CONFIG_FILENAME
+
 
 # The exhaustive set of activation events. Adding a new one here is the
 # only place you need to touch — the prompt copy and the docs reference

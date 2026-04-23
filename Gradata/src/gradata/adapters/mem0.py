@@ -86,9 +86,7 @@ class Mem0Adapter:
             ) from exc
 
         if not api_key:
-            raise ValueError(
-                "Mem0Adapter requires an api_key when no client is supplied"
-            )
+            raise ValueError("Mem0Adapter requires an api_key when no client is supplied")
         self._client = MemoryClient(api_key=api_key)
 
     # ------------------------------------------------------------------
@@ -160,18 +158,12 @@ class Mem0Adapter:
         except TypeError:
             # Older mem0ai versions don't accept `filters` kwarg.
             try:
-                raw = self._client.search(
-                    query, user_id=self.user_id, limit=k
-                )
+                raw = self._client.search(query, user_id=self.user_id, limit=k)
             except Exception as exc:
-                logger.warning(
-                    "Mem0Adapter.pull_memory_for_context failed: %s", exc
-                )
+                logger.warning("Mem0Adapter.pull_memory_for_context failed: %s", exc)
                 return []
         except Exception as exc:
-            logger.warning(
-                "Mem0Adapter.pull_memory_for_context failed: %s", exc
-            )
+            logger.warning("Mem0Adapter.pull_memory_for_context failed: %s", exc)
             return []
 
         return _normalise_search_results(raw)
@@ -261,19 +253,16 @@ def _normalise_search_results(raw: Any) -> list[dict[str, Any]]:
             continue
         # Mem0 uses "memory" for the text in most versions; fall back to
         # "text" and "content" for older / alternative shapes.
-        text = (
-            item.get("memory")
-            or item.get("text")
-            or item.get("content")
-            or ""
-        )
+        text = item.get("memory") or item.get("text") or item.get("content") or ""
         metadata = item.get("metadata") or {}
         score = item.get("score")
-        out.append({
-            "text": text,
-            "metadata": metadata if isinstance(metadata, dict) else {},
-            "score": score,
-        })
+        out.append(
+            {
+                "text": text,
+                "metadata": metadata if isinstance(metadata, dict) else {},
+                "score": score,
+            }
+        )
     return out
 
 
