@@ -61,10 +61,16 @@ class LangChainCallback(_BaseCallbackHandler):  # type: ignore[misc,valid-type]
         brain_path: str | Path | None = None,
         source: RuleSource | None = None,
         strict: bool = False,
+        session_id: str | None = None,
     ) -> None:
         super().__init__()
         self._source = source or RuleSource(brain_path=brain_path)
         self._strict = strict
+        if session_id is None:
+            import uuid
+
+            session_id = str(uuid.uuid4())
+        self._session_id = session_id
 
     # -- injection --------------------------------------------------------
 
@@ -123,6 +129,15 @@ class LangChainCallback(_BaseCallbackHandler):  # type: ignore[misc,valid-type]
         if not text:
             return
         check_output(self._source, text, strict=self._strict)
+
+        brain_path = self._source._brain_path
+        if brain_path:
+            try:
+                from gradata._transcript import log_turn
+
+                log_turn(str(brain_path), self._session_id, "assistant", text)
+            except Exception:
+                pass
 
 
 def _extract_llm_text(response: Any) -> str:

@@ -52,9 +52,15 @@ class CrewAIGuard:
         brain_path: str | Path | None = None,
         source: RuleSource | None = None,
         strict: bool = False,
+        session_id: str | None = None,
     ) -> None:
         self._source = source or RuleSource(brain_path=brain_path)
         self._strict = strict
+        if session_id is None:
+            import uuid
+
+            session_id = str(uuid.uuid4())
+        self._session_id = session_id
 
     def __call__(self, output: Any) -> tuple[bool, Any]:
         text = _coerce_text(output)
@@ -64,6 +70,16 @@ class CrewAIGuard:
             violations = check_output(self._source, text, strict=False)
         except RuleViolation as v:  # pragma: no cover - strict=False above
             return False, str(v)
+
+        brain_path = self._source._brain_path
+        if brain_path and text:
+            try:
+                from gradata._transcript import log_turn
+
+                log_turn(str(brain_path), self._session_id, "assistant", text)
+            except Exception:
+                pass
+
         if not violations:
             return True, output
         if self._strict:

@@ -85,11 +85,17 @@ class OpenAIMiddleware:
         brain_path: str | Path | None = None,
         source: RuleSource | None = None,
         strict: bool = False,
+        session_id: str | None = None,
     ) -> None:
         _require_openai()
         self._client = client
         self._source = source or RuleSource(brain_path=brain_path)
         self._strict = strict
+        if session_id is None:
+            import uuid
+
+            session_id = str(uuid.uuid4())
+        self._session_id = session_id
         self._orig_chat = client.chat
         self.chat = _ChatProxy(self)
 
@@ -115,16 +121,35 @@ class _CompletionsProxy:
 
     def create(self, *args: Any, **kwargs: Any) -> Any:
         block = build_brain_rules_block(self._mw._source)
+        messages = kwargs.get("messages") or []
         if block:
-            kwargs["messages"] = _inject_into_messages(
-                kwargs.get("messages") or [],
-                block,
-            )
+            kwargs["messages"] = _inject_into_messages(messages, block)
 
         response = self._mw._orig_chat.completions.create(*args, **kwargs)
         text = _extract_text(response)
         if text:
             check_output(self._mw._source, text, strict=self._mw._strict)
+
+        # Transcript logging (opt-in via GRADATA_TRANSCRIPT=1).
+        brain_path = self._mw._source._brain_path
+        if brain_path:
+            try:
+                from gradata._transcript import log_turn
+
+                for msg in reversed(messages):
+                    if isinstance(msg, dict) and msg.get("role") == "user":
+                        log_turn(
+                            str(brain_path),
+                            self._mw._session_id,
+                            "user",
+                            str(msg.get("content") or ""),
+                        )
+                        break
+                if text:
+                    log_turn(str(brain_path), self._mw._session_id, "assistant", text)
+            except Exception:
+                pass
+
         return response
 
 
@@ -134,6 +159,7 @@ def wrap_openai(
     brain_path: str | Path | None = None,
     source: RuleSource | None = None,
     strict: bool = False,
+    session_id: str | None = None,
 ) -> OpenAIMiddleware:
     """Convenience constructor — see :class:`OpenAIMiddleware`."""
     return OpenAIMiddleware(
@@ -141,4 +167,5 @@ def wrap_openai(
         brain_path=brain_path,
         source=source,
         strict=strict,
+        session_id=session_id,
     )

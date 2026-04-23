@@ -672,7 +672,112 @@ def _flush_retain_queue(brain_dir: str) -> None:
         _log.debug("retain flush skipped: %s", e)
 
 
+def _retroactive_sweep(brain_dir: str, data: dict) -> None:
+    """Run implicit_feedback patterns over all session turns retroactively.
+
+    Finds the session transcript via ProviderTranscriptSource (Claude Code
+    native JSONL) or GradataTranscriptSource (middleware-written). For each
+    user-role turn, runs every SIGNAL_MAP pattern from implicit_feedback.py
+    and emits IMPLICIT_FEEDBACK events for matches that aren't already in
+    the DB for this session.
+
+    Gated on GRADATA_TRANSCRIPT=1. Skips silently on any error.
+    """
+    if os.environ.get("GRADATA_TRANSCRIPT") != "1":
+        return
+    try:
+        from gradata._transcript_providers import get_transcript_source
+        from gradata.hooks.implicit_feedback import SIGNAL_MAP
+        from gradata._events import emit
+        from gradata._paths import BrainContext
+
+        session_id = data.get("session_id") or data.get("sessionId")
+        source = get_transcript_source(brain_dir, session_id)
+        if source is None:
+            _log.debug("retroactive_sweep: no transcript source available")
+            return
+
+        turns = source.turns()
+        user_turns = [t for t in turns if t.get("role") == "user" and t.get("content")]
+        if not user_turns:
+            return
+
+        session_num = int(data.get("session_number") or 0)
+        ctx = BrainContext.from_brain_dir(brain_dir)
+
+        # Load existing IMPLICIT_FEEDBACK events for this session to avoid dupes.
+        existing: set[str] = set()
+        db = Path(brain_dir) / "system.db"
+        if db.is_file():
+            try:
+                with sqlite3.connect(db) as conn:
+                    rows = conn.execute(
+                        "SELECT data_json FROM events WHERE type = 'IMPLICIT_FEEDBACK' "
+                        "AND session = ?",
+                        (session_num,),
+                    ).fetchall()
+                    for (raw,) in rows:
+                        try:
+                            import json as _json
+
+                            payload = _json.loads(raw) if isinstance(raw, str) else {}
+                            sig = payload.get("signal_type", "")
+                            snippet = payload.get("snippet", "")
+                            existing.add(f"{sig}:{snippet[:40]}")
+                        except Exception:
+                            pass
+            except sqlite3.Error:
+                pass
+
+        emitted = 0
+        for turn in user_turns:
+            text = turn.get("content") or ""
+            for signal_type, patterns in SIGNAL_MAP.items():
+                for pat in patterns:
+                    m = pat.search(text)
+                    if not m:
+                        continue
+                    snippet = text[max(0, m.start() - 20) : m.end() + 20].strip()
+                    dedup_key = f"{signal_type}:{snippet[:40]}"
+                    if dedup_key in existing:
+                        continue
+                    existing.add(dedup_key)
+                    emit(
+                        "IMPLICIT_FEEDBACK",
+                        source="hook:session_close:retroactive_sweep",
+                        data={
+                            "signal_type": signal_type,
+                            "snippet": snippet,
+                            "pattern": pat.pattern,
+                            "retroactive": True,
+                        },
+                        ctx=ctx,
+                        session=session_num,
+                    )
+                    emitted += 1
+                    break  # One signal per pattern group per turn is enough.
+
+        if emitted:
+            _log.info("retroactive_sweep: emitted %d IMPLICIT_FEEDBACK events", emitted)
+        else:
+            _log.debug("retroactive_sweep: no new signals found in %d turns", len(user_turns))
+
+        # TTL cleanup for old transcript files.
+        try:
+            from gradata._transcript import cleanup_ttl
+
+            deleted = cleanup_ttl(brain_dir)
+            if deleted:
+                _log.debug("retroactive_sweep: cleaned up %d old transcript files", deleted)
+        except Exception:
+            pass
+
+    except Exception as exc:
+        _log.debug("retroactive_sweep skipped: %s", exc)
+
+
 def _run_waterfall(brain_dir_str: str, brain_dir: Path, data: dict, upper_bound: str) -> None:
+    _retroactive_sweep(brain_dir_str, data)
     _run_graduation(brain_dir_str)
     _run_pipeline(brain_dir_str, data)
     _run_tree_consolidation(brain_dir_str)
