@@ -371,21 +371,30 @@ def _load_soul_mandatories(brain_dir: Path) -> list[str]:
     return lines
 
 
-def _refresh_brain_prompt(brain_dir: str, data: dict) -> None:
-    """Regenerate brain_prompt.md via direct Anthropic SDK call (no CLI subprocess).
+def _bracket_confidence(c: float) -> str:
+    """Bucket raw FSRS confidence into 3 stable bands for cache-key stability.
 
-    Uses GRADATA_SYNTHESIZER_MODEL (default claude-opus-4-7). The SDK reads
-    ANTHROPIC_API_KEY from the environment automatically. Silently skips if
-    the env var is absent or the SDK is not installed — injection falls back
-    to the fragmented format on miss.
+    Raw floats tick constantly (FSRS updates on every event), causing a cache
+    miss on every session_close even when no meaningful rule change occurred.
+    Three bands give the synthesizer enough signal without thrashing the cache.
+    """
+    if c < 0.5:
+        return "low"
+    if c < 0.75:
+        return "mid"
+    return "high"
+
+
+def _refresh_brain_prompt(brain_dir: str, data: dict) -> None:
+    """Regenerate brain_prompt.md via the model-agnostic call_provider dispatch.
+
+    Uses GRADATA_SYNTHESIZER_MODEL (default claude-opus-4-7). Provider is
+    selected by model prefix: claude-* → Anthropic, gpt-* → OpenAI,
+    gemini-* → Google, http(s):// → generic OpenAI-compatible endpoint.
+    Silently skips if the required API key is absent or the SDK is not
+    installed — injection falls back to the fragmented format on miss.
     """
     try:
-        if not os.environ.get("ANTHROPIC_API_KEY"):
-            _log.debug("brain_prompt refresh skipped: ANTHROPIC_API_KEY not set")
-            return
-
-        import anthropic
-
         from gradata.enhancements.rule_synthesizer import (
             _SYSTEM_PROMPT as _SYNTH_SYSTEM,
         )
@@ -396,6 +405,7 @@ def _refresh_brain_prompt(brain_dir: str, data: dict) -> None:
             _extract_wisdom_block,
             _read_cache,
             _write_cache,
+            call_provider,
         )
         from gradata.enhancements.self_improvement._confidence import parse_lessons
 
@@ -421,7 +431,7 @@ def _refresh_brain_prompt(brain_dir: str, data: dict) -> None:
             and int(getattr(l, "fire_count", 0) or 0) >= 10
         ]
         individual_lines = [
-            f"[{l.state.name}:{float(l.confidence or 0.0):.2f} fires:{int(getattr(l, 'fire_count', 0) or 0)}] "
+            f"[{l.state.name}:{_bracket_confidence(float(l.confidence or 0.0))} fires:{int(getattr(l, 'fire_count', 0) or 0)}] "
             f"{(l.category or 'GENERAL').strip()}: {(l.description or '').strip()}"
             for l in filtered
         ]
@@ -439,15 +449,10 @@ def _refresh_brain_prompt(brain_dir: str, data: dict) -> None:
             user_prompt = _build_user_prompt(
                 mandatory_lines, [], individual_lines, "", "", "general", "general"
             )
-            # SDK reads ANTHROPIC_API_KEY from environment automatically.
-            client = anthropic.Anthropic(timeout=60.0)
-            msg = client.messages.create(
-                model=model,
-                max_tokens=MAX_OUTPUT_TOKENS,
-                system=_SYNTH_SYSTEM,
-                messages=[{"role": "user", "content": user_prompt}],
-            )
-            raw = msg.content[0].text.strip()  # type: ignore[union-attr]
+            raw = call_provider(model, _SYNTH_SYSTEM, user_prompt, MAX_OUTPUT_TOKENS, 60.0)
+            if raw is None:
+                _log.debug("brain_prompt refresh: provider returned nothing")
+                return
             block = _extract_wisdom_block(raw)
             if not block or len(block) < 50:
                 _log.debug("synthesizer output malformed or too short")

@@ -49,6 +49,16 @@
     ],
     "Stop": [
       {
+        "description": "Gradata: context-window watchdog — write handoff at threshold",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m gradata.hooks.ctx_watchdog",
+            "timeout": 10000
+          }
+        ]
+      },
+      {
         "description": "Gradata: gated graduation sweep (concurrency-locked, SDK-only synth, throttled)",
         "hooks": [
           {

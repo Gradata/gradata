@@ -1,4 +1,4 @@
-"""Fail-safe contracts for the two-provider rule synthesizer.
+"""Fail-safe contracts for the SDK-only rule synthesizer.
 
 The module must never raise — every failure path returns None so the
 injection hook falls back to the fragmented format. These tests lock in
@@ -14,10 +14,9 @@ import pytest
 from gradata.enhancements import rule_synthesizer as rs
 
 
-def test_both_providers_absent_returns_none(tmp_path, monkeypatch):
-    """No API key + no `claude` CLI → must return None, not raise."""
+def test_no_api_key_returns_none(tmp_path, monkeypatch):
+    """No API key → must return None, not raise."""
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.setattr(rs.shutil, "which", lambda _name: None)
 
     result = rs.synthesize_rules_block(
         brain_dir=tmp_path,
@@ -32,10 +31,21 @@ def test_empty_inputs_returns_none(tmp_path, monkeypatch):
     """All-empty inputs must short-circuit before touching any provider."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-should-not-be-called")
 
+    import sys as _sys
+    import types as _types
+
     def _boom(*_a, **_kw):  # pragma: no cover - should never execute
         raise AssertionError("SDK must not be called on empty input")
 
-    monkeypatch.setattr(rs.shutil, "which", _boom)
+    fake_mod = _types.ModuleType("anthropic")
+
+    class _NeverCalled:
+        def __init__(self, *a, **kw):
+            _boom()
+
+    fake_mod.Anthropic = _NeverCalled
+    monkeypatch.setitem(_sys.modules, "anthropic", fake_mod)
+
     result = rs.synthesize_rules_block(
         brain_dir=tmp_path,
         mandatory_lines=[],
@@ -47,9 +57,8 @@ def test_empty_inputs_returns_none(tmp_path, monkeypatch):
 
 
 def test_cache_hit_skips_provider(tmp_path, monkeypatch):
-    """Cached block must be returned without calling either provider."""
+    """Cached block must be returned without calling the SDK."""
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.setattr(rs.shutil, "which", lambda _name: None)
 
     mandatory = ["[MANDATORY] Never paste raw URLs."]
     key = rs._compute_cache_key(mandatory, [], [], "", "", "", rs.DEFAULT_MODEL)
@@ -69,24 +78,16 @@ def test_cache_hit_skips_provider(tmp_path, monkeypatch):
     assert "cached content" in result
 
 
-def test_cli_fallback_triggers_when_sdk_raises(tmp_path, monkeypatch):
-    """SDK failure with key present must fall through to the CLI path."""
+def test_sdk_failure_returns_none(tmp_path, monkeypatch):
+    """SDK raises with key present → must return None, not propagate."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-fake")
 
-    calls = {"cli": 0}
-
-    def _cli_stub(_model, _prompt):
-        calls["cli"] += 1
-        return "<brain-wisdom>cli fallback content body long enough</brain-wisdom>"
-
-    monkeypatch.setattr(rs, "_try_claude_cli", _cli_stub)
+    import sys as _sys
+    import types as _types
 
     class _BrokenSDK:
         def __init__(self, *a, **kw):
             raise RuntimeError("anthropic SDK unavailable")
-
-    import sys as _sys
-    import types as _types
 
     fake_mod = _types.ModuleType("anthropic")
     fake_mod.Anthropic = _BrokenSDK
@@ -98,15 +99,30 @@ def test_cli_fallback_triggers_when_sdk_raises(tmp_path, monkeypatch):
         cluster_lines=[],
         individual_lines=[],
     )
-    assert result is not None
-    assert "cli fallback" in result
-    assert calls["cli"] == 1
+    assert result is None
 
 
 def test_malformed_output_returns_none(tmp_path, monkeypatch):
     """Missing <brain-wisdom> tags → None, no cache write."""
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.setattr(rs, "_try_claude_cli", lambda *_a, **_kw: "no tags here at all")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-fake")
+
+    import sys as _sys
+    import types as _types
+
+    class _FakeMessage:
+        content = [type("Block", (), {"text": "no tags here at all"})()]
+
+    class _FakeMessages:
+        def create(self, *a, **kw):
+            return _FakeMessage()
+
+    class _FakeClient:
+        def __init__(self, *a, **kw):
+            self.messages = _FakeMessages()
+
+    fake_mod = _types.ModuleType("anthropic")
+    fake_mod.Anthropic = _FakeClient
+    monkeypatch.setitem(_sys.modules, "anthropic", fake_mod)
 
     result = rs.synthesize_rules_block(
         brain_dir=tmp_path,

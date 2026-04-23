@@ -9,10 +9,8 @@ Design contracts:
   1. Fail-safe: any error (no provider, network, model timeout, short
      output, parse failure) returns None. Caller falls back to the
      fragmented format. The injection hook never breaks on synth trouble.
-  2. Two provider paths, tried in order:
-       a. anthropic SDK via ANTHROPIC_API_KEY (direct API billing).
-       b. `claude` CLI in print mode (Max-plan OAuth — no key needed).
-     Max-plan users without an exportable API key get synthesis via (b).
+  2. One provider path: anthropic SDK via ANTHROPIC_API_KEY. Returns None
+     when the key is absent — no CLI subprocess fallback.
   3. Cache by sha256(sorted_rule_signatures + task_type + model) in
      <brain>/.synth-cache/{hash}.txt. Per-rule signatures use short
      anchors, not full text, so cache survives wording tweaks.
@@ -28,8 +26,6 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
-import shutil
-import subprocess
 from pathlib import Path
 
 _log = logging.getLogger(__name__)
@@ -152,6 +148,141 @@ def _extract_wisdom_block(raw: str) -> str | None:
     return raw[start : end + len("</brain-wisdom>")]
 
 
+def _call_anthropic(
+    model: str, system: str, user_prompt: str, max_tokens: int, timeout: float
+) -> str | None:
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        _log.debug("synth: ANTHROPIC_API_KEY not set")
+        return None
+    try:
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=key, timeout=timeout)
+        msg = client.messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            system=system,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+        return msg.content[0].text.strip()  # type: ignore[union-attr]
+    except Exception as exc:
+        _log.debug("synth: anthropic SDK failed: %s", exc)
+        return None
+
+
+def _call_openai(
+    model: str, system: str, user_prompt: str, max_tokens: int, timeout: float
+) -> str | None:
+    key = os.environ.get("OPENAI_API_KEY")
+    if not key:
+        _log.debug("synth: OPENAI_API_KEY not set")
+        return None
+    try:
+        import openai
+
+        client = openai.OpenAI(api_key=key, timeout=timeout)
+        resp = client.chat.completions.create(
+            model=model,
+            max_tokens=max_tokens,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        text = resp.choices[0].message.content
+        return text.strip() if text else None
+    except Exception as exc:
+        _log.debug("synth: openai SDK failed: %s", exc)
+        return None
+
+
+def _call_gemini(
+    model: str, system: str, user_prompt: str, max_tokens: int, timeout: float
+) -> str | None:
+    key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+    if not key:
+        _log.debug("synth: GOOGLE_API_KEY / GEMINI_API_KEY not set")
+        return None
+    try:
+        from google import genai
+        from google.genai import types as genai_types
+
+        client = genai.Client(api_key=key)
+        config = genai_types.GenerateContentConfig(
+            system_instruction=system,
+            max_output_tokens=max_tokens,
+        )
+        resp = client.models.generate_content(
+            model=model,
+            contents=user_prompt,
+            config=config,
+        )
+        text = resp.text
+        return text.strip() if text else None
+    except Exception as exc:
+        _log.debug("synth: gemini SDK failed: %s", exc)
+        return None
+
+
+def _call_http(
+    model: str, system: str, user_prompt: str, max_tokens: int, timeout: float
+) -> str | None:
+    """OpenAI-compatible HTTP endpoint. Model string IS the base URL.
+
+    Set GRADATA_HTTP_API_KEY for auth, GRADATA_HTTP_MODEL for the model
+    name to pass in the request body (defaults to 'default').
+    """
+    key = os.environ.get("GRADATA_HTTP_API_KEY", "dummy")
+    model_name = os.environ.get("GRADATA_HTTP_MODEL", "default")
+    try:
+        import openai
+
+        client = openai.OpenAI(api_key=key, base_url=model, timeout=timeout)
+        resp = client.chat.completions.create(
+            model=model_name,
+            max_tokens=max_tokens,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        text = resp.choices[0].message.content
+        return text.strip() if text else None
+    except Exception as exc:
+        _log.debug("synth: HTTP provider failed (%s): %s", model, exc)
+        return None
+
+
+def call_provider(
+    model: str,
+    system: str,
+    user_prompt: str,
+    max_tokens: int = MAX_OUTPUT_TOKENS,
+    timeout: float = SYNTH_TIMEOUT,
+) -> str | None:
+    """Dispatch a synthesis call to the appropriate LLM provider.
+
+    Routing by model prefix:
+        claude-*        → Anthropic SDK (ANTHROPIC_API_KEY)
+        gpt-* / o1* / o3*  → OpenAI SDK (OPENAI_API_KEY)
+        gemini-*        → Google GenAI SDK (GOOGLE_API_KEY or GEMINI_API_KEY)
+        http:// https:// → OpenAI-compatible HTTP (GRADATA_HTTP_API_KEY)
+        <anything else> → Anthropic (default, same as claude-*)
+
+    Returns the raw text response or None on any failure.
+    """
+    m = model.lower()
+    if m.startswith("gpt-") or m.startswith("o1") or m.startswith("o3") or m.startswith("o4"):
+        return _call_openai(model, system, user_prompt, max_tokens, timeout)
+    if m.startswith("gemini-"):
+        return _call_gemini(model, system, user_prompt, max_tokens, timeout)
+    if m.startswith("http://") or m.startswith("https://"):
+        return _call_http(model, system, user_prompt, max_tokens, timeout)
+    # Default: Anthropic (covers claude-* and unknown prefixes).
+    return _call_anthropic(model, system, user_prompt, max_tokens, timeout)
+
+
 def synthesize_rules_block(
     *,
     brain_dir: Path,
@@ -207,78 +338,16 @@ def synthesize_rules_block(
         context,
     )
 
-    # Two provider paths, tried in order:
-    #   1. anthropic SDK (requires ANTHROPIC_API_KEY — direct API billing).
-    #   2. `claude` CLI in print mode (reuses Claude Code Max-plan OAuth —
-    #      no API key needed; subscription covers the call).
-    # Max-plan users have no exportable key, so without the CLI fallback
-    # synthesis would silently no-op for them. Order matters: API path is
-    # cheaper/faster when available; CLI path is the Max-plan cushion.
-    raw: str | None = None
-    provider_used = "none"
-
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        try:
-            import anthropic
-
-            client = anthropic.Anthropic(timeout=SYNTH_TIMEOUT)
-            msg = client.messages.create(
-                model=model,
-                max_tokens=MAX_OUTPUT_TOKENS,
-                system=_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_prompt}],
-            )
-            raw = msg.content[0].text.strip()  # type: ignore[union-attr]
-            provider_used = "sdk"
-        except Exception as exc:
-            _log.debug("anthropic SDK synth failed (%s); trying CLI fallback", exc)
-
+    raw = call_provider(model, _SYSTEM_PROMPT, user_prompt)
     if raw is None:
-        raw = _try_claude_cli(model, user_prompt)
-        if raw is not None:
-            provider_used = "cli"
-
-    if raw is None:
-        _log.debug("all synth providers failed; caller will fall back")
+        _log.debug("synth skipped: all providers failed or no key set")
         return None
 
     block = _extract_wisdom_block(raw)
     if not block or len(block) < 50:
-        _log.debug("synth output malformed or too short (provider=%s)", provider_used)
+        _log.debug("synth output malformed or too short")
         return None
 
     _write_cache(brain_dir, cache_key, block)
-    _log.debug("synth ok via %s (%d chars)", provider_used, len(block))
+    _log.debug("synth ok (%d chars)", len(block))
     return block
-
-
-def _try_claude_cli(model: str, user_prompt: str) -> str | None:
-    """Claude Code CLI fallback: `claude -p <prompt>` using Max-plan OAuth.
-
-    The CLI is bundled with Claude Code and authenticates via the same
-    OAuth session the user is already signed into — no API key required.
-    Emits the combined system+user prompt as a single turn to stdout and
-    returns the captured text, or None on any failure.
-
-    Model mapping: the CLI accepts shorthand names; we pass the Opus
-    family name and let the CLI resolve it.
-    """
-    exe = shutil.which("claude")
-    if not exe:
-        return None
-    full_prompt = f"{_SYSTEM_PROMPT}\n\n---\n\n{user_prompt}"
-    try:
-        proc = subprocess.run(
-            [exe, "-p", full_prompt, "--model", model, "--output-format", "text"],
-            capture_output=True,
-            text=True,
-            timeout=SYNTH_TIMEOUT * 3,  # CLI round-trip is heavier than SDK.
-            encoding="utf-8",
-        )
-        if proc.returncode != 0:
-            _log.debug("claude CLI returned %d: %s", proc.returncode, proc.stderr[:200])
-            return None
-        return proc.stdout.strip() or None
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
-        _log.debug("claude CLI invocation failed: %s", exc)
-        return None

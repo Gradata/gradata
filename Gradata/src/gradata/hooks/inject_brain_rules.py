@@ -50,9 +50,7 @@ HOOK_META = {
     "timeout": 10000,
 }
 
-MAX_RULES = int(os.environ.get("GRADATA_MAX_RULES", "10"))
 MIN_CONFIDENCE = float(os.environ.get("GRADATA_MIN_CONFIDENCE", "0.60"))
-# Meta-rules are high-level principles — separate cap from MAX_RULES.
 MAX_META_RULES = int(os.environ.get("GRADATA_MAX_META_RULES", "5"))
 
 
@@ -260,17 +258,12 @@ def main(data: dict) -> dict | None:
         except ValueError:
             session_seed = abs(hash(session_seed)) % (2**31)
 
-    # Overshoot the ranker so cluster/meta mutex filters have refill candidates.
-    # Without this, the ranker hard-caps at MAX_RULES and any rule suppressed
-    # by a cluster or meta-rule leaves an empty slot that cannot be filled.
-    # Final render loop enforces the MAX_RULES budget after filtering.
-    rank_overshoot = max(MAX_RULES * 3, MAX_RULES + 10)
     ranked = rank_rules(
         rule_dicts,
         current_session=int(data.get("session_number") or 0),
         task_type=data.get("task_type") or data.get("session_type") or None,
         context_keywords=context_keywords or None,
-        max_rules=rank_overshoot,
+        max_rules=len(rule_dicts),
         wiki_boost=wiki_boost or None,
         session_seed=session_seed if isinstance(session_seed, int) else None,
     )
@@ -394,13 +387,7 @@ def main(data: dict) -> dict | None:
     )
     suppressed_by_meta = 0
     individual_lines: list[str] = []
-    # Total <brain-rules> entries = cluster_lines + individual_lines.
-    # Enforce MAX_RULES here (after mutex) so freed slots get refilled from
-    # the overshoot pool, and the final block still respects the budget.
-    render_budget = max(0, MAX_RULES - len(cluster_lines))
     for r in scored:
-        if len(individual_lines) >= render_budget:
-            break
         rule_id = f"{r.category}:{r.description[:40]}"
         if rule_id in cluster_injected_ids:
             continue
@@ -611,10 +598,27 @@ def main(data: dict) -> dict | None:
     # round-trip) and non-deterministic. The session_close hook is the only
     # place we call the LLM; injection is pure read-compose.
     bp_text = _read_brain_prompt(Path(brain_dir))
-    if bp_text:
-        return {"result": bp_text}
+    base = bp_text if bp_text else (mandatory_block + disposition_block + rules_block + meta_block)
 
-    return {"result": mandatory_block + disposition_block + rules_block + meta_block}
+    # Watchdog alert: surface any pending handoff written by ctx_watchdog.
+    watchdog_block = ""
+    pending_handoff_path = Path(brain_dir) / "state" / "pending_handoff.txt"
+    if pending_handoff_path.is_file():
+        try:
+            handoff_file = pending_handoff_path.read_text(encoding="utf-8").strip()
+            if handoff_file:
+                watchdog_block = (
+                    "\n\n<watchdog-alert>\n"
+                    "CONTEXT WINDOW HIT THRESHOLD in the previous session.\n"
+                    f"Handoff written to: {handoff_file}\n"
+                    "Read this file, then run /compact or /clear to continue fresh.\n"
+                    "</watchdog-alert>"
+                )
+            pending_handoff_path.unlink(missing_ok=True)
+        except OSError as exc:
+            _log.debug("watchdog alert injection failed: %s", exc)
+
+    return {"result": base + watchdog_block}
 
 
 if __name__ == "__main__":
