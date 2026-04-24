@@ -185,6 +185,57 @@ def _wiki_categories(context: str) -> set[str]:
     return categories
 
 
+def _build_watchdog_block(brain_dir: str) -> str:
+    """Two-phase watchdog injection across /clear.
+
+    Phase 1 (pre-/clear): pending_handoff.txt exists → alert user, stage content
+    for the post-/clear session by writing post_clear_handoff.txt.
+    Phase 2 (post-/clear): post_clear_handoff.txt exists → inject handoff into the
+    fresh session and consume the file.
+    """
+    state_dir = Path(brain_dir) / "state"
+    pending_handoff_path = state_dir / "pending_handoff.txt"
+    post_clear_path = state_dir / "post_clear_handoff.txt"
+
+    if post_clear_path.is_file():
+        try:
+            content = post_clear_path.read_text(encoding="utf-8").strip()
+            post_clear_path.unlink(missing_ok=True)
+            if content:
+                return (
+                    "\n\n<session-handoff>\n"
+                    "Session cleared. Continuing from handoff:\n\n"
+                    f"{content}\n"
+                    "</session-handoff>"
+                )
+        except OSError as exc:
+            _log.debug("post-clear handoff injection failed: %s", exc)
+        return ""
+
+    if pending_handoff_path.is_file():
+        try:
+            handoff_file = pending_handoff_path.read_text(encoding="utf-8").strip()
+            pending_handoff_path.unlink(missing_ok=True)
+            if handoff_file:
+                try:
+                    content = Path(handoff_file).read_text(encoding="utf-8").strip()
+                    state_dir.mkdir(parents=True, exist_ok=True)
+                    post_clear_path.write_text(content, encoding="utf-8")
+                except OSError as exc:
+                    _log.debug("post-clear staging failed: %s", exc)
+                return (
+                    "\n\n<watchdog-alert>\n"
+                    "CONTEXT WINDOW HIT THRESHOLD in the previous session.\n"
+                    f"Handoff written to: {handoff_file}\n"
+                    "Run /clear — handoff will auto-inject into the fresh session.\n"
+                    "</watchdog-alert>"
+                )
+        except OSError as exc:
+            _log.debug("watchdog alert injection failed: %s", exc)
+
+    return ""
+
+
 def main(data: dict) -> dict | None:
     if parse_lessons is None:
         return None
@@ -600,25 +651,7 @@ def main(data: dict) -> dict | None:
     bp_text = _read_brain_prompt(Path(brain_dir))
     base = bp_text if bp_text else (mandatory_block + disposition_block + rules_block + meta_block)
 
-    # Watchdog alert: surface any pending handoff written by ctx_watchdog.
-    watchdog_block = ""
-    pending_handoff_path = Path(brain_dir) / "state" / "pending_handoff.txt"
-    if pending_handoff_path.is_file():
-        try:
-            handoff_file = pending_handoff_path.read_text(encoding="utf-8").strip()
-            if handoff_file:
-                watchdog_block = (
-                    "\n\n<watchdog-alert>\n"
-                    "CONTEXT WINDOW HIT THRESHOLD in the previous session.\n"
-                    f"Handoff written to: {handoff_file}\n"
-                    "Read this file, then run /compact or /clear to continue fresh.\n"
-                    "</watchdog-alert>"
-                )
-            pending_handoff_path.unlink(missing_ok=True)
-        except OSError as exc:
-            _log.debug("watchdog alert injection failed: %s", exc)
-
-    return {"result": base + watchdog_block}
+    return {"result": base + _build_watchdog_block(brain_dir)}
 
 
 if __name__ == "__main__":

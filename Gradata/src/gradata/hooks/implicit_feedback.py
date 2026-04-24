@@ -143,8 +143,7 @@ def main(data: dict) -> dict | None:
             except Exception as exc:
                 _log.debug("implicit_feedback emit failed: %s", exc)
 
-        signal_names = ", ".join(s["type"] for s in signals)
-        return {"result": f"IMPLICIT FEEDBACK: [{signal_names}]"}
+        return None
     except Exception as exc:
         _log.debug("implicit_feedback hook error: %s", exc)
         return None
