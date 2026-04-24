@@ -129,7 +129,7 @@ class TestCloudClient:
         assert result is True
         mock_post.assert_called_once()
         call_path = mock_post.call_args[0][0]
-        assert call_path == "/telemetry/metrics"
+        assert call_path == "/api/v1/telemetry/metrics"
 
     def test_sync_metrics_updates_last_sync_at_on_success(self, tmp_path: Path):
         cfg = CloudConfig(sync_enabled=True, token="abc")
@@ -168,7 +168,7 @@ class TestCloudClient:
 
         assert result is True
         mock_post.assert_called_once()
-        assert mock_post.call_args[0][0] == "/corpus/contribute"
+        assert mock_post.call_args[0][0] == "/api/v1/corpus/contribute"
 
 
 class TestConvenienceSync:
