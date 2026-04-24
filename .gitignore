@@ -199,6 +199,7 @@ Leads/
 # (subagents running Bash with > redirects land these in cwd)
 # ----------------------------------------------------------------------------
 $null
+BrainDetail
 GateResult
 None
 Path
