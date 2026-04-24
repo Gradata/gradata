@@ -651,7 +651,19 @@ def main(data: dict) -> dict | None:
     bp_text = _read_brain_prompt(Path(brain_dir))
     base = bp_text if bp_text else (mandatory_block + disposition_block + rules_block + meta_block)
 
-    return {"result": base + _build_watchdog_block(brain_dir)}
+    # Code graph activation directive — injected every session so the model
+    # loads tool schemas before falling back to file reads.
+    graph_hint = (
+        "\n\n<code-graph-tools>\n"
+        "MANDATORY FIRST STEP for code exploration: activate the graph before reading files.\n"
+        'Call: ToolSearch({query: "select:mcp__code-review-graph__semantic_search_nodes,'
+        "mcp__code-review-graph__query_graph,mcp__code-review-graph__get_impact_radius,"
+        'mcp__code-review-graph__get_review_context"})\n'
+        "Then use semantic_search_nodes / query_graph instead of Grep/Glob/Read.\n"
+        "</code-graph-tools>"
+    )
+
+    return {"result": base + graph_hint + _build_watchdog_block(brain_dir)}
 
 
 if __name__ == "__main__":
