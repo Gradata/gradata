@@ -1099,6 +1099,61 @@ def cmd_rule(args):
         print(f"error: unknown rule subcommand: {sub}", file=sys.stderr)
 
 
+def cmd_skill_export(args):
+    """Export graduated rules as an Anthropic Claude Skill folder.
+
+    Produces ``<output-dir>/<slug>/SKILL.md`` ready to drop into
+    ``.claude/skills/`` or any Skills-aware harness.
+    """
+    from gradata.enhancements.skill_export import export_skill, write_skill
+
+    brain_root = _resolve_brain_root(args)
+    lessons_path: Path | None = None
+    try:
+        brain = _get_brain(args)
+        lessons_path = brain._find_lessons_path()
+    except Exception:
+        lessons_path = None
+
+    name = args.name.strip()
+    if not name:
+        print("error: skill name required", file=sys.stderr)
+        return
+
+    output_dir = getattr(args, "output_dir", None)
+    if output_dir:
+        skill_md = write_skill(
+            brain_root,
+            name=name,
+            output_dir=Path(output_dir),
+            description=getattr(args, "description", None),
+            category=getattr(args, "category", None),
+            include_meta=not getattr(args, "no_meta", False),
+            lessons_path=lessons_path,
+        )
+        print(f"Wrote skill to {skill_md}")
+        return
+
+    text = export_skill(
+        brain_root,
+        name=name,
+        description=getattr(args, "description", None),
+        category=getattr(args, "category", None),
+        include_meta=not getattr(args, "no_meta", False),
+        lessons_path=lessons_path,
+    )
+    print(text, end="")
+
+
+def cmd_skill(args):
+    """Dispatch `gradata skill <subcommand>`."""
+    sub = getattr(args, "skill_cmd", None)
+    if sub == "export":
+        cmd_skill_export(args)
+    else:
+        print(f"error: unknown skill subcommand: {sub}", file=sys.stderr)
+
+
 def cmd_hooks(args):
     """Manage Claude Code hook integration."""
     action = args.action
@@ -1297,6 +1352,29 @@ def main():
         help="Override transcript root (default: ~/.claude/projects)",
     )
 
+    # skill — export graduated rules as an Anthropic Claude Skill folder
+    p_skill = sub.add_parser("skill", help="Export brain as a Claude Skill folder")
+    skill_sub = p_skill.add_subparsers(dest="skill_cmd", required=True)
+    p_skill_export = skill_sub.add_parser(
+        "export", help="Export graduated rules as a Claude Skill (SKILL.md)"
+    )
+    p_skill_export.add_argument("name", help="Skill name (becomes folder name + frontmatter name)")
+    p_skill_export.add_argument(
+        "--output-dir",
+        "-o",
+        help="Write Skill folder under this dir (default: print SKILL.md to stdout)",
+    )
+    p_skill_export.add_argument(
+        "--description",
+        help="Frontmatter description (default: auto-generated from rule categories)",
+    )
+    p_skill_export.add_argument("--category", help="Only include rules in this category")
+    p_skill_export.add_argument(
+        "--no-meta",
+        action="store_true",
+        help="Skip injectable meta-principles section",
+    )
+
     # rule — user-declared rules (fast-track to RULE tier, try hook install)
     p_rule = sub.add_parser("rule", help="Manage user-declared rules")
     rule_sub = p_rule.add_subparsers(dest="rule_cmd", required=True)
@@ -1339,6 +1417,7 @@ def main():
     commands["logout"] = cmd_logout
     commands["hooks"] = cmd_hooks
     commands["rule"] = cmd_rule
+    commands["skill"] = cmd_skill
     commands["seed"] = cmd_seed
     commands["mine"] = cmd_mine
 
