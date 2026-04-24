@@ -686,10 +686,10 @@ def _retroactive_sweep(brain_dir: str, data: dict) -> None:
     if os.environ.get("GRADATA_TRANSCRIPT") != "1":
         return
     try:
-        from gradata._transcript_providers import get_transcript_source
-        from gradata.hooks.implicit_feedback import SIGNAL_MAP
         from gradata._events import emit
         from gradata._paths import BrainContext
+        from gradata._transcript_providers import get_transcript_source
+        from gradata.hooks.implicit_feedback import SIGNAL_MAP
 
         session_id = data.get("session_id") or data.get("sessionId")
         source = get_transcript_source(brain_dir, session_id)

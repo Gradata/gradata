@@ -55,6 +55,19 @@ node_modules/
 .claude-flow/logs/
 graphify-out/
 **/graphify-out/
+.graphify_*.json
+.graphify_*.txt
+.graphify_python
+.graphify_split.py
+.graphify_ast_run.py
+.graphify_cache_check.py
+
+# Gradata runtime logs
+Gradata/run.log
+**/run.log
+
+# Personal tool/settings archives (Claude Code config backups)
+/.archive/
 
 # Virtual environments
 .venv/

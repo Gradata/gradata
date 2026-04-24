@@ -439,23 +439,37 @@ def test_session_persist_no_brain():
 from gradata.hooks.implicit_feedback import main as feedback_main
 
 
-def test_implicit_feedback_detects_negation():
-    result = feedback_main({"message": "No, that's wrong. Do it differently."})
-    assert result is not None
-    assert "IMPLICIT FEEDBACK" in result["result"]
-    assert "negation" in result["result"]
+def _run_feedback_with_mock(tmp_path, message):
+    with (
+        patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}),
+        patch("gradata._events.emit") as mock_emit,
+    ):
+        result = feedback_main({"message": message})
+    return result, mock_emit
 
 
-def test_implicit_feedback_detects_reminder():
-    result = feedback_main({"message": "I told you to always plan first before building."})
-    assert result is not None
-    assert "reminder" in result["result"]
+def test_implicit_feedback_detects_negation(tmp_path):
+    result, mock_emit = _run_feedback_with_mock(tmp_path, "No, that's wrong. Do it differently.")
+    assert result is None
+    mock_emit.assert_called_once()
+    assert mock_emit.call_args[0][0] == "IMPLICIT_FEEDBACK"
+    assert "negation" in mock_emit.call_args.kwargs["data"]["signals"]
 
 
-def test_implicit_feedback_detects_challenge():
-    result = feedback_main({"message": "Are you sure that's correct? It doesn't look right."})
-    assert result is not None
-    assert "challenge" in result["result"]
+def test_implicit_feedback_detects_reminder(tmp_path):
+    result, mock_emit = _run_feedback_with_mock(
+        tmp_path, "I told you to always plan first before building."
+    )
+    assert result is None
+    mock_emit.assert_called_once()
+    assert "reminder" in mock_emit.call_args.kwargs["data"]["signals"]
+
+
+def test_implicit_feedback_detects_challenge(tmp_path):
+    result, mock_emit = _run_feedback_with_mock(tmp_path, "Are you sure about the approach here?")
+    assert result is None
+    mock_emit.assert_called_once()
+    assert "challenge" in mock_emit.call_args.kwargs["data"]["signals"]
 
 
 def test_implicit_feedback_ignores_neutral():
@@ -464,12 +478,10 @@ def test_implicit_feedback_ignores_neutral():
 
 
 def test_implicit_feedback_emits_event(tmp_path):
-    with (
-        patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}),
-        patch("gradata._events.emit") as mock_emit,
-    ):
-        result = feedback_main({"message": "I told you not to do that, are you sure?"})
-    assert result is not None
+    result, mock_emit = _run_feedback_with_mock(
+        tmp_path, "I told you not to do that, are you sure?"
+    )
+    assert result is None
     mock_emit.assert_called_once()
     assert mock_emit.call_args[0][0] == "IMPLICIT_FEEDBACK"
 
