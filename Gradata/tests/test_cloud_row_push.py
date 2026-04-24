@@ -41,7 +41,7 @@ def test_disabled_by_default(brain: Path):
     assert _cloud_sync.push(brain) == {}
 
 
-def test_disabled_without_credentials(brain: Path, monkeypatch):  # noqa: ARG001
+def test_disabled_without_credentials(brain: Path, monkeypatch):
     monkeypatch.setenv(_cloud_sync.ENV_ENABLED, "1")
     # missing URL/KEY -> still disabled
     assert _cloud_sync.enabled() is False
@@ -178,3 +178,50 @@ def test_post_constraint_violation_logs_error(caplog, monkeypatch):
     ), (
         f"expected ERROR-level constraint log; saw: {[(r.levelno, r.message) for r in caplog.records]}"
     )
+
+
+def test_post_error_body_scrubs_row_values(monkeypatch):
+    """PostgREST 23505 `details`/`hint` echo conflicting row values. Those must
+    never land in the persisted error message because `gradata doctor` prints
+    the file verbatim."""
+    import io
+    import urllib.error
+
+    monkeypatch.setenv(_cloud_sync.ENV_URL, "https://example.supabase.co")
+    monkeypatch.setenv(_cloud_sync.ENV_KEY, "fake-key")
+
+    secret_detail = "Key (id)=(super-secret-tenant-uuid-abc123) already exists."
+    body = (
+        b'{"code":"23505","message":"duplicate key value violates unique constraint '
+        b'\\"events_brain_type_created_at_unique\\"","details":"'
+        + secret_detail.encode()
+        + b'","hint":"row data: data_json=leaked-conversation"}'
+    )
+    err = urllib.error.HTTPError(
+        url="https://example.supabase.co/rest/v1/events",
+        code=409,
+        msg="Conflict",
+        hdrs=None,  # type: ignore[arg-type]
+        fp=io.BytesIO(body),
+    )
+    with patch.object(_cloud_sync.urllib.request, "urlopen", side_effect=err):
+        _accepted, error = _cloud_sync._post(
+            "events", [{"id": 1, "brain_id": "t", "ts": "2026-04-24T00:00:00Z"}]
+        )
+
+    assert error is not None
+    persisted = error["message"]
+    # Safe fields retained.
+    assert "23505" in persisted
+    assert "events_brain_type_created_at_unique" in persisted
+    # Row values (details, hint) stripped.
+    assert "super-secret-tenant-uuid-abc123" not in persisted
+    assert "leaked-conversation" not in persisted
+    assert "data_json" not in persisted
+
+
+def test_scrub_error_body_handles_non_json():
+    """A non-JSON body (e.g. HTML 502 page) must not crash and must not leak."""
+    scrubbed = _cloud_sync._scrub_error_body("<html>error</html>")
+    assert "non-json" in scrubbed
+    assert "<html>" not in scrubbed

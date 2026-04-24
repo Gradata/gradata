@@ -309,18 +309,28 @@ _POST_BATCH_SIZE: Final[int] = 500
 _PUSH_ERROR_FILENAME: Final[str] = "cloud_push_error.json"
 
 
-def _coerce_post_result(result: Any) -> tuple[int, dict | None]:
-    """Normalize legacy int returns from mocked _post into the new tuple shape.
+def _scrub_error_body(body: str) -> str:
+    """Reduce a PostgREST error body to the subset safe to persist.
 
-    Existing tests patch ``_post`` with ``return_value=1`` / ``return_value=0``;
-    tolerate that so the contract change stays backwards-compatible for callers
-    that only care about the accepted count.
+    Postgres ``23505`` errors echo the conflicting row's column values in the
+    ``details``/``hint`` fields (e.g. ``"Key (id)=(uuid-value) already
+    exists"``). ``cloud_push_error.json`` is read and printed by ``gradata
+    doctor``, so leaking those values would surface tenant data on unrelated
+    screens. Keeps ``code`` and the first 120 chars of ``message`` (enough for
+    the constraint name); drops everything else.
     """
-    if isinstance(result, tuple):
-        return result
-    if isinstance(result, int):
-        return result, None
-    return 0, None
+    try:
+        parsed = json.loads(body)
+    except (json.JSONDecodeError, ValueError):
+        return f"<non-json body, {len(body)} bytes>"
+    if not isinstance(parsed, dict):
+        return f"<non-object body, {len(body)} bytes>"
+    safe: dict[str, Any] = {}
+    for k in ("code", "message"):
+        v = parsed.get(k)
+        if isinstance(v, str):
+            safe[k] = v[:120]
+    return json.dumps(safe)
 
 
 def _post(table: str, rows: list[dict[str, Any]]) -> tuple[int, dict | None]:
@@ -354,7 +364,7 @@ def _post(table: str, rows: list[dict[str, Any]]) -> tuple[int, dict | None]:
         total = 0
         first_error: dict | None = None
         for i in range(0, len(rows), _POST_BATCH_SIZE):
-            count, err = _coerce_post_result(_post(table, rows[i : i + _POST_BATCH_SIZE]))
+            count, err = _post(table, rows[i : i + _POST_BATCH_SIZE])
             total += count
             if err is not None and first_error is None:
                 first_error = err
@@ -390,23 +400,24 @@ def _post(table: str, rows: list[dict[str, Any]]) -> tuple[int, dict | None]:
     except urllib.error.HTTPError as e:
         body_snippet = e.read()[:500].decode("utf-8", errors="replace")
         is_constraint = e.code == 409 or "23505" in body_snippet
+        scrubbed = _scrub_error_body(body_snippet)
         if is_constraint:
             _log.error(
                 "cloud_sync: %s constraint violation (HTTP %s): %s",
                 table,
                 e.code,
-                body_snippet[:200],
+                scrubbed,
             )
         else:
             _log.warning(
                 "cloud_sync: %s HTTP %s: %s",
                 table,
                 e.code,
-                body_snippet[:200],
+                scrubbed,
             )
         return 0, {
             "code": e.code,
-            "message": body_snippet[:500],
+            "message": scrubbed,
             "constraint_violation": is_constraint,
         }
     except urllib.error.URLError as e:
@@ -421,16 +432,28 @@ def _post(table: str, rows: list[dict[str, Any]]) -> tuple[int, dict | None]:
 def _record_push_error(brain_dir: Path, error: dict) -> None:
     """Persist last cloud-push error so `gradata doctor` surfaces it.
 
+    Atomic: writes to a tmp sibling then ``os.replace`` — on any platform
+    concurrent readers never observe a truncated-then-rewritten file. This
+    matters because daemon + MCP server can both call ``push()`` while a user
+    runs ``gradata doctor``; a partial read would mask the violation as
+    ``error file unreadable`` instead of surfacing the constraint.
+
     Best-effort: swallows OSError (read-only FS, permissions) because cloud
     push must not take down the caller on disk hiccups.
     """
+    target = brain_dir / _PUSH_ERROR_FILENAME
+    tmp = target.with_suffix(target.suffix + ".tmp")
     try:
         payload = {**error, "recorded_at": _iso_now()}
-        (brain_dir / _PUSH_ERROR_FILENAME).write_text(
-            json.dumps(payload, indent=2), encoding="utf-8"
-        )
+        tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        os.replace(tmp, target)
     except OSError as exc:
         _log.debug("cloud_sync: could not record push error: %s", exc)
+        try:
+            if tmp.exists():
+                tmp.unlink()
+        except OSError:
+            pass
 
 
 def _clear_push_error(brain_dir: Path) -> None:
@@ -497,7 +520,7 @@ def push(brain_dir: str | Path) -> dict[str, int]:
                     all_ok = False
             if not transformed:
                 continue
-            accepted, error = _coerce_post_result(_post(table, transformed))
+            accepted, error = _post(table, transformed)
             pushed[table] = accepted
             if error is not None and last_error is None:
                 last_error = {**error, "table": table}
