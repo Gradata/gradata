@@ -415,19 +415,28 @@ def _check_cloud_push_error(brain_path):
     ``_cloud_sync.push`` writes ``cloud_push_error.json`` when a POST fails
     with an HTTP/constraint error. Without this check, watermark stalls from
     23505 unique-violation retries are invisible until someone greps logs.
+
+    The resolved brain path is always included in the detail so a user with
+    multiple brains can confirm which one was inspected — the push writer and
+    the doctor reader can diverge in multi-brain setups where the daemon was
+    started with an explicit ``brain_dir`` that differs from ``BRAIN_DIR``.
     """
     if brain_path is None:
         return _skip("cloud_push_error")
     p = brain_path / "cloud_push_error.json"
     if not p.exists():
-        return {"name": "cloud_push_error", "status": "ok", "detail": "no recent push errors"}
+        return {
+            "name": "cloud_push_error",
+            "status": "ok",
+            "detail": f"no recent push errors (checked {brain_path})",
+        }
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as e:
         return {
             "name": "cloud_push_error",
             "status": "warn",
-            "detail": f"error file unreadable: {e}",
+            "detail": f"error file unreadable at {p}: {e}",
         }
     table = data.get("table", "?")
     code = data.get("code", "?")
@@ -438,13 +447,14 @@ def _check_cloud_push_error(brain_path):
             "status": "fail",
             "detail": (
                 f"last push to '{table}' blocked by constraint (HTTP {code}) at {recorded} "
-                f"— watermark stalled; run `gradata migrate --brain <dir>` or dedupe rows"
+                f"in {brain_path} — watermark stalled; run `gradata migrate --brain <dir>` "
+                f"or dedupe rows"
             ),
         }
     return {
         "name": "cloud_push_error",
         "status": "warn",
-        "detail": f"last push to '{table}' returned HTTP {code} at {recorded}",
+        "detail": f"last push to '{table}' returned HTTP {code} at {recorded} in {brain_path}",
     }
 
 

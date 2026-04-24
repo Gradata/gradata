@@ -202,3 +202,26 @@ def test_cloud_push_error_non_constraint_warns(tmp_path):
 def test_cloud_push_error_skipped_when_no_brain_dir():
     result = _doctor._check_cloud_push_error(None)
     assert result["status"] == "skip"
+
+
+def test_cloud_push_error_detail_includes_brain_path(tmp_path):
+    """Detail must name the resolved brain path so a multi-brain user can
+    spot a divergence between the dir push writes to and the dir doctor reads."""
+    ok = _doctor._check_cloud_push_error(tmp_path)
+    assert str(tmp_path) in ok["detail"]
+
+    import json as _json
+
+    (tmp_path / "cloud_push_error.json").write_text(
+        _json.dumps(
+            {
+                "table": "events",
+                "code": 409,
+                "constraint_violation": True,
+                "recorded_at": "2026-04-24T05:50:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    fail = _doctor._check_cloud_push_error(tmp_path)
+    assert str(tmp_path) in fail["detail"]
