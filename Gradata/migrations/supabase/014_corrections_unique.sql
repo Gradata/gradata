@@ -1,7 +1,13 @@
 -- Migration 014: Deduplicate corrections + add UNIQUE constraint
 -- id is UUID, so we use ctid (not MIN(id)) to pick one row per duplicate group.
--- Applied to prod 2026-04-24 via Management API (constraint only; 0 duplicates found).
--- Run in Supabase SQL editor.
+-- Applied to prod 2026-04-24 via Management API (0 duplicates found).
+--
+-- Idempotency: guards against pre-existing UNIQUE constraints on the same
+-- columns (prod already had `corrections_brain_session_desc_key` from the
+-- initial table's inline UNIQUE(...) clause — this migration is a no-op there,
+-- kept for fresh-DB parity).
+--
+-- Run in Supabase SQL editor or via Management API.
 
 BEGIN;
 
@@ -12,8 +18,24 @@ WHERE a.brain_id = b.brain_id
   AND a.description = b.description
   AND a.ctid > b.ctid;
 
-ALTER TABLE corrections
-  ADD CONSTRAINT corrections_brain_session_description_unique
-  UNIQUE (brain_id, session, description);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint c
+    JOIN pg_class t ON t.oid = c.conrelid
+    WHERE t.relname = 'corrections'
+      AND c.contype = 'u'
+      AND c.conkey @> ARRAY[
+        (SELECT attnum FROM pg_attribute WHERE attrelid = t.oid AND attname = 'brain_id'),
+        (SELECT attnum FROM pg_attribute WHERE attrelid = t.oid AND attname = 'session'),
+        (SELECT attnum FROM pg_attribute WHERE attrelid = t.oid AND attname = 'description')
+      ]::smallint[]
+  ) THEN
+    ALTER TABLE corrections
+      ADD CONSTRAINT corrections_brain_session_description_unique
+      UNIQUE (brain_id, session, description);
+  END IF;
+END $$;
 
 COMMIT;

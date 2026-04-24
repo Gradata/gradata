@@ -1,5 +1,83 @@
 # Changelog
 
+## [Unreleased] — post-0.6.0 (2026-04-23 → 2026-04-24)
+
+33 commits ahead of public `origin/main`. Not yet pushed.
+
+### Added
+
+- **Cloud sync + Supabase schema hardening.** Dual-write path now pushes local
+  brain events to Supabase with a transform layer (`_cloud_sync.py`) that maps
+  SQLite rows to cloud schema + scrubs JSONB payloads. Watermark-based
+  incremental sync via `sync_state` table (migration 003).
+- **Local SQLite migrations 002 + 003.** `002_event_id_device_id_content_hash`
+  adds sync-stable identifiers; `003_add_sync_state` creates the watermark table.
+  Both idempotent — `CREATE TABLE IF NOT EXISTS` + `add_column_if_missing` + `has_applied()` gating.
+- **Supabase migrations 014/015/016 applied to prod.** UNIQUE constraints on
+  `corrections(brain_id, session, description)` and `events(brain_id, type, created_at)`,
+  plus `brains.last_used_at` column. Reference SQL tracked under
+  `Gradata/migrations/supabase/`; README documents application state + governance.
+- **Canonical graduation + persistent brain_prompt + two-provider synth**
+  (`f91d5557`). `<brain-wisdom>` now regenerates on every graduation-triggering
+  session close, model-agnostic.
+- **Context-window watchdog hook** (`ctx_watchdog`, commit `56bac80c`): auto-handoff
+  when Claude Code context hits threshold. Reduces forced /clear losses.
+- **Auto-compact handoff pipeline** (`485cd7b4`): two-phase /clear injection so
+  session state survives compaction.
+- **Code-review-graph activation enforced** before any Glob/Grep call
+  (`fd956ec4`) — pushes agents to use the structural graph instead of brute-force
+  file search.
+- **Cloud-health probes in `gradata doctor`** (`d5425337`): reachability + auth
+  token validation + data sanity.
+- **`lesson_applications` audit loop** (`d668bab7`): closes the
+  compound-quality feedback cycle.
+- **Implicit feedback: text-speak detection** (`5a6da455`, `1a497e85`):
+  catches corrections phrased as "r/u/dont/cant".
+
+### Changed
+
+- **Statusline session count** sourced from Anthropic JSONL (`18166663`,
+  `74af66e6`, `a405447d`) — replaces stale `loop-state.md` counter (367 → 659).
+- **Meta-rules `llm_synth` runs locally**, not cloud-side (`0b797b73`).
+  Removes cloud-dependence for a core graduation primitive.
+- **Streamlit dashboard deprecated** (`3ed9438c`). `gradata.ai` web dashboard
+  now covers all panels (`/rules`, `/corrections`, `/self-healing`,
+  `/observability`). Legacy CLI archived to
+  `Gradata/.archive/dashboard_streamlit_deprecated_2026-04-23.py`.
+- **`implicit_feedback` hook emit-only contract** (`aace2410`): main() returns
+  None uniformly; signals emit via `IMPLICIT_FEEDBACK` event instead of as
+  UserPromptSubmit injection to reduce prompt noise.
+
+### Fixed
+
+- **Bare `except: pass` blocks in core SDK** now log at DEBUG (`812eda9c`).
+  Removes silent-failure class from Layer 0.
+- **MISFIRE_PENALTY sign in `agent_graduation`** (`03ddb6f9`): penalties
+  were being applied as bonuses.
+- **Session-start hook**: correct lessons path + brain_prompt load +
+  tighten stale-notes detection (`c2cc47b6`).
+- **Cluster injection line count** now scopes to `<brain-rules>` block only,
+  not full prompt (`118122a2`).
+- **Public docs truth-pass** on cloud-vs-SDK boundary (`978e4c7f`): removed
+  stale cloud-graduation claims from Pro tier marketing (`2c65bf2a`).
+
+### Tests
+
+- **3932 pass, 3 skip** (up from 2598 in v0.6.0). No xfail remaining.
+- Meta-rules cloud-gated tests unskipped (`509bf927`).
+- `pipeline_e2e`: removed "not yet implemented" skips, bumped fixtures (`2a781645`).
+- `test_implicit_feedback`: coverage for text-speak + multi-signal inputs.
+
+### Security / Governance
+
+- **Supabase migrations now idempotent.** 014/015 wrapped in `DO $$` blocks
+  that check `pg_constraint` for existing UNIQUE on same columns before
+  adding. Prod state: both tables have pre-existing `_key` variants (from
+  inline `UNIQUE()` in original CREATE TABLE) + the new `_unique` variants —
+  redundant but harmless. Documented in `migrations/supabase/README.md`.
+- `.gitignore` hardened against bash-redirect artifacts (`0`, `BrainDetail`),
+  graphify cache files (`.graphify_*`), and run.log spray.
+
 ## [0.6.0] - 2026-04-15 — "We opened up"
 
 **Strategic pivot:** the moat is not the algorithm code, it's the hosted service.

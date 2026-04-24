@@ -23,9 +23,20 @@ Or paste into the Supabase SQL editor.
 
 | File | Applied | Notes |
 |------|---------|-------|
-| 014_corrections_unique.sql | 2026-04-24 | 0 duplicates found — constraint only |
-| 015_events_unique.sql      | 2026-04-24 | 0 duplicates found — constraint only |
+| 014_corrections_unique.sql | 2026-04-24 | 0 duplicates found. Prod already had `corrections_brain_session_desc_key` (inline UNIQUE from CREATE TABLE) — migration added a redundant `_unique` constraint on same columns. Both enforce; harmless. Migration now guards with a `pg_constraint` lookup so re-runs are no-ops. |
+| 015_events_unique.sql      | 2026-04-24 | Same pattern: prod already had `events_brain_type_created_at_key`. Migration guards with `pg_constraint` lookup. |
 | 016_brains_last_used_at.sql| 2026-04-24 | Column already existed; idempotent `IF NOT EXISTS` |
+
+### Prod constraint state (verified 2026-04-24)
+
+```
+corrections_brain_session_desc_key              UNIQUE (brain_id, session, description)  -- pre-existing
+corrections_brain_session_description_unique    UNIQUE (brain_id, session, description)  -- from 014
+events_brain_type_created_at_key                UNIQUE (brain_id, type, created_at)      -- pre-existing
+events_brain_type_created_at_unique             UNIQUE (brain_id, type, created_at)      -- from 015
+```
+
+Redundant pairs are functionally harmless (same column set, same enforcement). Dropping the `_key` variants is a future cleanup migration — not urgent.
 
 ## Convention
 
