@@ -5,9 +5,11 @@ the regex expansion in this session (apostrophe-less contractions,
 "r" for "are", trailing ".." challenge markers, etc.).
 """
 
-import pytest
+import logging
+from unittest.mock import patch
 
-from gradata.hooks.implicit_feedback import _detect_signals
+from gradata.hooks import implicit_feedback
+from gradata.hooks.implicit_feedback import _detect_signals, main
 
 
 def _signal_types(text: str) -> set[str]:
@@ -94,3 +96,37 @@ class TestEdgeCases:
 
     def test_short_unrelated_string(self):
         assert _detect_signals("ok") == []
+
+
+# ---------------------------------------------------------------------------
+# main() path — silent-drop guard when BRAIN_DIR is unresolved
+# ---------------------------------------------------------------------------
+
+
+class TestMainNoBrainDir:
+    """When resolve_brain_dir() returns None, main() must still detect signals
+    and log a debug breadcrumb instead of dropping them silently.
+    """
+
+    def test_main_logs_when_brain_dir_none(self, caplog):
+        caplog.set_level(logging.DEBUG, logger="gradata.hooks.implicit_feedback")
+        data = {"prompt": "Why r you not asking council again.."}
+        with patch.object(implicit_feedback, "resolve_brain_dir", return_value=None):
+            result = main(data)
+        assert result is None
+        debug_lines = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
+        assert any("BRAIN_DIR unresolved" in m for m in debug_lines), (
+            f"expected BRAIN_DIR-unresolved debug log; saw: {debug_lines}"
+        )
+
+    def test_main_no_log_when_no_signals(self, caplog):
+        caplog.set_level(logging.DEBUG, logger="gradata.hooks.implicit_feedback")
+        data = {"prompt": "hello there, just a regular message"}
+        with patch.object(implicit_feedback, "resolve_brain_dir", return_value=None):
+            result = main(data)
+        assert result is None
+        assert not any("BRAIN_DIR unresolved" in r.message for r in caplog.records)
+
+    def test_main_no_crash_on_short_message(self):
+        with patch.object(implicit_feedback, "resolve_brain_dir", return_value=None):
+            assert main({"prompt": "ok"}) is None

@@ -142,6 +142,14 @@ def main(data: dict) -> dict | None:
                     )
             except Exception as exc:
                 _log.debug("implicit_feedback emit failed: %s", exc)
+        else:
+            # BRAIN_DIR unset — detection worked but signals can't be persisted.
+            # Log so fresh-install/CI environments don't silently lose corrections.
+            _log.debug(
+                "implicit_feedback: BRAIN_DIR unresolved, dropping %d signal(s): %s",
+                len(signals),
+                [s["type"] for s in signals],
+            )
 
         return None
     except Exception as exc:
