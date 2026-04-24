@@ -129,8 +129,10 @@ class CloudClient:
             return {"status": "not_connected"}
 
         try:
+            # Backend route: POST /api/v1/sync (see cloud/app/routes/sync.py).
+            # DEFAULT_ENDPOINT already includes /api/v1 so we append /sync only.
             return self._post(
-                "/brains/sync",
+                "/sync",
                 {
                     "brain_id": self._brain_id,
                     "manifest": self._read_local_manifest(),

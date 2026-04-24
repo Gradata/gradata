@@ -1,4 +1,5 @@
 """Tests for gradata.cloud.sync — opt-in cloud telemetry client."""
+
 from __future__ import annotations
 
 import json
@@ -94,7 +95,7 @@ class TestCloudClient:
         assert result is True
         mock_post.assert_called_once()
         call_path = mock_post.call_args[0][0]
-        assert call_path == "/v1/telemetry/metrics"
+        assert call_path == "/api/v1/telemetry/metrics"
 
     def test_sync_metrics_updates_last_sync_at_on_success(self, tmp_path: Path):
         cfg = CloudConfig(sync_enabled=True, token="abc")
@@ -156,6 +157,7 @@ class TestPayload:
 
     def test_payload_serializes_to_json(self):
         from dataclasses import asdict
+
         p = _payload()
         data = asdict(p)
         json_str = json.dumps(data)
