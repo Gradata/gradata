@@ -1,0 +1,235 @@
+"""Export graduated rules as an Anthropic Claude Skill folder.
+
+A Claude Skill is a directory containing ``SKILL.md`` with YAML frontmatter
+(``name``, ``description``) plus a markdown body. Skills are discovered by
+the harness on demand; the model loads them when the user message or task
+context matches the description.
+
+Gradata's bet: graduated RULE-tier lessons ARE the "gotchas" section of a
+Skill — but generated from real corrections instead of hand-written. This
+module turns a brain into a shippable Skill folder so the same gotchas
+that fire in your IDE can ship as portable Skills consumed by anyone.
+
+Usage (library):
+    from gradata.enhancements.skill_export import export_skill, write_skill
+
+    # Generate SKILL.md content
+    text = export_skill(brain_root, name="sales-followups")
+
+    # Or write a complete Skill folder
+    skill_dir = write_skill(brain_root, name="sales-followups",
+                            output_dir=Path("./skills"))
+
+Usage (CLI):
+    gradata skill export sales-followups --output-dir ./skills
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from gradata.enhancements.rule_export import _parse_rules
+
+# Anthropic Skills frontmatter description has a 1024-char ceiling.
+# Source: anthropic.com/news/agent-skills (2025-10-16 launch announcement).
+# We clip generated descriptions defensively at 900 to leave headroom.
+_DESC_MAX_LEN = 900
+
+
+def _slugify(name: str) -> str:
+    """Lowercase, hyphenate. Strip everything that isn't alphanumeric or hyphen.
+
+    Anthropic's docs recommend skill names use lowercase-hyphenated form so
+    the folder name matches the frontmatter ``name`` and is shell-safe.
+    """
+    import re as _re
+
+    cleaned = _re.sub(r"[^a-zA-Z0-9-]+", "-", name.strip().lower())
+    cleaned = _re.sub(r"-+", "-", cleaned).strip("-")
+    return cleaned or "gradata-skill"
+
+
+def _auto_description(rules: list[tuple[str, str]], skill_name: str) -> str:
+    """Synthesize a frontmatter description from rule categories.
+
+    Format: ``Use when working on <cat1>, <cat2>, .... <N> rules graduated
+    from real corrections.`` This keeps the trigger surface obvious to the
+    model's Skill-discovery layer without hand-writing copy.
+    """
+    if not rules:
+        return f"{skill_name} skill (no graduated rules yet)."
+    cats: list[str] = []
+    seen: set[str] = set()
+    for cat, _ in rules:
+        c = (cat or "general").strip().lower()
+        if c not in seen:
+            seen.add(c)
+            cats.append(c)
+    cat_list = ", ".join(cats[:6])
+    if len(cats) > 6:
+        cat_list += f", +{len(cats) - 6} more"
+    desc = (
+        f"Use when working on {cat_list}. "
+        f"{len(rules)} rules graduated from real corrections in this brain."
+    )
+    if len(desc) > _DESC_MAX_LEN:
+        desc = desc[: _DESC_MAX_LEN - 3] + "..."
+    return desc
+
+
+def _filter_rules(rules: list[tuple[str, str]], category: str | None) -> list[tuple[str, str]]:
+    if not category:
+        return rules
+    needle = category.strip().lower()
+    return [(c, d) for c, d in rules if (c or "").strip().lower() == needle]
+
+
+def _format_skill_md(
+    name: str,
+    description: str,
+    rules: list[tuple[str, str]],
+    meta_principles: list[str],
+) -> str:
+    """Render the SKILL.md content. Pure string formatting — no I/O."""
+    by_cat: dict[str, list[str]] = {}
+    for cat, desc in rules:
+        key = cat or "general"
+        by_cat.setdefault(key, []).append(desc)
+
+    lines: list[str] = []
+    lines.append("---")
+    lines.append(f"name: {name}")
+    # Quote the description so colons / hashes inside don't break YAML.
+    safe_desc = description.replace('"', '\\"')
+    lines.append(f'description: "{safe_desc}"')
+    lines.append("---")
+    lines.append("")
+    lines.append(f"# {name}")
+    lines.append("")
+    lines.append(
+        "Apply these rules when relevant. They were graduated from real "
+        "corrections — trust them over default behavior."
+    )
+    lines.append("")
+
+    if rules:
+        lines.append("## Gotchas")
+        lines.append("")
+        for cat in sorted(by_cat):
+            lines.append(f"### {cat}")
+            lines.append("")
+            for desc in by_cat[cat]:
+                lines.append(f"- {desc}")
+            lines.append("")
+    else:
+        lines.append("## Gotchas")
+        lines.append("")
+        lines.append("_No graduated rules yet. Run `gradata stats` to see progress._")
+        lines.append("")
+
+    if meta_principles:
+        lines.append("## Meta-principles")
+        lines.append("")
+        lines.append("Higher-order patterns synthesized from clusters of related rules:")
+        lines.append("")
+        for principle in meta_principles:
+            lines.append(f"- {principle}")
+        lines.append("")
+
+    lines.append("---")
+    lines.append("")
+    rule_count = len(rules)
+    meta_count = len(meta_principles)
+    lines.append(
+        f"*Generated by `gradata skill export` from {rule_count} graduated "
+        f"rule{'s' if rule_count != 1 else ''} "
+        f"and {meta_count} meta-principle{'s' if meta_count != 1 else ''}.*"
+    )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _load_meta_principles(brain_root: Path) -> list[str]:
+    """Load injectable meta-rule principles. Empty list on any failure.
+
+    Meta-rule storage is opt-in — the cloud build writes them, OSS leaves
+    the table empty. We tolerate missing tables / DB without raising so a
+    fresh brain still produces a usable Skill.
+    """
+    try:
+        from gradata.enhancements.meta_rules import INJECTABLE_META_SOURCES
+        from gradata.enhancements.meta_rules_storage import load_meta_rules
+    except ImportError:
+        return []
+
+    db_path = brain_root / "system.db"
+    if not db_path.exists():
+        return []
+    try:
+        metas = load_meta_rules(db_path)
+    except Exception:
+        return []
+    return [
+        m.principle
+        for m in metas
+        if getattr(m, "source", "deterministic") in INJECTABLE_META_SOURCES
+    ]
+
+
+def export_skill(
+    brain_root: Path,
+    *,
+    name: str,
+    description: str | None = None,
+    category: str | None = None,
+    include_meta: bool = True,
+    lessons_path: Path | None = None,
+) -> str:
+    """Return the SKILL.md content for the given brain.
+
+    ``name`` becomes the frontmatter ``name`` and is slugified for safety.
+    ``description`` is auto-synthesized from rule categories if omitted.
+    ``category`` filters rules to a single category (case-insensitive).
+    ``include_meta`` controls whether injectable meta-principles are added.
+    ``lessons_path`` overrides the default ``brain_root / "lessons.md"``.
+    """
+    slug = _slugify(name)
+    rules = _parse_rules(Path(brain_root), lessons_path=lessons_path)
+    rules = _filter_rules(rules, category)
+    metas = _load_meta_principles(Path(brain_root)) if include_meta else []
+    desc = description.strip() if description else _auto_description(rules, slug)
+    if len(desc) > _DESC_MAX_LEN:
+        desc = desc[: _DESC_MAX_LEN - 3] + "..."
+    return _format_skill_md(slug, desc, rules, metas)
+
+
+def write_skill(
+    brain_root: Path,
+    *,
+    name: str,
+    output_dir: Path,
+    description: str | None = None,
+    category: str | None = None,
+    include_meta: bool = True,
+    lessons_path: Path | None = None,
+) -> Path:
+    """Write a complete Skill folder ``<output_dir>/<slug>/SKILL.md``.
+
+    Returns the path to the written ``SKILL.md`` file. Creates the folder
+    tree if it doesn't exist. Overwrites an existing SKILL.md without
+    warning — caller is responsible for git/backup hygiene.
+    """
+    slug = _slugify(name)
+    text = export_skill(
+        Path(brain_root),
+        name=slug,
+        description=description,
+        category=category,
+        include_meta=include_meta,
+        lessons_path=lessons_path,
+    )
+    skill_dir = Path(output_dir) / slug
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    skill_md = skill_dir / "SKILL.md"
+    skill_md.write_text(text, encoding="utf-8")
+    return skill_md
