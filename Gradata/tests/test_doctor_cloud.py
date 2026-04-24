@@ -136,6 +136,7 @@ def test_diagnose_cloud_only(isolated_config):
         "cloud_reachable",
         "cloud_auth",
         "cloud_has_data",
+        "cloud_push_error",
     }
 
 
@@ -144,3 +145,60 @@ def test_diagnose_no_cloud_skips_cloud_checks(tmp_path):
     names = {c["name"] for c in report["checks"]}
     assert "cloud_config" not in names
     assert "python_version" in names
+
+
+def test_cloud_push_error_ok_when_file_missing(tmp_path):
+    """No error file present → doctor reports ok."""
+    result = _doctor._check_cloud_push_error(tmp_path)
+    assert result["status"] == "ok"
+    assert "no recent" in result["detail"]
+
+
+def test_cloud_push_error_constraint_violation_fails(tmp_path):
+    """A recorded 23505 constraint violation must surface as a `fail` so the
+    user knows the watermark is stalled."""
+    import json as _json
+
+    (tmp_path / "cloud_push_error.json").write_text(
+        _json.dumps(
+            {
+                "table": "events",
+                "code": 409,
+                "message": "duplicate key value",
+                "constraint_violation": True,
+                "recorded_at": "2026-04-24T04:50:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = _doctor._check_cloud_push_error(tmp_path)
+    assert result["status"] == "fail"
+    assert "events" in result["detail"]
+    assert "409" in result["detail"]
+
+
+def test_cloud_push_error_non_constraint_warns(tmp_path):
+    """Non-constraint HTTP failures are warn, not fail (transient)."""
+    import json as _json
+
+    (tmp_path / "cloud_push_error.json").write_text(
+        _json.dumps(
+            {
+                "table": "lessons",
+                "code": 500,
+                "message": "Internal Server Error",
+                "constraint_violation": False,
+                "recorded_at": "2026-04-24T04:50:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = _doctor._check_cloud_push_error(tmp_path)
+    assert result["status"] == "warn"
+    assert "lessons" in result["detail"]
+    assert "500" in result["detail"]
+
+
+def test_cloud_push_error_skipped_when_no_brain_dir():
+    result = _doctor._check_cloud_push_error(None)
+    assert result["status"] == "skip"

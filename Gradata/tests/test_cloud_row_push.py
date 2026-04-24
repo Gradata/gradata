@@ -56,7 +56,7 @@ def test_push_filters_by_tenant(brain: Path, monkeypatch):
 
     def fake_post(table, rows):
         captured.append((table, rows))
-        return len(rows)
+        return len(rows), None
 
     with patch.object(_cloud_sync, "_post", side_effect=fake_post):
         result = _cloud_sync.push(brain)
@@ -73,7 +73,7 @@ def test_push_updates_sync_state(brain: Path, monkeypatch):
     monkeypatch.setenv(_cloud_sync.ENV_URL, "https://example.supabase.co")
     monkeypatch.setenv(_cloud_sync.ENV_KEY, "fake-key")
 
-    with patch.object(_cloud_sync, "_post", return_value=1):
+    with patch.object(_cloud_sync, "_post", return_value=(1, None)):
         _cloud_sync.push(brain)
 
     conn = sqlite3.connect(brain / "system.db")
@@ -100,8 +100,81 @@ def test_skips_tables_without_tenant_id_column(brain: Path, monkeypatch):
     monkeypatch.setenv(_cloud_sync.ENV_KEY, "fake-key")
 
     # No lessons table at all -> PRAGMA returns empty -> skip
-    with patch.object(_cloud_sync, "_post", return_value=0) as mp:
+    with patch.object(_cloud_sync, "_post", return_value=(0, None)) as mp:
         _cloud_sync.push(brain)
 
     called_tables = [c.args[0] for c in mp.call_args_list]
     assert "lessons" not in called_tables
+
+
+def test_push_records_constraint_error(brain: Path, monkeypatch):
+    """A 23505 constraint violation must leave a cloud_push_error.json for doctor."""
+    monkeypatch.setenv(_cloud_sync.ENV_ENABLED, "1")
+    monkeypatch.setenv(_cloud_sync.ENV_URL, "https://example.supabase.co")
+    monkeypatch.setenv(_cloud_sync.ENV_KEY, "fake-key")
+
+    err = {
+        "code": 409,
+        "message": '{"code":"23505","message":"duplicate key"}',
+        "constraint_violation": True,
+    }
+    with patch.object(_cloud_sync, "_post", return_value=(0, err)):
+        _cloud_sync.push(brain)
+
+    error_file = brain / "cloud_push_error.json"
+    assert error_file.exists(), "expected cloud_push_error.json to be written"
+    import json as _json
+
+    payload = _json.loads(error_file.read_text())
+    assert payload["constraint_violation"] is True
+    assert payload["code"] == 409
+    assert payload["table"] == "events"
+    assert "recorded_at" in payload
+
+
+def test_push_clears_error_on_success(brain: Path, monkeypatch):
+    """A successful full push must remove any stale cloud_push_error.json."""
+    monkeypatch.setenv(_cloud_sync.ENV_ENABLED, "1")
+    monkeypatch.setenv(_cloud_sync.ENV_URL, "https://example.supabase.co")
+    monkeypatch.setenv(_cloud_sync.ENV_KEY, "fake-key")
+
+    stale = brain / "cloud_push_error.json"
+    stale.write_text('{"code":409,"constraint_violation":true}', encoding="utf-8")
+
+    with patch.object(_cloud_sync, "_post", return_value=(1, None)):
+        _cloud_sync.push(brain)
+
+    assert not stale.exists(), "successful push should clear prior error file"
+
+
+def test_post_constraint_violation_logs_error(caplog, monkeypatch):
+    """HTTP 409 / Postgres 23505 must log at ERROR, not WARNING."""
+    import io
+    import logging
+    import urllib.error
+
+    monkeypatch.setenv(_cloud_sync.ENV_URL, "https://example.supabase.co")
+    monkeypatch.setenv(_cloud_sync.ENV_KEY, "fake-key")
+
+    err = urllib.error.HTTPError(
+        url="https://example.supabase.co/rest/v1/events",
+        code=409,
+        msg="Conflict",
+        hdrs=None,  # type: ignore[arg-type]
+        fp=io.BytesIO(b'{"code":"23505","message":"duplicate key value"}'),
+    )
+    with patch.object(_cloud_sync.urllib.request, "urlopen", side_effect=err):
+        caplog.set_level(logging.ERROR, logger="gradata.cloud_sync")
+        accepted, error = _cloud_sync._post(
+            "events", [{"id": 1, "brain_id": "t", "ts": "2026-04-24T00:00:00Z"}]
+        )
+
+    assert accepted == 0
+    assert error is not None
+    assert error["constraint_violation"] is True
+    assert error["code"] == 409
+    assert any(
+        "constraint violation" in r.message and r.levelno == logging.ERROR for r in caplog.records
+    ), (
+        f"expected ERROR-level constraint log; saw: {[(r.levelno, r.message) for r in caplog.records]}"
+    )

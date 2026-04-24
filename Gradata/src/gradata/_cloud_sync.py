@@ -303,9 +303,33 @@ def _rows_since(
 
 _POST_BATCH_SIZE: Final[int] = 500
 
+# Filename in brain_dir for last cloud push error. Surfaced by `gradata doctor`
+# so constraint-violation silent-retry loops become visible without
+# grepping logs.
+_PUSH_ERROR_FILENAME: Final[str] = "cloud_push_error.json"
 
-def _post(table: str, rows: list[dict[str, Any]]) -> int:
-    """POST rows to Supabase PostgREST. Returns count accepted.
+
+def _coerce_post_result(result: Any) -> tuple[int, dict | None]:
+    """Normalize legacy int returns from mocked _post into the new tuple shape.
+
+    Existing tests patch ``_post`` with ``return_value=1`` / ``return_value=0``;
+    tolerate that so the contract change stays backwards-compatible for callers
+    that only care about the accepted count.
+    """
+    if isinstance(result, tuple):
+        return result
+    if isinstance(result, int):
+        return result, None
+    return 0, None
+
+
+def _post(table: str, rows: list[dict[str, Any]]) -> tuple[int, dict | None]:
+    """POST rows to Supabase PostgREST.
+
+    Returns ``(accepted, error)``. ``error`` is ``None`` on success or
+    ``{"code": int, "message": str, "constraint_violation": bool}`` on
+    failure. Constraint violations (HTTP 409 / Postgres 23505) log at ERROR
+    so the doctor + log aggregators catch silent retry loops.
 
     Applies ``_TABLE_REMAP`` so local table names that differ from the cloud
     (e.g. ``correction_patterns`` -> ``corrections``) route correctly. Batches
@@ -313,7 +337,7 @@ def _post(table: str, rows: list[dict[str, Any]]) -> int:
     "Empty or invalid json" errors.
     """
     if not rows:
-        return 0
+        return 0, None
     # Dedupe within the batch so ON CONFLICT DO UPDATE doesn't hit the same
     # row twice in a single statement (Postgres rejects that).
     seen: set[Any] = set()
@@ -328,9 +352,13 @@ def _post(table: str, rows: list[dict[str, Any]]) -> int:
     rows = deduped
     if len(rows) > _POST_BATCH_SIZE:
         total = 0
+        first_error: dict | None = None
         for i in range(0, len(rows), _POST_BATCH_SIZE):
-            total += _post(table, rows[i : i + _POST_BATCH_SIZE])
-        return total
+            count, err = _coerce_post_result(_post(table, rows[i : i + _POST_BATCH_SIZE]))
+            total += count
+            if err is not None and first_error is None:
+                first_error = err
+        return total, first_error
     cloud_table = _TABLE_REMAP.get(table, table)
     url = f"{_env_url().rstrip('/')}/rest/v1/{cloud_table}"
     key = _env_key()
@@ -352,15 +380,66 @@ def _post(table: str, rows: list[dict[str, Any]]) -> int:
         # URL is sourced from GRADATA_CLOUD_URL env; operator-controlled.
         with urllib.request.urlopen(req, timeout=30) as resp:
             if 200 <= resp.status < 300:
-                return len(rows)
+                return len(rows), None
             _log.warning("cloud_sync: %s returned HTTP %s", table, resp.status)
-            return 0
+            return 0, {
+                "code": resp.status,
+                "message": f"HTTP {resp.status}",
+                "constraint_violation": False,
+            }
     except urllib.error.HTTPError as e:
-        _log.warning("cloud_sync: %s HTTP %s: %s", table, e.code, e.read()[:200])
-        return 0
+        body_snippet = e.read()[:500].decode("utf-8", errors="replace")
+        is_constraint = e.code == 409 or "23505" in body_snippet
+        if is_constraint:
+            _log.error(
+                "cloud_sync: %s constraint violation (HTTP %s): %s",
+                table,
+                e.code,
+                body_snippet[:200],
+            )
+        else:
+            _log.warning(
+                "cloud_sync: %s HTTP %s: %s",
+                table,
+                e.code,
+                body_snippet[:200],
+            )
+        return 0, {
+            "code": e.code,
+            "message": body_snippet[:500],
+            "constraint_violation": is_constraint,
+        }
     except urllib.error.URLError as e:
         _log.warning("cloud_sync: %s network error: %s", table, e)
-        return 0
+        return 0, {
+            "code": 0,
+            "message": f"network error: {e}",
+            "constraint_violation": False,
+        }
+
+
+def _record_push_error(brain_dir: Path, error: dict) -> None:
+    """Persist last cloud-push error so `gradata doctor` surfaces it.
+
+    Best-effort: swallows OSError (read-only FS, permissions) because cloud
+    push must not take down the caller on disk hiccups.
+    """
+    try:
+        payload = {**error, "recorded_at": _iso_now()}
+        (brain_dir / _PUSH_ERROR_FILENAME).write_text(
+            json.dumps(payload, indent=2), encoding="utf-8"
+        )
+    except OSError as exc:
+        _log.debug("cloud_sync: could not record push error: %s", exc)
+
+
+def _clear_push_error(brain_dir: Path) -> None:
+    try:
+        p = brain_dir / _PUSH_ERROR_FILENAME
+        if p.exists():
+            p.unlink()
+    except OSError as exc:
+        _log.debug("cloud_sync: could not clear push error: %s", exc)
 
 
 def _resolve_db(brain_dir: str | Path) -> Path | None:
@@ -404,6 +483,7 @@ def push(brain_dir: str | Path) -> dict[str, int]:
         pushed: dict[str, int] = {}
         all_ok = True
         started = _iso_now()
+        last_error: dict | None = None
         for table in PUSH_TABLES:
             rows = _rows_since(conn, table, tenant_id, since)
             if not rows:
@@ -417,12 +497,17 @@ def push(brain_dir: str | Path) -> dict[str, int]:
                     all_ok = False
             if not transformed:
                 continue
-            accepted = _post(table, transformed)
+            accepted, error = _coerce_post_result(_post(table, transformed))
             pushed[table] = accepted
+            if error is not None and last_error is None:
+                last_error = {**error, "table": table}
             if accepted != len(transformed):
                 all_ok = False
         if pushed and all_ok:
             _mark_push(conn, tenant_id, started)
+            _clear_push_error(brain)
+        elif last_error is not None:
+            _record_push_error(brain, last_error)
         return pushed
     finally:
         conn.close()

@@ -409,7 +409,46 @@ def _check_cloud_has_data():
         return {"name": "cloud_has_data", "status": "warn", "detail": "non-JSON response"}
 
 
-def _cloud_checks():
+def _check_cloud_push_error(brain_path):
+    """Surface the last recorded cloud-push error, if any.
+
+    ``_cloud_sync.push`` writes ``cloud_push_error.json`` when a POST fails
+    with an HTTP/constraint error. Without this check, watermark stalls from
+    23505 unique-violation retries are invisible until someone greps logs.
+    """
+    if brain_path is None:
+        return _skip("cloud_push_error")
+    p = brain_path / "cloud_push_error.json"
+    if not p.exists():
+        return {"name": "cloud_push_error", "status": "ok", "detail": "no recent push errors"}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        return {
+            "name": "cloud_push_error",
+            "status": "warn",
+            "detail": f"error file unreadable: {e}",
+        }
+    table = data.get("table", "?")
+    code = data.get("code", "?")
+    recorded = data.get("recorded_at", "?")
+    if data.get("constraint_violation"):
+        return {
+            "name": "cloud_push_error",
+            "status": "fail",
+            "detail": (
+                f"last push to '{table}' blocked by constraint (HTTP {code}) at {recorded} "
+                f"— watermark stalled; run `gradata migrate --brain <dir>` or dedupe rows"
+            ),
+        }
+    return {
+        "name": "cloud_push_error",
+        "status": "warn",
+        "detail": f"last push to '{table}' returned HTTP {code} at {recorded}",
+    }
+
+
+def _cloud_checks(brain_path=None):
     """All cloud checks, ordered so the first failure tells you what to do next."""
     return [
         _check_cloud_config(),
@@ -417,6 +456,7 @@ def _cloud_checks():
         _check_cloud_reachable(),
         _check_cloud_auth(),
         _check_cloud_has_data(),
+        _check_cloud_push_error(brain_path),
     ]
 
 
@@ -444,7 +484,7 @@ def diagnose(
     brain_path = Path(brain_dir).resolve() if brain_dir else _resolve_brain_path()
 
     if cloud_only:
-        checks = _cloud_checks()
+        checks = _cloud_checks(brain_path)
     else:
         checks = [
             _check_python_version(),
@@ -459,7 +499,7 @@ def diagnose(
             _check_disk_space(brain_path),
         ]
         if include_cloud:
-            checks.extend(_cloud_checks())
+            checks.extend(_cloud_checks(brain_path))
 
     # Determine overall status — "skip" means not applicable, not a problem
     active_statuses = [c["status"] for c in checks if c["status"] != "skip"]
