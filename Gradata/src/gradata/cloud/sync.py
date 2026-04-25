@@ -176,7 +176,9 @@ class CloudClient:
         """
         if not self.enabled or not self.config.contribute_corpus:
             return False
-        result = self._post("/v1/corpus/contribute", {"patterns": anonymized_patterns})
+        # Backend mounts the corpus router under /api/v1 (same prefix as
+        # telemetry — see cloud/app/main.py).
+        result = self._post("/api/v1/corpus/contribute", {"patterns": anonymized_patterns})
         return result is not None
 
 

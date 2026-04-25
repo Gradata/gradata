@@ -26,6 +26,7 @@ Usage (CLI):
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from gradata.enhancements.rule_export import _parse_rules
@@ -42,10 +43,8 @@ def _slugify(name: str) -> str:
     Anthropic's docs recommend skill names use lowercase-hyphenated form so
     the folder name matches the frontmatter ``name`` and is shell-safe.
     """
-    import re as _re
-
-    cleaned = _re.sub(r"[^a-zA-Z0-9-]+", "-", name.strip().lower())
-    cleaned = _re.sub(r"-+", "-", cleaned).strip("-")
+    cleaned = re.sub(r"[^a-zA-Z0-9-]+", "-", name.strip().lower())
+    cleaned = re.sub(r"-+", "-", cleaned).strip("-")
     return cleaned or "gradata-skill"
 
 

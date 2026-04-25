@@ -134,7 +134,7 @@ class TestCloudClient:
 
         assert result is True
         mock_post.assert_called_once()
-        assert mock_post.call_args[0][0] == "/v1/corpus/contribute"
+        assert mock_post.call_args[0][0] == "/api/v1/corpus/contribute"
 
 
 class TestConvenienceSync:
