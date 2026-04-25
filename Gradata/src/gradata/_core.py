@@ -1425,6 +1425,10 @@ def cloud_sync_tick(brain_dir: str | Path, session_number: int) -> None:
         # _cloud_sync_session only reads `.dir` and `.db_path` from brain —
         # a minimal stub lets us reuse the full telemetry/event path without
         # paying the cost of a fresh Brain() with migrations + FTS init.
+        # `db_path` may not exist for a fresh brain that has only lessons.md;
+        # downstream `compute_metrics` already tolerates that with a None-path
+        # short-circuit, so we pass it through unchanged rather than guarding
+        # here. Sync still completes and `last_sync_at` still updates.
         class _BrainStub:
             def __init__(self, d: _Path, db: _Path) -> None:
                 self.dir = d
