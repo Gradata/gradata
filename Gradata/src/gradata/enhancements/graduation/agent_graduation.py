@@ -219,10 +219,11 @@ _ENFORCEABLE_PATTERNS: dict[str, list[tuple[str, str]]] = {
         ("starter", r"(?i)starter.*(?:multi|multiple|two|2)\s*(?:account|brand)"),
     ],
     "DATA_INTEGRITY": [
-        (
-            "owner_only",
-            r"(?i)\b(?:EXCLUDED_NAMES_PLACEHOLDER)(?:'s)?\s+(?:campaign|deal|contact|lead)",
-        ),  # configure excluded names in brain config
+        # NOTE: Owner-only enforcement requires a runtime list of excluded
+        # names sourced from brain config — a literal placeholder regex
+        # ("EXCLUDED_NAMES_PLACEHOLDER") would never match real text and
+        # silently disable the guard.  Until config lookup is wired, omit
+        # the rule rather than ship a known-broken pattern.
     ],
 }
 
@@ -316,8 +317,40 @@ class AgentGraduationTracker:
                 )
                 self._profiles[agent_type] = profile
                 return profile
-            except (json.JSONDecodeError, KeyError):
-                logger.warning('Suppressed exception in AgentGraduationTracker._load_profile', exc_info=True)
+            except (json.JSONDecodeError, KeyError) as exc:
+                # Move the corrupt file aside so we don't keep re-reading it,
+                # raise once to surface the failure, then on subsequent calls
+                # fall through to a fresh AgentProfile (the backup is in
+                # place for forensics).
+                logger.warning(
+                    "AgentGraduationTracker: corrupt profile at %s: %s",
+                    profile_path,
+                    exc,
+                )
+                already_reported = getattr(self, "_corrupt_reported", set())
+                try:
+                    backup = profile_path.with_suffix(
+                        f".corrupt.{int(__import__('time').time())}"
+                    )
+                    profile_path.replace(backup)
+                    logger.warning(
+                        "AgentGraduationTracker: backed up corrupt profile to %s",
+                        backup,
+                    )
+                except OSError:
+                    logger.warning(
+                        "AgentGraduationTracker: failed to back up corrupt profile",
+                        exc_info=True,
+                    )
+                if agent_type not in already_reported:
+                    already_reported.add(agent_type)
+                    self._corrupt_reported = already_reported
+                    profile = AgentProfile(agent_type=agent_type)
+                    self._profiles[agent_type] = profile
+                    raise RuntimeError(
+                        f"corrupt agent profile at {profile_path}; backed up "
+                        f"and reset. Re-raising once so the failure is surfaced."
+                    ) from exc
 
         profile = AgentProfile(agent_type=agent_type)
         self._profiles[agent_type] = profile

@@ -300,7 +300,9 @@ class TestDeterministicRules:
         assert rule is None
 
     def test_data_integrity_rule(self):
-        """DATA_INTEGRITY rule compiles and has owner_only check."""
+        """DATA_INTEGRITY has no compileable deterministic rule until
+        owner-list config is wired (CR feedback: literal placeholder regex
+        was removed in favor of returning None)."""
         from gradata.enhancements.self_improvement import Lesson
 
         lesson = Lesson(
@@ -312,12 +314,10 @@ class TestDeterministicRules:
             fire_count=10,
         )
         rule = compile_deterministic_rule(lesson)
-        assert rule is not None
-        # The placeholder regex matches "EXCLUDED_NAMES_PLACEHOLDER" — users configure real names
-        result = rule.check("EXCLUDED_NAMES_PLACEHOLDER's campaign sent 84K emails")
-        assert not result["passed"]
-        result = rule.check("My pipeline has 12 active prospects")
-        assert result["passed"]
+        # No deterministic rule should compile while the excluded-names
+        # source is unconfigured — better than shipping a regex that can
+        # never match real text.
+        assert rule is None
 
     def test_pricing_rule(self):
         """PRICING rule blocks starter tier multi-account claims."""
