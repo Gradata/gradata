@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 
+from gradata.exceptions import BrainNotConfiguredError
 from gradata.hooks._base import extract_message, resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
 
@@ -113,45 +114,42 @@ def main(data: dict) -> dict | None:
         # Emit event if brain dir available
         brain_dir = resolve_brain_dir()
 
-        if brain_dir:
-            try:
-                from gradata._events import emit
-                from gradata._paths import BrainContext
+        if not brain_dir:
+            raise BrainNotConfiguredError(
+                "BRAIN_DIR is required to persist implicit feedback signals"
+            )
 
-                ctx = BrainContext.from_brain_dir(brain_dir)
+        try:
+            from gradata._events import emit
+            from gradata._paths import BrainContext
+
+            ctx = BrainContext.from_brain_dir(brain_dir)
+            emit(
+                "IMPLICIT_FEEDBACK",
+                source="hook:implicit_feedback",
+                data={
+                    "signals": [s["type"] for s in signals],
+                    "snippets": [s["snippet"] for s in signals[:3]],
+                    "message_preview": message[:200],
+                },
+                ctx=ctx,
+            )
+            # Emit OUTPUT_ACCEPTED for approval signals
+            if any(s["type"] == "approval" for s in signals):
                 emit(
-                    "IMPLICIT_FEEDBACK",
+                    "OUTPUT_ACCEPTED",
                     source="hook:implicit_feedback",
                     data={
-                        "signals": [s["type"] for s in signals],
-                        "snippets": [s["snippet"] for s in signals[:3]],
+                        "snippets": [s["snippet"] for s in signals if s["type"] == "approval"],
                         "message_preview": message[:200],
                     },
                     ctx=ctx,
                 )
-                # Emit OUTPUT_ACCEPTED for approval signals
-                if any(s["type"] == "approval" for s in signals):
-                    emit(
-                        "OUTPUT_ACCEPTED",
-                        source="hook:implicit_feedback",
-                        data={
-                            "snippets": [s["snippet"] for s in signals if s["type"] == "approval"],
-                            "message_preview": message[:200],
-                        },
-                        ctx=ctx,
-                    )
-            except Exception as exc:
-                _log.debug("implicit_feedback emit failed: %s", exc)
-        else:
-            # BRAIN_DIR unset — detection worked but signals can't be persisted.
-            # Log so fresh-install/CI environments don't silently lose corrections.
-            _log.debug(
-                "implicit_feedback: BRAIN_DIR unresolved, dropping %d signal(s): %s",
-                len(signals),
-                [s["type"] for s in signals],
-            )
-
+        except Exception as exc:
+            _log.debug("implicit_feedback emit failed: %s", exc)
         return None
+    except BrainNotConfiguredError:
+        raise
     except Exception as exc:
         _log.debug("implicit_feedback hook error: %s", exc)
         return None

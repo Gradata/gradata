@@ -89,8 +89,8 @@ def _check_brain_dir():
     if brain_dir is None:
         return {
             "name": "brain_dir",
-            "status": "skip",
-            "detail": "BRAIN_DIR not set (optional)",
+            "status": "fail",
+            "detail": "BRAIN_DIR not set; feedback persistence raises BrainNotConfiguredError",
         }
     p = Path(brain_dir)
     if p.is_dir():

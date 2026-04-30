@@ -56,10 +56,13 @@ from gradata.enhancements.self_improvement import (
 )
 from gradata.exceptions import (
     BrainError,
+    BrainLockedError,
+    BrainNotConfiguredError,
     BrainNotFoundError,
     EmbeddingError,
     EventPersistenceError,
     ExportError,
+    GradataError,
     TaxonomyError,
     ValidationError,
 )
@@ -71,10 +74,13 @@ __all__ = [
     "Brain",
     "BrainContext",
     "BrainError",
+    "BrainLockedError",
+    "BrainNotConfiguredError",
     "BrainNotFoundError",
     "EmbeddingError",
     "EventPersistenceError",
     "ExportError",
+    "GradataError",
     "Lesson",
     "LessonState",
     "Notification",

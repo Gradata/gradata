@@ -5,6 +5,7 @@ from pathlib import Path
 SRC_ROOT = Path(__file__).resolve().parents[1] / "src" / "gradata"
 
 ALLOWED_SINGLE_PASS_EXCEPTS = {
+    ("src/gradata/_atomic.py", "atomic_write_text", "FileNotFoundError"),  # tempfile already gone is OK
     ("src/gradata/_core.py", "brain_end_session", "ImportError"),  # optional dep ImportError
     ("src/gradata/_events.py", "emit", "ImportError"),  # optional dep ImportError
     ("src/gradata/brain.py", "Brain.__init__", "ImportError"),  # optional dep ImportError

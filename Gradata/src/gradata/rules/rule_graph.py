@@ -19,6 +19,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 
+from gradata._atomic import atomic_write_text
 from gradata._tenant import tenant_for
 
 _log = logging.getLogger(__name__)
@@ -358,7 +359,7 @@ class RuleGraph:
     def save(self) -> None:
         """Persist graph to disk."""
         if self._path:
-            self._path.write_text(json.dumps(self._edges, indent=2), encoding="utf-8")
+            atomic_write_text(self._path, json.dumps(self._edges, indent=2))
 
     def _ensure_node(self, rule_id: str) -> None:
         if rule_id not in self._edges:

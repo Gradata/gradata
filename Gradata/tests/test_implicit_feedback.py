@@ -8,6 +8,9 @@ the regex expansion in this session (apostrophe-less contractions,
 import logging
 from unittest.mock import patch
 
+import pytest
+
+from gradata.exceptions import BrainNotConfiguredError
 from gradata.hooks import implicit_feedback
 from gradata.hooks.implicit_feedback import _detect_signals, main
 
@@ -105,19 +108,14 @@ class TestEdgeCases:
 
 class TestMainNoBrainDir:
     """When resolve_brain_dir() returns None, main() must still detect signals
-    and log a debug breadcrumb instead of dropping them silently.
+    and raise instead of dropping them silently.
     """
 
-    def test_main_logs_when_brain_dir_none(self, caplog):
-        caplog.set_level(logging.DEBUG, logger="gradata.hooks.implicit_feedback")
+    def test_main_raises_when_brain_dir_none(self):
         data = {"prompt": "Why r you not asking council again.."}
         with patch.object(implicit_feedback, "resolve_brain_dir", return_value=None):
-            result = main(data)
-        assert result is None
-        debug_lines = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
-        assert any("BRAIN_DIR unresolved" in m for m in debug_lines), (
-            f"expected BRAIN_DIR-unresolved debug log; saw: {debug_lines}"
-        )
+            with pytest.raises(BrainNotConfiguredError):
+                main(data)
 
     def test_main_no_log_when_no_signals(self, caplog):
         caplog.set_level(logging.DEBUG, logger="gradata.hooks.implicit_feedback")

@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 import sys
 from pathlib import Path
 
+from gradata.exceptions import BrainNotConfiguredError
 from gradata.hooks._profiles import Profile
 
 _log = logging.getLogger(__name__)
@@ -132,6 +133,8 @@ def run_hook(main_fn, meta: dict, *, raw_input: str | None = None) -> None:
             payload = json.dumps(result)
             print(payload)
     except Exception as exc:
+        if isinstance(exc, BrainNotConfiguredError):
+            raise
         _log.debug("Hook %s suppressed exception: %s", meta.get("event", "?"), exc)
     finally:
         hook_name = getattr(main_fn, "__module__", "?").rsplit(".", 1)[-1]

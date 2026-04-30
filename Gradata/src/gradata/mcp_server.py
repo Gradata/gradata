@@ -30,10 +30,13 @@ import logging
 _log = logging.getLogger("gradata.mcp_server")
 
 import argparse
+import contextlib
 import json
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from gradata.exceptions import BrainLockedError
 
 if TYPE_CHECKING:
     import io
@@ -533,6 +536,7 @@ def run_server(brain_dir: str | Path | None, *, stdin=None, stdout=None) -> None
     # Instantiate Brain from the module-level import (patchable in tests).
     # Auto-initialize if the directory doesn't exist (zero-friction first run).
     brain: Any = None
+    lock_cm = None
     if brain_dir is not None:
         try:
             if Brain is None:
@@ -543,51 +547,64 @@ def run_server(brain_dir: str | Path | None, *, stdin=None, stdout=None) -> None
                 brain = Brain.init(brain_dir, domain="General")
             else:
                 brain = Brain(brain_dir)
+            from gradata._brain_lock import acquire_brain_lock
+
+            lock_path = getattr(brain, "dir", brain_path)
+            lock_cm = acquire_brain_lock(lock_path)
+            lock_cm.__enter__()
         except Exception as exc:
+            if lock_cm is not None:
+                with contextlib.suppress(Exception):
+                    lock_cm.__exit__(None, None, None)
             # Log to stderr so it does not pollute the JSON-RPC channel
             _log.error("Brain init failed: %s", exc)
+            if isinstance(exc, BrainLockedError):
+                raise
+    try:
+        while True:
+            msg = _read_message(in_stream)
+            if msg is None:
+                break  # EOF — client disconnected
 
-    while True:
-        msg = _read_message(in_stream)
-        if msg is None:
-            break  # EOF — client disconnected
+            method: str = msg.get("method", "")
+            req_id: Any = msg.get("id")  # None for notifications
+            params: dict[str, Any] = msg.get("params") or {}
 
-        method: str = msg.get("method", "")
-        req_id: Any = msg.get("id")  # None for notifications
-        params: dict[str, Any] = msg.get("params") or {}
+            # Notifications have no id and require no response
+            is_notification = req_id is None
 
-        # Notifications have no id and require no response
-        is_notification = req_id is None
+            if method == "initialize":
+                response = _handle_initialize(req_id)
 
-        if method == "initialize":
-            response = _handle_initialize(req_id)
+            elif method == "notifications/initialized":
+                # Acknowledge-only notification; no response required
+                continue
 
-        elif method == "notifications/initialized":
-            # Acknowledge-only notification; no response required
-            continue
+            elif method == "ping":
+                response = _handle_ping(req_id)
 
-        elif method == "ping":
-            response = _handle_ping(req_id)
+            elif method == "tools/list":
+                response = _handle_tools_list(req_id)
 
-        elif method == "tools/list":
-            response = _handle_tools_list(req_id)
+            elif method == "tools/call":
+                response = _handle_tools_call(req_id, params, brain)
 
-        elif method == "tools/call":
-            response = _handle_tools_call(req_id, params, brain)
+            elif method == "shutdown":
+                if not is_notification:
+                    _write_message(out_stream, _ok(req_id, None))
+                break
 
-        elif method == "shutdown":
-            if not is_notification:
-                _write_message(out_stream, _ok(req_id, None))
-            break
+            elif is_notification:
+                # Unknown notification — silently ignore per JSON-RPC spec
+                continue
 
-        elif is_notification:
-            # Unknown notification — silently ignore per JSON-RPC spec
-            continue
+            else:
+                response = _err(req_id, METHOD_NOT_FOUND, f"Method not found: {method}")
 
-        else:
-            response = _err(req_id, METHOD_NOT_FOUND, f"Method not found: {method}")
-
-        _write_message(out_stream, response)
+            _write_message(out_stream, response)
+    finally:
+        if lock_cm is not None:
+            lock_cm.__exit__(None, None, None)
 
 
 # ---------------------------------------------------------------------------
