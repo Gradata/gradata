@@ -151,3 +151,20 @@ exit=0
 - Each deletion as its own commit on `feat/council-phase-c-leanout`. Reverting = `git revert <sha>`.
 - Phase B fixes already on `feat/council-phase-b-fixes` — those are independent and merge-safe.
 - OneDrive tarball backups of council skill at `/mnt/c/Users/olive/OneDrive/Desktop/Sprites Work/.hermes-backups/`.
+
+## ATTEMPTED EXECUTION (2026-04-30 09:30) — graduation/scoring.py DELETE FAILED
+
+Tried to delete `src/gradata/enhancements/graduation/scoring.py` based on "0 callers verified". Pytest immediately broke:
+
+```
+ModuleNotFoundError: No module named 'gradata.enhancements.graduation.scoring'
+ERROR tests/test_graduation_scoring.py
+```
+
+**`tests/test_graduation_scoring.py`** is the consumer. 162 LOC of dedicated tests. The module is opt-in via env var (no production callers) but the test file IS a caller and represents shipped intent.
+
+**Updated verdict:** EVEN graduation/scoring.py is NOT safe to delete. Council called it "dead", but it has dedicated test coverage that proves it's a feature, not abandoned code.
+
+**Lesson learned:** "0 production import sites" ≠ "safe to delete". Tests count. Documented intent counts. Opt-in features with their own test file = real surface area, not waste.
+
+**Result:** ZERO of the 14 LEANOUT_PLAN deletion candidates have been verified safe to delete after this final pass. The only safe Phase D operations remaining are renames-with-deprecation-aliases (events_bus.py, _config.py), and even those require updating 3+ internal call sites each — deferred to a focused rename PR.
