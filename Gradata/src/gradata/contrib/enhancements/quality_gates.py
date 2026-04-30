@@ -357,15 +357,14 @@ def evaluate_success_conditions(
 
         db = _Path(db_path) if db_path else (_Path(ctx.brain_dir) / "system.db" if ctx else None)
         if db and db.exists():
-            conn = sqlite3.connect(str(db))
-            max_session = (
-                conn.execute(
-                    "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
-                ).fetchone()[0]
-                or 0
-            )
-            report.sessions_evaluated = max_session
-            conn.close()
+            with sqlite3.connect(str(db)) as conn:
+                max_session = (
+                    conn.execute(
+                        "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
+                    ).fetchone()[0]
+                    or 0
+                )
+                report.sessions_evaluated = max_session
     except Exception:
         logger.warning('Suppressed exception in evaluate_success_conditions', exc_info=True)
     report.conditions = conditions

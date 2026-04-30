@@ -100,7 +100,7 @@ def _lock_win32(fh: IO, timeout: float | None) -> bool:
             msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
             return True  # acquired
         except OSError:
-            logger.warning('Suppressed exception in _lock_win32', exc_info=True)
+            logger.debug('lock retry on %s', fh.name, exc_info=True)
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise TimeoutError(f"Could not acquire lock on {fh.name} within {timeout}s")
