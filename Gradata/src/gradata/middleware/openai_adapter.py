@@ -18,6 +18,7 @@ Usage::
 """
 
 from __future__ import annotations
+import logging
 
 from pathlib import Path
 from typing import Any
@@ -29,6 +30,8 @@ from gradata.middleware._core import (
     check_output,
     inject_into_system,
 )
+logger = logging.getLogger(__name__)
+
 
 
 def _require_openai() -> None:
@@ -148,7 +151,7 @@ class _CompletionsProxy:
                 if text:
                     log_turn(str(brain_path), self._mw._session_id, "assistant", text)
             except Exception:
-                pass
+                logger.warning('Suppressed exception in _CompletionsProxy.create', exc_info=True)
 
         return response
 

@@ -13,6 +13,7 @@ Usage:
 """
 
 from __future__ import annotations
+import logging
 
 import contextlib
 import json
@@ -24,6 +25,8 @@ import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
+logger = logging.getLogger(__name__)
+
 
 _CLOUD_PROBE_TIMEOUT = 5.0  # seconds — keep doctor fast even when offline
 
@@ -121,7 +124,7 @@ def _resolve_brain_path():
         if d and (d / "system.db").exists():
             return d
     except Exception:
-        pass
+        logger.warning('Suppressed exception in _resolve_brain_path', exc_info=True)
     return None
 
 

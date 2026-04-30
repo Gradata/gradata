@@ -21,6 +21,7 @@ minimal fallback so a broken brain never wedges the status bar.
 """
 
 from __future__ import annotations
+import logging
 
 import contextlib
 import sqlite3
@@ -28,6 +29,8 @@ import sys
 from pathlib import Path
 
 from gradata.hooks._base import resolve_brain_dir
+logger = logging.getLogger(__name__)
+
 
 
 def _brain_dir() -> Path | None:
@@ -69,7 +72,7 @@ def _fallback_session(db_path: Path) -> int:
             if row and row[0] is not None:
                 return int(row[0])
     except sqlite3.Error:
-        pass
+        logger.warning('Suppressed exception in _fallback_session', exc_info=True)
     return 0
 
 

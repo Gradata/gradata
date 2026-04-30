@@ -13,8 +13,11 @@ this module entirely.
 """
 
 from __future__ import annotations
+import logging
 
 import warnings
+logger = logging.getLogger(__name__)
+
 
 _WARNED = False
 
@@ -36,7 +39,7 @@ def __getattr__(name: str):
     try:
         return getattr(contrib, name)
     except AttributeError:
-        pass
+        logger.warning('Suppressed exception in __getattr__', exc_info=True)
 
     rules = importlib.import_module("gradata.rules")
     try:

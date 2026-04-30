@@ -16,6 +16,7 @@ Usage:
 """
 
 from __future__ import annotations
+import logging
 
 import json
 import os
@@ -24,6 +25,8 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
+logger = logging.getLogger(__name__)
+
 
 if TYPE_CHECKING:
     from gradata.brain import Brain
@@ -465,7 +468,7 @@ def onboard(
                 )
             write_lessons_safe(lessons_path, format_lessons(lessons))
         except Exception:
-            pass  # Seed rules are optional — don't block onboarding
+            logger.warning('Suppressed exception in onboard', exc_info=True)
 
     # ── Success output ─────────────────────────────────────────────────
 

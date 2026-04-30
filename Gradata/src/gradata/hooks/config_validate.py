@@ -1,12 +1,15 @@
 """SessionStart hook: validate Claude Code settings.json configuration."""
 
 from __future__ import annotations
+import logging
 
 import json
 from pathlib import Path
 
 from gradata.hooks._base import run_hook
 from gradata.hooks._profiles import Profile
+logger = logging.getLogger(__name__)
+
 
 HOOK_META = {
     "event": "SessionStart",
@@ -70,7 +73,7 @@ def _validate_json(path: Path) -> list[str]:
                                 f"gradata.hooks.{module_name} but module not found"
                             )
                     except Exception:
-                        pass
+                        logger.warning('Suppressed exception in _validate_json', exc_info=True)
 
     return warnings
 

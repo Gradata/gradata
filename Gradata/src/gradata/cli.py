@@ -28,6 +28,8 @@ import sys
 from pathlib import Path
 
 from gradata._env import env_str
+logger = logging.getLogger(__name__)
+
 
 _log = logging.getLogger("gradata.cli")
 
@@ -576,7 +578,7 @@ def _check_config_permissions(config_path: Path) -> None:
                 f"({oct(st.st_mode & 0o777)}). Run: chmod 600 {config_path}"
             )
     except (OSError, AttributeError):
-        pass  # Windows or permission check not available
+        logger.warning('Suppressed exception in _check_config_permissions', exc_info=True)
 
 
 def cmd_login(args):
@@ -1074,7 +1076,7 @@ def cmd_rule_remove(args):
                     {"slug": slug, "hook_path": str(removed_file)},
                 )
         except Exception:
-            pass  # Event emission is best-effort; CLI output still succeeds.
+            logger.warning('Suppressed exception in cmd_rule_remove', exc_info=True)
 
     if removed_file:
         print(f"Removed hook: {removed_file}")

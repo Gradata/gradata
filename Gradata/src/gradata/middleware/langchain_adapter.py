@@ -24,6 +24,7 @@ client.
 """
 
 from __future__ import annotations
+import logging
 
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,8 @@ from gradata.middleware._core import (
     build_brain_rules_block,
     check_output,
 )
+logger = logging.getLogger(__name__)
+
 
 try:
     from langchain_core.callbacks import BaseCallbackHandler as _BaseCallbackHandler
@@ -137,7 +140,7 @@ class LangChainCallback(_BaseCallbackHandler):  # type: ignore[misc,valid-type]
 
                 log_turn(str(brain_path), self._session_id, "assistant", text)
             except Exception:
-                pass
+                logger.warning('Suppressed exception in LangChainCallback.on_llm_end', exc_info=True)
 
 
 def _extract_llm_text(response: Any) -> str:

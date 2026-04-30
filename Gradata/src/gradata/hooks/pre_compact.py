@@ -11,6 +11,7 @@ For manual /compact (no pending handoff), falls back to saving a snapshot.
 """
 
 from __future__ import annotations
+import logging
 
 import contextlib
 import hashlib
@@ -22,6 +23,8 @@ from pathlib import Path
 
 from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
+logger = logging.getLogger(__name__)
+
 
 HOOK_META = {
     "event": "PreCompact",
@@ -43,7 +46,7 @@ def _read_pending_handoff(brain_dir: Path) -> tuple[str, Path] | tuple[None, Non
             if content:
                 return content, pending
     except OSError:
-        pass
+        logger.warning('Suppressed exception in _read_pending_handoff', exc_info=True)
     return None, None
 
 

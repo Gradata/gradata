@@ -12,6 +12,7 @@ Trust Dimensions:
 """
 
 from __future__ import annotations
+import logging
 
 import json
 import re
@@ -22,6 +23,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import gradata._paths as _p
+logger = logging.getLogger(__name__)
+
 
 if TYPE_CHECKING:
     from gradata._paths import BrainContext
@@ -244,7 +247,7 @@ def _verify_training_depth(manifest: dict, conn: sqlite3.Connection) -> dict:
                 }
             )
         except Exception:
-            pass
+            logger.warning('Suppressed exception in _verify_training_depth', exc_info=True)
 
     # 2d. CORRECTION events exist (brain was actually corrected = real interaction)
     try:
@@ -468,7 +471,7 @@ def _verify_data_completeness(manifest: dict, conn: sqlite3.Connection) -> dict:
             with open(_p.EVENTS_JSONL, encoding="utf-8") as f:
                 jsonl_count = sum(1 for line in f if line.strip())
         except Exception:
-            pass
+            logger.warning('Suppressed exception in _verify_data_completeness', exc_info=True)
 
     if total > 0:
         sync_ratio = jsonl_count / total if total > 0 else 0

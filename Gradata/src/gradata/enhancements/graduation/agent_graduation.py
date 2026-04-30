@@ -44,6 +44,7 @@ Research backing:
 """
 
 from __future__ import annotations
+import logging
 
 import json
 import re
@@ -66,6 +67,8 @@ from gradata.enhancements.self_improvement import (
     get_maturity_phase,
     parse_lessons,
 )
+logger = logging.getLogger(__name__)
+
 
 # ---------------------------------------------------------------------------
 # Approval Gate Thresholds
@@ -314,7 +317,7 @@ class AgentGraduationTracker:
                 self._profiles[agent_type] = profile
                 return profile
             except (json.JSONDecodeError, KeyError):
-                pass
+                logger.warning('Suppressed exception in AgentGraduationTracker._load_profile', exc_info=True)
 
         profile = AgentProfile(agent_type=agent_type)
         self._profiles[agent_type] = profile
@@ -624,7 +627,7 @@ class AgentGraduationTracker:
                     if lesson_task and lesson_task != task_type:
                         continue  # Scoped to a different task type
                 except (json.JSONDecodeError, TypeError):
-                    pass  # Malformed scope = treat as universal
+                    logger.warning('Suppressed exception in AgentGraduationTracker.get_agent_rules', exc_info=True)
 
             scope_tag = ""
             if lesson.scope_json:
@@ -632,7 +635,7 @@ class AgentGraduationTracker:
                     scope = json.loads(lesson.scope_json)
                     scope_tag = f" [scope:{scope.get('task_type', '?')}]"
                 except (json.JSONDecodeError, TypeError):
-                    pass
+                    logger.warning('Suppressed exception in AgentGraduationTracker.get_agent_rules', exc_info=True)
 
             rules.append(
                 f"[{lesson.state.value}] {lesson.category}: {lesson.description}{scope_tag}"
@@ -854,7 +857,7 @@ class AgentGraduationTracker:
                     if scope.get("task_type", "") and scope["task_type"] != task_type:
                         continue
                 except (json.JSONDecodeError, TypeError):
-                    pass
+                    logger.warning('Suppressed exception in AgentGraduationTracker.get_deterministic_rules', exc_info=True)
 
             det_rule = compile_deterministic_rule(lesson)
             if det_rule is not None:

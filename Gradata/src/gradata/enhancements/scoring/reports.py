@@ -11,6 +11,7 @@ All reports consume events from the events table (event-sourced).
 """
 
 from __future__ import annotations
+import logging
 
 import csv
 import io
@@ -19,6 +20,8 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+logger = logging.getLogger(__name__)
+
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -86,7 +89,7 @@ def generate_health_report(db_path: Path) -> HealthReport:
             ).fetchall()
             type_dist = {r[0]: r[1] for r in rows}
         except sqlite3.OperationalError:
-            pass
+            logger.warning('Suppressed exception in generate_health_report', exc_info=True)
 
         # Sessions
         try:
@@ -108,7 +111,7 @@ def generate_health_report(db_path: Path) -> HealthReport:
                 ).fetchone()[0]
                 fda = round(unedited / outputs, 4)
             except sqlite3.OperationalError:
-                pass
+                logger.warning('Suppressed exception in generate_health_report', exc_info=True)
 
         correction_rate = round(corrections / outputs, 4) if outputs > 0 else 0.0
 
@@ -205,7 +208,7 @@ def export_session_csv(db_path: Path, output: io.StringIO | None = None) -> str:
             rate = round(corrections / outputs, 4) if outputs > 0 else 0.0
             writer.writerow([session, outputs, corrections, rate, total])
     except sqlite3.OperationalError:
-        pass
+        logger.warning('Suppressed exception in export_session_csv', exc_info=True)
     finally:
         conn.close()
 

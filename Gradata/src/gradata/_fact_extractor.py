@@ -5,6 +5,7 @@ Reads brain entity files (prospects/, candidates/, etc.) and extracts
 structured facts. Domain-agnostic: entity directory and fact types are
 configurable.
 """
+import logging
 
 import json
 import re
@@ -13,6 +14,8 @@ from pathlib import Path
 
 import gradata._paths as _p
 from gradata._paths import BrainContext
+logger = logging.getLogger(__name__)
+
 
 # Constants — domain-specific fact types can be extended via brain config
 _DEFAULT_FACT_TYPES = (
@@ -39,7 +42,7 @@ def _load_fact_types() -> tuple:
             if extra:
                 return tuple(set(_DEFAULT_FACT_TYPES) | set(extra))
         except Exception:
-            pass
+            logger.warning('Suppressed exception in _load_fact_types', exc_info=True)
     return _DEFAULT_FACT_TYPES
 
 
@@ -111,7 +114,7 @@ def _get_entity_names():
                 if fm.get("name"):
                     names.add(fm["name"].strip())
             except Exception:
-                pass
+                logger.warning('Suppressed exception in _get_entity_names', exc_info=True)
     return names
 
 

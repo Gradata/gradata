@@ -15,6 +15,7 @@ Layer: enhancements/ (Layer 1) — imports from patterns/ only.
 """
 
 from __future__ import annotations
+import logging
 
 import contextlib
 import json
@@ -26,6 +27,8 @@ from typing import Any
 
 from gradata._events import emit as _emit_event_fn
 from gradata._tenant import tenant_for
+logger = logging.getLogger(__name__)
+
 
 # ═══════════════════════════════════════════════════════════════════
 # Registries (domain-agnostic defaults, override via register_*)
@@ -271,7 +274,7 @@ def log_outcome(
                 outcome_date = datetime.strptime(today, "%Y-%m-%d")
                 days = (outcome_date - prep_date).days
             except ValueError:
-                pass
+                logger.warning('Suppressed exception in log_outcome', exc_info=True)
 
         conn.execute(
             "UPDATE prep_outcomes SET outcome = ?, days_to_outcome = ? "

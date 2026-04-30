@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
+logger = logging.getLogger(__name__)
+
 
 _log = logging.getLogger(__name__)
 
@@ -740,7 +742,7 @@ def _log_outcome(brain, source: str, candidate: HookCandidate, result: Generatio
                 },
             )
     except Exception:
-        pass  # never fail graduation on a logging error
+        logger.warning('Suppressed exception in _log_outcome', exc_info=True)
 
 
 def promote(

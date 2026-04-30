@@ -31,6 +31,8 @@ from typing import TYPE_CHECKING
 
 from gradata.hooks._base import extract_message, resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
+logger = logging.getLogger(__name__)
+
 
 if TYPE_CHECKING:
     from gradata._types import Lesson
@@ -265,7 +267,7 @@ def _emit_event(brain_dir: str, payload: dict) -> None:
             f.write(line + "\n")
     except OSError:
         # Telemetry must never break the hook contract.
-        pass
+        logger.warning('Suppressed exception in _emit_event', exc_info=True)
 
 
 def main(data: dict) -> dict | None:

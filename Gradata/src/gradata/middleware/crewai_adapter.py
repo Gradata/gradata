@@ -23,6 +23,7 @@ plain Python call.
 """
 
 from __future__ import annotations
+import logging
 
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,8 @@ from gradata.middleware._core import (
     RuleViolation,
     check_output,
 )
+logger = logging.getLogger(__name__)
+
 
 _OUTPUT_TEXT_KEYS = ("raw", "output", "text", "content")
 
@@ -78,7 +81,7 @@ class CrewAIGuard:
 
                 log_turn(str(brain_path), self._session_id, "assistant", text)
             except Exception:
-                pass
+                logger.warning('Suppressed exception in CrewAIGuard.__call__', exc_info=True)
 
         if not violations:
             return True, output

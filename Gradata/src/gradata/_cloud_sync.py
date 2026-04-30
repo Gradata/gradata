@@ -37,6 +37,8 @@ from pathlib import Path
 from typing import Any, Final
 
 from gradata._tenant import tenant_for
+logger = logging.getLogger(__name__)
+
 
 _log = logging.getLogger("gradata.cloud_sync")
 
@@ -453,7 +455,7 @@ def _record_push_error(brain_dir: Path, error: dict) -> None:
             if tmp.exists():
                 tmp.unlink()
         except OSError:
-            pass
+            logger.warning('Suppressed exception in _record_push_error', exc_info=True)
 
 
 def _clear_push_error(brain_dir: Path) -> None:

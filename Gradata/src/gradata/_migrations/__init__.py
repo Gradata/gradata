@@ -17,6 +17,7 @@ happen transparently.
 """
 
 from __future__ import annotations
+import logging
 
 import contextlib
 import importlib
@@ -29,6 +30,8 @@ from gradata._db import get_connection
 
 from ._runner import ensure_migrations_table, has_applied, mark_applied
 from .tenant_uuid import get_or_create_tenant_id
+logger = logging.getLogger(__name__)
+
 
 _BASE_TABLES: list[str] = [
     """CREATE TABLE IF NOT EXISTS events (
@@ -110,7 +113,7 @@ def _apply_inline(conn: sqlite3.Connection) -> int:
             conn.execute(sql)
             applied += 1
         except sqlite3.OperationalError:
-            pass
+            logger.warning('Suppressed exception in _apply_inline', exc_info=True)
     return applied
 
 

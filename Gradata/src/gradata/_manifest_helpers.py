@@ -4,12 +4,15 @@ Brain Manifest Helpers.
 Shared constants and utility functions for manifest generation.
 Split from _brain_manifest.py for file size compliance (<500 lines).
 """
+import logging
 
 import re
 from typing import TYPE_CHECKING
 
 import gradata._paths as _p
 from gradata._db import get_connection
+logger = logging.getLogger(__name__)
+
 
 if TYPE_CHECKING:
     from gradata._paths import BrainContext
@@ -61,7 +64,7 @@ def _count_events(ctx: "BrainContext | None" = None) -> dict:
             result["total"] += row["cnt"]
         conn.close()
     except Exception:
-        pass
+        logger.warning('Suppressed exception in _count_events', exc_info=True)
     return result
 
 

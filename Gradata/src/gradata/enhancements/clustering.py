@@ -8,11 +8,14 @@ rules and group related lessons by category/domain.
 """
 
 from __future__ import annotations
+import logging
 
 import re
 from dataclasses import dataclass, field
 
 from gradata._types import Lesson, LessonState
+logger = logging.getLogger(__name__)
+
 
 
 @dataclass
@@ -93,7 +96,7 @@ def cluster_rules(
                 scope = json.loads(lesson.scope_json)
                 return scope.get("domain", "") or "global"
             except (json.JSONDecodeError, TypeError):
-                pass
+                logger.warning('Suppressed exception in cluster_rules._extract_domain', exc_info=True)
         return "global"
 
     # Only cluster RULE and PATTERN tier

@@ -15,6 +15,8 @@ import json
 import logging
 import os
 from typing import TYPE_CHECKING
+logger = logging.getLogger(__name__)
+
 
 if TYPE_CHECKING:
     from gradata.brain import Brain
@@ -112,7 +114,7 @@ def _record_telemetry(meta: dict, hook_name: str, payload: str | None) -> None:
         with log_path.open("a", encoding="utf-8") as fh:
             fh.write(line + "\n")
     except Exception:
-        pass
+        logger.warning('Suppressed exception in _record_telemetry', exc_info=True)
 
 
 def run_hook(main_fn, meta: dict, *, raw_input: str | None = None) -> None:

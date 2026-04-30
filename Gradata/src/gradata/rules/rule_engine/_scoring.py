@@ -6,11 +6,14 @@ to rank and filter lessons before injection.
 """
 
 from __future__ import annotations
+import logging
 
 import json
 
 from gradata._scope import RuleScope, scope_matches
 from gradata._types import CorrectionType, Lesson, LessonState, RuleTransferScope
+logger = logging.getLogger(__name__)
+
 
 # ---------------------------------------------------------------------------
 # State Priority
@@ -374,6 +377,6 @@ def validate_assumptions(
                     f"rule scoped to '{rule_tt}' but current task is '{current_tt}'",
                 )
         except Exception:
-            pass  # malformed scope_json — don't block on it
+            logger.warning('Suppressed exception in validate_assumptions', exc_info=True)
 
     return (True, "")

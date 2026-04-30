@@ -72,14 +72,14 @@ class BrainMemory:
             if rules:
                 parts.append(rules)
         except Exception:
-            pass
+            logger.warning('Suppressed exception in BrainMemory.load_memory_variables', exc_info=True)
 
         try:
             context = self.brain.context_for(str(user_input)[:200])
             if context:
                 parts.append(context)
         except Exception:
-            pass
+            logger.warning('Suppressed exception in BrainMemory.load_memory_variables', exc_info=True)
 
         return {self.memory_key: "\n\n".join(parts)}
 
@@ -102,7 +102,7 @@ class BrainMemory:
                 if hasattr(self.brain, "observe"):
                     self.brain.observe(messages)
             except Exception:
-                pass
+                logger.warning('Suppressed exception in BrainMemory.save_context', exc_info=True)
 
     def clear(self) -> None:
         """No-op for persistent brain memory."""

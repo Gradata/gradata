@@ -10,6 +10,7 @@ Never blocks: prints a warning, exits 0.
 """
 
 from __future__ import annotations
+import logging
 
 import hashlib
 import os
@@ -19,6 +20,8 @@ import sys
 from pathlib import Path
 
 from gradata._env import env_str
+logger = logging.getLogger(__name__)
+
 
 _HASH_LINE_RE = re.compile(r"^\s*\*\s*Source hash:\s*([0-9a-f]{12})", re.MULTILINE)
 # Kept for legacy pattern detection only. All RULE-tier lesson shapes go
@@ -144,7 +147,7 @@ def main() -> int:
         if not sys.stdin.isatty():
             sys.stdin.read()
     except Exception:
-        pass
+        logger.warning('Suppressed exception in main', exc_info=True)
 
     brain_root = _brain_root()
     lessons_by_slug, hooked_texts = _parse_lessons(brain_root)

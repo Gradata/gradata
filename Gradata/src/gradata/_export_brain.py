@@ -3,6 +3,7 @@ Brain Export Script.
 =====================
 Packages a trained brain into a shareable archive.
 """
+import logging
 
 import json
 import re
@@ -12,6 +13,8 @@ from pathlib import Path
 
 import gradata._paths as _p
 from gradata._paths import BrainContext
+logger = logging.getLogger(__name__)
+
 
 
 def _VAULT_DIR():
@@ -130,7 +133,7 @@ def build_prospect_map(prospects_dir: Path) -> dict[str, str]:
             if fm_company and fm_company.group(1).strip():
                 name_map[fm_company.group(1).strip()] = f"[COMPANY_{counter}]"
         except Exception:
-            pass
+            logger.warning('Suppressed exception in build_prospect_map', exc_info=True)
         counter += 1
 
     # Auto-detect owner name from brain manifest if available
@@ -146,7 +149,7 @@ def build_prospect_map(prospects_dir: Path) -> dict[str, str]:
                 name_map[owner] = "[OWNER]"
                 name_map[owner.lower()] = "[OWNER]"
         except Exception:
-            pass
+            logger.warning('Suppressed exception in build_prospect_map', exc_info=True)
     return name_map
 
 

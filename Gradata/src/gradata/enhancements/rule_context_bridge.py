@@ -92,7 +92,7 @@ def bootstrap_rule_context(
                     c2.execute("PRAGMA wal_checkpoint(TRUNCATE)")
                     c2.close()
                 except Exception:
-                    pass
+                    logger.warning('Suppressed exception in bootstrap_rule_context', exc_info=True)
 
             for row in rows:
                 rule_id = f"meta:{row['id']}"

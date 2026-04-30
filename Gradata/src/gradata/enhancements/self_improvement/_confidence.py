@@ -19,6 +19,8 @@ from gradata._types import (
     LessonState,
     transition,
 )
+logger = logging.getLogger(__name__)
+
 
 _log = logging.getLogger(__name__)
 
@@ -401,7 +403,7 @@ def parse_lessons(text: str) -> list[Lesson]:
                     alpha = bp.get("alpha", 1.0)
                     beta_param_val = bp.get("beta", 1.0)
                 except _json_bp.JSONDecodeError:
-                    pass
+                    logger.warning('Suppressed exception in parse_lessons', exc_info=True)
             elif meta_line.startswith("Domain scores:"):
                 import json as _json
 
@@ -426,7 +428,7 @@ def parse_lessons(text: str) -> list[Lesson]:
                     last_climb_session = _cl.get("last_session", 0)
                     tree_level = _cl.get("level", 0)
                 except _json_cl.JSONDecodeError:
-                    pass
+                    logger.warning('Suppressed exception in parse_lessons', exc_info=True)
             elif meta_line.startswith("Metadata:"):
                 import json as _json_md
 

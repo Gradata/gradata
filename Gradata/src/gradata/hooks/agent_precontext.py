@@ -11,6 +11,7 @@ Falls back to keyword inference when no explicit scope is set.
 """
 
 from __future__ import annotations
+import logging
 
 import os
 from pathlib import Path
@@ -18,6 +19,8 @@ from pathlib import Path
 from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
 from gradata.rules.rule_ranker import rank_rules
+logger = logging.getLogger(__name__)
+
 
 try:
     from gradata.enhancements.self_improvement import parse_lessons
@@ -137,7 +140,7 @@ def main(data: dict) -> dict | None:
                 if scoped:
                     filtered = scoped
             except Exception:
-                pass  # Fall back to unfiltered on any import/runtime error
+                logger.warning('Suppressed exception in main', exc_info=True)
 
         agent_type = _infer_agent_type(data)
         keywords = list(SCOPE_KEYWORDS.get(agent_type.lower(), []))

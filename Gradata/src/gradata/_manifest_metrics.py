@@ -26,6 +26,8 @@ from gradata._manifest_quality import (
     _transfer_score,
 )
 from gradata._stats import trend_analysis as _trend_analysis
+logger = logging.getLogger(__name__)
+
 
 if TYPE_CHECKING:
     from gradata._paths import BrainContext
@@ -147,7 +149,7 @@ def _temporal_provenance(ctx: "BrainContext | None" = None) -> dict:
                 t1 = datetime.fromisoformat(str(agg[2]).replace("Z", "+00:00"))
                 result["session_spread_days"] = max(0, (t1 - t0).days)
             except (ValueError, TypeError):
-                pass
+                logger.warning('Suppressed exception in _temporal_provenance', exc_info=True)
 
         # Query 2: source counts grouped -- filter in Python, no second query
         internal_prefixes = (

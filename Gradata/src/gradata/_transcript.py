@@ -27,6 +27,8 @@ import logging
 import os
 from datetime import UTC, datetime
 from pathlib import Path
+logger = logging.getLogger(__name__)
+
 
 _log = logging.getLogger(__name__)
 
@@ -116,7 +118,7 @@ def load_turns(brain_dir: str, session_id: str) -> list[dict]:
                 except json.JSONDecodeError:
                     continue
     except OSError:
-        pass
+        logger.warning('Suppressed exception in load_turns', exc_info=True)
     return turns
 
 

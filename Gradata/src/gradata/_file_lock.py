@@ -39,12 +39,15 @@ integrity.
 """
 
 from __future__ import annotations
+import logging
 
 import contextlib
 import sys
 import time
 from collections.abc import Generator
 from typing import IO
+logger = logging.getLogger(__name__)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -97,7 +100,7 @@ def _lock_win32(fh: IO, timeout: float | None) -> bool:
             msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
             return True  # acquired
         except OSError:
-            pass
+            logger.warning('Suppressed exception in _lock_win32', exc_info=True)
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise TimeoutError(f"Could not acquire lock on {fh.name} within {timeout}s")
@@ -143,7 +146,7 @@ def _lock_posix(fh: IO, timeout: float | None) -> bool:
             fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
             return True
         except OSError:
-            pass
+            logger.warning('Suppressed exception in _lock_posix', exc_info=True)
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise TimeoutError(f"Could not acquire lock on {fh.name} within {timeout}s")

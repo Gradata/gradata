@@ -1,11 +1,14 @@
 """PostToolUse hook: detect tool failures and emit TOOL_FAILURE event."""
 
 from __future__ import annotations
+import logging
 
 import re
 
 from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
+logger = logging.getLogger(__name__)
+
 
 HOOK_META = {
     "event": "PostToolUse",
@@ -92,7 +95,7 @@ def main(data: dict) -> dict | None:
                 ctx=ctx,
             )
     except Exception:
-        pass
+        logger.warning('Suppressed exception in main', exc_info=True)
     return None
 
 

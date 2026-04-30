@@ -16,10 +16,13 @@ Also from Revised Vision Gate 0:
 """
 
 from __future__ import annotations
+import logging
 
 import sqlite3
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+logger = logging.getLogger(__name__)
+
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -169,7 +172,7 @@ def evaluate_success_conditions(db_path: Path, window: int = 20) -> SuccessRepor
                     )
                 )
         except sqlite3.OperationalError:
-            pass
+            logger.warning('Suppressed exception in evaluate_success_conditions', exc_info=True)
 
         # 3. First-draft acceptance increases
         try:
@@ -197,7 +200,7 @@ def evaluate_success_conditions(db_path: Path, window: int = 20) -> SuccessRepor
                     )
                 )
         except sqlite3.OperationalError:
-            pass
+            logger.warning('Suppressed exception in evaluate_success_conditions', exc_info=True)
 
         # 4. Rule success rate increases
         try:
@@ -223,7 +226,7 @@ def evaluate_success_conditions(db_path: Path, window: int = 20) -> SuccessRepor
                     )
                 )
         except sqlite3.OperationalError:
-            pass
+            logger.warning('Suppressed exception in evaluate_success_conditions', exc_info=True)
 
         # 5. Misfires stay low
         try:
@@ -251,7 +254,7 @@ def evaluate_success_conditions(db_path: Path, window: int = 20) -> SuccessRepor
                     )
                 )
         except sqlite3.OperationalError:
-            pass
+            logger.warning('Suppressed exception in evaluate_success_conditions', exc_info=True)
 
         # 6. Output not becoming bland (from metrics module)
         try:
@@ -275,7 +278,7 @@ def evaluate_success_conditions(db_path: Path, window: int = 20) -> SuccessRepor
                 )
             )
         except Exception:
-            pass
+            logger.warning('Suppressed exception in evaluate_success_conditions', exc_info=True)
 
     finally:
         conn.close()

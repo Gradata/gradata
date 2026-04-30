@@ -1,9 +1,12 @@
 """PostToolUse hook: emit AGENT_OUTCOME event after Agent tool completes."""
 
 from __future__ import annotations
+import logging
 
 from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
+logger = logging.getLogger(__name__)
+
 
 HOOK_META = {
     "event": "PostToolUse",
@@ -92,7 +95,7 @@ def main(data: dict) -> dict | None:
             ctx=ctx,
         )
     except Exception:
-        pass
+        logger.warning('Suppressed exception in main', exc_info=True)
     return None
 
 

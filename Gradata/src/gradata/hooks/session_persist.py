@@ -1,6 +1,7 @@
 """Stop hook: persist session handoff data for cross-session continuity."""
 
 from __future__ import annotations
+import logging
 
 import json
 import os
@@ -10,6 +11,8 @@ from pathlib import Path
 
 from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
+logger = logging.getLogger(__name__)
+
 
 HOOK_META = {
     "event": "Stop",
@@ -38,7 +41,7 @@ def _get_modified_files() -> list[str]:
         if result.returncode == 0:
             files.extend(f.strip() for f in result.stdout.splitlines() if f.strip())
     except Exception:
-        pass
+        logger.warning('Suppressed exception in _get_modified_files', exc_info=True)
 
     # Untracked files (not ignored)
     try:
@@ -55,7 +58,7 @@ def _get_modified_files() -> list[str]:
         if result.returncode == 0:
             files.extend(f.strip() for f in result.stdout.splitlines() if f.strip())
     except Exception:
-        pass
+        logger.warning('Suppressed exception in _get_modified_files', exc_info=True)
 
     # Deduplicate while preserving order
     return list(dict.fromkeys(files))
@@ -83,7 +86,7 @@ def main(_data: dict) -> dict | None:
         out_path = persist_dir / "latest.json"
         out_path.write_text(json.dumps(handoff, indent=2), encoding="utf-8")
     except Exception:
-        pass
+        logger.warning('Suppressed exception in main', exc_info=True)
     return None
 
 

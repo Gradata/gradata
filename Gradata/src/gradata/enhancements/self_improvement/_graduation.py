@@ -27,6 +27,8 @@ from gradata.enhancements.self_improvement._confidence import (
     _classify_correction_direction,
     is_hook_enforced,
 )
+logger = logging.getLogger(__name__)
+
 
 _log = logging.getLogger(__name__)
 
@@ -166,7 +168,7 @@ def graduate(
                 ):
                     block_promotion = True
             except (ValueError, TypeError):
-                pass
+                logger.warning('Suppressed exception in graduate', exc_info=True)
 
         # Per-session invariant: at most ONE graduation tier transition per
         # session. If update_confidence already moved this lesson between
@@ -184,7 +186,7 @@ def graduate(
                     lesson.state = transition(lesson.state, "kill")
                     lesson.kill_reason = f"untestable_expired: {lesson.sessions_since_fire} idle sessions (limit: {kill_limit + 5})"
                 except ValueError:
-                    pass
+                    logger.warning('Suppressed exception in graduate', exc_info=True)
             continue
 
         # Kill: confidence at zero
@@ -193,7 +195,7 @@ def graduate(
                 lesson.state = transition(lesson.state, "kill")
                 lesson.kill_reason = "zero_confidence: accumulated penalties drove confidence to 0"
             except ValueError:
-                pass
+                logger.warning('Suppressed exception in graduate', exc_info=True)
             continue
 
         # Kill: untestable (too many sessions without a fire)
@@ -203,7 +205,7 @@ def graduate(
                     lesson.state = transition(lesson.state, "kill")
                     lesson.kill_reason = f"untestable_idle: {lesson.sessions_since_fire} sessions without firing (limit: {kill_limit})"
                 except ValueError:
-                    pass
+                    logger.warning('Suppressed exception in graduate', exc_info=True)
                 continue
             elif lesson.state in (LessonState.INSTINCT, LessonState.PATTERN):
                 lesson.state = LessonState.UNTESTABLE
@@ -252,7 +254,7 @@ def graduate(
                             "Graduation blocked (contradiction): '%s'", lesson.description[:60]
                         )
                 except Exception:
-                    pass
+                    logger.warning('Suppressed exception in graduate', exc_info=True)
 
             # Gate 3: paraphrase robustness — rule must match its own rewording.
             # If word-reordered text scores <25% similar, the rule's meaning depends
@@ -287,7 +289,7 @@ def graduate(
                 if result.best.content and result.best.score > 0.3:
                     lesson.description = result.best.content
             except Exception:
-                pass  # ToT is optional; graduate with original wording
+                logger.warning('Suppressed exception in graduate', exc_info=True)
             lesson.state = transition(lesson.state, "promote")
 
             # Rule-to-hook graduation: attempt to install a deterministic
@@ -324,7 +326,7 @@ def graduate(
                                 lesson.metadata = RuleMetadata()
                             lesson.metadata.how_enforced = "hooked"
             except Exception:
-                pass  # Hook generation is best-effort; never break graduation.
+                logger.warning('Suppressed exception in graduate', exc_info=True)
             continue
 
         # Promote INSTINCT -> PATTERN

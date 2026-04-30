@@ -21,6 +21,8 @@ import gradata._paths as _p
 from gradata._file_lock import platform_lock
 from gradata._platform import detect_platform_source
 from gradata._tenant import tenant_for
+logger = logging.getLogger(__name__)
+
 
 if TYPE_CHECKING:
     from gradata._paths import BrainContext
@@ -225,7 +227,7 @@ def emit(
         raw_jsonl = events_jsonl.parent / "events.raw.jsonl"
         _locked_append(raw_jsonl, json.dumps(raw_event, ensure_ascii=False) + "\n")
     except Exception:
-        pass  # intentionally swallowed
+        logger.warning('Suppressed exception in emit', exc_info=True)
 
     # Dual-write: JSONL (portable) + SQLite (queryable).
     # At least ONE must succeed or we raise — learning data loss is unacceptable.
@@ -512,7 +514,7 @@ def _detect_session(ctx: BrainContext | None = None) -> int:
             if row and row[0] is not None:
                 return int(row[0])
     except Exception:
-        pass
+        logger.warning('Suppressed exception in _detect_session', exc_info=True)
 
     return 0
 
@@ -616,7 +618,7 @@ class RetainOrchestrator:
                 data = json.loads(self._cursor_path.read_text(encoding="utf-8"))
                 return data.get("last_committed_key")
             except Exception:
-                pass
+                logger.warning('Suppressed exception in RetainOrchestrator._load_cursor', exc_info=True)
         return None
 
     def _save_cursor(self, key: str) -> None:
@@ -746,7 +748,7 @@ class RetainOrchestrator:
                 update_manifest(self.brain_dir)
                 manifest_updated = True
             except (ImportError, Exception):
-                pass
+                logger.warning('Suppressed exception in RetainOrchestrator.flush', exc_info=True)
         except Exception as exc:
             result["errors"].append(f"Phase 3: {exc}")
 

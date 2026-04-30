@@ -14,9 +14,12 @@ backends are in _query.py and _embed.py (the existing modules).
 """
 
 from __future__ import annotations
+import logging
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
+logger = logging.getLogger(__name__)
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -413,14 +416,14 @@ def cascade_retrieve(
                     pass2_results.append(fts2)
                     pass2_total += len(fts2)
                 except Exception:
-                    pass
+                    logger.warning('Suppressed exception in cascade_retrieve', exc_info=True)
             if vector_fn is not None:
                 try:
                     vec2 = vector_fn(expanded_query, limit * 2)
                     pass2_results.append(vec2)
                     pass2_total += len(vec2)
                 except Exception:
-                    pass
+                    logger.warning('Suppressed exception in cascade_retrieve', exc_info=True)
 
             if pass2_results:
                 # Merge pass 1 + pass 2, deduplicate by chunk_id

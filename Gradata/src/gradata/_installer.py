@@ -20,6 +20,7 @@ Flow:
 """
 
 from __future__ import annotations
+import logging
 
 import json
 import subprocess
@@ -27,6 +28,8 @@ import sys
 import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
+logger = logging.getLogger(__name__)
+
 
 DEFAULT_BRAINS_DIR = Path.home() / ".gradata" / "brains"
 
@@ -182,7 +185,7 @@ def list_installed() -> list[dict]:
                     }
                 )
             except Exception:
-                pass
+                logger.warning('Suppressed exception in list_installed', exc_info=True)
         elif manifest_file.exists():
             try:
                 manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
@@ -193,7 +196,7 @@ def list_installed() -> list[dict]:
                     }
                 )
             except Exception:
-                pass
+                logger.warning('Suppressed exception in list_installed', exc_info=True)
 
         brains.append(info)
     return brains

@@ -25,10 +25,13 @@ Usage::
 """
 
 from __future__ import annotations
+import logging
 
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+logger = logging.getLogger(__name__)
+
 
 __all__ = [
     "EXPORT_TARGETS",
@@ -207,7 +210,7 @@ def generate_briefing(
             if max_rules > 0:
                 briefing.rules = briefing.rules[:max_rules]
     except Exception:
-        pass
+        logger.warning('Suppressed exception in generate_briefing', exc_info=True)
 
     # Extract quality metrics
     try:
@@ -219,7 +222,7 @@ def generate_briefing(
             k: v for k, v in quality.items() if v is not None and v != [] and v != {}
         }
     except Exception:
-        pass
+        logger.warning('Suppressed exception in generate_briefing', exc_info=True)
 
     # Extract recent corrections from events
     try:
@@ -234,7 +237,7 @@ def generate_briefing(
                 }
             )
     except Exception:
-        pass
+        logger.warning('Suppressed exception in generate_briefing', exc_info=True)
 
     # Add anti-patterns from the negative rule library
     try:
@@ -348,7 +351,7 @@ def generate_health_report(db_path=None, ctx=None) -> HealthReport:
         if brain_dir:
             report.lessons_active = _count_active_lessons(brain_dir)
     except Exception:
-        pass  # Non-critical — lessons count is informational
+        logger.warning('Suppressed exception in generate_health_report', exc_info=True)
 
     return report
 

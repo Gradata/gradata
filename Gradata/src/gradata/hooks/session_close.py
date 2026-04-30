@@ -43,6 +43,8 @@ from pathlib import Path
 
 from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
+logger = logging.getLogger(__name__)
+
 
 _log = logging.getLogger(__name__)
 
@@ -149,7 +151,7 @@ def _acquire_lock() -> bool:
                 return False  # Another live instance is running.
             # Stale lock from a dead process — fall through to reclaim.
         except (ValueError, OSError):
-            pass  # Corrupt lock file — fall through to reclaim.
+            logger.warning('Suppressed exception in _acquire_lock', exc_info=True)
     try:
         lock_path.write_text(str(os.getpid()), encoding="utf-8")
         return True
@@ -202,7 +204,7 @@ def _should_run_graduation(brain_dir: Path, lessons_path: Path) -> bool:
             if instinct_count >= threshold:
                 return True
         except Exception:
-            pass
+            logger.warning('Suppressed exception in _should_run_graduation', exc_info=True)
 
     # Time-based gate.
     state_path = _throttle_state_path(brain_dir)
@@ -514,7 +516,7 @@ def _refresh_loop_state(brain_dir: str, data: dict) -> None:
                     ).fetchone()
                     corrections = row[0] if row else 0
             except sqlite3.Error:
-                pass
+                logger.warning('Suppressed exception in _refresh_loop_state', exc_info=True)
 
         # Rule / pattern counts from lessons.md.
         patterns = 0
@@ -526,7 +528,7 @@ def _refresh_loop_state(brain_dir: str, data: dict) -> None:
                 patterns = sum(1 for l in lessons if l.state.name == "PATTERN")
                 rules = sum(1 for l in lessons if l.state.name == "RULE")
             except Exception:
-                pass
+                logger.warning('Suppressed exception in _refresh_loop_state', exc_info=True)
 
         # Recent git commits — try known repo anchors in priority order.
         commits = ""
@@ -743,9 +745,9 @@ def _retroactive_sweep(brain_dir: str, data: dict) -> None:
                             snippet = payload.get("snippet", "")
                             existing.add(f"{sig}:{snippet[:40]}")
                         except Exception:
-                            pass
+                            logger.warning('Suppressed exception in _retroactive_sweep', exc_info=True)
             except sqlite3.Error:
-                pass
+                logger.warning('Suppressed exception in _retroactive_sweep', exc_info=True)
 
         emitted = 0
         for turn in user_turns:
@@ -788,7 +790,7 @@ def _retroactive_sweep(brain_dir: str, data: dict) -> None:
             if deleted:
                 _log.debug("retroactive_sweep: cleaned up %d old transcript files", deleted)
         except Exception:
-            pass
+            logger.warning('Suppressed exception in _retroactive_sweep', exc_info=True)
 
     except Exception as exc:
         _log.debug("retroactive_sweep skipped: %s", exc)

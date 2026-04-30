@@ -8,11 +8,14 @@ Domain-specific values (output types, personas, frameworks, etc.) are
 defaults that can be replaced by a brain's ``taxonomy.json`` config.
 The SDK ships with sales defaults because that's the first domain.
 """
+import logging
 
 import json
 import re
 
 import gradata._paths as _p
+logger = logging.getLogger(__name__)
+
 
 # ── Domain-Agnostic Core Tags (always present) ────────────────────────
 # These tags apply to ALL domains — they describe the brain's learning
@@ -254,7 +257,7 @@ def _load_taxonomy() -> dict:
                 )
             return taxonomy
         except Exception:
-            pass  # Fall through to defaults
+            logger.warning('Suppressed exception in _load_taxonomy', exc_info=True)
 
     # Fallback: merge sales defaults
     taxonomy.update(_SALES_DOMAIN_TAXONOMY)

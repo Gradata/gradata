@@ -1,11 +1,14 @@
 """Stop hook: run brain maintenance tasks at session end."""
 
 from __future__ import annotations
+import logging
 
 from pathlib import Path
 
 from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
+logger = logging.getLogger(__name__)
+
 
 HOOK_META = {
     "event": "Stop",
@@ -37,7 +40,7 @@ def _rebuild_fts(brain_dir: str, ctx=None) -> None:
             except Exception:
                 continue
     except Exception:
-        pass
+        logger.warning('Suppressed exception in _rebuild_fts', exc_info=True)
 
 
 def _generate_manifest(ctx=None) -> None:
@@ -48,7 +51,7 @@ def _generate_manifest(ctx=None) -> None:
         manifest = generate_manifest(ctx=ctx)
         write_manifest(manifest, ctx=ctx)
     except Exception:
-        pass
+        logger.warning('Suppressed exception in _generate_manifest', exc_info=True)
 
 
 def main(data: dict) -> dict | None:
@@ -64,7 +67,7 @@ def main(data: dict) -> dict | None:
         _rebuild_fts(brain_dir, ctx=ctx)
         _generate_manifest(ctx=ctx)
     except Exception:
-        pass
+        logger.warning('Suppressed exception in main', exc_info=True)
     return None
 
 

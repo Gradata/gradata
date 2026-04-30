@@ -17,12 +17,15 @@ Usage::
 """
 
 from __future__ import annotations
+import logging
 
 import os
 import sqlite3
 import time
 from contextlib import contextmanager
 from pathlib import Path
+logger = logging.getLogger(__name__)
+
 
 
 def get_connection(db_path: str | Path, wal: bool = True) -> sqlite3.Connection:
@@ -124,14 +127,14 @@ def lessons_lock(lessons_path: str | Path, timeout: float = 10.0):
 
                     msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
                 except OSError:
-                    pass
+                    logger.warning('Suppressed exception in lessons_lock', exc_info=True)
             else:
                 try:
                     import fcntl
 
                     fcntl.flock(fd, fcntl.LOCK_UN)
                 except OSError:
-                    pass
+                    logger.warning('Suppressed exception in lessons_lock', exc_info=True)
             os.close(fd)
 
 

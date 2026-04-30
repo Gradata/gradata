@@ -11,6 +11,8 @@ import json
 import logging
 import sys
 from pathlib import Path
+logger = logging.getLogger(__name__)
+
 
 _log = logging.getLogger(__name__)
 
@@ -281,7 +283,7 @@ def install(profile: str = "standard") -> None:
 
         _telemetry.send_once("first_hook_installed")
     except Exception:
-        pass
+        logger.warning('Suppressed exception in install', exc_info=True)
 
 
 def uninstall() -> None:

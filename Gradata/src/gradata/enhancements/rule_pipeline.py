@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from gradata._types import Lesson, LessonState
+logger = logging.getLogger(__name__)
+
 
 _log = logging.getLogger(__name__)
 
@@ -658,7 +660,7 @@ def build_knowledge_graph(lessons_path: Path, db_path: Path) -> dict:
             for c in cluster_rules(lessons)
         ]
     except (ImportError, Exception):
-        pass
+        logger.warning('Suppressed exception in build_knowledge_graph', exc_info=True)
 
     # Contradictions (across graduated rules)
     try:
@@ -669,7 +671,7 @@ def build_knowledge_graph(lessons_path: Path, db_path: Path) -> dict:
             {"rule_a": a, "rule_b": b} for a, b in detect_contradictions(graduated)
         ]
     except (ImportError, Exception):
-        pass
+        logger.warning('Suppressed exception in build_knowledge_graph', exc_info=True)
 
     # Cross-domain candidates
     try:
@@ -679,7 +681,7 @@ def build_knowledge_graph(lessons_path: Path, db_path: Path) -> dict:
 
         graph["cross_domain"] = detect_cross_domain_candidates(lessons)
     except (ImportError, Exception):
-        pass
+        logger.warning('Suppressed exception in build_knowledge_graph', exc_info=True)
 
     graph["stats"] = {
         "total_nodes": len(graph["nodes"]),

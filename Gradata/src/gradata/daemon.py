@@ -816,7 +816,7 @@ class GradataDaemon:
                 if (datetime.now(UTC) - last_sent).total_seconds() < 86400:
                     return
             except ValueError:
-                pass
+                logger.warning('Suppressed exception in GradataDaemon._maybe_send_telemetry', exc_info=True)
 
         def _send() -> None:
             import platform
@@ -849,7 +849,7 @@ class GradataDaemon:
                 )
                 urllib.request.urlopen(req, timeout=5)
             except Exception:
-                pass
+                logger.warning('Suppressed exception in GradataDaemon._maybe_send_telemetry._send', exc_info=True)
             try:
                 now = datetime.now(UTC).isoformat()
                 if "telemetry_last_sent" in config_text:
@@ -862,7 +862,7 @@ class GradataDaemon:
                     new_config = config_text.rstrip() + f'\ntelemetry_last_sent = "{now}"\n'
                 config_path.write_text(new_config, encoding="utf-8")
             except Exception:
-                pass
+                logger.warning('Suppressed exception in GradataDaemon._maybe_send_telemetry._send', exc_info=True)
 
         thread = threading.Thread(target=_send, daemon=True)
         thread.start()

@@ -17,9 +17,12 @@ Design decisions
 """
 
 from __future__ import annotations
+import logging
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
+logger = logging.getLogger(__name__)
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -364,7 +367,7 @@ def evaluate_success_conditions(
             report.sessions_evaluated = max_session
             conn.close()
     except Exception:
-        pass
+        logger.warning('Suppressed exception in evaluate_success_conditions', exc_info=True)
     report.conditions = conditions
     report.all_met = all(c.met for c in conditions)
     return report

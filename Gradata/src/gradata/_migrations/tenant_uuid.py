@@ -14,11 +14,14 @@ CLI:
 """
 
 from __future__ import annotations
+import logging
 
 import argparse
 import os
 import uuid
 from pathlib import Path
+logger = logging.getLogger(__name__)
+
 
 TENANT_FILE = ".tenant_id"
 
@@ -57,7 +60,7 @@ def get_or_create_tenant_id(brain_dir: str | Path) -> str:
             os.unlink(tmp)
     except FileExistsError:
         # Extremely unlikely (PID collision); fall back to reading disk.
-        pass
+        logger.warning('Suppressed exception in get_or_create_tenant_id', exc_info=True)
 
     tid = fpath.read_text(encoding="utf-8").strip()
     if _is_valid_uuid(tid):

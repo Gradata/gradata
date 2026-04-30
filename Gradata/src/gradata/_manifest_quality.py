@@ -4,6 +4,7 @@ Brain Manifest Quality Scoring.
 Quality scoring functions for brain manifest generation.
 Split from _brain_manifest.py for file size compliance (<500 lines).
 """
+import logging
 
 import math
 import re
@@ -14,6 +15,8 @@ import gradata._paths as _p
 from gradata._db import get_connection
 from gradata._manifest_helpers import LOW_SEVERITY, _session_window
 from gradata._stats import trend_analysis as _trend_analysis
+logger = logging.getLogger(__name__)
+
 
 if TYPE_CHECKING:
     from gradata._paths import BrainContext
@@ -387,7 +390,7 @@ def _severity_difficulty_weight(ctx: "BrainContext | None" = None) -> float | No
                 if fire_count and int(fire_count) > 0:
                     survived_weight += w
             except (ValueError, TypeError):
-                pass
+                logger.warning('Suppressed exception in _severity_difficulty_weight', exc_info=True)
 
         if total_weight == 0:
             return None

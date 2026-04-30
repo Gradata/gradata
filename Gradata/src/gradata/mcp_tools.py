@@ -24,6 +24,7 @@ Usage::
 """
 
 from __future__ import annotations
+import logging
 
 import json
 from pathlib import Path
@@ -31,6 +32,8 @@ from typing import Any
 
 from gradata._types import ELIGIBLE_STATES, Lesson, LessonState
 from gradata.enhancements.diff_engine import compute_diff
+logger = logging.getLogger(__name__)
+
 
 # ---------------------------------------------------------------------------
 # Tool 1: correct -- Log a correction
@@ -98,7 +101,7 @@ def correct(
             lesson_created = True
     except Exception:
         # Brain not available or not initialized -- still return diff results
-        pass
+        logger.warning('Suppressed exception in correct', exc_info=True)
 
     return {
         "severity": diff.severity,
@@ -385,7 +388,7 @@ def manifest(
                 "lessons_graduated", result["lessons_graduated"]
             )
     except Exception:
-        pass
+        logger.warning('Suppressed exception in manifest', exc_info=True)
 
     # Detect extinct categories (categories with RULE state but no recent corrections)
     category_states: dict[str, list[str]] = {}

@@ -13,6 +13,7 @@ brain on one machine is stable across sessions.
 """
 
 from __future__ import annotations
+import logging
 
 import argparse
 import contextlib
@@ -20,6 +21,8 @@ import os
 import re
 import uuid
 from pathlib import Path
+logger = logging.getLogger(__name__)
+
 
 DEVICE_FILE = ".device_id"
 _DEVICE_RE = re.compile(r"^dev_[0-9a-f]{32}$")
@@ -56,7 +59,7 @@ def get_or_create_device_id(brain_dir: str | Path) -> str:
         fd = os.open(tmp, flags, 0o644)
     except FileExistsError:
         # Extremely unlikely PID collision; fall through to disk read.
-        pass
+        logger.warning('Suppressed exception in get_or_create_device_id', exc_info=True)
     else:
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as fh:

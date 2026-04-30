@@ -14,6 +14,8 @@ from datetime import UTC
 from typing import TYPE_CHECKING
 
 from gradata._http import require_https
+logger = logging.getLogger(__name__)
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -480,7 +482,7 @@ def brain_correct(
                             session=session or 0,
                         )
                     except (ImportError, Exception):
-                        pass
+                        logger.warning('Suppressed exception in brain_correct', exc_info=True)
                 else:
                     import json as _json
 
@@ -546,7 +548,7 @@ def brain_correct(
                             session=session or 0,
                         )
                     except (ImportError, Exception):
-                        pass
+                        logger.warning('Suppressed exception in brain_correct', exc_info=True)
                     if approval_required:
                         event["approval_required"] = True
                         try:
@@ -689,7 +691,7 @@ def brain_correct(
                                     _revert,
                                 )
                         except Exception:  # pragma: no cover — defensive
-                            pass
+                            logger.warning('Suppressed exception in brain_correct', exc_info=True)
                 except Exception as heal_exc:
                     _log.debug("Auto-heal failed: %s", heal_exc)
     except Exception as e:
@@ -787,7 +789,7 @@ def brain_correct(
         )
         event["provenance"] = provenance
     except Exception:
-        pass  # Never block corrections
+        logger.warning('Suppressed exception in brain_correct', exc_info=True)
 
     return event
 
@@ -1284,7 +1286,7 @@ def _cloud_sync_session(
             m = compute_metrics(db_path=brain.db_path, window=1)
             correction_density = float(m.get("correction_density", 0.0))
         except Exception:
-            pass
+            logger.warning('Suppressed exception in _cloud_sync_session', exc_info=True)
 
         # Blandness: compute from correction finals if available
         blandness_score = 0.0
@@ -1295,7 +1297,7 @@ def _cloud_sync_session(
             if finals:
                 blandness_score = compute_blandness(finals)
         except Exception:
-            pass
+            logger.warning('Suppressed exception in _cloud_sync_session', exc_info=True)
 
         # Rule stats from lessons
         rules_active = sum(1 for l in all_lessons if l.state.value in ("INSTINCT", "PATTERN"))
@@ -1337,7 +1339,7 @@ def _cloud_sync_session(
             cfg = _parse_toml_cloud(config_path)
             sync_mode = cfg.get("sync_mode", "metrics_only")
         except Exception:
-            pass
+            logger.warning('Suppressed exception in _cloud_sync_session', exc_info=True)
 
         if sync_mode == "full":
             # 4. Sync events/corrections via the full cloud client (opt-in only)
@@ -1640,7 +1642,7 @@ def brain_export_rules(brain: Brain, *, min_state: str = "PATTERN", skill_name: 
             manifest = json.loads(brain.manifest_path.read_text(encoding="utf-8"))
             domain = manifest.get("metadata", {}).get("domain", "general")
         except Exception:
-            pass
+            logger.warning('Suppressed exception in brain_export_rules', exc_info=True)
 
     if not skill_name:
         skill_name = f"gradata-{domain.lower().replace(' ', '-')}-rules"
@@ -1781,7 +1783,7 @@ def brain_export_skill(
             provenance["domain"] = manifest.get("metadata", {}).get("domain", "")
             provenance["sessions_trained"] = manifest.get("metadata", {}).get("sessions_trained", 0)
         except Exception:
-            pass
+            logger.warning('Suppressed exception in brain_export_skill', exc_info=True)
     (skill_dir / "provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
     return skill_dir
 
@@ -1809,7 +1811,7 @@ def brain_export_skills(
             manifest = json.loads(brain.manifest_path.read_text(encoding="utf-8"))
             domain = manifest.get("metadata", {}).get("domain", "general").lower()
     except Exception:
-        pass
+        logger.warning('Suppressed exception in brain_export_skills', exc_info=True)
 
     base = Path(output_dir).resolve() if output_dir else brain.dir / "skills"
     created = []
@@ -2070,7 +2072,7 @@ def brain_prove(brain: Brain) -> dict:
                 1 for l in lessons if l.state in (LessonState.PATTERN, LessonState.RULE)
             )
     except Exception:
-        pass
+        logger.warning('Suppressed exception in brain_prove', exc_info=True)
 
     # Determine which categories have converged
     by_cat = convergence.get("by_category", {})

@@ -20,6 +20,8 @@ import sqlite3
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
+logger = logging.getLogger(__name__)
+
 
 _log = logging.getLogger(__name__)
 
@@ -91,7 +93,7 @@ def _get_db_path(ctx=None) -> Path:
         if p.exists():
             return p
     except Exception:
-        pass
+        logger.warning('Suppressed exception in _get_db_path', exc_info=True)
 
     raise ValueError(
         "Cannot resolve rule_canary DB path: no context, BRAIN_DIR, or relative path found"

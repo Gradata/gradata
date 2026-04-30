@@ -31,6 +31,8 @@ from pathlib import Path
 
 from gradata.hooks._base import resolve_brain_dir, run_hook
 from gradata.hooks._profiles import Profile
+logger = logging.getLogger(__name__)
+
 
 _log = logging.getLogger(__name__)
 
@@ -137,7 +139,7 @@ def _lesson_counts(brain_dir: Path) -> tuple[int, int, int]:
             elif "[RULE:" in line:
                 rule += 1
     except OSError:
-        pass
+        logger.warning('Suppressed exception in _lesson_counts', exc_info=True)
     return instinct, pattern, rule
 
 
@@ -162,7 +164,7 @@ def _recent_corrections(brain_dir: Path, limit: int = 10) -> list[str]:
                 except (TypeError, json.JSONDecodeError):
                     rows.append(f"- {str(raw)[:80]}")
     except sqlite3.Error:
-        pass
+        logger.warning('Suppressed exception in _recent_corrections', exc_info=True)
     return rows
 
 

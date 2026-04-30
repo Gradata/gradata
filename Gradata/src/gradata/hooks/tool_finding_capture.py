@@ -1,6 +1,7 @@
 """PostToolUse hook: capture test findings and detect when user acts on them."""
 
 from __future__ import annotations
+import logging
 
 import json
 import os
@@ -9,6 +10,8 @@ from pathlib import Path
 
 from gradata.hooks._base import run_hook
 from gradata.hooks._profiles import Profile
+logger = logging.getLogger(__name__)
+
 
 HOOK_META = {
     "event": "PostToolUse",
@@ -63,7 +66,7 @@ def _load_findings() -> list[dict]:
         if FINDINGS_FILE.exists():
             return json.loads(FINDINGS_FILE.read_text(encoding="utf-8"))
     except Exception:
-        pass
+        logger.warning('Suppressed exception in _load_findings', exc_info=True)
     return []
 
 
@@ -76,7 +79,7 @@ def _save_findings(findings: list[dict]) -> None:
         tmp.write_text(content, encoding="utf-8")
         tmp.replace(FINDINGS_FILE)  # atomic on POSIX, near-atomic on Windows
     except Exception:
-        pass
+        logger.warning('Suppressed exception in _save_findings', exc_info=True)
 
 
 def _extract_failed_files(output: str) -> list[str]:
