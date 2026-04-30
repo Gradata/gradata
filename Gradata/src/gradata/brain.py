@@ -911,7 +911,13 @@ class Brain(BrainInspectionMixin):
                             "domain": scope.domain,
                             "audience": scope.audience,
                         },
-                        "task": task,
+                        # SECURITY: don't persist raw task text — it may
+                        # contain PII or proprietary content.  Emit a stable
+                        # sha256 prefix so downstream effectiveness tracking
+                        # can correlate without storing the original.
+                        "task_hash": __import__("hashlib")
+                        .sha256((task or "").encode("utf-8"))
+                        .hexdigest()[:16],
                     },
                 )
             except Exception as e:

@@ -223,11 +223,14 @@ def emit(
 
     # Best-effort raw side-log (gitignored).  Failures MUST NOT block the
     # canonical write — disk-full on the raw log is not a learning-data loss.
-    try:
-        raw_jsonl = events_jsonl.parent / "events.raw.jsonl"
-        _locked_append(raw_jsonl, json.dumps(raw_event, ensure_ascii=False) + "\n")
-    except Exception:
-        logger.warning('Suppressed exception in emit', exc_info=True)
+    # SECURITY: raw events contain unredacted PII. Only write when explicitly
+    # opted in via GRADATA_DEBUG_RAW_EVENTS=1. Default OFF.
+    if os.environ.get("GRADATA_DEBUG_RAW_EVENTS") == "1":
+        try:
+            raw_jsonl = events_jsonl.parent / "events.raw.jsonl"
+            _locked_append(raw_jsonl, json.dumps(raw_event, ensure_ascii=False) + "\n")
+        except Exception:
+            logger.warning('Suppressed exception in emit', exc_info=True)
 
     # Dual-write: JSONL (portable) + SQLite (queryable).
     # At least ONE must succeed or we raise — learning data loss is unacceptable.

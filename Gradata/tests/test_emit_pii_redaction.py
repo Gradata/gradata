@@ -62,7 +62,25 @@ def test_emitted_event_is_redacted_in_sqlite(tmp_path):
     assert "[REDACTED_EMAIL]" in row[0]
 
 
-def test_raw_side_log_keeps_original(tmp_path):
+def test_raw_side_log_disabled_by_default(tmp_path, monkeypatch):
+    """SECURITY: raw side-log must be OFF unless explicitly opted in.
+
+    PR #145 CR feedback: events.raw.jsonl contains unredacted PII and
+    must not be written by default.  Gated behind GRADATA_DEBUG_RAW_EVENTS=1.
+    """
+    monkeypatch.delenv("GRADATA_DEBUG_RAW_EVENTS", raising=False)
+    brain = init_brain(tmp_path)
+    brain.emit("T3", "test", {"note": f"reach me: {SECRET_EMAIL}"}, [])
+
+    raw_path = brain.dir / "events.raw.jsonl"
+    assert not raw_path.exists() or not raw_path.read_text().strip(), (
+        "events.raw.jsonl must NOT be written when GRADATA_DEBUG_RAW_EVENTS is unset"
+    )
+
+
+def test_raw_side_log_keeps_original_when_opted_in(tmp_path, monkeypatch):
+    """When GRADATA_DEBUG_RAW_EVENTS=1, raw side-log preserves PII for debugging."""
+    monkeypatch.setenv("GRADATA_DEBUG_RAW_EVENTS", "1")
     brain = init_brain(tmp_path)
     brain.emit("T3", "test", {"note": f"reach me: {SECRET_EMAIL}"}, [])
 
