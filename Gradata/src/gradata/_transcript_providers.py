@@ -15,9 +15,30 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 
 _log = logging.getLogger(__name__)
+
+
+_VALID_SESSION_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
+
+
+def _validate_session_id(session_id: str | None) -> bool:
+    """Same path-traversal guard as gradata._transcript._validate_session_id."""
+    if not session_id or not isinstance(session_id, str):
+        return False
+    if ".." in session_id or "/" in session_id or "\\" in session_id:
+        return False
+    return bool(_VALID_SESSION_RE.match(session_id))
+
+
+def _safe_mtime(p: Path) -> float:
+    """Return file mtime or -1 if stat fails. Used as a sort key."""
+    try:
+        return p.stat().st_mtime
+    except OSError:
+        return -1.0
 
 
 class ProviderTranscriptSource:
@@ -33,6 +54,10 @@ class ProviderTranscriptSource:
     """
 
     def __init__(self, session_id: str | None) -> None:
+        # Reject path-traversal session ids before they get joined into a path.
+        if session_id is not None and not _validate_session_id(session_id):
+            _log.debug("ProviderTranscriptSource rejecting invalid session_id")
+            session_id = None
         self._session_id = session_id
         self._path: Path | None = self._locate()
 
@@ -58,7 +83,7 @@ class ProviderTranscriptSource:
                 all_jsonls.extend(f for f in d.iterdir() if f.suffix == ".jsonl")
             except OSError:
                 continue
-        return max(all_jsonls, key=lambda p: p.stat().st_mtime) if all_jsonls else None
+        return max(all_jsonls, key=_safe_mtime) if all_jsonls else None
 
     def available(self) -> bool:
         return self._path is not None and self._path.is_file()
@@ -104,7 +129,14 @@ class ProviderTranscriptSource:
                                 continue
                             btype = block.get("type", "")
                             if btype == "text":
-                                text_parts.append(block.get("text", ""))
+                                text_value = block.get("text", "")
+                                if not isinstance(text_value, str):
+                                    _log.debug(
+                                        "skipping non-str text block: %r",
+                                        type(text_value).__name__,
+                                    )
+                                    continue
+                                text_parts.append(text_value)
                             else:
                                 has_non_text = True
                         result.append(
@@ -132,6 +164,9 @@ class GradataTranscriptSource:
 
     def _path(self) -> Path | None:
         if not self._session_id:
+            return None
+        if not _validate_session_id(self._session_id):
+            _log.debug("GradataTranscriptSource rejecting invalid session_id")
             return None
         p = Path(self._brain_dir) / "sessions" / self._session_id / "transcript.jsonl"
         return p if p.is_file() else None

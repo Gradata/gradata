@@ -311,9 +311,16 @@ def _mine_session(path: Path) -> list[dict]:
         snippet = re.sub(r"[\"\\\n]", " ", text[:100])
         category = _classify_correction(text)
         session_uuid = msg.get("sessionId") or path.stem
+        # Deterministic ts fallback: derive from the session+uuid+text hash so
+        # reruns produce stable dedup keys even when msg has no timestamp.
+        msg_ts = msg.get("timestamp")
+        if not msg_ts:
+            _hash_input = f"{session_uuid}|{msg.get('uuid', '')}|{text[:200]}"
+            _h = hashlib.sha256(_hash_input.encode("utf-8")).hexdigest()
+            msg_ts = f"hash:{_h[:16]}"
         events.append(
             {
-                "ts": msg.get("timestamp") or datetime.now(UTC).isoformat(),
+                "ts": msg_ts,
                 "event": "IMPLICIT_FEEDBACK",
                 "source": "gradata.mine",
                 "category": category,

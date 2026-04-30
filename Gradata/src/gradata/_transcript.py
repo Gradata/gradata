@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 logger = logging.getLogger(__name__)
@@ -41,6 +42,30 @@ _TTL_ENV = "GRADATA_TRANSCRIPT_TTL_DAYS"
 
 def _is_enabled() -> bool:
     return os.environ.get(_ENABLED_ENV, "0") == "1"
+
+
+_VALID_SESSION_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
+
+
+def _validate_session_id(session_id: str) -> bool:
+    """Reject session ids containing path-traversal or separator chars.
+
+    Returns True iff session_id is non-empty, contains no path separators or
+    parent-dir markers, and matches a strict alnum/dash/underscore pattern.
+    """
+    if not session_id or not isinstance(session_id, str):
+        return False
+    if ".." in session_id or "/" in session_id or "\\" in session_id:
+        return False
+    return bool(_VALID_SESSION_RE.match(session_id))
+
+
+def _safe_int_env(key: str, default: int) -> int:
+    """Read an int from env with try/except fallback."""
+    try:
+        return int(os.environ.get(key, str(default)))
+    except (TypeError, ValueError):
+        return default
 
 
 def _session_dir(brain_dir: str, session_id: str) -> Path:
@@ -70,11 +95,14 @@ def log_turn(
         return
     if not brain_dir or not session_id:
         return
+    if not _validate_session_id(session_id):
+        _log.debug("transcript log_turn rejected invalid session_id")
+        return
 
     limit = (
         truncate_at
         if truncate_at is not None
-        else int(os.environ.get(_TRUNCATE_ENV, str(DEFAULT_TRUNCATE)))
+        else _safe_int_env(_TRUNCATE_ENV, DEFAULT_TRUNCATE)
     )
 
     entry: dict = {
@@ -103,6 +131,8 @@ def load_turns(brain_dir: str, session_id: str) -> list[dict]:
 
     Returns an empty list on any read error or if the file doesn't exist.
     """
+    if not _validate_session_id(session_id):
+        return []
     path = _transcript_path(brain_dir, session_id)
     if not path.is_file():
         return []
@@ -124,9 +154,7 @@ def load_turns(brain_dir: str, session_id: str) -> list[dict]:
 
 def cleanup_ttl(brain_dir: str, ttl_days: int | None = None) -> int:
     """Delete transcript directories older than ttl_days. Returns count deleted."""
-    days = (
-        ttl_days if ttl_days is not None else int(os.environ.get(_TTL_ENV, str(DEFAULT_TTL_DAYS)))
-    )
+    days = ttl_days if ttl_days is not None else _safe_int_env(_TTL_ENV, DEFAULT_TTL_DAYS)
     now = datetime.now(UTC).timestamp()
     cutoff = now - days * 86400
     sessions_dir = Path(brain_dir) / "sessions"
