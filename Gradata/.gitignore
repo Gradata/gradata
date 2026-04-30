@@ -1,0 +1,7 @@
+
+# Council Phase A — committed scratch should never come back
+.tmp/
+.archive/
+sessions/handoff-*.md
+/0
+/BrainDetail
