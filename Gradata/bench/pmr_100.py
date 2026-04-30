@@ -259,19 +259,20 @@ def run_one_session(session_id: int, scenario: Scenario, brain_dir: Path,
         for i in range(distractor_count):
             brain.emit("DISTRACTOR", "bench", {"turn": i, "text": f"unrelated chatter {i}"})
 
-        # 3. Probe — does apply_brain_rules return our rule?
-        rules = brain.apply_brain_rules(scenario.probe) or []
+        # 3. Probe — does apply_brain_rules return text matching our rule?
+        rules_text = brain.apply_brain_rules(scenario.probe) or ""
 
-        # check recall@1 and @3
-        def matches(rule: Any) -> bool:
-            text = (getattr(rule, "text", None) or str(rule)).lower()
-            return any(kw.lower() in text for kw in scenario.expected_keywords)
-
-        recall_at_1 = bool(rules) and matches(rules[0])
-        recall_at_3 = any(matches(r) for r in rules[:3])
+        # apply_brain_rules returns a formatted string (not a list of rule objects).
+        # We score by whether expected keywords appear in the rendered prompt block.
+        text_lower = rules_text.lower()
+        recall_at_1 = bool(rules_text) and any(kw.lower() in text_lower
+                                                for kw in scenario.expected_keywords)
+        # @3 collapses to @1 with a string return — kept for compatibility / future
+        # variant where we score per-rule chunks.
+        recall_at_3 = recall_at_1
 
         # check rule was actually extracted at all
-        rule_extracted = bool(rules)
+        rule_extracted = bool(rules_text)
 
         return SessionResult(
             session_id=session_id,
