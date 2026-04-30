@@ -65,7 +65,9 @@ def test_cache_hit_skips_provider(tmp_path, monkeypatch):
     cache_file = rs._cache_path(tmp_path, key)
     cache_file.parent.mkdir(parents=True, exist_ok=True)
     cache_file.write_text(
-        "<brain-wisdom>cached content payload ok ok ok</brain-wisdom>", encoding="utf-8"
+        f"{rs._VERSION_HEADER_PREFIX}{rs.SYNTHESIZER_VERSION}\n"
+        "<brain-wisdom>cached content payload ok ok ok</brain-wisdom>",
+        encoding="utf-8",
     )
 
     result = rs.synthesize_rules_block(

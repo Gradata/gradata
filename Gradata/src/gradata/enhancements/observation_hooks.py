@@ -79,7 +79,7 @@ import re as _re
 
 # PII patterns to redact from observations before storage
 _PII_PATTERNS = [
-    (_re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"), "[EMAIL]"),
+    (_re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"), "[EMAIL]"),
     (_re.compile(r"(?:\+?1[\s\-.]?)?\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}\b"), "[PHONE]"),
     (_re.compile(r"\b(?:sk-|api[_-]?key[=:]\s*)[A-Za-z0-9_-]{10,}\b", _re.I), "[API_KEY]"),
     (_re.compile(r"\b(?:token[=:]\s*|bearer\s+)[A-Za-z0-9_.-]{10,}\b", _re.I), "[TOKEN]"),

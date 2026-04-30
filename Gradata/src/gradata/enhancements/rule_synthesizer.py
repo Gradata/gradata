@@ -34,6 +34,10 @@ DEFAULT_MODEL = "claude-opus-4-7"
 CACHE_DIRNAME = ".synth-cache"
 MAX_OUTPUT_TOKENS = 1200
 SYNTH_TIMEOUT = 20.0
+# Bump when cache format / synthesizer prompt changes so older entries are
+# treated as invalid and re-synthesized.
+SYNTHESIZER_VERSION = "v1"
+_VERSION_HEADER_PREFIX = "# synthesizer-version: "
 
 _SYSTEM_PROMPT = """You are the brain-wisdom synthesizer for an AI coding/sales assistant.
 
@@ -94,21 +98,45 @@ def _compute_cache_key(
     return hashlib.sha256(joined).hexdigest()[:16]
 
 
+def _is_valid_cache_payload(payload: str) -> bool:
+    """Return True iff payload is non-empty and carries the current
+    synthesizer-version header AND a <brain-wisdom> block."""
+    if not payload or not payload.strip():
+        return False
+    expected_header = f"{_VERSION_HEADER_PREFIX}{SYNTHESIZER_VERSION}"
+    if not payload.startswith(expected_header):
+        return False
+    if "<brain-wisdom>" not in payload or "</brain-wisdom>" not in payload:
+        return False
+    return True
+
+
+def _strip_cache_header(payload: str) -> str:
+    """Drop the version header line from a cached payload."""
+    nl = payload.find("\n")
+    return payload[nl + 1 :] if nl != -1 else payload
+
+
 def _read_cache(brain_dir: Path, cache_key: str) -> str | None:
     path = _cache_path(brain_dir, cache_key)
     if not path.is_file():
         return None
     try:
-        return path.read_text(encoding="utf-8")
+        raw = path.read_text(encoding="utf-8")
     except OSError:
         return None
+    if not _is_valid_cache_payload(raw):
+        _log.debug("synth cache invalid (version/empty), ignoring: %s", path)
+        return None
+    return _strip_cache_header(raw)
 
 
 def _write_cache(brain_dir: Path, cache_key: str, content: str) -> None:
     try:
         cache_dir = brain_dir / CACHE_DIRNAME
         cache_dir.mkdir(parents=True, exist_ok=True)
-        _cache_path(brain_dir, cache_key).write_text(content, encoding="utf-8")
+        header = f"{_VERSION_HEADER_PREFIX}{SYNTHESIZER_VERSION}\n"
+        _cache_path(brain_dir, cache_key).write_text(header + content, encoding="utf-8")
     except OSError as exc:
         _log.debug("synth cache write failed: %s", exc)
 

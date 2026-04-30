@@ -77,7 +77,9 @@ def _failures_by_description(rule_failure_events: list[dict]) -> dict[str, int]:
     by_desc: dict[str, int] = {}
     for event in rule_failure_events:
         data = event.get("data", {}) or {}
-        desc = (data.get("failed_rule_description") or data.get("description") or "").strip()
+        raw = data.get("failed_rule_description") or data.get("description") or ""
+        # Guard against non-string descriptions (e.g. legacy dict payloads).
+        desc = raw.strip() if isinstance(raw, str) else str(raw).strip()
         if not desc:
             continue
         by_desc[desc] = by_desc.get(desc, 0) + 1
