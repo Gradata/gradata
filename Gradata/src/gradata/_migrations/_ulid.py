@@ -40,12 +40,22 @@ def ulid_from_iso(iso_ts: str) -> str:
 
     Used by Migration 002 to backfill event_id on historical rows so the
     leading 10 chars still sort-align with the original ``events.ts``.
+
+    On parse failure we derive a deterministic ULID from sha256(iso_ts) so
+    reruns of the migration produce the same id for the same input row,
+    preserving idempotence.
     """
     from datetime import datetime
+    import hashlib
 
     try:
         dt = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
-    except (ValueError, TypeError):
-        return new_ulid()
+    except (ValueError, TypeError, AttributeError):
+        # Deterministic fallback: hash the input to derive both ts and rand
+        # components.  Same input -> same ULID across runs.
+        digest = hashlib.sha256((iso_ts or "").encode("utf-8")).digest()
+        ts_ms = int.from_bytes(digest[:6], "big") & ((1 << 48) - 1)
+        rand = int.from_bytes(digest[6:16], "big")
+        return _encode(ts_ms, 10) + _encode(rand, 16)
     ts_ms = int(dt.timestamp() * 1000)
     return new_ulid(ts_ms=ts_ms)

@@ -51,6 +51,10 @@ def get_or_create_device_id(brain_dir: str | Path) -> str:
         did = fpath.read_text(encoding="utf-8").strip()
         if _is_valid(did):
             return did
+        # File exists but is malformed/legacy.  Fall through to regen so we
+        # both generate a fresh id AND persist it; otherwise every subsequent
+        # call would re-mint (non-idempotent).
+        logger.warning("device_id at %s invalid, regenerating", fpath)
 
     new_did = _new_device_id()
     tmp = brain / f".device_id.tmp.{os.getpid()}"
@@ -64,7 +68,11 @@ def get_or_create_device_id(brain_dir: str | Path) -> str:
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 fh.write(new_did)
-            if not fpath.exists():
+            # If the existing file is invalid OR missing, replace it.
+            existing_did = (
+                fpath.read_text(encoding="utf-8").strip() if fpath.exists() else ""
+            )
+            if not existing_did or not _is_valid(existing_did):
                 os.replace(tmp, fpath)
             else:
                 os.unlink(tmp)
