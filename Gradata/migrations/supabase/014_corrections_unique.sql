@@ -26,11 +26,15 @@ BEGIN
     JOIN pg_class t ON t.oid = c.conrelid
     WHERE t.relname = 'corrections'
       AND c.contype = 'u'
-      AND c.conkey @> ARRAY[
-        (SELECT attnum FROM pg_attribute WHERE attrelid = t.oid AND attname = 'brain_id'),
-        (SELECT attnum FROM pg_attribute WHERE attrelid = t.oid AND attname = 'session'),
-        (SELECT attnum FROM pg_attribute WHERE attrelid = t.oid AND attname = 'description')
-      ]::smallint[]
+      -- Exact-match check (not superset): sort both sides then compare arrays.
+      AND (
+        SELECT array_agg(k ORDER BY k) FROM unnest(c.conkey) AS k
+      ) = (
+        SELECT array_agg(attnum ORDER BY attnum)::int2[]
+        FROM pg_attribute
+        WHERE attrelid = t.oid
+          AND attname IN ('brain_id', 'session', 'description')
+      )
   ) THEN
     ALTER TABLE corrections
       ADD CONSTRAINT corrections_brain_session_description_unique
