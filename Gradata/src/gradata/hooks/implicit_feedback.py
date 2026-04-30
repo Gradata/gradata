@@ -5,7 +5,13 @@ from __future__ import annotations
 import logging
 import re
 
-from gradata.hooks._base import emit_hook_event, extract_message, run_hook
+from gradata.exceptions import BrainNotConfiguredError
+from gradata.hooks._base import (
+    emit_hook_event,
+    extract_message,
+    resolve_brain_dir,
+    run_hook,
+)
 from gradata.hooks._profiles import Profile
 
 _log = logging.getLogger(__name__)
@@ -183,6 +189,14 @@ def main(data: dict) -> dict | None:
         if not signals and not tacit_accept:
             return None
 
+        # Phase B P0 fix: hard-fail when BRAIN_DIR is unresolved instead of
+        # silently dropping signals. Implicit feedback is high-signal data —
+        # losing it because the brain dir env var is missing is a footgun.
+        if not resolve_brain_dir():
+            raise BrainNotConfiguredError(
+                "BRAIN_DIR is required to persist implicit feedback signals"
+            )
+
         if signals:
             emit_hook_event(
                 "IMPLICIT_FEEDBACK",
@@ -221,6 +235,8 @@ def main(data: dict) -> dict | None:
             sig_str = ",".join(_SIG_ABBREV.get(str(s["type"]), str(s["type"])) for s in signals)
             return {"result": f"[fb:{sig_str}]"}
         return None
+    except BrainNotConfiguredError:
+        raise
     except Exception as exc:
         _log.debug("implicit_feedback hook error: %s", exc)
         return None
