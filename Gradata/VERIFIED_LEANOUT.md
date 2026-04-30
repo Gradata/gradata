@@ -81,13 +81,26 @@ Same as above. Different responsibilities:
 
 **Correct action**: Move behind `gradata[daemon]` extra. Don't delete.
 
-### `notifications.py`, `onboard.py`, `safety.py` — Pragmatist's "DELETE" list  →  VERIFIED: ⚠️ NOT YET CHECKED
+### `notifications.py`, `onboard.py`, `safety.py` — Pragmatist's "DELETE" list  →  VERIFIED: ❌ ALL THREE UNSAFE
 
-Pragmatist called these dead in their council response. I did not have time to grep for callers in this audit pass. Should not be deleted without:
+Pragmatist's call was 0-for-3. After targeted import grep:
 
-1. Full caller search across Gradata src + tests
-2. Confirmation no external consumer imports them
-3. Pytest pass with them removed
+- **`notifications.py`** — Imported in `__init__.py` line 69 (PUBLIC API: `from gradata.notifications import Notification`). Used in `brain.py` line 1398 by `Brain.subscribe()` callback API. **KEEP.**
+- **`onboard.py`** — `Brain.init()` (the canonical bootstrap shown in the README!) calls `from gradata.onboard import onboard` at brain.py:247. Headline API. **KEEP.**
+- **`safety.py`** — `_core.py:193` uses `from gradata.safety import redact_pii_with_report` for PII redaction. Security-relevant. **KEEP.**
+
+Council's structural critique (bloat) was correct, but specific "delete" calls were heuristic, not analytical.
+
+## Phase B test verification (2026-04-30 09:13)
+
+Full pytest sweep on `feat/council-phase-b-fixes`:
+
+```
+3970 passed, 5 skipped, 5 deselected, 4 warnings in 274.91s (4:34)
+exit=0
+```
+
+**Phase B is provably non-regressive.** Every bare-except conversion, atomic-write change, BRAIN_DIR hard-fail, import-integrity check, and thread-safety lock survives the existing test suite. Safe to push.
 
 ### `hooks/implicit_feedback.py` — Pragmatist's "DELETE" list  →  VERIFIED: ⚠️ KEEP
 
