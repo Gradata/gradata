@@ -16,6 +16,7 @@ import re
 
 from gradata._types import (
     CorrectionType,
+    Example,
     Lesson,
     LessonState,
     transition,
@@ -371,6 +372,8 @@ def parse_lessons(text: str) -> list[Lesson]:
         alpha = 1.0
         beta_param_val = 1.0
         slot = ""
+        examples: list[Example] = []
+        output_shape: str | None = None
         j = i + 1
         while j < len(lines) and lines[j].startswith("  "):
             meta_line = lines[j].strip()
@@ -409,6 +412,18 @@ def parse_lessons(text: str) -> list[Lesson]:
                     domain_scores = {}
             elif meta_line.startswith("Slot:"):
                 slot = meta_line[len("Slot:") :].strip().lower()
+            elif meta_line.startswith("Examples:"):
+                # Issue #129: persisted as JSON array of {good, bad} pairs
+                try:
+                    raw_examples = json.loads(meta_line[len("Examples:") :].strip())
+                    if isinstance(raw_examples, list):
+                        for ex in raw_examples:
+                            if isinstance(ex, dict):
+                                examples.append(Example.from_dict(ex))
+                except (json.JSONDecodeError, ValueError, TypeError):
+                    pass
+            elif meta_line.startswith("Output shape:"):
+                output_shape = meta_line[len("Output shape:") :].strip() or None
             elif meta_line.startswith("Path:"):
                 path = meta_line[len("Path:") :].strip()
             elif meta_line.startswith("Secondary categories:"):
@@ -468,6 +483,8 @@ def parse_lessons(text: str) -> list[Lesson]:
             last_climb_session=last_climb_session,
             tree_level=tree_level,
             slot=slot,
+            examples=examples,
+            output_shape=output_shape,
         )
         if metadata_obj is not None:
             _lesson.metadata = metadata_obj
@@ -1116,6 +1133,18 @@ def format_lessons(lessons: list[Lesson]) -> str:
 
         if getattr(lesson, "slot", ""):
             lines.append(f"  Slot: {lesson.slot}")
+
+        # Issue #129: examples + output_shape — only write when populated.
+        _examples = getattr(lesson, "examples", None) or []
+        if _examples:
+            payload = [
+                e.to_dict() if hasattr(e, "to_dict") else dict(e)
+                for e in _examples
+            ]
+            lines.append(f"  Examples: {json.dumps(payload, ensure_ascii=False)}")
+        _output_shape = getattr(lesson, "output_shape", None)
+        if _output_shape:
+            lines.append(f"  Output shape: {_output_shape}")
 
         if lesson.path:
             lines.append(f"  Path: {lesson.path}")
