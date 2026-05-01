@@ -1171,6 +1171,49 @@ def cmd_hooks(args):
         hook_status()
 
 
+def cmd_project(args) -> None:
+    """Project graduated rules into a Memory-tool-readable file tree.
+
+    Default output is ``<brain>/memories/{voice,decisions,process,preferences,relations}.md``.
+    The split is by ACTIVATION ENTROPY — voice rules fire on every draft and
+    belong in the cached prefix, decision rubrics fire sparsely and want
+    on-demand recall. Splitting by topic instead would defeat caching.
+    """
+    import json as _json
+
+    from gradata._projector import project
+
+    brain = _get_brain(args)
+    output_dir = Path(args.output) if getattr(args, "output", None) else None
+    result = project(brain, output_dir=output_dir, dry_run=getattr(args, "dry_run", False))
+
+    if getattr(args, "json", False):
+        print(
+            _json.dumps(
+                {
+                    "memories_dir": str(result.memories_dir),
+                    "files_written": list(result.files_written),
+                    "files_unchanged": list(result.files_unchanged),
+                    "rules_total": result.rules_total,
+                    "rules_by_file": result.rules_by_file,
+                    "digest": result.digest,
+                    "dry_run": getattr(args, "dry_run", False),
+                },
+                indent=2,
+            )
+        )
+        return
+
+    print(f"projected → {result.memories_dir}")
+    print(f"  rules: {result.rules_total} graduated")
+    for name, count in result.rules_by_file.items():
+        marker = "✓" if name in result.files_written else " "
+        print(f"  {marker} {name:<16} {count:>4} rules")
+    if result.files_unchanged:
+        print(f"  ({len(result.files_unchanged)} files unchanged — caches stay hot)")
+    print(f"  digest: {result.digest[:16]}…")
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="gradata",
@@ -1389,6 +1432,28 @@ def main():
         help="Also delete the lesson (default: keep as soft injection)",
     )
 
+    # project — emit memories/ file tree for LLM Memory tool consumption
+    p_project = sub.add_parser(
+        "project",
+        help="Project graduated rules to memories/ file tree (Anthropic Memory tool, etc.)",
+    )
+    p_project.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help="Custom output dir (default: <brain>/memories/). Use for per-persona rentable namespaces.",
+    )
+    p_project.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Render and report what would be written without touching disk.",
+    )
+    p_project.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit ProjectionResult as JSON (digest, counts, files written).",
+    )
+
     args = parser.parse_args()
 
     commands = {
@@ -1420,6 +1485,7 @@ def main():
     commands["skill"] = cmd_skill
     commands["seed"] = cmd_seed
     commands["mine"] = cmd_mine
+    commands["project"] = cmd_project
 
     if args.command in commands:
         commands[args.command](args)
