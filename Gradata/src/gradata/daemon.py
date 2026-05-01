@@ -41,6 +41,7 @@ from pathlib import Path
 from socketserver import ThreadingMixIn
 
 import gradata
+from gradata._brain_lock import acquire_brain_lock
 from gradata._scope import RuleScope
 from gradata._types import LessonState
 from gradata._workers import WorkerPool
@@ -613,6 +614,8 @@ class GradataDaemon:
         self._port = port
         self._pid_file = Path(pid_file) if pid_file else None
         self._server: _ThreadingHTTPServer | None = None
+        self._process_lock_cm = None
+        self._process_lock = None
         self._started_mono = time.monotonic()
         self._started_at = datetime.now(UTC).isoformat()
 
@@ -673,41 +676,48 @@ class GradataDaemon:
 
     def start(self) -> None:
         """Start the HTTP server (blocking)."""
-        port = self._port if self._port != 0 else _pick_port(str(self._brain_dir))
-        self._try_bind(port)
-
-        assert self._server is not None, "Server must be bound after _try_bind"
-        self._server._daemon = self  # type: ignore[attr-defined]
-        actual_port: int = self._server.server_address[1]
-        self._port = actual_port
-
-        logger.info(
-            "Gradata daemon listening on port %d (brain=%s)",
-            actual_port,
-            self._brain_dir,
-        )
-
-        # PID file
-        if self._pid_file:
-            _write_pid_file(self._pid_file, actual_port, self._brain_dir, self._started_at)
-
-        # SIGTERM handler
-        _register_signal_handler(self)
-
-        # Start idle timer
-        self._reset_idle_timer()
-
-        # Spin up the background worker pool alongside the HTTP server.
-        self._worker_pool = WorkerPool(self._brain.db_path)
-        self._worker_pool.start()
-
-        # Opt-in anonymous telemetry
-        self._maybe_send_telemetry()
-
+        self._process_lock_cm = acquire_brain_lock(self._brain_dir)
+        self._process_lock = self._process_lock_cm.__enter__()
         try:
-            self._server.serve_forever()
-        finally:
-            self._cleanup()
+            port = self._port if self._port != 0 else _pick_port(str(self._brain_dir))
+            self._try_bind(port)
+
+            assert self._server is not None, "Server must be bound after _try_bind"
+            self._server._daemon = self  # type: ignore[attr-defined]
+            actual_port: int = self._server.server_address[1]
+            self._port = actual_port
+
+            logger.info(
+                "Gradata daemon listening on port %d (brain=%s)",
+                actual_port,
+                self._brain_dir,
+            )
+
+            # PID file
+            if self._pid_file:
+                _write_pid_file(self._pid_file, actual_port, self._brain_dir, self._started_at)
+
+            # SIGTERM handler
+            _register_signal_handler(self)
+
+            # Start idle timer
+            self._reset_idle_timer()
+
+            # Spin up the background worker pool alongside the HTTP server.
+            self._worker_pool = WorkerPool(self._brain.db_path)
+            self._worker_pool.start()
+
+            # Opt-in anonymous telemetry
+            self._maybe_send_telemetry()
+
+            try:
+                self._server.serve_forever()
+            finally:
+                self._cleanup()
+        except Exception:
+            if self._process_lock_cm is not None:
+                self._cleanup()
+            raise
 
     def _try_bind(self, port: int) -> None:
         """Try to bind to *port*, falling back up to 10 attempts, then OS-assigned."""
@@ -740,6 +750,10 @@ class GradataDaemon:
         if self._pid_file and self._pid_file.exists():
             with contextlib.suppress(OSError):
                 self._pid_file.unlink()
+        if self._process_lock_cm is not None:
+            self._process_lock_cm.__exit__(None, None, None)
+            self._process_lock_cm = None
+            self._process_lock = None
 
     def _maybe_send_telemetry(self) -> None:
         """Send anonymous daily heartbeat if telemetry is opted in."""
