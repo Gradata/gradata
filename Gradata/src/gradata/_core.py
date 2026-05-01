@@ -1369,7 +1369,81 @@ def _cloud_sync_session(
             )
 
     except Exception as e:
-        _log.debug("Cloud sync failed (non-fatal): %s", e)
+        _log.warning("Cloud sync failed (non-fatal): %s", e, exc_info=True)
+
+
+def cloud_sync_tick(brain_dir: str | Path, session_number: int) -> None:
+    """Hook-safe cloud sync that doesn't require an instantiated Brain.
+
+    Reads lessons from lessons.md and session corrections from system.db,
+    then runs the same telemetry path as ``brain_end_session()``.
+
+    Called by the Stop hook so cloud sync actually fires from Claude Code
+    sessions — Claude Code never calls ``brain.end_session()`` directly.
+    Never raises.
+    """
+    try:
+        import json as _json
+        import sqlite3
+        from pathlib import Path as _Path
+
+        bd = _Path(brain_dir)
+        if not bd.is_dir():
+            return
+
+        all_lessons: list[Lesson] = []
+        lessons_path = bd / "lessons.md"
+        if lessons_path.is_file():
+            try:
+                from gradata.enhancements.self_improvement._confidence import (
+                    parse_lessons,
+                )
+
+                all_lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+            except Exception as e:
+                _log.debug("cloud_sync_tick: parse_lessons failed: %s", e)
+
+        session_corrections: list[dict] = []
+        db_path = bd / "system.db"
+        if db_path.is_file() and session_number:
+            try:
+                with sqlite3.connect(db_path) as conn:
+                    rows = conn.execute(
+                        "SELECT data_json FROM events WHERE type = 'CORRECTION' AND session = ?",
+                        (session_number,),
+                    ).fetchall()
+                for (raw,) in rows:
+                    try:
+                        parsed = _json.loads(raw) if isinstance(raw, str) else raw
+                        if isinstance(parsed, dict):
+                            session_corrections.append(parsed)
+                    except (TypeError, _json.JSONDecodeError):
+                        continue
+            except sqlite3.Error as e:
+                _log.debug("cloud_sync_tick: db read failed: %s", e)
+
+        # _cloud_sync_session only reads `.dir` and `.db_path` from brain —
+        # a minimal stub lets us reuse the full telemetry/event path without
+        # paying the cost of a fresh Brain() with migrations + FTS init.
+        # `db_path` may not exist for a fresh brain that has only lessons.md;
+        # downstream `compute_metrics` already tolerates that with a None-path
+        # short-circuit, so we pass it through unchanged rather than guarding
+        # here. Sync still completes and `last_sync_at` still updates.
+        class _BrainStub:
+            def __init__(self, d: _Path, db: _Path) -> None:
+                self.dir = d
+                self.db_path = db
+
+        stub = _BrainStub(bd, db_path)
+        _cloud_sync_session(
+            stub,  # type: ignore[arg-type]
+            session_number,
+            all_lessons,
+            session_corrections,
+            {},
+        )
+    except Exception as e:
+        _log.warning("cloud_sync_tick failed: %s", e, exc_info=True)
 
 
 def _parse_toml_cloud(config_path: Path) -> dict:

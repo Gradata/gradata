@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
@@ -336,6 +337,24 @@ def _resolve_pending_applications(brain_dir: str, data: dict) -> None:
         _log.debug("lesson_applications resolve skipped: %s", exc)
 
 
+def _run_cloud_sync(brain_dir: str, data: dict) -> None:
+    """Push session telemetry + corrections to Gradata Cloud.
+
+    Claude Code never calls ``brain.end_session()`` directly, so
+    ``_cloud_sync_session`` never fired from IDE sessions before this hook
+    path existed. Gated on GRADATA_API_KEY — no key, no sync, no network.
+    """
+    if not os.environ.get("GRADATA_API_KEY"):
+        return
+    try:
+        from gradata._core import cloud_sync_tick
+
+        session_num = int(data.get("session_number") or 0)
+        cloud_sync_tick(brain_dir, session_num)
+    except Exception as e:
+        _log.warning("cloud sync tick skipped: %s", e)
+
+
 def _flush_retain_queue(brain_dir: str) -> None:
     """Always runs — cheap + essential so no queued events are lost."""
     try:
@@ -369,6 +388,7 @@ def main(data: dict) -> dict | None:
     _run_tree_consolidation(brain_dir_str)
     _resolve_pending_applications(brain_dir_str, data)
     _refresh_brain_prompt(brain_dir_str, data)
+    _run_cloud_sync(brain_dir_str, data)
 
     _write_stamp(brain_dir, upper_bound)
     return None
