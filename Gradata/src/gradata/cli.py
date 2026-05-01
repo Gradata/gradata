@@ -1029,12 +1029,13 @@ def cmd_skill_export(args):
     Produces ``<output-dir>/<slug>/SKILL.md`` ready to drop into
     ``.claude/skills/`` or any Skills-aware harness.
     """
+    from gradata import Brain
     from gradata.enhancements.skill_export import export_skill, write_skill
 
     brain_root = _resolve_brain_root(args)
     lessons_path: Path | None = None
     try:
-        brain = _get_brain(args)
+        brain = Brain(brain_root)
         lessons_path = brain._find_lessons_path()
     except Exception:
         lessons_path = None

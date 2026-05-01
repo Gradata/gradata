@@ -162,6 +162,14 @@ def main(data: dict) -> dict | None:
         signal_types = {s["type"] for s in signals}
         has_negative = bool(signal_types & _NEGATIVE_SIGNAL_TYPES)
         has_approval = "approval" in signal_types
+        # Conflict resolution: when negative and approval coexist on the same
+        # message, negative wins. The user is critiquing — the polite "thanks"
+        # doesn't override "but this is wrong". Drop approval from emitted
+        # signals and suppress OUTPUT_ACCEPTED for this message.
+        if has_negative and has_approval:
+            signals = [s for s in signals if s["type"] != "approval"]
+            signal_types = {s["type"] for s in signals}
+            has_approval = False
         # Tacit acceptance: substantive follow-up with no negative signals. The
         # brain.correct() pipeline logs ~20x more CORRECTION than OUTPUT_ACCEPTED
         # because users rarely type "looks good" — silence is approval.

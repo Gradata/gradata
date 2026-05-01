@@ -99,7 +99,9 @@ def _format_skill_md(
     lines.append("---")
     lines.append(f"name: {name}")
     # Quote the description so colons / hashes inside don't break YAML.
-    safe_desc = description.replace('"', '\\"')
+    # Escape backslashes first, then quotes, so YAML stays valid even for
+    # Windows paths or descriptions containing literal `\\` sequences.
+    safe_desc = description.replace("\\", "\\\\").replace('"', '\\"')
     lines.append(f'description: "{safe_desc}"')
     lines.append("---")
     lines.append("")
@@ -196,7 +198,10 @@ def export_skill(
     rules = _parse_rules(Path(brain_root), lessons_path=lessons_path)
     rules = _filter_rules(rules, category)
     metas = _load_meta_principles(Path(brain_root)) if include_meta else []
-    desc = description.strip() if description else _auto_description(rules, slug)
+    if description and description.strip():
+        desc = description.strip()
+    else:
+        desc = _auto_description(rules, slug)
     if len(desc) > _DESC_MAX_LEN:
         desc = desc[: _DESC_MAX_LEN - 3] + "..."
     return _format_skill_md(slug, desc, rules, metas)

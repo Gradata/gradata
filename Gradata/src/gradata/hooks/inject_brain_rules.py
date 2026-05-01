@@ -182,7 +182,14 @@ def _read_brain_prompt(brain_dir: Path) -> str | None:
         count=1,
     )
     # Limit to first GRADATA_WISDOM_MAX_RULES non-negotiable rules.
-    wisdom_max_rules = int(os.environ.get("GRADATA_WISDOM_MAX_RULES", "9"))
+    _raw_max = os.environ.get("GRADATA_WISDOM_MAX_RULES", "9")
+    try:
+        wisdom_max_rules = int(_raw_max)
+    except (ValueError, TypeError):
+        _log.warning(
+            "GRADATA_WISDOM_MAX_RULES=%r not an int — defaulting to 9", _raw_max
+        )
+        wisdom_max_rules = 9
     if wisdom_max_rules > 0:
         rule_lines = [ln for ln in text.split("\n") if ln.startswith("- ")]
         if len(rule_lines) > wisdom_max_rules:
