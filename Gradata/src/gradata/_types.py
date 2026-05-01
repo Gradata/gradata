@@ -136,6 +136,26 @@ class RuleMetadata:
 
 
 @dataclass
+class Example:
+    """A good/bad pair illustrating a lesson (issue #129).
+
+    Populated only from real surviving corrections — never LLM-generated.
+    Both ``good`` and ``bad`` should be one short sentence each so that
+    rendering inside ``<rule>`` blocks stays cheap on injection budget.
+    """
+
+    good: str = ""
+    bad: str = ""
+
+    def to_dict(self) -> dict:
+        return {"good": self.good, "bad": self.bad}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Example":
+        return cls(good=str(data.get("good", "")), bad=str(data.get("bad", "")))
+
+
+@dataclass
 class Lesson:
     """A single learned lesson with confidence tracking."""
 
@@ -188,6 +208,16 @@ class Lesson:
     # Assigned at graduation time by prompt_synthesizer.classify_slot. Empty on legacy
     # lessons; the synthesizer falls back to category-based inference at render time.
     slot: str = ""
+    # ── Issue #129: examples + output_shape (prompt-injection standard) ──
+    # Optional list of good/bad pairs, populated only when the lesson has
+    # surviving evidence (real corrections). Rendered inside <rule> blocks
+    # by the brain-injection template. Defaults to empty list for
+    # back-compat: pre-upgrade serialized lessons load without Examples.
+    examples: list[Example] = field(default_factory=list)
+    # Short tag describing the shape this lesson governs ("tone",
+    # "format:markdown-table", "length<=200w", …). ``None`` when the
+    # lesson is a pure constraint (no output-shape opinion).
+    output_shape: str | None = None
 
     def __post_init__(self) -> None:
         self.confidence = round(max(0.0, min(1.0, self.confidence)), 2)

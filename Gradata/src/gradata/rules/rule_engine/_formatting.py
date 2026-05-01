@@ -331,14 +331,40 @@ def format_rules_for_prompt(
     ]
 
     for rule in rules:
-        lines.append(f"- {rule.instruction}")
+        lesson = rule.lesson
+        # Issue #129: when a lesson carries Example pairs and/or an
+        # output_shape, render the rule as a structured XML block so the
+        # agent sees <good>/<bad>/<shape> alongside the goal. Falls back
+        # to the legacy bullet form when none of those fields are set.
+        examples = list(getattr(lesson, "examples", None) or [])
+        output_shape = getattr(lesson, "output_shape", None)
+        if examples or output_shape:
+            lines.append("<rule>")
+            goal = (rule.instruction or lesson.description or "").strip()
+            lines.append(f"  <goal>{goal}</goal>")
+            if output_shape:
+                lines.append(f"  <shape>{output_shape}</shape>")
+            for ex in examples:
+                good = (getattr(ex, "good", "") or "").strip()
+                bad = (getattr(ex, "bad", "") or "").strip()
+                if good:
+                    lines.append(f"  <good>{good}</good>")
+                if bad:
+                    lines.append(f"  <bad>{bad}</bad>")
+            lines.append("</rule>")
+        else:
+            lines.append(f"- {rule.instruction}")
 
         # Include few-shot examples only for low-confidence rules with misfires
-        lesson = rule.lesson
         needs_reinforcement = lesson.confidence < 0.70 and getattr(lesson, "misfire_count", 0) > 1
         example_draft = getattr(lesson, "example_draft", None)
         example_corrected = getattr(lesson, "example_corrected", None)
-        if needs_reinforcement and example_draft is not None and example_corrected is not None:
+        if (
+            not (examples or output_shape)
+            and needs_reinforcement
+            and example_draft is not None
+            and example_corrected is not None
+        ):
             lines.append(f'   e.g. "{example_draft[:80]}" -> "{example_corrected[:80]}"')
 
     lines.append("</brain-rules>")
@@ -459,4 +485,27 @@ def capture_example_from_correction(
     """
     lesson.example_draft = draft[:_EXAMPLE_MAX_CHARS]
     lesson.example_corrected = corrected[:_EXAMPLE_MAX_CHARS]
+
+    # Issue #129: also append a structured Example so the brain-injection
+    # template can render <good>/<bad> for this lesson. Real surviving
+    # corrections only — never LLM-fabricated.
+    try:
+        from gradata._types import Example as _Example
+
+        good_text = corrected[:_EXAMPLE_MAX_CHARS].strip()
+        bad_text = draft[:_EXAMPLE_MAX_CHARS].strip()
+        if good_text and bad_text:
+            existing = list(getattr(lesson, "examples", None) or [])
+            # De-dupe: skip if the same pair is already attached.
+            already = any(
+                getattr(e, "good", "") == good_text and getattr(e, "bad", "") == bad_text
+                for e in existing
+            )
+            if not already:
+                existing.append(_Example(good=good_text, bad=bad_text))
+                # Cap to keep injection budget bounded.
+                lesson.examples = existing[-3:]
+    except Exception:  # noqa: BLE001 — never fail correction capture on Example back-compat
+        pass
+
     return lesson
