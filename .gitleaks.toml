@@ -1,0 +1,17 @@
+title = "Gradata gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Suppress confirmed false positives: .env.example placeholder + cloud/tests/ fixture keys"
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''(^|/)cloud/tests/''',
+  '''(^|/)Gradata/tests/''',
+  '''(^|/)tests/''',
+]
+regexes = [
+  '''gd_test_[A-Za-z0-9_-]+''',
+  '''gd_demo_[A-Za-z0-9_-]+''',
+]
