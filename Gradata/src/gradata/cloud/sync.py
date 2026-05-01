@@ -223,7 +223,7 @@ class CloudClient:
         # Backend mounts the metrics router under /api/v1 (see
         # cloud/app/main.py → app.include_router(router, prefix="/api/v1")
         # and cloud/app/routes/metrics.py → @router.post("/telemetry/metrics")).
-        result = self._post("/api/v1/telemetry/metrics", asdict(payload))
+        result = self._post("/telemetry/metrics", asdict(payload))
         if result is not None:
             self.config.last_sync_at = payload.sent_at
             save_config(self.brain_dir, self.config)
@@ -241,7 +241,7 @@ class CloudClient:
             return False
         # Backend mounts the corpus router under /api/v1 (same prefix as
         # telemetry — see cloud/app/main.py).
-        result = self._post("/api/v1/corpus/contribute", {"patterns": anonymized_patterns})
+        result = self._post("/corpus/contribute", {"patterns": anonymized_patterns})
         return result is not None
 
 

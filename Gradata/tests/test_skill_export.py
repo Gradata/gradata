@@ -123,6 +123,34 @@ class TestExportSkill:
         # Ensure the quote is backslash-escaped so YAML stays valid
         assert r'description: "He said \"hi\" loudly"' in text
 
+    def test_backslash_in_description_is_escaped(self, tmp_path: Path) -> None:
+        # Windows path with literal backslashes must produce an escaped YAML string.
+        text = export_skill(tmp_path, name="demo", description=r"C:\Users\foo")
+        assert r'description: "C:\\Users\\foo"' in text
+
+    def test_backslash_and_quote_combined(self, tmp_path: Path) -> None:
+        # Backslashes must be escaped BEFORE quotes so we don't accidentally
+        # produce \\" sequences that break YAML.
+        text = export_skill(tmp_path, name="demo", description=r'path C:\a "b"')
+        assert r'description: "path C:\\a \"b\""' in text
+
+    def test_multiline_literal_newline_in_description(self, tmp_path: Path) -> None:
+        # A literal `\n` (two chars: backslash + n) must round-trip as `\\n`.
+        text = export_skill(tmp_path, name="demo", description=r"line1\nline2")
+        assert r'description: "line1\\nline2"' in text
+
+    def test_whitespace_only_description_falls_back_to_auto(
+        self, tmp_path: Path
+    ) -> None:
+        _write_lessons(tmp_path, SAMPLE_LESSONS)
+        text = export_skill(tmp_path, name="demo", description="   \t\n  ")
+        # Auto description must not be empty and must not be just whitespace.
+        import re
+
+        m = re.search(r'^description: "(.*)"$', text, flags=re.MULTILINE)
+        assert m is not None, "description line missing"
+        assert m.group(1).strip() != "", "whitespace-only desc should fall back to auto"
+
     def test_category_filter_narrows_output(self, tmp_path: Path) -> None:
         _write_lessons(tmp_path, SAMPLE_LESSONS)
         text = export_skill(tmp_path, name="demo", category="DRAFTING")
