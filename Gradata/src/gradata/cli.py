@@ -1085,7 +1085,18 @@ def cmd_hooks(args):
     if action == "install":
         from gradata.hooks.claude_code import install_hook
 
-        install_hook(profile=getattr(args, "profile", "standard"))
+        project_dir = getattr(args, "project_dir", None)
+        if project_dir:
+            project_dir = Path(project_dir)
+        elif getattr(args, "include_watchdog", False):
+            # Watchdog needs an on-disk JS path; default to CWD when unset.
+            project_dir = Path.cwd()
+
+        install_hook(
+            profile=getattr(args, "profile", "standard"),
+            project_dir=project_dir,
+            include_watchdog=getattr(args, "include_watchdog", False),
+        )
     elif action == "uninstall":
         from gradata.hooks.claude_code import uninstall_hook
 
@@ -1278,6 +1289,16 @@ def main():
         choices=["minimal", "standard", "strict"],
         default="standard",
         help="Hook profile tier (default: standard)",
+    )
+    p_hooks.add_argument(
+        "--project-dir",
+        default=None,
+        help="Project directory whose .claude/hooks/ should receive bundled JS hook assets",
+    )
+    p_hooks.add_argument(
+        "--include-watchdog",
+        action="store_true",
+        help="Force-install the JS handoff watchdog hooks (#127) regardless of profile",
     )
 
     # seed — pre-populate brain with high-confidence starter rules
