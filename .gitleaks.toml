@@ -8,6 +8,8 @@ description = "Suppress confirmed false positives: .env.example placeholder + cl
 paths = [
   '''(^|/)\.env\.example$''',
   '''(^|/)cloud/tests/''',
+  '''(^|/)Gradata/tests/''',
+  '''(^|/)tests/''',
 ]
 regexes = [
   '''gd_test_[A-Za-z0-9_-]+''',
