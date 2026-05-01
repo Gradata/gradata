@@ -58,9 +58,23 @@ Documentation = "https://gradata.github.io/gradata/"
 [tool.hatch.build.targets.wheel]
 packages = ["src/gradata"]
 exclude = ["**/__pycache__", "**/*.pyc", "**/*.db", "**/*( 1)*", "**/* (1)*"]
+artifacts = [
+    "src/gradata/hooks/assets/**/*.js",
+]
 
 [tool.hatch.build.targets.sdist]
 exclude = ["**/__pycache__", "**/*.pyc", "**/*.db", "**/*( 1)*", "**/* (1)*"]
+artifacts = [
+    "src/gradata/hooks/assets/**/*.js",
+]
+
+# Setuptools-compatible package data (issue #135) — for non-hatchling builds
+# of the same source tree. Hatchling uses the artifacts entries above.
+[tool.setuptools.package-data]
+gradata = [
+    "hooks/assets/claude_code/user-prompt/*.js",
+    "hooks/assets/claude_code/session-start/*.js",
+]
 
 # --- Ruff (linter + formatter) ---
 [tool.ruff]

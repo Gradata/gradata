@@ -6,3 +6,6 @@ sessions/handoff-*.md
 /0
 /BrainDetail
 bench/results/
+
+# pytest-MagicMock test artifact
+MagicMock/
