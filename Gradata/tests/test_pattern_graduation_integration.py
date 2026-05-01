@@ -495,7 +495,13 @@ class TestFullPipeline:
 
     def test_doctor_runs_on_brain(self, e2e_brain):
         from gradata._doctor import diagnose
-        report = diagnose(brain_dir=e2e_brain.dir)
+
+        # Scope the check to local brain health. Cloud probes (config.toml,
+        # network reachability, auth) are environment-dependent and not what
+        # this test asserts — they make the doctor return "broken" in CI and
+        # on dev machines without cloud credentials, even when the brain
+        # itself is perfectly fine.
+        report = diagnose(brain_dir=e2e_brain.dir, include_cloud=False)
         assert report["status"] in ("healthy", "degraded")
 
     def test_manifest_generates(self, e2e_brain):
