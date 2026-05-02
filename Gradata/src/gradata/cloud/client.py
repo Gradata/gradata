@@ -14,12 +14,13 @@ the zero-dependency guarantee for the base SDK.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
 from pathlib import Path
 from typing import Any
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from gradata._http import require_https
@@ -29,6 +30,10 @@ logger = logging.getLogger("gradata.cloud")
 DEFAULT_ENDPOINT = "https://api.gradata.ai/api/v1"
 ENV_API_KEY = "GRADATA_API_KEY"
 ENV_ENDPOINT = "GRADATA_ENDPOINT"
+
+
+class _TooLargeError(Exception):
+    """Raised when the server returns HTTP 413 (batch too large)."""
 
 
 class CloudClient:
@@ -120,27 +125,134 @@ class CloudClient:
     # A compromised cloud server could inject malicious prompt instructions.
     # Rules are ALWAYS computed locally from the brain's own lessons.
 
-    def sync(self) -> dict:
-        """Sync local brain state to cloud.
+    def sync(self, batch_size: int = 500) -> int:
+        """Sync raw events from events.jsonl to cloud with watermark cursor.
 
-        Uploads new events since last sync. Returns sync status.
+        Reads events.jsonl, filters to events newer than the last watermark,
+        and batches them to /sync in chunks of `batch_size`. Advances the
+        cursor after each successful batch so the method is resumable and
+        idempotent (server upserts on event_id).
+
+        Returns total number of events ingested (0 if not connected or no events).
         """
         if not self.connected:
-            return {"status": "not_connected"}
+            return 0
+
+        events_path = self.brain_dir / "events.jsonl"
+        if not events_path.exists():
+            return 0
+
+        state = self._read_sync_state()
+        last_watermark = state.get("last_sync_at", "")
 
         try:
-            # Backend route: POST /api/v1/sync (see cloud/app/routes/sync.py).
-            # DEFAULT_ENDPOINT already includes /api/v1 so we append /sync only.
-            return self._post(
-                "/sync",
-                {
-                    "brain_id": self._brain_id,
-                    "manifest": self._read_local_manifest(),
-                },
-            )
-        except Exception as e:
-            logger.warning("Sync failed: %s", e)
-            return {"status": "error", "error": str(e)}
+            all_lines = events_path.read_text(encoding="utf-8").splitlines()
+        except OSError as e:
+            logger.warning("Sync: cannot read events.jsonl: %s", e)
+            return 0
+
+        pending: list[dict] = []
+        for line in all_lines:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                ev = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            ts = ev.get("ts", "")
+            if ts > last_watermark:
+                pending.append(ev)
+
+        if not pending:
+            logger.debug("Sync: no new events since watermark=%r", last_watermark)
+            return 0
+
+        manifest = self._read_local_manifest()
+        total_ingested = 0
+        offset = 0
+        current_batch = batch_size
+
+        while offset < len(pending):
+            chunk = pending[offset : offset + current_batch]
+            payload_events = [self._format_event(ev) for ev in chunk]
+
+            try:
+                resp = self._post(
+                    "/sync",
+                    {
+                        "brain_name": manifest.get("metadata", {}).get("name", self.brain_dir.name),
+                        "manifest": manifest,
+                        "events": payload_events,
+                        "cursor": last_watermark,
+                    },
+                )
+            except _TooLargeError:
+                # Server returned 413 — halve the batch and retry this chunk.
+                current_batch = max(1, current_batch // 2)
+                logger.warning(
+                    "Sync: 413 from server — reducing batch size to %d", current_batch
+                )
+                continue
+            except Exception as e:
+                logger.error("Sync: POST failed at offset=%d: %s", offset, e)
+                return total_ingested
+
+            ingested = resp.get("ingested_count", 0)
+            watermark = resp.get("new_watermark")
+            total_ingested += ingested
+            if watermark:
+                last_watermark = watermark
+                self._write_sync_state({"last_sync_at": last_watermark})
+
+            offset += len(chunk)
+            # Reset batch size to default for next chunk after a 413 recovery.
+            current_batch = batch_size
+
+        logger.info(
+            "Sync: ingested %d events (watermark=%r)", total_ingested, last_watermark
+        )
+        return total_ingested
+
+    # ── Sync state helpers ────────────────────────────────────────────────────
+
+    def _read_sync_state(self) -> dict:
+        state_path = self.brain_dir / ".gradata-sync-state.json"
+        if state_path.exists():
+            try:
+                return json.loads(state_path.read_text(encoding="utf-8"))
+            except Exception:
+                return {}
+        return {}
+
+    def _write_sync_state(self, state: dict) -> None:
+        state_path = self.brain_dir / ".gradata-sync-state.json"
+        try:
+            state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        except OSError as e:
+            logger.warning("Sync: cannot write sync state: %s", e)
+
+    @staticmethod
+    def _format_event(ev: dict) -> dict:
+        """Convert an events.jsonl row to the /sync EventPayload shape.
+
+        Computes a deterministic event_id from (ts, type, source) so the
+        server can upsert idempotently on (brain_id, event_id).
+        """
+        ts = ev.get("ts", "")
+        event_type = ev.get("type", "")
+        source = ev.get("source", "")
+        raw = f"{ts}:{event_type}:{source}"
+        event_id = hashlib.sha256(raw.encode()).hexdigest()[:32]
+        return {
+            "event_id": event_id,
+            "type": event_type,
+            "source": source,
+            "data": ev.get("data", {}),
+            "tags": ev.get("tags", []),
+            "session": ev.get("session"),
+            "created_at": ts or None,
+        }
 
     # ── Internal helpers ──────────────────────────────────────────────
 
@@ -161,6 +273,10 @@ class CloudClient:
         try:
             with urlopen(req, timeout=30) as resp:
                 return json.loads(resp.read().decode("utf-8"))
+        except HTTPError as e:
+            if e.code == 413:
+                raise _TooLargeError() from e
+            raise ConnectionError(f"Cloud API request failed: {e}") from e
         except URLError as e:
             raise ConnectionError(f"Cloud API request failed: {e}") from e
 
