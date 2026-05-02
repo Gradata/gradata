@@ -380,7 +380,14 @@ class Brain(BrainInspectionMixin):
         return self._memory_manager
 
     def close(self):
-        """Cleanup: re-encrypt database if encryption is enabled."""
+        """Cleanup: drain EventBus and re-encrypt database if encryption is enabled."""
+        bus = getattr(self, "bus", None)
+        if bus is not None:
+            try:
+                bus.close()
+            except Exception:
+                import logging as _l
+                _l.getLogger(__name__).exception("EventBus close failed")
         if self._encryption_key:
             from gradata._encryption import close_encrypted_db
 
