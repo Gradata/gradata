@@ -221,6 +221,26 @@ def cmd_doctor(args):
     from gradata._doctor import diagnose, print_diagnosis
 
     brain_dir = getattr(args, "brain_dir", None)
+    if getattr(args, "reconcile", False):
+        from gradata._doctor import resolve_brain_path
+        from gradata._events import reconcile_jsonl_to_sqlite
+
+        brain_path = resolve_brain_path(brain_dir)
+        if brain_path is None:
+            print("reconcile: no brain dir resolved", file=sys.stderr)
+            sys.exit(1)
+        result = reconcile_jsonl_to_sqlite(brain_path)
+        if getattr(args, "json", False):
+            print(json.dumps({"reconcile": result}, indent=2))
+        else:
+            print(
+                "reconcile: "
+                f"drift={result.get('drift', 0)} "
+                f"replayed={result.get('replayed', 0)} "
+                f"jsonl={result.get('jsonl_events', 0)} "
+                f"sqlite={result.get('sqlite_events_after', result.get('sqlite_events_before', 0))}"
+            )
+        return
     cloud_only = getattr(args, "cloud", False)
     include_cloud = not getattr(args, "no_cloud", False)
     report = diagnose(
@@ -1227,6 +1247,11 @@ def main():
     p_doctor.add_argument("--json", action="store_true", help="Output as JSON")
     p_doctor.add_argument("--cloud", action="store_true", help="Only run cloud checks")
     p_doctor.add_argument("--no-cloud", action="store_true", help="Skip cloud checks (offline)")
+    p_doctor.add_argument(
+        "--reconcile",
+        action="store_true",
+        help="Replay events.jsonl into system.db and report healed drift",
+    )
 
     # install
     p_install = sub.add_parser("install", help="Install a brain from marketplace archive")

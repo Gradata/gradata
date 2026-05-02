@@ -315,6 +315,7 @@ class TestGraduateIntegration:
         from datetime import UTC as _UTC
         from datetime import datetime as _dt
 
+        monkeypatch.setenv("GRADATA_BETA_LB_GATE", "0")
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         from gradata import _paths as _p
         from gradata._types import Lesson, LessonState

@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from gradata._env import env_str
 from gradata.enhancements.rule_to_hook import DeterminismCheck, classify_rule
+from gradata.security.score_obfuscation import obfuscate_instruction
 
 if TYPE_CHECKING:  # pragma: no cover
     from gradata._types import Lesson
@@ -276,7 +277,10 @@ def build_brain_rules_block(source: RuleSource) -> str:
     selected = source.select()
     if not selected:
         return ""
-    lines = [f"[{l.state}:{l.confidence:.2f}] {l.category}: {l.description}" for l in selected]
+    lines = [
+        obfuscate_instruction(f"[{l.state}:{l.confidence:.2f}] {l.category}: {l.description}")
+        for l in selected
+    ]
     return "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
 
 

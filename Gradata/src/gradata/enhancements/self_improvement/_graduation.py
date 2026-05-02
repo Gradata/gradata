@@ -107,7 +107,12 @@ def _read_beta_lb_config() -> tuple[bool, float, int]:
     import math
     import os
 
-    enabled = os.environ.get("GRADATA_BETA_LB_GATE", "").lower() in ("1", "true", "yes", "on")
+    enabled = os.environ.get("GRADATA_BETA_LB_GATE", "1").lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
     try:
         threshold = float(os.environ.get("GRADATA_BETA_LB_THRESHOLD", "0.85"))
         if not math.isfinite(threshold):
@@ -128,7 +133,7 @@ def _passes_beta_lb_gate(
 ) -> bool:
     """Beta lower-bound gate on PATTERN -> RULE promotion.
 
-    Opt-in via env var ``GRADATA_BETA_LB_GATE`` (default off). When enabled,
+    Enabled by default; set ``GRADATA_BETA_LB_GATE=0`` to disable. When enabled,
     requires the 5th-percentile lower bound of Beta(α, β) to meet the
     configured threshold (``GRADATA_BETA_LB_THRESHOLD``, default 0.85) AND
     at least ``GRADATA_BETA_LB_MIN_FIRES`` observations (default 5).

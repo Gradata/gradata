@@ -43,7 +43,8 @@ def test_build_brain_rules_block_wraps_in_xml():
     block = build_brain_rules_block(src)
     assert block.startswith("<brain-rules>")
     assert block.endswith("</brain-rules>")
-    assert "[RULE:0.95]" in block
+    assert "[RULE]" in block
+    assert "[RULE:" not in block
     assert "TONE" in block
 
 
@@ -55,7 +56,7 @@ def test_build_brain_rules_block_respects_max_rules():
     ]
     src = RuleSource(lessons=lessons, max_rules=5)
     block = build_brain_rules_block(src)
-    assert block.count("[RULE:") == 5
+    assert block.count("[RULE]") == 5
 
 
 def test_check_output_finds_em_dash_violation():

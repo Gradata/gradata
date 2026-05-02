@@ -153,6 +153,99 @@ def _ensure_table(conn: sqlite3.Connection):
         _schema_initialized.add(db_file)
 
 
+def _insert_event_projection(
+    conn: sqlite3.Connection,
+    event: dict,
+    *,
+    brain_dir: Path,
+) -> int | None:
+    """Project one canonical JSONL event into SQLite idempotently."""
+    _ensure_table(conn)
+    tid = tenant_for(brain_dir)
+    cursor = conn.execute(
+        "INSERT OR IGNORE INTO events "
+        "(ts, session, type, source, data_json, tags_json, valid_from, valid_until, tenant_id, schema_version) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
+        (
+            event.get("ts", ""),
+            event.get("session"),
+            event.get("type", ""),
+            event.get("source", ""),
+            json.dumps(event.get("data", {}), default=str),
+            json.dumps(event.get("tags", []), default=str),
+            event.get("valid_from"),
+            event.get("valid_until"),
+            tid,
+        ),
+    )
+    if cursor.rowcount == 1:
+        return cursor.lastrowid
+    existing = conn.execute(
+        "SELECT id FROM events WHERE tenant_id=? AND ts=? AND type=? AND source=?",
+        (tid, event.get("ts", ""), event.get("type", ""), event.get("source", "")),
+    ).fetchone()
+    return existing[0] if existing else None
+
+
+def reconcile_jsonl_to_sqlite(
+    brain_dir: str | Path | None = None,
+    *,
+    ctx: BrainContext | None = None,
+) -> dict:
+    """Replay canonical ``events.jsonl`` rows into the SQLite projection.
+
+    JSONL is the source of truth. SQLite is a query projection that may lag
+    after process death between append+fsync and DB commit. This function is
+    idempotent because inserts use the event dedup key.
+    """
+    if ctx is not None:
+        events_jsonl = ctx.events_jsonl
+        db_path = ctx.db_path
+        root = ctx.brain_dir
+    else:
+        root = Path(brain_dir).resolve() if brain_dir is not None else _p.BRAIN_DIR
+        events_jsonl = root / "events.jsonl"
+        db_path = root / "system.db"
+
+    if not events_jsonl.exists():
+        return {"jsonl_events": 0, "sqlite_events_before": 0, "replayed": 0, "invalid": 0}
+
+    invalid = 0
+    total = 0
+    with (
+        open(events_jsonl, encoding="utf-8", errors="replace") as fh,
+        contextlib.closing(sqlite3.connect(str(db_path))) as conn,
+    ):
+        conn.execute("PRAGMA busy_timeout=5000")
+        _ensure_table(conn)
+        before = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+        for raw in fh:
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                event = json.loads(raw)
+            except json.JSONDecodeError:
+                invalid += 1
+                continue
+            if not isinstance(event, dict):
+                invalid += 1
+                continue
+            total += 1
+            _insert_event_projection(conn, event, brain_dir=root)
+        conn.commit()
+        after = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+
+    return {
+        "jsonl_events": total,
+        "sqlite_events_before": before,
+        "sqlite_events_after": after,
+        "drift": max(0, total - before),
+        "replayed": max(0, after - before),
+        "invalid": invalid,
+    }
+
+
 def emit(
     event_type: str,
     source: str,
@@ -248,42 +341,23 @@ def emit(
     try:
         _locked_append(events_jsonl, json.dumps(event, ensure_ascii=False) + "\n")
         jsonl_ok = True
+        delay_ms = os.environ.get("GRADATA_DUALWRITE_JSONL_FSYNC_DELAY_MS", "").strip()
+        if delay_ms:
+            import time
+
+            with contextlib.suppress(ValueError):
+                time.sleep(max(0.0, float(delay_ms)) / 1000.0)
     except Exception as e:
         _log.error("JSONL write failed: %s", e)
 
     try:
         with contextlib.closing(sqlite3.connect(str(db_path))) as conn:
-            _ensure_table(conn)
             # INSERT OR IGNORE + UNIQUE(ts,type,source) makes emit() idempotent
             # across retries and partial-write recoveries. If an identical
             # event was already persisted (same dedup key), the INSERT is a
             # no-op -- we then look up the pre-existing row's id so callers
             # that depend on `event["id"]` still get the real rowid.
-            _tid = tenant_for(db_path.parent)
-            cursor = conn.execute(
-                "INSERT OR IGNORE INTO events "
-                "(ts, session, type, source, data_json, tags_json, valid_from, valid_until, tenant_id, schema_version) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
-                (
-                    ts,
-                    session,
-                    event_type,
-                    source,
-                    json.dumps(redacted_data),
-                    json.dumps(redacted_tags),
-                    valid_from,
-                    valid_until,
-                    _tid,
-                ),
-            )
-            if cursor.rowcount == 1:
-                event["id"] = cursor.lastrowid
-            else:
-                existing = conn.execute(
-                    "SELECT id FROM events WHERE tenant_id=? AND ts=? AND type=? AND source=?",
-                    (_tid, ts, event_type, source),
-                ).fetchone()
-                event["id"] = existing[0] if existing else None
+            event["id"] = _insert_event_projection(conn, event, brain_dir=db_path.parent)
             conn.commit()
             sqlite_ok = True
     except Exception as e:
@@ -729,25 +803,8 @@ class RetainOrchestrator:
                     with contextlib.closing(sqlite3.connect(str(self.db_path))) as conn:
                         _ensure_table(conn)
                         conn.execute("PRAGMA busy_timeout=5000")
-                        _tid = tenant_for(self.brain_dir)
                         for event in new_events:
-                            conn.execute(
-                                "INSERT OR IGNORE INTO events "
-                                "(ts, session, type, source, data_json, tags_json, "
-                                " valid_from, valid_until, tenant_id, schema_version) "
-                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
-                                (
-                                    event.get("ts", ""),
-                                    event.get("session"),
-                                    event.get("type", ""),
-                                    event.get("source", ""),
-                                    json.dumps(event.get("data", {}), default=str),
-                                    json.dumps(event.get("tags", []), default=str),
-                                    event.get("valid_from"),
-                                    event.get("valid_until"),
-                                    _tid,
-                                ),
-                            )
+                            _insert_event_projection(conn, event, brain_dir=self.brain_dir)
                         conn.commit()
                 except Exception as db_exc:
                     result["errors"].append(f"Phase 2 DB: {db_exc}")
