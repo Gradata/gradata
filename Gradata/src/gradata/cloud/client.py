@@ -161,6 +161,10 @@ class CloudClient:
             except json.JSONDecodeError:
                 continue
             ts = ev.get("ts", "")
+            # Coerce non-string ts (e.g. float epoch) to string for safe compare
+            if not isinstance(ts, str):
+                ts = str(ts)
+                ev["ts"] = ts
             if ts > last_watermark:
                 pending.append(ev)
 
@@ -240,17 +244,35 @@ class CloudClient:
         server can upsert idempotently on (brain_id, event_id).
         """
         ts = ev.get("ts", "")
+        if not isinstance(ts, str):
+            ts = str(ts)
         event_type = ev.get("type", "")
         source = ev.get("source", "")
         raw = f"{ts}:{event_type}:{source}"
         event_id = hashlib.sha256(raw.encode()).hexdigest()[:32]
+        # Coerce session to int|None — server schema rejects floats/strings
+        session_raw = ev.get("session")
+        session_val: int | None
+        try:
+            if session_raw is None:
+                session_val = None
+            elif isinstance(session_raw, bool):
+                session_val = None
+            elif isinstance(session_raw, int):
+                session_val = session_raw
+            elif isinstance(session_raw, float):
+                session_val = int(session_raw)
+            else:
+                session_val = int(str(session_raw))
+        except (ValueError, TypeError):
+            session_val = None
         return {
             "event_id": event_id,
             "type": event_type,
             "source": source,
             "data": ev.get("data", {}),
             "tags": ev.get("tags", []),
-            "session": ev.get("session"),
+            "session": session_val,
             "created_at": ts or None,
         }
 
@@ -276,7 +298,11 @@ class CloudClient:
         except HTTPError as e:
             if e.code == 413:
                 raise _TooLargeError() from e
-            raise ConnectionError(f"Cloud API request failed: {e}") from e
+            try:
+                body = e.read().decode("utf-8", errors="replace")[:500]
+            except Exception:
+                body = ""
+            raise ConnectionError(f"Cloud API request failed: {e} body={body}") from e
         except URLError as e:
             raise ConnectionError(f"Cloud API request failed: {e}") from e
 
