@@ -179,7 +179,14 @@ class CloudClient:
 
         while offset < len(pending):
             chunk = pending[offset : offset + current_batch]
-            payload_events = [self._format_event(ev) for ev in chunk]
+            payload_events_raw = [self._format_event(ev) for ev in chunk]
+            # Dedup within batch by event_id — server upsert can't update the
+            # same key twice in one statement. Keep the LAST occurrence so
+            # later writes win (matches PG ON CONFLICT semantics intent).
+            _seen: dict[str, dict] = {}
+            for _pe in payload_events_raw:
+                _seen[_pe.get("event_id", "")] = _pe
+            payload_events = list(_seen.values())
 
             try:
                 resp = self._post(
@@ -247,9 +254,37 @@ class CloudClient:
         if not isinstance(ts, str):
             ts = str(ts)
         event_type = ev.get("type", "")
-        source = ev.get("source", "")
-        raw = f"{ts}:{event_type}:{source}"
-        event_id = hashlib.sha256(raw.encode()).hexdigest()[:32]
+        if not isinstance(event_type, str) or not event_type.strip():
+            event_type = "unknown"
+        source = ev.get("source", "") or ""
+        if not isinstance(source, str):
+            source = str(source)
+        # data must be dict — coerce strings (some legacy events stored
+        # JSON-encoded strings) and other types into a dict envelope.
+        data_val = ev.get("data", {})
+        if isinstance(data_val, str):
+            try:
+                _parsed = json.loads(data_val)
+                data_val = _parsed if isinstance(_parsed, dict) else {"_raw": data_val}
+            except Exception:
+                data_val = {"_raw": data_val}
+        elif not isinstance(data_val, dict):
+            data_val = {"_raw": str(data_val)}
+        # Prefer existing event_id from local jsonl (ULID, globally unique) if
+        # present. Else derive from (ts,type,source,data,session) so events
+        # that share a timestamp + type don't collide and silently overwrite.
+        existing_eid = ev.get("event_id")
+        if isinstance(existing_eid, str) and existing_eid:
+            event_id = existing_eid[:64]
+        else:
+            try:
+                data_blob = json.dumps(
+                    ev.get("data", {}), sort_keys=True, default=str
+                )
+            except Exception:
+                data_blob = str(ev.get("data", ""))
+            raw = f"{ts}:{event_type}:{source}:{ev.get('session', '')}:{data_blob}"
+            event_id = hashlib.sha256(raw.encode()).hexdigest()[:32]
         # Coerce session to int|None — server schema rejects floats/strings
         session_raw = ev.get("session")
         session_val: int | None
@@ -270,7 +305,7 @@ class CloudClient:
             "event_id": event_id,
             "type": event_type,
             "source": source,
-            "data": ev.get("data", {}),
+            "data": data_val,
             "tags": ev.get("tags", []),
             "session": session_val,
             "created_at": ts or None,
