@@ -145,4 +145,5 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [
     "integration: tests that hit external LLM APIs (cost money, skip in CI)",
+    "dualwrite: dual-write crash recovery and reconciliation tests",
 ]
