@@ -14,6 +14,7 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
@@ -123,6 +124,11 @@ def _resolve_brain_path():
     except Exception:
         pass
     return None
+
+
+def resolve_brain_path(brain_dir: str | Path | None = None) -> Path | None:
+    """Public wrapper used by CLI subcommands that need the doctor target."""
+    return Path(brain_dir).resolve() if brain_dir else _resolve_brain_path()
 
 
 def _skip(name: str) -> dict:
@@ -367,10 +373,8 @@ def _probe_api(url: str, bearer: str) -> tuple[int, str]:
             return resp.status, body
     except urllib.error.HTTPError as e:
         body = ""
-        try:
+        with contextlib.suppress(Exception):
             body = e.read(512).decode("utf-8", errors="replace")
-        except Exception:
-            pass
         return e.code, body
     except (urllib.error.URLError, OSError) as e:
         return 0, str(e)
@@ -475,7 +479,7 @@ def diagnose(
         }
     """
     # Resolve brain path
-    brain_path = Path(brain_dir).resolve() if brain_dir else _resolve_brain_path()
+    brain_path = resolve_brain_path(brain_dir)
 
     if cloud_only:
         checks = _cloud_checks()

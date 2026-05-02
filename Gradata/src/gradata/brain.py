@@ -60,11 +60,13 @@ class Brain(BrainInspectionMixin):
 
     def __init__(
         self,
-        brain_dir: str | Path,
+        brain_dir: str | Path | None = None,
         working_dir: str | Path | None = None,
         encryption_key: str | None = None,
     ):
-        self.dir = Path(brain_dir).resolve()
+        from gradata._paths import resolve_brain_dir
+
+        self.dir = resolve_brain_dir(brain_dir)
         if not self.dir.exists():
             from gradata.exceptions import BrainNotFoundError
 
@@ -135,6 +137,16 @@ class Brain(BrainInspectionMixin):
         from gradata._migrations import run_migrations
 
         run_migrations(self.db_path)
+
+        # JSONL is canonical; SQLite is a query projection. A process can die
+        # after append+fsync and before SQLite commit, so every open heals any
+        # projection lag before readers query the events table.
+        try:
+            from gradata._events import reconcile_jsonl_to_sqlite
+
+            reconcile_jsonl_to_sqlite(ctx=self.ctx)
+        except Exception as exc:
+            logger.debug("event projection reconcile failed: %s", exc)
 
         # Initialize pattern registries (lazy — ImportError safe)
         try:
@@ -1505,8 +1517,17 @@ class Brain(BrainInspectionMixin):
         except ImportError:
             return []
 
-    def observe(self, messages: list[dict], user_id: str = "default") -> list[dict]:
+    def observe(
+        self,
+        messages: list[dict] | str,
+        user_id: str = "default",
+        *,
+        kind: str | None = None,
+    ) -> list[dict] | dict:
         """Extract facts from a conversation without requiring corrections."""
+        if isinstance(messages, str):
+            event_type = (kind or "observation").strip().upper()
+            return self.emit(event_type, "brain.observe", {"content": messages})
         try:
             from gradata.enhancements.memory_extraction import MemoryExtractor
         except ImportError:
