@@ -76,11 +76,11 @@ class TestBetaPPF:
 
 
 class TestBetaLBGate:
-    def test_gate_disabled_by_default_allows_promotion(self, monkeypatch):
+    def test_gate_can_be_disabled_to_allow_promotion(self, monkeypatch):
         from gradata._types import Lesson, LessonState
         from gradata.enhancements.self_improvement import _passes_beta_lb_gate
 
-        monkeypatch.delenv("GRADATA_BETA_LB_GATE", raising=False)
+        monkeypatch.setenv("GRADATA_BETA_LB_GATE", "0")
         lesson = Lesson(
             date="2026-04-15", category="test", description="test rule",
             state=LessonState.PATTERN, confidence=0.95, fire_count=5,

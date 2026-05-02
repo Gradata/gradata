@@ -168,7 +168,7 @@ def test_pipeline_does_not_graduate_instinct_below_threshold(tmp_path: Path) -> 
     assert result.graduated == []
 
 
-def test_pipeline_graduates_pattern_to_rule(tmp_path: Path) -> None:
+def test_pipeline_graduates_pattern_to_rule(tmp_path: Path, monkeypatch) -> None:
     """PATTERN lesson at 0.90 confidence with >= 5 fires graduates to RULE.
 
     C2 fix: MIN_APPLICATIONS_FOR_RULE was accidentally lowered to 3 in
@@ -177,6 +177,7 @@ def test_pipeline_graduates_pattern_to_rule(tmp_path: Path) -> None:
     which only passed because of the bug. Updated to fire_count=5 which is
     the correct threshold.
     """
+    monkeypatch.setenv("GRADATA_BETA_LB_GATE", "0")
     lesson = _make_lesson(
         state=LessonState.PATTERN,
         confidence=0.90,
@@ -242,7 +243,7 @@ def test_pipeline_handles_missing_retrieval_fusion_module(tmp_path: Path) -> Non
     _write_lessons(lessons_path, [lesson])
     db_path = tmp_path / "system.db"
 
-    with patch.dict(sys.modules, {"gradata.enhancements.retrieval_fusion": None}):
+    with patch.dict(sys.modules, {"gradata.enhancements.scoring.retrieval_fusion": None}):
         result = run_rule_pipeline(lessons_path, db_path, current_session=5)
 
     assert not any("retrieval_fusion" in e for e in result.errors)
