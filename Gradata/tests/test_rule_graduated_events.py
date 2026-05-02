@@ -59,7 +59,8 @@ def test_instinct_to_pattern_emits_rule_graduated(tmp_path):
     assert data["fire_count"] == 5
 
 
-def test_pattern_to_rule_emits_rule_graduated(tmp_path):
+def test_pattern_to_rule_emits_rule_graduated(tmp_path, monkeypatch):
+    monkeypatch.setenv("GRADATA_BETA_LB_GATE", "0")
     brain = init_brain(tmp_path)
     lesson = Lesson(
         date="2026-04-21",

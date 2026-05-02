@@ -335,7 +335,7 @@ def run_rule_pipeline(
 
     # Rank rules using retrieval fusion if available
     try:
-        from gradata.enhancements.retrieval_fusion import (  # type: ignore[import]
+        from gradata.enhancements.scoring.retrieval_fusion import (  # type: ignore[import]
             ScoredRule,
             apply_correction_boost,
             reciprocal_rank_fusion,

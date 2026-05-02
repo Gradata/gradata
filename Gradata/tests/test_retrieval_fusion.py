@@ -3,13 +3,12 @@ from __future__ import annotations
 
 import pytest
 
-from gradata.enhancements.retrieval_fusion import (
+from gradata.enhancements.scoring.retrieval_fusion import (
     MergedRule,
     ScoredRule,
     apply_correction_boost,
     reciprocal_rank_fusion,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

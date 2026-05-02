@@ -80,8 +80,9 @@ class TestFireCountGuards:
             f"Promoted to {lesson.state} with only {lesson.fire_count} fires"
         )
 
-    def test_rule_with_5_fires(self) -> None:
+    def test_rule_with_5_fires(self, monkeypatch) -> None:
         """PATTERN -> RULE succeeds with 5+ fires and sufficient confidence."""
+        monkeypatch.setenv("GRADATA_BETA_LB_GATE", "0")
         lesson = _make_lesson(
             state=LessonState.PATTERN,
             confidence=RULE_THRESHOLD + 0.01,

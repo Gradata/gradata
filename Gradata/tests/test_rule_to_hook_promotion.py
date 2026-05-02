@@ -264,6 +264,7 @@ def test_graduation_auto_promotes_deterministic_rule(tmp_path, monkeypatch):
     from gradata.enhancements.self_improvement import graduate
 
     hook_dir = tmp_path / "pre-tool" / "generated"
+    monkeypatch.setenv("GRADATA_BETA_LB_GATE", "0")
     monkeypatch.setenv("GRADATA_HOOK_ROOT", str(hook_dir))
 
     # Satisfy the council empirical gate: fire_count>=10 and >=3 distinct
