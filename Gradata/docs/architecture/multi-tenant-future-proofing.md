@@ -13,7 +13,7 @@
 - Embeddings stored as BLOB (`brain_embeddings`); FTS5 via `brain_fts`.
 - `events.scope` column exists (default 'local') — partial seed for tenant scoping, not used.
 - `sync_state` table exists per source but not cloud-bound.
-- Proprietary dashboard / team-sharing code in `gradata_cloud_backup/`. Graduation runs locally in the OSS SDK.
+<!-- TODO: re-document team-sharing/dashboard surface once gradata_cloud_backup namespace actually exists. Prior copy claimed proprietary dashboard code in `gradata_cloud_backup/` — that path does not exist on disk. -->
 - Open SDK is Apache-2.0 — cannot require cloud to run.
 
 ## Architectural Decisions (Lock In Now)

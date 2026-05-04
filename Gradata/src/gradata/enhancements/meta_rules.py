@@ -652,8 +652,8 @@ def refresh_meta_rules(
     """Re-discover meta-rules, keeping valid existing ones.
 
     In the open-source build, this validates and returns existing
-    meta-rules but does not discover new ones.  New discovery
-    requires Gradata Cloud.
+    meta-rules but does not discover new ones. New discovery is not
+    yet implemented locally; cloud sync is optional.
 
     Args:
         lessons: All lessons (active + archived).
@@ -666,7 +666,7 @@ def refresh_meta_rules(
     Returns:
         Validated subset of *existing_metas*.
     """
-    _log.info("Meta-rule discovery requires Gradata Cloud")
+    _log.info("Meta-rule discovery not implemented in open-source build; validating existing meta-rules only")
     corrections = recent_corrections or []
 
     # Validate existing meta-rules (invalidation still works locally).
