@@ -407,7 +407,26 @@ def apply_rules_with_tree(
     event_bus: EventBus | None = None,
     rule_graph: RuleGraph | None = None,
 ) -> list[AppliedRule]:
-    """Apply rules using hierarchical tree retrieval.
+    """Apply rules using hierarchical tree retrieval, then rank.
+
+    Pipeline:
+        1. If no lessons carry a ``path`` (legacy / pre-migration corpora),
+           delegate to :func:`apply_rules` — preserves backwards compat.
+        2. Otherwise, use :class:`RuleTree` to filter to a path-aware
+           candidate pool (extra-wide so the ranker has signal).
+        3. Rank the candidate pool through the same scoring stack as
+           :func:`apply_rules` — scope-weight relevance × correction-type
+           boost, then sort by ``(state_priority, difficulty, relevance,
+           effective_confidence)``.
+        4. Cap at *max_rules* and emit :class:`AppliedRule` objects with a
+           **real** relevance score.
+
+    Council finding (council_2026-05-04T15-53-40.md, Skeptic): the previous
+    implementation hard-coded ``relevance=1.0`` for every returned rule,
+    silently bypassing FSRS / scope ranking. That made any subsequent
+    token-budget cap "confidently-wrong with finer granularity". This is a
+    correctness fix — the tree's path filtering is preserved, but ranking
+    now runs over the candidate pool instead of being short-circuited.
 
     Falls back to flat scoring if no lessons have paths.
     """
@@ -419,19 +438,74 @@ def apply_rules_with_tree(
         # Fallback: use existing flat apply_rules
         return apply_rules(lessons, scope, max_rules=max_rules, bus=event_bus, graph=rule_graph)
 
+    # 1. Path-aware filtering — get a wide candidate pool. The ranker below
+    #    will narrow to max_rules, so request enough headroom that ranking
+    #    has something to choose from.
     tree = RuleTree(lessons)
+    candidate_pool_size = max(max_rules * 4, 20)
     candidates = tree.get_rules_for_context(
         task_type=scope.task_type,
         domain=scope.domain,
-        max_rules=max_rules * 2,  # get extra, let formatting trim
+        max_rules=candidate_pool_size,
+    )
+    if not candidates:
+        return []
+
+    # 2. Score candidates with the same weights apply_rules uses. Empty
+    #    scopes still produce a valid weight (compute_scope_weight is
+    #    wildcard-tolerant) — at minimum we get a confidence-driven order.
+    current_domain = scope.domain.upper() if scope.domain else ""
+    scored: list[tuple[Lesson, float]] = []
+    for lesson in candidates:
+        relevance = compute_scope_weight(lesson_scope(lesson), scope)
+        relevance *= _CT_BOOST.get(lesson.correction_type, 1.0)
+        # Floor: tree already deemed this lesson path-relevant, so keep it
+        # in the pool even if scope_weight returns 0 (e.g. lesson lacks an
+        # explicit scope_json). Use a small positive epsilon so downstream
+        # consumers can still distinguish ranks from "not applied".
+        if relevance <= 0.0:
+            relevance = 0.05
+        scored.append((lesson, relevance))
+
+    def _effective_conf(lesson: Lesson, domain: str) -> float:
+        if not domain:
+            return lesson.confidence
+        scores = lesson.domain_scores.get(domain, {})
+        return effective_confidence(
+            lesson.confidence,
+            scores.get("fires", 0),
+            scores.get("misfires", 0),
+        )
+
+    # 3. Rank — match the ordering used by apply_rules so callers get a
+    #    consistent experience whether tree retrieval fired or not.
+    scored.sort(
+        key=lambda t: (
+            _STATE_PRIORITY[t[0].state],
+            _difficulty_from_lesson(t[0]),
+            t[1],
+            _effective_conf(t[0], current_domain),
+        ),
+        reverse=True,
     )
 
-    # Format as AppliedRule objects
-    applied = []
-    for lesson in candidates[:max_rules]:
-        # Stable, deterministic ID — Python's built-in hash() is randomized
-        # per-process (PYTHONHASHSEED), which broke RuleCache/RuleGraph lookups
-        # keyed on rule_id across runs.
+    # 4. Conflict filtering against rule_graph (parity with apply_rules).
+    if rule_graph:
+        filtered_scored: list[tuple[Lesson, float]] = []
+        selected_ids: set[str] = set()
+        for lesson, relevance in scored:
+            rid = _make_rule_id(lesson)
+            dominated = any(
+                rule_graph.conflict_count(rid, sel) >= 3 for sel in selected_ids
+            )
+            if not dominated:
+                filtered_scored.append((lesson, relevance))
+                selected_ids.add(rid)
+        scored = filtered_scored
+
+    # 5. Format as AppliedRule objects with the *real* relevance score.
+    applied: list[AppliedRule] = []
+    for lesson, relevance in scored[:max_rules]:
         rule_id = _make_rule_id(lesson)
         instruction = (
             f'<rule confidence="{lesson.confidence:.2f}">'
@@ -441,8 +515,12 @@ def apply_rules_with_tree(
             AppliedRule(
                 rule_id=rule_id,
                 lesson=lesson,
-                relevance=1.0,  # tree already filtered for relevance
+                relevance=relevance,
                 instruction=instruction,
             )
         )
+
+    if rule_graph and len(applied) > 1:
+        rule_graph.add_co_occurrence([r.rule_id for r in applied])
+
     return applied
