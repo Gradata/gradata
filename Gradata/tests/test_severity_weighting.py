@@ -5,7 +5,6 @@ Verifies that edit distance severity labels scale confidence
 updates instead of applying flat-rate penalties/bonuses.
 
 Tests work against whichever self_improvement module is available:
-- gradata_cloud.graduation.self_improvement (proprietary, CI)
 - gradata.enhancements.self_improvement (packaged engine)
 - gradata._self_improvement stubs (open source, constants only)
 """

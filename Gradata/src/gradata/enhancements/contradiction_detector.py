@@ -15,9 +15,6 @@ Contradiction types detected:
 
 If contradictions are found with confidence > 0.7, the lesson is flagged
 as PENDING_REVIEW instead of graduating automatically.
-
-OPEN SOURCE: Detection heuristics are open. Embedding-based semantic
-similarity is proprietary cloud-side (medium-term).
 """
 
 from __future__ import annotations
