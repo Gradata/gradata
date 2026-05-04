@@ -773,6 +773,21 @@ _GEMMA_DEFAULT_BASE = "https://generativelanguage.googleapis.com/v1beta/openai"
 _GEMMA_DEFAULT_MODEL = "gemma-3-27b-it"
 
 
+def _get_meta_provider():
+    """Return a unified LLMProvider when one is configured, else None.
+
+    Honors GRADATA_LLM_PROVIDER and the ``auto`` resolution chain. Returning
+    ``None`` keeps the legacy urllib / Gemma-native code paths in play and
+    preserves backwards compatibility with tests that patch internal helpers.
+    """
+    try:
+        from gradata.enhancements.llm_provider import get_provider
+        return get_provider()
+    except Exception as exc:  # pragma: no cover — defensive
+        _log.debug("Unified provider lookup failed: %s", exc)
+        return None
+
+
 def _resolve_llm_credentials() -> tuple[str, str, str]:
     """Resolve LLM credentials from environment. Returns (key, base, model).
 
@@ -871,6 +886,20 @@ def _try_llm_principle(
     """
     if not rules:
         return None
+
+    # NEW: route through unified provider if user explicitly opted into a
+    # BYO mode (cli / cloud / auto). Legacy urllib + Gemma paths remain
+    # for the explicit GRADATA_LLM_KEY+BASE / GRADATA_GEMMA_API_KEY contract
+    # so that existing tests which patch the helpers below still pass.
+    explicit_mode = (env_str("GRADATA_LLM_PROVIDER", "") or "").lower()
+    if explicit_mode in {"cli", "cloud", "auto"}:
+        provider = _get_meta_provider()
+        if provider is not None:
+            prompt = _build_principle_prompt(rules, category)
+            out = provider.complete(prompt, max_tokens=200, timeout=30.0, sanitize=True)
+            if out:
+                return out
+            # fall through to legacy path on miss
 
     c = creds if creds is not None else _resolve_principle_creds()
     k = c.get("openai_key")
