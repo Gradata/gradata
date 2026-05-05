@@ -7,6 +7,7 @@ session context instead of brute-force top-10 by confidence.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import shutil
@@ -89,10 +90,8 @@ def _should_skip_ranked_rules(brain_dir: Path, lessons_path: Path) -> bool:
         _log.debug("handoff sentinel parse failed (%s) — falling back", exc)
         return False
     finally:
-        try:
+        with contextlib.suppress(OSError):
             sentinel.unlink()
-        except OSError:
-            pass
     return unchanged
 
 
@@ -186,9 +185,7 @@ def _read_brain_prompt(brain_dir: Path) -> str | None:
     try:
         wisdom_max_rules = int(_raw_max)
     except (ValueError, TypeError):
-        _log.warning(
-            "GRADATA_WISDOM_MAX_RULES=%r not an int — defaulting to 9", _raw_max
-        )
+        _log.warning("GRADATA_WISDOM_MAX_RULES=%r not an int — defaulting to 9", _raw_max)
         wisdom_max_rules = 9
     if wisdom_max_rules > 0:
         rule_lines = [ln for ln in text.split("\n") if ln.startswith("- ")]
@@ -196,7 +193,7 @@ def _read_brain_prompt(brain_dir: Path) -> str | None:
             # Find the character position just after the Nth rule line.
             remaining = wisdom_max_rules
             cutoff = len(text)
-            for j, ch in enumerate(text):
+            for j, _ch in enumerate(text):
                 if text[j : j + 2] == "- " and j > 0 and text[j - 1] == "\n":
                     remaining -= 1
                     if remaining < 0:
@@ -318,6 +315,16 @@ def main(data: dict) -> dict | None:
     brain_dir = resolve_brain_dir()
     if not brain_dir:
         return None
+    try:
+        from gradata._config import _load_brain_config
+
+        brain_cfg = _load_brain_config(brain_dir)
+    except ImportError:
+        brain_cfg = None
+    max_rules = MAX_RULES
+    max_prompt_chars = MAX_BRAIN_PROMPT_CHARS
+    if brain_cfg is not None:
+        max_prompt_chars = min(max_prompt_chars, brain_cfg.max_recall_tokens * 4)
 
     lessons_path = Path(brain_dir) / "lessons.md"
     if not lessons_path.is_file():
@@ -385,7 +392,7 @@ def main(data: dict) -> dict | None:
     # Without this, the ranker hard-caps at MAX_RULES and any rule suppressed
     # by a cluster or meta-rule leaves an empty slot that cannot be filled.
     # Final render loop enforces the MAX_RULES budget after filtering.
-    rank_overshoot = max(MAX_RULES * 3, MAX_RULES + 10)
+    rank_overshoot = max(max_rules * 3, max_rules + 10)
     ranked = rank_rules(
         rule_dicts,
         current_session=int(data.get("session_number") or 0),
@@ -430,9 +437,16 @@ def main(data: dict) -> dict | None:
         try:
             cached_metas = list(load_meta_rules(db_path))
             for m in cached_metas:
-                if getattr(m, "source", "deterministic") in INJECTABLE_META_SOURCES:
+                source = getattr(m, "source", "deterministic")
+                if source in INJECTABLE_META_SOURCES:
                     meta_covered_categories.update(getattr(m, "source_categories", []))
                     meta_covered_lesson_ids.update(getattr(m, "source_lesson_ids", []) or [])
+                else:
+                    _log.warning(
+                        "dropping meta-rule %s (source=%s) from injection",
+                        getattr(m, "id", "<unknown>"),
+                        source,
+                    )
         except Exception as exc:
             _log.debug("meta-rule mutex pre-pass failed (%s) — clusters will fire", exc)
             cached_metas = None
@@ -518,7 +532,7 @@ def main(data: dict) -> dict | None:
     # Total <brain-rules> entries = cluster_lines + individual_lines.
     # Enforce MAX_RULES here (after mutex) so freed slots get refilled from
     # the overshoot pool, and the final block still respects the budget.
-    render_budget = max(0, MAX_RULES - len(cluster_lines))
+    render_budget = max(0, max_rules - len(cluster_lines))
     for r in scored:
         if len(individual_lines) >= render_budget:
             break
@@ -561,7 +575,7 @@ def main(data: dict) -> dict | None:
         rules_block = ""
     else:
         synth_input: list[dict] = []
-        for r in scored[:MAX_RULES]:
+        for r in scored[:max_rules]:
             if (
                 meta_mutex_enabled
                 and lesson_id_fn is not None
@@ -724,9 +738,17 @@ def main(data: dict) -> dict | None:
             # Reuse the mutex pre-pass result when available to avoid a second
             # DB open. Fall back to a fresh load if the pre-pass failed.
             metas = cached_metas if cached_metas is not None else load_meta_rules(db_path)
-            injectable = [
-                m for m in metas if getattr(m, "source", "deterministic") in INJECTABLE_META_SOURCES
-            ]
+            injectable = []
+            for m in metas:
+                source = getattr(m, "source", "deterministic")
+                if source in INJECTABLE_META_SOURCES:
+                    injectable.append(m)
+                else:
+                    _log.warning(
+                        "dropping meta-rule %s (source=%s) from injection",
+                        getattr(m, "id", "<unknown>"),
+                        source,
+                    )
             if injectable:
                 # Build a sanitized condition_context from the hook payload so
                 # applies_when / never_when are honored during SessionStart.
@@ -776,7 +798,10 @@ def main(data: dict) -> dict | None:
     if bp_text:
         return {"result": bp_text}
 
-    return {"result": mandatory_block + disposition_block + rules_block + meta_block}
+    result = mandatory_block + disposition_block + rules_block + meta_block
+    if len(result) > max_prompt_chars:
+        result = result[:max_prompt_chars].rstrip()
+    return {"result": result}
 
 
 if __name__ == "__main__":

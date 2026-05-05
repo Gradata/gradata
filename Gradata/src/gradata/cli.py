@@ -135,23 +135,14 @@ def cmd_stats(args):
 
 
 def cmd_audit(args):
-    try:
-        from gradata._data_flow_audit import run_audit
+    from gradata._audit import format_audit_text, run_audit
 
-        report = run_audit()
-        if args.json:
-            print(json.dumps(report, indent=2))
-        else:
-            status = (
-                "PASS" if report["score"] >= 80 else "WARN" if report["score"] >= 60 else "FAIL"
-            )
-            print(f"{status}: {report['passed']}/{report['total']} checks ({report['score']}%)")
-            failures = [c for c in report["checks"] if not c["passed"]]
-            if failures:
-                for f in failures:
-                    print(f"  FAIL: {f['name']} -- {f['detail'][:80]}")
-    except ImportError:
-        print("Audit module not available.")
+    brain_root = _resolve_brain_root(args)
+    report = run_audit(brain_root)
+    if args.json:
+        print(json.dumps(report, indent=2))
+    else:
+        print(format_audit_text(report))
 
 
 def cmd_export(args):
@@ -257,6 +248,10 @@ def cmd_doctor(args):
 
 
 def cmd_install(args):
+    if getattr(args, "agent", None):
+        _cmd_install_agent(args)
+        return
+
     from gradata._installer import install, list_installed
 
     if args.list:
@@ -277,6 +272,51 @@ def cmd_install(args):
     report = install(Path(args.archive), target, dry_run=args.dry_run)
     if report["status"] == "failed":
         sys.exit(1)
+
+
+def _cmd_install_agent(args) -> None:
+    from gradata.hooks.adapters._base import AGENTS, adapter_config_path, get_adapter
+
+    agent = args.agent
+    brain_dir = Path(args.brain or env_str("BRAIN_DIR") or "./brain").expanduser().resolve()
+    agents = [a for a in AGENTS if adapter_config_path(a).exists()] if agent == "all" else [agent]
+
+    if not agents:
+        print("No agent config files detected.")
+        return
+
+    had_failure = False
+    for name in agents:
+        try:
+            adapter = get_adapter(name)
+            config_path = adapter_config_path(name)
+            result = adapter.install(brain_dir, config_path)
+        except Exception as exc:
+            print(f"✗ {name} → unknown (failed: {exc})")
+            had_failure = True
+            continue
+        marker = "✓" if result.action != "failed" else "✗"
+        if result.action == "failed":
+            had_failure = True
+        print(f"{marker} {result.agent} → {result.config_path} ({result.action})")
+    if had_failure:
+        sys.exit(1)
+
+
+def cmd_recall(args) -> None:
+    from gradata.mcp_tools import gradata_recall
+
+    brain_root = _resolve_brain_root(args)
+    print(
+        gradata_recall(
+            args.situation,
+            max_tokens=args.max_tokens,
+            ranker=args.ranker,
+            include_all_sources=args.include_all_sources,
+            lessons_path=brain_root / "lessons.md",
+            meta_rules_path=brain_root / "meta-rules.json",
+        )
+    )
 
 
 def cmd_health(args):
@@ -553,7 +593,7 @@ def cmd_demo(args):
 
 def _resolve_brain_root(args):
     """Figure out where brain lives. Prefer env override for tests, then --brain-dir arg, then default."""
-    override = env_str("GRADATA_BRAIN")
+    override = env_str("GRADATA_BRAIN") or env_str("BRAIN_DIR")
     if override:
         return Path(override)
     brain_dir = getattr(args, "brain_dir", None)
@@ -1217,6 +1257,17 @@ def main():
     p_audit = sub.add_parser("audit", help="Data flow audit")
     p_audit.add_argument("--json", action="store_true")
 
+    # recall
+    p_recall = sub.add_parser("recall", help="Recall relevant brain rules as XML")
+    p_recall.add_argument("situation", help="Current situation or task")
+    p_recall.add_argument("--max-tokens", type=int, default=None)
+    p_recall.add_argument("--ranker", choices=["hybrid", "flat", "tree_only"], default=None)
+    p_recall.add_argument(
+        "--include-all-sources",
+        action="store_true",
+        help="Debug: include meta-rules from non-injectable sources",
+    )
+
     # export — marketplace archive OR platform-specific rule export
     p_export = sub.add_parser(
         "export",
@@ -1254,11 +1305,22 @@ def main():
     )
 
     # install
-    p_install = sub.add_parser("install", help="Install a brain from marketplace archive")
+    p_install = sub.add_parser("install", help="Install a brain archive or configure an agent")
     p_install.add_argument("archive", nargs="?", help="Path to brain archive (.zip)")
     p_install.add_argument("--target", type=str, help="Installation directory")
     p_install.add_argument("--dry-run", action="store_true")
     p_install.add_argument("--list", action="store_true", help="List installed brains")
+    p_install.add_argument(
+        "--agent",
+        choices=["claude-code", "codex", "gemini", "cursor", "hermes", "opencode", "all"],
+        help="Install Gradata recall hook/MCP config for an agent",
+    )
+    p_install.add_argument(
+        "--brain",
+        type=str,
+        default=None,
+        help="Brain directory for agent hook config (default: BRAIN_DIR or ./brain)",
+    )
 
     # health
     p_health = sub.add_parser("health", help="Brain health report")
@@ -1452,6 +1514,7 @@ def main():
         "manifest": cmd_manifest,
         "stats": cmd_stats,
         "audit": cmd_audit,
+        "recall": cmd_recall,
         "export": cmd_export,
         "context": cmd_context,
         "validate": cmd_validate,
