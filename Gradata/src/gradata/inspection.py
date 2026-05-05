@@ -46,13 +46,16 @@ def _lesson_to_dict(lesson: Lesson) -> dict:
         "correction_event_ids": lesson.correction_event_ids,
     }
     if hasattr(lesson, "metadata") and lesson.metadata is not None:
-        d["metadata"] = lesson.metadata.to_dict() if hasattr(lesson.metadata, "to_dict") else lesson.metadata
+        d["metadata"] = (
+            lesson.metadata.to_dict() if hasattr(lesson.metadata, "to_dict") else lesson.metadata
+        )
     return d
 
 
 # ---------------------------------------------------------------------------
 # Core API
 # ---------------------------------------------------------------------------
+
 
 def list_rules(
     *,
@@ -182,6 +185,7 @@ def export_rules(
 # ---------------------------------------------------------------------------
 # Minimal YAML serializer (~30 lines, no PyYAML dependency)
 # ---------------------------------------------------------------------------
+
 
 def _yaml_val(v: object) -> str:
     """Format a scalar value for YAML output."""

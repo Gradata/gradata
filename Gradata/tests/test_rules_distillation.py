@@ -8,21 +8,23 @@ Tests cover:
 - Proposals sorted by count descending
 - format_proposals output correctness
 """
-import pytest
+
 from gradata.enhancements.graduation.rules_distillation import (
-    LessonEntry,
     DistillationProposal,
-    find_distillation_candidates,
+    LessonEntry,
     _check_coverage,
+    find_distillation_candidates,
     format_proposals,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def make_entry(category: str, description: str, source: str = "lessons.md", status: str = "PATTERN:0.70") -> LessonEntry:
+
+def make_entry(
+    category: str, description: str, source: str = "lessons.md", status: str = "PATTERN:0.70"
+) -> LessonEntry:
     return LessonEntry(
         date="2026-01-01",
         status=status,
@@ -35,6 +37,7 @@ def make_entry(category: str, description: str, source: str = "lessons.md", stat
 # ---------------------------------------------------------------------------
 # find_distillation_candidates — happy paths
 # ---------------------------------------------------------------------------
+
 
 class TestFindCandidates:
     def test_three_entries_same_category_produces_proposal(self):
@@ -78,10 +81,9 @@ class TestFindCandidates:
         assert proposals == []
 
     def test_multiple_categories_each_meeting_threshold(self):
-        entries = (
-            [make_entry("DRAFTING", f"draft tip {i}") for i in range(3)]
-            + [make_entry("ACCURACY", f"accuracy tip {i}") for i in range(4)]
-        )
+        entries = [make_entry("DRAFTING", f"draft tip {i}") for i in range(3)] + [
+            make_entry("ACCURACY", f"accuracy tip {i}") for i in range(4)
+        ]
         proposals = find_distillation_candidates(entries)
         assert len(proposals) == 2
         # Sorted by count descending: ACCURACY (4) before DRAFTING (3)
@@ -120,6 +122,7 @@ class TestFindCandidates:
 # ---------------------------------------------------------------------------
 # Coverage check — ALREADY_COVERED vs PROPOSE
 # ---------------------------------------------------------------------------
+
 
 class TestCoverageCheck:
     def test_high_keyword_overlap_marks_already_covered(self):
@@ -179,6 +182,7 @@ class TestCheckCoverageDirectly:
 # Custom min_count threshold
 # ---------------------------------------------------------------------------
 
+
 class TestMinCountParameter:
     def test_min_count_2_accepts_two_entries(self):
         entries = [
@@ -198,6 +202,7 @@ class TestMinCountParameter:
 # ---------------------------------------------------------------------------
 # format_proposals
 # ---------------------------------------------------------------------------
+
 
 class TestFormatProposals:
     def test_empty_proposals_returns_no_candidates_message(self):

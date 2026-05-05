@@ -1,4 +1,5 @@
 """Claude Code PostToolUse runner for user-installed generated hooks."""
+
 from __future__ import annotations
 
 import sys

@@ -10,6 +10,7 @@ Strategy
 - The blandness / compute_metrics integration path is patched via monkeypatch
   so we avoid a hard dependency on gradata.enhancements.metrics.
 """
+
 from __future__ import annotations
 
 import json
@@ -28,10 +29,10 @@ from gradata.enhancements.scoring.success_conditions import (
     format_success_report,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_db(path: Path) -> sqlite3.Connection:
     """Create a minimal events table and return an open connection."""
@@ -50,9 +51,7 @@ def _make_db(path: Path) -> sqlite3.Connection:
 
 def _insert_events(conn: sqlite3.Connection, rows: list[tuple]) -> None:
     """Insert (type, session, data_json) tuples."""
-    conn.executemany(
-        "INSERT INTO events (type, session, data_json) VALUES (?, ?, ?)", rows
-    )
+    conn.executemany("INSERT INTO events (type, session, data_json) VALUES (?, ?, ?)", rows)
     conn.commit()
 
 
@@ -78,17 +77,22 @@ def _seed_sessions(
                 data["edit_distance"] = edit_distance
             rows.append(("CORRECTION", s, json.dumps(data)))
         for _ in range(rule_apps_per):
-            rows.append((
-                "RULE_APPLICATION", s,
-                json.dumps({"accepted": 1 if rule_accepted else 0,
-                            "misfired": 1 if misfired else 0}),
-            ))
+            rows.append(
+                (
+                    "RULE_APPLICATION",
+                    s,
+                    json.dumps(
+                        {"accepted": 1 if rule_accepted else 0, "misfired": 1 if misfired else 0}
+                    ),
+                )
+            )
     _insert_events(conn, rows)
 
 
 # ---------------------------------------------------------------------------
 # ConditionResult dataclass
 # ---------------------------------------------------------------------------
+
 
 class TestConditionResult:
     def test_fields_stored(self):
@@ -115,6 +119,7 @@ class TestConditionResult:
 # ---------------------------------------------------------------------------
 # SuccessReport dataclass + properties
 # ---------------------------------------------------------------------------
+
 
 class TestSuccessReport:
     def _make_report(self, met_flags: list[bool]) -> SuccessReport:
@@ -161,6 +166,7 @@ class TestSuccessReport:
 # _split_halves
 # ---------------------------------------------------------------------------
 
+
 class TestSplitHalves:
     def test_too_short_returns_zeros(self):
         assert _split_halves([]) == (0.0, 0.0)
@@ -169,12 +175,12 @@ class TestSplitHalves:
 
     def test_four_values(self):
         first, second = _split_halves([1.0, 2.0, 3.0, 4.0])
-        assert first == pytest.approx(1.5)   # avg(1,2)
+        assert first == pytest.approx(1.5)  # avg(1,2)
         assert second == pytest.approx(3.5)  # avg(3,4)
 
     def test_six_values(self):
         first, second = _split_halves([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
-        assert first == pytest.approx(2.0)   # avg(1,2,3)
+        assert first == pytest.approx(2.0)  # avg(1,2,3)
         assert second == pytest.approx(5.0)  # avg(4,5,6)
 
     def test_five_values(self):
@@ -192,6 +198,7 @@ class TestSplitHalves:
 # ---------------------------------------------------------------------------
 # _get_session_metrics
 # ---------------------------------------------------------------------------
+
 
 class TestGetSessionMetrics:
     def test_returns_empty_when_no_events_table(self, tmp_path):
@@ -212,13 +219,16 @@ class TestGetSessionMetrics:
     def test_aggregates_by_session(self, tmp_path):
         db_path = tmp_path / "test.db"
         conn = _make_db(db_path)
-        _insert_events(conn, [
-            ("OUTPUT", 1, None),
-            ("OUTPUT", 1, None),
-            ("CORRECTION", 1, None),
-            ("OUTPUT", 2, None),
-            ("RULE_APPLICATION", 2, None),
-        ])
+        _insert_events(
+            conn,
+            [
+                ("OUTPUT", 1, None),
+                ("OUTPUT", 1, None),
+                ("CORRECTION", 1, None),
+                ("OUTPUT", 2, None),
+                ("RULE_APPLICATION", 2, None),
+            ],
+        )
         result = _get_session_metrics(conn, 20)
         conn.close()
         by_session = {r["session"]: r for r in result}
@@ -240,10 +250,13 @@ class TestGetSessionMetrics:
     def test_null_session_excluded(self, tmp_path):
         db_path = tmp_path / "test.db"
         conn = _make_db(db_path)
-        _insert_events(conn, [
-            ("OUTPUT", None, None),
-            ("OUTPUT", 1, None),
-        ])
+        _insert_events(
+            conn,
+            [
+                ("OUTPUT", None, None),
+                ("OUTPUT", 1, None),
+            ],
+        )
         result = _get_session_metrics(conn, 20)
         conn.close()
         assert all(r["session"] is not None for r in result)
@@ -263,6 +276,7 @@ class TestGetSessionMetrics:
 # evaluate_success_conditions — path: db does not exist
 # ---------------------------------------------------------------------------
 
+
 class TestEvaluateSuccessConditionsNoDb:
     def test_missing_db_returns_empty_report(self, tmp_path):
         absent = tmp_path / "no_such.db"
@@ -281,6 +295,7 @@ class TestEvaluateSuccessConditionsNoDb:
 # ---------------------------------------------------------------------------
 # evaluate_success_conditions — path: insufficient data (n < 4)
 # ---------------------------------------------------------------------------
+
 
 class TestEvaluateInsufficientData:
     def test_zero_sessions(self, tmp_path):
@@ -318,6 +333,7 @@ class TestEvaluateInsufficientData:
 # ---------------------------------------------------------------------------
 # evaluate_success_conditions — full path with >=4 sessions
 # ---------------------------------------------------------------------------
+
 
 class TestEvaluateFullConditions:
     """Tests that exercise the main evaluation branches with 4+ sessions."""
@@ -361,12 +377,18 @@ class TestEvaluateFullConditions:
         db_path = tmp_path / "brain.db"
         conn = _make_db(db_path)
         # 4 sessions, some with zero outputs
-        _insert_events(conn, [
-            ("CORRECTION", 1, None),  # no OUTPUT for session 1
-            ("OUTPUT", 2, None), ("OUTPUT", 2, None),
-            ("OUTPUT", 3, None), ("OUTPUT", 3, None),
-            ("OUTPUT", 4, None), ("OUTPUT", 4, None),
-        ])
+        _insert_events(
+            conn,
+            [
+                ("CORRECTION", 1, None),  # no OUTPUT for session 1
+                ("OUTPUT", 2, None),
+                ("OUTPUT", 2, None),
+                ("OUTPUT", 3, None),
+                ("OUTPUT", 3, None),
+                ("OUTPUT", 4, None),
+                ("OUTPUT", 4, None),
+            ],
+        )
         conn.close()
         # Should not raise
         report = evaluate_success_conditions(db_path)
@@ -417,10 +439,13 @@ class TestEvaluateFullConditions:
         conn = _make_db(db_path)
         _seed_sessions(conn, sessions=4, outputs_per=4, corrections_per=0, rule_apps_per=0)
         # Only 2 sessions have edit_distance data
-        _insert_events(conn, [
-            ("CORRECTION", 1, json.dumps({"edit_distance": 5.0})),
-            ("CORRECTION", 2, json.dumps({"edit_distance": 3.0})),
-        ])
+        _insert_events(
+            conn,
+            [
+                ("CORRECTION", 1, json.dumps({"edit_distance": 5.0})),
+                ("CORRECTION", 2, json.dumps({"edit_distance": 3.0})),
+            ],
+        )
         conn.close()
         report = evaluate_success_conditions(db_path)
         names = [c.name for c in report.conditions]
@@ -432,20 +457,26 @@ class TestEvaluateFullConditions:
         conn = _make_db(db_path)
         # Early sessions: major edits present (accepted=False proxy)
         for s in [1, 2]:
-            _insert_events(conn, [
-                ("OUTPUT", s, json.dumps({"major_edit": 1})),
-                ("OUTPUT", s, json.dumps({"major_edit": 1})),
-                ("OUTPUT", s, json.dumps({"major_edit": 0})),
-                ("OUTPUT", s, json.dumps({"major_edit": 0})),
-            ])
+            _insert_events(
+                conn,
+                [
+                    ("OUTPUT", s, json.dumps({"major_edit": 1})),
+                    ("OUTPUT", s, json.dumps({"major_edit": 1})),
+                    ("OUTPUT", s, json.dumps({"major_edit": 0})),
+                    ("OUTPUT", s, json.dumps({"major_edit": 0})),
+                ],
+            )
         # Later sessions: mostly accepted
         for s in [3, 4]:
-            _insert_events(conn, [
-                ("OUTPUT", s, json.dumps({"major_edit": 0})),
-                ("OUTPUT", s, json.dumps({"major_edit": 0})),
-                ("OUTPUT", s, json.dumps({"major_edit": 0})),
-                ("OUTPUT", s, json.dumps({"major_edit": 0})),
-            ])
+            _insert_events(
+                conn,
+                [
+                    ("OUTPUT", s, json.dumps({"major_edit": 0})),
+                    ("OUTPUT", s, json.dumps({"major_edit": 0})),
+                    ("OUTPUT", s, json.dumps({"major_edit": 0})),
+                    ("OUTPUT", s, json.dumps({"major_edit": 0})),
+                ],
+            )
         conn.close()
         report = evaluate_success_conditions(db_path)
         fda = next((c for c in report.conditions if c.name == "acceptance_rate_increases"), None)
@@ -457,12 +488,15 @@ class TestEvaluateFullConditions:
         db_path = tmp_path / "brain.db"
         conn = _make_db(db_path)
         for s in range(1, 5):
-            _insert_events(conn, [
-                ("OUTPUT", s, json.dumps({})),  # major_edit IS NULL
-                ("OUTPUT", s, json.dumps({})),
-                ("OUTPUT", s, json.dumps({})),
-                ("OUTPUT", s, json.dumps({})),
-            ])
+            _insert_events(
+                conn,
+                [
+                    ("OUTPUT", s, json.dumps({})),  # major_edit IS NULL
+                    ("OUTPUT", s, json.dumps({})),
+                    ("OUTPUT", s, json.dumps({})),
+                    ("OUTPUT", s, json.dumps({})),
+                ],
+            )
         conn.close()
         report = evaluate_success_conditions(db_path)
         fda = next((c for c in report.conditions if c.name == "acceptance_rate_increases"), None)
@@ -476,20 +510,28 @@ class TestEvaluateFullConditions:
         conn = _make_db(db_path)
         # Baseline sessions: low acceptance
         for s in [1, 2]:
-            _insert_events(conn, [
-                ("OUTPUT", s, None), ("OUTPUT", s, None),
-                ("RULE_APPLICATION", s, json.dumps({"accepted": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"accepted": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"accepted": 1})),
-            ])
+            _insert_events(
+                conn,
+                [
+                    ("OUTPUT", s, None),
+                    ("OUTPUT", s, None),
+                    ("RULE_APPLICATION", s, json.dumps({"accepted": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"accepted": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"accepted": 1})),
+                ],
+            )
         # Current sessions: high acceptance
         for s in [3, 4]:
-            _insert_events(conn, [
-                ("OUTPUT", s, None), ("OUTPUT", s, None),
-                ("RULE_APPLICATION", s, json.dumps({"accepted": 1})),
-                ("RULE_APPLICATION", s, json.dumps({"accepted": 1})),
-                ("RULE_APPLICATION", s, json.dumps({"accepted": 1})),
-            ])
+            _insert_events(
+                conn,
+                [
+                    ("OUTPUT", s, None),
+                    ("OUTPUT", s, None),
+                    ("RULE_APPLICATION", s, json.dumps({"accepted": 1})),
+                    ("RULE_APPLICATION", s, json.dumps({"accepted": 1})),
+                    ("RULE_APPLICATION", s, json.dumps({"accepted": 1})),
+                ],
+            )
         conn.close()
         report = evaluate_success_conditions(db_path)
         rs = next((c for c in report.conditions if c.name == "rule_success_increases"), None)
@@ -500,17 +542,25 @@ class TestEvaluateFullConditions:
         db_path = tmp_path / "brain.db"
         conn = _make_db(db_path)
         for s in [1, 2]:
-            _insert_events(conn, [
-                ("OUTPUT", s, None), ("OUTPUT", s, None),
-                ("RULE_APPLICATION", s, json.dumps({"accepted": 1})),
-                ("RULE_APPLICATION", s, json.dumps({"accepted": 1})),
-            ])
+            _insert_events(
+                conn,
+                [
+                    ("OUTPUT", s, None),
+                    ("OUTPUT", s, None),
+                    ("RULE_APPLICATION", s, json.dumps({"accepted": 1})),
+                    ("RULE_APPLICATION", s, json.dumps({"accepted": 1})),
+                ],
+            )
         for s in [3, 4]:
-            _insert_events(conn, [
-                ("OUTPUT", s, None), ("OUTPUT", s, None),
-                ("RULE_APPLICATION", s, json.dumps({"accepted": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"accepted": 0})),
-            ])
+            _insert_events(
+                conn,
+                [
+                    ("OUTPUT", s, None),
+                    ("OUTPUT", s, None),
+                    ("RULE_APPLICATION", s, json.dumps({"accepted": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"accepted": 0})),
+                ],
+            )
         conn.close()
         report = evaluate_success_conditions(db_path)
         rs = next((c for c in report.conditions if c.name == "rule_success_increases"), None)
@@ -522,12 +572,16 @@ class TestEvaluateFullConditions:
         db_path = tmp_path / "brain.db"
         conn = _make_db(db_path)
         for s in range(1, 5):
-            _insert_events(conn, [
-                ("OUTPUT", s, None), ("OUTPUT", s, None),
-                ("RULE_APPLICATION", s, json.dumps({"accepted": 1, "misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"accepted": 1, "misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"accepted": 1, "misfired": 0})),
-            ])
+            _insert_events(
+                conn,
+                [
+                    ("OUTPUT", s, None),
+                    ("OUTPUT", s, None),
+                    ("RULE_APPLICATION", s, json.dumps({"accepted": 1, "misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"accepted": 1, "misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"accepted": 1, "misfired": 0})),
+                ],
+            )
         conn.close()
         report = evaluate_success_conditions(db_path)
         mf = next((c for c in report.conditions if c.name == "misfires_stay_low"), None)
@@ -540,18 +594,26 @@ class TestEvaluateFullConditions:
         conn = _make_db(db_path)
         # Baseline: 0% misfire
         for s in [1, 2]:
-            _insert_events(conn, [
-                ("OUTPUT", s, None), ("OUTPUT", s, None),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-            ])
+            _insert_events(
+                conn,
+                [
+                    ("OUTPUT", s, None),
+                    ("OUTPUT", s, None),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                ],
+            )
         # Current: 100% misfire
         for s in [3, 4]:
-            _insert_events(conn, [
-                ("OUTPUT", s, None), ("OUTPUT", s, None),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 1})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 1})),
-            ])
+            _insert_events(
+                conn,
+                [
+                    ("OUTPUT", s, None),
+                    ("OUTPUT", s, None),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 1})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 1})),
+                ],
+            )
         conn.close()
         report = evaluate_success_conditions(db_path)
         mf = next((c for c in report.conditions if c.name == "misfires_stay_low"), None)
@@ -565,29 +627,33 @@ class TestEvaluateFullConditions:
         conn = _make_db(db_path)
         # 5% misfire throughout (well within 0.05 delta)
         for s in range(1, 5):
-            _insert_events(conn, [
-                ("OUTPUT", s, None), ("OUTPUT", s, None),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 1})),
-            ])
+            _insert_events(
+                conn,
+                [
+                    ("OUTPUT", s, None),
+                    ("OUTPUT", s, None),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 1})),
+                ],
+            )
         conn.close()
         report = evaluate_success_conditions(db_path)
         mf = next((c for c in report.conditions if c.name == "misfires_stay_low"), None)
@@ -600,18 +666,26 @@ class TestEvaluateFullConditions:
         conn = _make_db(db_path)
         # Baseline: 50% misfire
         for s in [1, 2]:
-            _insert_events(conn, [
-                ("OUTPUT", s, None), ("OUTPUT", s, None),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 1})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-            ])
+            _insert_events(
+                conn,
+                [
+                    ("OUTPUT", s, None),
+                    ("OUTPUT", s, None),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 1})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                ],
+            )
         # Current: 0% misfire
         for s in [3, 4]:
-            _insert_events(conn, [
-                ("OUTPUT", s, None), ("OUTPUT", s, None),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
-            ])
+            _insert_events(
+                conn,
+                [
+                    ("OUTPUT", s, None),
+                    ("OUTPUT", s, None),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"misfired": 0})),
+                ],
+            )
         conn.close()
         report = evaluate_success_conditions(db_path)
         mf = next((c for c in report.conditions if c.name == "misfires_stay_low"), None)
@@ -639,18 +713,23 @@ class TestEvaluateFullConditions:
         # 8 sessions: decreasing corrections, stable acceptance, increasing rule success, low misfire
         for s in range(1, 9):
             corr_count = max(4 - (s // 2), 0)
-            _insert_events(conn, [
-                *[("OUTPUT", s, json.dumps({"major_edit": 0}))] * 4,
-                *[("CORRECTION", s, None)] * corr_count,
-                ("RULE_APPLICATION", s, json.dumps({"accepted": 1, "misfired": 0})),
-                ("RULE_APPLICATION", s, json.dumps({"accepted": 1, "misfired": 0})),
-            ])
+            _insert_events(
+                conn,
+                [
+                    *[("OUTPUT", s, json.dumps({"major_edit": 0}))] * 4,
+                    *[("CORRECTION", s, None)] * corr_count,
+                    ("RULE_APPLICATION", s, json.dumps({"accepted": 1, "misfired": 0})),
+                    ("RULE_APPLICATION", s, json.dumps({"accepted": 1, "misfired": 0})),
+                ],
+            )
         conn.close()
         report = evaluate_success_conditions(db_path, window=8)
         # At minimum the correction_rate, acceptance, rule_success, misfire conditions exist
         assert len(report.conditions) >= 3
         # Check all_met reflects actual condition outcomes
-        assert report.all_met == (all(c.met for c in report.conditions) and len(report.conditions) >= 3)
+        assert report.all_met == (
+            all(c.met for c in report.conditions) and len(report.conditions) >= 3
+        )
 
     def test_custom_window_respected(self, tmp_path):
         """window parameter is stored in the report."""
@@ -666,6 +745,7 @@ class TestEvaluateFullConditions:
 # evaluate_success_conditions — blandness / compute_metrics branch
 # ---------------------------------------------------------------------------
 
+
 class TestBlandnessBranch:
     def _seed_4_sessions(self, tmp_path: Path) -> Path:
         db_path = tmp_path / "brain.db"
@@ -679,14 +759,15 @@ class TestBlandnessBranch:
         db_path = self._seed_4_sessions(tmp_path)
         with patch(
             "gradata.enhancements.scoring.success_conditions.evaluate_success_conditions.__wrapped__"
-            if hasattr(evaluate_success_conditions, "__wrapped__") else
-            "gradata.enhancements.metrics.compute_metrics",
+            if hasattr(evaluate_success_conditions, "__wrapped__")
+            else "gradata.enhancements.metrics.compute_metrics",
             return_value={"blandness_score": 0.3},
             create=True,
         ):
             with patch.dict("sys.modules", {}):
                 # Patch at the import site inside the function
                 import sys
+
                 fake_metrics = type(sys)("gradata.enhancements.metrics")
                 fake_metrics.compute_metrics = lambda db_path, window: {"blandness_score": 0.3}
                 orig = sys.modules.get("gradata.enhancements.metrics")
@@ -707,6 +788,7 @@ class TestBlandnessBranch:
         """compute_metrics returns blandness=0.85 -> output_not_bland not met."""
         db_path = self._seed_4_sessions(tmp_path)
         import sys
+
         fake_metrics = type(sys)("gradata.enhancements.metrics")
         fake_metrics.compute_metrics = lambda db_path, window: {"blandness_score": 0.85}
         orig = sys.modules.get("gradata.enhancements.metrics")
@@ -772,12 +854,19 @@ class TestBlandnessBranch:
 # format_success_report
 # ---------------------------------------------------------------------------
 
+
 class TestFormatSuccessReport:
     def _make_full_report(self, all_met: bool) -> SuccessReport:
         conditions = [
-            ConditionResult("correction_rate_decreases", all_met, 0.1, 0.2, "improving", "0.20% -> 0.10%"),
-            ConditionResult("edit_distance_decreases", all_met, 2.0, 5.0, "improving", "5.00 -> 2.00"),
-            ConditionResult("acceptance_rate_increases", all_met, 0.9, 0.7, "improving", "70.0% -> 90.0%"),
+            ConditionResult(
+                "correction_rate_decreases", all_met, 0.1, 0.2, "improving", "0.20% -> 0.10%"
+            ),
+            ConditionResult(
+                "edit_distance_decreases", all_met, 2.0, 5.0, "improving", "5.00 -> 2.00"
+            ),
+            ConditionResult(
+                "acceptance_rate_increases", all_met, 0.9, 0.7, "improving", "70.0% -> 90.0%"
+            ),
         ]
         return SuccessReport(
             conditions=conditions,
@@ -802,7 +891,9 @@ class TestFormatSuccessReport:
             ConditionResult("b", False, 0.5, 0.3, "degrading", "d2"),
             ConditionResult("c", True, 0.8, 0.7, "stable", "d3"),
         ]
-        report = SuccessReport(conditions=conditions, all_met=False, sessions_evaluated=20, window_size=20)
+        report = SuccessReport(
+            conditions=conditions, all_met=False, sessions_evaluated=20, window_size=20
+        )
         result = format_success_report(report)
         assert "2/3 MET" in result
 
@@ -823,7 +914,9 @@ class TestFormatSuccessReport:
 
     def test_fail_icon_for_not_met_condition(self):
         conditions = [ConditionResult("x", False, 0.5, 0.1, "degrading", "bad")]
-        report = SuccessReport(conditions=conditions, all_met=False, sessions_evaluated=5, window_size=20)
+        report = SuccessReport(
+            conditions=conditions, all_met=False, sessions_evaluated=5, window_size=20
+        )
         result = format_success_report(report)
         assert "[FAIL]" in result
 
@@ -837,7 +930,9 @@ class TestFormatSuccessReport:
             ConditionResult("good_cond", True, 0.1, 0.2, "improving", "ok"),
             ConditionResult("bad_cond", False, 0.5, 0.1, "degrading", "bad"),
         ]
-        report = SuccessReport(conditions=conditions, all_met=False, sessions_evaluated=10, window_size=20)
+        report = SuccessReport(
+            conditions=conditions, all_met=False, sessions_evaluated=10, window_size=20
+        )
         result = format_success_report(report)
         assert "bad_cond" in result
         assert "Focus on" in result
@@ -869,7 +964,9 @@ class TestFormatSuccessReport:
             ConditionResult("cond_a", False, 0.5, 0.1, "degrading", "bad a"),
             ConditionResult("cond_b", False, 0.8, 0.2, "degrading", "bad b"),
         ]
-        report = SuccessReport(conditions=conditions, all_met=False, sessions_evaluated=10, window_size=20)
+        report = SuccessReport(
+            conditions=conditions, all_met=False, sessions_evaluated=10, window_size=20
+        )
         result = format_success_report(report)
         assert "cond_a" in result
         assert "cond_b" in result
@@ -884,14 +981,16 @@ class TestFormatSuccessReport:
 # call (the sub-queries), while returning real rows on the first call.
 # ---------------------------------------------------------------------------
 
+
 class TestOperationalErrorBranches:
     """Cover the four `except sqlite3.OperationalError: pass` guards."""
 
     def _db_with_4_sessions(self, tmp_path: Path) -> Path:
         db_path = tmp_path / "brain.db"
         conn = _make_db(db_path)
-        _seed_sessions(conn, sessions=4, outputs_per=4, corrections_per=2, rule_apps_per=2,
-                       edit_distance=5.0)
+        _seed_sessions(
+            conn, sessions=4, outputs_per=4, corrections_per=2, rule_apps_per=2, edit_distance=5.0
+        )
         conn.close()
         return db_path
 

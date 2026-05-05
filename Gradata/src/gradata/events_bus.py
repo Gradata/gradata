@@ -32,7 +32,9 @@ class EventBus:
 
     def __init__(self) -> None:
         self.listeners: dict[str, list[tuple[Callable, bool]]] = defaultdict(list)
-        self._pool = ThreadPoolExecutor(max_workers=MAX_ASYNC_WORKERS, thread_name_prefix="gradata-bus")
+        self._pool = ThreadPoolExecutor(
+            max_workers=MAX_ASYNC_WORKERS, thread_name_prefix="gradata-bus"
+        )
         self._lock = threading.Lock()
 
     def on(self, event: str, handler: Callable, async_handler: bool = False) -> None:
@@ -42,7 +44,9 @@ class EventBus:
             if any(h is handler for h, _ in entries):
                 return
             if len(entries) >= MAX_LISTENERS_PER_EVENT:
-                logger.warning("EventBus: max listeners (%d) reached for %r", MAX_LISTENERS_PER_EVENT, event)
+                logger.warning(
+                    "EventBus: max listeners (%d) reached for %r", MAX_LISTENERS_PER_EVENT, event
+                )
                 return
             entries.append((handler, async_handler))
 

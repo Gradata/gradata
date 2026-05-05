@@ -77,8 +77,7 @@ def test_tree_retrieval_relevance_is_not_constant():
     # see a non-degenerate relevance signal — not a flat 1.0.
     unique = {round(r, 4) for r in relevances}
     assert unique != {1.0}, (
-        f"tree retrieval flat-rated relevance to 1.0 (council finding): "
-        f"relevances={relevances}"
+        f"tree retrieval flat-rated relevance to 1.0 (council finding): relevances={relevances}"
     )
 
 

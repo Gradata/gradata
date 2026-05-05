@@ -6,11 +6,14 @@ Domain-specific values (FILE_TYPE_MAP, MEMORY_TYPE_MAP, MEMORY_TYPE_WEIGHTS)
 are defaults that can be overridden by brain/taxonomy.json. See reload_config()
 and the _tag_taxonomy.py reload mechanism.
 """
+
 from __future__ import annotations
 
 import json
 import os
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 # ── Embedding Model ────────────────────────────────────────────────
 # Two providers: "gemini" (cloud, free tier, better quality) or "local" (no API key needed)
@@ -65,6 +68,56 @@ CONFIDENCE_LOW = 0.35
 # ── Query Defaults ─────────────────────────────────────────────────
 DEFAULT_TOP_K = 5
 SIMILARITY_THRESHOLD = 0.35
+
+RecallRanker = Literal["hybrid", "flat", "tree_only"]
+
+
+@dataclass(frozen=True)
+class BrainConfig:
+    """Runtime config loaded from a brain directory."""
+
+    max_recall_tokens: int = 2000
+    ranker: RecallRanker = "hybrid"
+
+
+BRAIN_CONFIG = BrainConfig()
+
+
+def current_brain_config() -> BrainConfig:
+    """Return the process-local brain config."""
+    return BRAIN_CONFIG
+
+
+def _load_brain_config(brain_dir: str | Path | None = None) -> BrainConfig:
+    if brain_dir is None:
+        return BrainConfig()
+
+    path = Path(brain_dir) / "brain-config.json"
+    if not path.exists():
+        return BrainConfig()
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return BrainConfig()
+
+    max_recall_tokens = data.get("max_recall_tokens", 2000)
+    try:
+        max_recall_tokens = int(max_recall_tokens)
+    except (TypeError, ValueError):
+        max_recall_tokens = 2000
+    if max_recall_tokens <= 0:
+        max_recall_tokens = 2000
+
+    ranker = str(data.get("ranker", "hybrid"))
+    if ranker not in ("hybrid", "flat", "tree_only"):
+        ranker = "hybrid"
+
+    return BrainConfig(
+        max_recall_tokens=max_recall_tokens,
+        ranker=ranker,  # type: ignore[arg-type]
+    )
+
 
 CATEGORY_SIMILARITY_THRESHOLDS: dict[str, float] = {
     "ACCURACY": 0.60,
@@ -154,7 +207,9 @@ def reload_config(brain_dir: str | Path | None = None) -> None:
           }
         }
     """
-    global FILE_TYPE_MAP, MEMORY_TYPE_MAP, MEMORY_TYPE_WEIGHTS
+    global BRAIN_CONFIG, FILE_TYPE_MAP, MEMORY_TYPE_MAP, MEMORY_TYPE_WEIGHTS
+
+    BRAIN_CONFIG = _load_brain_config(brain_dir)
 
     if brain_dir is None:
         return
@@ -179,7 +234,13 @@ def reload_config(brain_dir: str | Path | None = None) -> None:
         # Always preserve the "default" fallback
         new_weights = data["memory_type_weights"]
         if "default" not in new_weights:
-            new_weights["default"] = MEMORY_TYPE_WEIGHTS.get("default", {
-                "episodic": 1.0, "semantic": 1.0, "procedural": 1.0, "strategic": 1.0,
-            })
+            new_weights["default"] = MEMORY_TYPE_WEIGHTS.get(
+                "default",
+                {
+                    "episodic": 1.0,
+                    "semantic": 1.0,
+                    "procedural": 1.0,
+                    "strategic": 1.0,
+                },
+            )
         MEMORY_TYPE_WEIGHTS.update(new_weights)

@@ -25,6 +25,7 @@ _log = logging.getLogger(__name__)
 # Write provenance
 # ---------------------------------------------------------------------------
 
+
 def write_provenance(
     db_path: str | Path,
     *,
@@ -48,25 +49,30 @@ def write_provenance(
 
     _tid = tenant_for(Path(db_path).parent)
     try:
-        import contextlib as _ctx
-        import sqlite3 as _sqlite3
         with get_connection(db_path) as conn:
-            # Defensive migration: brains created before migration 001 lack tenant_id.
-            with _ctx.suppress(_sqlite3.OperationalError):
-                conn.execute("ALTER TABLE rule_provenance ADD COLUMN tenant_id TEXT")
-            conn.execute(
-                "INSERT INTO rule_provenance "
-                "(rule_id, correction_event_id, session, timestamp, user_context, tenant_id) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (rule_id, correction_event_id, session, timestamp, user_context, _tid),
-            )
-    except Exception as e:
-        _log.debug("write_provenance failed: %s", e)
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(rule_provenance)")}
+            if "tenant_id" in cols:
+                conn.execute(
+                    "INSERT INTO rule_provenance "
+                    "(rule_id, correction_event_id, session, timestamp, user_context, tenant_id) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (rule_id, correction_event_id, session, timestamp, user_context, _tid),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO rule_provenance "
+                    "(rule_id, correction_event_id, session, timestamp, user_context) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (rule_id, correction_event_id, session, timestamp, user_context),
+                )
+    except Exception:
+        _log.warning("write_provenance failed", exc_info=True)
 
 
 # ---------------------------------------------------------------------------
 # Query provenance
 # ---------------------------------------------------------------------------
+
 
 def query_provenance(
     db_path: str | Path,
@@ -111,6 +117,7 @@ def query_provenance(
 # ---------------------------------------------------------------------------
 # Scan events.jsonl for specific IDs
 # ---------------------------------------------------------------------------
+
 
 def _scan_events_for_ids(
     events_path: str | Path,
@@ -157,6 +164,7 @@ def _scan_events_for_ids(
 # Full trace: provenance + events + transitions
 # ---------------------------------------------------------------------------
 
+
 def trace_rule(
     db_path: str | Path,
     events_path: str | Path,
@@ -196,8 +204,7 @@ def trace_rule(
     correction_event_ids: list[str] = []
     if provenance:
         correction_event_ids = [
-            r["correction_event_id"] for r in provenance
-            if r.get("correction_event_id")
+            r["correction_event_id"] for r in provenance if r.get("correction_event_id")
         ]
     if not correction_event_ids and target.correction_event_ids:
         correction_event_ids = target.correction_event_ids

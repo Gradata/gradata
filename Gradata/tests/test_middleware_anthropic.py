@@ -129,9 +129,7 @@ def test_wrap_anthropic_strict_raises_on_violation(brain_with_em_dash_rule: Path
         )
 
 
-def test_wrap_anthropic_non_strict_logs_but_does_not_raise(
-    brain_with_em_dash_rule: Path, caplog
-):
+def test_wrap_anthropic_non_strict_logs_but_does_not_raise(brain_with_em_dash_rule: Path, caplog):
     from gradata.middleware import wrap_anthropic
 
     client = _FakeClient(reply="em dash here \u2014 nope")
@@ -147,9 +145,7 @@ def test_wrap_anthropic_non_strict_logs_but_does_not_raise(
     assert any("rule violation" in rec.message.lower() for rec in caplog.records)
 
 
-def test_wrap_anthropic_bypass_env_disables_injection(
-    brain_with_em_dash_rule: Path, monkeypatch
-):
+def test_wrap_anthropic_bypass_env_disables_injection(brain_with_em_dash_rule: Path, monkeypatch):
     from gradata.middleware import wrap_anthropic
 
     monkeypatch.setenv("GRADATA_BYPASS", "1")
@@ -193,7 +189,9 @@ def test_anthropic_import_error_has_install_hint(monkeypatch):
     # Remove both anthropic stub and cached adapter so the import check runs.
     monkeypatch.delitem(sys.modules, "anthropic", raising=False)
     monkeypatch.delitem(
-        sys.modules, "gradata.middleware.anthropic_adapter", raising=False,
+        sys.modules,
+        "gradata.middleware.anthropic_adapter",
+        raising=False,
     )
 
     # Force ImportError on `import anthropic` by installing a finder that

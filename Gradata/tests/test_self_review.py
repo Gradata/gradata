@@ -1,21 +1,19 @@
 """Tests for the self_review PostToolUse hook."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from gradata.hooks.self_review import (
     _check_rule_compliance,
     _extract_output_text,
-    _load_mandatory_rules,
     main,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _rule(description: str, category: str = "DRAFTING") -> dict:
     return {"description": description, "category": category}
@@ -50,6 +48,7 @@ def _lesson(
 # 1. Non-Write/Edit tools are skipped
 # ---------------------------------------------------------------------------
 
+
 class TestMainToolFilter:
     def test_bash_tool_returns_none(self):
         data = {"tool_name": "Bash", "tool_output": "some output"}
@@ -71,6 +70,7 @@ class TestMainToolFilter:
 # ---------------------------------------------------------------------------
 # 2. Empty output is skipped (even for Write/Edit)
 # ---------------------------------------------------------------------------
+
 
 class TestMainEmptyOutput:
     def _patch_brain(self, tmp_path):
@@ -99,6 +99,7 @@ class TestMainEmptyOutput:
 # 3. No brain dir → None
 # ---------------------------------------------------------------------------
 
+
 def test_no_brain_dir_returns_none():
     with patch("gradata.hooks.self_review.resolve_brain_dir", return_value=None):
         result = main({"tool_name": "Write", "tool_output": "hello"})
@@ -108,6 +109,7 @@ def test_no_brain_dir_returns_none():
 # ---------------------------------------------------------------------------
 # 4. No mandatory rules → no violations, returns None
 # ---------------------------------------------------------------------------
+
 
 def test_no_mandatory_rules_returns_none(tmp_path):
     with (
@@ -121,6 +123,7 @@ def test_no_mandatory_rules_returns_none(tmp_path):
 # ---------------------------------------------------------------------------
 # 5. "never use em dash" rule + output WITH em dash → violation detected
 # ---------------------------------------------------------------------------
+
 
 class TestCheckRuleCompliance:
     def test_em_dash_in_output_triggers_violation(self):
@@ -147,16 +150,16 @@ class TestCheckRuleCompliance:
         # A rule "never use \u2014" would match the glyph; "never use em dash"
         # only matches the words "em dash" appearing in the output.
         rules = [
-            _rule("never use em dash"),          # banned literal: "em dash"
-            _rule("never include pricing"),       # banned literal: "pricing"
-            _rule("never create readme files"),   # banned literal: "readme files"
+            _rule("never use em dash"),  # banned literal: "em dash"
+            _rule("never include pricing"),  # banned literal: "pricing"
+            _rule("never create readme files"),  # banned literal: "readme files"
         ]
         output = "The price is $500 per seat. Pricing details follow."
         violations = _check_rule_compliance(output, rules)
 
         flagged = {v["rule"] for v in violations}
         assert "never include pricing" in flagged
-        assert "never use em dash" not in flagged          # "em dash" not in output
+        assert "never use em dash" not in flagged  # "em dash" not in output
         assert "never create readme files" not in flagged  # "readme files" not in output
 
     def test_case_insensitive_match(self):
@@ -185,6 +188,7 @@ class TestCheckRuleCompliance:
 # 8. Violations include evidence string
 # ---------------------------------------------------------------------------
 
+
 def test_violation_evidence_string():
     rules = [_rule("never use em dash")]
     violations = _check_rule_compliance("Here is an em dash in the text", rules)
@@ -197,6 +201,7 @@ def test_violation_evidence_string():
 # ---------------------------------------------------------------------------
 # _load_mandatory_rules filtering
 # ---------------------------------------------------------------------------
+
 
 class TestLoadMandatoryRules:
     """_load_mandatory_rules must filter: RULE state + conf >= 0.90 + fire >= 10."""
@@ -243,11 +248,7 @@ class TestLoadMandatoryRules:
         failing_fire = _lesson(state_name="RULE", confidence=0.95, fire_count=9)
 
         def passes(l):
-            return (
-                l.state == LessonState.RULE
-                and l.confidence >= 0.90
-                and l.fire_count >= 10
-            )
+            return l.state == LessonState.RULE and l.confidence >= 0.90 and l.fire_count >= 10
 
         assert passes(passing)
         assert not passes(failing_state)
@@ -258,6 +259,7 @@ class TestLoadMandatoryRules:
 # ---------------------------------------------------------------------------
 # _extract_output_text
 # ---------------------------------------------------------------------------
+
 
 class TestExtractOutputText:
     def test_tool_output_key_preferred(self):
@@ -279,6 +281,7 @@ class TestExtractOutputText:
 # ---------------------------------------------------------------------------
 # main integration: violation path triggers _log_violations
 # ---------------------------------------------------------------------------
+
 
 def test_main_calls_log_violations_on_violation(tmp_path):
     rules = [_rule("never use em dash")]

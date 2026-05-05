@@ -13,16 +13,14 @@ import pytest
 from gradata import Brain
 from gradata._types import Lesson, LessonState
 from gradata.enhancements.self_improvement import (
-    parse_lessons,
-    update_confidence,
-    graduate,
-    format_lessons,
+    INITIAL_CONFIDENCE,
     compute_learning_velocity,
+    format_lessons,
     fsrs_bonus,
     fsrs_penalty,
-    INITIAL_CONFIDENCE,
-    PATTERN_THRESHOLD,
-    RULE_THRESHOLD,
+    graduate,
+    parse_lessons,
+    update_confidence,
 )
 
 
@@ -118,7 +116,9 @@ class TestCLBGraduation:
 
     def test_full_lifecycle(self):
         """Simulate a lesson going from INSTINCT → PATTERN → RULE."""
-        lesson = Lesson("2026-01-01", LessonState.INSTINCT, INITIAL_CONFIDENCE, "TONE", "Be concise")
+        lesson = Lesson(
+            "2026-01-01", LessonState.INSTINCT, INITIAL_CONFIDENCE, "TONE", "Be concise"
+        )
 
         # Simulate 10 sessions of survival (corrections in other categories)
         for _ in range(10):

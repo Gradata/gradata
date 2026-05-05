@@ -7,9 +7,7 @@ relationship detection and querying.
 from __future__ import annotations
 
 import sqlite3
-import tempfile
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
 
 import pytest
 
@@ -19,7 +17,6 @@ from gradata.rules.rule_graph import (
     detect_relationship,
     get_related_rules,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -242,7 +239,7 @@ class TestGetRelatedRules:
                 rule_b_id,
                 relationship,
                 confidence,
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(UTC).isoformat(),
             ),
         )
         conn.commit()

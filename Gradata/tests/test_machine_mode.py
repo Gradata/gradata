@@ -142,13 +142,16 @@ class TestGraduateMachineMode:
 class TestMachineConstants:
     def test_machine_penalty_softer_than_human(self):
         from gradata.enhancements.self_improvement import CONTRADICTION_PENALTY
+
         assert abs(MACHINE_CONTRADICTION_PENALTY) < abs(CONTRADICTION_PENALTY)
 
     def test_machine_kill_limits_higher_than_human(self):
         from gradata.enhancements.self_improvement import KILL_LIMITS
+
         for key in KILL_LIMITS:
-            assert MACHINE_KILL_LIMITS[key] > KILL_LIMITS[key], \
+            assert MACHINE_KILL_LIMITS[key] > KILL_LIMITS[key], (
                 f"Machine {key} ({MACHINE_KILL_LIMITS[key]}) should exceed human ({KILL_LIMITS[key]})"
+            )
 
     def test_machine_severity_weights_are_softer(self):
         assert MACHINE_SEVERITY_WEIGHTS["moderate"] < 0.60

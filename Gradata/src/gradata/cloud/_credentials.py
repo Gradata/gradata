@@ -53,7 +53,7 @@ def write_to_keyfile(credential: str) -> Path:
     try:
         os.chmod(KEYFILE_PATH, 0o600)
     except OSError:
-        pass
+        log.warning("cloud keyfile chmod failed", exc_info=True)
     return KEYFILE_PATH
 
 

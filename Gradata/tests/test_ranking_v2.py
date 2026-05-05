@@ -1,7 +1,7 @@
 """Tests for BM25 + Thompson sampling modes in rule_ranker."""
+
 from __future__ import annotations
 
-import os
 import sys
 
 import pytest
@@ -10,8 +10,18 @@ from gradata.rules import rule_ranker
 from gradata.rules.rule_ranker import rank_rules
 
 
-def _mk(desc, *, confidence=0.8, category="CODE", fire_count=5, session=1,
-        alpha=1.0, beta_param=1.0, tags="", rid=None):
+def _mk(
+    desc,
+    *,
+    confidence=0.8,
+    category="CODE",
+    fire_count=5,
+    session=1,
+    alpha=1.0,
+    beta_param=1.0,
+    tags="",
+    rid=None,
+):
     return {
         "id": rid or desc,
         "description": desc,
@@ -39,12 +49,13 @@ def test_bm25_ranks_relevant_rule_above_irrelevant_when_available():
     if not rule_ranker._BM25_AVAILABLE:
         pytest.skip("bm25s not installed")
     rules = [
-        _mk("validate email addresses before sending upload",
-            confidence=0.80, category="CODE"),
-        _mk("always clamp confidence scores to the range zero to one",
-            confidence=0.80, category="CODE"),
-        _mk("refactor graduated pattern storage layer",
-            confidence=0.80, category="CODE"),
+        _mk("validate email addresses before sending upload", confidence=0.80, category="CODE"),
+        _mk(
+            "always clamp confidence scores to the range zero to one",
+            confidence=0.80,
+            category="CODE",
+        ),
+        _mk("refactor graduated pattern storage layer", confidence=0.80, category="CODE"),
     ]
     ranked = rank_rules(
         rules,
@@ -94,10 +105,7 @@ def test_bm25_handles_missing_bm25s_module_via_sys_modules(monkeypatch):
 
 def test_thompson_deterministic_with_same_seed(monkeypatch):
     monkeypatch.setenv("GRADATA_THOMPSON_RANKING", "1")
-    rules = [
-        _mk(f"rule{i}", confidence=0.7, alpha=i + 1.0, beta_param=10.0 - i)
-        for i in range(8)
-    ]
+    rules = [_mk(f"rule{i}", confidence=0.7, alpha=i + 1.0, beta_param=10.0 - i) for i in range(8)]
     a = rank_rules(rules, current_session=5, session_seed=42, max_rules=5)
     b = rank_rules(rules, current_session=5, session_seed=42, max_rules=5)
     assert [r["id"] for r in a] == [r["id"] for r in b]
@@ -106,10 +114,7 @@ def test_thompson_deterministic_with_same_seed(monkeypatch):
 def test_thompson_different_seeds_can_differ(monkeypatch):
     monkeypatch.setenv("GRADATA_THOMPSON_RANKING", "1")
     # Many near-equal rules so sampling dominates — different seeds should diverge.
-    rules = [
-        _mk(f"rule{i}", confidence=0.7, alpha=2.0, beta_param=2.0)
-        for i in range(20)
-    ]
+    rules = [_mk(f"rule{i}", confidence=0.7, alpha=2.0, beta_param=2.0) for i in range(20)]
     orderings = set()
     for seed in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10):
         ranked = rank_rules(rules, current_session=1, session_seed=seed, max_rules=10)

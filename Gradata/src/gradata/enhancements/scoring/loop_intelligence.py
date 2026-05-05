@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import sqlite3
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
@@ -27,19 +28,31 @@ from typing import Any
 from gradata._events import emit as _emit_event_fn
 from gradata._tenant import tenant_for
 
+logger = logging.getLogger(__name__)
+
 # ═══════════════════════════════════════════════════════════════════
 # Registries (domain-agnostic defaults, override via register_*)
 # ═══════════════════════════════════════════════════════════════════
 
 _ACTIVITY_TYPES: set[str] = {
-    "email_sent", "email_received", "call", "meeting", "deal_stage_change",
+    "email_sent",
+    "email_received",
+    "call",
+    "meeting",
+    "deal_stage_change",
 }
 _SOURCES: set[str] = {"claude_assisted", "manual", "instantly"}
 _PREP_TYPES: set[str] = {"research", "personalization", "cheat_sheet", "email_draft"}
 _OUTCOMES: set[str] = {"reply", "no_reply", "meeting_booked", "deal_advanced", "closed"}
 _POSITIVE_OUTCOMES: set[str] = {
-    "reply", "positive-reply", "meeting-booked", "demo-completed",
-    "deal-advanced", "meeting_booked", "deal_advanced", "closed",
+    "reply",
+    "positive-reply",
+    "meeting-booked",
+    "demo-completed",
+    "deal-advanced",
+    "meeting_booked",
+    "deal_advanced",
+    "closed",
 }
 
 
@@ -64,6 +77,7 @@ def register_outcomes(*outcomes: str, positive: bool = False) -> None:
 # Confidence bands
 # ═══════════════════════════════════════════════════════════════════
 
+
 def confidence_label(n: int) -> str:
     """Map sample count to a confidence label."""
     if n < 3:
@@ -82,6 +96,7 @@ def confidence_label(n: int) -> str:
 # ═══════════════════════════════════════════════════════════════════
 # Activity Tracker (from delta_tag.py)
 # ═══════════════════════════════════════════════════════════════════
+
 
 def _get_db(db_path: str | Path) -> sqlite3.Connection:
     """Get a connection with WAL mode and Row factory."""
@@ -167,9 +182,10 @@ def log_activity(
 
     if emit_event:
         # Never break the logging path on emit failure
-        with contextlib.suppress(Exception):
+        try:
             _emit_event_fn(
-                "DELTA_TAG", "loop_intelligence",
+                "DELTA_TAG",
+                "loop_intelligence",
                 {
                     "activity_type": activity_type,
                     "prospect": prospect,
@@ -179,12 +195,18 @@ def log_activity(
                     "detail": detail,
                     "activity_log_id": row_id,
                 },
-                tags=[t for t in [
-                    f"prospect:{prospect}" if prospect else None,
-                    f"type:{activity_type}",
-                ] if t],
+                tags=[
+                    t
+                    for t in [
+                        f"prospect:{prospect}" if prospect else None,
+                        f"type:{activity_type}",
+                    ]
+                    if t
+                ],
                 session=session,
             )
+        except Exception:
+            logger.warning("loop_intelligence activity event emit failed", exc_info=True)
 
     return {
         "id": row_id,
@@ -308,15 +330,25 @@ def detect_manual(
 
     logged = []
     for i in range(manual_emails):
-        log_activity(db_path, "email_sent",
-                     detail=f"manual email #{i+1} (detected from external diff)",
-                     source="manual", date=today, emit_event=False)
+        log_activity(
+            db_path,
+            "email_sent",
+            detail=f"manual email #{i + 1} (detected from external diff)",
+            source="manual",
+            date=today,
+            emit_event=False,
+        )
         logged.append("email_sent:manual")
 
     for i in range(manual_crm):
-        log_activity(db_path, "deal_stage_change",
-                     detail=f"manual CRM update #{i+1} (detected from external diff)",
-                     source="manual", date=today, emit_event=False)
+        log_activity(
+            db_path,
+            "deal_stage_change",
+            detail=f"manual CRM update #{i + 1} (detected from external diff)",
+            source="manual",
+            date=today,
+            emit_event=False,
+        )
         logged.append("deal_stage_change:manual")
 
     conn.close()
@@ -361,22 +393,27 @@ def get_activity_stats(db_path: str | Path, days: int = 30) -> dict[str, Any]:
         (cutoff,),
     ).fetchall():
         rate = (r["positive"] / r["total"] * 100) if r["total"] > 0 else 0
-        prep_stats.append({
-            "level": r["prep_level"],
-            "total": r["total"],
-            "positive": r["positive"],
-            "rate": round(rate, 1),
-            "avg_days": round(r["avg_days"], 1) if r["avg_days"] else None,
-        })
+        prep_stats.append(
+            {
+                "level": r["prep_level"],
+                "total": r["total"],
+                "positive": r["positive"],
+                "rate": round(rate, 1),
+                "avg_days": round(r["avg_days"], 1) if r["avg_days"] else None,
+            }
+        )
 
     total_activities = conn.execute(
-        "SELECT COUNT(*) as c FROM activity_log WHERE date >= ?", (cutoff,),
+        "SELECT COUNT(*) as c FROM activity_log WHERE date >= ?",
+        (cutoff,),
     ).fetchone()["c"]
     total_outcomes = conn.execute(
-        "SELECT COUNT(*) as c FROM prep_outcomes WHERE date >= ? AND outcome IS NOT NULL", (cutoff,),
+        "SELECT COUNT(*) as c FROM prep_outcomes WHERE date >= ? AND outcome IS NOT NULL",
+        (cutoff,),
     ).fetchone()["c"]
     pending_outcomes = conn.execute(
-        "SELECT COUNT(*) as c FROM prep_outcomes WHERE date >= ? AND outcome IS NULL", (cutoff,),
+        "SELECT COUNT(*) as c FROM prep_outcomes WHERE date >= ? AND outcome IS NULL",
+        (cutoff,),
     ).fetchone()["c"]
 
     conn.close()
@@ -395,6 +432,7 @@ def get_activity_stats(db_path: str | Path, days: int = 30) -> dict[str, Any]:
 # ═══════════════════════════════════════════════════════════════════
 # Pattern Aggregator (from patterns_updater.py)
 # ═══════════════════════════════════════════════════════════════════
+
 
 def query_tagged_interactions(
     db_path: str | Path,
@@ -429,15 +467,17 @@ def query_tagged_interactions(
             if data.get("source") in exclude_sources:
                 continue
 
-            interactions.append({
-                "prospect": tag_dict.get("prospect", data.get("prospect", "")),
-                "angle": tag_dict.get("angle", data.get("angle", "")),
-                "tone": tag_dict.get("tone", data.get("tone", "")),
-                "persona": tag_dict.get("persona", data.get("persona", "")),
-                "channel": tag_dict.get("channel", data.get("activity_type", "")),
-                "outcome": tag_dict.get("outcome", data.get("outcome", "pending")),
-                "framework": tag_dict.get("framework", data.get("framework", "")),
-            })
+            interactions.append(
+                {
+                    "prospect": tag_dict.get("prospect", data.get("prospect", "")),
+                    "angle": tag_dict.get("angle", data.get("angle", "")),
+                    "tone": tag_dict.get("tone", data.get("tone", "")),
+                    "persona": tag_dict.get("persona", data.get("persona", "")),
+                    "channel": tag_dict.get("channel", data.get("activity_type", "")),
+                    "outcome": tag_dict.get("outcome", data.get("outcome", "pending")),
+                    "framework": tag_dict.get("framework", data.get("framework", "")),
+                }
+            )
 
         return interactions
     except Exception:
@@ -510,15 +550,20 @@ def update_markdown_table(
                 continue
 
             row_key = cells[0].strip().lower().replace(" ", "-")
-            is_pipeline = tier in line or tier.lower() != "cold"
+            has_tier = "Tier" in (lines[header_line] if header_line >= 0 else "")
+            row_tier = cells[5].strip().lower() if has_tier and len(cells) > 5 else ""
+            is_target_tier = (not has_tier) or (row_tier == tier.lower())
 
-            if row_key in data and is_pipeline:
+            if row_key in data and is_target_tier:
                 d = data[row_key]
-                has_tier = "Tier" in (lines[header_line] if header_line >= 0 else "")
                 if has_tier:
-                    lines[i] = f"| {cells[0]} | {d['sent']} | {d['replies']} | {d['rate']}% | {d['confidence']} | Pipeline | Auto-updated |"
+                    lines[i] = (
+                        f"| {cells[0]} | {d['sent']} | {d['replies']} | {d['rate']}% | {d['confidence']} | {tier} | Auto-updated |"
+                    )
                 else:
-                    lines[i] = f"| {cells[0]} | {d['sent']} | {d['replies']} | {d['rate']}% | {d['confidence']} |"
+                    lines[i] = (
+                        f"| {cells[0]} | {d['sent']} | {d['replies']} | {d['rate']}% | {d['confidence']} |"
+                    )
                 del data[row_key]
 
         if in_section and in_table and not line.strip().startswith("|") and line.strip():
@@ -531,7 +576,7 @@ def update_markdown_table(
         for val, d in data.items():
             display = val.replace("-", " ").title()
             if has_tier:
-                new_row = f"| {display} | {d['sent']} | {d['replies']} | {d['rate']}% | {d['confidence']} | Pipeline | Auto-added |"
+                new_row = f"| {display} | {d['sent']} | {d['replies']} | {d['rate']}% | {d['confidence']} | {tier} | Auto-added |"
             else:
                 new_row = f"| {display} | {d['sent']} | {d['replies']} | {d['rate']}% | {d['confidence']} |"
             lines.insert(insert_at, new_row)

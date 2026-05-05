@@ -1,4 +1,5 @@
 """Tests for telemetry recording in run_hook + the summary CLI."""
+
 from __future__ import annotations
 
 import json
@@ -35,7 +36,7 @@ def test_run_hook_records_zero_bytes_when_none(tmp_path, monkeypatch):
         return None
 
     main_fn.__module__ = "gradata.hooks.fake_hook"
-    _base.run_hook(main_fn, {"event": "PreToolUse", "profile": Profile.STANDARD}, raw_input='{}')
+    _base.run_hook(main_fn, {"event": "PreToolUse", "profile": Profile.STANDARD}, raw_input="{}")
 
     log = tmp_path / "telemetry.jsonl"
     rows = [json.loads(line) for line in log.read_text().strip().splitlines()]
@@ -50,7 +51,7 @@ def test_telemetry_disabled_via_env(tmp_path, monkeypatch):
         return {"result": "x"}
 
     main_fn.__module__ = "gradata.hooks.fake_hook"
-    _base.run_hook(main_fn, {"event": "PreToolUse", "profile": Profile.STANDARD}, raw_input='{}')
+    _base.run_hook(main_fn, {"event": "PreToolUse", "profile": Profile.STANDARD}, raw_input="{}")
 
     assert not (tmp_path / "telemetry.jsonl").exists()
 

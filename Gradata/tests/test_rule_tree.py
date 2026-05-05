@@ -1,6 +1,5 @@
 """Tests for hierarchical rule tree."""
 
-import pytest
 from gradata._types import Lesson, LessonState
 
 
@@ -288,7 +287,6 @@ class TestTreeRetrieval:
 
 
 import json
-from pathlib import Path
 
 
 class TestTreeExport:

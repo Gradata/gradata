@@ -3,14 +3,14 @@
 Covers the cross-platform export targets — cursor, agents, aider (existing)
 plus codex, cline, continue (new).
 """
+
 from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
 
-from gradata.enhancements.rule_export import DEFAULT_PATHS, _FORMATTERS, export_rules
-
+from gradata.enhancements.rule_export import _FORMATTERS, DEFAULT_PATHS, export_rules
 
 # ---------------------------------------------------------------------------
 # Helpers

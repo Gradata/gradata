@@ -17,7 +17,6 @@ import pytest
 
 from gradata import Brain
 
-
 # ---------------------------------------------------------------------------
 # Core helper — rewires module-level path caches after Brain.init()
 # ---------------------------------------------------------------------------
@@ -46,9 +45,9 @@ def init_brain(
     )
 
     # --- rewire module-level path caches ---
-    import gradata._paths as _p
-    import gradata._events as _ev
     import gradata._brain_manifest as _bm
+    import gradata._events as _ev
+    import gradata._paths as _p
 
     _ev.BRAIN_DIR = _p.BRAIN_DIR
     _ev.EVENTS_JSONL = _p.EVENTS_JSONL
@@ -114,6 +113,20 @@ def _isolate_brain_dir_env():
         os.environ.pop("BRAIN_DIR", None)
     else:
         os.environ["BRAIN_DIR"] = prev
+
+
+@pytest.fixture(autouse=True)
+def _isolate_user_configs_for_adapter_tests(
+    request: pytest.FixtureRequest,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Keep hook adapter tests away from real ~/.codex, ~/.hermes, etc."""
+    if request.node.path.name not in {"test_hook_adapters.py", "test_cli_install_agent.py"}:
+        return
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / ".config"))
 
 
 # Hook kill-switch env vars from #133 — when set to "0" in a dev shell they
@@ -214,7 +227,7 @@ def brain_db(brain_dir: Path) -> Path:
     callers get a ready-to-use SQLite file without duplicating schema setup.
     """
     db_path = brain_dir / "system.db"
-    from gradata._events import _ensure_table  # noqa: PLC0415
+    from gradata._events import _ensure_table
 
     conn = sqlite3.connect(str(db_path))
     try:

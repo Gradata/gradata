@@ -11,11 +11,9 @@ Covers:
 
 from __future__ import annotations
 
-import pytest
-
 from gradata.correction_detector import (
-    StructuredCorrectionType,
     StructuredCorrection,
+    StructuredCorrectionType,
     _classify_correction_type,
     _classify_domain,
     _classify_severity,
@@ -24,7 +22,6 @@ from gradata.correction_detector import (
     extract_structured_correction,
 )
 
-
 # ---------------------------------------------------------------------------
 # StructuredCorrectionType classification
 # ---------------------------------------------------------------------------
@@ -32,32 +29,59 @@ from gradata.correction_detector import (
 
 class TestClassifyStructuredCorrectionType:
     def test_factual_error(self):
-        assert _classify_correction_type("That is wrong, the number is 42") == StructuredCorrectionType.FACTUAL_ERROR
+        assert (
+            _classify_correction_type("That is wrong, the number is 42")
+            == StructuredCorrectionType.FACTUAL_ERROR
+        )
 
     def test_hallucination_priority_over_factual(self):
         # "hallucin" keyword should win over "wrong" because it appears first in pattern list.
-        assert _classify_correction_type("You hallucinated that endpoint, it doesn't exist") == StructuredCorrectionType.HALLUCINATION
+        assert (
+            _classify_correction_type("You hallucinated that endpoint, it doesn't exist")
+            == StructuredCorrectionType.HALLUCINATION
+        )
 
     def test_tone(self):
-        assert _classify_correction_type("The tone is too cold and formal for this prospect") == StructuredCorrectionType.TONE
+        assert (
+            _classify_correction_type("The tone is too cold and formal for this prospect")
+            == StructuredCorrectionType.TONE
+        )
 
     def test_style_dash(self):
-        assert _classify_correction_type("Don't use em dash in the email") == StructuredCorrectionType.STYLE
+        assert (
+            _classify_correction_type("Don't use em dash in the email")
+            == StructuredCorrectionType.STYLE
+        )
 
     def test_style_emoji(self):
-        assert _classify_correction_type("Remove the emoji from the subject line") == StructuredCorrectionType.STYLE
+        assert (
+            _classify_correction_type("Remove the emoji from the subject line")
+            == StructuredCorrectionType.STYLE
+        )
 
     def test_format(self):
-        assert _classify_correction_type("The layout and heading structure is off") == StructuredCorrectionType.FORMAT
+        assert (
+            _classify_correction_type("The layout and heading structure is off")
+            == StructuredCorrectionType.FORMAT
+        )
 
     def test_omission(self):
-        assert _classify_correction_type("You forgot to include the pricing section") == StructuredCorrectionType.OMISSION
+        assert (
+            _classify_correction_type("You forgot to include the pricing section")
+            == StructuredCorrectionType.OMISSION
+        )
 
     def test_approach(self):
-        assert _classify_correction_type("Please change the strategy and workflow here") == StructuredCorrectionType.APPROACH
+        assert (
+            _classify_correction_type("Please change the strategy and workflow here")
+            == StructuredCorrectionType.APPROACH
+        )
 
     def test_scope(self):
-        assert _classify_correction_type("This rule is only for email scope, not code") == StructuredCorrectionType.SCOPE
+        assert (
+            _classify_correction_type("This rule is only for email scope, not code")
+            == StructuredCorrectionType.SCOPE
+        )
 
     def test_unknown_fallback(self):
         assert _classify_correction_type("Please update this") == StructuredCorrectionType.UNKNOWN
@@ -116,7 +140,9 @@ class TestExtractWhy:
         assert "informal" in result.lower()
 
     def test_since_clause(self):
-        result = _extract_why("since the prospect already knows us, skip the intro", "make it shorter")
+        result = _extract_why(
+            "since the prospect already knows us, skip the intro", "make it shorter"
+        )
         assert "prospect" in result.lower() or "intro" in result.lower()
 
     def test_context_first_sentence(self):

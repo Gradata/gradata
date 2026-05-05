@@ -36,8 +36,7 @@ def _require_openai() -> None:
         import openai  # noqa: F401
     except ImportError as exc:  # pragma: no cover - import guard
         raise ImportError(
-            "OpenAIMiddleware requires the 'openai' package. "
-            "Install with: pip install openai"
+            "OpenAIMiddleware requires the 'openai' package. Install with: pip install openai"
         ) from exc
 
 
@@ -118,7 +117,8 @@ class _CompletionsProxy:
         block = build_brain_rules_block(self._mw._source)
         if block:
             kwargs["messages"] = _inject_into_messages(
-                kwargs.get("messages") or [], block,
+                kwargs.get("messages") or [],
+                block,
             )
 
         response = self._mw._orig_chat.completions.create(*args, **kwargs)
@@ -137,5 +137,8 @@ def wrap_openai(
 ) -> OpenAIMiddleware:
     """Convenience constructor — see :class:`OpenAIMiddleware`."""
     return OpenAIMiddleware(
-        client, brain_path=brain_path, source=source, strict=strict,
+        client,
+        brain_path=brain_path,
+        source=source,
+        strict=strict,
     )

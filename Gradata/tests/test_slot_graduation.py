@@ -14,8 +14,8 @@ from __future__ import annotations
 from gradata._types import Lesson, LessonState
 from gradata.enhancements.self_improvement import (
     format_lessons,
-    parse_lessons,
     graduate,
+    parse_lessons,
 )
 
 

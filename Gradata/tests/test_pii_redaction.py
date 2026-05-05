@@ -14,12 +14,12 @@ def _build(parts: list[str]) -> str:
 
 # ── Unit: redact_pii ─────────────────────────────────────────────────
 
+
 class TestRedactPii:
     """redact_pii replaces sensitive data with placeholders."""
 
     def test_email(self):
-        assert redact_pii("contact alice@example.com now") == \
-            "contact [REDACTED_EMAIL] now"
+        assert redact_pii("contact alice@example.com now") == "contact [REDACTED_EMAIL] now"
 
     def test_phone_us(self):
         assert "[REDACTED_PHONE]" in redact_pii("Call me at (555) 123-4567")
@@ -97,6 +97,7 @@ class TestRedactPii:
 
 # ── Unit: redact_pii_with_report ─────────────────────────────────────
 
+
 class TestRedactPiiWithReport:
     """redact_pii_with_report returns cleaned text plus a report dict."""
 
@@ -121,7 +122,7 @@ class TestRedactPiiWithReport:
 
     def test_report_multiple_types(self):
         text = "email test@test.com ssn 123-45-6789"
-        cleaned, report = redact_pii_with_report(text)
+        _cleaned, report = redact_pii_with_report(text)
         assert report["redactions_count"] == 2
         assert "email" in report["types_found"]
         assert "ssn" in report["types_found"]
@@ -135,6 +136,7 @@ class TestRedactPiiWithReport:
 
 # ── Integration: brain.correct() with PII ────────────────────────────
 
+
 class TestBrainCorrectPiiIntegration:
     """Verify that brain.correct() redacts PII before storage but
     extracts behavioral instructions from full text."""
@@ -142,6 +144,7 @@ class TestBrainCorrectPiiIntegration:
     @pytest.fixture()
     def brain(self, tmp_path):
         from gradata.brain import Brain
+
         return Brain(brain_dir=str(tmp_path))
 
     def test_pii_redacted_in_stored_event(self, brain):

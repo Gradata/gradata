@@ -1,5 +1,6 @@
 """Tests for scoring/loop_intelligence.py — all public functions + private helpers.
 SQLite fixtures for DB-backed functions. 100% line coverage."""
+
 import json
 import sqlite3
 import unittest.mock as mock
@@ -8,18 +9,31 @@ from pathlib import Path
 import pytest
 
 from gradata.enhancements.scoring.loop_intelligence import (
-    _ACTIVITY_TYPES, _OUTCOMES, _POSITIVE_OUTCOMES, _PREP_TYPES,
-    _get_db, _init_tables,
-    aggregate_by_key, confidence_label, detect_manual, get_activity_stats,
-    log_activity, log_outcome, log_prep,
-    query_tagged_interactions, register_activity_types, register_outcomes,
-    register_prep_types, update_markdown_table, update_patterns_file,
+    _ACTIVITY_TYPES,
+    _OUTCOMES,
+    _POSITIVE_OUTCOMES,
+    _PREP_TYPES,
+    _get_db,
+    _init_tables,
+    aggregate_by_key,
+    confidence_label,
+    detect_manual,
+    get_activity_stats,
+    log_activity,
+    log_outcome,
+    log_prep,
+    query_tagged_interactions,
+    register_activity_types,
+    register_outcomes,
+    register_prep_types,
+    update_markdown_table,
+    update_patterns_file,
 )
-
 
 # ---------------------------------------------------------------------------
 # DB helpers
 # ---------------------------------------------------------------------------
+
 
 def make_activity_db(tmp_path: Path) -> Path:
     db = tmp_path / "system.db"
@@ -38,7 +52,8 @@ def make_activity_db(tmp_path: Path) -> Path:
             claude_assisted INTEGER DEFAULT 1, session INTEGER, timestamp TEXT
         );
     """)
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
     return db
 
 
@@ -48,7 +63,8 @@ def make_events_db(tmp_path: Path) -> Path:
     conn.execute("""CREATE TABLE events (
         id INTEGER PRIMARY KEY AUTOINCREMENT, session INTEGER,
         type TEXT, source TEXT, data_json TEXT, tags_json TEXT)""")
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
     return db
 
 
@@ -58,12 +74,14 @@ def insert_event(db: Path, session: int, data: dict, tags: list) -> None:
         "INSERT INTO events (session, type, data_json, tags_json) VALUES (?, 'DELTA_TAG', ?, ?)",
         (session, json.dumps(data), json.dumps(tags)),
     )
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
 
 
 # ---------------------------------------------------------------------------
 # Registries
 # ---------------------------------------------------------------------------
+
 
 class TestRegistries:
     def test_register_activity_types(self):
@@ -85,21 +103,32 @@ class TestRegistries:
     def test_register_outcomes_positive(self):
         register_outcomes("_test_out_pos", positive=True)
         assert "_test_out_pos" in _OUTCOMES and "_test_out_pos" in _POSITIVE_OUTCOMES
-        _OUTCOMES.discard("_test_out_pos"); _POSITIVE_OUTCOMES.discard("_test_out_pos")
+        _OUTCOMES.discard("_test_out_pos")
+        _POSITIVE_OUTCOMES.discard("_test_out_pos")
 
 
 # ---------------------------------------------------------------------------
 # confidence_label — all 6 bands + boundaries
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("n,expected", [
-    (0, "[INSUFFICIENT]"), (2, "[INSUFFICIENT]"),
-    (3, "[HYPOTHESIS]"),   (9, "[HYPOTHESIS]"),
-    (10, "[EMERGING]"),    (24, "[EMERGING]"),
-    (25, "[PROVEN]"),      (49, "[PROVEN]"),
-    (50, "[HIGH CONFIDENCE]"), (99, "[HIGH CONFIDENCE]"),
-    (100, "[DEFINITIVE]"), (10000, "[DEFINITIVE]"),
-])
+
+@pytest.mark.parametrize(
+    "n,expected",
+    [
+        (0, "[INSUFFICIENT]"),
+        (2, "[INSUFFICIENT]"),
+        (3, "[HYPOTHESIS]"),
+        (9, "[HYPOTHESIS]"),
+        (10, "[EMERGING]"),
+        (24, "[EMERGING]"),
+        (25, "[PROVEN]"),
+        (49, "[PROVEN]"),
+        (50, "[HIGH CONFIDENCE]"),
+        (99, "[HIGH CONFIDENCE]"),
+        (100, "[DEFINITIVE]"),
+        (10000, "[DEFINITIVE]"),
+    ],
+)
 def test_confidence_label(n, expected):
     assert confidence_label(n) == expected
 
@@ -107,6 +136,7 @@ def test_confidence_label(n, expected):
 # ---------------------------------------------------------------------------
 # _get_db / _init_tables
 # ---------------------------------------------------------------------------
+
 
 class TestGetDbInitTables:
     def test_returns_connection_with_row_factory(self, tmp_path):
@@ -117,20 +147,21 @@ class TestGetDbInitTables:
     def test_init_tables_creates_both_tables(self, tmp_path):
         conn = _get_db(tmp_path / "test.db")
         _init_tables(conn)
-        tables = {r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'")}
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert {"activity_log", "prep_outcomes"}.issubset(tables)
         conn.close()
 
     def test_init_tables_idempotent(self, tmp_path):
         conn = _get_db(tmp_path / "test.db")
-        _init_tables(conn); _init_tables(conn)  # must not raise
+        _init_tables(conn)
+        _init_tables(conn)  # must not raise
         conn.close()
 
 
 # ---------------------------------------------------------------------------
 # log_activity
 # ---------------------------------------------------------------------------
+
 
 class TestLogActivity:
     def test_returns_id_and_logged_string(self, tmp_path):
@@ -166,6 +197,7 @@ class TestLogActivity:
 # log_prep
 # ---------------------------------------------------------------------------
 
+
 class TestLogPrep:
     def test_returns_id_and_logged_string(self, tmp_path):
         db = make_activity_db(tmp_path)
@@ -185,6 +217,7 @@ class TestLogPrep:
 # log_outcome
 # ---------------------------------------------------------------------------
 
+
 class TestLogOutcome:
     def test_links_to_existing_prep(self, tmp_path):
         db = make_activity_db(tmp_path)
@@ -202,7 +235,9 @@ class TestLogOutcome:
         log_prep(db, "Hank", "research", date="2025-01-01")
         log_outcome(db, "Hank", "research", "meeting_booked", days=0, date="2025-01-10")
         conn = sqlite3.connect(str(db))
-        row = conn.execute("SELECT days_to_outcome FROM prep_outcomes WHERE prospect='Hank'").fetchone()
+        row = conn.execute(
+            "SELECT days_to_outcome FROM prep_outcomes WHERE prospect='Hank'"
+        ).fetchone()
         conn.close()
         assert row[0] == 9
 
@@ -211,7 +246,9 @@ class TestLogOutcome:
         log_prep(db, "Irene", "research", date="2025-01-01")
         log_outcome(db, "Irene", "research", "reply", days=5, date="2025-01-15")
         conn = sqlite3.connect(str(db))
-        row = conn.execute("SELECT days_to_outcome FROM prep_outcomes WHERE prospect='Irene'").fetchone()
+        row = conn.execute(
+            "SELECT days_to_outcome FROM prep_outcomes WHERE prospect='Irene'"
+        ).fetchone()
         conn.close()
         assert row[0] == 5
 
@@ -221,8 +258,12 @@ class TestLogOutcome:
         r2 = log_prep(db, "Jack", "research", date="2025-01-10")
         log_outcome(db, "Jack", "research", "reply")
         conn = sqlite3.connect(str(db))
-        out1 = conn.execute("SELECT outcome FROM prep_outcomes WHERE id=?", (r1["id"],)).fetchone()[0]
-        out2 = conn.execute("SELECT outcome FROM prep_outcomes WHERE id=?", (r2["id"],)).fetchone()[0]
+        out1 = conn.execute("SELECT outcome FROM prep_outcomes WHERE id=?", (r1["id"],)).fetchone()[
+            0
+        ]
+        out2 = conn.execute("SELECT outcome FROM prep_outcomes WHERE id=?", (r2["id"],)).fetchone()[
+            0
+        ]
         conn.close()
         assert out1 is None and out2 == "reply"
 
@@ -230,15 +271,24 @@ class TestLogOutcome:
         # ValueError from strptime is suppressed; row still updated
         db = make_activity_db(tmp_path)
         conn = sqlite3.connect(str(db))
-        conn.execute("INSERT INTO prep_outcomes (date, prospect, prep_type) VALUES (?, ?, ?)",
-                     ("not-a-date", "Zara", "research"))
-        conn.commit(); conn.close()
-        assert log_outcome(db, "Zara", "research", "reply", days=0, date="2025-01-10")["linked_to_prep"] is True
+        conn.execute(
+            "INSERT INTO prep_outcomes (date, prospect, prep_type) VALUES (?, ?, ?)",
+            ("not-a-date", "Zara", "research"),
+        )
+        conn.commit()
+        conn.close()
+        assert (
+            log_outcome(db, "Zara", "research", "reply", days=0, date="2025-01-10")[
+                "linked_to_prep"
+            ]
+            is True
+        )
 
 
 # ---------------------------------------------------------------------------
 # detect_manual
 # ---------------------------------------------------------------------------
+
 
 class TestDetectManual:
     def test_zero_diff_returns_nothing_detected(self, tmp_path):
@@ -248,7 +298,9 @@ class TestDetectManual:
 
     def test_gmail_exceeds_ai_creates_manual_emails(self, tmp_path):
         db = make_activity_db(tmp_path)
-        log_activity(db, "email_sent", source="claude_assisted", date="2025-06-01", emit_event=False)
+        log_activity(
+            db, "email_sent", source="claude_assisted", date="2025-06-01", emit_event=False
+        )
         r = detect_manual(db, gmail_sent=3, crm_updates=0, date="2025-06-01")
         assert r["manual_emails"] == 2 and r["manual_detected"] == 2
 
@@ -259,7 +311,9 @@ class TestDetectManual:
 
     def test_ai_count_in_result(self, tmp_path):
         db = make_activity_db(tmp_path)
-        log_activity(db, "email_sent", source="claude_assisted", date="2025-06-01", emit_event=False)
+        log_activity(
+            db, "email_sent", source="claude_assisted", date="2025-06-01", emit_event=False
+        )
         r = detect_manual(db, gmail_sent=1, crm_updates=0, date="2025-06-01")
         assert r["ai_logged_today"] == 1 and r["manual_emails"] == 0
 
@@ -267,6 +321,7 @@ class TestDetectManual:
 # ---------------------------------------------------------------------------
 # get_activity_stats
 # ---------------------------------------------------------------------------
+
 
 class TestGetActivityStats:
     def test_empty_db_returns_zeros(self, tmp_path):
@@ -303,15 +358,26 @@ class TestGetActivityStats:
 # query_tagged_interactions
 # ---------------------------------------------------------------------------
 
+
 class TestQueryTaggedInteractions:
     def test_empty_db_returns_empty(self, tmp_path):
         assert query_tagged_interactions(make_events_db(tmp_path)) == []
 
     def test_tags_parsed_into_fields(self, tmp_path):
         db = make_events_db(tmp_path)
-        insert_event(db, 1, {"source": "claude_assisted"},
-                     ["prospect:Alice", "angle:roi", "tone:confident",
-                      "persona:ceo", "outcome:reply", "framework:spin"])
+        insert_event(
+            db,
+            1,
+            {"source": "claude_assisted"},
+            [
+                "prospect:Alice",
+                "angle:roi",
+                "tone:confident",
+                "persona:ceo",
+                "outcome:reply",
+                "framework:spin",
+            ],
+        )
         r = query_tagged_interactions(db)[0]
         assert r["prospect"] == "Alice" and r["angle"] == "roi" and r["outcome"] == "reply"
 
@@ -330,8 +396,11 @@ class TestQueryTaggedInteractions:
     def test_null_json_handled_gracefully(self, tmp_path):
         db = make_events_db(tmp_path)
         conn = sqlite3.connect(str(db))
-        conn.execute("INSERT INTO events (session, type, data_json, tags_json) VALUES (1,'DELTA_TAG',NULL,NULL)")
-        conn.commit(); conn.close()
+        conn.execute(
+            "INSERT INTO events (session, type, data_json, tags_json) VALUES (1,'DELTA_TAG',NULL,NULL)"
+        )
+        conn.commit()
+        conn.close()
         result = query_tagged_interactions(db)
         assert isinstance(result, list)
 
@@ -348,9 +417,20 @@ class TestQueryTaggedInteractions:
 # aggregate_by_key
 # ---------------------------------------------------------------------------
 
+
 def _ints(rows):
-    return [{"angle": a, "outcome": o, "tone": "", "persona": "",
-             "channel": "", "prospect": "", "framework": ""} for a, o in rows]
+    return [
+        {
+            "angle": a,
+            "outcome": o,
+            "tone": "",
+            "persona": "",
+            "channel": "",
+            "prospect": "",
+            "framework": "",
+        }
+        for a, o in rows
+    ]
 
 
 class TestAggregateByKey:
@@ -358,24 +438,51 @@ class TestAggregateByKey:
         assert aggregate_by_key([], "angle") == {}
 
     def test_blank_key_skipped(self):
-        assert aggregate_by_key([{"angle": "", "outcome": "reply", "tone": "", "persona": "",
-                                   "channel": "", "prospect": "", "framework": ""}], "angle") == {}
+        assert (
+            aggregate_by_key(
+                [
+                    {
+                        "angle": "",
+                        "outcome": "reply",
+                        "tone": "",
+                        "persona": "",
+                        "channel": "",
+                        "prospect": "",
+                        "framework": "",
+                    }
+                ],
+                "angle",
+            )
+            == {}
+        )
 
     def test_sent_replies_rate(self):
-        r = aggregate_by_key(_ints([("roi", "reply"), ("roi", "reply"), ("roi", "no_reply"), ("roi", "no_reply")]), "angle")
-        assert r["roi"]["sent"] == 4 and r["roi"]["replies"] == 2 and r["roi"]["rate"] == pytest.approx(50.0)
+        r = aggregate_by_key(
+            _ints([("roi", "reply"), ("roi", "reply"), ("roi", "no_reply"), ("roi", "no_reply")]),
+            "angle",
+        )
+        assert (
+            r["roi"]["sent"] == 4
+            and r["roi"]["replies"] == 2
+            and r["roi"]["rate"] == pytest.approx(50.0)
+        )
 
     def test_confidence_label_applied(self):
         r = aggregate_by_key(_ints([("roi", "pending")]), "angle")
         assert r["roi"]["confidence"] == "[INSUFFICIENT]"
 
     def test_custom_positive_outcomes(self):
-        r = aggregate_by_key(_ints([("roi", "custom_win"), ("roi", "no_reply")]), "angle",
-                             positive_outcomes={"custom_win"})
+        r = aggregate_by_key(
+            _ints([("roi", "custom_win"), ("roi", "no_reply")]),
+            "angle",
+            positive_outcomes={"custom_win"},
+        )
         assert r["roi"]["replies"] == 1
 
     def test_multiple_keys_independent(self):
-        r = aggregate_by_key(_ints([("roi", "reply"), ("pain", "reply"), ("roi", "no_reply")]), "angle")
+        r = aggregate_by_key(
+            _ints([("roi", "reply"), ("pain", "reply"), ("roi", "no_reply")]), "angle"
+        )
         assert r["roi"]["sent"] == 2 and r["pain"]["sent"] == 1
 
 
@@ -406,56 +513,103 @@ class TestUpdateMarkdownTable:
         assert update_markdown_table(SAMPLE_MD, "Reply Rates by Angle", {}) == SAMPLE_MD
 
     def test_updates_existing_row(self):
-        r = update_markdown_table(SAMPLE_MD, "Reply Rates by Angle",
-                                  {"roi": {"sent": 15, "replies": 5, "rate": 33.3, "confidence": "[EMERGING]"}})
+        r = update_markdown_table(
+            SAMPLE_MD,
+            "Reply Rates by Angle",
+            {"roi": {"sent": 15, "replies": 5, "rate": 33.3, "confidence": "[EMERGING]"}},
+        )
         assert "15" in r and "33.3" in r
+        assert "Auto-updated" not in r
 
     def test_adds_new_row(self):
-        r = update_markdown_table(SAMPLE_MD, "Reply Rates by Angle",
-                                  {"urgency": {"sent": 3, "replies": 1, "rate": 33.3, "confidence": "[HYPOTHESIS]"}})
+        r = update_markdown_table(
+            SAMPLE_MD,
+            "Reply Rates by Angle",
+            {"urgency": {"sent": 3, "replies": 1, "rate": 33.3, "confidence": "[HYPOTHESIS]"}},
+        )
         assert "Urgency" in r
 
     def test_section_boundary_stops_update(self):
-        r = update_markdown_table(SAMPLE_MD, "Reply Rates by Angle",
-                                  {"roi": {"sent": 99, "replies": 0, "rate": 0.0, "confidence": "[HYPOTHESIS]"}})
+        r = update_markdown_table(
+            SAMPLE_MD,
+            "Reply Rates by Angle",
+            {"roi": {"sent": 99, "replies": 0, "rate": 0.0, "confidence": "[HYPOTHESIS]"}},
+        )
         # roi in "Reply Rates by Angle" gets updated
         assert "99" in r
 
     def test_missing_section_unchanged(self):
-        assert update_markdown_table(SAMPLE_MD, "Nonexistent", {"roi": {"sent": 99, "replies": 0, "rate": 0.0, "confidence": "[HYPOTHESIS]"}}) == SAMPLE_MD
+        assert (
+            update_markdown_table(
+                SAMPLE_MD,
+                "Nonexistent",
+                {"roi": {"sent": 99, "replies": 0, "rate": 0.0, "confidence": "[HYPOTHESIS]"}},
+            )
+            == SAMPLE_MD
+        )
 
     def test_dash_to_title(self):
-        r = update_markdown_table(SAMPLE_MD, "Reply Rates by Angle",
-                                  {"problem-agitate": {"sent": 2, "replies": 0, "rate": 0.0, "confidence": "[INSUFFICIENT]"}})
+        r = update_markdown_table(
+            SAMPLE_MD,
+            "Reply Rates by Angle",
+            {
+                "problem-agitate": {
+                    "sent": 2,
+                    "replies": 0,
+                    "rate": 0.0,
+                    "confidence": "[INSUFFICIENT]",
+                }
+            },
+        )
         assert "Problem Agitate" in r
 
     def test_tier_column_update_existing(self):
-        r = update_markdown_table(TIER_MD, "Reply Rates by Angle",
-                                  {"roi": {"sent": 20, "replies": 8, "rate": 40.0, "confidence": "[EMERGING]"}})
+        r = update_markdown_table(
+            TIER_MD,
+            "Reply Rates by Angle",
+            {"roi": {"sent": 20, "replies": 8, "rate": 40.0, "confidence": "[EMERGING]"}},
+        )
         assert "Auto-updated" in r and "20" in r
 
     def test_tier_column_add_new(self):
-        r = update_markdown_table(TIER_MD, "Reply Rates by Angle",
-                                  {"urgency": {"sent": 5, "replies": 2, "rate": 40.0, "confidence": "[HYPOTHESIS]"}})
+        r = update_markdown_table(
+            TIER_MD,
+            "Reply Rates by Angle",
+            {"urgency": {"sent": 5, "replies": 2, "rate": 40.0, "confidence": "[HYPOTHESIS]"}},
+        )
         assert "Auto-added" in r and "Urgency" in r
 
     def test_empty_cells_row_skipped(self):
-        md = ("## Reply Rates by Angle\n\n| Angle | Sent | Replies | Rate | Confidence |\n"
-              "|---|---|---|---|---|\n| | | | | |\n| roi | 5 | 1 | 20.0% | [HYPOTHESIS] |\n\n")
-        r = update_markdown_table(md, "Reply Rates by Angle",
-                                  {"roi": {"sent": 9, "replies": 2, "rate": 22.2, "confidence": "[HYPOTHESIS]"}})
+        md = (
+            "## Reply Rates by Angle\n\n| Angle | Sent | Replies | Rate | Confidence |\n"
+            "|---|---|---|---|---|\n| | | | | |\n| roi | 5 | 1 | 20.0% | [HYPOTHESIS] |\n\n"
+        )
+        r = update_markdown_table(
+            md,
+            "Reply Rates by Angle",
+            {"roi": {"sent": 9, "replies": 2, "rate": 22.2, "confidence": "[HYPOTHESIS]"}},
+        )
         assert "9" in r
 
     def test_non_pipe_line_ends_table_traversal(self):
-        md = ("## Reply Rates by Angle\n\n| Angle | Sent | Replies | Rate | Confidence |\n"
-              "|---|---|---|---|---|\n| roi | 5 | 1 | 20.0% | [HYPOTHESIS] |\nSome prose.\n\n")
-        assert isinstance(update_markdown_table(md, "Reply Rates by Angle",
-                                                {"roi": {"sent": 9, "replies": 2, "rate": 22.2, "confidence": "[HYPOTHESIS]"}}), str)
+        md = (
+            "## Reply Rates by Angle\n\n| Angle | Sent | Replies | Rate | Confidence |\n"
+            "|---|---|---|---|---|\n| roi | 5 | 1 | 20.0% | [HYPOTHESIS] |\nSome prose.\n\n"
+        )
+        assert isinstance(
+            update_markdown_table(
+                md,
+                "Reply Rates by Angle",
+                {"roi": {"sent": 9, "replies": 2, "rate": 22.2, "confidence": "[HYPOTHESIS]"}},
+            ),
+            str,
+        )
 
 
 # ---------------------------------------------------------------------------
 # update_patterns_file
 # ---------------------------------------------------------------------------
+
 
 class TestUpdatePatternsFile:
     def test_missing_file_returns_error(self, tmp_path):
@@ -483,8 +637,12 @@ class TestUpdatePatternsFile:
         db = make_events_db(tmp_path)
         pf = tmp_path / "patterns.md"
         pf.write_text(SAMPLE_MD, encoding="utf-8")
-        insert_event(db, 1, {"source": "claude_assisted"},
-                     ["angle:roi", "tone:confident", "persona:ceo", "framework:spin", "outcome:reply"])
+        insert_event(
+            db,
+            1,
+            {"source": "claude_assisted"},
+            ["angle:roi", "tone:confident", "persona:ceo", "framework:spin", "outcome:reply"],
+        )
         r = update_patterns_file(db, pf, dry_run=True)
         for key in ("by_angle", "by_tone", "by_persona", "by_framework", "dry_run"):
             assert key in r

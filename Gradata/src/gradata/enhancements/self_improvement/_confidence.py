@@ -1137,10 +1137,7 @@ def format_lessons(lessons: list[Lesson]) -> str:
         # Issue #129: examples + output_shape — only write when populated.
         _examples = getattr(lesson, "examples", None) or []
         if _examples:
-            payload = [
-                e.to_dict() if hasattr(e, "to_dict") else dict(e)
-                for e in _examples
-            ]
+            payload = [e.to_dict() if hasattr(e, "to_dict") else dict(e) for e in _examples]
             lines.append(f"  Examples: {json.dumps(payload, ensure_ascii=False)}")
         _output_shape = getattr(lesson, "output_shape", None)
         if _output_shape:

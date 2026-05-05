@@ -1,4 +1,5 @@
 """PostToolUse hook: capture test findings and detect when user acts on them."""
+
 from __future__ import annotations
 
 import json
@@ -15,6 +16,7 @@ HOOK_META = {
     "profile": Profile.STANDARD,
     "timeout": 5000,
 }
+
 
 def _findings_path() -> Path:
     import hashlib
@@ -93,7 +95,7 @@ def _extract_failed_files(output: str) -> list[str]:
             start = line.find('"')
             end = line.find('"', start + 1)
             if start != -1 and end != -1:
-                files.append(line[start + 1:end])
+                files.append(line[start + 1 : end])
     return files
 
 
@@ -113,11 +115,13 @@ def main(data: dict) -> dict | None:
             failed_files = _extract_failed_files(output)
             if failed_files:
                 findings = _load_findings()
-                findings.append({
-                    "files": failed_files,
-                    "preview": output[:500],
-                    "command": tool_input.get("command", "")[:200],
-                })
+                findings.append(
+                    {
+                        "files": failed_files,
+                        "preview": output[:500],
+                        "command": tool_input.get("command", "")[:200],
+                    }
+                )
                 _save_findings(findings)
             return None
 

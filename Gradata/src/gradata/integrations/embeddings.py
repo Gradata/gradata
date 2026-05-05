@@ -16,4 +16,4 @@ warnings.warn(
     stacklevel=2,
 )
 
-from gradata.services.embeddings import *  # noqa: E402,F401,F403
+from gradata.services.embeddings import *  # noqa: F403

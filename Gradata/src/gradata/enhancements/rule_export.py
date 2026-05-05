@@ -15,14 +15,13 @@ Usage (library):
 Usage (CLI):
     gradata export --target cursor --output .cursorrules
 """
+
 from __future__ import annotations
 
 from pathlib import Path
 
 
-def _parse_rules(
-    brain_root: Path, *, lessons_path: Path | None = None
-) -> list[tuple[str, str]]:
+def _parse_rules(brain_root: Path, *, lessons_path: Path | None = None) -> list[tuple[str, str]]:
     """Return [(category, description), ...] for every RULE-tier lesson.
 
     Delegates to the canonical lessons.md parser in self_improvement.py.
@@ -132,6 +131,7 @@ _GROUPED_MARKDOWN_TITLES = {
 def _make_grouped_formatter(title: str):
     def _fmt(rules: list[tuple[str, str]]) -> str:
         return _format_grouped_markdown(title, rules)
+
     return _fmt
 
 
@@ -154,9 +154,7 @@ DEFAULT_PATHS: dict[str, str] = {
 }
 
 
-def export_rules(
-    brain_root: Path, *, target: str, lessons_path: Path | None = None
-) -> str:
+def export_rules(brain_root: Path, *, target: str, lessons_path: Path | None = None) -> str:
     """Return a formatted string of graduated rules for the given target.
 
     ``lessons_path`` overrides the default ``brain_root / "lessons.md"`` lookup,

@@ -93,13 +93,7 @@ def test_identical_sources_are_as_is():
 
 def test_local_rename_is_minor():
     """Renaming one local in a small function is a minor correction."""
-    before = (
-        "def total(items):\n"
-        "    s = 0\n"
-        "    for i in items:\n"
-        "        s = s + i\n"
-        "    return s\n"
-    )
+    before = "def total(items):\n    s = 0\n    for i in items:\n        s = s + i\n    return s\n"
     after = (
         "def total(items):\n"
         "    acc = 0\n"
@@ -126,13 +120,7 @@ def test_signature_change_is_major_or_moderate():
 
 
 def test_full_body_rewrite_is_major_or_rewrite():
-    before = (
-        "def compute(xs):\n"
-        "    s = 0\n"
-        "    for x in xs:\n"
-        "        s += x\n"
-        "    return s\n"
-    )
+    before = "def compute(xs):\n    s = 0\n    for x in xs:\n        s += x\n    return s\n"
     after = (
         "def compute(xs):\n"
         "    if not xs:\n"
@@ -193,7 +181,7 @@ def test_watcher_shunt_engages_on_python_when_flag_set(tmp_path, monkeypatch):
 @pytest.mark.parametrize(
     "filename,flag_on",
     [
-        ("mod.py", False),   # flag off => edit-distance path (not forced as-is)
+        ("mod.py", False),  # flag off => edit-distance path (not forced as-is)
         ("notes.md", True),  # flag on but non-python => shunt skipped
     ],
 )
@@ -208,7 +196,9 @@ def test_watcher_shunt_skipped(tmp_path, monkeypatch, filename, flag_on):
 
     target = tmp_path / filename
     before = "def f(x):return x+1\n" if filename.endswith(".py") else "hello world\n"
-    after = "def f(x):\n    return x + 1\n" if filename.endswith(".py") else "hello brave new world\n"
+    after = (
+        "def f(x):\n    return x + 1\n" if filename.endswith(".py") else "hello brave new world\n"
+    )
 
     watcher = FileWatcher(tmp_path)
     watcher.track(str(target), before)

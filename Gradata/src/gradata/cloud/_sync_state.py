@@ -45,16 +45,20 @@ def _ensure_schema(conn: sqlite3.Connection, db_path: Path) -> None:
         )
         """
     )
+    existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(sync_state)").fetchall()}
     for col, decl in (
         ("tenant_id", "TEXT"),
         ("device_id", "TEXT"),
         ("last_push_event_id", "TEXT"),
         ("last_pull_cursor", "TEXT"),
     ):
+        if col in existing_cols:
+            continue
         try:
             conn.execute(f"ALTER TABLE sync_state ADD COLUMN {col} {decl}")
         except sqlite3.OperationalError:
-            pass  # column already present
+            _log.warning("sync_state schema migration failed for column %s", col, exc_info=True)
+            raise
 
     # ON CONFLICT(tenant_id, device_id) requires a UNIQUE constraint on the
     # composite key. If a non-UNIQUE index exists from an older run, upgrade

@@ -12,6 +12,7 @@ Tests cover:
 - compute_correction_profile from a real SQLite database
 - format_correction_profile includes required sections
 """
+
 import json
 import math
 import sqlite3
@@ -20,18 +21,18 @@ from pathlib import Path
 import pytest
 
 from gradata.enhancements.scoring.correction_tracking import (
-    compute_half_life,
-    compute_mtbf_mttr,
+    CorrectionProfile,
     _split_half_trend,
     compute_correction_profile,
+    compute_half_life,
+    compute_mtbf_mttr,
     format_correction_profile,
-    CorrectionProfile,
 )
-
 
 # ---------------------------------------------------------------------------
 # DB helpers
 # ---------------------------------------------------------------------------
+
 
 def make_events_db(tmp_path: Path) -> Path:
     db = tmp_path / "system.db"
@@ -68,10 +69,12 @@ def insert(db: Path, rows: list[tuple]) -> None:
 # compute_half_life
 # ---------------------------------------------------------------------------
 
+
 class TestComputeHalfLife:
     def test_exponentially_decaying_series_returns_finite_half_life(self):
         # d(t) = 1.0 * exp(-0.1*t) — lambda=0.1, half_life = ln2/0.1 ≈ 6.93
         import math
+
         series = [math.exp(-0.1 * t) for t in range(10)]
         hl = compute_half_life(series)
         assert math.isfinite(hl)
@@ -103,6 +106,7 @@ class TestComputeHalfLife:
 # compute_mtbf_mttr
 # ---------------------------------------------------------------------------
 
+
 class TestComputeMtbfMttr:
     def test_no_corrections_returns_total_sessions_and_one(self):
         mtbf, mttr = compute_mtbf_mttr([], total_sessions=10)
@@ -115,12 +119,12 @@ class TestComputeMtbfMttr:
         assert mttr == 1.0
 
     def test_two_sessions_gap_3_gives_mtbf_3(self):
-        mtbf, mttr = compute_mtbf_mttr([2, 5], total_sessions=10)
+        mtbf, _mttr = compute_mtbf_mttr([2, 5], total_sessions=10)
         assert mtbf == pytest.approx(3.0)
 
     def test_multiple_gaps_averages_correctly(self):
         # Sessions 1, 4, 7 → gaps of 3, 3 → avg mtbf = 3.0
-        mtbf, mttr = compute_mtbf_mttr([1, 4, 7], total_sessions=10)
+        mtbf, _mttr = compute_mtbf_mttr([1, 4, 7], total_sessions=10)
         assert mtbf == pytest.approx(3.0)
 
     def test_consecutive_streak_gives_mttr_gt_1(self):
@@ -140,7 +144,7 @@ class TestComputeMtbfMttr:
         assert mtbf == pytest.approx(3.0)
 
     def test_zero_total_sessions_returns_zero_mtbf(self):
-        mtbf, mttr = compute_mtbf_mttr([], total_sessions=0)
+        mtbf, _mttr = compute_mtbf_mttr([], total_sessions=0)
         # No sessions, no corrections
         assert mtbf == 0.0
 
@@ -148,6 +152,7 @@ class TestComputeMtbfMttr:
 # ---------------------------------------------------------------------------
 # _split_half_trend
 # ---------------------------------------------------------------------------
+
 
 class TestSplitHalfTrend:
     def test_fewer_than_4_values_is_stable(self):
@@ -168,7 +173,7 @@ class TestSplitHalfTrend:
 
     def test_within_5pct_is_stable(self):
         # 0.5 → 0.52 is ~4% change, below 5% threshold
-        trend, pct = _split_half_trend([0.50, 0.50, 0.52, 0.52])
+        trend, _pct = _split_half_trend([0.50, 0.50, 0.52, 0.52])
         assert trend == "stable"
 
     def test_zero_baseline_with_positive_recent_returns_100pct(self):
@@ -186,6 +191,7 @@ class TestSplitHalfTrend:
 # compute_correction_profile — database integration
 # ---------------------------------------------------------------------------
 
+
 class TestComputeCorrectionProfile:
     def test_empty_db_returns_zero_profile(self, tmp_path):
         db = make_events_db(tmp_path)
@@ -197,11 +203,16 @@ class TestComputeCorrectionProfile:
 
     def test_corrections_and_outputs_counted_correctly(self, tmp_path):
         db = make_events_db(tmp_path)
-        insert(db, [
-            (1, "CORRECTION"), (1, "CORRECTION"),
-            (1, "OUTPUT"),
-            (2, "OUTPUT"), (2, "OUTPUT"),
-        ])
+        insert(
+            db,
+            [
+                (1, "CORRECTION"),
+                (1, "CORRECTION"),
+                (1, "OUTPUT"),
+                (2, "OUTPUT"),
+                (2, "OUTPUT"),
+            ],
+        )
         profile = compute_correction_profile(db, window=20)
         assert profile.total_corrections == 2
         assert profile.total_outputs == 3
@@ -209,11 +220,14 @@ class TestComputeCorrectionProfile:
 
     def test_category_breakdown_uses_data_json(self, tmp_path):
         db = make_events_db(tmp_path)
-        insert(db, [
-            (1, "CORRECTION", json.dumps({"category": "DRAFTING"})),
-            (1, "CORRECTION", json.dumps({"category": "ACCURACY"})),
-            (1, "CORRECTION", json.dumps({"category": "DRAFTING"})),
-        ])
+        insert(
+            db,
+            [
+                (1, "CORRECTION", json.dumps({"category": "DRAFTING"})),
+                (1, "CORRECTION", json.dumps({"category": "ACCURACY"})),
+                (1, "CORRECTION", json.dumps({"category": "DRAFTING"})),
+            ],
+        )
         profile = compute_correction_profile(db, window=20)
         assert profile.category_breakdown["DRAFTING"] == 2
         assert profile.category_breakdown["ACCURACY"] == 1
@@ -256,10 +270,14 @@ class TestComputeCorrectionProfile:
         db = make_events_db(tmp_path)
         # Session 1: 1 correction, 1 output (density=1.0)
         # Session 2: 0 corrections, 1 output (density=0.0)
-        insert(db, [
-            (1, "CORRECTION"), (1, "OUTPUT"),
-            (2, "OUTPUT"),
-        ])
+        insert(
+            db,
+            [
+                (1, "CORRECTION"),
+                (1, "OUTPUT"),
+                (2, "OUTPUT"),
+            ],
+        )
         profile = compute_correction_profile(db, window=20)
         assert profile.density_per_session[0] == pytest.approx(1.0)
         assert profile.density_per_session[1] == pytest.approx(0.0)
@@ -268,6 +286,7 @@ class TestComputeCorrectionProfile:
 # ---------------------------------------------------------------------------
 # format_correction_profile
 # ---------------------------------------------------------------------------
+
 
 class TestFormatCorrectionProfile:
     def make_profile(self, **kwargs) -> CorrectionProfile:

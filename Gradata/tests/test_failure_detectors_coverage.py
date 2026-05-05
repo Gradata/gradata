@@ -3,7 +3,9 @@ Behavior-focused tests for gradata.enhancements.scoring.failure_detectors.
 
 Coverage target: >=85% of the 67 statements in failure_detectors.py.
 """
+
 import pytest
+
 from gradata.enhancements.metrics import MetricsWindow
 from gradata.enhancements.scoring.failure_detectors import (
     Alert,
@@ -15,10 +17,10 @@ from gradata.enhancements.scoring.failure_detectors import (
     format_alerts,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_window(
     sample_size: int = 10,
@@ -41,6 +43,7 @@ def make_window(
 # ---------------------------------------------------------------------------
 # Alert dataclass
 # ---------------------------------------------------------------------------
+
 
 class TestAlert:
     def test_required_fields(self):
@@ -65,6 +68,7 @@ class TestAlert:
 # ---------------------------------------------------------------------------
 # detect_being_ignored
 # ---------------------------------------------------------------------------
+
 
 class TestDetectBeingIgnored:
     def test_no_previous_returns_empty(self):
@@ -130,6 +134,7 @@ class TestDetectBeingIgnored:
 # detect_playing_safe
 # ---------------------------------------------------------------------------
 
+
 class TestDetectPlayingSafe:
     def test_no_previous_returns_empty(self):
         curr = make_window(rewrite_rate=0.2, blandness_score=0.6)
@@ -193,6 +198,7 @@ class TestDetectPlayingSafe:
 # ---------------------------------------------------------------------------
 # detect_overfitting
 # ---------------------------------------------------------------------------
+
 
 class TestDetectOverfitting:
     def test_no_previous_returns_empty(self):
@@ -266,6 +272,7 @@ class TestDetectOverfitting:
 # detect_regression_to_mean
 # ---------------------------------------------------------------------------
 
+
 class TestDetectRegressionToMean:
     def test_below_warn_threshold_no_alert(self):
         curr = make_window(blandness_score=0.60)
@@ -337,6 +344,7 @@ class TestDetectRegressionToMean:
 # detect_failures (aggregator)
 # ---------------------------------------------------------------------------
 
+
 class TestDetectFailures:
     def test_no_previous_only_regression_can_fire(self):
         # Without previous, only detect_regression_to_mean can produce alerts
@@ -350,24 +358,23 @@ class TestDetectFailures:
 
     def test_clean_windows_produce_no_alerts(self):
         prev = make_window(
-            rewrite_rate=0.30, blandness_score=0.40,
-            edit_distance_avg=8.0, rule_misfire_rate=0.05
+            rewrite_rate=0.30, blandness_score=0.40, edit_distance_avg=8.0, rule_misfire_rate=0.05
         )
         curr = make_window(
-            rewrite_rate=0.28, blandness_score=0.41,
-            edit_distance_avg=7.9, rule_misfire_rate=0.05
+            rewrite_rate=0.28, blandness_score=0.41, edit_distance_avg=7.9, rule_misfire_rate=0.05
         )
         assert detect_failures(curr, prev) == []
 
     def test_multiple_detectors_can_fire_simultaneously(self):
         # Construct a window that triggers both overfitting and regression_to_mean
         prev = make_window(
-            rewrite_rate=0.50, blandness_score=0.40,
-            edit_distance_avg=10.0, rule_misfire_rate=0.05
+            rewrite_rate=0.50, blandness_score=0.40, edit_distance_avg=10.0, rule_misfire_rate=0.05
         )
         curr = make_window(
-            rewrite_rate=0.50, blandness_score=0.90,  # regression_to_mean fires
-            edit_distance_avg=10.0, rule_misfire_rate=0.30  # overfitting fires
+            rewrite_rate=0.50,
+            blandness_score=0.90,  # regression_to_mean fires
+            edit_distance_avg=10.0,
+            rule_misfire_rate=0.30,  # overfitting fires
         )
         alerts = detect_failures(curr, prev)
         detectors = {a.detector for a in alerts}
@@ -394,12 +401,10 @@ class TestDetectFailures:
         # Not all four can fire simultaneously without contradictions, but
         # we verify detect_failures calls all four by checking aggregation.
         prev = make_window(
-            rewrite_rate=0.60, blandness_score=0.20,
-            edit_distance_avg=10.0, rule_misfire_rate=0.05
+            rewrite_rate=0.60, blandness_score=0.20, edit_distance_avg=10.0, rule_misfire_rate=0.05
         )
         curr = make_window(
-            rewrite_rate=0.40, blandness_score=0.90,
-            edit_distance_avg=9.9, rule_misfire_rate=0.30
+            rewrite_rate=0.40, blandness_score=0.90, edit_distance_avg=9.9, rule_misfire_rate=0.30
         )
         alerts = detect_failures(curr, prev)
         detectors = {a.detector for a in alerts}
@@ -412,6 +417,7 @@ class TestDetectFailures:
 # ---------------------------------------------------------------------------
 # format_alerts
 # ---------------------------------------------------------------------------
+
 
 class TestFormatAlerts:
     def test_empty_list_returns_no_alerts(self):

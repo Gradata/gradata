@@ -8,6 +8,7 @@ No I/O, no external state.
 from __future__ import annotations
 
 import hashlib
+import logging
 import random
 import secrets
 from collections import defaultdict
@@ -15,6 +16,8 @@ from collections import defaultdict
 from gradata._types import Lesson, LessonState, RuleTransferScope
 
 from ._models import AppliedRule
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Deduplication and Merging
@@ -419,7 +422,7 @@ def format_rule_constitutional(category: str, description: str) -> str:
     desc = description.strip()
     for prefix in _IMPERATIVE_PREFIXES:
         if desc.startswith(prefix):
-            desc = desc[len(prefix):]
+            desc = desc[len(prefix) :]
             break
 
     return f"<principle>You value {value} — {desc.lower()}</principle>"
@@ -505,7 +508,7 @@ def capture_example_from_correction(
                 existing.append(_Example(good=good_text, bad=bad_text))
                 # Cap to keep injection budget bounded.
                 lesson.examples = existing[-3:]
-    except Exception:  # noqa: BLE001 — never fail correction capture on Example back-compat
-        pass
+    except Exception:
+        logger.exception("failed to attach structured correction example")
 
     return lesson

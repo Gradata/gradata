@@ -1,7 +1,6 @@
 """Tests for brain.share() and brain.absorb() — team rule sharing."""
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 from tests.conftest import init_brain
 

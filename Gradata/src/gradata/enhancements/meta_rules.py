@@ -89,6 +89,19 @@ class MetaRule:
 INJECTABLE_META_SOURCES = frozenset({"llm_synth", "human_curated"})
 
 
+def is_injectable_meta_rule(meta: MetaRule) -> bool:
+    """Return whether *meta* can be injected, logging filtered sources."""
+    source = getattr(meta, "source", "deterministic")
+    if source in INJECTABLE_META_SOURCES:
+        return True
+    _log.warning(
+        "dropping meta-rule %s (source=%s) from injection",
+        getattr(meta, "id", "<unknown>"),
+        source,
+    )
+    return False
+
+
 @dataclass
 class SuperMetaRule:
     """Higher-order principle from 3+ meta-rules (Rosch tier 2/3)."""
@@ -666,7 +679,9 @@ def refresh_meta_rules(
     Returns:
         Validated subset of *existing_metas*.
     """
-    _log.info("Meta-rule discovery not implemented in open-source build; validating existing meta-rules only")
+    _log.info(
+        "Meta-rule discovery not implemented in open-source build; validating existing meta-rules only"
+    )
     corrections = recent_corrections or []
 
     # Validate existing meta-rules (invalidation still works locally).
@@ -782,6 +797,7 @@ def _get_meta_provider():
     """
     try:
         from gradata.enhancements.llm_provider import get_provider
+
         return get_provider()
     except Exception as exc:  # pragma: no cover — defensive
         _log.debug("Unified provider lookup failed: %s", exc)

@@ -47,9 +47,7 @@ def test_top_k_equivalent_when_no_lessons_have_path():
     )
     # Relevance scores must also match in the legacy path — proves we are
     # not silently re-rating in the fallback branch.
-    assert [round(r.relevance, 4) for r in flat] == [
-        round(r.relevance, 4) for r in tree
-    ]
+    assert [round(r.relevance, 4) for r in flat] == [round(r.relevance, 4) for r in tree]
 
 
 def test_relevance_not_flat_rated_when_paths_present():
@@ -72,6 +70,4 @@ def test_relevance_not_flat_rated_when_paths_present():
 
     rels = [a.relevance for a in applied]
     assert applied, "expected ranked rules"
-    assert {round(r, 4) for r in rels} != {1.0}, (
-        f"relevance regressed to flat 1.0: {rels}"
-    )
+    assert {round(r, 4) for r in rels} != {1.0}, f"relevance regressed to flat 1.0: {rels}"

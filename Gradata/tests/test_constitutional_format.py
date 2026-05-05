@@ -5,15 +5,12 @@ Covers format_rule_constitutional() and format_rules_styled() from rule_engine.
 
 from __future__ import annotations
 
-import pytest
-
-from gradata._types import CorrectionType, Lesson, LessonState
+from gradata._types import Lesson, LessonState
 from gradata.rules.rule_engine import (
     AppliedRule,
     format_rule_constitutional,
     format_rules_styled,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

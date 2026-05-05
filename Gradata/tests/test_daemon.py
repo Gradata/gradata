@@ -7,8 +7,6 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-import pytest
-
 from gradata.daemon import GradataDaemon
 
 if TYPE_CHECKING:
@@ -71,7 +69,7 @@ def test_telemetry_sent_when_opted_in(tmp_path: Path, brain_dir: Path) -> None:
     config_dir = fake_home / ".gradata"
     config_dir.mkdir(parents=True)
     config_path = config_dir / "config.toml"
-    config_path.write_text('telemetry = true\n', encoding="utf-8")
+    config_path.write_text("telemetry = true\n", encoding="utf-8")
 
     d = GradataDaemon(brain_dir, port=0)
 

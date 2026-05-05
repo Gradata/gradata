@@ -9,12 +9,10 @@ from __future__ import annotations
 import io
 import json
 import urllib.error
-from unittest.mock import patch
 
 import pytest
 
 from gradata.enhancements import llm_provider as lp
-
 
 # ---------------------------------------------------------------------------
 # CLIProvider
@@ -30,8 +28,9 @@ class _FakeProc:
 
 def test_cli_provider_claude_happy(monkeypatch):
     """When `claude` CLI is on PATH and returns 0, .complete() returns its stdout."""
-    monkeypatch.setattr(lp.shutil, "which",
-                        lambda name: "/usr/local/bin/claude" if name == "claude" else None)
+    monkeypatch.setattr(
+        lp.shutil, "which", lambda name: "/usr/local/bin/claude" if name == "claude" else None
+    )
     captured: dict = {}
 
     def fake_run(argv, **kwargs):
@@ -58,8 +57,9 @@ def test_cli_provider_binary_missing(monkeypatch):
 
 def test_cli_provider_circuit_breaker(monkeypatch):
     """3 consecutive failures opens the circuit; the 4th call must skip subprocess."""
-    monkeypatch.setattr(lp.shutil, "which",
-                        lambda name: "/usr/local/bin/claude" if name == "claude" else None)
+    monkeypatch.setattr(
+        lp.shutil, "which", lambda name: "/usr/local/bin/claude" if name == "claude" else None
+    )
     call_count = {"n": 0}
 
     def fake_run(argv, **kwargs):
@@ -79,8 +79,9 @@ def test_cli_provider_circuit_breaker(monkeypatch):
 
 def test_cli_provider_codex_argv(monkeypatch):
     """Codex argv shape is the documented `codex exec ... -m <model> <prompt>`."""
-    monkeypatch.setattr(lp.shutil, "which",
-                        lambda name: "/usr/local/bin/codex" if name == "codex" else None)
+    monkeypatch.setattr(
+        lp.shutil, "which", lambda name: "/usr/local/bin/codex" if name == "codex" else None
+    )
     captured: dict = {}
 
     def fake_run(argv, **kwargs):
@@ -139,6 +140,7 @@ def test_cloud_provider_happy(monkeypatch):
 
 def test_cloud_provider_402(monkeypatch):
     """402 Payment Required → graceful None (quota exhausted)."""
+
     def fake_urlopen(req, timeout=None):
         raise urllib.error.HTTPError(req.full_url, 402, "Payment Required", {}, io.BytesIO(b""))
 
@@ -151,9 +153,11 @@ def test_cloud_provider_no_key(monkeypatch):
     """Missing GRADATA_API_KEY → returns None without making a request."""
     monkeypatch.delenv("GRADATA_API_KEY", raising=False)
     called = {"n": 0}
+
     def fake_urlopen(*a, **kw):
         called["n"] += 1
         raise AssertionError("must not be called")
+
     monkeypatch.setattr(lp.urllib.request, "urlopen", fake_urlopen)
     provider = lp.GradataCloudProvider(api_key="", endpoint="https://api.gradata.cloud")
     assert provider.complete("x") is None
@@ -168,13 +172,18 @@ def test_cloud_provider_no_key(monkeypatch):
 def test_factory_auto_resolution(monkeypatch):
     """auto picks cli when claude present; anthropic when only ANTHROPIC_API_KEY set;
     cloud when only GRADATA_API_KEY set; None when nothing configured."""
-    for var in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GRADATA_LLM_KEY",
-                "GRADATA_API_KEY", "GRADATA_GEMMA_API_KEY", "GRADATA_LLM_PROVIDER"):
+    for var in (
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "GRADATA_LLM_KEY",
+        "GRADATA_API_KEY",
+        "GRADATA_GEMMA_API_KEY",
+        "GRADATA_LLM_PROVIDER",
+    ):
         monkeypatch.delenv(var, raising=False)
 
     # Case 1: claude on PATH → CLIProvider
-    monkeypatch.setattr(lp.shutil, "which",
-                        lambda name: "/u/claude" if name == "claude" else None)
+    monkeypatch.setattr(lp.shutil, "which", lambda name: "/u/claude" if name == "claude" else None)
     p = lp.get_provider("auto")
     assert isinstance(p, lp.CLIProvider)
 

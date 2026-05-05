@@ -1,4 +1,5 @@
 """Tests for the notification system (notifications.py + brain.on_notification)."""
+
 from __future__ import annotations
 
 from gradata.brain import Brain
@@ -13,7 +14,6 @@ from gradata.notifications import (
     collect_handler,
     subscribe,
 )
-
 
 # ── Formatter unit tests ──────────────────────────────────────────────
 
@@ -34,10 +34,15 @@ def test_fmt_correction_empty_payload():
 
 
 def test_fmt_graduation():
-    n = _fmt_graduation({
-        "category": "DRAFTING", "old_state": "INSTINCT", "new_state": "PATTERN",
-        "description": "use colons", "confidence": 0.72,
-    })
+    n = _fmt_graduation(
+        {
+            "category": "DRAFTING",
+            "old_state": "INSTINCT",
+            "new_state": "PATTERN",
+            "description": "use colons",
+            "confidence": 0.72,
+        }
+    )
     assert n.event == "lesson.graduated"
     assert n.level == "success"
     assert "DRAFTING" in n.message
@@ -59,9 +64,13 @@ def test_fmt_session_ended():
 
 
 def test_fmt_rule_scoped_out():
-    n = _fmt_rule_scoped_out({
-        "lesson_category": "CODE", "domain": "EMAIL", "misfire_rate": 0.8,
-    })
+    n = _fmt_rule_scoped_out(
+        {
+            "lesson_category": "CODE",
+            "domain": "EMAIL",
+            "misfire_rate": 0.8,
+        }
+    )
     assert n.level == "warning"
     assert "CODE" in n.message
     assert "EMAIL" in n.message
@@ -76,9 +85,15 @@ def test_subscribe_routes_events():
     subscribe(bus, collect_handler(collected))
 
     bus.emit("correction.created", {"category": "TONE", "description": "fix"})
-    bus.emit("lesson.graduated", {
-        "category": "X", "old_state": "I", "new_state": "P", "confidence": 0.7,
-    })
+    bus.emit(
+        "lesson.graduated",
+        {
+            "category": "X",
+            "old_state": "I",
+            "new_state": "P",
+            "confidence": 0.7,
+        },
+    )
 
     assert len(collected) == 2
     assert collected[0].event == "correction.created"
@@ -123,10 +138,16 @@ def test_brain_on_notification_default_cli(tmp_path, capsys):
     brain = Brain(str(tmp_path))
     brain.on_notification()
 
-    brain.bus.emit("lesson.graduated", {
-        "category": "CODE", "old_state": "INSTINCT", "new_state": "PATTERN",
-        "description": "test graduation", "confidence": 0.75,
-    })
+    brain.bus.emit(
+        "lesson.graduated",
+        {
+            "category": "CODE",
+            "old_state": "INSTINCT",
+            "new_state": "PATTERN",
+            "description": "test graduation",
+            "confidence": 0.75,
+        },
+    )
 
     captured = capsys.readouterr()
     assert "CODE" in captured.err

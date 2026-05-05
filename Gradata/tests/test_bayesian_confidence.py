@@ -1,7 +1,7 @@
 """Tests for Bayesian confidence integration in self_improvement."""
 
 from gradata._types import Lesson, LessonState
-from gradata.enhancements.self_improvement import update_confidence, format_lessons, parse_lessons
+from gradata.enhancements.self_improvement import format_lessons, parse_lessons, update_confidence
 
 
 class TestBayesianConfidence:

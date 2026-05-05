@@ -41,7 +41,9 @@ def _stub_langchain(monkeypatch):
 
         # Force a fresh import of the adapter so it picks up the stub.
         monkeypatch.delitem(
-            sys.modules, "gradata.middleware.langchain_adapter", raising=False,
+            sys.modules,
+            "gradata.middleware.langchain_adapter",
+            raising=False,
         )
     yield
 
@@ -128,8 +130,7 @@ def test_on_chat_model_start_preserves_multimodal_list_system(
     assert isinstance(sys_msg.content, list)
     assert sys_msg.content[0] == {"type": "text", "text": "You are kind."}
     assert any(
-        isinstance(b, dict) and "<brain-rules>" in str(b.get("text", ""))
-        for b in sys_msg.content
+        isinstance(b, dict) and "<brain-rules>" in str(b.get("text", "")) for b in sys_msg.content
     )
 
 
@@ -174,7 +175,9 @@ def test_langchain_import_error_has_install_hint(monkeypatch):
     monkeypatch.delitem(sys.modules, "langchain_core.callbacks", raising=False)
     monkeypatch.delitem(sys.modules, "langchain_core.messages", raising=False)
     monkeypatch.delitem(
-        sys.modules, "gradata.middleware.langchain_adapter", raising=False,
+        sys.modules,
+        "gradata.middleware.langchain_adapter",
+        raising=False,
     )
 
     import builtins

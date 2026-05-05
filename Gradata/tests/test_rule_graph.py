@@ -1,4 +1,5 @@
 """Tests for rule graph — conflict and co-occurrence edges."""
+
 from pathlib import Path
 
 from gradata.rules.rule_graph import RuleGraph

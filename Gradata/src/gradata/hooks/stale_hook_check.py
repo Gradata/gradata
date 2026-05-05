@@ -8,6 +8,7 @@ old pattern. This check catches that drift at session start.
 
 Never blocks: prints a warning, exits 0.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -81,7 +82,7 @@ def _parse_lessons(brain_root: Path) -> tuple[dict[str, str], list[str]]:
         desc = m.group("desc").strip()
         # Detect if this row had the legacy token position.
         if re.search(r"\[RULE:[\d.]+\]\s+\[hooked\]\s+", line):
-            clean = desc[len("[hooked] "):] if desc.startswith("[hooked] ") else desc
+            clean = desc[len("[hooked] ") :] if desc.startswith("[hooked] ") else desc
             legacy_hooked_descs.add(clean)
 
     try:
@@ -101,7 +102,7 @@ def _parse_lessons(brain_root: Path) -> tuple[dict[str, str], list[str]]:
                 continue
             desc = (getattr(lesson, "description", "") or "").strip()
             modern_hooked = desc.startswith("[hooked] ")
-            clean = desc[len("[hooked] "):] if modern_hooked else desc
+            clean = desc[len("[hooked] ") :] if modern_hooked else desc
             by_slug[_slug(clean)] = clean
             if modern_hooked or clean in legacy_hooked_descs:
                 hooked.append(clean)
@@ -117,7 +118,7 @@ def _parse_lessons(brain_root: Path) -> tuple[dict[str, str], list[str]]:
         is_hooked = desc.startswith("[hooked] ") or re.search(
             r"\[RULE:[\d.]+\]\s+\[hooked\]\s+", line
         )
-        clean = desc[len("[hooked] "):] if desc.startswith("[hooked] ") else desc
+        clean = desc[len("[hooked] ") :] if desc.startswith("[hooked] ") else desc
         by_slug[_slug(clean)] = clean
         if is_hooked:
             hooked.append(clean)
@@ -160,7 +161,9 @@ def main() -> int:
     # are candidates for fuzzy pairing (rule text edited, slug drifted).
     orphan_hooked_texts = [t for t in hooked_texts if _slug(t) not in all_hook_slugs]
 
-    stale: list[tuple[str, Path, str, str, str]] = []  # (slug, path, hook_hash, current_hash, fix_text)
+    stale: list[
+        tuple[str, Path, str, str, str]
+    ] = []  # (slug, path, hook_hash, current_hash, fix_text)
     orphan_idx = 0
     for d in _hook_dirs():
         if not d.exists():

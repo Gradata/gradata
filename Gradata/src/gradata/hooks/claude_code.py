@@ -15,8 +15,9 @@ import json
 import sys
 
 
-def install_hook(profile: str = "standard", project_dir=None,
-                 include_watchdog: bool = False) -> None:
+def install_hook(
+    profile: str = "standard", project_dir=None, include_watchdog: bool = False
+) -> None:
     """Add Gradata hooks to Claude Code settings."""
     from gradata.hooks._installer import install
 

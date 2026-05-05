@@ -1,11 +1,11 @@
 """Integration test: daemon receives correction, extracts instruction, rules inject on next call."""
+
 import json
 import threading
 import time
 import urllib.request
 
 import pytest
-from pathlib import Path
 
 from tests.conftest import init_brain
 
@@ -17,10 +17,11 @@ def running_daemon(tmp_path):
     brain_dir = brain.dir
 
     from gradata.daemon import GradataDaemon
+
     d = GradataDaemon(str(brain_dir), port=0)
 
     # Event to signal the server is ready
-    ready = threading.Event()
+    threading.Event()
     original_start = d.start
 
     def _start_and_signal():
@@ -71,7 +72,7 @@ def _get(url, endpoint):
 
 
 def test_health_endpoint(running_daemon):
-    url, brain_dir = running_daemon
+    url, _brain_dir = running_daemon
     r = _get(url, "/health")
     assert r["status"] == "ok"
     assert "sdk_version" in r
@@ -87,12 +88,16 @@ def test_full_learning_loop(running_daemon):
     assert len(r1["rules"]) == 0
 
     # 2. Send a correction
-    r2 = _post(url, "/correct", {
-        "old_string": "def foo(x):\n    return x",
-        "new_string": "def foo(x: int) -> int:\n    return x",
-        "file_path": "/project/main.py",
-        "session_id": "s1",
-    })
+    r2 = _post(
+        url,
+        "/correct",
+        {
+            "old_string": "def foo(x):\n    return x",
+            "new_string": "def foo(x: int) -> int:\n    return x",
+            "file_path": "/project/main.py",
+            "session_id": "s1",
+        },
+    )
     assert r2["captured"] is True
 
     # 3. End session (graduation sweep)
@@ -105,13 +110,17 @@ def test_full_learning_loop(running_daemon):
 
 
 def test_implicit_feedback_detection(running_daemon):
-    url, brain_dir = running_daemon
+    url, _brain_dir = running_daemon
 
-    result = _post(url, "/detect", {
-        "user_message": "that's wrong, stop doing that",
-        "session_id": "s2",
-        "recent_fired_rules": [],
-    })
+    result = _post(
+        url,
+        "/detect",
+        {
+            "user_message": "that's wrong, stop doing that",
+            "session_id": "s2",
+            "recent_fired_rules": [],
+        },
+    )
     assert result["implicit_feedback"]["detected"] is True
     assert len(result["implicit_feedback"]["signals"]) > 0
 
@@ -119,12 +128,16 @@ def test_implicit_feedback_detection(running_daemon):
 def test_no_op_correction_rejected(running_daemon):
     """Identical old/new strings should not be captured."""
     url, _ = running_daemon
-    r = _post(url, "/correct", {
-        "old_string": "same text",
-        "new_string": "same text",
-        "file_path": "/project/main.py",
-        "session_id": "s3",
-    })
+    r = _post(
+        url,
+        "/correct",
+        {
+            "old_string": "same text",
+            "new_string": "same text",
+            "file_path": "/project/main.py",
+            "session_id": "s3",
+        },
+    )
     assert r["captured"] is False
 
 

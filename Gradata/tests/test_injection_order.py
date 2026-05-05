@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import re
 
-import pytest
-
-from gradata._scope import RuleScope
 from gradata._types import Lesson, LessonState
-from gradata.rules.rule_engine import AppliedRule, format_rules_for_prompt, _make_rule_id
+from gradata.rules.rule_engine import AppliedRule, _make_rule_id, format_rules_for_prompt
 from gradata.security.score_obfuscation import truncate_score
 
 
@@ -80,14 +77,13 @@ class TestWithinTierShuffle:
     """Within-tier order should vary across different seeds."""
 
     def test_different_seeds_different_order(self) -> None:
-        rules = [
-            _make_applied(f"R{i}", LessonState.RULE, 0.90 + i * 0.01)
-            for i in range(5)
-        ]
+        rules = [_make_applied(f"R{i}", LessonState.RULE, 0.90 + i * 0.01) for i in range(5)]
         orders: set[tuple[str, ...]] = set()
         for seed in range(20):
             prompt = format_rules_for_prompt(
-                list(rules), merge=False, shuffle_seed=seed,
+                list(rules),
+                merge=False,
+                shuffle_seed=seed,
             )
             # Extract rule categories in order from the prompt
             cats = re.findall(r"\[RULE\] (R\d):", prompt)
@@ -96,10 +92,7 @@ class TestWithinTierShuffle:
         assert len(orders) > 1, "Expected different orderings across seeds"
 
     def test_same_seed_same_order(self) -> None:
-        rules = [
-            _make_applied(f"R{i}", LessonState.RULE, 0.90 + i * 0.01)
-            for i in range(5)
-        ]
+        rules = [_make_applied(f"R{i}", LessonState.RULE, 0.90 + i * 0.01) for i in range(5)]
         prompt1 = format_rules_for_prompt(list(rules), merge=False, shuffle_seed=99)
         prompt2 = format_rules_for_prompt(list(rules), merge=False, shuffle_seed=99)
         assert prompt1 == prompt2

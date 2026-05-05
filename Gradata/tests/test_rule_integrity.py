@@ -10,14 +10,10 @@ Tests cover:
 - sign_lesson_file / verify_lesson_file roundtrip
 - Confidence clamping before signing
 """
-import os
-import tempfile
-from pathlib import Path
-from unittest.mock import patch
 
 import pytest
-import gradata.enhancements.rule_integrity as ri
 
+import gradata.enhancements.rule_integrity as ri
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -48,6 +44,7 @@ def with_key(monkeypatch):
 # generate_key
 # ---------------------------------------------------------------------------
 
+
 class TestGenerateKey:
     def test_returns_64_char_hex_string(self):
         key = ri.generate_key()
@@ -64,6 +61,7 @@ class TestGenerateKey:
 # Unsigned mode (no key configured)
 # ---------------------------------------------------------------------------
 
+
 class TestUnsignedMode:
     def test_sign_rule_returns_empty_string_when_no_key(self):
         sig = ri.sign_rule("some rule text", "DRAFTING", 0.75)
@@ -78,6 +76,7 @@ class TestUnsignedMode:
 # ---------------------------------------------------------------------------
 # Signed mode — sign + verify roundtrip
 # ---------------------------------------------------------------------------
+
 
 class TestSignedMode:
     def test_sign_and_verify_roundtrip(self, with_key):
@@ -121,8 +120,8 @@ class TestSignedMode:
     def test_confidence_clamped_below_zero_before_signing(self, with_key):
         """Confidence < 0 should be clamped to 0.0 for signing — verify should still match."""
         rule = "test"
-        sig_clamped = ri.sign_rule(rule, "TEST", 0.0)   # explicitly 0.0
-        sig_neg = ri.sign_rule(rule, "TEST", -0.5)       # should clamp to 0.0
+        sig_clamped = ri.sign_rule(rule, "TEST", 0.0)  # explicitly 0.0
+        sig_neg = ri.sign_rule(rule, "TEST", -0.5)  # should clamp to 0.0
         assert sig_clamped == sig_neg
 
     def test_confidence_clamped_above_one_before_signing(self, with_key):
@@ -136,6 +135,7 @@ class TestSignedMode:
 # ---------------------------------------------------------------------------
 # _canonical_payload determinism
 # ---------------------------------------------------------------------------
+
 
 class TestCanonicalPayload:
     def test_same_inputs_produce_same_bytes(self):
@@ -162,6 +162,7 @@ class TestCanonicalPayload:
 # ---------------------------------------------------------------------------
 # sign_lesson_file / verify_lesson_file roundtrip
 # ---------------------------------------------------------------------------
+
 
 class TestLessonFileSigningRoundtrip:
     LESSONS_CONTENT = """\

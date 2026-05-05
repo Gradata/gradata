@@ -1,4 +1,5 @@
 import pytest
+
 """
 Enhancement module tests for the Gradata.
 
@@ -21,18 +22,12 @@ Modules covered:
 Run: cd sdk && python -m pytest tests/ -v
 """
 
-import math
-import os
-import sqlite3
-import tempfile
 from pathlib import Path
-
-import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_lesson_text(*entries: str) -> str:
     """Join lesson entries separated by blank lines."""
@@ -43,9 +38,11 @@ def _make_lesson_text(*entries: str) -> str:
 # _self_improvement — parse_lessons
 # ===========================================================================
 
+
 class TestParseLessons:
     def setup_method(self):
-        from gradata.enhancements.self_improvement import parse_lessons, LessonState
+        from gradata.enhancements.self_improvement import LessonState, parse_lessons
+
         self.parse = parse_lessons
         self.LessonState = LessonState
 
@@ -125,14 +122,20 @@ class TestParseLessons:
 # _self_improvement — update_confidence
 # ===========================================================================
 
+
 class TestUpdateConfidence:
     def setup_method(self):
         from gradata.enhancements.self_improvement import (
-            update_confidence, Lesson, LessonState,
-            INITIAL_CONFIDENCE, SURVIVAL_BONUS, CONTRADICTION_PENALTY,
-            PATTERN_THRESHOLD, RULE_THRESHOLD,
+            INITIAL_CONFIDENCE,
+            PATTERN_THRESHOLD,
+            RULE_THRESHOLD,
+            Lesson,
+            LessonState,
+            fsrs_bonus,
+            fsrs_penalty,
+            update_confidence,
         )
-        from gradata.enhancements.self_improvement import fsrs_bonus, fsrs_penalty
+
         self.update = update_confidence
         self.Lesson = Lesson
         self.LessonState = LessonState
@@ -144,6 +147,7 @@ class TestUpdateConfidence:
 
     def _lesson(self, category="DRAFTING", confidence=0.30, state=None):
         from gradata.enhancements.self_improvement import LessonState
+
         state = state or LessonState.INSTINCT
         return self.Lesson(
             date="2026-01-01",
@@ -184,6 +188,7 @@ class TestUpdateConfidence:
     def test_promotion_pattern_to_rule(self):
         """PATTERN at 0.85 + survival + sufficient applications -> RULE."""
         from gradata.enhancements.self_improvement import LessonState
+
         lesson = self._lesson("DRAFTING", 0.85, LessonState.PATTERN)
         lesson.fire_count = 5  # MIN_APPLICATIONS_FOR_RULE
         result = self.update([lesson], [{"category": "ACCURACY"}])
@@ -192,9 +197,10 @@ class TestUpdateConfidence:
     def test_rule_lessons_demoted_on_contradiction(self):
         """RULE-state lessons CAN be demoted if contradicted (not immortal)."""
         from gradata.enhancements.self_improvement import (
-            LessonState,
             MAX_PER_STEP_PENALTY,
+            LessonState,
         )
+
         lesson = self._lesson("DRAFTING", 0.95, LessonState.RULE)
         original_conf = lesson.confidence
         result = self.update([lesson], [{"category": "DRAFTING"}])
@@ -230,11 +236,16 @@ class TestUpdateConfidence:
 # _self_improvement — format_lessons
 # ===========================================================================
 
+
 class TestFormatLessons:
     def setup_method(self):
         from gradata.enhancements.self_improvement import (
-            format_lessons, parse_lessons, Lesson, LessonState,
+            Lesson,
+            LessonState,
+            format_lessons,
+            parse_lessons,
         )
+
         self.format = format_lessons
         self.parse = parse_lessons
         self.Lesson = Lesson
@@ -242,10 +253,12 @@ class TestFormatLessons:
 
     def test_roundtrip_preserves_data(self):
         """parse -> format -> parse should preserve all key fields."""
-        original_text = "\n\n".join([
-            "[2026-01-10] [INSTINCT:0.30] DRAFTING: Use tight prose.",
-            "[2026-02-20] [PATTERN:0.70] ACCURACY: Cross-source numbers.",
-        ])
+        original_text = "\n\n".join(
+            [
+                "[2026-01-10] [INSTINCT:0.30] DRAFTING: Use tight prose.",
+                "[2026-02-20] [PATTERN:0.70] ACCURACY: Cross-source numbers.",
+            ]
+        )
         lessons = self.parse(original_text)
         formatted = self.format(lessons)
         reparsed = self.parse(formatted)
@@ -289,17 +302,22 @@ class TestFormatLessons:
 # _self_improvement — graduate
 # ===========================================================================
 
+
 class TestGraduate:
     def setup_method(self):
-        from gradata.enhancements.self_improvement import graduate, Lesson, LessonState
+        from gradata.enhancements.self_improvement import Lesson, LessonState, graduate
+
         self.graduate = graduate
         self.Lesson = Lesson
         self.LessonState = LessonState
 
     def _make(self, state):
         return self.Lesson(
-            date="2026-01-01", state=state, confidence=0.50,
-            category="TEST", description="test",
+            date="2026-01-01",
+            state=state,
+            confidence=0.50,
+            category="TEST",
+            description="test",
         )
 
     def test_splits_active_and_graduated(self):
@@ -332,9 +350,15 @@ class TestGraduate:
 # _self_improvement — compute_learning_velocity
 # ===========================================================================
 
+
 class TestComputeLearningVelocity:
     def setup_method(self):
-        from gradata.enhancements.self_improvement import compute_learning_velocity, Lesson, LessonState
+        from gradata.enhancements.self_improvement import (
+            Lesson,
+            LessonState,
+            compute_learning_velocity,
+        )
+
         self.compute = compute_learning_velocity
         self.Lesson = Lesson
         self.LessonState = LessonState
@@ -380,9 +404,11 @@ class TestComputeLearningVelocity:
 # _stats — brier_score
 # ===========================================================================
 
+
 class TestBrierScore:
     def setup_method(self):
         from gradata._stats import brier_score
+
         self.brier = brier_score
 
     def test_perfect_predictions(self):
@@ -422,9 +448,11 @@ class TestBrierScore:
 # _stats — rolling_comparison
 # ===========================================================================
 
+
 class TestRollingComparison:
     def setup_method(self):
         from gradata._stats import rolling_comparison
+
         self.compare = rolling_comparison
 
     def test_empty_returns_no_data(self):
@@ -466,9 +494,11 @@ class TestRollingComparison:
 # _stats — wilson_ci
 # ===========================================================================
 
+
 class TestWilsonCI:
     def setup_method(self):
         from gradata._stats import wilson_ci
+
         self.wilson = wilson_ci
 
     def test_zero_total_returns_no_data(self):
@@ -502,9 +532,11 @@ class TestWilsonCI:
 # _stats — correction_half_life
 # ===========================================================================
 
+
 class TestCorrectionHalfLife:
     def setup_method(self):
         from gradata._stats import correction_half_life
+
         self.half_life = correction_half_life
 
     def test_empty_returns_no_data(self):
@@ -539,8 +571,8 @@ class TestCorrectionHalfLife:
     def test_overall_learning_status(self):
         """More learned than recurring -> LEARNING."""
         corrections = [
-            {"category": "A", "session": 1},   # single -> learned
-            {"category": "B", "session": 2},   # single -> learned
+            {"category": "A", "session": 1},  # single -> learned
+            {"category": "B", "session": 2},  # single -> learned
         ]
         result = self.half_life(corrections)
         assert result["overall"] == "LEARNING"
@@ -559,9 +591,11 @@ class TestCorrectionHalfLife:
 # _stats — beta_posterior
 # ===========================================================================
 
+
 class TestBetaPosterior:
     def setup_method(self):
         from gradata._stats import beta_posterior
+
         self.posterior = beta_posterior
 
     def test_zero_trials_uniform(self):
@@ -595,9 +629,11 @@ class TestBetaPosterior:
 # _stats — ewma_control
 # ===========================================================================
 
+
 class TestEwmaControl:
     def setup_method(self):
         from gradata._stats import ewma_control
+
         self.ewma = ewma_control
 
     def test_insufficient_data(self):
@@ -630,9 +666,11 @@ class TestEwmaControl:
 # _stats — task_success_rate
 # ===========================================================================
 
+
 class TestTaskSuccessRate:
     def setup_method(self):
         from gradata._stats import task_success_rate
+
         self.success_rate = task_success_rate
 
     def test_empty_returns_none(self):
@@ -670,9 +708,11 @@ class TestTaskSuccessRate:
 # _stats — mtbf_mttr
 # ===========================================================================
 
+
 class TestMtbfMttr:
     def setup_method(self):
         from gradata._stats import mtbf_mttr
+
         self.mtbf = mtbf_mttr
 
     def test_empty_returns_none(self):
@@ -703,13 +743,15 @@ class TestMtbfMttr:
 # _tag_taxonomy — validate_tag
 # ===========================================================================
 
+
 class TestValidateTag:
     def setup_method(self):
         from gradata._tag_taxonomy import validate_tag
+
         self.validate = validate_tag
 
     def test_valid_output_tag(self):
-        valid, msg = self.validate("output:email")
+        valid, _msg = self.validate("output:email")
         assert valid is True
 
     def test_invalid_output_value(self):
@@ -724,27 +766,27 @@ class TestValidateTag:
 
     def test_unknown_prefix_non_strict(self):
         """Unknown prefix allowed in non-strict mode."""
-        valid, msg = self.validate("custom:value", strict=False)
+        valid, _msg = self.validate("custom:value", strict=False)
         assert valid is True
 
     def test_unknown_prefix_strict_fails(self):
-        valid, msg = self.validate("custom:value", strict=True)
+        valid, _msg = self.validate("custom:value", strict=True)
         assert valid is False
 
     def test_valid_closed_tone(self):
-        valid, msg = self.validate("tone:direct")
+        valid, _msg = self.validate("tone:direct")
         assert valid is True
 
     def test_invalid_tone_value(self):
-        valid, msg = self.validate("tone:aggressive")
+        valid, _msg = self.validate("tone:aggressive")
         assert valid is False
 
     def test_valid_category_tag(self):
-        valid, msg = self.validate("category:DRAFTING")
+        valid, _msg = self.validate("category:DRAFTING")
         assert valid is True
 
     def test_invalid_category_value(self):
-        valid, msg = self.validate("category:INVENTED")
+        valid, _msg = self.validate("category:INVENTED")
         assert valid is False
 
 
@@ -752,9 +794,11 @@ class TestValidateTag:
 # _tag_taxonomy — validate_tags
 # ===========================================================================
 
+
 class TestValidateTags:
     def setup_method(self):
         from gradata._tag_taxonomy import validate_tags
+
         self.validate_tags = validate_tags
 
     def test_empty_tags_no_issues(self):
@@ -785,9 +829,11 @@ class TestValidateTags:
 # _tag_taxonomy — enrich_tags
 # ===========================================================================
 
+
 class TestEnrichTags:
     def setup_method(self):
         from gradata._tag_taxonomy import enrich_tags
+
         self.enrich = enrich_tags
 
     def test_correction_event_adds_category(self):
@@ -803,10 +849,14 @@ class TestEnrichTags:
         assert "output:email" in tags
 
     def test_delta_tag_adds_channel_for_email_sent(self):
-        tags = self.enrich([], "DELTA_TAG", {
-            "prospect": "Jane",
-            "activity_type": "email_sent",
-        })
+        tags = self.enrich(
+            [],
+            "DELTA_TAG",
+            {
+                "prospect": "Jane",
+                "activity_type": "email_sent",
+            },
+        )
         assert "channel:email" in tags
         assert "prospect:Jane" in tags
 
@@ -826,9 +876,11 @@ class TestEnrichTags:
 # _fact_extractor — _quality_gate
 # ===========================================================================
 
+
 class TestQualityGate:
     def setup_method(self):
         from gradata._fact_extractor import _quality_gate
+
         self.gate = _quality_gate
 
     def test_valid_fact_passes(self):
@@ -845,6 +897,7 @@ class TestQualityGate:
 
     def test_all_valid_types_pass(self):
         from gradata._fact_extractor import VALID_FACT_TYPES
+
         for fact_type in VALID_FACT_TYPES:
             assert self.gate(fact_type, "some valid text") is True
 
@@ -853,9 +906,11 @@ class TestQualityGate:
 # _fact_extractor — _clean_value
 # ===========================================================================
 
+
 class TestCleanValue:
     def setup_method(self):
         from gradata._fact_extractor import _clean_value
+
         self.clean = _clean_value
 
     def test_strips_bold_markdown(self):
@@ -878,9 +933,11 @@ class TestCleanValue:
 # _fact_extractor — _parse_frontmatter
 # ===========================================================================
 
+
 class TestParseFrontmatter:
     def setup_method(self):
         from gradata._fact_extractor import _parse_frontmatter
+
         self.parse = _parse_frontmatter
 
     def test_basic_yaml_parsing(self):
@@ -909,13 +966,14 @@ class TestParseFrontmatter:
 # _fact_extractor — extract_from_file (integration)
 # ===========================================================================
 
+
 class TestExtractFromFile:
     def test_extracts_company_size(self, tmp_path):
         from gradata._fact_extractor import extract_from_file
+
         prospect_file = tmp_path / "Jane Smith -- Acme Corp.md"
         prospect_file.write_text(
-            "---\nname: Jane Smith\ncompany: Acme Corp\n---\n"
-            "**Employees:** 250\n",
+            "---\nname: Jane Smith\ncompany: Acme Corp\n---\n**Employees:** 250\n",
             encoding="utf-8",
         )
         facts = extract_from_file(prospect_file)
@@ -924,10 +982,10 @@ class TestExtractFromFile:
 
     def test_extracts_tech_stack_keywords(self, tmp_path):
         from gradata._fact_extractor import extract_from_file
+
         prospect_file = tmp_path / "Bob Jones -- Tech Inc.md"
         prospect_file.write_text(
-            "---\nname: Bob Jones\n---\n"
-            "They use Shopify and Google Analytics for their store.\n",
+            "---\nname: Bob Jones\n---\nThey use Shopify and Google Analytics for their store.\n",
             encoding="utf-8",
         )
         facts = extract_from_file(prospect_file)
@@ -937,11 +995,13 @@ class TestExtractFromFile:
 
     def test_nonexistent_file_returns_empty(self):
         from gradata._fact_extractor import extract_from_file
+
         facts = extract_from_file("/nonexistent/path/file.md")
         assert facts == []
 
     def test_extracts_budget_from_deal_value(self, tmp_path):
         from gradata._fact_extractor import extract_from_file
+
         prospect_file = tmp_path / "Alice Brown.md"
         prospect_file.write_text(
             "---\nname: Alice Brown\ndeal_value: $50,000\n---\n",
@@ -956,9 +1016,11 @@ class TestExtractFromFile:
 # _validator — _compute_trust_score
 # ===========================================================================
 
+
 class TestComputeTrustScore:
     def setup_method(self):
         from gradata._validator import _compute_trust_score
+
         self.compute = _compute_trust_score
 
     def _dim(self, name, score):
@@ -1008,7 +1070,7 @@ class TestComputeTrustScore:
     def test_metric_integrity_weighted_highest(self):
         """METRIC_INTEGRITY has 0.30 weight — high score there should lift overall."""
         dims_high_integrity = [
-            self._dim("METRIC_INTEGRITY", 1.0),   # weight 0.30
+            self._dim("METRIC_INTEGRITY", 1.0),  # weight 0.30
             self._dim("TRAINING_DEPTH", 0.0),
             self._dim("LEARNING_SIGNAL", 0.0),
             self._dim("DATA_COMPLETENESS", 0.0),
@@ -1016,7 +1078,7 @@ class TestComputeTrustScore:
         ]
         dims_low_integrity = [
             self._dim("METRIC_INTEGRITY", 0.0),
-            self._dim("TRAINING_DEPTH", 1.0),     # weight 0.20
+            self._dim("TRAINING_DEPTH", 1.0),  # weight 0.20
             self._dim("LEARNING_SIGNAL", 0.0),
             self._dim("DATA_COMPLETENESS", 0.0),
             self._dim("BEHAVIORAL_COVERAGE", 0.0),
@@ -1030,16 +1092,21 @@ class TestComputeTrustScore:
 # _paths — make_paths and resolve_brain_dir
 # ===========================================================================
 
+
 class TestPaths:
     def setup_method(self):
         from gradata._paths import make_paths, resolve_brain_dir
+
         self.make_paths = make_paths
         self.resolve = resolve_brain_dir
 
     def test_make_paths_derives_all_keys(self):
         result = self.make_paths("/some/brain/dir")
         required_keys = [
-            "BRAIN_DIR", "DB_PATH", "EVENTS_JSONL", "PROSPECTS_DIR",
+            "BRAIN_DIR",
+            "DB_PATH",
+            "EVENTS_JSONL",
+            "PROSPECTS_DIR",
             "SESSIONS_DIR",
         ]
         for k in required_keys:
@@ -1069,43 +1136,51 @@ class TestPaths:
 # _config — constants and env-var behavior
 # ===========================================================================
 
+
 class TestConfig:
     def test_default_provider_is_local(self):
         """Default embedding provider is 'local' (no API key needed)."""
-        import importlib
         import gradata._config as cfg
+
         # Test that defaults are sensible (without env var forcing gemini)
         assert cfg.EMBEDDING_PROVIDER in ("local", "gemini")
 
     def test_local_model_has_correct_dims(self):
-        from gradata._config import LOCAL_MODEL, LOCAL_DIMS
+        from gradata._config import LOCAL_DIMS, LOCAL_MODEL
+
         assert LOCAL_DIMS == 384
         assert "MiniLM" in LOCAL_MODEL or "minilm" in LOCAL_MODEL.lower()
 
     def test_gemini_model_has_correct_dims(self):
-        from gradata._config import GEMINI_MODEL, GEMINI_DIMS
+        from gradata._config import GEMINI_DIMS, GEMINI_MODEL
+
         assert GEMINI_DIMS == 768
         assert "gemini" in GEMINI_MODEL.lower()
 
     def test_similarity_threshold_is_between_zero_and_one(self):
         from gradata._config import SIMILARITY_THRESHOLD
+
         assert 0.0 < SIMILARITY_THRESHOLD < 1.0
 
     def test_file_type_map_contains_expected_dirs(self):
         from gradata._config import FILE_TYPE_MAP
+
         for dirname in ("entities", "sessions", "emails"):
             assert dirname in FILE_TYPE_MAP
 
     def test_memory_type_map_covers_all_file_types(self):
         from gradata._config import FILE_TYPE_MAP, MEMORY_TYPE_MAP
+
         for file_type in FILE_TYPE_MAP.values():
             assert file_type in MEMORY_TYPE_MAP, f"File type '{file_type}' not in MEMORY_TYPE_MAP"
 
     def test_skip_dirs_does_not_include_prospects(self):
         """prospects/ must NOT be skipped during indexing."""
         from gradata._config import SKIP_DIRS
+
         assert "prospects" not in SKIP_DIRS
 
     def test_rag_activation_threshold_positive(self):
         from gradata._config import RAG_ACTIVATION_THRESHOLD
+
         assert RAG_ACTIVATION_THRESHOLD > 0

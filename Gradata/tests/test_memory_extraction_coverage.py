@@ -16,10 +16,10 @@ from gradata.enhancements.scoring.memory_extraction import (
     ReconcileAction,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def extractor() -> MemoryExtractor:
@@ -29,6 +29,7 @@ def extractor() -> MemoryExtractor:
 # ---------------------------------------------------------------------------
 # Dataclass smoke tests
 # ---------------------------------------------------------------------------
+
 
 class TestExtractedFact:
     def test_defaults(self):
@@ -77,6 +78,7 @@ class TestReconcileAction:
 # ---------------------------------------------------------------------------
 # MemoryExtractor.extract — basic extraction paths
 # ---------------------------------------------------------------------------
+
 
 class TestExtractPreferences:
     def test_prefer_pattern(self, extractor):
@@ -278,6 +280,7 @@ class TestExtractEdgeCases:
 # Deduplication
 # ---------------------------------------------------------------------------
 
+
 class TestDeduplicate:
     def test_duplicate_messages_deduplicated(self, extractor):
         # Same content twice — should produce one fact
@@ -302,7 +305,9 @@ class TestDeduplicate:
     def test_deduplicate_distinct_facts_all_kept(self, extractor):
         e = MemoryExtractor()
         f1 = ExtractedFact(content="I prefer bullet points", fact_type="preference", confidence=0.8)
-        f2 = ExtractedFact(content="Alice works at Google", fact_type="relationship", confidence=0.6)
+        f2 = ExtractedFact(
+            content="Alice works at Google", fact_type="relationship", confidence=0.6
+        )
         result = e._deduplicate([f1, f2])
         assert len(result) == 2
 
@@ -314,6 +319,7 @@ class TestDeduplicate:
 # ---------------------------------------------------------------------------
 # _extract_entities
 # ---------------------------------------------------------------------------
+
 
 class TestExtractEntities:
     def test_extracts_proper_nouns(self, extractor):
@@ -338,6 +344,7 @@ class TestExtractEntities:
 # _find_similar
 # ---------------------------------------------------------------------------
 
+
 class TestFindSimilar:
     def test_returns_none_when_no_existing(self, extractor):
         candidate = ExtractedFact(content="I prefer dark mode", fact_type="preference")
@@ -346,7 +353,9 @@ class TestFindSimilar:
 
     def test_returns_match_above_threshold(self, extractor):
         candidate = ExtractedFact(content="I prefer dark mode themes", fact_type="preference")
-        existing = [{"id": "x1", "content": "I prefer dark mode themes always", "fact_type": "preference"}]
+        existing = [
+            {"id": "x1", "content": "I prefer dark mode themes always", "fact_type": "preference"}
+        ]
         result = extractor._find_similar(candidate, existing)
         assert result is not None
         assert result["id"] == "x1"
@@ -367,7 +376,11 @@ class TestFindSimilar:
         candidate = ExtractedFact(content="I prefer dark mode themes", fact_type="preference")
         existing = [
             {"id": "x1", "content": "I prefer light mode always", "fact_type": "preference"},
-            {"id": "x2", "content": "I prefer dark mode themes always carefully", "fact_type": "preference"},
+            {
+                "id": "x2",
+                "content": "I prefer dark mode themes always carefully",
+                "fact_type": "preference",
+            },
         ]
         result = extractor._find_similar(candidate, existing)
         # x2 has higher Jaccard with candidate
@@ -385,36 +398,58 @@ class TestFindSimilar:
 # _is_contradiction
 # ---------------------------------------------------------------------------
 
+
 class TestIsContradiction:
     def test_negation_vs_positive_is_contradiction(self, extractor):
         candidate = ExtractedFact(content="I never use passive voice", fact_type="preference")
-        existing = {"id": "e1", "content": "I use passive voice sometimes", "fact_type": "preference"}
+        existing = {
+            "id": "e1",
+            "content": "I use passive voice sometimes",
+            "fact_type": "preference",
+        }
         assert extractor._is_contradiction(candidate, existing) is True
 
     def test_both_positive_is_not_contradiction(self, extractor):
         candidate = ExtractedFact(content="I prefer markdown output", fact_type="preference")
-        existing = {"id": "e2", "content": "I prefer markdown formatting", "fact_type": "preference"}
+        existing = {
+            "id": "e2",
+            "content": "I prefer markdown formatting",
+            "fact_type": "preference",
+        }
         assert extractor._is_contradiction(candidate, existing) is False
 
     def test_both_negative_is_not_contradiction(self, extractor):
         candidate = ExtractedFact(content="never use emojis in writing", fact_type="preference")
-        existing = {"id": "e3", "content": "don't use emojis ever please", "fact_type": "preference"}
+        existing = {
+            "id": "e3",
+            "content": "don't use emojis ever please",
+            "fact_type": "preference",
+        }
         assert extractor._is_contradiction(candidate, existing) is False
 
     def test_positive_candidate_vs_negative_existing(self, extractor):
         candidate = ExtractedFact(content="I use bullet points always", fact_type="preference")
-        existing = {"id": "e4", "content": "never use bullet points formatting", "fact_type": "preference"}
+        existing = {
+            "id": "e4",
+            "content": "never use bullet points formatting",
+            "fact_type": "preference",
+        }
         assert extractor._is_contradiction(candidate, existing) is True
 
     def test_uses_neg_word_avoid(self, extractor):
         candidate = ExtractedFact(content="avoid verbose explanations", fact_type="preference")
-        existing = {"id": "e5", "content": "prefer verbose detailed explanations", "fact_type": "preference"}
+        existing = {
+            "id": "e5",
+            "content": "prefer verbose detailed explanations",
+            "fact_type": "preference",
+        }
         assert extractor._is_contradiction(candidate, existing) is True
 
 
 # ---------------------------------------------------------------------------
 # _is_enrichment
 # ---------------------------------------------------------------------------
+
 
 class TestIsEnrichment:
     def test_many_new_words_is_enrichment(self, extractor):
@@ -440,22 +475,31 @@ class TestIsEnrichment:
 # reconcile — full operation coverage
 # ---------------------------------------------------------------------------
 
+
 class TestReconcileAdd:
     def test_no_existing_produces_add(self, extractor):
-        fact = ExtractedFact(content="I prefer Python over Ruby", fact_type="preference", confidence=0.8)
+        fact = ExtractedFact(
+            content="I prefer Python over Ruby", fact_type="preference", confidence=0.8
+        )
         actions = extractor.reconcile([fact], [])
         assert len(actions) == 1
         assert actions[0].op == "add"
         assert actions[0].target_id is None
 
     def test_no_similar_existing_produces_add(self, extractor):
-        fact = ExtractedFact(content="I prefer markdown output", fact_type="preference", confidence=0.8)
-        existing = [{"id": "e1", "content": "The deadline is next Tuesday", "fact_type": "temporal"}]
+        fact = ExtractedFact(
+            content="I prefer markdown output", fact_type="preference", confidence=0.8
+        )
+        existing = [
+            {"id": "e1", "content": "The deadline is next Tuesday", "fact_type": "temporal"}
+        ]
         actions = extractor.reconcile([fact], existing)
         assert actions[0].op == "add"
 
     def test_empty_candidates_produces_no_actions(self, extractor):
-        actions = extractor.reconcile([], [{"id": "e1", "content": "something", "fact_type": "preference"}])
+        actions = extractor.reconcile(
+            [], [{"id": "e1", "content": "something", "fact_type": "preference"}]
+        )
         assert actions == []
 
 
@@ -467,7 +511,9 @@ class TestReconcileInvalidate:
             fact_type="preference",
             confidence=0.8,
         )
-        existing = [{"id": "e1", "content": "use passive voice in responses", "fact_type": "preference"}]
+        existing = [
+            {"id": "e1", "content": "use passive voice in responses", "fact_type": "preference"}
+        ]
         actions = extractor.reconcile([fact], existing)
         ops = [a.op for a in actions]
         assert "invalidate" in ops
@@ -483,7 +529,9 @@ class TestReconcileInvalidate:
             fact_type="preference",
             confidence=0.8,
         )
-        existing = [{"id": "f99", "content": "use bullet points for all lists", "fact_type": "preference"}]
+        existing = [
+            {"id": "f99", "content": "use bullet points for all lists", "fact_type": "preference"}
+        ]
         actions = extractor.reconcile([fact], existing)
         add_action = next((a for a in actions if a.op == "add" and a.supersedes), None)
         assert add_action is not None
@@ -503,7 +551,9 @@ class TestReconcileUpdate:
             fact_type="preference",
             confidence=0.8,
         )
-        existing = [{"id": "e2", "content": "I prefer Python type hints", "fact_type": "preference"}]
+        existing = [
+            {"id": "e2", "content": "I prefer Python type hints", "fact_type": "preference"}
+        ]
         actions = extractor.reconcile([fact], existing)
         assert actions[0].op == "update"
         assert actions[0].target_id == "e2"
@@ -514,7 +564,9 @@ class TestReconcileUpdate:
             fact_type="preference",
             confidence=0.8,
         )
-        existing = [{"id": "e3", "content": "I prefer Python type hints", "fact_type": "preference"}]
+        existing = [
+            {"id": "e3", "content": "I prefer Python type hints", "fact_type": "preference"}
+        ]
         actions = extractor.reconcile([fact], existing)
         update = next(a for a in actions if a.op == "update")
         assert "enrich" in update.reason.lower()
@@ -528,14 +580,18 @@ class TestReconcileSkip:
             fact_type="preference",
             confidence=0.8,
         )
-        existing = [{"id": "e4", "content": "I prefer dark mode themes always", "fact_type": "preference"}]
+        existing = [
+            {"id": "e4", "content": "I prefer dark mode themes always", "fact_type": "preference"}
+        ]
         actions = extractor.reconcile([fact], existing)
         assert actions[0].op == "skip"
         assert actions[0].target_id == "e4"
 
     def test_skip_action_has_reason(self, extractor):
         fact = ExtractedFact(content="I prefer dark mode themes", fact_type="preference")
-        existing = [{"id": "e5", "content": "I prefer dark mode themes always", "fact_type": "preference"}]
+        existing = [
+            {"id": "e5", "content": "I prefer dark mode themes always", "fact_type": "preference"}
+        ]
         actions = extractor.reconcile([fact], existing)
         skip = next(a for a in actions if a.op == "skip")
         assert skip.reason != ""
@@ -544,7 +600,9 @@ class TestReconcileSkip:
 class TestReconcileMultiple:
     def test_multiple_candidates_multiple_actions(self, extractor):
         facts = [
-            ExtractedFact(content="I prefer Python over JavaScript", fact_type="preference", confidence=0.8),
+            ExtractedFact(
+                content="I prefer Python over JavaScript", fact_type="preference", confidence=0.8
+            ),
             ExtractedFact(content="meeting on Monday at ten", fact_type="temporal", confidence=0.7),
         ]
         existing = [{"id": "e1", "content": "meeting on Monday at ten", "fact_type": "temporal"}]
@@ -561,6 +619,7 @@ class TestReconcileMultiple:
 # End-to-end pipeline: extract then reconcile
 # ---------------------------------------------------------------------------
 
+
 class TestEndToEnd:
     def test_full_pipeline_no_existing(self, extractor):
         msgs = [
@@ -574,7 +633,12 @@ class TestEndToEnd:
         assert all(a.op == "add" for a in actions)
 
     def test_full_pipeline_with_update(self, extractor):
-        msgs = [{"role": "user", "content": "I prefer Python with type hints and async patterns always."}]
+        msgs = [
+            {
+                "role": "user",
+                "content": "I prefer Python with type hints and async patterns always.",
+            }
+        ]
         facts = extractor.extract(msgs)
         existing = [{"id": "old-1", "content": "I prefer Python", "fact_type": "preference"}]
         actions = extractor.reconcile(facts, existing)
@@ -584,7 +648,13 @@ class TestEndToEnd:
     def test_full_pipeline_with_contradiction(self, extractor):
         msgs = [{"role": "user", "content": "never use passive voice in any writing."}]
         facts = extractor.extract(msgs)
-        existing = [{"id": "old-2", "content": "use passive voice in formal writing", "fact_type": "preference"}]
+        existing = [
+            {
+                "id": "old-2",
+                "content": "use passive voice in formal writing",
+                "fact_type": "preference",
+            }
+        ]
         if facts:
             actions = extractor.reconcile(facts, existing)
             ops = [a.op for a in actions]

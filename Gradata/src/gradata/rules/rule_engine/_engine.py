@@ -155,6 +155,91 @@ def filter_by_scope(
     return results
 
 
+def _scope_with_detected_task_type(scope: RuleScope, user_message: str) -> RuleScope:
+    if not user_message or scope.task_type:
+        return scope
+    detected_tt = detect_task_type(user_message)
+    if not detected_tt:
+        return scope
+    return RuleScope(
+        domain=scope.domain,
+        task_type=detected_tt,
+        audience=scope.audience,
+        channel=scope.channel,
+        stakes=scope.stakes,
+    )
+
+
+def _eligible_lessons(
+    lessons: list[Lesson],
+    scope: RuleScope,
+    max_rules: int,
+    *,
+    bus: EventBus | None = None,
+    _ctx=None,
+) -> list[Lesson]:
+    """Apply the shared state and domain gates before relevance scoring."""
+    rules_only = [lesson for lesson in lessons if lesson.state == LessonState.RULE]
+    if len(rules_only) >= max_rules:
+        eligible = rules_only
+    else:
+        eligible = [lesson for lesson in lessons if lesson.state in _ELIGIBLE_STATES]
+
+    current_domain = scope.domain.upper() if scope.domain else ""
+    if not current_domain:
+        return eligible
+
+    filtered: list[Lesson] = []
+    for lesson in eligible:
+        if is_rule_disabled_for_domain(lesson, current_domain):
+            if bus:
+                scores = lesson.domain_scores.get(current_domain, {})
+                bus.emit(
+                    "rule_scoped_out",
+                    {
+                        "lesson_category": lesson.category,
+                        "lesson_description": lesson.description[:80],
+                        "domain": current_domain,
+                        "misfire_rate": scores.get("misfires", 0) / max(1, scores.get("fires", 1)),
+                    },
+                )
+            from gradata.rules.rule_tracker import log_suppression
+
+            log_suppression(
+                rule_id=_make_rule_id(lesson),
+                reason="domain_disabled",
+                relevance=0.0,
+                ctx=_ctx,
+            )
+        else:
+            filtered.append(lesson)
+    return filtered
+
+
+def _score_scoped_lessons(
+    lessons: list[Lesson],
+    scope: RuleScope,
+    *,
+    _ctx=None,
+) -> list[tuple[Lesson, float]]:
+    scored: list[tuple[Lesson, float]] = []
+    for lesson in lessons:
+        relevance = compute_scope_weight(lesson_scope(lesson), scope)
+        relevance *= _CT_BOOST.get(lesson.correction_type, 1.0)
+        if relevance >= 0.4:
+            scored.append((lesson, relevance))
+        elif _ctx:
+            from gradata.rules.rule_tracker import log_suppression
+
+            log_suppression(
+                rule_id=_make_rule_id(lesson),
+                reason="relevance_threshold",
+                relevance=relevance,
+                ctx=_ctx,
+            )
+    return scored
+
+
 def apply_rules(
     lessons: list[Lesson],
     scope: RuleScope,
@@ -211,73 +296,10 @@ def apply_rules(
     if ttl_sessions > 0:
         demote_stale_rules(lessons, ttl_sessions=ttl_sessions, bus=bus)
 
-    # Enrich scope with detected task type if not already set
-    if user_message and not scope.task_type:
-        detected_tt = detect_task_type(user_message)
-        if detected_tt:
-            # RuleScope is frozen, so create a new one with the detected type
-            scope = RuleScope(
-                domain=scope.domain,
-                task_type=detected_tt,
-                audience=scope.audience,
-                channel=scope.channel,
-                stakes=scope.stakes,
-            )
-
-    # Step 1 — eligibility gate: prefer RULEs, only include PATTERNs if needed
-    rules_only = [lesson for lesson in lessons if lesson.state == LessonState.RULE]
-    if len(rules_only) >= max_rules:
-        eligible = rules_only
-    else:
-        eligible = [lesson for lesson in lessons if lesson.state in _ELIGIBLE_STATES]
-
-    # Step 1.5 — domain scoping: filter out rules disabled for current domain
+    scope = _scope_with_detected_task_type(scope, user_message)
     current_domain = scope.domain.upper() if scope.domain else ""
-    if current_domain:
-        filtered = []
-        for lesson in eligible:
-            if is_rule_disabled_for_domain(lesson, current_domain):
-                if bus:
-                    scores = lesson.domain_scores.get(current_domain, {})
-                    bus.emit(
-                        "rule_scoped_out",
-                        {
-                            "lesson_category": lesson.category,
-                            "lesson_description": lesson.description[:80],
-                            "domain": current_domain,
-                            "misfire_rate": scores.get("misfires", 0)
-                            / max(1, scores.get("fires", 1)),
-                        },
-                    )
-                from gradata.rules.rule_tracker import log_suppression
-
-                log_suppression(
-                    rule_id=_make_rule_id(lesson),
-                    reason="domain_disabled",
-                    relevance=0.0,
-                    ctx=_ctx,
-                )
-            else:
-                filtered.append(lesson)
-        eligible = filtered
-
-    # Step 2 & 3 — score with weighted scope matching and threshold
-    scored: list[tuple[Lesson, float]] = []
-    for lesson in eligible:
-        # Use weighted scope matching (exact > partial > wildcard)
-        relevance = compute_scope_weight(lesson_scope(lesson), scope)
-        relevance *= _CT_BOOST.get(lesson.correction_type, 1.0)
-        if relevance >= 0.4:
-            scored.append((lesson, relevance))
-        elif _ctx:
-            from gradata.rules.rule_tracker import log_suppression
-
-            log_suppression(
-                rule_id=_make_rule_id(lesson),
-                reason="relevance_threshold",
-                relevance=relevance,
-                ctx=_ctx,
-            )
+    eligible = _eligible_lessons(lessons, scope, max_rules, bus=bus, _ctx=_ctx)
+    scored = _score_scoped_lessons(eligible, scope, _ctx=_ctx)
 
     # Step 3.5 — assumption invalidation (dynamic runtime checks)
     if _context:
@@ -404,6 +426,7 @@ def apply_rules_with_tree(
     scope: RuleScope,
     *,
     max_rules: int = 5,
+    ranker: str = "hybrid",
     event_bus: EventBus | None = None,
     rule_graph: RuleGraph | None = None,
 ) -> list[AppliedRule]:
@@ -432,9 +455,17 @@ def apply_rules_with_tree(
     """
     from gradata.rules.rule_tree import RuleTree
 
+    if ranker == "flat":
+        return apply_rules(lessons, scope, max_rules=max_rules, bus=event_bus, graph=rule_graph)
+    if ranker not in {"hybrid", "tree_only"}:
+        _log.warning("unknown rule ranker %r; falling back to hybrid", ranker)
+        ranker = "hybrid"
+
     # Check if any lessons have paths
     has_paths = any(l.path for l in lessons)
     if not has_paths:
+        if ranker == "tree_only":
+            return []
         # Fallback: use existing flat apply_rules
         return apply_rules(lessons, scope, max_rules=max_rules, bus=event_bus, graph=rule_graph)
 
@@ -451,21 +482,17 @@ def apply_rules_with_tree(
     if not candidates:
         return []
 
+    if DEFAULT_TTL_SESSIONS > 0:
+        demote_stale_rules(candidates, ttl_sessions=DEFAULT_TTL_SESSIONS, bus=event_bus)
+    candidates = _eligible_lessons(candidates, scope, max_rules, bus=event_bus)
+
     # 2. Score candidates with the same weights apply_rules uses. Empty
     #    scopes still produce a valid weight (compute_scope_weight is
     #    wildcard-tolerant) — at minimum we get a confidence-driven order.
     current_domain = scope.domain.upper() if scope.domain else ""
-    scored: list[tuple[Lesson, float]] = []
-    for lesson in candidates:
-        relevance = compute_scope_weight(lesson_scope(lesson), scope)
-        relevance *= _CT_BOOST.get(lesson.correction_type, 1.0)
-        # Floor: tree already deemed this lesson path-relevant, so keep it
-        # in the pool even if scope_weight returns 0 (e.g. lesson lacks an
-        # explicit scope_json). Use a small positive epsilon so downstream
-        # consumers can still distinguish ranks from "not applied".
-        if relevance <= 0.0:
-            relevance = 0.05
-        scored.append((lesson, relevance))
+    scored = _score_scoped_lessons(candidates, scope)
+    if not scored:
+        return []
 
     def _effective_conf(lesson: Lesson, domain: str) -> float:
         if not domain:
@@ -495,9 +522,7 @@ def apply_rules_with_tree(
         selected_ids: set[str] = set()
         for lesson, relevance in scored:
             rid = _make_rule_id(lesson)
-            dominated = any(
-                rule_graph.conflict_count(rid, sel) >= 3 for sel in selected_ids
-            )
+            dominated = any(rule_graph.conflict_count(rid, sel) >= 3 for sel in selected_ids)
             if not dominated:
                 filtered_scored.append((lesson, relevance))
                 selected_ids.add(rid)

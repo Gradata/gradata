@@ -110,16 +110,13 @@ class MCPBridge:
         except Exception as e:
             return {"error": str(e)}
 
-
     def stats(self) -> dict[str, Any]:
         """Bridge statistics."""
         return {
             "brain_tools": len(self._tools),
             "brain_handlers": len(self._handlers),
             "connected_servers": len(self._connected_servers),
-            "total_external_tools": sum(
-                len(s.tools) for s in self._connected_servers
-            ),
+            "total_external_tools": sum(len(s.tools) for s in self._connected_servers),
         }
 
 
@@ -130,29 +127,34 @@ def create_brain_mcp_tools() -> list[MCPToolSchema]:
     """
     return [
         MCPToolSchema(
-            "brain_search", "Search the brain for relevant context",
+            "brain_search",
+            "Search the brain for relevant context",
             {"query": {"type": "string", "description": "Search query"}},
         ),
         MCPToolSchema(
-            "brain_correct", "Record a user correction to improve the brain",
+            "brain_correct",
+            "Record a user correction to improve the brain",
             {
                 "draft": {"type": "string", "description": "Original AI draft"},
                 "final": {"type": "string", "description": "User-edited final version"},
             },
         ),
         MCPToolSchema(
-            "brain_log_output", "Log an AI-generated output for tracking",
+            "brain_log_output",
+            "Log an AI-generated output for tracking",
             {
                 "text": {"type": "string", "description": "Generated text"},
                 "output_type": {"type": "string", "description": "Type of output"},
             },
         ),
         MCPToolSchema(
-            "brain_manifest", "Generate and return brain quality manifest",
+            "brain_manifest",
+            "Generate and return brain quality manifest",
             {},
         ),
         MCPToolSchema(
-            "brain_health", "Check brain health status",
+            "brain_health",
+            "Check brain health status",
             {},
         ),
     ]

@@ -41,10 +41,11 @@ __all__ = [
 
 class ContextBracket(Enum):
     """Context capacity brackets based on remaining token budget."""
-    FRESH = "fresh"          # >70% remaining
-    MODERATE = "moderate"    # 40-70% remaining
-    DEEP = "deep"            # 20-40% remaining
-    CRITICAL = "critical"    # <20% remaining
+
+    FRESH = "fresh"  # >70% remaining
+    MODERATE = "moderate"  # 40-70% remaining
+    DEEP = "deep"  # 20-40% remaining
+    CRITICAL = "critical"  # <20% remaining
 
 
 @dataclass(frozen=True)
@@ -61,6 +62,7 @@ class BracketConfig:
         plan_sizing: Recommended plan size as fraction of remaining capacity.
         should_handoff: Whether to prepare a session handoff.
     """
+
     bracket: ContextBracket
     min_ratio: float
     max_ratio: float
@@ -153,6 +155,7 @@ BRACKET_CONFIGS: dict[ContextBracket, BracketConfig] = {
 # Bracket detection
 # ---------------------------------------------------------------------------
 
+
 def get_bracket(remaining_ratio: float) -> ContextBracket:
     """Determine the context bracket from remaining capacity ratio.
 
@@ -166,9 +169,7 @@ def get_bracket(remaining_ratio: float) -> ContextBracket:
         ValueError: If remaining_ratio is outside [0.0, 1.0].
     """
     if not (0.0 <= remaining_ratio <= 1.0):
-        raise ValueError(
-            f"remaining_ratio must be in [0.0, 1.0], got {remaining_ratio}"
-        )
+        raise ValueError(f"remaining_ratio must be in [0.0, 1.0], got {remaining_ratio}")
 
     if remaining_ratio >= 0.70:
         return ContextBracket.FRESH
@@ -249,9 +250,7 @@ def format_bracket_prompt(bracket: ContextBracket) -> str:
     ]
 
     if config.prohibited_actions:
-        lines.append(
-            f"  AVOID: {', '.join(config.prohibited_actions)}"
-        )
+        lines.append(f"  AVOID: {', '.join(config.prohibited_actions)}")
 
     if config.should_handoff:
         lines.append("  ACTION REQUIRED: Prepare session handoff before context exhaustion.")
@@ -275,9 +274,7 @@ class ContextTracker:
 
     max_tokens: int
     tokens_used: int = 0
-    _transitions: list[tuple[int, ContextBracket]] = field(
-        default_factory=list, repr=False
-    )
+    _transitions: list[tuple[int, ContextBracket]] = field(default_factory=list, repr=False)
 
     def __post_init__(self) -> None:
         if self.max_tokens <= 0:

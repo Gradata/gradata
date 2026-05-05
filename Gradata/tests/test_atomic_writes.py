@@ -1,16 +1,15 @@
 """Tests for atomic file operations — persistence and data integrity."""
+
 import json
 import multiprocessing
-import tempfile
-from pathlib import Path
 
 from tests.conftest import init_brain
-
 
 # ---------------------------------------------------------------------------
 # Worker used by the concurrency property test (must be module-level so that
 # multiprocessing can pickle it on Windows).
 # ---------------------------------------------------------------------------
+
 
 def _emit_worker(brain_dir_str: str, n: int, worker_id: int) -> None:
     """Emit *n* events from a subprocess, each carrying the worker id."""
@@ -98,9 +97,8 @@ class TestAtomicWrites:
             except json.JSONDecodeError as exc:
                 parse_errors.append((idx, str(exc), line[:80]))
 
-        assert parse_errors == [], (
-            f"{len(parse_errors)} corrupted line(s) detected:\n"
-            + "\n".join(f"  line {i}: {e} | preview: {pr}" for i, e, pr in parse_errors)
+        assert parse_errors == [], f"{len(parse_errors)} corrupted line(s) detected:\n" + "\n".join(
+            f"  line {i}: {e} | preview: {pr}" for i, e, pr in parse_errors
         )
         assert len(lines) == expected_total, (
             f"Expected {expected_total} lines, got {len(lines)}. "

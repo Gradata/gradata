@@ -18,6 +18,7 @@ tool_failure_emit hook entries with a single entry pointing here. Keep
 ``generated_runner_post`` separate (it shells out to user-installed hooks
 with its own timeout discipline).
 """
+
 from __future__ import annotations
 
 import logging
@@ -47,12 +48,10 @@ _ROUTING: dict[str, tuple[str, ...]] = {
 def _invoke(module_name: str, data: dict) -> dict | None:
     """Import and invoke a constituent hook's main(). Suppress all errors."""
     try:
-        module = __import__(
-            f"gradata.hooks.{module_name}", fromlist=["main"]
-        )
+        module = __import__(f"gradata.hooks.{module_name}", fromlist=["main"])
         return module.main(data)
-    except Exception as exc:
-        _log.debug("dispatch_post: %s suppressed exception: %s", module_name, exc)
+    except Exception:
+        _log.warning("dispatch_post: %s suppressed exception", module_name, exc_info=True)
         return None
 
 

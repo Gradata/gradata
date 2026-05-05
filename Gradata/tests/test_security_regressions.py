@@ -227,7 +227,7 @@ class TestSyncClientHttpsGuard:
         from gradata.cloud.sync import CloudClient, CloudConfig
 
         cfg = CloudConfig(sync_enabled=True, api_base=api_base)
-        cfg.token = _FT  # noqa: S105 — intentionally short fake value
+        cfg.token = _FT
         return CloudClient(brain_dir=tmp_path, config=cfg)
 
     def test_http_remote_post_returns_none(self, tmp_path):

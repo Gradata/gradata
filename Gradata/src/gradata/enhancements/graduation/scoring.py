@@ -25,6 +25,7 @@ PATTERN, ``>= 0.80`` → RULE. Those thresholds are deliberately broader than
 the hand-tuned constants so the score's *shape* — not a single ratchet —
 controls promotion.
 """
+
 from __future__ import annotations
 
 import math
@@ -73,9 +74,9 @@ PATTERN_SCORE_CUT = 0.45
 RULE_SCORE_CUT = 0.80
 
 # Shape parameters.
-_FIRE_SATURATION = 8.0        # fire_count at which fire_component ≈ 0.9
-_RECENCY_HALF_LIFE = 10.0     # sessions_since_fire for 50% recency weight
-_MATURITY_SATURATION = 20.0   # total_sessions_observed for 0.9 maturity
+_FIRE_SATURATION = 8.0  # fire_count at which fire_component ≈ 0.9
+_RECENCY_HALF_LIFE = 10.0  # sessions_since_fire for 50% recency weight
+_MATURITY_SATURATION = 20.0  # total_sessions_observed for 0.9 maturity
 
 
 def _fire_component(fire_count: int) -> float:

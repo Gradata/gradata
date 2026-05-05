@@ -23,7 +23,7 @@ class TestGracefulDegradation:
         assert len(events) >= 1, "Empty draft correction should still be recorded"
 
     def test_brain_init_creates_db(self, tmp_path):
-        brain = init_brain(tmp_path)
+        init_brain(tmp_path)
         assert (tmp_path / "brain" / "system.db").exists()
 
     def test_search_with_no_index(self, tmp_path):

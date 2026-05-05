@@ -59,13 +59,26 @@ def is_addition(old: str, new: str, min_added_chars: int = 10) -> bool:
 
 # Extension → high-level category
 _EXT_CATEGORY: dict[str, str] = {
-    ".py": "python", ".pyi": "python",
-    ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript",
-    ".ts": "typescript", ".tsx": "typescript",
-    ".rs": "rust", ".go": "go", ".java": "java", ".rb": "ruby",
-    ".c": "c", ".cpp": "cpp", ".h": "c", ".cs": "csharp",
-    ".swift": "swift", ".kt": "kotlin",
-    ".md": "markdown", ".txt": "text", ".rst": "restructuredtext",
+    ".py": "python",
+    ".pyi": "python",
+    ".js": "javascript",
+    ".jsx": "javascript",
+    ".mjs": "javascript",
+    ".ts": "typescript",
+    ".tsx": "typescript",
+    ".rs": "rust",
+    ".go": "go",
+    ".java": "java",
+    ".rb": "ruby",
+    ".c": "c",
+    ".cpp": "cpp",
+    ".h": "c",
+    ".cs": "csharp",
+    ".swift": "swift",
+    ".kt": "kotlin",
+    ".md": "markdown",
+    ".txt": "text",
+    ".rst": "restructuredtext",
 }
 
 # Regex patterns for non-Python code files
@@ -114,12 +127,18 @@ def _classify_python_addition(added_text: str) -> str:
             if node.returns is not None:
                 return "return_type"
             # Check for docstring
-            if (node.body and isinstance(node.body[0], ast.Expr)
-                    and isinstance(node.body[0].value, ast.Constant)
-                    and isinstance(node.body[0].value.value, str)):
+            if (
+                node.body
+                and isinstance(node.body[0], ast.Expr)
+                and isinstance(node.body[0].value, ast.Constant)
+                and isinstance(node.body[0].value.value, str)
+            ):
                 return "docstring"
-        if (isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
-                and isinstance(node.value.value, str)):
+        if (
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ):
             return "docstring"
         if isinstance(node, ast.Assert):
             return "assertion"
@@ -142,7 +161,7 @@ def classify_addition(old: str, new: str, file_ext: str) -> tuple[str, str]:
     # Extract only the added portion
     if old and old in new:
         idx = new.index(old)
-        added_text = new[:idx] + new[idx + len(old):]
+        added_text = new[:idx] + new[idx + len(old) :]
     else:
         added_text = new
 
@@ -173,6 +192,7 @@ def classify_addition(old: str, new: str, file_ext: str) -> tuple[str, str]:
 @dataclass
 class _FingerprintCounter:
     """Track occurrences of a fingerprint across sessions."""
+
     count: int = 0
     sessions: set[str] = field(default_factory=set)
 
@@ -189,7 +209,9 @@ class AdditionTracker:
         if not isinstance(threshold, int) or threshold < 1:
             raise ValueError(f"threshold must be a positive integer, got {threshold}")
         if not isinstance(cross_session_threshold, int) or cross_session_threshold < 1:
-            raise ValueError(f"cross_session_threshold must be a positive integer, got {cross_session_threshold}")
+            raise ValueError(
+                f"cross_session_threshold must be a positive integer, got {cross_session_threshold}"
+            )
         self._threshold = threshold
         self._cross_session_threshold = cross_session_threshold
         self._counters: dict[tuple[str, str], _FingerprintCounter] = defaultdict(
@@ -197,9 +219,7 @@ class AdditionTracker:
         )
         self._lock = threading.Lock()
 
-    def record(
-        self, fingerprint: tuple[str, str], session_id: str
-    ) -> dict | None:
+    def record(self, fingerprint: tuple[str, str], session_id: str) -> dict | None:
         """Record one occurrence. Returns a lesson dict when threshold met."""
         category, stype = fingerprint
         lesson = None
@@ -211,8 +231,7 @@ class AdditionTracker:
 
             # Check cross-session first (2 occurrences across 2+ sessions)
             if (
-                len(counter.sessions) >= 2
-                and counter.count >= self._cross_session_threshold
+                len(counter.sessions) >= 2 and counter.count >= self._cross_session_threshold
             ) or counter.count >= self._threshold:
                 self._counters[fingerprint] = _FingerprintCounter()
                 lesson = self._make_lesson(category, stype)

@@ -8,24 +8,18 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from gradata._types import Lesson, LessonState, RuleTransferScope, CorrectionType
+from gradata._types import Lesson, LessonState
 from gradata.enhancements.meta_rules import (
     MetaRule,
     SynthesisEvidence,
-    _gather_graduated_rules,
     _gather_correction_history,
+    _gather_graduated_rules,
     _group_rules_by_category,
     _validate_citations,
     synthesize_meta_rules_agentic,
-    MIN_SOURCE_RULES,
-    MIN_SOURCE_CONFIDENCE,
-    MAX_SYNTHESIS_ITERATIONS,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -310,7 +304,7 @@ def test_non_rule_state_lessons_excluded():
     # Add 3 genuine RULE-state so total would qualify if state check is broken
     rules = _make_rule_group("DRAFTING", n=3, confidence=0.92)
 
-    result_with_noise = synthesize_meta_rules_agentic(lessons=rules + [instinct, pattern])
+    result_with_noise = synthesize_meta_rules_agentic(lessons=[*rules, instinct, pattern])
     result_clean = synthesize_meta_rules_agentic(lessons=rules)
 
     # Both runs should produce exactly 1 meta-rule with the same 3 source IDs

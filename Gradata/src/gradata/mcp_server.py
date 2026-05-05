@@ -140,6 +140,34 @@ def _err(req_id: Any, code: int, message: str, data: Any = None) -> dict[str, An
 
 _TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
+        "name": "gradata_recall",
+        "description": (
+            "Retrieve relevant Gradata brain rules for the current situation under a token budget. "
+            "WHEN: Call before tool use or drafting when you need compact behavioral memory injection. "
+            "RETURNS: <brain-rules> XML text."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "situation": {"type": "string", "description": "Free-form current situation"},
+                "max_tokens": {
+                    "type": "integer",
+                    "description": "Approximate token budget (default from BrainConfig)",
+                },
+                "ranker": {
+                    "type": "string",
+                    "enum": ["hybrid", "flat", "tree_only"],
+                },
+                "include_all_sources": {
+                    "type": "boolean",
+                    "description": "Debug: include non-injectable meta-rule sources",
+                    "default": False,
+                },
+            },
+            "required": ["situation"],
+        },
+    },
+    {
         "name": "brain_search",
         "description": (
             "Search the brain for relevant rules, patterns, and past corrections. "
@@ -317,6 +345,22 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
         return {"error": "Brain not initialized. Pass --brain-dir at startup."}
 
     try:
+        if tool_name == "gradata_recall":
+            from gradata.mcp_tools import gradata_recall
+
+            situation = arguments.get("situation", "")
+            max_tokens_arg = arguments.get("max_tokens")
+            ranker_arg = arguments.get("ranker")
+            text = gradata_recall(
+                str(situation),
+                max_tokens=int(max_tokens_arg) if max_tokens_arg is not None else None,
+                ranker=str(ranker_arg) if ranker_arg is not None else None,
+                include_all_sources=bool(arguments.get("include_all_sources", False)),
+                lessons_path=getattr(brain, "_find_lessons_path", lambda: None)(),
+                meta_rules_path=Path(getattr(brain, "dir", ".")) / "meta-rules.json",
+            )
+            return {"content": [{"type": "text", "text": text}]}
+
         if tool_name == "brain_search":
             query = arguments.get("query", "")
             top_k = int(arguments.get("top_k", 5))

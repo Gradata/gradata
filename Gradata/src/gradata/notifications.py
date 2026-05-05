@@ -10,6 +10,7 @@ Events handled:
   - session.ended        -> "Session complete: {corrections} corrections, {promotions} promotions"
   - rule_scoped_out      -> "Scoped out: {category} (misfire rate too high in {domain})"
 """
+
 from __future__ import annotations
 
 import logging
@@ -101,24 +102,28 @@ _FORMATTERS: dict[str, Callable[[dict], Notification]] = {
 
 # ── Subscriber wiring ────────────────────────────────────────────────
 
+
 def subscribe(bus: EventBus, callback: Callable[[Notification], None]) -> None:
     """Wire all notification formatters to the bus, routing to callback."""
     for event_name, formatter in _FORMATTERS.items():
+
         def _make_handler(fmt: Callable) -> Callable:
             def handler(payload: dict) -> None:
                 try:
                     notif = fmt(payload or {})
                     callback(notif)
                 except Exception:
-                    _log.debug("Notification handler error", exc_info=True)
+                    _log.warning("Notification handler error", exc_info=True)
+
             return handler
+
         bus.on(event_name, _make_handler(formatter))
 
 
 # ── Built-in output handlers ─────────────────────────────────────────
 
 _COLORS = {
-    "info": "\033[36m",     # cyan
+    "info": "\033[36m",  # cyan
     "success": "\033[32m",  # green
     "warning": "\033[33m",  # yellow
 }
@@ -134,6 +139,8 @@ def cli_handler(notif: Notification) -> None:
 
 def collect_handler(target: list[Notification]) -> Callable[[Notification], None]:
     """Return a handler that appends notifications to a list (for testing/MCP)."""
+
     def handler(notif: Notification) -> None:
         target.append(notif)
+
     return handler

@@ -7,31 +7,30 @@ Covers:
 - install_hook() routes session_directive to session-start directory
 - inject_brain_rules mandatory injection tier formatting
 """
+
 from __future__ import annotations
 
 import os
-import textwrap
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 
 from gradata.enhancements.rule_to_hook import (
+    _IMPLEMENTED_TEMPLATES,
+    _SESSION_START_TEMPLATES,
+    _TEMPLATES_SKIP_SELFTEST,
     DeterminismCheck,
     EnforcementType,
     HookCandidate,
     classify_rule,
     render_hook,
-    _IMPLEMENTED_TEMPLATES,
-    _SESSION_START_TEMPLATES,
-    _TEMPLATES_SKIP_SELFTEST,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _classify(description: str) -> HookCandidate:
     return classify_rule(description, confidence=0.92)
@@ -45,6 +44,7 @@ def _is_session_directive(description: str) -> bool:
 # ---------------------------------------------------------------------------
 # Positive directive pattern tests
 # ---------------------------------------------------------------------------
+
 
 class TestPositiveDirectivePatterns:
     def test_use_superpowers_before_building(self):
@@ -115,6 +115,7 @@ class TestPositiveDirectivePatterns:
 # Regression: existing negation patterns still work
 # ---------------------------------------------------------------------------
 
+
 class TestNegationPatternsRegression:
     def test_never_em_dash(self):
         c = _classify("never use em-dash in prose")
@@ -156,8 +157,11 @@ class TestNegationPatternsRegression:
 # render_hook() for session_directive
 # ---------------------------------------------------------------------------
 
+
 class TestRenderHookSessionDirective:
-    def _make_candidate(self, description: str = "use superpowers before building") -> HookCandidate:
+    def _make_candidate(
+        self, description: str = "use superpowers before building"
+    ) -> HookCandidate:
         return HookCandidate(
             rule_description=description,
             rule_confidence=0.92,
@@ -228,9 +232,11 @@ class TestRenderHookSessionDirective:
 # install_hook() routing for session_directive
 # ---------------------------------------------------------------------------
 
+
 class TestInstallHookRouting:
     def test_session_directive_routes_to_session_start(self, tmp_path):
         from gradata.enhancements.rule_to_hook import install_hook
+
         session_root = tmp_path / "session-start"
         with patch.dict(os.environ, {"GRADATA_HOOK_ROOT_SESSION": str(session_root)}):
             path = install_hook("test-directive", "// js", template="session_directive")
@@ -239,6 +245,7 @@ class TestInstallHookRouting:
 
     def test_auto_test_routes_to_post_tool(self, tmp_path):
         from gradata.enhancements.rule_to_hook import install_hook
+
         post_root = tmp_path / "post-tool"
         with patch.dict(os.environ, {"GRADATA_HOOK_ROOT_POST": str(post_root)}):
             path = install_hook("test-auto", "// js", template="auto_test")
@@ -246,6 +253,7 @@ class TestInstallHookRouting:
 
     def test_regular_template_routes_to_pre_tool(self, tmp_path):
         from gradata.enhancements.rule_to_hook import install_hook
+
         pre_root = tmp_path / "pre-tool"
         with patch.dict(os.environ, {"GRADATA_HOOK_ROOT": str(pre_root)}):
             path = install_hook("test-pre", "// js", template="regex_replace")
@@ -256,15 +264,19 @@ class TestInstallHookRouting:
 # classify_rule -> render_hook end-to-end for session directives
 # ---------------------------------------------------------------------------
 
+
 class TestEndToEnd:
-    @pytest.mark.parametrize("description", [
-        "use superpowers before building",
-        "always use council for decisions",
-        "use worktrees for all code changes",
-        "OODA godmode",
-        "spawn parallel agents",
-        "never stop to ask",
-    ])
+    @pytest.mark.parametrize(
+        "description",
+        [
+            "use superpowers before building",
+            "always use council for decisions",
+            "use worktrees for all code changes",
+            "OODA godmode",
+            "spawn parallel agents",
+            "never stop to ask",
+        ],
+    )
     def test_classify_then_render_produces_js(self, description: str):
         candidate = classify_rule(description, 0.92)
         assert candidate.determinism == DeterminismCheck.SESSION_DIRECTIVE
@@ -278,8 +290,10 @@ class TestEndToEnd:
 # inject_brain_rules mandatory injection tier
 # ---------------------------------------------------------------------------
 
+
 class _FakeLesson:
     """Minimal Lesson stub for injection tests."""
+
     def __init__(self, description, category, confidence, fire_count, state_name="RULE"):
         self.description = description
         self.category = category
@@ -297,15 +311,14 @@ class TestMandatoryInjectionTier:
     def _build_mandatory_output(self, lessons: list) -> str:
         """Replicate the mandatory block construction from inject_brain_rules."""
         mandatory = [
-            lesson for lesson in lessons
+            lesson
+            for lesson in lessons
             if lesson.state.name == "RULE"
             and lesson.confidence >= 0.90
             and getattr(lesson, "fire_count", 0) >= 10
         ]
         if mandatory:
-            mandatory_lines = [
-                f"[MANDATORY] {r.category}: {r.description}" for r in mandatory
-            ]
+            mandatory_lines = [f"[MANDATORY] {r.category}: {r.description}" for r in mandatory]
             mandatory_block = (
                 "<mandatory-directives>\n"
                 "## NON-NEGOTIABLE DIRECTIVES\n"

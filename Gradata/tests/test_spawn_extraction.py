@@ -7,14 +7,12 @@ brain/scripts/spawn.py into the SDK patterns/ layer.
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
-from typing import Any
-
 
 # ---------------------------------------------------------------------------
 # 1. Route Rules (orchestrator.py)
 # ---------------------------------------------------------------------------
+
 
 class TestRouteRules:
     """Tests for register_route_rules() and route_by_keywords()."""
@@ -22,38 +20,51 @@ class TestRouteRules:
     def setup_method(self):
         """Reset route rules before each test."""
         from gradata.contrib.patterns.orchestrator import register_route_rules
+
         register_route_rules([], default_agent="general", replace=True)
 
     def test_route_by_keywords_returns_default_when_empty(self):
         from gradata.contrib.patterns.orchestrator import route_by_keywords
+
         assert route_by_keywords("some random task") == "general"
 
     def test_register_and_route_single_rule(self):
         from gradata.contrib.patterns.orchestrator import register_route_rules, route_by_keywords
-        register_route_rules([
-            (["research", "enrich"], "prospector"),
-        ])
+
+        register_route_rules(
+            [
+                (["research", "enrich"], "prospector"),
+            ]
+        )
         assert route_by_keywords("Research this company") == "prospector"
 
     def test_route_case_insensitive(self):
         from gradata.contrib.patterns.orchestrator import register_route_rules, route_by_keywords
-        register_route_rules([
-            (["debug", "fix"], "debugger"),
-        ])
+
+        register_route_rules(
+            [
+                (["debug", "fix"], "debugger"),
+            ]
+        )
         assert route_by_keywords("DEBUG the broken pipeline") == "debugger"
         assert route_by_keywords("Fix the error") == "debugger"
 
     def test_route_first_match_wins(self):
         from gradata.contrib.patterns.orchestrator import register_route_rules, route_by_keywords
-        register_route_rules([
-            (["check draft"], "critic"),
-            (["draft", "write"], "writer"),
-        ], replace=True)
+
+        register_route_rules(
+            [
+                (["check draft"], "critic"),
+                (["draft", "write"], "writer"),
+            ],
+            replace=True,
+        )
         assert route_by_keywords("check draft of email") == "critic"
         assert route_by_keywords("draft an email") == "writer"
 
     def test_route_default_agent_override(self):
         from gradata.contrib.patterns.orchestrator import register_route_rules, route_by_keywords
+
         register_route_rules(
             [(["research"], "prospector")],
             default_agent="fallback-agent",
@@ -63,6 +74,7 @@ class TestRouteRules:
 
     def test_register_replace_mode(self):
         from gradata.contrib.patterns.orchestrator import register_route_rules, route_by_keywords
+
         register_route_rules([(["alpha"], "agent-a")], replace=True)
         register_route_rules([(["beta"], "agent-b")], replace=True)
         # alpha rule should be gone after replace
@@ -71,13 +83,15 @@ class TestRouteRules:
 
     def test_register_prepend_mode(self):
         from gradata.contrib.patterns.orchestrator import register_route_rules, route_by_keywords
+
         register_route_rules([(["task"], "agent-a")], replace=True)
         register_route_rules([(["task"], "agent-b")], replace=False)
         # Prepended rules take priority
         assert route_by_keywords("do this task") == "agent-b"
 
     def test_get_route_rules_returns_copy(self):
-        from gradata.contrib.patterns.orchestrator import register_route_rules, get_route_rules
+        from gradata.contrib.patterns.orchestrator import get_route_rules, register_route_rules
+
         register_route_rules([(["x"], "y")], replace=True)
         rules = get_route_rules()
         assert len(rules) == 1
@@ -89,6 +103,7 @@ class TestRouteRules:
 
     def test_route_no_match_returns_default(self):
         from gradata.contrib.patterns.orchestrator import register_route_rules, route_by_keywords
+
         register_route_rules(
             [(["very-specific-keyword"], "special-agent")],
             default_agent="my-default",
@@ -98,15 +113,20 @@ class TestRouteRules:
 
     def test_route_empty_description(self):
         from gradata.contrib.patterns.orchestrator import register_route_rules, route_by_keywords
+
         register_route_rules([(["x"], "y")], default_agent="d", replace=True)
         assert route_by_keywords("") == "d"
 
     def test_route_multi_word_keyword(self):
         from gradata.contrib.patterns.orchestrator import register_route_rules, route_by_keywords
-        register_route_rules([
-            (["linkedin message"], "writer"),
-            (["linkedin"], "prospector"),
-        ], replace=True)
+
+        register_route_rules(
+            [
+                (["linkedin message"], "writer"),
+                (["linkedin"], "prospector"),
+            ],
+            replace=True,
+        )
         assert route_by_keywords("Send a linkedin message") == "writer"
         assert route_by_keywords("Search linkedin for leads") == "prospector"
 
@@ -115,11 +135,13 @@ class TestRouteRules:
 # 2. Agent Definition Loading (sub_agents.py)
 # ---------------------------------------------------------------------------
 
+
 class TestLoadAgentDefinition:
     """Tests for load_agent_definition()."""
 
     def test_missing_file_returns_defaults(self, tmp_path):
         from gradata.contrib.patterns.sub_agents import load_agent_definition
+
         result = load_agent_definition("nonexistent", tmp_path)
         assert result["name"] == "nonexistent"
         assert "_warning" in result
@@ -129,6 +151,7 @@ class TestLoadAgentDefinition:
 
     def test_plain_markdown_no_frontmatter(self, tmp_path):
         from gradata.contrib.patterns.sub_agents import load_agent_definition
+
         agent_file = tmp_path / "simple.md"
         agent_file.write_text("You are a simple agent.\nDo the thing.", encoding="utf-8")
         result = load_agent_definition("simple", tmp_path)
@@ -138,6 +161,7 @@ class TestLoadAgentDefinition:
 
     def test_frontmatter_parsed_correctly(self, tmp_path):
         from gradata.contrib.patterns.sub_agents import load_agent_definition
+
         agent_file = tmp_path / "research.md"
         agent_file.write_text(
             "---\n"
@@ -162,6 +186,7 @@ class TestLoadAgentDefinition:
 
     def test_empty_frontmatter(self, tmp_path):
         from gradata.contrib.patterns.sub_agents import load_agent_definition
+
         agent_file = tmp_path / "empty-fm.md"
         # Empty frontmatter (no key-value lines) — body is still parsed
         agent_file.write_text("---\nempty: true\n---\nJust the body.", encoding="utf-8")
@@ -171,6 +196,7 @@ class TestLoadAgentDefinition:
 
     def test_default_agent_definition_constant(self):
         from gradata.contrib.patterns.sub_agents import DEFAULT_AGENT_DEFINITION
+
         assert DEFAULT_AGENT_DEFINITION["model"] == "sonnet"
         assert isinstance(DEFAULT_AGENT_DEFINITION["tools"], list)
 
@@ -179,11 +205,13 @@ class TestLoadAgentDefinition:
 # 3. Handoff Management (sub_agents.py)
 # ---------------------------------------------------------------------------
 
+
 class TestHandoffs:
     """Tests for create_handoff() and read_handoff()."""
 
     def test_create_and_read_handoff(self, tmp_path):
         from gradata.contrib.patterns.sub_agents import create_handoff, read_handoff
+
         handoff_dir = tmp_path / "handoffs"
         path = create_handoff("task_001", "researcher", "Found 3 leads.", handoff_dir)
         assert Path(path).exists()
@@ -194,17 +222,20 @@ class TestHandoffs:
 
     def test_read_handoff_missing_file(self, tmp_path):
         from gradata.contrib.patterns.sub_agents import read_handoff
+
         content = read_handoff("missing_task", "ghost", tmp_path)
         assert content == ""
 
     def test_create_handoff_creates_directory(self, tmp_path):
         from gradata.contrib.patterns.sub_agents import create_handoff
+
         nested = tmp_path / "deep" / "nested" / "handoffs"
         path = create_handoff("t1", "agent", "output", nested)
         assert Path(path).exists()
 
     def test_handoff_overwrites_existing(self, tmp_path):
         from gradata.contrib.patterns.sub_agents import create_handoff, read_handoff
+
         handoff_dir = tmp_path / "handoffs"
         create_handoff("t1", "a", "first version", handoff_dir)
         create_handoff("t1", "a", "second version", handoff_dir)
@@ -213,6 +244,7 @@ class TestHandoffs:
 
     def test_handoff_unicode_content(self, tmp_path):
         from gradata.contrib.patterns.sub_agents import create_handoff, read_handoff
+
         handoff_dir = tmp_path / "handoffs"
         create_handoff("t1", "a", "Hello from Tokyo", handoff_dir)
         content = read_handoff("t1", "a", handoff_dir)
@@ -223,11 +255,13 @@ class TestHandoffs:
 # 4. Agent Quality Scores (agent_graduation.py)
 # ---------------------------------------------------------------------------
 
+
 class TestComputeQualityScores:
     """Tests for AgentGraduationTracker.compute_quality_scores()."""
 
     def test_empty_tracker_returns_empty(self, tmp_path):
         from gradata.enhancements.graduation.agent_graduation import AgentGraduationTracker
+
         tracker = AgentGraduationTracker(tmp_path)
         scores = tracker.compute_quality_scores()
         assert scores["by_agent"] == {}
@@ -237,6 +271,7 @@ class TestComputeQualityScores:
 
     def test_scores_after_recording_outcomes(self, tmp_path):
         from gradata.enhancements.graduation.agent_graduation import AgentGraduationTracker
+
         tracker = AgentGraduationTracker(tmp_path)
 
         # Record 10 approvals for research agent
@@ -253,6 +288,7 @@ class TestComputeQualityScores:
 
     def test_scores_with_mixed_outcomes(self, tmp_path):
         from gradata.enhancements.graduation.agent_graduation import AgentGraduationTracker
+
         tracker = AgentGraduationTracker(tmp_path)
 
         # 7 approved, 2 edited, 1 rejected = 70% FDA, 90% acceptance
@@ -265,12 +301,13 @@ class TestComputeQualityScores:
         scores = tracker.compute_quality_scores()
         writer = scores["by_agent"]["writer"]
         assert writer["total_verified"] == 10
-        assert writer["pass_rate"] == 0.9   # 9/10 accepted or edited
-        assert writer["avg_score"] == 7.0   # 7/10 FDA -> 7.0
+        assert writer["pass_rate"] == 0.9  # 9/10 accepted or edited
+        assert writer["avg_score"] == 7.0  # 7/10 FDA -> 7.0
         assert writer["reject_count"] == 1
 
     def test_best_worst_agent_selection(self, tmp_path):
         from gradata.enhancements.graduation.agent_graduation import AgentGraduationTracker
+
         tracker = AgentGraduationTracker(tmp_path)
 
         # Research: 100% FDA

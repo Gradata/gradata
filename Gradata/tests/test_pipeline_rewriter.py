@@ -1,4 +1,5 @@
 """Tests for Meta-Harness B pipeline_rewriter — read-only threshold proposer."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -43,8 +44,7 @@ def test_analyze_flags_stuck_at_instinct():
     """Many INSTINCTs with enough fires but confidence below PATTERN_THRESHOLD
     should propose a PATTERN_THRESHOLD drop."""
     lessons = [
-        _mk_lesson(LessonState.INSTINCT, description=f"lesson {i}",
-                   confidence=0.55, fire_count=4)
+        _mk_lesson(LessonState.INSTINCT, description=f"lesson {i}", confidence=0.55, fire_count=4)
         for i in range(8)
     ]
     diag = analyze_pipeline(lessons, [], [])
@@ -81,7 +81,10 @@ def test_analyze_accepts_hook_emitted_failure_shape():
     """capture_learning.py emits {data: {description: ...}} (no prefix).
     self_healing emits {data: {failed_rule_description: ...}}. Both count."""
     rule = _mk_lesson(
-        LessonState.RULE, description="shared rule", confidence=0.92, fire_count=4,
+        LessonState.RULE,
+        description="shared rule",
+        confidence=0.92,
+        fire_count=4,
     )
     failures = [
         {"data": {"description": "shared rule"}},
@@ -101,8 +104,11 @@ def test_analyze_flags_zero_rules_in_populated_brain():
         for i in range(25)
     ]
     diag = analyze_pipeline(lessons, [], [])
-    drops = [p for p in diag.proposals
-             if p.constant == "MIN_APPLICATIONS_FOR_RULE" and p.proposed < p.current]
+    drops = [
+        p
+        for p in diag.proposals
+        if p.constant == "MIN_APPLICATIONS_FOR_RULE" and p.proposed < p.current
+    ]
     assert len(drops) == 1
 
 
@@ -142,7 +148,8 @@ def test_run_pipeline_rewriter_handles_missing_query_events(tmp_path: Path):
     """Brain without query_events must not crash — fall back to empty events."""
 
     class DummyBrain:
-        all_lessons = [_mk_lesson(LessonState.RULE, confidence=0.95, fire_count=6)]
+        def __init__(self) -> None:
+            self.all_lessons = [_mk_lesson(LessonState.RULE, confidence=0.95, fire_count=6)]
 
     path = run_pipeline_rewriter(DummyBrain(), tmp_path)
     assert path.is_file()
@@ -176,7 +183,10 @@ def test_proposal_delta_property():
     )
     assert p.delta == 1.0
     n = ThresholdProposal(
-        constant="PATTERN_THRESHOLD", current=0.60, proposed=0.55,
-        evidence_count=1, rationale="x",
+        constant="PATTERN_THRESHOLD",
+        current=0.60,
+        proposed=0.55,
+        evidence_count=1,
+        rationale="x",
     )
     assert n.delta == -0.05

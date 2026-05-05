@@ -9,6 +9,7 @@ Covers:
 - End-to-end: brain.correct() does NOT inflate fire_count / lesson count
   when the same correction is submitted repeatedly in-window.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -23,6 +24,7 @@ from gradata.enhancements.dedup import (
 # ---------------------------------------------------------------------------
 # Fingerprint
 # ---------------------------------------------------------------------------
+
 
 def test_fingerprint_is_stable():
     fp1 = observation_fingerprint("Don't use em-dashes.", category="FORMAT")
@@ -56,6 +58,7 @@ def test_fingerprint_text_differences_break_match():
 # ---------------------------------------------------------------------------
 # Register / is_duplicate
 # ---------------------------------------------------------------------------
+
 
 def test_first_sighting_is_not_duplicate(tmp_path):
     db = tmp_path / "dedup.db"
@@ -119,10 +122,9 @@ def test_register_persists_seen_count(tmp_path):
         register_observation(db, fp, category="FORMAT", session=i + 1)
     # One logical observation, five sightings
     import sqlite3
+
     with sqlite3.connect(str(db)) as conn:
-        rows = list(
-            conn.execute("SELECT fingerprint, seen_count FROM observation_dedup")
-        )
+        rows = list(conn.execute("SELECT fingerprint, seen_count FROM observation_dedup"))
     assert len(rows) == 1
     assert rows[0][0] == fp
     assert rows[0][1] == 5
@@ -131,7 +133,10 @@ def test_register_persists_seen_count(tmp_path):
 def test_check_and_register_roundtrip(tmp_path):
     db = tmp_path / "dedup.db"
     first = check_and_register(
-        db, "Don't use em-dashes.", category="FORMAT", session=1,
+        db,
+        "Don't use em-dashes.",
+        category="FORMAT",
+        session=1,
         recent_window_sessions=10,
     )
     assert first["is_duplicate"] is False
@@ -139,7 +144,10 @@ def test_check_and_register_roundtrip(tmp_path):
     assert first["seen_count"] == 1
 
     second = check_and_register(
-        db, "  DON'T  USE  EM-DASHES!!  ", category="format", session=2,
+        db,
+        "  DON'T  USE  EM-DASHES!!  ",
+        category="format",
+        session=2,
         recent_window_sessions=10,
     )
     assert second["is_duplicate"] is True  # was already present before this register
@@ -151,6 +159,7 @@ def test_check_and_register_roundtrip(tmp_path):
 # ---------------------------------------------------------------------------
 # End-to-end via Brain.correct — the real-world harm we're preventing
 # ---------------------------------------------------------------------------
+
 
 def test_brain_correct_suppresses_duplicate_lesson_reinforcement(fresh_brain):
     """Same correction applied 10 times must not inflate fire_count 10x."""
@@ -171,8 +180,7 @@ def test_brain_correct_suppresses_duplicate_lesson_reinforcement(fresh_brain):
             dedup_hits += 1
 
     assert dedup_hits == 9, (
-        f"Expected 9 dedup hits, got {dedup_hits}. "
-        "Dedup must suppress in-window duplicates."
+        f"Expected 9 dedup hits, got {dedup_hits}. Dedup must suppress in-window duplicates."
     )
 
     # Lesson fire_count must NOT have been inflated by 10

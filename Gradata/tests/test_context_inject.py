@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -15,7 +14,6 @@ from gradata.hooks.context_inject import (
     _load_injected_descriptions,
     main,
 )
-
 
 # ---------------------------------------------------------------------------
 # Unit: _jaccard

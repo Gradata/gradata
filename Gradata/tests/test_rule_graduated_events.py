@@ -11,11 +11,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from gradata._types import Lesson, LessonState
-from gradata.brain import Brain
 from gradata.enhancements.self_improvement import graduate
 from tests.conftest import init_brain
+
+if TYPE_CHECKING:
+    from gradata.brain import Brain
 
 
 def _rule_graduated_events(brain: Brain) -> list[dict]:

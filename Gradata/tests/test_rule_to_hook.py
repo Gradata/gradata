@@ -1,4 +1,5 @@
 """Tests for rule-to-hook graduation."""
+
 import json as _json
 import shutil
 import subprocess
@@ -22,30 +23,6 @@ pytestmark = pytest.mark.skipif(
     shutil.which("node") is None,
     reason="node not installed — rule-to-hook integration tests shell out to Node",
 )
-
-
-def test_correction_event_captures_draft_text(tmp_path: Path) -> None:
-    """CORRECTION events must carry the raw violating assistant draft under
-    ``data['draft_text']`` so later tasks can use it as ground truth when
-    self-testing generated hooks."""
-    brain = Brain.init(
-        tmp_path / "brain",
-        name="RuleToHookTest",
-        domain="Testing",
-        embedding="local",
-        interactive=False,
-    )
-
-    brain.record_correction(
-        text="no don't use em dashes",
-        assistant_draft="Subject: Let me — help you out",
-        category="FORMATTING",
-    )
-
-    events = brain.query_events(event_type="CORRECTION", last_n_sessions=1)
-    assert len(events) == 1
-    assert events[0]["data"]["draft_text"] == "Subject: Let me — help you out"
-    assert events[0]["data"]["category"] == "FORMATTING"
 
 
 def test_correction_event_captures_draft_text(tmp_path: Path) -> None:
@@ -143,7 +120,11 @@ class TestFindHookCandidates:
 
     def test_meta_rule_included(self):
         lessons = [
-            {"status": "META_RULE", "confidence": 0.98, "description": "Run tests after code changes"},
+            {
+                "status": "META_RULE",
+                "confidence": 0.98,
+                "description": "Run tests after code changes",
+            },
         ]
         candidates = find_hook_candidates(lessons)
         assert len(candidates) == 1
@@ -152,6 +133,7 @@ class TestFindHookCandidates:
 class TestRenderHook:
     def test_render_substitutes_placeholders(self):
         from gradata.enhancements.rule_to_hook import classify_rule, render_hook
+
         candidate = classify_rule("Never use em dashes", 0.95)
         rendered = render_hook(candidate)
         assert rendered is not None
@@ -163,6 +145,7 @@ class TestRenderHook:
 
     def test_render_returns_none_for_nondeterministic(self):
         from gradata.enhancements.rule_to_hook import classify_rule, render_hook
+
         candidate = classify_rule("Be concise and direct", 0.91)
         rendered = render_hook(candidate)
         assert rendered is None
@@ -170,6 +153,7 @@ class TestRenderHook:
     def test_render_returns_none_for_unimplemented_template(self):
         # read_before_edit template remains unimplemented (stateful)
         from gradata.enhancements.rule_to_hook import classify_rule, render_hook
+
         candidate = classify_rule("Always read files before editing", 0.92)
         rendered = render_hook(candidate)
         assert rendered is None  # gracefully skip unimplemented templates
@@ -178,6 +162,7 @@ class TestRenderHook:
 class TestSelfTest:
     def test_self_test_passes_when_hook_blocks_positive(self):
         from gradata.enhancements.rule_to_hook import classify_rule, render_hook, self_test
+
         candidate = classify_rule("Never use em dashes", 0.95)
         rendered = render_hook(candidate)
         ok = self_test(rendered, positive="hello \u2014 world", tool_name="Write")
@@ -185,6 +170,7 @@ class TestSelfTest:
 
     def test_self_test_fails_when_hook_does_not_block(self):
         from gradata.enhancements.rule_to_hook import classify_rule, render_hook, self_test
+
         candidate = classify_rule("Never use em dashes", 0.95)
         rendered = render_hook(candidate)
         # Plain ASCII content shouldn't match em-dash pattern
@@ -195,6 +181,7 @@ class TestSelfTest:
 class TestInstallHook:
     def test_install_writes_file_and_sets_executable(self, tmp_path, monkeypatch):
         from gradata.enhancements.rule_to_hook import install_hook
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         path = install_hook("em-dash", "console.log('hello');\n", template="regex_replace")
         assert path.exists()
@@ -205,25 +192,35 @@ class TestInstallHook:
 
 class TestTryGenerate:
     def test_try_generate_installs_for_em_dash(self, tmp_path, monkeypatch):
-        from gradata.enhancements.rule_to_hook import try_generate, classify_rule
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         candidate = classify_rule("Never use em dashes", 0.95)
         result = try_generate(candidate, positive_example="this \u2014 fails")
         assert result.installed is True
         assert result.hook_path is not None
         assert result.hook_path.exists()
-        assert "never-use-em-dashes" in result.hook_path.name.lower() or "em-dash" in result.hook_path.name.lower()
+        assert (
+            "never-use-em-dashes" in result.hook_path.name.lower()
+            or "em-dash" in result.hook_path.name.lower()
+        )
 
     def test_try_generate_skips_nondeterministic(self, tmp_path, monkeypatch):
-        from gradata.enhancements.rule_to_hook import try_generate, classify_rule
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         candidate = classify_rule("Be concise and direct", 0.91)
         result = try_generate(candidate)
         assert result.installed is False
-        assert "not deterministic" in result.reason.lower() or "not a hook" in result.reason.lower() or "advisory" in result.reason.lower()
+        assert (
+            "not deterministic" in result.reason.lower()
+            or "not a hook" in result.reason.lower()
+            or "advisory" in result.reason.lower()
+        )
 
     def test_try_generate_skips_unimplemented_template(self, tmp_path, monkeypatch):
-        from gradata.enhancements.rule_to_hook import try_generate, classify_rule
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         # read_before_edit remains unimplemented (stateful)
         candidate = classify_rule("Always read files before editing", 0.92)
@@ -233,7 +230,8 @@ class TestTryGenerate:
     def test_try_generate_fails_self_test_if_positive_does_not_match(self, tmp_path, monkeypatch):
         # If caller passes a positive_example that the generated regex doesn't match,
         # self-test will fail and hook should NOT be installed.
-        from gradata.enhancements.rule_to_hook import try_generate, classify_rule
+        from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         candidate = classify_rule("Never use em dashes", 0.95)
         result = try_generate(candidate, positive_example="plain ascii no dashes here")
@@ -252,6 +250,7 @@ class TestCliRuleAdd:
 
         # Run the CLI
         import os
+
         env = os.environ.copy()
         src_dir = str(Path(__file__).resolve().parent.parent / "src")
         env["PYTHONPATH"] = src_dir + os.pathsep + env.get("PYTHONPATH", "")
@@ -259,7 +258,8 @@ class TestCliRuleAdd:
         env["GRADATA_HOOK_ROOT"] = str(hook_root)
         result = subprocess.run(
             [sys.executable, "-m", "gradata.cli", "rule", "add", "never use em dashes"],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
             cwd=str(tmp_path),
             env=env,
         )
@@ -284,6 +284,7 @@ class TestCliRuleAdd:
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(hook_root))
 
         import os
+
         env = os.environ.copy()
         src_dir = str(Path(__file__).resolve().parent.parent / "src")
         env["PYTHONPATH"] = src_dir + os.pathsep + env.get("PYTHONPATH", "")
@@ -291,7 +292,8 @@ class TestCliRuleAdd:
         env["GRADATA_HOOK_ROOT"] = str(hook_root)
         result = subprocess.run(
             [sys.executable, "-m", "gradata.cli", "rule", "add", "lead with the answer"],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
             cwd=str(tmp_path),
             env=env,
         )
@@ -329,13 +331,18 @@ class TestGraduateIntegration:
         events_jsonl = brain_dir / "events.jsonl"
         with events_jsonl.open("w", encoding="utf-8") as fh:
             for i, sess in enumerate((1, 2, 3), start=1):
-                fh.write(_json.dumps({
-                    "id": f"e{i}",
-                    "session": sess,
-                    "type": "CORRECTION",
-                    "ts": _dt.now(_UTC).isoformat(),
-                    "data": {},
-                }) + "\n")
+                fh.write(
+                    _json.dumps(
+                        {
+                            "id": f"e{i}",
+                            "session": sess,
+                            "type": "CORRECTION",
+                            "ts": _dt.now(_UTC).isoformat(),
+                            "data": {},
+                        }
+                    )
+                    + "\n"
+                )
         monkeypatch.setattr(_p, "EVENTS_JSONL", events_jsonl)
         monkeypatch.setattr(_p, "BRAIN_DIR", brain_dir)
 
@@ -382,8 +389,8 @@ class TestGraduateIntegration:
         """A graduated rule whose description is non-deterministic should
         reach RULE but NOT install a hook and NOT get the [hooked] marker."""
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
-        from gradata.enhancements.self_improvement import graduate
         from gradata._types import Lesson, LessonState
+        from gradata.enhancements.self_improvement import graduate
 
         lesson = Lesson(
             date="2026-04-12",
@@ -414,6 +421,7 @@ class TestBypassEnv:
         import json as _j
         import os as _os
         import subprocess as _sp
+
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
 
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
@@ -425,29 +433,33 @@ class TestBypassEnv:
         env = {**_os.environ, "GRADATA_BYPASS": "1"}
         proc = _sp.run(
             ["node", str(result.hook_path)],
-            input=_j.dumps({"tool_name": "Write",
-                            "tool_input": {"content": "this \u2014 should pass"}}),
-            capture_output=True, text=True, env=env, timeout=5,
+            input=_j.dumps(
+                {"tool_name": "Write", "tool_input": {"content": "this \u2014 should pass"}}
+            ),
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=5,
         )
-        assert proc.returncode == 0, (
-            f"bypass failed: rc={proc.returncode} stdout={proc.stdout!r}"
-        )
+        assert proc.returncode == 0, f"bypass failed: rc={proc.returncode} stdout={proc.stdout!r}"
 
 
 class TestFstringBlockTemplate:
     def test_fstring_rule_graduates_to_bash_hook(self, tmp_path, monkeypatch):
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
-        candidate = classify_rule(
-            "Never use python -c to format an f-string", 0.95
-        )
+        candidate = classify_rule("Never use python -c to format an f-string", 0.95)
         assert candidate.hook_template == "fstring_block"
         result = try_generate(candidate)
         assert result.installed is True, result.reason
 
     def test_fstring_hook_blocks_violating_bash_command(self, tmp_path, monkeypatch):
-        import subprocess, json as _j
+        import json as _j
+        import subprocess
+
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         candidate = classify_rule("Never use python -c to format an f-string", 0.95)
         result = try_generate(candidate)
@@ -456,18 +468,24 @@ class TestFstringBlockTemplate:
         # Violating bash command
         proc = subprocess.run(
             ["node", str(result.hook_path)],
-            input=_j.dumps({"tool_name": "Bash",
-                            "tool_input": {"command": "python -c \"f'{x}'\""}}),
-            capture_output=True, text=True, timeout=5,
+            input=_j.dumps(
+                {"tool_name": "Bash", "tool_input": {"command": "python -c \"f'{x}'\""}}
+            ),
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         assert proc.returncode == 2
 
         # Clean command — no f-string
         proc = subprocess.run(
             ["node", str(result.hook_path)],
-            input=_j.dumps({"tool_name": "Bash",
-                            "tool_input": {"command": "python -c \"print(1)\""}}),
-            capture_output=True, text=True, timeout=5,
+            input=_j.dumps(
+                {"tool_name": "Bash", "tool_input": {"command": 'python -c "print(1)"'}}
+            ),
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         assert proc.returncode == 0
 
@@ -475,6 +493,7 @@ class TestFstringBlockTemplate:
 class TestRootFileSaveTemplate:
     def test_root_file_rule_graduates(self, tmp_path, monkeypatch):
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         candidate = classify_rule("Never save files to the root folder", 0.95)
         assert candidate.hook_template == "root_file_save"
@@ -482,8 +501,11 @@ class TestRootFileSaveTemplate:
         assert result.installed is True, result.reason
 
     def test_root_file_hook_blocks_root_path_but_allows_nested(self, tmp_path, monkeypatch):
-        import subprocess, json as _j
+        import json as _j
+        import subprocess
+
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         candidate = classify_rule("Never save files to the root folder", 0.95)
         result = try_generate(candidate)
@@ -492,18 +514,20 @@ class TestRootFileSaveTemplate:
         # Root-level write → blocked
         proc = subprocess.run(
             ["node", str(result.hook_path)],
-            input=_j.dumps({"tool_name": "Write",
-                            "tool_input": {"file_path": "foo.py"}}),
-            capture_output=True, text=True, timeout=5,
+            input=_j.dumps({"tool_name": "Write", "tool_input": {"file_path": "foo.py"}}),
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         assert proc.returncode == 2
 
         # Nested write → allowed
         proc = subprocess.run(
             ["node", str(result.hook_path)],
-            input=_j.dumps({"tool_name": "Write",
-                            "tool_input": {"file_path": "sdk/foo.py"}}),
-            capture_output=True, text=True, timeout=5,
+            input=_j.dumps({"tool_name": "Write", "tool_input": {"file_path": "sdk/foo.py"}}),
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         assert proc.returncode == 0
 
@@ -512,6 +536,7 @@ class TestGeneratedRunner:
     @staticmethod
     def _runner_env(gen_dir):
         import os
+
         env = os.environ.copy()
         src_dir = str(Path(__file__).resolve().parent.parent / "src")
         env["PYTHONPATH"] = src_dir + os.pathsep + env.get("PYTHONPATH", "")
@@ -524,6 +549,7 @@ class TestGeneratedRunner:
         import json as _j
         import subprocess as _sp
         import sys as _sys
+
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
 
         gen_dir = tmp_path / "generated"
@@ -535,18 +561,24 @@ class TestGeneratedRunner:
         assert try_generate(candidate).installed
 
         # Run the runner with violating payload — should block
-        payload = {"tool_name": "Write",
-                   "tool_input": {"content": "this \u2014 violates"}}
+        payload = {"tool_name": "Write", "tool_input": {"content": "this \u2014 violates"}}
         proc = _sp.run(
             [_sys.executable, "-m", "gradata.hooks.generated_runner"],
             input=_j.dumps(payload),
-            capture_output=True, text=True, env=self._runner_env(gen_dir),
+            capture_output=True,
+            text=True,
+            env=self._runner_env(gen_dir),
             timeout=10,
         )
-        assert proc.returncode == 2, f"expected block (2), got {proc.returncode}; stdout={proc.stdout!r}; stderr={proc.stderr!r}"
+        assert proc.returncode == 2, (
+            f"expected block (2), got {proc.returncode}; stdout={proc.stdout!r}; stderr={proc.stderr!r}"
+        )
 
     def test_runner_passes_clean_input(self, tmp_path, monkeypatch):
-        import json as _j, subprocess as _sp, sys as _sys
+        import json as _j
+        import subprocess as _sp
+        import sys as _sys
+
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
 
         gen_dir = tmp_path / "generated"
@@ -558,7 +590,8 @@ class TestGeneratedRunner:
         proc = _sp.run(
             [_sys.executable, "-m", "gradata.hooks.generated_runner"],
             input=_j.dumps(payload),
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
             env=self._runner_env(gen_dir),
             timeout=10,
         )
@@ -566,7 +599,10 @@ class TestGeneratedRunner:
 
     def test_runner_exits_zero_when_no_hooks_installed(self, tmp_path, monkeypatch):
         """No hooks → exit 0 silently. Never break Claude Code."""
-        import json as _j, subprocess as _sp, sys as _sys
+        import json as _j
+        import subprocess as _sp
+        import sys as _sys
+
         gen_dir = tmp_path / "generated"
         gen_dir.mkdir(parents=True)
 
@@ -574,7 +610,8 @@ class TestGeneratedRunner:
         proc = _sp.run(
             [_sys.executable, "-m", "gradata.hooks.generated_runner"],
             input=_j.dumps(payload),
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
             env=self._runner_env(gen_dir),
             timeout=10,
         )
@@ -586,6 +623,7 @@ class TestInstallerRegistry:
         """The installer must register the generated runner so fresh
         `gradata hooks install` picks it up automatically."""
         from gradata.hooks._installer import HOOK_REGISTRY
+
         modules = [entry[0] for entry in HOOK_REGISTRY]
         assert "generated_runner" in modules
 
@@ -593,6 +631,7 @@ class TestInstallerRegistry:
 class TestDestructiveBlockTemplate:
     def test_rm_rf_rule_graduates(self, tmp_path, monkeypatch):
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         candidate = classify_rule("Never rm -rf anything", 0.95)
         assert candidate.hook_template == "destructive_block"
@@ -600,30 +639,36 @@ class TestDestructiveBlockTemplate:
 
     def test_force_push_rule_graduates(self, tmp_path, monkeypatch):
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         candidate = classify_rule("Never force push", 0.95)
         assert candidate.hook_template == "destructive_block"
         assert try_generate(candidate).installed
 
     def test_destructive_hook_blocks_rm_rf(self, tmp_path, monkeypatch):
-        import subprocess, json as _j
+        import json as _j
+        import subprocess
+
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         candidate = classify_rule("Never rm -rf anything", 0.95)
         result = try_generate(candidate)
         proc = subprocess.run(
             ["node", str(result.hook_path)],
-            input=_j.dumps({"tool_name": "Bash",
-                            "tool_input": {"command": "rm -rf /tmp/foo"}}),
-            capture_output=True, text=True, timeout=5,
+            input=_j.dumps({"tool_name": "Bash", "tool_input": {"command": "rm -rf /tmp/foo"}}),
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         assert proc.returncode == 2
         # Safe command passes
         proc = subprocess.run(
             ["node", str(result.hook_path)],
-            input=_j.dumps({"tool_name": "Bash",
-                            "tool_input": {"command": "ls -la"}}),
-            capture_output=True, text=True, timeout=5,
+            input=_j.dumps({"tool_name": "Bash", "tool_input": {"command": "ls -la"}}),
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         assert proc.returncode == 0
 
@@ -631,6 +676,7 @@ class TestDestructiveBlockTemplate:
 class TestSecretScanTemplate:
     def test_secret_rule_graduates(self, tmp_path, monkeypatch):
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         candidate = classify_rule("Never commit secrets", 0.95)
         assert candidate.hook_template == "secret_scan"
@@ -638,6 +684,7 @@ class TestSecretScanTemplate:
 
     def test_secret_hook_blocks_openai_key(self, tmp_path, monkeypatch):
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         candidate = classify_rule("Never commit secrets", 0.95)
         result = try_generate(candidate)
@@ -646,17 +693,26 @@ class TestSecretScanTemplate:
         fake_key = "sk" + "-" + "abc123def456ghi789jklmno"
         proc = subprocess.run(
             ["node", str(result.hook_path)],
-            input=_json.dumps({"tool_name": "Write",
-                               "tool_input": {"content": f"OPENAI_KEY = '{fake_key}'"}}),
-            capture_output=True, text=True, timeout=5,
+            input=_json.dumps(
+                {"tool_name": "Write", "tool_input": {"content": f"OPENAI_KEY = '{fake_key}'"}}
+            ),
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         assert proc.returncode == 2
         # Clean content passes
         proc = subprocess.run(
             ["node", str(result.hook_path)],
-            input=_json.dumps({"tool_name": "Write",
-                               "tool_input": {"content": "OPENAI_KEY = os.environ['OPENAI_API_KEY']"}}),
-            capture_output=True, text=True, timeout=5,
+            input=_json.dumps(
+                {
+                    "tool_name": "Write",
+                    "tool_input": {"content": "OPENAI_KEY = os.environ['OPENAI_API_KEY']"},
+                }
+            ),
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         assert proc.returncode == 0
 
@@ -664,6 +720,7 @@ class TestSecretScanTemplate:
 class TestFileSizeCheckTemplate:
     def test_file_size_rule_graduates_with_limit(self, tmp_path, monkeypatch):
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         candidate = classify_rule("Keep files under 500 lines", 0.95)
         assert candidate.hook_template == "file_size_check"
@@ -671,32 +728,38 @@ class TestFileSizeCheckTemplate:
         assert try_generate(candidate).installed
 
     def test_file_size_hook_blocks_oversized_content(self, tmp_path, monkeypatch):
-        import subprocess, json as _j
+        import json as _j
+        import subprocess
+
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         candidate = classify_rule("Keep files under 100 lines", 0.95)
         result = try_generate(candidate)
         big = "line\n" * 150
         proc = subprocess.run(
             ["node", str(result.hook_path)],
-            input=_j.dumps({"tool_name": "Write",
-                            "tool_input": {"content": big}}),
-            capture_output=True, text=True, timeout=5,
+            input=_j.dumps({"tool_name": "Write", "tool_input": {"content": big}}),
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         assert proc.returncode == 2
         small = "line\n" * 50
         proc = subprocess.run(
             ["node", str(result.hook_path)],
-            input=_j.dumps({"tool_name": "Write",
-                            "tool_input": {"content": small}}),
-            capture_output=True, text=True, timeout=5,
+            input=_j.dumps({"tool_name": "Write", "tool_input": {"content": small}}),
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         assert proc.returncode == 0
 
 
 class TestPhrasingCoverage:
     def test_em_dash_paraphrasing(self):
-        from gradata.enhancements.rule_to_hook import classify_rule, EnforcementType
+        from gradata.enhancements.rule_to_hook import EnforcementType, classify_rule
+
         c1 = classify_rule("Avoid em dashes in prose", 0.95)
         c2 = classify_rule("Em dashes are banned", 0.95)
         assert c1.enforcement == EnforcementType.HOOK
@@ -707,13 +770,15 @@ class TestPhrasingCoverage:
 
 class TestAutoTestTemplate:
     def test_auto_test_rule_classifies(self):
-        from gradata.enhancements.rule_to_hook import classify_rule, EnforcementType
+        from gradata.enhancements.rule_to_hook import EnforcementType, classify_rule
+
         candidate = classify_rule("Run tests after code changes", 0.95)
         assert candidate.enforcement == EnforcementType.HOOK
         assert candidate.hook_template == "auto_test"
 
     def test_auto_test_installs_to_post_tool_dir(self, tmp_path, monkeypatch):
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         post_dir = tmp_path / "post-tool-generated"
         post_dir.mkdir()
         monkeypatch.setenv("GRADATA_HOOK_ROOT_POST", str(post_dir))
@@ -728,8 +793,11 @@ class TestAutoTestTemplate:
 
     def test_auto_test_hook_runs_pytest_and_exits_zero_if_no_test_file(self, tmp_path, monkeypatch):
         """If no matching test file exists, hook silently exits 0 — don't noise up every edit."""
-        import subprocess, json as _j
+        import json as _j
+        import subprocess
+
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         post_dir = tmp_path / "post-tool-generated"
         post_dir.mkdir()
         monkeypatch.setenv("GRADATA_HOOK_ROOT_POST", str(post_dir))
@@ -746,7 +814,9 @@ class TestAutoTestTemplate:
         proc = subprocess.run(
             ["node", str(result.hook_path)],
             input=_j.dumps(payload),
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert proc.returncode == 0
 
@@ -754,28 +824,34 @@ class TestAutoTestTemplate:
 class TestGeneratedRunnerPost:
     def test_post_runner_registered_in_installer(self):
         from gradata.hooks._installer import HOOK_REGISTRY
+
         modules = [entry[0] for entry in HOOK_REGISTRY]
         assert "generated_runner_post" in modules
 
     def test_post_runner_iterates_post_tool_dir(self, tmp_path, monkeypatch):
-        import json as _j, subprocess as _sp, sys as _sys, os as _os
+        import json as _j
+        import os as _os
+        import subprocess as _sp
+        import sys as _sys
+
         post_dir = tmp_path / "post-tool-generated"
         post_dir.mkdir()
         # Install a no-op hook file directly
         noop = post_dir / "noop.js"
         noop.write_text(
-            "process.stdin.on('data', ()=>{}); "
-            "process.stdin.on('end', ()=>process.exit(0));\n",
-            encoding="utf-8", newline="\n",
+            "process.stdin.on('data', ()=>{}); process.stdin.on('end', ()=>process.exit(0));\n",
+            encoding="utf-8",
+            newline="\n",
         )
 
-        env = {**_os.environ,
-               "GRADATA_HOOK_ROOT_POST": str(post_dir),
-               "PYTHONPATH": "src"}
+        env = {**_os.environ, "GRADATA_HOOK_ROOT_POST": str(post_dir), "PYTHONPATH": "src"}
         proc = _sp.run(
             [_sys.executable, "-m", "gradata.hooks.generated_runner_post"],
             input=_j.dumps({"tool_name": "Write", "tool_input": {"file_path": "x.py"}}),
-            capture_output=True, text=True, env=env, timeout=10,
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=10,
         )
         assert proc.returncode == 0
 
@@ -783,18 +859,20 @@ class TestGeneratedRunnerPost:
 class TestRuleExport:
     def _write_lessons(self, brain_dir, lines):
         brain_dir.mkdir(parents=True, exist_ok=True)
-        (brain_dir / "lessons.md").write_text(
-            "\n".join(lines) + "\n", encoding="utf-8"
-        )
+        (brain_dir / "lessons.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def test_export_cursor_format(self, tmp_path):
         from gradata.enhancements.rule_export import export_rules
+
         brain = tmp_path / "brain"
-        self._write_lessons(brain, [
-            "[2026-04-12] [RULE:1.00] [hooked] FORMATTING: never use em dashes",
-            "[2026-04-12] [RULE:0.95] STRUCTURE: lead with the answer",
-            "[2026-04-12] [PATTERN:0.70] TONE: be friendly",  # should skip non-RULE
-        ])
+        self._write_lessons(
+            brain,
+            [
+                "[2026-04-12] [RULE:1.00] [hooked] FORMATTING: never use em dashes",
+                "[2026-04-12] [RULE:0.95] STRUCTURE: lead with the answer",
+                "[2026-04-12] [PATTERN:0.70] TONE: be friendly",  # should skip non-RULE
+            ],
+        )
         output = export_rules(brain, target="cursor")
         assert "never use em dashes" in output
         assert "lead with the answer" in output
@@ -804,11 +882,15 @@ class TestRuleExport:
 
     def test_export_agents_format(self, tmp_path):
         from gradata.enhancements.rule_export import export_rules
+
         brain = tmp_path / "brain"
-        self._write_lessons(brain, [
-            "[2026-04-12] [RULE:1.00] FORMATTING: never use em dashes",
-            "[2026-04-12] [RULE:0.95] STRUCTURE: lead with the answer",
-        ])
+        self._write_lessons(
+            brain,
+            [
+                "[2026-04-12] [RULE:1.00] FORMATTING: never use em dashes",
+                "[2026-04-12] [RULE:0.95] STRUCTURE: lead with the answer",
+            ],
+        )
         output = export_rules(brain, target="agents")
         # AGENTS.md has a heading and bullet rules
         assert "# " in output or "## " in output
@@ -817,14 +899,19 @@ class TestRuleExport:
 
     def test_export_aider_format(self, tmp_path):
         from gradata.enhancements.rule_export import export_rules
+
         brain = tmp_path / "brain"
-        self._write_lessons(brain, [
-            "[2026-04-12] [RULE:1.00] FORMATTING: never use em dashes",
-        ])
+        self._write_lessons(
+            brain,
+            [
+                "[2026-04-12] [RULE:1.00] FORMATTING: never use em dashes",
+            ],
+        )
         output = export_rules(brain, target="aider")
         # Aider format: YAML-safe. Should validate as YAML.
         try:
             import yaml
+
             parsed = yaml.safe_load(output)
             assert parsed is not None
         except ImportError:
@@ -834,16 +921,21 @@ class TestRuleExport:
     def test_export_strips_hooked_marker(self, tmp_path):
         """The [hooked] marker is internal — exported rules shouldn't include it."""
         from gradata.enhancements.rule_export import export_rules
+
         brain = tmp_path / "brain"
-        self._write_lessons(brain, [
-            "[2026-04-12] [RULE:1.00] [hooked] FORMATTING: never use em dashes",
-        ])
+        self._write_lessons(
+            brain,
+            [
+                "[2026-04-12] [RULE:1.00] [hooked] FORMATTING: never use em dashes",
+            ],
+        )
         output = export_rules(brain, target="cursor")
         assert "[hooked]" not in output
         assert "never use em dashes" in output
 
     def test_export_empty_brain(self, tmp_path):
         from gradata.enhancements.rule_export import export_rules
+
         brain = tmp_path / "brain"
         brain.mkdir()
         (brain / "lessons.md").write_text("", encoding="utf-8")
@@ -854,7 +946,10 @@ class TestRuleExport:
 
 class TestCliExport:
     def test_cli_export_writes_cursorrules(self, tmp_path, monkeypatch):
-        import subprocess, sys, os
+        import os
+        import subprocess
+        import sys
+
         brain = tmp_path / "brain"
         brain.mkdir()
         (brain / "lessons.md").write_text(
@@ -867,14 +962,26 @@ class TestCliExport:
         # Resolve src/ to absolute path so cwd=tmp_path doesn't break imports
         repo_src = str(Path(__file__).resolve().parent.parent / "src")
         existing_pp = os.environ.get("PYTHONPATH", "")
-        env = {**os.environ,
-               "GRADATA_BRAIN": str(brain),
-               "PYTHONPATH": (repo_src + os.pathsep + existing_pp) if existing_pp else repo_src}
+        env = {
+            **os.environ,
+            "GRADATA_BRAIN": str(brain),
+            "PYTHONPATH": (repo_src + os.pathsep + existing_pp) if existing_pp else repo_src,
+        }
         proc = subprocess.run(
-            [sys.executable, "-m", "gradata.cli", "export",
-             "--target", "cursor",
-             "--output", str(out_dir / ".cursorrules")],
-            capture_output=True, text=True, env=env, cwd=str(tmp_path),
+            [
+                sys.executable,
+                "-m",
+                "gradata.cli",
+                "export",
+                "--target",
+                "cursor",
+                "--output",
+                str(out_dir / ".cursorrules"),
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            cwd=str(tmp_path),
         )
         assert proc.returncode == 0, f"stderr: {proc.stderr}\nstdout: {proc.stdout}"
         written = out_dir / ".cursorrules"
@@ -882,7 +989,10 @@ class TestCliExport:
         assert "never use em dashes" in written.read_text(encoding="utf-8")
 
     def test_cli_export_writes_stdout_when_no_output_flag(self, tmp_path):
-        import subprocess, sys, os
+        import os
+        import subprocess
+        import sys
+
         brain = tmp_path / "brain"
         brain.mkdir()
         (brain / "lessons.md").write_text(
@@ -892,12 +1002,17 @@ class TestCliExport:
         # Resolve src/ to absolute path so cwd=tmp_path doesn't break imports
         repo_src = str(Path(__file__).resolve().parent.parent / "src")
         existing_pp = os.environ.get("PYTHONPATH", "")
-        env = {**os.environ,
-               "GRADATA_BRAIN": str(brain),
-               "PYTHONPATH": (repo_src + os.pathsep + existing_pp) if existing_pp else repo_src}
+        env = {
+            **os.environ,
+            "GRADATA_BRAIN": str(brain),
+            "PYTHONPATH": (repo_src + os.pathsep + existing_pp) if existing_pp else repo_src,
+        }
         proc = subprocess.run(
             [sys.executable, "-m", "gradata.cli", "export", "--target", "agents"],
-            capture_output=True, text=True, env=env, cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
+            env=env,
+            cwd=str(tmp_path),
         )
         assert proc.returncode == 0
         assert "never use em dashes" in proc.stdout
@@ -909,30 +1024,41 @@ class TestCliRuleList:
         (brain_dir / "lessons.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def test_rule_list_shows_hooked_markers(self, tmp_path):
-        import subprocess, sys, os
+        import os
+        import subprocess
+        import sys
+
         brain = tmp_path / "brain"
         pre = tmp_path / "pre"
         post = tmp_path / "post"
         pre.mkdir(parents=True)
         post.mkdir(parents=True)
 
-        self._write_lessons(brain, [
-            "[2026-04-13] [RULE:1.00] FORMATTING: [hooked] never use em dashes",
-            "[2026-04-13] [RULE:0.95] STRUCTURE: lead with the answer",
-        ])
+        self._write_lessons(
+            brain,
+            [
+                "[2026-04-13] [RULE:1.00] FORMATTING: [hooked] never use em dashes",
+                "[2026-04-13] [RULE:0.95] STRUCTURE: lead with the answer",
+            ],
+        )
         # Install matching .js for the em-dash rule
         (pre / "never-use-em-dashes.js").write_text("// stub\n", encoding="utf-8")
 
-        repo_src = str((__import__("pathlib").Path(__file__).resolve().parent.parent / "src"))
+        repo_src = str(__import__("pathlib").Path(__file__).resolve().parent.parent / "src")
         existing_pp = os.environ.get("PYTHONPATH", "")
-        env = {**os.environ,
-               "GRADATA_BRAIN": str(brain),
-               "GRADATA_HOOK_ROOT": str(pre),
-               "GRADATA_HOOK_ROOT_POST": str(post),
-               "PYTHONPATH": (repo_src + os.pathsep + existing_pp) if existing_pp else repo_src}
+        env = {
+            **os.environ,
+            "GRADATA_BRAIN": str(brain),
+            "GRADATA_HOOK_ROOT": str(pre),
+            "GRADATA_HOOK_ROOT_POST": str(post),
+            "PYTHONPATH": (repo_src + os.pathsep + existing_pp) if existing_pp else repo_src,
+        }
         proc = subprocess.run(
             [sys.executable, "-m", "gradata.cli", "rule", "list"],
-            capture_output=True, text=True, env=env, cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
+            env=env,
+            cwd=str(tmp_path),
         )
         assert proc.returncode == 0, proc.stderr
         out = proc.stdout
@@ -943,47 +1069,66 @@ class TestCliRuleList:
 
     def test_rule_list_flags_stale_and_orphan(self, tmp_path):
         """[hooked] in lessons but no .js file = STALE. .js file without [hooked] = ORPHAN."""
-        import subprocess, sys, os
+        import os
+        import subprocess
+        import sys
+
         brain = tmp_path / "brain"
         pre = tmp_path / "pre"
         post = tmp_path / "post"
         pre.mkdir(parents=True)
         post.mkdir(parents=True)
 
-        self._write_lessons(brain, [
-            "[2026-04-13] [RULE:1.00] FORMATTING: [hooked] this rule is stale",
-        ])
+        self._write_lessons(
+            brain,
+            [
+                "[2026-04-13] [RULE:1.00] FORMATTING: [hooked] this rule is stale",
+            ],
+        )
         # Orphan hook file — no matching lessons.md entry
         (pre / "orphan-hook.js").write_text("// orphan\n", encoding="utf-8")
 
-        repo_src = str((__import__("pathlib").Path(__file__).resolve().parent.parent / "src"))
+        repo_src = str(__import__("pathlib").Path(__file__).resolve().parent.parent / "src")
         existing_pp = os.environ.get("PYTHONPATH", "")
-        env = {**os.environ,
-               "GRADATA_BRAIN": str(brain),
-               "GRADATA_HOOK_ROOT": str(pre),
-               "GRADATA_HOOK_ROOT_POST": str(post),
-               "PYTHONPATH": (repo_src + os.pathsep + existing_pp) if existing_pp else repo_src}
+        env = {
+            **os.environ,
+            "GRADATA_BRAIN": str(brain),
+            "GRADATA_HOOK_ROOT": str(pre),
+            "GRADATA_HOOK_ROOT_POST": str(post),
+            "PYTHONPATH": (repo_src + os.pathsep + existing_pp) if existing_pp else repo_src,
+        }
         proc = subprocess.run(
             [sys.executable, "-m", "gradata.cli", "rule", "list"],
-            capture_output=True, text=True, env=env, cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
+            env=env,
+            cwd=str(tmp_path),
         )
         assert proc.returncode == 0, proc.stderr
         assert "STALE" in proc.stdout
         assert "orphan-hook" in proc.stdout.lower() or "ORPHAN" in proc.stdout
 
     def test_rule_list_empty_is_fine(self, tmp_path):
-        import subprocess, sys, os
+        import os
+        import subprocess
+        import sys
+
         brain = tmp_path / "brain"
         brain.mkdir()
         (brain / "lessons.md").write_text("", encoding="utf-8")
-        repo_src = str((__import__("pathlib").Path(__file__).resolve().parent.parent / "src"))
+        repo_src = str(__import__("pathlib").Path(__file__).resolve().parent.parent / "src")
         existing_pp = os.environ.get("PYTHONPATH", "")
-        env = {**os.environ,
-               "GRADATA_BRAIN": str(brain),
-               "PYTHONPATH": (repo_src + os.pathsep + existing_pp) if existing_pp else repo_src}
+        env = {
+            **os.environ,
+            "GRADATA_BRAIN": str(brain),
+            "PYTHONPATH": (repo_src + os.pathsep + existing_pp) if existing_pp else repo_src,
+        }
         proc = subprocess.run(
             [sys.executable, "-m", "gradata.cli", "rule", "list"],
-            capture_output=True, text=True, env=env, cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
+            env=env,
+            cwd=str(tmp_path),
         )
         assert proc.returncode == 0
         # Empty lessons → should still print header or "no rules"
@@ -998,29 +1143,40 @@ class TestCliRuleRemove:
     def _env(self, tmp_path):
         import os
         from pathlib import Path as _P
-        return {**os.environ,
-                "GRADATA_BRAIN": str(tmp_path / "brain"),
-                "GRADATA_HOOK_ROOT": str(tmp_path / "pre"),
-                "GRADATA_HOOK_ROOT_POST": str(tmp_path / "post"),
-                "PYTHONPATH": str(_P(__file__).resolve().parents[1] / "src")}
+
+        return {
+            **os.environ,
+            "GRADATA_BRAIN": str(tmp_path / "brain"),
+            "GRADATA_HOOK_ROOT": str(tmp_path / "pre"),
+            "GRADATA_HOOK_ROOT_POST": str(tmp_path / "post"),
+            "PYTHONPATH": str(_P(__file__).resolve().parents[1] / "src"),
+        }
 
     def test_rule_remove_deletes_hook_and_unmarks_lesson(self, tmp_path):
-        import subprocess, sys
+        import subprocess
+        import sys
+
         brain = tmp_path / "brain"
         pre = tmp_path / "pre"
         pre.mkdir(parents=True)
         (tmp_path / "post").mkdir()
 
-        self._write_lessons(brain, [
-            "[2026-04-13] [RULE:1.00] FORMATTING: [hooked] never use em dashes",
-            "[2026-04-13] [RULE:0.95] STRUCTURE: lead with the answer",
-        ])
+        self._write_lessons(
+            brain,
+            [
+                "[2026-04-13] [RULE:1.00] FORMATTING: [hooked] never use em dashes",
+                "[2026-04-13] [RULE:0.95] STRUCTURE: lead with the answer",
+            ],
+        )
         hook_file = pre / "never-use-em-dashes.js"
         hook_file.write_text("// stub\n", encoding="utf-8")
 
         proc = subprocess.run(
             [sys.executable, "-m", "gradata.cli", "rule", "remove", "never-use-em-dashes"],
-            capture_output=True, text=True, env=self._env(tmp_path), cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
+            env=self._env(tmp_path),
+            cwd=str(tmp_path),
         )
         assert proc.returncode == 0, proc.stderr
         assert not hook_file.exists(), "hook file should be deleted"
@@ -1032,21 +1188,37 @@ class TestCliRuleRemove:
         assert "lead with the answer" in lessons_text
 
     def test_rule_remove_purge_deletes_lesson(self, tmp_path):
-        import subprocess, sys
+        import subprocess
+        import sys
+
         brain = tmp_path / "brain"
         pre = tmp_path / "pre"
         pre.mkdir(parents=True)
         (tmp_path / "post").mkdir()
 
-        self._write_lessons(brain, [
-            "[2026-04-13] [RULE:1.00] FORMATTING: [hooked] never use em dashes",
-            "[2026-04-13] [RULE:0.95] STRUCTURE: lead with the answer",
-        ])
+        self._write_lessons(
+            brain,
+            [
+                "[2026-04-13] [RULE:1.00] FORMATTING: [hooked] never use em dashes",
+                "[2026-04-13] [RULE:0.95] STRUCTURE: lead with the answer",
+            ],
+        )
         (pre / "never-use-em-dashes.js").write_text("// stub\n", encoding="utf-8")
 
         proc = subprocess.run(
-            [sys.executable, "-m", "gradata.cli", "rule", "remove", "never-use-em-dashes", "--purge"],
-            capture_output=True, text=True, env=self._env(tmp_path), cwd=str(tmp_path),
+            [
+                sys.executable,
+                "-m",
+                "gradata.cli",
+                "rule",
+                "remove",
+                "never-use-em-dashes",
+                "--purge",
+            ],
+            capture_output=True,
+            text=True,
+            env=self._env(tmp_path),
+            cwd=str(tmp_path),
         )
         assert proc.returncode == 0, proc.stderr
         lessons_text = (brain / "lessons.md").read_text(encoding="utf-8")
@@ -1055,7 +1227,9 @@ class TestCliRuleRemove:
 
     def test_rule_remove_idempotent(self, tmp_path):
         """Running remove on a non-existent slug is a no-op, exit 0."""
-        import subprocess, sys
+        import subprocess
+        import sys
+
         brain = tmp_path / "brain"
         brain.mkdir()
         (brain / "lessons.md").write_text("", encoding="utf-8")
@@ -1064,29 +1238,40 @@ class TestCliRuleRemove:
 
         proc = subprocess.run(
             [sys.executable, "-m", "gradata.cli", "rule", "remove", "nonexistent-slug"],
-            capture_output=True, text=True, env=self._env(tmp_path), cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
+            env=self._env(tmp_path),
+            cwd=str(tmp_path),
         )
         assert proc.returncode == 0
         assert "nothing to remove" in proc.stdout.lower() or "no" in proc.stdout.lower()
 
     def test_rule_remove_finds_hook_in_post_dir(self, tmp_path):
         """auto_test lives in post-tool dir; remove should find it there too."""
-        import subprocess, sys
+        import subprocess
+        import sys
+
         brain = tmp_path / "brain"
         pre = tmp_path / "pre"
         post = tmp_path / "post"
         pre.mkdir(parents=True)
         post.mkdir(parents=True)
 
-        self._write_lessons(brain, [
-            "[2026-04-13] [RULE:1.00] TEST_TRIGGER: [hooked] always run tests after edit",
-        ])
+        self._write_lessons(
+            brain,
+            [
+                "[2026-04-13] [RULE:1.00] TEST_TRIGGER: [hooked] always run tests after edit",
+            ],
+        )
         post_hook = post / "always-run-tests-after-edit.js"
         post_hook.write_text("// stub\n", encoding="utf-8")
 
         proc = subprocess.run(
             [sys.executable, "-m", "gradata.cli", "rule", "remove", "always-run-tests-after-edit"],
-            capture_output=True, text=True, env=self._env(tmp_path), cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
+            env=self._env(tmp_path),
+            cwd=str(tmp_path),
         )
         assert proc.returncode == 0, proc.stderr
         assert not post_hook.exists()
@@ -1095,6 +1280,7 @@ class TestCliRuleRemove:
 class TestRuleToHookEvents:
     def _make_brain(self, tmp_path):
         from gradata.brain import Brain
+
         return Brain.init(
             tmp_path / "brain",
             name="EventsTest",
@@ -1105,6 +1291,7 @@ class TestRuleToHookEvents:
 
     def test_emits_installed_event_on_success(self, tmp_path, monkeypatch):
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         brain = self._make_brain(tmp_path)
 
@@ -1122,6 +1309,7 @@ class TestRuleToHookEvents:
 
     def test_emits_failed_event_on_skip(self, tmp_path, monkeypatch):
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         brain = self._make_brain(tmp_path)
 
@@ -1137,6 +1325,7 @@ class TestRuleToHookEvents:
     def test_no_brain_skips_logging_gracefully(self, tmp_path, monkeypatch):
         """try_generate without brain=... must still work (backward-compat)."""
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(tmp_path))
         candidate = classify_rule("Never use em dashes", 0.95)
         result = try_generate(candidate)  # no brain kwarg
@@ -1146,7 +1335,9 @@ class TestRuleToHookEvents:
 class TestStaleHookCheck:
     def test_detects_stale_hook_when_rule_text_changes(self, tmp_path, monkeypatch):
         """Install an em-dash hook, then modify the lesson text -> SessionStart check warns."""
-        import subprocess, sys, os
+        import os
+        import subprocess
+        import sys
         from pathlib import Path as _P
 
         brain = tmp_path / "brain"
@@ -1160,6 +1351,7 @@ class TestStaleHookCheck:
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(pre))
         monkeypatch.setenv("GRADATA_HOOK_ROOT_POST", str(post))
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         candidate = classify_rule("Never use em dashes", 0.95)
         result = try_generate(candidate)
         assert result.installed
@@ -1170,14 +1362,20 @@ class TestStaleHookCheck:
             encoding="utf-8",
         )
 
-        env = {**os.environ,
-               "GRADATA_BRAIN": str(brain),
-               "GRADATA_HOOK_ROOT": str(pre),
-               "GRADATA_HOOK_ROOT_POST": str(post),
-               "PYTHONPATH": str(_P(__file__).resolve().parents[1] / "src")}
+        env = {
+            **os.environ,
+            "GRADATA_BRAIN": str(brain),
+            "GRADATA_HOOK_ROOT": str(pre),
+            "GRADATA_HOOK_ROOT_POST": str(post),
+            "PYTHONPATH": str(_P(__file__).resolve().parents[1] / "src"),
+        }
         proc = subprocess.run(
             [sys.executable, "-m", "gradata.hooks.stale_hook_check"],
-            capture_output=True, text=True, env=env, cwd=str(tmp_path), timeout=10,
+            capture_output=True,
+            text=True,
+            env=env,
+            cwd=str(tmp_path),
+            timeout=10,
         )
         assert proc.returncode == 0  # never block session
         assert "stale" in proc.stdout.lower()
@@ -1185,7 +1383,9 @@ class TestStaleHookCheck:
 
     def test_no_warning_when_hashes_match(self, tmp_path, monkeypatch):
         """Install + leave lesson text unchanged -> no stale warning."""
-        import subprocess, sys, os
+        import os
+        import subprocess
+        import sys
         from pathlib import Path as _P
 
         brain = tmp_path / "brain"
@@ -1198,6 +1398,7 @@ class TestStaleHookCheck:
         monkeypatch.setenv("GRADATA_HOOK_ROOT", str(pre))
         monkeypatch.setenv("GRADATA_HOOK_ROOT_POST", str(post))
         from gradata.enhancements.rule_to_hook import classify_rule, try_generate
+
         candidate = classify_rule("Never use em dashes", 0.95)
         result = try_generate(candidate)
         assert result.installed
@@ -1207,38 +1408,52 @@ class TestStaleHookCheck:
             encoding="utf-8",
         )
 
-        env = {**os.environ,
-               "GRADATA_BRAIN": str(brain),
-               "GRADATA_HOOK_ROOT": str(pre),
-               "GRADATA_HOOK_ROOT_POST": str(post),
-               "PYTHONPATH": str(_P(__file__).resolve().parents[1] / "src")}
+        env = {
+            **os.environ,
+            "GRADATA_BRAIN": str(brain),
+            "GRADATA_HOOK_ROOT": str(pre),
+            "GRADATA_HOOK_ROOT_POST": str(post),
+            "PYTHONPATH": str(_P(__file__).resolve().parents[1] / "src"),
+        }
         proc = subprocess.run(
             [sys.executable, "-m", "gradata.hooks.stale_hook_check"],
-            capture_output=True, text=True, env=env, cwd=str(tmp_path), timeout=10,
+            capture_output=True,
+            text=True,
+            env=env,
+            cwd=str(tmp_path),
+            timeout=10,
         )
         assert proc.returncode == 0
         assert "stale" not in proc.stdout.lower()
 
     def test_no_hooks_installed_exits_silently(self, tmp_path):
         """Fresh install, no generated hooks -> no output, exit 0."""
-        import subprocess, sys, os
+        import os
+        import subprocess
+        import sys
         from pathlib import Path as _P
 
         empty = tmp_path / "empty"
         empty.mkdir()
-        env = {**os.environ,
-               "GRADATA_HOOK_ROOT": str(empty),
-               "GRADATA_HOOK_ROOT_POST": str(empty),
-               "PYTHONPATH": str(_P(__file__).resolve().parents[1] / "src")}
+        env = {
+            **os.environ,
+            "GRADATA_HOOK_ROOT": str(empty),
+            "GRADATA_HOOK_ROOT_POST": str(empty),
+            "PYTHONPATH": str(_P(__file__).resolve().parents[1] / "src"),
+        }
         proc = subprocess.run(
             [sys.executable, "-m", "gradata.hooks.stale_hook_check"],
-            capture_output=True, text=True, env=env, timeout=10,
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=10,
         )
         assert proc.returncode == 0
         assert proc.stdout.strip() == ""
 
     def test_installer_registers_session_start_entry(self):
         from gradata.hooks._installer import HOOK_REGISTRY
+
         entries = [e for e in HOOK_REGISTRY if e[0] == "stale_hook_check"]
         assert len(entries) == 1
         assert entries[0][1] == "SessionStart"

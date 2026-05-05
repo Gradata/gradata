@@ -39,34 +39,84 @@ _EXPLICIT_PATTERNS: list[tuple[re.Pattern, float, str]] = [
     # Direct negation of AI output
     (re.compile(r"no[,.]?\s*(not\s+)?(that|this|like that)", re.IGNORECASE), 0.85, "negation"),
     # Instruction to change
-    (re.compile(r"(change|fix|update|replace)\s+(this|that|it)\s+to", re.IGNORECASE), 0.90, "change_instruction"),
+    (
+        re.compile(r"(change|fix|update|replace)\s+(this|that|it)\s+to", re.IGNORECASE),
+        0.90,
+        "change_instruction",
+    ),
     # Prohibition
-    (re.compile(r"don'?t\s+(do|use|include|add|write|say|put|make)", re.IGNORECASE), 0.92, "prohibition"),
+    (
+        re.compile(r"don'?t\s+(do|use|include|add|write|say|put|make)", re.IGNORECASE),
+        0.92,
+        "prohibition",
+    ),
     # Wrong/incorrect labels
-    (re.compile(r"\b(wrong|incorrect|inaccurate|not right|not correct)\b", re.IGNORECASE), 0.88, "wrong_label"),
+    (
+        re.compile(r"\b(wrong|incorrect|inaccurate|not right|not correct)\b", re.IGNORECASE),
+        0.88,
+        "wrong_label",
+    ),
     # Stop/never directives
-    (re.compile(r"(stop|quit|never)\s+(doing|using|writing|adding|putting|making)", re.IGNORECASE), 0.90, "stop_directive"),
+    (
+        re.compile(
+            r"(stop|quit|never)\s+(doing|using|writing|adding|putting|making)", re.IGNORECASE
+        ),
+        0.90,
+        "stop_directive",
+    ),
     # Redo requests
-    (re.compile(r"\b(redo|rewrite|start over|try again|do it again)\b", re.IGNORECASE), 0.85, "redo_request"),
+    (
+        re.compile(r"\b(redo|rewrite|start over|try again|do it again)\b", re.IGNORECASE),
+        0.85,
+        "redo_request",
+    ),
     # Too much/little
-    (re.compile(r"\btoo\s+(long|short|verbose|brief|formal|casual|aggressive|soft)\b", re.IGNORECASE), 0.80, "degree_correction"),
+    (
+        re.compile(
+            r"\btoo\s+(long|short|verbose|brief|formal|casual|aggressive|soft)\b", re.IGNORECASE
+        ),
+        0.80,
+        "degree_correction",
+    ),
     # Remove/delete requests
-    (re.compile(r"\b(remove|delete|drop|cut|get rid of)\s+(the|this|that|all)", re.IGNORECASE), 0.82, "removal"),
+    (
+        re.compile(r"\b(remove|delete|drop|cut|get rid of)\s+(the|this|that|all)", re.IGNORECASE),
+        0.82,
+        "removal",
+    ),
 ]
 
 _IMPLICIT_PATTERNS: list[tuple[re.Pattern, float, str]] = [
     # Redirect with "actually", "instead", "rather"
     (re.compile(r"\b(actually|instead|rather)[,.]?\s", re.IGNORECASE), 0.65, "redirect"),
     # Should-be directives
-    (re.compile(r"(should\s+be|needs\s+to\s+be|make\s+it|make\s+this)", re.IGNORECASE), 0.70, "should_be"),
+    (
+        re.compile(r"(should\s+be|needs\s+to\s+be|make\s+it|make\s+this)", re.IGNORECASE),
+        0.70,
+        "should_be",
+    ),
     # Reference to prior instruction
-    (re.compile(r"I\s+(said|told\s+you|asked\s+for|wanted|meant)", re.IGNORECASE), 0.75, "prior_reference"),
+    (
+        re.compile(r"I\s+(said|told\s+you|asked\s+for|wanted|meant)", re.IGNORECASE),
+        0.75,
+        "prior_reference",
+    ),
     # Preference expression
-    (re.compile(r"I\s+(prefer|want|need|like)\s+(it\s+)?(to\s+be\s+)?", re.IGNORECASE), 0.60, "preference"),
+    (
+        re.compile(r"I\s+(prefer|want|need|like)\s+(it\s+)?(to\s+be\s+)?", re.IGNORECASE),
+        0.60,
+        "preference",
+    ),
     # But/however (often precedes a correction)
     (re.compile(r"\b(but|however)[,.]?\s+(the|this|that|it|you)", re.IGNORECASE), 0.55, "contrast"),
     # More/less directive
-    (re.compile(r"\b(more|less)\s+(concise|detailed|specific|general|formal|casual)", re.IGNORECASE), 0.68, "degree_adjust"),
+    (
+        re.compile(
+            r"\b(more|less)\s+(concise|detailed|specific|general|formal|casual)", re.IGNORECASE
+        ),
+        0.68,
+        "degree_adjust",
+    ),
 ]
 
 # ---------------------------------------------------------------------------
@@ -78,25 +128,71 @@ _IMPLICIT_PATTERNS: list[tuple[re.Pattern, float, str]] = [
 _TYPE_KEYWORD_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"\bhallucin|made\s+up|doesn'?t\s+exist\b", re.IGNORECASE), "hallucination"),
     (re.compile(r"\b(wrong|incorrect|inaccurate|false)\b", re.IGNORECASE), "factual_error"),
-    (re.compile(r"\b(tone|warm|cold|formal|casual|friendly|harsh|aggressive|soft)\b", re.IGNORECASE), "tone"),
+    (
+        re.compile(
+            r"\b(tone|warm|cold|formal|casual|friendly|harsh|aggressive|soft)\b", re.IGNORECASE
+        ),
+        "tone",
+    ),
     # format before style — layout/heading/structure are format, not style
-    (re.compile(r"\b(format|layout|structure|heading|indent|spacing|align)\b", re.IGNORECASE), "format"),
+    (
+        re.compile(r"\b(format|layout|structure|heading|indent|spacing|align)\b", re.IGNORECASE),
+        "format",
+    ),
     (re.compile(r"\b(style|dash(?:es)?|emoji|bold|italic|bullet|font)\b", re.IGNORECASE), "style"),
-    (re.compile(r"\b(missing|forgot|omit|skip|left\s+out|didn'?t\s+include)\b", re.IGNORECASE), "omission"),
-    (re.compile(r"\b(approach|method|strategy|workflow|process|tactic|technique)\b", re.IGNORECASE), "approach"),
-    (re.compile(r"\b(scope|domain|context|only\s+for|not\s+for|outside)\b", re.IGNORECASE), "scope"),
+    (
+        re.compile(r"\b(missing|forgot|omit|skip|left\s+out|didn'?t\s+include)\b", re.IGNORECASE),
+        "omission",
+    ),
+    (
+        re.compile(
+            r"\b(approach|method|strategy|workflow|process|tactic|technique)\b", re.IGNORECASE
+        ),
+        "approach",
+    ),
+    (
+        re.compile(r"\b(scope|domain|context|only\s+for|not\s+for|outside)\b", re.IGNORECASE),
+        "scope",
+    ),
 ]
 
 # Domain keyword → domain name mapping.
 _DOMAIN_KEYWORD_PATTERNS: list[tuple[re.Pattern, str]] = [
-    (re.compile(r"\b(email|subject\s+line|inbox|reply|thread|sender|recipient)\b", re.IGNORECASE), "email"),
-    (re.compile(r"\b(code|function|class|method|variable|import|test|pytest|lint)\b", re.IGNORECASE), "code"),
+    (
+        re.compile(
+            r"\b(email|subject\s+line|inbox|reply|thread|sender|recipient)\b", re.IGNORECASE
+        ),
+        "email",
+    ),
+    (
+        re.compile(
+            r"\b(code|function|class|method|variable|import|test|pytest|lint)\b", re.IGNORECASE
+        ),
+        "code",
+    ),
     # deploy before sales — "pipeline" and "workflow" are deploy terms; sales uses "campaign/prospect/lead/deal"
-    (re.compile(r"\b(deploy|railway|docker|ci|cd|build|pipeline|workflow|action)\b", re.IGNORECASE), "deploy"),
+    (
+        re.compile(
+            r"\b(deploy|railway|docker|ci|cd|build|pipeline|workflow|action)\b", re.IGNORECASE
+        ),
+        "deploy",
+    ),
     (re.compile(r"\b(sales|prospect|lead|deal|outreach|campaign|crm)\b", re.IGNORECASE), "sales"),
-    (re.compile(r"\b(api|endpoint|route|request|response|rest|graphql|http)\b", re.IGNORECASE), "api"),
-    (re.compile(r"\b(database|db|sql|query|schema|table|migration|supabase)\b", re.IGNORECASE), "database"),
-    (re.compile(r"\b(doc|document|readme|spec|design|architecture|plan)\b", re.IGNORECASE), "docs"),
+    (
+        re.compile(r"\b(api|endpoint|route|request|response|rest|graphql|http)\b", re.IGNORECASE),
+        "api",
+    ),
+    (
+        re.compile(r"\b(database|db|sql|query|schema|table|migration|supabase)\b", re.IGNORECASE),
+        "database",
+    ),
+    (
+        re.compile(
+            r"\b(doc|docs|document|documentation|readme|spec|design|architecture|plan)\b",
+            re.IGNORECASE,
+        ),
+        "docs",
+    ),
 ]
 
 
@@ -228,6 +324,7 @@ class CorrectionContext:
         signal_details: List of (signal_type, matched_text, confidence) tuples.
         implied_changes: What the user wants changed (extracted from text).
     """
+
     is_correction: bool
     confidence: float
     signals: list[str]

@@ -1,9 +1,8 @@
 """Tests for rule clustering and contradiction detection (Phase 1)."""
+
 from __future__ import annotations
 
-import pytest
-
-from gradata._types import CorrectionType, Lesson, LessonState, RuleTransferScope
+from gradata._types import Lesson, LessonState
 from gradata.enhancements.clustering import (
     RuleCluster,
     cluster_rules,
@@ -11,10 +10,10 @@ from gradata.enhancements.clustering import (
     promote_instinct_clusters,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _lesson(
     description: str,
@@ -36,6 +35,7 @@ def _lesson(
 # ---------------------------------------------------------------------------
 # cluster_rules tests
 # ---------------------------------------------------------------------------
+
 
 def test_cluster_rules_empty_lessons_returns_empty():
     """cluster_rules with no lessons should return an empty list."""
@@ -104,6 +104,7 @@ def test_cluster_rules_only_includes_rule_and_pattern_tier():
 def test_cluster_rules_domain_from_scope_json():
     """Domain should be extracted from the first member's scope_json."""
     import json
+
     scope = json.dumps({"domain": "email"})
     lessons = [
         _lesson("Rule A", scope_json=scope),
@@ -126,6 +127,7 @@ def test_cluster_rules_domain_defaults_to_global_when_no_scope():
 # ---------------------------------------------------------------------------
 # detect_contradictions tests
 # ---------------------------------------------------------------------------
+
 
 def test_detect_contradictions_finds_never_vs_always_pair():
     """'never X' and 'always X' with >= 3 shared tokens should be flagged."""
@@ -185,6 +187,7 @@ def test_detect_contradictions_same_negation_not_flagged():
 # RuleCluster property tests
 # ---------------------------------------------------------------------------
 
+
 def test_rule_cluster_has_contradictions_property_true():
     """has_contradictions should be True when contradictions list is non-empty."""
     cluster = RuleCluster(
@@ -222,8 +225,13 @@ def test_rule_cluster_size_property():
 # promote_instinct_clusters tests
 # ---------------------------------------------------------------------------
 
-def _instinct_lesson(description: str, category: str = "DRAFTING", confidence: float = 0.50) -> Lesson:
-    return _lesson(description, category=category, state=LessonState.INSTINCT, confidence=confidence)
+
+def _instinct_lesson(
+    description: str, category: str = "DRAFTING", confidence: float = 0.50
+) -> Lesson:
+    return _lesson(
+        description, category=category, state=LessonState.INSTINCT, confidence=confidence
+    )
 
 
 def test_promote_instinct_clusters_promotes_coherent_group():

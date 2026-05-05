@@ -171,6 +171,8 @@ class CloudClient:
         if not pending:
             logger.debug("Sync: no new events since watermark=%r", last_watermark)
             return 0
+        if batch_size <= 0:
+            raise ValueError("batch_size must be greater than 0")
 
         manifest = self._read_local_manifest()
         total_ingested = 0
@@ -200,10 +202,18 @@ class CloudClient:
                 )
             except _TooLargeError:
                 # Server returned 413 — halve the batch and retry this chunk.
+                # If one event alone is too large, skip it so sync can make
+                # progress on later events instead of looping forever.
+                if current_batch == 1:
+                    logger.warning(
+                        "Sync: single event at offset=%d exceeded server size limit; skipping",
+                        offset,
+                    )
+                    offset += 1
+                    current_batch = batch_size
+                    continue
                 current_batch = max(1, current_batch // 2)
-                logger.warning(
-                    "Sync: 413 from server — reducing batch size to %d", current_batch
-                )
+                logger.warning("Sync: 413 from server — reducing batch size to %d", current_batch)
                 continue
             except Exception as e:
                 logger.error("Sync: POST failed at offset=%d: %s", offset, e)
@@ -220,9 +230,7 @@ class CloudClient:
             # Reset batch size to default for next chunk after a 413 recovery.
             current_batch = batch_size
 
-        logger.info(
-            "Sync: ingested %d events (watermark=%r)", total_ingested, last_watermark
-        )
+        logger.info("Sync: ingested %d events (watermark=%r)", total_ingested, last_watermark)
         return total_ingested
 
     # ── Sync state helpers ────────────────────────────────────────────────────
@@ -278,9 +286,7 @@ class CloudClient:
             event_id = existing_eid[:64]
         else:
             try:
-                data_blob = json.dumps(
-                    ev.get("data", {}), sort_keys=True, default=str
-                )
+                data_blob = json.dumps(ev.get("data", {}), sort_keys=True, default=str)
             except Exception:
                 data_blob = str(ev.get("data", ""))
             raw = f"{ts}:{event_type}:{source}:{ev.get('session', '')}:{data_blob}"
@@ -289,9 +295,7 @@ class CloudClient:
         session_raw = ev.get("session")
         session_val: int | None
         try:
-            if session_raw is None:
-                session_val = None
-            elif isinstance(session_raw, bool):
+            if session_raw is None or isinstance(session_raw, bool):
                 session_val = None
             elif isinstance(session_raw, int):
                 session_val = session_raw
@@ -299,7 +303,7 @@ class CloudClient:
                 session_val = int(session_raw)
             else:
                 session_val = int(str(session_raw))
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, OverflowError):
             session_val = None
         return {
             "event_id": event_id,

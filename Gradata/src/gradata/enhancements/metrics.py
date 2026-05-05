@@ -13,13 +13,17 @@ rule success/misfire rates, blandness score.
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
 class MetricsWindow:
     """Snapshot of quality metrics over a session window."""
+
     sessions: list = field(default_factory=list)
     window_size: int = 10
     sample_size: int = 0
@@ -88,26 +92,32 @@ def compute_metrics(
         if not db.exists():
             return {}
 
-        conn = sqlite3.connect(str(db))
+        with sqlite3.connect(str(db)) as conn:
+            # Get last N sessions
+            max_session = (
+                conn.execute(
+                    "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
+                ).fetchone()[0]
+                or 0
+            )
+            min_session = max(1, max_session - window + 1)
 
-        # Get last N sessions
-        max_session = conn.execute(
-            "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
-        ).fetchone()[0] or 0
-        min_session = max(1, max_session - window + 1)
-
-        # Correction density
-        outputs = conn.execute(
-            "SELECT COUNT(*) FROM events WHERE type='OUTPUT' AND session >= ?",
-            (min_session,)
-        ).fetchone()[0] or 0
-        corrections = conn.execute(
-            "SELECT COUNT(*) FROM events WHERE type='CORRECTION' AND session >= ?",
-            (min_session,)
-        ).fetchone()[0] or 0
+            # Correction density
+            outputs = (
+                conn.execute(
+                    "SELECT COUNT(*) FROM events WHERE type='OUTPUT' AND session >= ?",
+                    (min_session,),
+                ).fetchone()[0]
+                or 0
+            )
+            corrections = (
+                conn.execute(
+                    "SELECT COUNT(*) FROM events WHERE type='CORRECTION' AND session >= ?",
+                    (min_session,),
+                ).fetchone()[0]
+                or 0
+            )
         density = corrections / outputs if outputs > 0 else 0.0
-
-        conn.close()
 
         return {
             "window_size": window,
@@ -116,6 +126,7 @@ def compute_metrics(
             "sessions_covered": max_session - min_session + 1,
         }
     except Exception:
+        logger.warning("compute_metrics failed", exc_info=True)
         return {}
 
 
@@ -136,10 +147,7 @@ def format_metrics(m) -> str:
     window_size = int(get("window_size", 0))
 
     if sample_size == 0:
-        return (
-            f"MetricsWindow (window={window_size})\n"
-            "  No data — no OUTPUT events in window.\n"
-        )
+        return f"MetricsWindow (window={window_size})\n  No data — no OUTPUT events in window.\n"
 
     acceptance = get("acceptance_distribution", {}) or {}
     dist_parts = ", ".join(f"{k}: {v}" for k, v in sorted(acceptance.items()))
@@ -154,9 +162,6 @@ def format_metrics(m) -> str:
         f"  Acceptance dist:        {dist_parts or 'none'}",
         f"  Rule success rate:      {float(get('rule_success_rate', 0.0)):.1%}",
         f"  Rule misfire rate:      {float(get('rule_misfire_rate', 0.0)):.1%}",
-        f"  Blandness score:        {blandness:.3f} "
-        f"({'generic' if blandness > 0.7 else 'varied'})",
+        f"  Blandness score:        {blandness:.3f} ({'generic' if blandness > 0.7 else 'varied'})",
     ]
     return "\n".join(lines)
-
-

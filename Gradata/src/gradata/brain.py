@@ -879,9 +879,21 @@ class Brain(BrainInspectionMixin):
         task: str,
         context: dict | None = None,
         agent_type: str | None = None,
-        max_rules: int = 10,
+        max_rules: int | None = None,
+        max_recall_tokens: int | None = None,
+        ranker: str | None = None,
     ) -> str:
         """Get applicable brain rules for a task, formatted for prompt injection."""
+        from gradata._config import _load_brain_config
+
+        cfg = _load_brain_config(self.dir)
+        if max_rules is None:
+            max_rules = 10
+        if max_recall_tokens is None:
+            max_recall_tokens = cfg.max_recall_tokens
+        if ranker is None:
+            ranker = cfg.ranker
+
         self._query_budget.record("apply_rules")
         if self._query_budget.is_rate_exceeded("apply_rules"):
             logger.warning("Query budget exceeded for apply_rules")
@@ -910,7 +922,11 @@ class Brain(BrainInspectionMixin):
         # Check rule cache first (Pattern 2: skip re-ranking if scope unchanged)
         from gradata.rules.cache import RuleCache
 
-        cache_key = RuleCache.make_key(scope.task_type, scope.domain, scope.audience)
+        cache_key = RuleCache.make_key(
+            f"{scope.task_type}:{ranker}:{max_recall_tokens}:{max_rules}",
+            scope.domain,
+            scope.audience,
+        )
         cached = self._rule_cache.get(cache_key)
         if cached is not None:
             return cached
@@ -929,6 +945,7 @@ class Brain(BrainInspectionMixin):
                 lessons,
                 scope,
                 max_rules=max_rules,
+                ranker=ranker,
                 event_bus=_bus,
             )
         except (ImportError, Exception):
@@ -963,6 +980,17 @@ class Brain(BrainInspectionMixin):
                 logger.debug("rules.injected emit failed: %s", e)
 
         result = format_rules_for_prompt(applied)
+        if max_recall_tokens > 0 and result:
+            budget_chars = max_recall_tokens * 4
+            if len(result) > budget_chars:
+                result = result[:budget_chars].rstrip()
+                if not result.endswith("</brain-rules>"):
+                    last_tag_boundary = result.rfind(">")
+                    if last_tag_boundary >= 0:
+                        result = result[: last_tag_boundary + 1].rstrip()
+                    else:
+                        result = "<brain-rules>"
+                    result = f"{result}\n</brain-rules>"
         self._rule_cache.put(cache_key, result)
         return result
 

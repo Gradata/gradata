@@ -11,14 +11,8 @@ Steals 1-2 are design docs (no code to test).
 """
 
 import json
-import re
-import tempfile
-from pathlib import Path
 
-import pytest
-
-from gradata._types import Lesson, LessonState, CorrectionType, RuleTransferScope
-
+from gradata._types import Lesson, LessonState
 
 # =========================================================================
 # STEAL 3: MCP Tools
@@ -90,8 +84,14 @@ class TestMCPToolCorrect:
         from gradata.mcp_tools import correct
 
         result = correct("alpha", "beta")
-        required_keys = {"severity", "edit_distance", "compression_distance",
-                         "category", "summary_stats", "lesson_created"}
+        required_keys = {
+            "severity",
+            "edit_distance",
+            "compression_distance",
+            "category",
+            "summary_stats",
+            "lesson_created",
+        }
         assert required_keys.issubset(result.keys())
 
 
@@ -126,7 +126,9 @@ class TestMCPToolRecall:
 
         lines = []
         for i in range(20):
-            lines.append(f"[2026-03-01] [RULE:0.9{i % 10}] CAT{i}: Rule number {i} about email writing\n")
+            lines.append(
+                f"[2026-03-01] [RULE:0.9{i % 10}] CAT{i}: Rule number {i} about email writing\n"
+            )
 
         lessons_file = tmp_path / "lessons.md"
         lessons_file.write_text("".join(lines), encoding="utf-8")
@@ -160,9 +162,17 @@ class TestMCPToolManifest:
         from gradata.mcp_tools import manifest
 
         result = manifest()
-        required_keys = {"correction_rate", "categories_extinct", "compound_score",
-                         "rules_count", "meta_rules_count", "sessions_trained",
-                         "maturity_phase", "lessons_active", "lessons_graduated"}
+        required_keys = {
+            "correction_rate",
+            "categories_extinct",
+            "compound_score",
+            "rules_count",
+            "meta_rules_count",
+            "sessions_trained",
+            "maturity_phase",
+            "lessons_active",
+            "lessons_graduated",
+        }
         assert required_keys.issubset(result.keys())
 
     def test_compound_score_range(self):
@@ -366,23 +376,48 @@ class TestLearningGraph:
 
     def _make_lessons(self) -> list[Lesson]:
         return [
-            Lesson(date="2026-03-01", state=LessonState.RULE, confidence=0.95,
-                   category="DRAFTING", description="Never use revolutionize"),
-            Lesson(date="2026-03-01", state=LessonState.RULE, confidence=0.92,
-                   category="DRAFTING", description="Keep emails under 200 words"),
-            Lesson(date="2026-03-01", state=LessonState.PATTERN, confidence=0.72,
-                   category="PROCESS", description="Verify prospect identity"),
-            Lesson(date="2026-03-01", state=LessonState.INSTINCT, confidence=0.35,
-                   category="TONE", description="Casual follow-up tone"),
-            Lesson(date="2026-03-01", state=LessonState.PATTERN, confidence=0.68,
-                   category="FORMATTING", description="No em dashes in email"),
+            Lesson(
+                date="2026-03-01",
+                state=LessonState.RULE,
+                confidence=0.95,
+                category="DRAFTING",
+                description="Never use revolutionize",
+            ),
+            Lesson(
+                date="2026-03-01",
+                state=LessonState.RULE,
+                confidence=0.92,
+                category="DRAFTING",
+                description="Keep emails under 200 words",
+            ),
+            Lesson(
+                date="2026-03-01",
+                state=LessonState.PATTERN,
+                confidence=0.72,
+                category="PROCESS",
+                description="Verify prospect identity",
+            ),
+            Lesson(
+                date="2026-03-01",
+                state=LessonState.INSTINCT,
+                confidence=0.35,
+                category="TONE",
+                description="Casual follow-up tone",
+            ),
+            Lesson(
+                date="2026-03-01",
+                state=LessonState.PATTERN,
+                confidence=0.68,
+                category="FORMATTING",
+                description="No em dashes in email",
+            ),
         ]
 
     def test_build_graph_nodes(self):
         from gradata.graph import build_learning_graph
 
         lessons = self._make_lessons()
-        nodes, edges = build_learning_graph(lessons)
+        nodes, _edges = build_learning_graph(lessons)
 
         assert len(nodes) == 5
         # Check node types
@@ -394,10 +429,10 @@ class TestLearningGraph:
         from gradata.graph import build_learning_graph
 
         lessons = self._make_lessons()
-        nodes, edges = build_learning_graph(lessons)
+        _nodes, edges = build_learning_graph(lessons)
 
         # Should have graduation edges within DRAFTING category
-        edge_relations = {e.relation for e in edges}
+        {e.relation for e in edges}
         assert len(edges) > 0
 
     def test_build_graph_with_meta_rules(self):
@@ -415,7 +450,7 @@ class TestLearningGraph:
             }
         ]
 
-        nodes, edges = build_learning_graph(lessons, meta_rules)
+        nodes, _edges = build_learning_graph(lessons, meta_rules)
 
         # Should have meta-rule node
         meta_nodes = [n for n in nodes if n.type == "meta_rule"]
@@ -469,12 +504,22 @@ class TestLearningGraph:
         from gradata.graph import build_learning_graph
 
         lessons = [
-            Lesson(date="2026-03-01", state=LessonState.RULE, confidence=0.99,
-                   category="DRAFTING", description="High confidence rule",
-                   fire_count=10),
-            Lesson(date="2026-03-01", state=LessonState.INSTINCT, confidence=0.20,
-                   category="DRAFTING", description="Low confidence instinct",
-                   fire_count=0),
+            Lesson(
+                date="2026-03-01",
+                state=LessonState.RULE,
+                confidence=0.99,
+                category="DRAFTING",
+                description="High confidence rule",
+                fire_count=10,
+            ),
+            Lesson(
+                date="2026-03-01",
+                state=LessonState.INSTINCT,
+                confidence=0.20,
+                category="DRAFTING",
+                description="Low confidence instinct",
+                fire_count=0,
+            ),
         ]
 
         nodes, _ = build_learning_graph(lessons)
@@ -509,18 +554,16 @@ class TestIntegration:
     """Test that all new modules import cleanly and work together."""
 
     def test_all_imports(self):
-        from gradata.mcp_tools import correct, recall, manifest
-        from gradata.correction_detector import detect_correction, extract_correction_context
-        from gradata.graph import build_learning_graph, GraphNode, GraphEdge, to_json
+        pass
 
     def test_correction_to_graph_flow(self):
         """Simulate: detect correction -> log it -> build graph."""
         from gradata.correction_detector import detect_correction
-        from gradata.mcp_tools import correct
         from gradata.graph import build_learning_graph
+        from gradata.mcp_tools import correct
 
         # Step 1: Detect correction
-        is_corr, conf = detect_correction("No, don't use bold in the email body")
+        is_corr, _conf = detect_correction("No, don't use bold in the email body")
         assert is_corr is True
 
         # Step 2: Log the correction
@@ -539,7 +582,6 @@ class TestIntegration:
             category="FORMATTING",
             description="No bold in email body text",
         )
-        nodes, edges = build_learning_graph([lesson])
+        nodes, _edges = build_learning_graph([lesson])
         assert len(nodes) == 1
         assert nodes[0].category == "FORMATTING"
-

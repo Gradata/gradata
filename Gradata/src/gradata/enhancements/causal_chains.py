@@ -87,12 +87,10 @@ class CausalChain:
         return {
             "rule_id": rule_id,
             "correction_sources": [
-                {"id": l.source_id, "strength": l.strength, "session": l.session}
-                for l in origins
+                {"id": l.source_id, "strength": l.strength, "session": l.session} for l in origins
             ],
             "behavioral_impacts": [
-                {"id": l.target_id, "strength": l.strength, "session": l.session}
-                for l in impacts
+                {"id": l.target_id, "strength": l.strength, "session": l.session} for l in impacts
             ],
             "total_evidence": len(origins) + len(impacts),
         }

@@ -26,10 +26,13 @@ Usage (CLI):
 
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 
 from gradata.enhancements.rule_export import _parse_rules
+
+_log = logging.getLogger(__name__)
 
 # Anthropic Skills frontmatter description has a 1024-char ceiling.
 # Source: anthropic.com/news/agent-skills (2025-10-16 launch announcement).
@@ -170,11 +173,18 @@ def _load_meta_principles(brain_root: Path) -> list[str]:
         metas = load_meta_rules(db_path)
     except Exception:
         return []
-    return [
-        m.principle
-        for m in metas
-        if getattr(m, "source", "deterministic") in INJECTABLE_META_SOURCES
-    ]
+    principles = []
+    for meta in metas:
+        source = getattr(meta, "source", "deterministic")
+        if source in INJECTABLE_META_SOURCES:
+            principles.append(meta.principle)
+        else:
+            _log.warning(
+                "dropping meta-rule %s (source=%s) from injection",
+                getattr(meta, "id", "<unknown>"),
+                source,
+            )
+    return principles
 
 
 def export_skill(

@@ -1,5 +1,7 @@
 """Tests for prove() integration in brain manifest."""
+
 from unittest.mock import patch
+
 from gradata.brain import Brain
 
 
@@ -35,6 +37,7 @@ def test_manifest_proof_survives_prove_failure(tmp_path):
 def test_manifest_proof_written_to_disk(tmp_path):
     """brain.manifest.json on disk should contain the proof key."""
     import json
+
     brain = Brain(str(tmp_path))
     brain.manifest()
     manifest_path = tmp_path / "brain.manifest.json"

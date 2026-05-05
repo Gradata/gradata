@@ -6,19 +6,17 @@ at the behavioral level (no internal state inspection).
 
 Run: cd sdk && python -m pytest tests/test_brain_learning.py -v
 """
-from __future__ import annotations
 
-import tempfile
-from pathlib import Path
+from __future__ import annotations
 
 import pytest
 
 from tests.conftest import init_brain
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _seed_lessons(brain, n: int = 1, category: str = "TONE") -> None:
     """Create or append minimal lessons.md entries so forget() has something to remove.
@@ -26,9 +24,10 @@ def _seed_lessons(brain, n: int = 1, category: str = "TONE") -> None:
     Uses format_lessons() to guarantee the file is parseable by parse_lessons().
     Appends to an existing file so multiple calls accumulate lessons.
     """
-    from gradata._types import Lesson, LessonState
-    from gradata.enhancements.self_improvement import parse_lessons, format_lessons
     from datetime import date
+
+    from gradata._types import Lesson, LessonState
+    from gradata.enhancements.self_improvement import format_lessons, parse_lessons
 
     new_lessons = [
         Lesson(
@@ -55,6 +54,7 @@ def _seed_lessons(brain, n: int = 1, category: str = "TONE") -> None:
 # ---------------------------------------------------------------------------
 # 1. detect_implicit_feedback()
 # ---------------------------------------------------------------------------
+
 
 class TestDetectImplicitFeedback:
     """detect_implicit_feedback() classifies implicit signals in user text."""
@@ -154,6 +154,7 @@ class TestDetectImplicitFeedback:
 # 2. forget()
 # ---------------------------------------------------------------------------
 
+
 class TestForget:
     """forget() — human-friendly undo via plain English strings."""
 
@@ -213,6 +214,7 @@ class TestForget:
 # 3. correct() — input validation (guard-rails, not pipeline internals)
 # ---------------------------------------------------------------------------
 
+
 class TestCorrectValidation:
     """correct() rejects malformed inputs before touching the pipeline."""
 
@@ -257,6 +259,7 @@ class TestCorrectValidation:
 # 4. log_output()
 # ---------------------------------------------------------------------------
 
+
 class TestLogOutput:
     """log_output() records AI-generated text for outcome attribution."""
 
@@ -295,6 +298,7 @@ class TestLogOutput:
 # 5. plan()
 # ---------------------------------------------------------------------------
 
+
 class TestPlan:
     """plan() builds a structured task plan (steps + applicable rules)."""
 
@@ -328,6 +332,7 @@ class TestPlan:
 # ---------------------------------------------------------------------------
 # 6. spawn_queue()
 # ---------------------------------------------------------------------------
+
 
 class TestSpawnQueue:
     """spawn_queue() runs tasks concurrently and returns completion stats."""

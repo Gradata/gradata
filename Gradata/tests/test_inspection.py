@@ -12,8 +12,8 @@ import pytest
 from gradata.inspection import (
     _dict_to_yaml,
     _make_rule_id,
-    export_rules,
     explain_rule,
+    export_rules,
     list_rules,
 )
 
@@ -79,7 +79,16 @@ def brain_dir(tmp_path: Path) -> Path:
         """INSERT INTO lesson_transitions
            (lesson_desc, category, old_state, new_state, confidence, fire_count, session, transitioned_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        ("Never use em dashes in email prose", "DRAFTING", "PATTERN", "RULE", 0.95, 12, 50, "2026-01-15T10:00:00"),
+        (
+            "Never use em dashes in email prose",
+            "DRAFTING",
+            "PATTERN",
+            "RULE",
+            0.95,
+            12,
+            50,
+            "2026-01-15T10:00:00",
+        ),
     )
     conn.commit()
     conn.close()
@@ -94,28 +103,30 @@ def brain_dir(tmp_path: Path) -> Path:
 # list_rules tests
 # ---------------------------------------------------------------------------
 
+
 class TestListRules:
     def test_default_filters_to_pattern_and_rule(self, brain_dir: Path):
         """Default call returns only PATTERN + RULE lessons."""
-        result = list_rules(db_path=brain_dir / "system.db",
-                            lessons_path=brain_dir / "lessons.md")
+        result = list_rules(db_path=brain_dir / "system.db", lessons_path=brain_dir / "lessons.md")
         assert len(result) == 2
         states = {r["state"] for r in result}
         assert states == {"RULE", "PATTERN"}
 
     def test_include_all_returns_everything(self, brain_dir: Path):
         """include_all=True returns all 3 lessons."""
-        result = list_rules(db_path=brain_dir / "system.db",
-                            lessons_path=brain_dir / "lessons.md",
-                            include_all=True)
+        result = list_rules(
+            db_path=brain_dir / "system.db", lessons_path=brain_dir / "lessons.md", include_all=True
+        )
         assert len(result) == 3
 
     def test_category_filter(self, brain_dir: Path):
         """Category filter narrows results."""
-        result = list_rules(db_path=brain_dir / "system.db",
-                            lessons_path=brain_dir / "lessons.md",
-                            include_all=True,
-                            category="DRAFTING")
+        result = list_rules(
+            db_path=brain_dir / "system.db",
+            lessons_path=brain_dir / "lessons.md",
+            include_all=True,
+            category="DRAFTING",
+        )
         assert len(result) == 1
         assert result[0]["category"] == "DRAFTING"
 
@@ -124,14 +135,12 @@ class TestListRules:
         d = tmp_path / "empty-brain"
         d.mkdir()
         (d / "lessons.md").write_text("", encoding="utf-8")
-        result = list_rules(db_path=d / "system.db",
-                            lessons_path=d / "lessons.md")
+        result = list_rules(db_path=d / "system.db", lessons_path=d / "lessons.md")
         assert result == []
 
     def test_rule_dict_has_expected_keys(self, brain_dir: Path):
         """Each rule dict has id, state, confidence, category, description."""
-        result = list_rules(db_path=brain_dir / "system.db",
-                            lessons_path=brain_dir / "lessons.md")
+        result = list_rules(db_path=brain_dir / "system.db", lessons_path=brain_dir / "lessons.md")
         for r in result:
             assert "id" in r
             assert "state" in r
@@ -144,26 +153,30 @@ class TestListRules:
 # explain_rule tests
 # ---------------------------------------------------------------------------
 
+
 class TestExplainRule:
     def test_explain_existing_rule(self, brain_dir: Path):
         """explain_rule returns metadata + transitions for an existing rule."""
-        rules = list_rules(db_path=brain_dir / "system.db",
-                           lessons_path=brain_dir / "lessons.md")
+        rules = list_rules(db_path=brain_dir / "system.db", lessons_path=brain_dir / "lessons.md")
         rule_id = rules[0]["id"]  # first RULE/PATTERN
-        result = explain_rule(db_path=brain_dir / "system.db",
-                              events_path=brain_dir / "events.jsonl",
-                              rule_id=rule_id,
-                              lessons_path=brain_dir / "lessons.md")
+        result = explain_rule(
+            db_path=brain_dir / "system.db",
+            events_path=brain_dir / "events.jsonl",
+            rule_id=rule_id,
+            lessons_path=brain_dir / "lessons.md",
+        )
         assert "description" in result
         assert "category" in result
         assert "transitions" in result
 
     def test_explain_nonexistent_rule(self, brain_dir: Path):
         """explain_rule returns error dict for unknown rule_id."""
-        result = explain_rule(db_path=brain_dir / "system.db",
-                              events_path=brain_dir / "events.jsonl",
-                              rule_id="nonexistent-id",
-                              lessons_path=brain_dir / "lessons.md")
+        result = explain_rule(
+            db_path=brain_dir / "system.db",
+            events_path=brain_dir / "events.jsonl",
+            rule_id="nonexistent-id",
+            lessons_path=brain_dir / "lessons.md",
+        )
         assert "error" in result
 
 
@@ -171,12 +184,15 @@ class TestExplainRule:
 # export_rules tests
 # ---------------------------------------------------------------------------
 
+
 class TestExportRules:
     def test_json_format(self, brain_dir: Path):
         """JSON export is valid JSON with expected keys."""
-        output = export_rules(db_path=brain_dir / "system.db",
-                              lessons_path=brain_dir / "lessons.md",
-                              output_format="json")
+        output = export_rules(
+            db_path=brain_dir / "system.db",
+            lessons_path=brain_dir / "lessons.md",
+            output_format="json",
+        )
         parsed = json.loads(output)
         assert "rules" in parsed
         assert "metadata" in parsed
@@ -184,23 +200,28 @@ class TestExportRules:
 
     def test_yaml_format(self, brain_dir: Path):
         """YAML export contains expected markers."""
-        output = export_rules(db_path=brain_dir / "system.db",
-                              lessons_path=brain_dir / "lessons.md",
-                              output_format="yaml")
+        output = export_rules(
+            db_path=brain_dir / "system.db",
+            lessons_path=brain_dir / "lessons.md",
+            output_format="yaml",
+        )
         assert "rules:" in output
         assert "category:" in output
 
     def test_invalid_format_raises(self, brain_dir: Path):
         """Unsupported format raises ValueError."""
         with pytest.raises(ValueError, match="Unsupported"):
-            export_rules(db_path=brain_dir / "system.db",
-                         lessons_path=brain_dir / "lessons.md",
-                         output_format="xml")
+            export_rules(
+                db_path=brain_dir / "system.db",
+                lessons_path=brain_dir / "lessons.md",
+                output_format="xml",
+            )
 
 
 # ---------------------------------------------------------------------------
 # _dict_to_yaml tests
 # ---------------------------------------------------------------------------
+
 
 class TestDictToYaml:
     def test_simple_dict(self):
@@ -223,13 +244,19 @@ class TestDictToYaml:
 # _make_rule_id tests
 # ---------------------------------------------------------------------------
 
+
 class TestMakeRuleId:
     def test_stable_id(self):
         """Same input produces same ID."""
         from gradata._types import Lesson, LessonState
-        lesson = Lesson(date="2026-01-01", state=LessonState.RULE,
-                        confidence=0.95, category="DRAFTING",
-                        description="Never use em dashes")
+
+        lesson = Lesson(
+            date="2026-01-01",
+            state=LessonState.RULE,
+            confidence=0.95,
+            category="DRAFTING",
+            description="Never use em dashes",
+        )
         id1 = _make_rule_id(lesson)
         id2 = _make_rule_id(lesson)
         assert id1 == id2
@@ -237,12 +264,21 @@ class TestMakeRuleId:
 
     def test_different_lessons_different_ids(self):
         from gradata._types import Lesson, LessonState
-        l1 = Lesson(date="2026-01-01", state=LessonState.RULE,
-                     confidence=0.95, category="DRAFTING",
-                     description="Never use em dashes")
-        l2 = Lesson(date="2026-01-01", state=LessonState.RULE,
-                     confidence=0.95, category="ACCURACY",
-                     description="Verify data first")
+
+        l1 = Lesson(
+            date="2026-01-01",
+            state=LessonState.RULE,
+            confidence=0.95,
+            category="DRAFTING",
+            description="Never use em dashes",
+        )
+        l2 = Lesson(
+            date="2026-01-01",
+            state=LessonState.RULE,
+            confidence=0.95,
+            category="ACCURACY",
+            description="Verify data first",
+        )
         assert _make_rule_id(l1) != _make_rule_id(l2)
 
 
@@ -250,12 +286,21 @@ class TestMakeRuleId:
 # Brain wrapper tests
 # ---------------------------------------------------------------------------
 
+
 class TestBrainWrappers:
     @pytest.fixture()
     def brain(self, brain_dir: Path):
+        import importlib
+        import os
+
+        import gradata._paths as _p
         from gradata.brain import Brain
-        return Brain.init(brain_dir, name="Test", domain="Testing",
-                          embedding="local", interactive=False)
+
+        os.environ["BRAIN_DIR"] = str(brain_dir)
+        importlib.reload(_p)
+        return Brain.init(
+            brain_dir, name="Test", domain="Testing", embedding="local", interactive=False
+        )
 
     def test_brain_rules_returns_list(self, brain):
         result = brain.rules()
@@ -280,8 +325,8 @@ class TestBrainWrappers:
     def test_brain_rules_empty(self, tmp_path: Path):
         """Brain with no lessons returns empty list."""
         from gradata.brain import Brain
+
         d = tmp_path / "empty-brain"
-        b = Brain.init(d, name="Empty", domain="Test",
-                       embedding="local", interactive=False)
+        b = Brain.init(d, name="Empty", domain="Test", embedding="local", interactive=False)
         result = b.rules()
         assert result == []

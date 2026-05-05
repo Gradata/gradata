@@ -15,6 +15,7 @@ Callers should ALWAYS go through :func:`get_config_dir` instead of building
 paths from ``Path.home()`` directly. That keeps future work (XDG compliance,
 Windows %APPDATA%, sandboxed test overrides) in one place.
 """
+
 from __future__ import annotations
 
 import os
@@ -34,7 +35,10 @@ def get_config_dir() -> Path:
     """
     override = os.environ.get(ENV_CONFIG_DIR, "").strip()
     if override:
-        return Path(override).expanduser().resolve()
+        override_path = Path(override).expanduser()
+        if not override_path.is_absolute():
+            raise ValueError(f"{ENV_CONFIG_DIR} must be an absolute path")
+        return override_path.resolve()
 
     xdg = os.environ.get(ENV_XDG_CONFIG_HOME, "").strip()
     if xdg and os.name != "nt":
@@ -45,4 +49,15 @@ def get_config_dir() -> Path:
 
 def get_config_file(name: str) -> Path:
     """Return ``<config_dir>/<name>``. Convenience wrapper."""
-    return get_config_dir() / name
+    if not str(name).strip():
+        raise ValueError("config file name must be a relative path inside the config directory")
+    requested = Path(name)
+    if requested == Path("."):
+        raise ValueError("config file name must be a relative path inside the config directory")
+    if requested.is_absolute() or ".." in requested.parts:
+        raise ValueError("config file name must be a relative path inside the config directory")
+    config_dir = get_config_dir()
+    resolved = (config_dir / requested).resolve()
+    if config_dir.resolve() not in (resolved, *resolved.parents):
+        raise ValueError("config file path escapes the config directory")
+    return resolved

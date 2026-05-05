@@ -42,12 +42,12 @@ class RuleRelationType(Enum):
 # Contradiction detection patterns (imported from contradiction_detector)
 # ---------------------------------------------------------------------------
 
-from gradata.enhancements.contradiction_detector import (  # noqa: E402
+from gradata.enhancements.contradiction_detector import (
     _ACTION_OPPOSITES,
     _POLARITY_PAIRS,
     _normalize,
 )
-from gradata.enhancements.similarity import _STOP_WORDS as _STOPWORDS  # noqa: E402
+from gradata.enhancements.similarity import _STOP_WORDS as _STOPWORDS
 
 
 def _extract_keywords(text: str) -> set[str]:

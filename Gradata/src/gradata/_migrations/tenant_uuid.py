@@ -12,9 +12,11 @@ Usage (as module):
 CLI:
     python src/gradata/_migrations/tenant_uuid.py --brain C:/.../brain
 """
+
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import uuid
 from pathlib import Path
@@ -38,27 +40,32 @@ def get_or_create_tenant_id(brain_dir: str | Path) -> str:
         if _is_valid_uuid(tid):
             return tid
 
-    # Exclusive create of a per-process temp file, then atomic rename.
+    # Exclusive create of a unique temp file, then atomic rename.
     new_tid = str(uuid.uuid4())
-    tmp = brain / f".tenant_id.tmp.{os.getpid()}"
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    fd = os.open(tmp, flags, 0o644)
+    while True:
+        tmp = brain / f".tenant_id.tmp.{os.getpid()}.{uuid.uuid4().hex}"
+        try:
+            fd = os.open(tmp, flags, 0o644)
+            break
+        except FileExistsError:
+            continue
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(new_tid)
-        # os.replace is atomic on POSIX AND on Windows (overwrites target).
-        # If the target already exists (another process won), we still replace
-        # with our tmp -- but we'll read the existing file below instead.
-        if not fpath.exists():
+        try:
             os.replace(tmp, fpath)
-        else:
-            # Lost the race: drop our temp, read what the winner wrote.
+        except FileExistsError:
             os.unlink(tmp)
-    except FileExistsError:
-        # Extremely unlikely (PID collision); fall back to reading disk.
-        pass
+    except Exception:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(tmp)
+        raise
 
-    tid = fpath.read_text(encoding="utf-8").strip()
+    try:
+        tid = fpath.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return new_tid
     if _is_valid_uuid(tid):
         return tid
     # Shouldn't happen; return our generated UUID as last resort.

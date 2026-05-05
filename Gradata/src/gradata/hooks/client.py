@@ -8,6 +8,7 @@ other than changing the command to route through this module.
 Exits 0 on success, 127 on unknown hook, 1 on transport errors (after
 fallback also fails).
 """
+
 from __future__ import annotations
 
 import importlib

@@ -9,26 +9,25 @@ stdlib + pytest only; no network, no FS side-effects outside tmp_path.
 from __future__ import annotations
 
 import pytest
-
 from src.gradata.enhancements.scoring.gate_calibration import (
     CalibrationResult,
     GateCalibrator,
     ThresholdCandidate,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_calibrator(**kwargs) -> GateCalibrator:
     """Return a GateCalibrator with default args, overridable via kwargs."""
     return GateCalibrator(**kwargs)
 
 
-def _clear_accept_reject_data(n_accept: int, n_reject: int,
-                               accept_score: float = 9.0,
-                               reject_score: float = 5.0) -> list[tuple[float, bool]]:
+def _clear_accept_reject_data(
+    n_accept: int, n_reject: int, accept_score: float = 9.0, reject_score: float = 5.0
+) -> list[tuple[float, bool]]:
     """Produce a simple labelled dataset with no ambiguity."""
     return [(accept_score, True)] * n_accept + [(reject_score, False)] * n_reject
 
@@ -37,11 +36,18 @@ def _clear_accept_reject_data(n_accept: int, n_reject: int,
 # Dataclass shape tests
 # ---------------------------------------------------------------------------
 
+
 class TestDataclassShapes:
     def test_threshold_candidate_fields(self):
         tc = ThresholdCandidate(
-            threshold=8.0, precision=0.9, recall=0.8, f1=0.847,
-            true_positives=9, false_positives=1, true_negatives=10, false_negatives=2,
+            threshold=8.0,
+            precision=0.9,
+            recall=0.8,
+            f1=0.847,
+            true_positives=9,
+            false_positives=1,
+            true_negatives=10,
+            false_negatives=2,
         )
         assert tc.threshold == 8.0
         assert tc.true_positives == 9
@@ -66,6 +72,7 @@ class TestDataclassShapes:
 # ---------------------------------------------------------------------------
 # GateCalibrator construction
 # ---------------------------------------------------------------------------
+
 
 class TestConstruction:
     def test_defaults(self):
@@ -96,6 +103,7 @@ class TestConstruction:
 # record() and n_samples
 # ---------------------------------------------------------------------------
 
+
 class TestRecord:
     def test_single_record(self):
         gc = GateCalibrator()
@@ -120,6 +128,7 @@ class TestRecord:
 # load()
 # ---------------------------------------------------------------------------
 
+
 class TestLoad:
     def test_load_extends_data(self):
         gc = GateCalibrator()
@@ -143,6 +152,7 @@ class TestLoad:
 # to_pairs()
 # ---------------------------------------------------------------------------
 
+
 class TestToPairs:
     def test_empty(self):
         gc = GateCalibrator()
@@ -152,8 +162,8 @@ class TestToPairs:
         gc = GateCalibrator()
         gc.record(8.0, True)
         pairs = gc.to_pairs()
-        pairs.append((1.0, False))        # mutate the return value
-        assert gc.n_samples == 1          # internal list must be unchanged
+        pairs.append((1.0, False))  # mutate the return value
+        assert gc.n_samples == 1  # internal list must be unchanged
 
     def test_order_preserved(self):
         gc = GateCalibrator()
@@ -165,6 +175,7 @@ class TestToPairs:
 # ---------------------------------------------------------------------------
 # compute_optimal_threshold — empty data
 # ---------------------------------------------------------------------------
+
 
 class TestComputeEmpty:
     def test_empty_returns_sentinel(self):
@@ -186,6 +197,7 @@ class TestComputeEmpty:
 # compute_optimal_threshold — insufficient data (n < min_samples)
 # ---------------------------------------------------------------------------
 
+
 class TestComputeInsufficientData:
     def test_insufficient_data_flag(self):
         gc = GateCalibrator(min_samples=50)
@@ -205,6 +217,7 @@ class TestComputeInsufficientData:
 # ---------------------------------------------------------------------------
 # compute_optimal_threshold — sufficient data (n >= min_samples)
 # ---------------------------------------------------------------------------
+
 
 class TestComputeSufficientData:
     def test_sufficient_data_flag(self):
@@ -274,6 +287,7 @@ class TestComputeSufficientData:
 # _evaluate_threshold — direct coverage of all quadrants
 # ---------------------------------------------------------------------------
 
+
 class TestEvaluateThreshold:
     """Drive _evaluate_threshold through every TP/FP/TN/FN branch."""
 
@@ -325,10 +339,10 @@ class TestEvaluateThreshold:
 
     def test_mixed_all_quadrants(self):
         data = [
-            (9.0, True),   # TP
+            (9.0, True),  # TP
             (9.0, False),  # FP
             (5.0, False),  # TN
-            (5.0, True),   # FN
+            (5.0, True),  # FN
         ]
         gc = self._gc_with(data)
         c = gc._evaluate_threshold(8.0)
@@ -351,6 +365,7 @@ class TestEvaluateThreshold:
 # Tie-breaking: prefer_higher_on_tie
 # ---------------------------------------------------------------------------
 
+
 class TestTieBreaking:
     def _tie_data(self):
         """Dataset where multiple thresholds yield the same F1=1.0."""
@@ -358,8 +373,10 @@ class TestTieBreaking:
 
     def test_prefer_higher_picks_highest_tied_threshold(self):
         gc = GateCalibrator(
-            min_samples=1, prefer_higher_on_tie=True,
-            sweep_min=5.0, sweep_max=9.5,
+            min_samples=1,
+            prefer_higher_on_tie=True,
+            sweep_min=5.0,
+            sweep_max=9.5,
         )
         gc.load(self._tie_data())
         result = gc.compute_optimal_threshold()
@@ -370,8 +387,10 @@ class TestTieBreaking:
         the first threshold above 5.0 that captures all 9.0-scored accepts
         while excluding 5.0-scored rejects)."""
         gc = GateCalibrator(
-            min_samples=1, prefer_higher_on_tie=False,
-            sweep_min=5.0, sweep_max=9.5,
+            min_samples=1,
+            prefer_higher_on_tie=False,
+            sweep_min=5.0,
+            sweep_max=9.5,
         )
         gc.load(self._tie_data())
         result = gc.compute_optimal_threshold()
@@ -382,6 +401,7 @@ class TestTieBreaking:
 # ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
+
 
 class TestEdgeCases:
     def test_all_accepted(self):
@@ -418,8 +438,10 @@ class TestEdgeCases:
     def test_current_threshold_not_in_sweep_still_returns(self):
         """If sweep range excludes current_threshold, current_f1 stays 0."""
         gc = GateCalibrator(
-            current_threshold=8.0, min_samples=1,
-            sweep_min=5.0, sweep_max=7.0,
+            current_threshold=8.0,
+            min_samples=1,
+            sweep_min=5.0,
+            sweep_max=7.0,
         )
         gc.load(_clear_accept_reject_data(10, 10))
         result = gc.compute_optimal_threshold()
@@ -442,7 +464,7 @@ class TestEdgeCases:
     def test_precision_recall_zero_when_no_positives_predicted(self):
         """All scores below threshold => no predicted positives => precision=recall=0."""
         gc = GateCalibrator(min_samples=1)
-        gc.load([(4.0, True)] * 5)   # all below any sweep threshold
+        gc.load([(4.0, True)] * 5)  # all below any sweep threshold
         c = gc._evaluate_threshold(5.0)
         # score 4.0 < 5.0 => predicted fail; accepted=True => FN
         assert c.false_negatives == 5

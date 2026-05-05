@@ -1,11 +1,12 @@
 """Tests for RuleGraph integration with the correction pipeline."""
+
 from gradata.brain import Brain
 from gradata.rules.rule_graph import RuleGraph
 
 
 def test_brain_has_rule_graph(tmp_path):
     brain = Brain(str(tmp_path))
-    assert hasattr(brain, '_rule_graph')
+    assert hasattr(brain, "_rule_graph")
     assert isinstance(brain._rule_graph, RuleGraph)
 
 
@@ -18,23 +19,33 @@ def test_rule_graph_persists_after_correction(tmp_path):
         session=1,
     )
     # Graph file should exist after correction
-    graph_path = tmp_path / "rule_graph.json"
+    tmp_path / "rule_graph.json"
     # Graph may or may not have edges depending on whether rules were applied
-    assert hasattr(brain._rule_graph, 'node_count')
+    assert hasattr(brain._rule_graph, "node_count")
 
 
 def test_co_occurrence_tracked_in_apply_rules():
     """apply_rules records co-occurrence when graph is provided."""
-    from gradata._types import Lesson, LessonState
     from gradata._scope import RuleScope
+    from gradata._types import Lesson, LessonState
     from gradata.rules.rule_engine import apply_rules
 
     graph = RuleGraph()
     rules = [
-        Lesson(date="2026-04-06", state=LessonState.RULE, confidence=0.95,
-               category="DRAFTING", description="Use active voice"),
-        Lesson(date="2026-04-06", state=LessonState.RULE, confidence=0.90,
-               category="TONE", description="Be concise"),
+        Lesson(
+            date="2026-04-06",
+            state=LessonState.RULE,
+            confidence=0.95,
+            category="DRAFTING",
+            description="Use active voice",
+        ),
+        Lesson(
+            date="2026-04-06",
+            state=LessonState.RULE,
+            confidence=0.90,
+            category="TONE",
+            description="Be concise",
+        ),
     ]
     scope = RuleScope()
     apply_rules(rules, scope, graph=graph)
@@ -45,18 +56,24 @@ def test_co_occurrence_tracked_in_apply_rules():
 
 def test_conflict_filtering_drops_conflicting_rules():
     """apply_rules drops lower-ranked rules that conflict with higher-ranked ones."""
-    from gradata._types import Lesson, LessonState
     from gradata._scope import RuleScope
-    from gradata.rules.rule_engine import apply_rules, _make_rule_id
+    from gradata._types import Lesson, LessonState
+    from gradata.rules.rule_engine import _make_rule_id, apply_rules
 
     # Build two lessons and derive their actual rule IDs
     lesson_a = Lesson(
-        date="2026-04-06", state=LessonState.RULE, confidence=0.95,
-        category="DRAFTING", description="Use active voice",
+        date="2026-04-06",
+        state=LessonState.RULE,
+        confidence=0.95,
+        category="DRAFTING",
+        description="Use active voice",
     )
     lesson_b = Lesson(
-        date="2026-04-06", state=LessonState.RULE, confidence=0.90,
-        category="TONE", description="Be concise",
+        date="2026-04-06",
+        state=LessonState.RULE,
+        confidence=0.90,
+        category="TONE",
+        description="Be concise",
     )
     rule_id_a = _make_rule_id(lesson_a)
     rule_id_b = _make_rule_id(lesson_b)

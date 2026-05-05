@@ -58,6 +58,7 @@ def ensure_table(conn: sqlite3.Connection, create_sql: str) -> None:
 # File Locking — concurrency protection for lessons.md
 # ---------------------------------------------------------------------------
 
+
 @contextmanager
 def lessons_lock(lessons_path: str | Path, timeout: float = 10.0):
     """Context manager for exclusive file lock on lessons.md.
@@ -87,6 +88,7 @@ def lessons_lock(lessons_path: str | Path, timeout: float = 10.0):
         # Platform-specific locking
         if os.name == "nt":
             import msvcrt
+
             while True:
                 try:
                     msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
@@ -99,6 +101,7 @@ def lessons_lock(lessons_path: str | Path, timeout: float = 10.0):
                     time.sleep(0.1)
         else:
             import fcntl
+
             while True:
                 try:
                     fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -118,12 +121,14 @@ def lessons_lock(lessons_path: str | Path, timeout: float = 10.0):
             if os.name == "nt":
                 try:
                     import msvcrt
+
                     msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
                 except OSError:
                     pass
             else:
                 try:
                     import fcntl
+
                     fcntl.flock(fd, fcntl.LOCK_UN)
                 except OSError:
                     pass
@@ -205,8 +210,14 @@ def check_budget(conn: sqlite3.Connection, api_name: str, count: int = 1) -> dic
     ).fetchone()
 
     if row is None:
-        return {"allowed": True, "remaining": 999, "daily_limit": 999, "used_today": 0,
-                "api_name": api_name, "error": "unknown API — no budget configured"}
+        return {
+            "allowed": True,
+            "remaining": 999,
+            "daily_limit": 999,
+            "used_today": 0,
+            "api_name": api_name,
+            "error": "unknown API — no budget configured",
+        }
 
     limit, used, last_reset = row[0], row[1], row[2]
 
@@ -242,6 +253,7 @@ def spend_budget(conn: sqlite3.Connection, api_name: str, count: int = 1) -> dic
         return result
 
     from datetime import date
+
     today = date.today().isoformat()
 
     conn.execute(
@@ -258,6 +270,7 @@ def spend_budget(conn: sqlite3.Connection, api_name: str, count: int = 1) -> dic
 def budget_summary(conn: sqlite3.Connection) -> list[dict]:
     """Return all budget rows for morning brief reporting."""
     from datetime import date
+
     today = date.today().isoformat()
 
     # Reset stale rows first

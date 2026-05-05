@@ -21,12 +21,7 @@ Fix verified:
 from __future__ import annotations
 
 import json
-import os
-import textwrap
 from pathlib import Path
-
-import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -72,12 +67,11 @@ class TestResolveAgentBrainDir:
         monkeypatch.delenv("GRADATA_BRAIN_DIR", raising=False)
 
         from gradata.hooks.agent_precontext import _resolve_agent_brain_dir
+
         result = _resolve_agent_brain_dir()
         assert result == str(brain_dir)
 
-    def test_negative_gradata_brain_dir_does_not_shadow_brain_dir(
-        self, tmp_path, monkeypatch
-    ):
+    def test_negative_gradata_brain_dir_does_not_shadow_brain_dir(self, tmp_path, monkeypatch):
         """GRADATA_BRAIN_DIR must NOT shadow an explicitly set BRAIN_DIR.
 
         This is the regression: before the fix, an ambient GRADATA_BRAIN_DIR
@@ -93,6 +87,7 @@ class TestResolveAgentBrainDir:
         monkeypatch.setenv("GRADATA_BRAIN_DIR", str(ambient_brain))
 
         from gradata.hooks.agent_precontext import _resolve_agent_brain_dir
+
         result = _resolve_agent_brain_dir()
         assert result == str(test_brain), (
             "REGRESSION: GRADATA_BRAIN_DIR shadowed BRAIN_DIR — "
@@ -151,18 +146,22 @@ class TestAgentPrecontextDomainFilter:
 
     def test_positive_correct_domain_rules_injected(self, tmp_path, monkeypatch):
         """Rules for the requested domain appear in the result block."""
-        brain_dir = _init_test_brain(tmp_path, [
-            {
-                "category": "STYLE",
-                "description": "CODE-RULE: use type hints",
-                "scope_json": json.dumps({"domain": "code"}),
-                "confidence": 0.95,
-            },
-        ])
+        brain_dir = _init_test_brain(
+            tmp_path,
+            [
+                {
+                    "category": "STYLE",
+                    "description": "CODE-RULE: use type hints",
+                    "scope_json": json.dumps({"domain": "code"}),
+                    "confidence": 0.95,
+                },
+            ],
+        )
         monkeypatch.setenv("BRAIN_DIR", str(brain_dir))
         monkeypatch.delenv("GRADATA_SCOPE_DOMAIN", raising=False)
 
         from gradata.hooks import agent_precontext
+
         data = {"tool_input": {"subagent_type": "code", "scope_domain": "code"}}
         result = agent_precontext.main(data)
 
@@ -178,25 +177,29 @@ class TestAgentPrecontextDomainFilter:
         GRADATA_SCOPE_DOMAIN could cause domain A rules to surface in domain B
         agent context.
         """
-        brain_dir = _init_test_brain(tmp_path, [
-            {
-                "category": "TONE",
-                "description": "SALES-RULE: use warm opener",
-                "scope_json": json.dumps({"domain": "sales"}),
-                "confidence": 0.95,
-            },
-            {
-                "category": "STYLE",
-                "description": "CODE-RULE: prefer comprehensions",
-                "scope_json": json.dumps({"domain": "code"}),
-                "confidence": 0.95,
-            },
-        ])
+        brain_dir = _init_test_brain(
+            tmp_path,
+            [
+                {
+                    "category": "TONE",
+                    "description": "SALES-RULE: use warm opener",
+                    "scope_json": json.dumps({"domain": "sales"}),
+                    "confidence": 0.95,
+                },
+                {
+                    "category": "STYLE",
+                    "description": "CODE-RULE: prefer comprehensions",
+                    "scope_json": json.dumps({"domain": "code"}),
+                    "confidence": 0.95,
+                },
+            ],
+        )
         monkeypatch.setenv("BRAIN_DIR", str(brain_dir))
         # Env says "sales" but tool_input says "code" — tool_input must win
         monkeypatch.setenv("GRADATA_SCOPE_DOMAIN", "sales")
 
         from gradata.hooks import agent_precontext
+
         data = {
             "tool_input": {
                 "subagent_type": "general",

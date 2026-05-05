@@ -16,13 +16,21 @@ from gradata._paths import BrainContext
 
 # Constants — domain-specific fact types can be extended via brain config
 _DEFAULT_FACT_TYPES = (
-    "company_size", "tech_stack", "objection", "decision_maker",
-    "pain_point", "budget", "timeline",
+    "company_size",
+    "tech_stack",
+    "objection",
+    "decision_maker",
+    "pain_point",
+    "budget",
+    "timeline",
 )
+
 
 def _load_fact_types() -> tuple:
     """Load fact types from brain config or use defaults."""
-    config_path = _p.BRAIN_DIR / "taxonomy.json" if hasattr(_p, 'BRAIN_DIR') and _p.BRAIN_DIR else None
+    config_path = (
+        _p.BRAIN_DIR / "taxonomy.json" if hasattr(_p, "BRAIN_DIR") and _p.BRAIN_DIR else None
+    )
     if config_path and config_path.exists():
         try:
             with open(config_path, encoding="utf-8") as f:
@@ -33,6 +41,7 @@ def _load_fact_types() -> tuple:
         except Exception:
             pass
     return _DEFAULT_FACT_TYPES
+
 
 VALID_FACT_TYPES = _load_fact_types()
 MIN_FACT_LENGTH = 3
@@ -86,7 +95,7 @@ def _get_entity_names():
     """Get entity names from brain directory (prospects, candidates, etc.)."""
     names = set()
     for dirname in ("prospects", "candidates", "customers", "entities"):
-        entity_dir = _p.BRAIN_DIR / dirname if hasattr(_p, 'BRAIN_DIR') and _p.BRAIN_DIR else None
+        entity_dir = _p.BRAIN_DIR / dirname if hasattr(_p, "BRAIN_DIR") and _p.BRAIN_DIR else None
         if not entity_dir or not entity_dir.exists():
             continue
         for f in entity_dir.glob("*.md"):
@@ -146,11 +155,16 @@ def extract_from_file(filepath):
     def add_fact(ftype, fvalue, conf=CONF_EXPLICIT):
         fvalue = _clean_value(fvalue)
         if _quality_gate(ftype, fvalue):
-            facts.append({
-                "prospect": prospect, "company": company,
-                "fact_type": ftype, "fact_value": fvalue,
-                "confidence": conf, "source": source,
-            })
+            facts.append(
+                {
+                    "prospect": prospect,
+                    "company": company,
+                    "fact_type": ftype,
+                    "fact_value": fvalue,
+                    "confidence": conf,
+                    "source": source,
+                }
+            )
 
     # Frontmatter extraction
     if fm.get("deal_value"):
@@ -171,7 +185,10 @@ def extract_from_file(filepath):
         if emp_val and not emp_val.startswith("- **"):
             add_fact("company_size", emp_val, CONF_EXPLICIT)
 
-    for pattern in [r"^(?:employees|team_size|headcount):\s*(.+)", r"- \*\*(?:Team Size|Headcount):\*\*\s*(.+)"]:
+    for pattern in [
+        r"^(?:employees|team_size|headcount):\s*(.+)",
+        r"- \*\*(?:Team Size|Headcount):\*\*\s*(.+)",
+    ]:
         for m in re.finditer(pattern, text, re.IGNORECASE | re.MULTILINE):
             val = m.group(1).strip()
             if val and val != fm.get("name", ""):
@@ -184,10 +201,25 @@ def extract_from_file(filepath):
             add_fact("tech_stack", tech_val, CONF_EXPLICIT)
 
     tech_keywords = [
-        "Meta Pixel", "Google Ads", "Facebook Ads", "TikTok Ads",
-        "Shopify", "WordPress", "HubSpot", "Salesforce", "Marketo",
-        "Google Analytics", "GA4", "Klaviyo", "Mailchimp", "Segment",
-        "BigQuery", "Looker", "Triple Whale", "Northbeam", "Hyros",
+        "Meta Pixel",
+        "Google Ads",
+        "Facebook Ads",
+        "TikTok Ads",
+        "Shopify",
+        "WordPress",
+        "HubSpot",
+        "Salesforce",
+        "Marketo",
+        "Google Analytics",
+        "GA4",
+        "Klaviyo",
+        "Mailchimp",
+        "Segment",
+        "BigQuery",
+        "Looker",
+        "Triple Whale",
+        "Northbeam",
+        "Hyros",
     ]
     for kw in tech_keywords:
         if kw.lower() in text.lower():
@@ -243,10 +275,9 @@ def extract_from_file(filepath):
     return facts
 
 
-
-
-def query_facts(prospect=None, fact_type=None, min_confidence=0.0,
-                ctx: "BrainContext | None" = None):
+def query_facts(
+    prospect=None, fact_type=None, min_confidence=0.0, ctx: "BrainContext | None" = None
+):
     conn = _get_db(ctx)
     _init_tables(conn)
     sql = "SELECT * FROM facts WHERE stale=0"
@@ -264,8 +295,6 @@ def query_facts(prospect=None, fact_type=None, min_confidence=0.0,
     rows = conn.execute(sql, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
-
-
 
 
 def get_stats(ctx: BrainContext | None = None):

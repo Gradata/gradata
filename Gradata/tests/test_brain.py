@@ -17,10 +17,10 @@ import pytest
 
 from gradata import Brain
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _init_brain(tmp_path: Path, name: str = "TestBrain", domain: str = "Testing") -> Brain:
     """Create a fresh brain in the given tmp directory.
@@ -42,9 +42,10 @@ def _init_brain(tmp_path: Path, name: str = "TestBrain", domain: str = "Testing"
     # set_brain_dir() which updates _paths globals, but any module that
     # already imported those names holds stale references.  Force the
     # dependent modules to re-read the current values.
-    import gradata._paths as _p
-    import gradata._events as _ev
     import gradata._brain_manifest as _bm
+    import gradata._events as _ev
+    import gradata._paths as _p
+
     _ev.BRAIN_DIR = _p.BRAIN_DIR
     _ev.EVENTS_JSONL = _p.EVENTS_JSONL
     _ev.DB_PATH = _p.DB_PATH
@@ -55,6 +56,7 @@ def _init_brain(tmp_path: Path, name: str = "TestBrain", domain: str = "Testing"
     _bm.MANIFEST_PATH = _p.BRAIN_DIR / "brain.manifest.json"
     # Export module also caches paths and derived vars at module level
     import gradata._export_brain as _ex
+
     _ex.BRAIN_DIR = _p.BRAIN_DIR
     _ex.WORKING_DIR = _p.WORKING_DIR
     _ex.PROSPECTS_DIR = _p.PROSPECTS_DIR
@@ -74,11 +76,13 @@ def _init_brain(tmp_path: Path, name: str = "TestBrain", domain: str = "Testing"
     _ex.CARL_GLOBAL = _p.CARL_DIR / "global"
     # Query module caches DB_PATH / BRAIN_DIR
     import gradata._query as _q
+
     _q.DB_PATH = _p.DB_PATH
     _q.BRAIN_DIR = _p.BRAIN_DIR
     # ChromaDB removed S66 — no CHROMA_DIR needed in _query
     # Tag taxonomy caches PROSPECTS_DIR
     import gradata._tag_taxonomy as _tt
+
     _tt.PROSPECTS_DIR = _p.PROSPECTS_DIR
     return brain
 
@@ -86,6 +90,7 @@ def _init_brain(tmp_path: Path, name: str = "TestBrain", domain: str = "Testing"
 # ---------------------------------------------------------------------------
 # 1. test_init_creates_brain
 # ---------------------------------------------------------------------------
+
 
 class TestInit:
     def test_init_creates_brain(self, tmp_path):
@@ -109,9 +114,10 @@ class TestInit:
 
         # DB has events table
         conn = sqlite3.connect(str(brain.db_path))
-        tables = [r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall()]
+        tables = [
+            r[0]
+            for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        ]
         conn.close()
         assert "events" in tables, f"events table missing. Tables: {tables}"
 
@@ -127,13 +133,15 @@ class TestInit:
 # 2. test_emit_event
 # ---------------------------------------------------------------------------
 
+
 class TestEmitEvent:
     def test_emit_event(self, tmp_path):
         """Emitting an event writes to BOTH events.jsonl and system.db."""
         brain = _init_brain(tmp_path)
 
         result = brain.emit(
-            "TEST_EVENT", "pytest",
+            "TEST_EVENT",
+            "pytest",
             data={"detail": "hello world"},
             tags=["session:0"],
             session=0,
@@ -170,13 +178,15 @@ class TestEmitEvent:
 # 3. test_emit_enriches_tags
 # ---------------------------------------------------------------------------
 
+
 class TestTagEnrichment:
     def test_emit_enriches_tags(self, tmp_path):
         """DELTA_TAG events auto-enrich prospect and channel tags in BOTH stores."""
         brain = _init_brain(tmp_path)
 
         result = brain.emit(
-            "DELTA_TAG", "pytest",
+            "DELTA_TAG",
+            "pytest",
             data={
                 "prospect": "Jane Doe",
                 "activity_type": "email_sent",
@@ -193,22 +203,20 @@ class TestTagEnrichment:
 
         # Verify channel value is correct for email_sent
         channel_tags = [t for t in tags if t.startswith("channel:")]
-        assert any("email" in t for t in channel_tags), f"Expected channel:email, got {channel_tags}"
+        assert any("email" in t for t in channel_tags), (
+            f"Expected channel:email, got {channel_tags}"
+        )
 
         # Verify JSONL also has enriched tags
         jsonl_path = brain.dir / "events.jsonl"
-        event_jsonl = json.loads(
-            jsonl_path.read_text(encoding="utf-8").strip().splitlines()[-1]
-        )
+        event_jsonl = json.loads(jsonl_path.read_text(encoding="utf-8").strip().splitlines()[-1])
         jsonl_prefixes = {t.split(":")[0] for t in event_jsonl.get("tags", []) if ":" in t}
         assert "prospect" in jsonl_prefixes, "prospect tag missing from JSONL"
         assert "channel" in jsonl_prefixes, "channel tag missing from JSONL"
 
         # Verify SQLite also has enriched tags
         conn = sqlite3.connect(str(brain.db_path))
-        row = conn.execute(
-            "SELECT tags_json FROM events WHERE type = 'DELTA_TAG'"
-        ).fetchone()
+        row = conn.execute("SELECT tags_json FROM events WHERE type = 'DELTA_TAG'").fetchone()
         conn.close()
         db_tags = json.loads(row[0])
         db_prefixes = {t.split(":")[0] for t in db_tags if ":" in t}
@@ -219,6 +227,7 @@ class TestTagEnrichment:
 # ---------------------------------------------------------------------------
 # 4. test_search_keyword
 # ---------------------------------------------------------------------------
+
 
 class TestSearch:
     def test_search_keyword(self, tmp_path):
@@ -238,8 +247,9 @@ class TestSearch:
 
         # Rebuild FTS5 index
         from gradata._query import fts_rebuild
+
         count = fts_rebuild()
-        assert count >= 1, f"FTS rebuild indexed 0 documents (expected >= 1)"
+        assert count >= 1, "FTS rebuild indexed 0 documents (expected >= 1)"
 
         # Search for a keyword
         results = brain.search("rocketship", mode="keyword")
@@ -258,6 +268,7 @@ class TestSearch:
 # ---------------------------------------------------------------------------
 # 5. test_manifest_generation
 # ---------------------------------------------------------------------------
+
 
 class TestManifest:
     def test_manifest_generation(self, tmp_path):
@@ -302,6 +313,7 @@ class TestManifest:
 # 6. test_validator
 # ---------------------------------------------------------------------------
 
+
 class TestValidator:
     def test_validator(self, tmp_path):
         """Generate manifest, then validate it. No issues expected for a clean brain."""
@@ -313,6 +325,7 @@ class TestValidator:
 
         # Validate
         from gradata._brain_manifest import validate_manifest
+
         issues = validate_manifest()
 
         assert isinstance(issues, list)
@@ -326,15 +339,19 @@ class TestValidator:
         brain.manifest_path.unlink()
 
         from gradata._brain_manifest import validate_manifest
+
         issues = validate_manifest()
 
         assert len(issues) > 0
-        assert any("does not exist" in i for i in issues), f"Expected 'does not exist' issue: {issues}"
+        assert any("does not exist" in i for i in issues), (
+            f"Expected 'does not exist' issue: {issues}"
+        )
 
 
 # ---------------------------------------------------------------------------
 # 7. test_export
 # ---------------------------------------------------------------------------
+
 
 class TestExport:
     def test_export_redacts_pii(self, tmp_path):
@@ -377,25 +394,18 @@ class TestExport:
             assert "john.smith@acmecorp.com" not in prospect_content, (
                 "Email was NOT redacted in export"
             )
-            assert "[EMAIL_REDACTED]" in prospect_content, (
-                "Email redaction marker missing"
-            )
-            assert "867-5309" not in prospect_content, (
-                "Phone was NOT redacted in export"
-            )
-            assert "[PHONE_REDACTED]" in prospect_content, (
-                "Phone redaction marker missing"
-            )
+            assert "[EMAIL_REDACTED]" in prospect_content, "Email redaction marker missing"
+            assert "867-5309" not in prospect_content, "Phone was NOT redacted in export"
+            assert "[PHONE_REDACTED]" in prospect_content, "Phone redaction marker missing"
 
             # Raw PII strings should not appear
-            assert "john.smith" not in prospect_content.lower(), (
-                "Email fragment still present"
-            )
+            assert "john.smith" not in prospect_content.lower(), "Email fragment still present"
 
 
 # ---------------------------------------------------------------------------
 # 8. Core Learning Loop (correction capture)
 # ---------------------------------------------------------------------------
+
 
 class TestCoreLearningLoop:
     def test_correct_produces_diff(self, tmp_path):
@@ -429,14 +439,18 @@ class TestCoreLearningLoop:
 # 9. EventBus integration
 # ---------------------------------------------------------------------------
 
+
 def test_brain_has_event_bus(tmp_path):
-    from tests.conftest import init_brain
     from gradata.events_bus import EventBus
+    from tests.conftest import init_brain
+
     brain = init_brain(tmp_path)
     assert isinstance(brain.bus, EventBus)
 
+
 def test_correct_emits_correction_created(tmp_path):
     from tests.conftest import init_brain
+
     brain = init_brain(tmp_path)
     received = []
     brain.bus.on("correction.created", lambda p: received.append(p))
@@ -445,8 +459,10 @@ def test_correct_emits_correction_created(tmp_path):
     assert received[0]["category"] == "CODE"
     assert "severity" in received[0]
 
+
 def test_end_session_emits_session_ended(tmp_path):
     from tests.conftest import init_brain
+
     brain = init_brain(tmp_path)
     received = []
     brain.bus.on("session.ended", lambda p: received.append(p))
@@ -455,8 +471,10 @@ def test_end_session_emits_session_ended(tmp_path):
     assert len(received) == 1
     assert "session_number" in received[0]
 
+
 def test_brain_bus_has_subscribers(tmp_path):
     from tests.conftest import init_brain
+
     brain = init_brain(tmp_path)
     assert len(brain.bus.listeners.get("correction.created", [])) >= 1
     assert len(brain.bus.listeners.get("session.ended", [])) >= 1

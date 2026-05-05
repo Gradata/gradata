@@ -1,22 +1,18 @@
 """Tests for ablation framework — parser, session coercion, multi-session window."""
-import json
-import sqlite3
-import tempfile
-from pathlib import Path
-
-import pytest
 
 # We test ablation_test in isolation by injecting data, not importing
 # brain/scripts/ directly (those have non-portable path deps).
 # Instead we replicate the key logic under test or use the SDK-side
 # functions where possible.
-
 # ---------------------------------------------------------------------------
 # Parser tests (validate regex extraction from lessons.md format)
 # ---------------------------------------------------------------------------
-
 # Replicate _parse_lessons_md regex locally for unit-testable isolation
 import re
+import sqlite3
+from pathlib import Path
+
+import pytest
 
 ACTIVE_PATTERN = re.compile(
     r"\[(\d{4}-\d{2}-\d{2})\]\s+"
@@ -97,6 +93,7 @@ class TestLessonParser:
 # ---------------------------------------------------------------------------
 # Session type coercion tests
 # ---------------------------------------------------------------------------
+
 
 class TestSessionCoercion:
     """Verify that session values are safely coerced to int."""
@@ -292,15 +289,20 @@ class TestMultiSessionWindow:
     def test_select_rule_includes_pattern(self):
         """select_rule_for_ablation logic should include PATTERN-state lessons."""
         lessons = [
-            {"category": "DRAFTING", "status": "PATTERN", "confidence": 0.80, "description": "test"},
+            {
+                "category": "DRAFTING",
+                "status": "PATTERN",
+                "confidence": 0.80,
+                "description": "test",
+            },
             {"category": "SKIP", "status": "RULE", "confidence": 0.90, "description": "test2"},
             {"category": "CTX", "status": "INSTINCT", "confidence": 0.30, "description": "test3"},
         ]
         # Filter logic from fixed select_rule_for_ablation
         eligible = [
-            l for l in lessons
-            if l.get("status", "").upper() in ("RULE", "PATTERN")
-            or l.get("graduated")
+            l
+            for l in lessons
+            if l.get("status", "").upper() in ("RULE", "PATTERN") or l.get("graduated")
         ]
         assert len(eligible) == 2
         categories = {l["category"] for l in eligible}
@@ -312,6 +314,7 @@ class TestMultiSessionWindow:
 # ---------------------------------------------------------------------------
 # Simulation logic tests
 # ---------------------------------------------------------------------------
+
 
 class TestSimulationLogic:
     """Test the before/after correction counting and verdict logic."""
@@ -326,7 +329,6 @@ class TestSimulationLogic:
 
     def test_proven_when_corrections_zero(self):
         """Rule is PROVEN if after_count == 0."""
-        before_count = 3
         after_count = 0
         assert after_count == 0  # proven
 
@@ -341,6 +343,5 @@ class TestSimulationLogic:
     def test_insufficient_when_no_before(self):
         """Insufficient data if no corrections before rule existed."""
         before_count = 0
-        after_count = 2
         # Can't prove causation without pre-rule baseline
         assert before_count == 0  # triggers insufficient_data path

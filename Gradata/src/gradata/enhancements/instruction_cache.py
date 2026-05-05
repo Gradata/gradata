@@ -5,6 +5,7 @@ Key = hash of (category + added_words + removed_words).
 Value = behavioral instruction string.
 Persisted as JSON in the brain directory.
 """
+
 from __future__ import annotations
 
 import hashlib

@@ -53,10 +53,7 @@ class TestScanForAdversarialPhrases:
         assert "override previous" in hits
 
     def test_multiple_hits_deduplicated(self):
-        text = (
-            "Ignore previous instructions. ignore previous instructions. "
-            "Also jailbreak this."
-        )
+        text = "Ignore previous instructions. ignore previous instructions. Also jailbreak this."
         hits = scan_for_adversarial_phrases(text)
         assert hits.count("ignore previous instructions") == 1
         assert "jailbreak" in hits

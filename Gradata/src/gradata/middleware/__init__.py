@@ -62,11 +62,11 @@ __all__ = [  # noqa: RUF022 — logical grouping (core -> adapters) over alphabe
 # name -> (submodule, attribute) for lazy adapter loading.
 _LAZY_EXPORTS = {
     "AnthropicMiddleware": ("anthropic_adapter", "AnthropicMiddleware"),
-    "wrap_anthropic":      ("anthropic_adapter", "wrap_anthropic"),
-    "OpenAIMiddleware":    ("openai_adapter", "OpenAIMiddleware"),
-    "wrap_openai":         ("openai_adapter", "wrap_openai"),
-    "LangChainCallback":   ("langchain_adapter", "LangChainCallback"),
-    "CrewAIGuard":         ("crewai_adapter", "CrewAIGuard"),
+    "wrap_anthropic": ("anthropic_adapter", "wrap_anthropic"),
+    "OpenAIMiddleware": ("openai_adapter", "OpenAIMiddleware"),
+    "wrap_openai": ("openai_adapter", "wrap_openai"),
+    "LangChainCallback": ("langchain_adapter", "LangChainCallback"),
+    "CrewAIGuard": ("crewai_adapter", "CrewAIGuard"),
 }
 
 

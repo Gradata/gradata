@@ -66,26 +66,46 @@ class TestRuleMetadataToDict:
         assert d["utility_score"] == 0.7
         assert d["safety_score"] == 0.5
         assert set(d.keys()) == {
-            "what", "why", "who", "when_created", "when_validated",
-            "where_scope", "how_enforced", "utility_score", "safety_score",
+            "what",
+            "why",
+            "who",
+            "when_created",
+            "when_validated",
+            "where_scope",
+            "how_enforced",
+            "utility_score",
+            "safety_score",
         }
 
 
 class TestLessonMetadataField:
     def test_lesson_has_metadata(self):
         lesson = Lesson(
-            date="2026-04-07", state=LessonState.INSTINCT,
-            confidence=0.4, category="TEST", description="test lesson",
+            date="2026-04-07",
+            state=LessonState.INSTINCT,
+            confidence=0.4,
+            category="TEST",
+            description="test lesson",
         )
         assert isinstance(lesson.metadata, RuleMetadata)
         assert lesson.metadata.utility_score == 0.5
 
     def test_lesson_metadata_independent(self):
         """Each Lesson gets its own RuleMetadata (not shared)."""
-        a = Lesson(date="2026-01-01", state=LessonState.INSTINCT,
-                   confidence=0.4, category="A", description="a")
-        b = Lesson(date="2026-01-01", state=LessonState.INSTINCT,
-                   confidence=0.4, category="B", description="b")
+        a = Lesson(
+            date="2026-01-01",
+            state=LessonState.INSTINCT,
+            confidence=0.4,
+            category="A",
+            description="a",
+        )
+        b = Lesson(
+            date="2026-01-01",
+            state=LessonState.INSTINCT,
+            confidence=0.4,
+            category="B",
+            description="b",
+        )
         a.metadata.utility_score = 0.9
         assert b.metadata.utility_score == 0.5
         assert a.metadata is not b.metadata

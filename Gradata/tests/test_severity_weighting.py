@@ -13,10 +13,10 @@ import pytest
 
 from gradata._types import Lesson, LessonState
 from gradata.enhancements.self_improvement import (
-    SEVERITY_WEIGHTS,
-    SURVIVAL_SEVERITY_WEIGHTS,
-    SURVIVAL_BONUS,
     CONTRADICTION_PENALTY,
+    SEVERITY_WEIGHTS,
+    SURVIVAL_BONUS,
+    SURVIVAL_SEVERITY_WEIGHTS,
 )
 
 # Try to get the real engine functions; skip functional tests if only stubs

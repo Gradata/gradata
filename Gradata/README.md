@@ -15,10 +15,10 @@ You fix a tone. You rewrite a regex. You re-explain how your team formats PRs. T
 pip install gradata
 ```
 
-One-command setup for Claude Code, Cursor, Windsurf, or any MCP-compatible IDE:
+One-command setup for your agent:
 
 ```bash
-npx gradata-install install --ide=claude-code
+gradata install --agent claude-code --brain ./my-brain
 ```
 
 Works with any LLM. Python 3.11+. Zero required dependencies. Local-first. Apache-2.0.
@@ -95,6 +95,35 @@ Smaller/local models benefit most. Frontier models get calibrated faster. The cu
 
 ---
 
+## Quickstart
+
+Install Gradata, create a brain, then attach it to the agent you use every day:
+
+```bash
+pip install gradata
+gradata init ./my-brain
+gradata install --agent claude-code --brain ./my-brain
+gradata audit
+```
+
+Supported agent targets:
+
+```bash
+gradata install --agent claude-code
+gradata install --agent codex
+gradata install --agent gemini
+gradata install --agent cursor
+gradata install --agent hermes
+gradata install --agent opencode
+gradata install --agent all
+```
+
+Once installed, Gradata recalls relevant behavioral rules before tool use. You can also call recall directly:
+
+```bash
+gradata recall "drafting cold email to PE-backed ecommerce CMO" --max-tokens 2000
+```
+
 ## 60-second demo
 
 ```python
@@ -135,7 +164,8 @@ Prereq: `pipx install gradata`. See [`.claude-plugin/README.md`](./.claude-plugi
 
 ```bash
 pipx install gradata
-gradata install-hook --ide=claude-code
+gradata init ./my-brain
+gradata install --agent claude-code --brain ./my-brain
 ```
 
 ### JS / TypeScript
@@ -173,12 +203,27 @@ Or `docker build -t gradata/daemon:dev .` from the repo root. `docker-compose.ym
 
 ```bash
 gradata init ./my-brain        # create a brain
+gradata install --agent codex  # install recall hook for an agent
 gradata demo ./eval-brain      # try a pre-trained one
 gradata convergence            # ASCII chart of correction trend
 gradata manifest --json        # mathematical convergence proof
 gradata review                 # approve/reject pending promotions
 gradata stats                  # brain health metrics
 gradata doctor                 # diagnose issues
+```
+
+### Advanced: manual hook setup
+
+`gradata install --agent <name>` writes the native config for each supported agent and preserves existing settings. If you need to wire a hook manually, point the agent's pre-tool hook at:
+
+```bash
+python -m gradata.hooks.inject_brain_rules --brain-dir ./my-brain
+```
+
+For MCP-only clients, register:
+
+```bash
+python -m gradata.mcp_server --brain-dir ./my-brain
 ```
 
 ---

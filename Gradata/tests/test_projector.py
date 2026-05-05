@@ -6,26 +6,30 @@ from __future__ import annotations
 
 from datetime import date as _date
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
-from gradata import Brain
 from gradata._projector import (
-    ProjectionResult,
-    project,
-    _classify,
     _ALL_FILES,
-    _VOICE,
     _DECISIONS,
-    _PROCESS,
     _PREFERENCES,
+    _PROCESS,
     _RELATIONS,
+    _VOICE,
+    ProjectionResult,
+    _classify,
+    project,
 )
 from gradata._types import Lesson, LessonState
 
+if TYPE_CHECKING:
+    from gradata import Brain
 
-def _mk(category: str, description: str, state: LessonState = LessonState.RULE,
-        confidence: float = 0.95) -> Lesson:
+
+def _mk(
+    category: str, description: str, state: LessonState = LessonState.RULE, confidence: float = 0.95
+) -> Lesson:
     """Tiny factory for Lesson objects with the minimum required fields."""
     return Lesson(
         date=_date(2026, 4, 30).isoformat(),
@@ -169,7 +173,7 @@ def test_project_skips_unchanged_files(fresh_brain: Brain, monkeypatch):
     project(fresh_brain)
 
     # Add a decisions rule; voice file must remain untouched.
-    lessons_v2 = lessons_v1 + [_mk("ACCURACY", "decision rule")]
+    lessons_v2 = [*lessons_v1, _mk("ACCURACY", "decision rule")]
     monkeypatch.setattr(fresh_brain, "_load_lessons", lambda: lessons_v2)
     r2 = project(fresh_brain)
 
@@ -197,8 +201,7 @@ def test_project_custom_output_dir(fresh_brain: Brain, monkeypatch, tmp_path: Pa
     """Custom output_dir enables `/personas/<id>/memories/` per-persona namespacing
     that the rentable-brain SKU needs for path-based isolation."""
     persona_dir = tmp_path / "personas" / "founder-x" / "memories"
-    monkeypatch.setattr(fresh_brain, "_load_lessons",
-                        lambda: [_mk("DRAFTING", "founder voice")])
+    monkeypatch.setattr(fresh_brain, "_load_lessons", lambda: [_mk("DRAFTING", "founder voice")])
 
     result = project(fresh_brain, output_dir=persona_dir)
 
@@ -229,8 +232,7 @@ def test_project_atomic_write_no_torn_reads(fresh_brain: Brain, monkeypatch):
     sees either the old file or the new file, never a half-written one.
     We can't simulate true concurrency cheaply, but we can assert no .tmp
     file leaks after a normal run."""
-    monkeypatch.setattr(fresh_brain, "_load_lessons",
-                        lambda: [_mk("DRAFTING", "voice rule")])
+    monkeypatch.setattr(fresh_brain, "_load_lessons", lambda: [_mk("DRAFTING", "voice rule")])
     project(fresh_brain)
 
     leaked = list((fresh_brain.dir / "memories").glob("*.tmp"))

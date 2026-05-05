@@ -10,14 +10,13 @@ Tests:
 
 from __future__ import annotations
 
+import importlib
+import os
 import sqlite3
 import textwrap
 from pathlib import Path
 
 import pytest
-
-from gradata._types import Lesson, LessonState
-
 
 # ---------------------------------------------------------------------------
 # Sample lessons: 1 RULE, 1 PATTERN, 1 INSTINCT
@@ -81,14 +80,20 @@ def brain_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture()
 def brain(brain_dir: Path):
+    import gradata._paths as _p
     from gradata.brain import Brain
-    return Brain.init(brain_dir, name="Test", domain="Testing",
-                      embedding="local", interactive=False)
+
+    os.environ["BRAIN_DIR"] = str(brain_dir)
+    importlib.reload(_p)
+    return Brain.init(
+        brain_dir, name="Test", domain="Testing", embedding="local", interactive=False
+    )
 
 
 # ---------------------------------------------------------------------------
 # pending_promotions tests
 # ---------------------------------------------------------------------------
+
 
 class TestPendingPromotions:
     def test_returns_list(self, brain):
@@ -128,10 +133,13 @@ class TestPendingPromotions:
 
     def test_empty_brain(self, tmp_path: Path):
         """Brain with no lessons returns empty list."""
+        import gradata._paths as _p
         from gradata.brain import Brain
+
         d = tmp_path / "empty-brain"
-        b = Brain.init(d, name="Empty", domain="Test",
-                       embedding="local", interactive=False)
+        os.environ["BRAIN_DIR"] = str(d)
+        importlib.reload(_p)
+        b = Brain.init(d, name="Empty", domain="Test", embedding="local", interactive=False)
         result = b.pending_promotions()
         assert result == []
 
@@ -139,6 +147,7 @@ class TestPendingPromotions:
 # ---------------------------------------------------------------------------
 # approve_promotion tests
 # ---------------------------------------------------------------------------
+
 
 class TestApprovePromotion:
     def test_approve_returns_approved_true(self, brain):
@@ -171,6 +180,7 @@ class TestApprovePromotion:
 # ---------------------------------------------------------------------------
 # reject_promotion tests
 # ---------------------------------------------------------------------------
+
 
 class TestRejectPromotion:
     def test_reject_returns_rejected_true(self, brain):
@@ -214,6 +224,7 @@ class TestRejectPromotion:
 # end_session graduated_rules tests
 # ---------------------------------------------------------------------------
 
+
 class TestEndSessionGraduatedRules:
     def test_end_session_has_promotions_key(self, brain):
         result = brain.end_session()
@@ -228,6 +239,7 @@ class TestEndSessionGraduatedRules:
 # ---------------------------------------------------------------------------
 # Not reviewing = rules persist
 # ---------------------------------------------------------------------------
+
 
 class TestRulesPersistWithoutReview:
     def test_unreviewed_rules_persist(self, brain):

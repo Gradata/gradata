@@ -63,7 +63,9 @@ def _get_brain():
         return None
 
 
-def _extract_correction(tool_input: dict, tool_output: dict | str | None = None) -> tuple[str, str] | None:
+def _extract_correction(
+    tool_input: dict, tool_output: dict | str | None = None
+) -> tuple[str, str] | None:
     """Extract before/after text from a tool call.
 
     Handles Edit (old_string/new_string) and Write (checks git diff).

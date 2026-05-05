@@ -18,12 +18,24 @@ from gradata.middleware import (
 def test_rule_source_from_static_lessons_selects_rule_and_pattern():
     src = RuleSource(
         lessons=[
-            {"state": "RULE", "confidence": 0.95, "category": "TONE",
-             "description": "Never use em dashes"},
-            {"state": "PATTERN", "confidence": 0.70, "category": "STRUCTURE",
-             "description": "Lead with the answer"},
-            {"state": "INSTINCT", "confidence": 0.55, "category": "DRAFTING",
-             "description": "Avoid padding"},
+            {
+                "state": "RULE",
+                "confidence": 0.95,
+                "category": "TONE",
+                "description": "Never use em dashes",
+            },
+            {
+                "state": "PATTERN",
+                "confidence": 0.70,
+                "category": "STRUCTURE",
+                "description": "Lead with the answer",
+            },
+            {
+                "state": "INSTINCT",
+                "confidence": 0.55,
+                "category": "DRAFTING",
+                "description": "Avoid padding",
+            },
         ],
     )
     selected = src.select()
@@ -36,8 +48,12 @@ def test_rule_source_from_static_lessons_selects_rule_and_pattern():
 def test_build_brain_rules_block_wraps_in_xml():
     src = RuleSource(
         lessons=[
-            {"state": "RULE", "confidence": 0.95, "category": "TONE",
-             "description": "Never use em dashes"},
+            {
+                "state": "RULE",
+                "confidence": 0.95,
+                "category": "TONE",
+                "description": "Never use em dashes",
+            },
         ],
     )
     block = build_brain_rules_block(src)
@@ -50,8 +66,12 @@ def test_build_brain_rules_block_wraps_in_xml():
 
 def test_build_brain_rules_block_respects_max_rules():
     lessons = [
-        {"state": "RULE", "confidence": min(1.0, 0.90 + i / 200), "category": f"C{i}",
-         "description": f"desc {i}"}
+        {
+            "state": "RULE",
+            "confidence": min(1.0, 0.90 + i / 200),
+            "category": f"C{i}",
+            "description": f"desc {i}",
+        }
         for i in range(20)
     ]
     src = RuleSource(lessons=lessons, max_rules=5)
@@ -62,8 +82,12 @@ def test_build_brain_rules_block_respects_max_rules():
 def test_check_output_finds_em_dash_violation():
     src = RuleSource(
         lessons=[
-            {"state": "RULE", "confidence": 0.95, "category": "TONE",
-             "description": "Never use em dashes"},
+            {
+                "state": "RULE",
+                "confidence": 0.95,
+                "category": "TONE",
+                "description": "Never use em dashes",
+            },
         ],
     )
     violations = check_output(src, "no good \u2014 here", strict=False)
@@ -74,8 +98,12 @@ def test_check_output_finds_em_dash_violation():
 def test_check_output_strict_raises():
     src = RuleSource(
         lessons=[
-            {"state": "RULE", "confidence": 0.95, "category": "TONE",
-             "description": "Never use em dashes"},
+            {
+                "state": "RULE",
+                "confidence": 0.95,
+                "category": "TONE",
+                "description": "Never use em dashes",
+            },
         ],
     )
     with pytest.raises(RuleViolation):
@@ -85,8 +113,12 @@ def test_check_output_strict_raises():
 def test_check_output_ignores_non_rule_tier():
     src = RuleSource(
         lessons=[
-            {"state": "PATTERN", "confidence": 0.80, "category": "TONE",
-             "description": "Never use em dashes"},
+            {
+                "state": "PATTERN",
+                "confidence": 0.80,
+                "category": "TONE",
+                "description": "Never use em dashes",
+            },
         ],
     )
     # PATTERN-tier is injected but not enforced
@@ -106,8 +138,12 @@ def test_bypass_disables_block_and_check(monkeypatch):
     monkeypatch.setenv("GRADATA_BYPASS", "1")
     src = RuleSource(
         lessons=[
-            {"state": "RULE", "confidence": 0.95, "category": "TONE",
-             "description": "Never use em dashes"},
+            {
+                "state": "RULE",
+                "confidence": 0.95,
+                "category": "TONE",
+                "description": "Never use em dashes",
+            },
         ],
     )
     assert build_brain_rules_block(src) == ""
@@ -140,10 +176,13 @@ def test_rule_source_skips_non_numeric_confidence():
     # Malformed caller-supplied lessons must not abort the injection path.
     src = RuleSource(
         lessons=[
-            {"state": "RULE", "confidence": "high", "category": "TONE",
-             "description": "malformed"},
-            {"state": "RULE", "confidence": 0.95, "category": "TONE",
-             "description": "Never use em dashes"},
+            {"state": "RULE", "confidence": "high", "category": "TONE", "description": "malformed"},
+            {
+                "state": "RULE",
+                "confidence": 0.95,
+                "category": "TONE",
+                "description": "Never use em dashes",
+            },
         ],
     )
     selected = src.select()

@@ -1,7 +1,7 @@
 """Tests for behavioral instruction cache."""
+
 from __future__ import annotations
 
-import json
 import tempfile
 from pathlib import Path
 
@@ -34,8 +34,12 @@ def test_cache_persists_to_disk():
 
 def test_cache_key_generation():
     assert InstructionCache.make_key("CODE", ["getattr"], []) != ""
-    assert InstructionCache.make_key("CODE", ["getattr"], []) == InstructionCache.make_key("CODE", ["getattr"], [])
-    assert InstructionCache.make_key("CODE", ["getattr"], []) != InstructionCache.make_key("TONE", ["getattr"], [])
+    assert InstructionCache.make_key("CODE", ["getattr"], []) == InstructionCache.make_key(
+        "CODE", ["getattr"], []
+    )
+    assert InstructionCache.make_key("CODE", ["getattr"], []) != InstructionCache.make_key(
+        "TONE", ["getattr"], []
+    )
 
 
 def test_cache_handles_corrupt_file():

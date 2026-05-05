@@ -606,21 +606,28 @@ class TestEntropyOrdering:
         assert _ordering_entropy(mixed) > _ordering_entropy(run)
 
     def test_returns_new_list(self):
-        rules = [_make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C", "D")]
+        rules = [
+            _make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C", "D")
+        ]
         out = choose_entropy_ordering(rules, samples=4, seed=1)
         # Same set of rules, not necessarily same order; and input is not mutated.
         assert set(id(r) for r in out) == set(id(r) for r in rules)
         assert len(out) == len(rules)
 
     def test_deterministic_with_seed(self):
-        rules = [_make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C", "D", "E")]
+        rules = [
+            _make_applied(_make_lesson(category=c, description=c))
+            for c in ("A", "B", "C", "D", "E")
+        ]
         a = choose_entropy_ordering(rules, samples=8, seed=42)
         clear_ordering_cache()
         b = choose_entropy_ordering(rules, samples=8, seed=42)
         assert [r.rule_id for r in a] == [r.rule_id for r in b]
 
     def test_cache_hit_returns_same_order(self):
-        rules = [_make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C", "D")]
+        rules = [
+            _make_applied(_make_lesson(category=c, description=c)) for c in ("A", "B", "C", "D")
+        ]
         key = ("email", _rule_set_hash(rules))
         a = choose_entropy_ordering(rules, samples=8, seed=1, cache_key=key)
         # Second call with a different seed should still return the cached order.

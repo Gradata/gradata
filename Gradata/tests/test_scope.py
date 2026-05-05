@@ -37,7 +37,7 @@ class TestTemporalScope:
         assert temporal_decay(sessions_since_fire=100, max_idle=0) == 1.0
 
     def test_scope_serialization_roundtrip(self):
-        from gradata._scope import scope_to_dict, scope_from_dict
+        from gradata._scope import scope_from_dict, scope_to_dict
 
         scope = RuleScope(
             domain="sales", temporal_relevance="recent", max_idle_sessions=10, created_session=5

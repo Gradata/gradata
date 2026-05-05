@@ -26,11 +26,17 @@ Usage::
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
+from gradata._config import current_brain_config
+from gradata._scope import build_scope
 from gradata._types import ELIGIBLE_STATES, Lesson, LessonState
 from gradata.enhancements.diff_engine import compute_diff
+from gradata.rules.rule_engine import AppliedRule, apply_rules, apply_rules_with_tree
+
+_log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Tool 1: correct -- Log a correction
@@ -112,14 +118,33 @@ def correct(
 
 # Category signal words. Order matters — first match wins.
 _CATEGORY_SIGNALS: list[tuple[str, tuple[str, ...]]] = [
-    ("FORMATTING", ("bold", "italic", "heading", "bullet", "indent",
-                    "em dash", "colon", "comma", "spacing", "markdown")),
-    ("ACCURACY", ("wrong", "incorrect", "inaccurate", "outdated",
-                  "error", "mistake", "not true", "false")),
-    ("TONE", ("tone", "formal", "casual", "aggressive", "softer",
-              "professional", "friendly", "polite")),
-    ("PROCESS", ("step", "order", "first", "before", "after",
-                 "verify", "check", "validate", "workflow")),
+    (
+        "FORMATTING",
+        (
+            "bold",
+            "italic",
+            "heading",
+            "bullet",
+            "indent",
+            "em dash",
+            "colon",
+            "comma",
+            "spacing",
+            "markdown",
+        ),
+    ),
+    (
+        "ACCURACY",
+        ("wrong", "incorrect", "inaccurate", "outdated", "error", "mistake", "not true", "false"),
+    ),
+    (
+        "TONE",
+        ("tone", "formal", "casual", "aggressive", "softer", "professional", "friendly", "polite"),
+    ),
+    (
+        "PROCESS",
+        ("step", "order", "first", "before", "after", "verify", "check", "validate", "workflow"),
+    ),
 ]
 
 
@@ -145,7 +170,9 @@ def _auto_detect_category(draft: str, final: str, severity: str) -> str:
 def recall(
     query: str,
     *,
-    max_rules: int = 5,
+    max_rules: int | None = None,
+    ranker: str | None = None,
+    include_all_sources: bool = False,
     lessons_path: str | Path | None = None,
     meta_rules_path: str | Path | None = None,
 ) -> str:
@@ -170,14 +197,35 @@ def recall(
 
         Returns empty <brain-rules/> if no relevant rules found.
     """
+    cfg = current_brain_config()
+    if max_rules is None:
+        max_rules = 5
+    if ranker is None:
+        ranker = cfg.ranker
+    return _recall_by_count(
+        query,
+        max_rules=max_rules,
+        ranker=ranker,
+        include_all_sources=include_all_sources,
+        lessons_path=lessons_path,
+        meta_rules_path=meta_rules_path,
+    )
+
+
+def _recall_by_count(
+    query: str,
+    *,
+    max_rules: int,
+    ranker: str,
+    include_all_sources: bool,
+    lessons_path: str | Path | None,
+    meta_rules_path: str | Path | None,
+) -> str:
     lessons = _load_lessons(lessons_path)
-    meta_rules = _load_meta_rules(meta_rules_path)
+    meta_rules = _load_meta_rules(meta_rules_path, include_all_sources=include_all_sources)
 
     # Filter to eligible states only
-    eligible = [
-        lesson for lesson in lessons
-        if lesson.state in ELIGIBLE_STATES
-    ]
+    eligible = [lesson for lesson in lessons if lesson.state in ELIGIBLE_STATES]
 
     # Score each lesson by relevance to query
     scored: list[tuple[float, str]] = []
@@ -203,6 +251,10 @@ def recall(
 
     # Sort by score descending, take top N
     scored.sort(key=lambda x: x[0], reverse=True)
+    if ranker == "tree_only":
+        scored = list(reversed(scored))
+    elif ranker == "flat":
+        scored.sort(key=lambda x: x[1])
     top = scored[:max_rules]
 
     if not top:
@@ -210,6 +262,111 @@ def recall(
 
     rules_text = "\n".join(line for _, line in top)
     return f"<brain-rules>\n{rules_text}\n</brain-rules>"
+
+
+def gradata_recall(
+    situation: str,
+    *,
+    max_tokens: int | None = None,
+    ranker: str | None = None,
+    include_all_sources: bool = False,
+    lessons_path: str | Path | None = None,
+    meta_rules_path: str | Path | None = None,
+) -> str:
+    """Retrieve ranked rules under a rough token budget.
+
+    Token accounting intentionally uses the project-wide cheap estimate
+    ``len(text) // 4``. The envelope is included in the budget so callers can
+    pass the result directly into a prompt.
+    """
+    cfg = current_brain_config()
+    if max_tokens is None:
+        max_tokens = cfg.max_recall_tokens
+    if ranker is None:
+        ranker = cfg.ranker
+    if max_tokens <= 0:
+        return "<brain-rules/>"
+    if ranker not in {"hybrid", "flat", "tree_only"}:
+        ranker = "hybrid"
+
+    lessons = _load_lessons(lessons_path)
+    metas = _load_meta_rules(meta_rules_path, include_all_sources=include_all_sources)
+    query_words = set(situation.lower().split())
+    scope = build_scope({"task": situation, "task_type": situation})
+
+    max_candidates = max(100, len(lessons) + len(metas))
+    if ranker == "flat":
+        applied = apply_rules(lessons, scope, max_rules=max_candidates, user_message=situation)
+    else:
+        applied = apply_rules_with_tree(
+            lessons,
+            scope,
+            max_rules=max_candidates,
+            ranker=ranker,
+        )
+    if ranker == "tree_only":
+        applied = list(reversed(applied))
+    lesson_lines = [_line_from_applied(rule) for rule in applied]
+
+    meta_scored: list[tuple[float, str]] = []
+    for mr in metas:
+        principle = str(mr.get("principle", "")).strip()
+        relevance = _relevance_score(query_words, principle, "")
+        if relevance <= 0.0 and ranker != "tree_only":
+            continue
+        conf = float(mr.get("confidence", 0.8) or 0.8)
+        line = f"[META:{conf:.2f}] {principle}"
+        score = relevance * 0.6 + conf * 0.4
+        meta_scored.append((score, line))
+    meta_scored.sort(key=lambda x: x[0], reverse=True)
+    if ranker == "tree_only":
+        meta_scored = list(reversed(meta_scored))
+    elif ranker == "flat":
+        meta_scored.sort(key=lambda x: x[1])
+    meta_lines = [line for _, line in meta_scored]
+
+    return _format_budgeted_rules(lesson_lines, meta_lines, max_tokens)
+
+
+def _line_from_applied(rule: AppliedRule) -> str:
+    lesson = rule.lesson
+    return f"[{lesson.state.value}:{lesson.confidence:.2f}] {lesson.category}: {lesson.description}"
+
+
+def _rough_tokens(text: str) -> int:
+    return max(1, len(text) // 4)
+
+
+def _format_budgeted_rules(lesson_lines: list[str], meta_lines: list[str], max_tokens: int) -> str:
+    if not lesson_lines and not meta_lines:
+        return "<brain-rules/>"
+
+    selected: list[str] = []
+    envelope_tokens = _rough_tokens("<brain-rules>\n\n</brain-rules>")
+    used = envelope_tokens
+
+    reserved_meta = meta_lines[0] if meta_lines else None
+    if reserved_meta is not None:
+        cost = _rough_tokens(reserved_meta)
+        if used + cost <= max_tokens:
+            selected.append(reserved_meta)
+            used += cost
+
+    remaining_meta = meta_lines[1:] if reserved_meta is not None else meta_lines
+    combined = lesson_lines + remaining_meta
+    for line in combined:
+        if line in selected:
+            continue
+        cost = _rough_tokens(line)
+        if used + cost > max_tokens:
+            continue
+        selected.append(line)
+        used += cost
+
+    if not selected:
+        return "<brain-rules/>"
+
+    return "<brain-rules>\n" + "\n".join(selected) + "\n</brain-rules>"
 
 
 def _relevance_score(query_words: set[str], description: str, category: str) -> float:
@@ -247,8 +404,9 @@ def _load_lessons(lessons_path: str | Path | None = None) -> list[Lesson]:
         # Try default paths
         try:
             import gradata._paths as _p
+
             path = _p.LESSONS_FILE
-        except Exception:
+        except (ImportError, AttributeError):
             return []
 
     if not path.exists():
@@ -256,20 +414,27 @@ def _load_lessons(lessons_path: str | Path | None = None) -> list[Lesson]:
 
     try:
         from gradata.enhancements.self_improvement import parse_lessons
+
         return parse_lessons(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (ImportError, OSError, ValueError):
+        _log.warning("failed to load lessons from %s", path, exc_info=True)
         return []
 
 
-def _load_meta_rules(meta_rules_path: str | Path | None = None) -> list[dict]:
+def _load_meta_rules(
+    meta_rules_path: str | Path | None = None,
+    *,
+    include_all_sources: bool = False,
+) -> list[dict]:
     """Load meta-rules from JSON file."""
     if meta_rules_path is not None:
         path = Path(meta_rules_path)
     else:
         try:
             import gradata._paths as _p
+
             path = _p.BRAIN_DIR / "meta-rules.json"
-        except Exception:
+        except (ImportError, AttributeError):
             return []
 
     if not path.exists():
@@ -277,15 +442,40 @@ def _load_meta_rules(meta_rules_path: str | Path | None = None) -> list[dict]:
 
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (json.JSONDecodeError, OSError):
+        _log.warning("failed to load meta-rules from %s", path, exc_info=True)
         return []
     if isinstance(data, list):
-        return [m for m in data if isinstance(m, dict)]
+        return _filter_meta_dicts([m for m in data if isinstance(m, dict)], include_all_sources)
     if isinstance(data, dict):
         rules = data.get("meta_rules", [])
         if isinstance(rules, list):
-            return [m for m in rules if isinstance(m, dict)]
+            return _filter_meta_dicts(
+                [m for m in rules if isinstance(m, dict)],
+                include_all_sources,
+            )
     return []
+
+
+def _filter_meta_dicts(rules: list[dict], include_all_sources: bool) -> list[dict]:
+    if include_all_sources:
+        return rules
+    try:
+        from gradata.enhancements.meta_rules import INJECTABLE_META_SOURCES
+    except ImportError:
+        return rules
+    filtered = []
+    for rule in rules:
+        source = str(rule.get("source", "deterministic"))
+        if source in INJECTABLE_META_SOURCES:
+            filtered.append(rule)
+        else:
+            _log.warning(
+                "dropping meta-rule %s (source=%s) from injection",
+                rule.get("id", "<unknown>"),
+                source,
+            )
+    return filtered
 
 
 # ---------------------------------------------------------------------------
@@ -339,12 +529,19 @@ def manifest(
     patterns = [lesson for lesson in lessons if lesson.state == LessonState.PATTERN]
     result["rules_count"] = len(rules) + len(patterns)
     result["meta_rules_count"] = len(meta_rules)
-    result["lessons_active"] = len([lesson for lesson in lessons if lesson.state in (LessonState.INSTINCT, LessonState.PATTERN)])
+    result["lessons_active"] = len(
+        [
+            lesson
+            for lesson in lessons
+            if lesson.state in (LessonState.INSTINCT, LessonState.PATTERN)
+        ]
+    )
     result["lessons_graduated"] = len(rules)
 
     # Try to get full manifest from brain (supplement, don't override file-based counts)
     try:
         from gradata._brain_manifest import generate_manifest
+
         full_manifest = generate_manifest()
         quality = full_manifest.get("quality", {})
         metadata = full_manifest.get("metadata", {})
@@ -355,7 +552,9 @@ def manifest(
         # Only use brain-derived counts if no explicit lessons_path was provided
         if not lessons_path:
             result["lessons_active"] = quality.get("lessons_active", result["lessons_active"])
-            result["lessons_graduated"] = quality.get("lessons_graduated", result["lessons_graduated"])
+            result["lessons_graduated"] = quality.get(
+                "lessons_graduated", result["lessons_graduated"]
+            )
     except Exception:
         pass
 

@@ -1,4 +1,5 @@
 """Tests for gradata._telemetry — opt-in anonymous activation events."""
+
 from __future__ import annotations
 
 import json
@@ -189,6 +190,7 @@ class TestPrompt:
     def test_eof_rejects(self):
         def _eof(_p):
             raise EOFError
+
         result = _telemetry.prompt_and_persist(input_fn=_eof)
         assert result is False
 

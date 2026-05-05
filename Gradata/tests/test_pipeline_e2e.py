@@ -10,7 +10,6 @@ Run: python -m pytest tests/test_pipeline_e2e.py -v
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
@@ -25,11 +24,8 @@ from gradata.enhancements.meta_rules import (
     ensure_table,
     format_meta_rules_for_prompt,
     load_meta_rules,
-    merge_into_meta,
-    refresh_meta_rules,
     save_meta_rules,
 )
-
 
 SALES_CORRECTIONS = [
     {
@@ -360,8 +356,8 @@ class TestCrossCategoryIsolation:
 def test_correction_pattern_tracking(tmp_path):
     from gradata.enhancements.meta_rules_storage import (
         ensure_pattern_table,
-        upsert_correction_pattern,
         query_graduation_candidates,
+        upsert_correction_pattern,
     )
 
     db = str(tmp_path / "test_patterns.db")

@@ -42,8 +42,8 @@ class ToolSpec:
 class PlannedStep:
     """A single step in an execution plan."""
 
-    tool: str          # tool name
-    purpose: str       # why this step is needed
+    tool: str  # tool name
+    purpose: str  # why this step is needed
     params: dict[str, Any] = field(default_factory=dict)
     depends_on: list[int] = field(default_factory=list)  # step indices
 
@@ -119,8 +119,7 @@ class ToolRegistry:
         """Search tools by name or description keyword."""
         q = query.lower()
         return [
-            t for t in self._tools.values()
-            if q in t.name.lower() or q in t.description.lower()
+            t for t in self._tools.values() if q in t.name.lower() or q in t.description.lower()
         ]
 
     def execute(
@@ -142,7 +141,8 @@ class ToolRegistry:
         handler = self._handlers.get(name)
         if handler is None:
             return ToolResult(
-                tool=name, success=False,
+                tool=name,
+                success=False,
                 error=f"No handler registered for '{name}'",
             )
 
@@ -152,13 +152,19 @@ class ToolRegistry:
             try:
                 output = handler(**params)
                 return ToolResult(
-                    tool=name, success=True, output=output, retries=attempt,
+                    tool=name,
+                    success=True,
+                    output=output,
+                    retries=attempt,
                 )
             except Exception as e:
                 last_error = str(e)
 
         return ToolResult(
-            tool=name, success=False, error=last_error, retries=max_retries,
+            tool=name,
+            success=False,
+            error=last_error,
+            retries=max_retries,
         )
 
     def plan(self, task: str) -> ExecutionPlan:
@@ -175,10 +181,12 @@ class ToolRegistry:
             desc_words = set(tool.description.lower().split())
             task_words = set(task_lower.split())
             if desc_words & task_words:
-                steps.append(PlannedStep(
-                    tool=tool.name,
-                    purpose=f"Use {tool.name}: {tool.description}",
-                ))
+                steps.append(
+                    PlannedStep(
+                        tool=tool.name,
+                        purpose=f"Use {tool.name}: {tool.description}",
+                    )
+                )
 
         return ExecutionPlan(steps=steps, task=task)
 
@@ -189,5 +197,3 @@ class ToolRegistry:
             "with_handlers": len(self._handlers),
             "categories": self.categories(),
         }
-
-

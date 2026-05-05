@@ -22,6 +22,7 @@ Dry run:
 Apply:
     python src/gradata/_migrations/001_add_tenant_id.py --brain <path>
 """
+
 from __future__ import annotations
 
 import argparse
@@ -127,9 +128,7 @@ def plan(conn: sqlite3.Connection) -> dict:
             actions.append(f"ALTER {t} ADD tenant_id TEXT")
         # Backfill count: rows where tenant_id is NULL (or column doesn't exist -> all rows)
         if column_exists(conn, t, "tenant_id"):
-            cnt = conn.execute(
-                f"SELECT COUNT(*) FROM {t} WHERE tenant_id IS NULL"
-            ).fetchone()[0]
+            cnt = conn.execute(f"SELECT COUNT(*) FROM {t} WHERE tenant_id IS NULL").fetchone()[0]
         else:
             cnt = conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
         if cnt:
@@ -145,9 +144,7 @@ def plan(conn: sqlite3.Connection) -> dict:
         if not column_exists(conn, t, "visibility"):
             actions.append(f"ALTER {t} ADD visibility TEXT DEFAULT 'private'")
 
-    if table_exists(conn, "events") and not column_exists(
-        conn, "events", "schema_version"
-    ):
+    if table_exists(conn, "events") and not column_exists(conn, "events", "schema_version"):
         actions.append("ALTER events ADD schema_version INTEGER DEFAULT 1")
 
     return {
@@ -201,14 +198,10 @@ def up(conn: sqlite3.Connection, tenant_id: str) -> dict:
             continue
         if add_column_if_missing(conn, t, "tenant_id", "TEXT"):
             summary["columns_added"].append(f"{t}.tenant_id")
-        if add_column_if_missing(
-            conn, t, "visibility", "TEXT DEFAULT 'private'"
-        ):
+        if add_column_if_missing(conn, t, "visibility", "TEXT DEFAULT 'private'"):
             summary["columns_added"].append(f"{t}.visibility")
         # Backfill visibility for pre-existing NULLs
-        cur = conn.execute(
-            f"UPDATE {t} SET visibility = 'private' WHERE visibility IS NULL"
-        )
+        cur = conn.execute(f"UPDATE {t} SET visibility = 'private' WHERE visibility IS NULL")
         summary["visibility_backfilled"] += cur.rowcount
         # Backfill tenant_id: all existing rows belong to primary tenant.
         # Future: admin can promote rows to visibility='global' & tenant_id=NULL.
@@ -218,9 +211,7 @@ def up(conn: sqlite3.Connection, tenant_id: str) -> dict:
         )
         if cur.rowcount:
             summary["rows_backfilled"] += cur.rowcount
-            summary["tables_backfilled"][t] = (
-                summary["tables_backfilled"].get(t, 0) + cur.rowcount
-            )
+            summary["tables_backfilled"][t] = summary["tables_backfilled"].get(t, 0) + cur.rowcount
         idx = f"idx_{t}_tenant"
         if create_index_if_missing(conn, idx, t, "tenant_id"):
             summary["indexes_created"].append(idx)
@@ -233,13 +224,9 @@ def up(conn: sqlite3.Connection, tenant_id: str) -> dict:
     # earlier partial run. This keeps the migration idempotent across retries
     # instead of only touching rows the first time the column is added.
     if table_exists(conn, "events"):
-        if add_column_if_missing(
-            conn, "events", "schema_version", "INTEGER DEFAULT 1"
-        ):
+        if add_column_if_missing(conn, "events", "schema_version", "INTEGER DEFAULT 1"):
             summary["columns_added"].append("events.schema_version")
-        conn.execute(
-            "UPDATE events SET schema_version = 1 WHERE schema_version IS NULL"
-        )
+        conn.execute("UPDATE events SET schema_version = 1 WHERE schema_version IS NULL")
 
     # Commit lives in the caller (_apply_numbered) so the schema/data changes
     # and the `migrations` tracking row land atomically.
@@ -283,8 +270,7 @@ def _main() -> int:
         for a in p["actions"]:
             print(f"  {a}")
         print(
-            f"  backfill {p['total_rows_to_backfill']} rows across "
-            f"{len(p['row_backfills'])} tables"
+            f"  backfill {p['total_rows_to_backfill']} rows across {len(p['row_backfills'])} tables"
         )
         if p["row_backfills"]:
             sample = p["row_backfills"][:10]

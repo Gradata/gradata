@@ -205,7 +205,8 @@ def test_happy_path_pushes_events_and_advances_watermark(tmp_path, monkeypatch):
 
     captured: list[dict] = []
 
-    def fake_urlopen(req, timeout):  # noqa: ARG001
+    def fake_urlopen(req, timeout):
+        _ = timeout
         body = json.loads(req.data.decode("utf-8"))
         captured.append(body)
         return _FakeResp(b'{"accepted": 3, "rejected": []}')
@@ -236,7 +237,8 @@ def test_resume_from_watermark_skips_already_pushed(tmp_path, monkeypatch):
 
     captured: list[dict] = []
 
-    def fake_urlopen(req, timeout):  # noqa: ARG001
+    def fake_urlopen(req, timeout):
+        _ = timeout
         captured.append(json.loads(req.data.decode("utf-8")))
         return _FakeResp()
 
@@ -253,7 +255,8 @@ def test_chunked_batching_multiple_posts(tmp_path, monkeypatch):
 
     posts: list[int] = []
 
-    def fake_urlopen(req, timeout):  # noqa: ARG001
+    def fake_urlopen(req, timeout):
+        _ = timeout
         body = json.loads(req.data.decode("utf-8"))
         posts.append(len(body["events"]))
         return _FakeResp()
@@ -273,7 +276,8 @@ def test_4xx_is_fatal_no_retry(tmp_path, monkeypatch):
 
     calls = {"n": 0}
 
-    def fake_urlopen(req, timeout):  # noqa: ARG001
+    def fake_urlopen(req, timeout):
+        _ = timeout
         calls["n"] += 1
         raise urllib.error.HTTPError(
             req.full_url, 400, "Bad Request", hdrs=None, fp=io.BytesIO(b"")
@@ -295,7 +299,8 @@ def test_5xx_retried_then_fails(tmp_path, monkeypatch):
 
     calls = {"n": 0}
 
-    def fake_urlopen(req, timeout):  # noqa: ARG001
+    def fake_urlopen(req, timeout):
+        _ = timeout
         calls["n"] += 1
         raise urllib.error.HTTPError(
             req.full_url, 503, "Service Unavailable", hdrs=None, fp=io.BytesIO(b"")
@@ -316,7 +321,8 @@ def test_5xx_then_success_within_retries(tmp_path, monkeypatch):
 
     calls = {"n": 0}
 
-    def fake_urlopen(req, timeout):  # noqa: ARG001
+    def fake_urlopen(req, timeout):
+        _ = timeout
         calls["n"] += 1
         if calls["n"] < 2:
             raise urllib.error.HTTPError(
@@ -339,7 +345,8 @@ def test_credential_resolves_from_keyfile_when_config_token_empty(tmp_path, monk
 
     captured: list[dict[str, Any]] = []
 
-    def fake_urlopen(req, timeout):  # noqa: ARG001
+    def fake_urlopen(req, timeout):
+        _ = timeout
         captured.append({"auth": req.headers.get("Authorization")})
         return _FakeResp()
 
@@ -353,7 +360,8 @@ def test_credential_resolves_from_keyfile_when_config_token_empty(tmp_path, monk
 def test_empty_events_table_returns_ok_noop(tmp_path, monkeypatch):
     brain = _make_brain(tmp_path, events=[])
 
-    def fake_urlopen(req, timeout):  # noqa: ARG001
+    def fake_urlopen(req, timeout):
+        _ = timeout
         raise AssertionError("should not POST when no events")
 
     monkeypatch.setattr(push_mod.urllib.request, "urlopen", fake_urlopen)
@@ -375,7 +383,8 @@ def test_partial_2xx_does_not_advance_watermark(tmp_path, monkeypatch):
     ]
     brain = _make_brain(tmp_path, events=events)
 
-    def fake_urlopen(req, timeout):  # noqa: ARG001
+    def fake_urlopen(req, timeout):
+        _ = timeout
         return _FakeResp(
             b'{"accepted": 1, "rejected": [{"event_id": "01HN000000000000000000000B"}]}'
         )
@@ -403,7 +412,8 @@ def test_partial_2xx_count_mismatch_does_not_advance_watermark(tmp_path, monkeyp
     ]
     brain = _make_brain(tmp_path, events=events)
 
-    def fake_urlopen(req, timeout):  # noqa: ARG001
+    def fake_urlopen(req, timeout):
+        _ = timeout
         return _FakeResp(b'{"accepted": 2, "rejected": []}')
 
     monkeypatch.setattr(push_mod.urllib.request, "urlopen", fake_urlopen)
@@ -472,7 +482,8 @@ def test_other_tenant_rows_are_not_pushed(tmp_path, monkeypatch):
 
     captured: dict[str, Any] = {}
 
-    def fake_urlopen(req, timeout):  # noqa: ARG001
+    def fake_urlopen(req, timeout):
+        _ = timeout
         captured["body"] = json.loads(req.data.decode("utf-8"))
         return _FakeResp(b'{"accepted": 1, "rejected": []}')
 
@@ -513,7 +524,8 @@ def test_legacy_null_tenant_rows_still_pushed(tmp_path, monkeypatch):
 
     captured: dict[str, Any] = {}
 
-    def fake_urlopen(req, timeout):  # noqa: ARG001
+    def fake_urlopen(req, timeout):
+        _ = timeout
         captured["body"] = json.loads(req.data.decode("utf-8"))
         return _FakeResp(b'{"accepted": 1, "rejected": []}')
 

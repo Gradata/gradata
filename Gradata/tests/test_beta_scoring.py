@@ -1,11 +1,12 @@
 """Tests for Bayesian Beta domain scoring — unified with FSRS."""
+
 from __future__ import annotations
 
 from gradata._types import Lesson, LessonState
 from gradata.rules.rule_engine import (
     beta_domain_reliability,
-    is_rule_disabled_for_domain,
     effective_confidence,
+    is_rule_disabled_for_domain,
 )
 
 
@@ -35,8 +36,10 @@ def test_beta_reliability_all_misfires():
 def test_disabled_uses_beta_not_naive_ratio():
     """2 fires, 1 misfire (50% ratio) should NOT disable — too few observations."""
     lesson = Lesson(
-        date="2026-04-06", state=LessonState.RULE,
-        confidence=0.95, category="DRAFTING",
+        date="2026-04-06",
+        state=LessonState.RULE,
+        confidence=0.95,
+        category="DRAFTING",
         description="Use active voice",
         domain_scores={"CODE": {"fires": 2, "misfires": 1}},
     )
@@ -46,8 +49,10 @@ def test_disabled_uses_beta_not_naive_ratio():
 def test_disabled_with_strong_evidence():
     """20 fires, 10 misfires (50%) — enough evidence, should disable."""
     lesson = Lesson(
-        date="2026-04-06", state=LessonState.RULE,
-        confidence=0.95, category="DRAFTING",
+        date="2026-04-06",
+        state=LessonState.RULE,
+        confidence=0.95,
+        category="DRAFTING",
         description="Use active voice",
         domain_scores={"CODE": {"fires": 20, "misfires": 10}},
     )

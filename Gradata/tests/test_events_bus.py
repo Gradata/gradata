@@ -3,8 +3,6 @@
 import threading
 import time
 
-import pytest
-
 from gradata.events_bus import EventBus
 
 
@@ -27,7 +25,10 @@ class TestEventBus:
 
     def test_off_removes_handler(self):
         calls = []
-        handler = lambda p: calls.append(1)
+
+        def handler(p):
+            return calls.append(1)
+
         self.bus.on("evt", handler)
         self.bus.off("evt", handler)
         self.bus.emit("evt", {})

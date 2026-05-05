@@ -30,9 +30,9 @@ import json
 import logging
 import re
 from collections import Counter, defaultdict
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, Sequence
 
 _log = logging.getLogger("gradata.triggers")
 
@@ -49,15 +49,85 @@ _WORD_RE = re.compile(r"[a-z][a-z0-9_'-]{1,}")
 # (you'd start picking up "a", "the" pairs that match every text).
 _STOP = frozenset(
     {
-        "the", "a", "an", "and", "or", "but", "if", "of", "to", "in", "on",
-        "at", "by", "for", "with", "from", "as", "is", "are", "was", "were",
-        "be", "been", "being", "this", "that", "these", "those", "it", "its",
-        "i", "you", "he", "she", "we", "they", "me", "him", "her", "us",
-        "them", "my", "your", "his", "their", "our", "what", "which", "who",
-        "whom", "whose", "do", "does", "did", "have", "has", "had", "will",
-        "would", "should", "could", "can", "may", "might", "must", "shall",
-        "not", "no", "yes", "so", "than", "then", "there", "here", "very",
-        "just", "only", "also", "too",
+        "the",
+        "a",
+        "an",
+        "and",
+        "or",
+        "but",
+        "if",
+        "of",
+        "to",
+        "in",
+        "on",
+        "at",
+        "by",
+        "for",
+        "with",
+        "from",
+        "as",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "this",
+        "that",
+        "these",
+        "those",
+        "it",
+        "its",
+        "i",
+        "you",
+        "he",
+        "she",
+        "we",
+        "they",
+        "me",
+        "him",
+        "her",
+        "us",
+        "them",
+        "my",
+        "your",
+        "his",
+        "their",
+        "our",
+        "what",
+        "which",
+        "who",
+        "whom",
+        "whose",
+        "do",
+        "does",
+        "did",
+        "have",
+        "has",
+        "had",
+        "will",
+        "would",
+        "should",
+        "could",
+        "can",
+        "may",
+        "might",
+        "must",
+        "shall",
+        "not",
+        "no",
+        "yes",
+        "so",
+        "than",
+        "then",
+        "there",
+        "here",
+        "very",
+        "just",
+        "only",
+        "also",
+        "too",
     }
 )
 
@@ -142,7 +212,9 @@ class TriggerIndex:
             self._table.setdefault(ng, {})[rule_id] = self._table.get(ng, {}).get(rule_id, 0) + 1
             self._by_rule.setdefault(rule_id, set()).add(ng)
 
-    def lookup(self, ngrams: Iterable[tuple[str, str]], *, top_k: int = 10) -> list[tuple[str, float]]:
+    def lookup(
+        self, ngrams: Iterable[tuple[str, str]], *, top_k: int = 10
+    ) -> list[tuple[str, float]]:
         """Return rule_ids ranked by summed weight across matched ngrams.
 
         The score is the sum of edge weights for every fired ngram. Ties are
@@ -280,9 +352,7 @@ def measure_recall(
     hits = 0
     empty = 0
     for ex in test:
-        candidates = idx.lookup(
-            extract_correction_triggers(ex.draft, ex.final), top_k=top_k
-        )
+        candidates = idx.lookup(extract_correction_triggers(ex.draft, ex.final), top_k=top_k)
         by_rule[ex.rule_id]["total"] += 1
         if not candidates:
             empty += 1

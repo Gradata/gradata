@@ -18,7 +18,6 @@ from gradata import _events as _ev
 from gradata.exceptions import EventPersistenceError
 from tests.conftest import init_brain
 
-
 SECRET_EMAIL = "leaker@example.com"
 
 

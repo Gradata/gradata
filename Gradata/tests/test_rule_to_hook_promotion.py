@@ -9,6 +9,7 @@ Covers the end-to-end loop:
 
 Shells out to Node for hook self-test, so skip when Node is absent.
 """
+
 from __future__ import annotations
 
 import json
@@ -45,12 +46,14 @@ def _seed_events(brain_dir, event_records: list[dict]) -> None:
 def _bind_brain_dir(monkeypatch, brain_dir):
     """Point gradata._paths at a tmp brain dir so events.jsonl is discoverable."""
     from gradata import _paths as _p
+
     brain_dir.mkdir(parents=True, exist_ok=True)
     events_jsonl = brain_dir / "events.jsonl"
     if not events_jsonl.exists():
         events_jsonl.touch()
     monkeypatch.setattr(_p, "EVENTS_JSONL", events_jsonl)
     monkeypatch.setattr(_p, "BRAIN_DIR", brain_dir)
+
 
 pytestmark = pytest.mark.skipif(
     shutil.which("node") is None,
@@ -243,9 +246,11 @@ def test_jit_inject_skips_hook_enforced(tmp_path, monkeypatch):
     monkeypatch.setattr(jit, "resolve_brain_dir", lambda: brain_dir)
 
     # Payload mirrors real UserPromptSubmit hook data.
-    out = jit.main({
-        "prompt": "Help me draft an email about em dashes and dashes in prose",
-    })
+    out = jit.main(
+        {
+            "prompt": "Help me draft an email about em dashes and dashes in prose",
+        }
+    )
 
     if out is None:
         # No rules ranked highly enough for JIT — still valid; the assertion
@@ -271,11 +276,32 @@ def test_graduation_auto_promotes_deterministic_rule(tmp_path, monkeypatch):
     # sessions in the proof chain, no reversals.
     brain_dir = tmp_path / "brain"
     _bind_brain_dir(monkeypatch, brain_dir)
-    _seed_events(brain_dir, [
-        {"id": "e1", "session": 1, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-        {"id": "e2", "session": 2, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-        {"id": "e3", "session": 3, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-    ])
+    _seed_events(
+        brain_dir,
+        [
+            {
+                "id": "e1",
+                "session": 1,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+            {
+                "id": "e2",
+                "session": 2,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+            {
+                "id": "e3",
+                "session": 3,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+        ],
+    )
 
     # A PATTERN that should graduate to RULE on this pass.
     l = Lesson(
@@ -394,11 +420,32 @@ def test_empirical_gate_blocks_when_fire_count_below_threshold(tmp_path, monkeyp
     monkeypatch.setenv("GRADATA_HOOK_ROOT", str(hook_dir))
     brain_dir = tmp_path / "brain"
     _bind_brain_dir(monkeypatch, brain_dir)
-    _seed_events(brain_dir, [
-        {"id": "e1", "session": 1, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-        {"id": "e2", "session": 2, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-        {"id": "e3", "session": 3, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-    ])
+    _seed_events(
+        brain_dir,
+        [
+            {
+                "id": "e1",
+                "session": 1,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+            {
+                "id": "e2",
+                "session": 2,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+            {
+                "id": "e3",
+                "session": 3,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+        ],
+    )
 
     lesson = _make_lesson_with_chain(fire_count=9, event_ids=["e1", "e2", "e3"])
 
@@ -416,11 +463,32 @@ def test_empirical_gate_blocks_when_distinct_sessions_below_threshold(tmp_path, 
     brain_dir = tmp_path / "brain"
     _bind_brain_dir(monkeypatch, brain_dir)
     # Only two distinct sessions in the proof chain.
-    _seed_events(brain_dir, [
-        {"id": "e1", "session": 7, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-        {"id": "e2", "session": 7, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-        {"id": "e3", "session": 8, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-    ])
+    _seed_events(
+        brain_dir,
+        [
+            {
+                "id": "e1",
+                "session": 7,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+            {
+                "id": "e2",
+                "session": 7,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+            {
+                "id": "e3",
+                "session": 8,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+        ],
+    )
 
     lesson = _make_lesson_with_chain(fire_count=15, event_ids=["e1", "e2", "e3"])
 
@@ -443,18 +511,39 @@ def test_empirical_gate_blocks_when_recent_human_reversal_exists(tmp_path, monke
     lesson = _make_lesson_with_chain(fire_count=12, event_ids=["e1", "e2", "e3"])
     rule_id = _make_rule_id(lesson)
 
-    _seed_events(brain_dir, [
-        {"id": "e1", "session": 1, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-        {"id": "e2", "session": 2, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-        {"id": "e3", "session": 3, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-        {
-            "id": "r1",
-            "session": 4,
-            "type": RULE_PATCH_REVERTED,
-            "ts": datetime.now(UTC).isoformat(),
-            "data": {"rule_id": rule_id, "slug": "x"},
-        },
-    ])
+    _seed_events(
+        brain_dir,
+        [
+            {
+                "id": "e1",
+                "session": 1,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+            {
+                "id": "e2",
+                "session": 2,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+            {
+                "id": "e3",
+                "session": 3,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+            {
+                "id": "r1",
+                "session": 4,
+                "type": RULE_PATCH_REVERTED,
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {"rule_id": rule_id, "slug": "x"},
+            },
+        ],
+    )
 
     result = promote(lesson.description, 0.99, lesson=lesson)
 
@@ -469,11 +558,32 @@ def test_empirical_gate_passes_when_all_criteria_met(tmp_path, monkeypatch):
     monkeypatch.setenv("GRADATA_HOOK_ROOT", str(hook_dir))
     brain_dir = tmp_path / "brain"
     _bind_brain_dir(monkeypatch, brain_dir)
-    _seed_events(brain_dir, [
-        {"id": "e1", "session": 1, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-        {"id": "e2", "session": 2, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-        {"id": "e3", "session": 3, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-    ])
+    _seed_events(
+        brain_dir,
+        [
+            {
+                "id": "e1",
+                "session": 1,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+            {
+                "id": "e2",
+                "session": 2,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+            {
+                "id": "e3",
+                "session": 3,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+        ],
+    )
 
     lesson = _make_lesson_with_chain(fire_count=12, event_ids=["e1", "e2", "e3"])
 
@@ -514,11 +624,32 @@ def test_hook_demoted_event_emitted_on_demote(tmp_path, monkeypatch):
     _bind_brain_dir(monkeypatch, brain_dir)
 
     # Seed an empirical-gate-passing promotion path, then demote.
-    _seed_events(brain_dir, [
-        {"id": "e1", "session": 1, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-        {"id": "e2", "session": 2, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-        {"id": "e3", "session": 3, "type": "CORRECTION", "ts": datetime.now(UTC).isoformat(), "data": {}},
-    ])
+    _seed_events(
+        brain_dir,
+        [
+            {
+                "id": "e1",
+                "session": 1,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+            {
+                "id": "e2",
+                "session": 2,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+            {
+                "id": "e3",
+                "session": 3,
+                "type": "CORRECTION",
+                "ts": datetime.now(UTC).isoformat(),
+                "data": {},
+            },
+        ],
+    )
     lesson = _make_lesson_with_chain(fire_count=12, event_ids=["e1", "e2", "e3"])
     promoted = promote(lesson.description, 0.99, lesson=lesson)
     assert promoted.installed

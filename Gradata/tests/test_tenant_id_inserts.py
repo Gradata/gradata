@@ -6,7 +6,6 @@ the resulting DB row has tenant_id IS NOT NULL.
 
 from __future__ import annotations
 
-import os
 import sqlite3
 from pathlib import Path
 
@@ -37,6 +36,7 @@ def db_path(brain_dir: Path) -> Path:
 # Helper: create tables needed by each module (mimics what run_migrations does)
 # ---------------------------------------------------------------------------
 
+
 def _make_rule_provenance(db_path: Path) -> None:
     conn = sqlite3.connect(str(db_path))
     conn.execute(
@@ -46,7 +46,8 @@ def _make_rule_provenance(db_path: Path) -> None:
             correction_event_id TEXT,
             session INTEGER,
             timestamp TEXT NOT NULL,
-            user_context TEXT
+            user_context TEXT,
+            tenant_id TEXT
         )"""
     )
     conn.commit()
@@ -88,9 +89,7 @@ def test_write_provenance_sets_tenant_id(brain_dir: Path, db_path: Path) -> None
     )
 
     conn = sqlite3.connect(str(db_path))
-    row = conn.execute(
-        "SELECT tenant_id FROM rule_provenance WHERE rule_id = 'r_test'"
-    ).fetchone()
+    row = conn.execute("SELECT tenant_id FROM rule_provenance WHERE rule_id = 'r_test'").fetchone()
     conn.close()
     assert row is not None
     assert row[0] == TEST_TENANT
@@ -162,9 +161,7 @@ def test_upsert_correction_pattern_sets_tenant_id(brain_dir: Path, db_path: Path
 # ---------------------------------------------------------------------------
 
 
-def test_upsert_correction_patterns_batch_sets_tenant_id(
-    brain_dir: Path, db_path: Path
-) -> None:
+def test_upsert_correction_patterns_batch_sets_tenant_id(brain_dir: Path, db_path: Path) -> None:
     from gradata.enhancements.meta_rules_storage import upsert_correction_patterns_batch
 
     upsert_correction_patterns_batch(
@@ -198,9 +195,7 @@ def test_log_activity_sets_tenant_id(brain_dir: Path, db_path: Path) -> None:
 
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
-    row = conn.execute(
-        "SELECT tenant_id FROM activity_log ORDER BY id DESC LIMIT 1"
-    ).fetchone()
+    row = conn.execute("SELECT tenant_id FROM activity_log ORDER BY id DESC LIMIT 1").fetchone()
     conn.close()
     assert row is not None
     assert row["tenant_id"] == TEST_TENANT
@@ -218,9 +213,7 @@ def test_log_prep_sets_tenant_id(brain_dir: Path, db_path: Path) -> None:
 
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
-    row = conn.execute(
-        "SELECT tenant_id FROM prep_outcomes ORDER BY id DESC LIMIT 1"
-    ).fetchone()
+    row = conn.execute("SELECT tenant_id FROM prep_outcomes ORDER BY id DESC LIMIT 1").fetchone()
     conn.close()
     assert row is not None
     assert row["tenant_id"] == TEST_TENANT
@@ -235,15 +228,14 @@ def test_log_outcome_fallback_sets_tenant_id(brain_dir: Path, db_path: Path) -> 
     from gradata.enhancements.scoring.loop_intelligence import log_outcome
 
     # No existing prep row -> triggers the fallback INSERT path
-    result = log_outcome(db_path, prospect="Bob", prep_type="personalization",
-                         outcome="reply", days=3)
+    result = log_outcome(
+        db_path, prospect="Bob", prep_type="personalization", outcome="reply", days=3
+    )
     assert result["linked_to_prep"] is False
 
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
-    row = conn.execute(
-        "SELECT tenant_id FROM prep_outcomes WHERE prospect = 'Bob'"
-    ).fetchone()
+    row = conn.execute("SELECT tenant_id FROM prep_outcomes WHERE prospect = 'Bob'").fetchone()
     conn.close()
     assert row is not None
     assert row["tenant_id"] == TEST_TENANT
@@ -261,9 +253,7 @@ def test_store_relationship_sets_tenant_id(brain_dir: Path, db_path: Path) -> No
     store_relationship(db_path, "rA", "rB", RuleRelationType.REINFORCES, confidence=0.75)
 
     conn = sqlite3.connect(str(db_path))
-    row = conn.execute(
-        "SELECT tenant_id FROM rule_relationships WHERE rule_a_id = 'rA'"
-    ).fetchone()
+    row = conn.execute("SELECT tenant_id FROM rule_relationships WHERE rule_a_id = 'rA'").fetchone()
     conn.close()
     assert row is not None
     assert row[0] == TEST_TENANT
@@ -301,7 +291,14 @@ def test_fts_index_batch_sets_tenant_id(brain_dir: Path, db_path: Path) -> None:
 
     ctx = BrainContext.from_brain_dir(brain_dir)
     fts_index_batch(
-        [{"source": "batch/file.md", "file_type": "general", "text": "batch text", "embed_date": "2026-04-17"}],
+        [
+            {
+                "source": "batch/file.md",
+                "file_type": "general",
+                "text": "batch text",
+                "embed_date": "2026-04-17",
+            }
+        ],
         ctx=ctx,
     )
 

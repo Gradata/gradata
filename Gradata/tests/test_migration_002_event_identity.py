@@ -96,7 +96,7 @@ def test_historical_rows_backfilled(tmp_path):
             "FROM events WHERE type = 'TEST_HISTORICAL'"
         ).fetchone()
 
-    event_id, device_id, content_hash, ts, ev_type, source, data_json = row
+    event_id, device_id, content_hash, _ts, ev_type, source, data_json = row
     # event_id: 26-char Crockford base32 ULID
     assert event_id is not None
     assert re.fullmatch(r"[0-9A-HJKMNP-TV-Z]{26}", event_id), event_id

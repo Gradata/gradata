@@ -117,18 +117,17 @@ BANNED_PHRASES: list[str] = [
 
 # Pre-compiled patterns for performance
 _BANNED_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    (phrase, re.compile(re.escape(phrase), re.IGNORECASE))
-    for phrase in BANNED_PHRASES
+    (phrase, re.compile(re.escape(phrase), re.IGNORECASE)) for phrase in BANNED_PHRASES
 ]
 
 # Numbers without source: percentage or multiplier not preceded by a citation.
 # Matches "300%", "3x", "2.5x" etc.
 _NUMBER_CLAIM_RE = re.compile(
-    r"(?<!\()"               # not inside a parenthetical
-    r"(?<!source:)"          # not after "source:"
-    r"(?<!ref:)"             # not after "ref:"
+    r"(?<!\()"  # not inside a parenthetical
+    r"(?<!source:)"  # not after "source:"
+    r"(?<!ref:)"  # not after "ref:"
     r"\b(\d+(?:\.\d+)?)\s*"  # number
-    r"(%|x\b)",              # percent or multiplier
+    r"(%|x\b)",  # percent or multiplier
     re.IGNORECASE,
 )
 
@@ -168,21 +167,25 @@ def verify_claims(output: str) -> TruthVerdict:
             found_phrases.append(phrase)
 
     if found_phrases:
-        verdict.add(TruthCheck(
-            name="no_banned_phrases",
-            passed=False,
-            detail=(
-                f"Output contains {len(found_phrases)} banned phrase(s) "
-                "that signal unverified success claims."
-            ),
-            evidence="; ".join(found_phrases[:5]),  # cap evidence to 5
-        ))
+        verdict.add(
+            TruthCheck(
+                name="no_banned_phrases",
+                passed=False,
+                detail=(
+                    f"Output contains {len(found_phrases)} banned phrase(s) "
+                    "that signal unverified success claims."
+                ),
+                evidence="; ".join(found_phrases[:5]),  # cap evidence to 5
+            )
+        )
     else:
-        verdict.add(TruthCheck(
-            name="no_banned_phrases",
-            passed=True,
-            detail="No banned success phrases detected.",
-        ))
+        verdict.add(
+            TruthCheck(
+                name="no_banned_phrases",
+                passed=True,
+                detail="No banned success phrases detected.",
+            )
+        )
 
     # --- Check 2: numbers without source ---
     number_matches = list(_NUMBER_CLAIM_RE.finditer(output))
@@ -197,26 +200,30 @@ def verify_claims(output: str) -> TruthVerdict:
     # Deduplicate while preserving order
     seen: set[str] = set()
     unique_unverified = [
-        v for v in unverified if not (v in seen or seen.add(v))  # type: ignore[func-returns-value]
+        v
+        for v in unverified
+        if not (v in seen or seen.add(v))  # type: ignore[func-returns-value]
     ]
 
     if unique_unverified:
-        verdict.add(TruthCheck(
-            name="no_unverified_numbers",
-            passed=False,
-            detail=(
-                f"Found {len(unique_unverified)} numeric claim(s) without "
-                "an accompanying citation or source reference."
-            ),
-            evidence=", ".join(unique_unverified[:5]),
-        ))
+        verdict.add(
+            TruthCheck(
+                name="no_unverified_numbers",
+                passed=False,
+                detail=(
+                    f"Found {len(unique_unverified)} numeric claim(s) without "
+                    "an accompanying citation or source reference."
+                ),
+                evidence=", ".join(unique_unverified[:5]),
+            )
+        )
     else:
-        verdict.add(TruthCheck(
-            name="no_unverified_numbers",
-            passed=True,
-            detail="All numeric claims have accompanying citations or none found.",
-        ))
+        verdict.add(
+            TruthCheck(
+                name="no_unverified_numbers",
+                passed=True,
+                detail="All numeric claims have accompanying citations or none found.",
+            )
+        )
 
     return verdict
-
-

@@ -3,8 +3,6 @@
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from gradata._types import Lesson, LessonState
 from gradata.enhancements.llm_synthesizer import synthesise_principle_llm
 

@@ -36,16 +36,12 @@ class TestClassifyMode:
         assert conf > 0.0
 
     def test_documentation_readme(self) -> None:
-        mode, conf = classify_mode(
-            "update the README with installation instructions"
-        )
+        mode, conf = classify_mode("update the README with installation instructions")
         assert mode == "documentation"
         assert conf > 0.0
 
     def test_documentation_explain(self) -> None:
-        mode, conf = classify_mode(
-            "explain how the authentication module works"
-        )
+        mode, conf = classify_mode("explain how the authentication module works")
         assert mode == "documentation"
         assert conf > 0.0
 
@@ -69,9 +65,7 @@ class TestConfidenceScaling:
 
     def test_more_keywords_higher_confidence(self) -> None:
         _, conf_one = classify_mode("implement something")
-        _, conf_many = classify_mode(
-            "implement a function to fix the bug and refactor the class"
-        )
+        _, conf_many = classify_mode("implement a function to fix the bug and refactor the class")
         assert conf_many > conf_one
 
     def test_confidence_capped_at_one(self) -> None:
