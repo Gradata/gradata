@@ -68,7 +68,11 @@ def get_relevant_rules(tool_type: str, all_rules: list[dict]) -> list[dict]:
     Returns:
         Filtered list of rule dicts relevant to the tool type.
     """
-    return [rule for rule in all_rules if should_verify(tool_type, rule.get("category", "UNKNOWN"))]
+    return [
+        rule
+        for rule in all_rules
+        if should_verify(tool_type, str(rule.get("category") or "UNKNOWN"))
+    ]
 
 
 # ---------------------------------------------------------------------------

@@ -49,21 +49,24 @@ def write_provenance(
 
     _tid = tenant_for(Path(db_path).parent)
     try:
-        import contextlib as _ctx
-        import sqlite3 as _sqlite3
-
         with get_connection(db_path) as conn:
-            # Defensive migration: brains created before migration 001 lack tenant_id.
-            with _ctx.suppress(_sqlite3.OperationalError):
-                conn.execute("ALTER TABLE rule_provenance ADD COLUMN tenant_id TEXT")
-            conn.execute(
-                "INSERT INTO rule_provenance "
-                "(rule_id, correction_event_id, session, timestamp, user_context, tenant_id) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (rule_id, correction_event_id, session, timestamp, user_context, _tid),
-            )
-    except Exception as e:
-        _log.debug("write_provenance failed: %s", e)
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(rule_provenance)")}
+            if "tenant_id" in cols:
+                conn.execute(
+                    "INSERT INTO rule_provenance "
+                    "(rule_id, correction_event_id, session, timestamp, user_context, tenant_id) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (rule_id, correction_event_id, session, timestamp, user_context, _tid),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO rule_provenance "
+                    "(rule_id, correction_event_id, session, timestamp, user_context) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (rule_id, correction_event_id, session, timestamp, user_context),
+                )
+    except Exception:
+        _log.warning("write_provenance failed", exc_info=True)
 
 
 # ---------------------------------------------------------------------------

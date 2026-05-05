@@ -57,6 +57,22 @@ MIN_CONFIDENCE = float(os.environ.get("GRADATA_MIN_CONFIDENCE", "0.60"))
 MAX_META_RULES = int(os.environ.get("GRADATA_MAX_META_RULES", "5"))
 MAX_BRAIN_PROMPT_CHARS = int(os.environ.get("GRADATA_MAX_BRAIN_PROMPT_CHARS", "4000"))
 
+
+def _filter_injectable_metas(metas: list) -> list:
+    injectable = []
+    for m in metas:
+        source = getattr(m, "source", "deterministic")
+        if source in INJECTABLE_META_SOURCES:
+            injectable.append(m)
+        else:
+            _log.warning(
+                "dropping meta-rule %s (source=%s) from injection",
+                getattr(m, "id", "<unknown>"),
+                source,
+            )
+    return injectable
+
+
 # Sentinel written by inject_handoff when a handoff carries a rules snapshot.
 # When present, we compare mtime(lessons.md) vs. snapshot_ts and skip the
 # ranked <brain-rules> block if nothing has graduated since — the handoff
@@ -432,24 +448,19 @@ def main(data: dict) -> dict | None:
     meta_covered_categories: set[str] = set()
     meta_covered_lesson_ids: set[str] = set()
     cached_metas: list | None = None
+    cached_injectable_metas: list | None = None
     db_path = Path(brain_dir) / "system.db"
     if load_meta_rules and db_path.is_file():
         try:
             cached_metas = list(load_meta_rules(db_path))
-            for m in cached_metas:
-                source = getattr(m, "source", "deterministic")
-                if source in INJECTABLE_META_SOURCES:
-                    meta_covered_categories.update(getattr(m, "source_categories", []))
-                    meta_covered_lesson_ids.update(getattr(m, "source_lesson_ids", []) or [])
-                else:
-                    _log.warning(
-                        "dropping meta-rule %s (source=%s) from injection",
-                        getattr(m, "id", "<unknown>"),
-                        source,
-                    )
+            cached_injectable_metas = _filter_injectable_metas(cached_metas)
+            for m in cached_injectable_metas:
+                meta_covered_categories.update(getattr(m, "source_categories", []))
+                meta_covered_lesson_ids.update(getattr(m, "source_lesson_ids", []) or [])
         except Exception as exc:
             _log.debug("meta-rule mutex pre-pass failed (%s) — clusters will fire", exc)
             cached_metas = None
+            cached_injectable_metas = None
 
     # Injection manifest: short_anchor → {full_id, category, description, state,
     # cluster_category}. Written to <brain>/.last_injection.json so the
@@ -737,18 +748,13 @@ def main(data: dict) -> dict | None:
         try:
             # Reuse the mutex pre-pass result when available to avoid a second
             # DB open. Fall back to a fresh load if the pre-pass failed.
-            metas = cached_metas if cached_metas is not None else load_meta_rules(db_path)
-            injectable = []
-            for m in metas:
-                source = getattr(m, "source", "deterministic")
-                if source in INJECTABLE_META_SOURCES:
-                    injectable.append(m)
-                else:
-                    _log.warning(
-                        "dropping meta-rule %s (source=%s) from injection",
-                        getattr(m, "id", "<unknown>"),
-                        source,
-                    )
+            if cached_injectable_metas is not None:
+                injectable = cached_injectable_metas
+                meta_count = len(cached_metas or [])
+            else:
+                fresh_metas = list(load_meta_rules(db_path))
+                injectable = _filter_injectable_metas(fresh_metas)
+                meta_count = len(fresh_metas)
             if injectable:
                 # Build a sanitized condition_context from the hook payload so
                 # applies_when / never_when are honored during SessionStart.
@@ -775,11 +781,11 @@ def main(data: dict) -> dict | None:
                 )
                 if formatted:
                     meta_block = "\n<brain-meta-rules>\n" + formatted + "\n</brain-meta-rules>"
-            elif metas:
+            elif meta_count:
                 _log.debug(
                     "Skipped meta-rule injection: %d metas in DB, none with "
                     "injectable source (llm_synth or human_curated)",
-                    len(metas),
+                    meta_count,
                 )
         except Exception as exc:
             _log.debug(

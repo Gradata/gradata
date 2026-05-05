@@ -13,8 +13,11 @@ rule success/misfire rates, blandness score.
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -125,6 +128,7 @@ def compute_metrics(
             "sessions_covered": max_session - min_session + 1,
         }
     except Exception:
+        logger.warning("compute_metrics failed", exc_info=True)
         return {}
 
 

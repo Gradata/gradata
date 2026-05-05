@@ -290,8 +290,14 @@ class TestMakeRuleId:
 class TestBrainWrappers:
     @pytest.fixture()
     def brain(self, brain_dir: Path):
+        import importlib
+        import os
+
+        import gradata._paths as _p
         from gradata.brain import Brain
 
+        os.environ["BRAIN_DIR"] = str(brain_dir)
+        importlib.reload(_p)
         return Brain.init(
             brain_dir, name="Test", domain="Testing", embedding="local", interactive=False
         )

@@ -6,6 +6,7 @@ sqlite-vec planned for vector similarity.
 """
 
 import contextlib
+import logging
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -31,6 +32,8 @@ from gradata._config import (
 )
 from gradata._tenant import tenant_for
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from gradata._paths import BrainContext
 
@@ -45,11 +48,12 @@ def _ensure_fts_table(conn: sqlite3.Connection):
             tenant_id TEXT
         )
     """)
-    # Defensive migration for brains created before tenant_id was added.
-    # Only OperationalError ("duplicate column name") should be suppressed;
-    # other sqlite errors (locking, I/O) must surface.
-    with contextlib.suppress(sqlite3.OperationalError):
-        conn.execute("ALTER TABLE brain_fts_content ADD COLUMN tenant_id TEXT")
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(brain_fts_content)").fetchall()}
+    if "tenant_id" not in cols:
+        try:
+            conn.execute("ALTER TABLE brain_fts_content ADD COLUMN tenant_id TEXT")
+        except sqlite3.OperationalError:
+            logger.warning("brain_fts_content tenant_id migration failed", exc_info=True)
     conn.execute("""
         CREATE VIRTUAL TABLE IF NOT EXISTS brain_fts USING fts5(
             source, file_type, text, embed_date,

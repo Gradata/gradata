@@ -50,8 +50,8 @@ def _invoke(module_name: str, data: dict) -> dict | None:
     try:
         module = __import__(f"gradata.hooks.{module_name}", fromlist=["main"])
         return module.main(data)
-    except Exception as exc:
-        _log.debug("dispatch_post: %s suppressed exception: %s", module_name, exc)
+    except Exception:
+        _log.warning("dispatch_post: %s suppressed exception", module_name, exc_info=True)
         return None
 
 

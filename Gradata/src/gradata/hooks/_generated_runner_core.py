@@ -59,7 +59,6 @@ def run_generated_hooks(*, env_var: str, default_dir: str, per_hook_timeout: int
                 ["node", str(hook_path)],
                 input=payload_json,
                 capture_output=True,
-                text=True,
                 timeout=per_hook_timeout,
                 encoding="utf-8",
                 errors="replace",

@@ -436,6 +436,7 @@ def apply_rules_with_tree(
     if ranker == "flat":
         return apply_rules(lessons, scope, max_rules=max_rules, bus=event_bus, graph=rule_graph)
     if ranker not in {"hybrid", "tree_only"}:
+        _log.warning("unknown rule ranker %r; falling back to hybrid", ranker)
         ranker = "hybrid"
 
     # Check if any lessons have paths

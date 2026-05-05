@@ -2,21 +2,25 @@
 
 from __future__ import annotations
 
-import tempfile
+import importlib
 from pathlib import Path
 
+import gradata._paths as _p
 from gradata.brain import Brain
 
 
-def _make_brain(corrections: list[tuple[int, float]]) -> Brain:
+def _make_brain(tmp_path: Path, corrections: list[tuple[int, float]]) -> Brain:
     """Create a brain with correction events containing edit_distance.
 
     Args:
         corrections: list of (session, edit_distance) tuples.
     """
-    d = tempfile.mkdtemp()
-    (Path(d) / "lessons.md").write_text("", encoding="utf-8")
-    brain = Brain(d)
+    d = tmp_path / "brain"
+    import os
+
+    os.environ["BRAIN_DIR"] = str(d)
+    importlib.reload(_p)
+    brain = Brain.init(d, domain="test", interactive=False)
     for session, ed in corrections:
         brain.emit(
             "CORRECTION",
@@ -33,18 +37,16 @@ def _make_brain(corrections: list[tuple[int, float]]) -> Brain:
     return brain
 
 
-def test_convergence_includes_edit_distance_fields():
+def test_convergence_includes_edit_distance_fields(tmp_path):
     """convergence() returns edit distance fields even when empty."""
-    d = tempfile.mkdtemp()
-    (Path(d) / "lessons.md").write_text("", encoding="utf-8")
-    brain = Brain(d)
+    brain = _make_brain(tmp_path, [])
     result = brain.convergence()
     assert "edit_distance_per_session" in result
     assert "edit_distance_trend" in result
     assert isinstance(result["edit_distance_per_session"], list)
 
 
-def test_edit_distance_trend_improving():
+def test_edit_distance_trend_improving(tmp_path):
     """Declining edit distances across sessions show 'improving' trend."""
     # 5 sessions with declining average edit distance
     corrections = [
@@ -59,13 +61,13 @@ def test_edit_distance_trend_improving():
         (5, 0.2),
         (5, 0.15),
     ]
-    brain = _make_brain(corrections)
+    brain = _make_brain(tmp_path, corrections)
     result = brain.convergence()
     assert len(result["edit_distance_per_session"]) == 5
     assert result["edit_distance_trend"] == "improving"
 
 
-def test_edit_distance_trend_worsening():
+def test_edit_distance_trend_worsening(tmp_path):
     """Increasing edit distances show 'worsening' trend."""
     corrections = [
         (1, 0.1),
@@ -79,38 +81,36 @@ def test_edit_distance_trend_worsening():
         (5, 0.7),
         (5, 0.75),
     ]
-    brain = _make_brain(corrections)
+    brain = _make_brain(tmp_path, corrections)
     result = brain.convergence()
     assert result["edit_distance_trend"] == "worsening"
 
 
-def test_edit_distance_empty_brain():
+def test_edit_distance_empty_brain(tmp_path):
     """Empty brain returns empty edit distance data."""
-    d = tempfile.mkdtemp()
-    (Path(d) / "lessons.md").write_text("", encoding="utf-8")
-    brain = Brain(d)
+    brain = _make_brain(tmp_path, [])
     result = brain.convergence()
     assert result["edit_distance_per_session"] == []
     assert result["edit_distance_trend"] == "insufficient_data"
 
 
-def test_edit_distance_insufficient_sessions():
+def test_edit_distance_insufficient_sessions(tmp_path):
     """Fewer than 3 sessions returns insufficient_data trend."""
     corrections = [(1, 0.5), (2, 0.3)]
-    brain = _make_brain(corrections)
+    brain = _make_brain(tmp_path, corrections)
     result = brain.convergence()
     assert len(result["edit_distance_per_session"]) == 2
     assert result["edit_distance_trend"] == "insufficient_data"
 
 
-def test_edit_distance_values_are_rounded():
+def test_edit_distance_values_are_rounded(tmp_path):
     """Edit distance values are rounded to 4 decimal places."""
     corrections = [
         (1, 0.123456789),
         (2, 0.987654321),
         (3, 0.555555555),
     ]
-    brain = _make_brain(corrections)
+    brain = _make_brain(tmp_path, corrections)
     result = brain.convergence()
     for val in result["edit_distance_per_session"]:
         # Check that the value has at most 4 decimal places

@@ -153,12 +153,10 @@ _TOOL_SCHEMAS: list[dict[str, Any]] = [
                 "max_tokens": {
                     "type": "integer",
                     "description": "Approximate token budget (default from BrainConfig)",
-                    "default": 2000,
                 },
                 "ranker": {
                     "type": "string",
                     "enum": ["hybrid", "flat", "tree_only"],
-                    "default": "hybrid",
                 },
                 "include_all_sources": {
                     "type": "boolean",
@@ -351,10 +349,12 @@ def _dispatch(brain: Any, tool_name: str, arguments: dict[str, Any]) -> dict[str
             from gradata.mcp_tools import gradata_recall
 
             situation = arguments.get("situation", "")
+            max_tokens_arg = arguments.get("max_tokens")
+            ranker_arg = arguments.get("ranker")
             text = gradata_recall(
                 str(situation),
-                max_tokens=int(arguments.get("max_tokens", 2000)),
-                ranker=str(arguments.get("ranker", "hybrid")),
+                max_tokens=int(max_tokens_arg) if max_tokens_arg is not None else None,
+                ranker=str(ranker_arg) if ranker_arg is not None else None,
                 include_all_sources=bool(arguments.get("include_all_sources", False)),
                 lessons_path=getattr(brain, "_find_lessons_path", lambda: None)(),
                 meta_rules_path=Path(getattr(brain, "dir", ".")) / "meta-rules.json",

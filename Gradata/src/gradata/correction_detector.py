@@ -186,7 +186,13 @@ _DOMAIN_KEYWORD_PATTERNS: list[tuple[re.Pattern, str]] = [
         re.compile(r"\b(database|db|sql|query|schema|table|migration|supabase)\b", re.IGNORECASE),
         "database",
     ),
-    (re.compile(r"\b(doc|document|readme|spec|design|architecture|plan)\b", re.IGNORECASE), "docs"),
+    (
+        re.compile(
+            r"\b(doc|docs|document|documentation|readme|spec|design|architecture|plan)\b",
+            re.IGNORECASE,
+        ),
+        "docs",
+    ),
 ]
 
 

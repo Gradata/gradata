@@ -14,6 +14,7 @@ Trust Dimensions:
 from __future__ import annotations
 
 import json
+import logging
 import re
 import sqlite3
 import sys
@@ -22,6 +23,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import gradata._paths as _p
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from gradata._paths import BrainContext
@@ -243,8 +246,8 @@ def _verify_training_depth(manifest: dict, conn: sqlite3.Connection) -> dict:
                     else "all training in <3 days — insufficient maturation",
                 }
             )
-        except Exception:
-            pass
+        except (TypeError, ValueError):
+            logger.warning("timestamp-span validation failed", exc_info=True)
 
     # 2d. CORRECTION events exist (brain was actually corrected = real interaction)
     try:

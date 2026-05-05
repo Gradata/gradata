@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 from pathlib import Path
 
 import pytest
 
 from gradata import Brain
 from gradata.cli import _SEVEN_STARTER_RULES, cmd_seed
+
+
+def _bootstrap_brain(brain_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import gradata._paths as _p
+
+    monkeypatch.setenv("BRAIN_DIR", str(brain_dir))
+    importlib.reload(_p)
+    Brain.init(brain_dir)
 
 
 def _args(brain_dir: Path, *, seven_lines: bool = True) -> argparse.Namespace:
@@ -22,17 +31,17 @@ def test_seven_starter_rules_shape():
         assert len(text) > 10
 
 
-def test_cmd_seed_adds_7_rules_first_run(tmp_path, capsys):
+def test_cmd_seed_adds_7_rules_first_run(tmp_path, capsys, monkeypatch):
     brain_dir = tmp_path / "brain"
-    Brain.init(brain_dir)  # bootstrap
+    _bootstrap_brain(brain_dir, monkeypatch)
     cmd_seed(_args(brain_dir))
     out = capsys.readouterr().out
     assert "7 added, 0 already present" in out
 
 
-def test_cmd_seed_is_idempotent(tmp_path, capsys):
+def test_cmd_seed_is_idempotent(tmp_path, capsys, monkeypatch):
     brain_dir = tmp_path / "brain"
-    Brain.init(brain_dir)
+    _bootstrap_brain(brain_dir, monkeypatch)
     cmd_seed(_args(brain_dir))
     capsys.readouterr()  # drop first output
     cmd_seed(_args(brain_dir))
@@ -40,9 +49,9 @@ def test_cmd_seed_is_idempotent(tmp_path, capsys):
     assert "0 added, 7 already present" in out
 
 
-def test_cmd_seed_errors_without_flag(tmp_path, capsys):
+def test_cmd_seed_errors_without_flag(tmp_path, capsys, monkeypatch):
     brain_dir = tmp_path / "brain"
-    Brain.init(brain_dir)
+    _bootstrap_brain(brain_dir, monkeypatch)
     with pytest.raises(SystemExit) as exc:
         cmd_seed(_args(brain_dir, seven_lines=False))
     assert exc.value.code == 2

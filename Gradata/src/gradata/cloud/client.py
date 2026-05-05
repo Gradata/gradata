@@ -200,6 +200,16 @@ class CloudClient:
                 )
             except _TooLargeError:
                 # Server returned 413 — halve the batch and retry this chunk.
+                # If one event alone is too large, skip it so sync can make
+                # progress on later events instead of looping forever.
+                if current_batch == 1:
+                    logger.warning(
+                        "Sync: single event at offset=%d exceeded server size limit; skipping",
+                        offset,
+                    )
+                    offset += 1
+                    current_batch = batch_size
+                    continue
                 current_batch = max(1, current_batch // 2)
                 logger.warning("Sync: 413 from server — reducing batch size to %d", current_batch)
                 continue

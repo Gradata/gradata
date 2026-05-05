@@ -35,7 +35,7 @@ def test_gradata_recall_caps_output_under_budget(tmp_path: Path) -> None:
     )
 
     assert text.startswith("<brain-rules>")
-    assert len(text) // 4 <= 100
+    assert (len(text) + 3) // 4 <= 100
     assert text.count("[RULE:") < 10
 
 

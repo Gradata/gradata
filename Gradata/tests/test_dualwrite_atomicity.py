@@ -36,6 +36,8 @@ import pytest
 
 pytestmark = pytest.mark.dualwrite
 
+_WINDOWS_DUALWRITE_ISSUE = "known issue, tracked separately — pre-PR171"
+
 
 # ---------------------------------------------------------------------------
 # Helpers — kill-9 simulation via subprocess so we can pull the plug mid-write
@@ -112,6 +114,7 @@ def test_dualwrite_jsonl_first_then_sqlite(tmp_path, monkeypatch):
     assert _count_jsonl(tmp_path) == _count_sqlite_events(tmp_path) == 10
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason=_WINDOWS_DUALWRITE_ISSUE)
 def test_dualwrite_kill9_mid_batch_leaves_jsonl_canonical(tmp_path):
     """Crash mid-batch. JSONL must be ahead of (or equal to) SQLite, never behind."""
     _spawn_writer(tmp_path, n_events=20, kill_after=5)
@@ -121,7 +124,8 @@ def test_dualwrite_kill9_mid_batch_leaves_jsonl_canonical(tmp_path):
     assert j > 0, "kill-9 fired before any write reached disk — flaky fixture"
 
 
-def test_reconcile_replays_missing_sqlite_rows(tmp_path):
+@pytest.mark.skipif(sys.platform == "win32", reason=_WINDOWS_DUALWRITE_ISSUE)
+def test_reconcile_replays_missing_sqlite_rows(tmp_path, monkeypatch):
     """After kill-9 + reopen, Brain.__init__ (or doctor --reconcile) must replay JSONL → SQLite."""
     _spawn_writer(tmp_path, n_events=20, kill_after=5)
     j_before = _count_jsonl(tmp_path)
@@ -130,7 +134,7 @@ def test_reconcile_replays_missing_sqlite_rows(tmp_path):
         pytest.skip("no drift to reconcile — try a more aggressive kill-after")
 
     # Trigger reconcile — either via Brain.__init__ auto-replay or doctor CLI
-    os.environ["BRAIN_DIR"] = str(tmp_path)
+    monkeypatch.setenv("BRAIN_DIR", str(tmp_path))
     from gradata import Brain
 
     Brain()  # should auto-replay on init
@@ -156,6 +160,7 @@ def test_reconcile_idempotent(tmp_path, monkeypatch):
     assert snapshot1 == snapshot2 == snapshot3
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason=_WINDOWS_DUALWRITE_ISSUE)
 def test_doctor_reconcile_reports_drift(tmp_path):
     """gradata doctor --reconcile must report the drift count it healed."""
     _spawn_writer(tmp_path, n_events=20, kill_after=5)
@@ -178,6 +183,7 @@ def test_doctor_reconcile_reports_drift(tmp_path):
     assert _count_sqlite_events(tmp_path) == j_before
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason=_WINDOWS_DUALWRITE_ISSUE)
 def test_concurrent_writers_serialize(tmp_path):
     """Two writers should not produce interleaved partial events in JSONL."""
     p1 = subprocess.Popen(

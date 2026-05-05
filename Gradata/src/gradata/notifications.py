@@ -113,7 +113,7 @@ def subscribe(bus: EventBus, callback: Callable[[Notification], None]) -> None:
                     notif = fmt(payload or {})
                     callback(notif)
                 except Exception:
-                    _log.debug("Notification handler error", exc_info=True)
+                    _log.warning("Notification handler error", exc_info=True)
 
             return handler
 

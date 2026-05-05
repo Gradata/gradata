@@ -923,7 +923,7 @@ class Brain(BrainInspectionMixin):
         from gradata.rules.cache import RuleCache
 
         cache_key = RuleCache.make_key(
-            f"{scope.task_type}:{ranker}:{max_recall_tokens}",
+            f"{scope.task_type}:{ranker}:{max_recall_tokens}:{max_rules}",
             scope.domain,
             scope.audience,
         )
@@ -985,7 +985,11 @@ class Brain(BrainInspectionMixin):
             if len(result) > budget_chars:
                 result = result[:budget_chars].rstrip()
                 if not result.endswith("</brain-rules>"):
-                    result = result.removesuffix("</brain-rules>").rstrip()
+                    last_tag_boundary = result.rfind(">")
+                    if last_tag_boundary >= 0:
+                        result = result[: last_tag_boundary + 1].rstrip()
+                    else:
+                        result = "<brain-rules>"
                     result = f"{result}\n</brain-rules>"
         self._rule_cache.put(cache_key, result)
         return result

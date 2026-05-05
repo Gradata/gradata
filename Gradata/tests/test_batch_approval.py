@@ -10,6 +10,8 @@ Tests:
 
 from __future__ import annotations
 
+import importlib
+import os
 import sqlite3
 import textwrap
 from pathlib import Path
@@ -78,8 +80,11 @@ def brain_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture()
 def brain(brain_dir: Path):
+    import gradata._paths as _p
     from gradata.brain import Brain
 
+    os.environ["BRAIN_DIR"] = str(brain_dir)
+    importlib.reload(_p)
     return Brain.init(
         brain_dir, name="Test", domain="Testing", embedding="local", interactive=False
     )
@@ -128,9 +133,12 @@ class TestPendingPromotions:
 
     def test_empty_brain(self, tmp_path: Path):
         """Brain with no lessons returns empty list."""
+        import gradata._paths as _p
         from gradata.brain import Brain
 
         d = tmp_path / "empty-brain"
+        os.environ["BRAIN_DIR"] = str(d)
+        importlib.reload(_p)
         b = Brain.init(d, name="Empty", domain="Test", embedding="local", interactive=False)
         result = b.pending_promotions()
         assert result == []

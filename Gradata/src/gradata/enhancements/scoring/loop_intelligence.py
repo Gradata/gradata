@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import sqlite3
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
@@ -26,6 +27,8 @@ from typing import Any
 
 from gradata._events import emit as _emit_event_fn
 from gradata._tenant import tenant_for
+
+logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════
 # Registries (domain-agnostic defaults, override via register_*)
@@ -179,7 +182,7 @@ def log_activity(
 
     if emit_event:
         # Never break the logging path on emit failure
-        with contextlib.suppress(Exception):
+        try:
             _emit_event_fn(
                 "DELTA_TAG",
                 "loop_intelligence",
@@ -202,6 +205,8 @@ def log_activity(
                 ],
                 session=session,
             )
+        except Exception:
+            logger.warning("loop_intelligence activity event emit failed", exc_info=True)
 
     return {
         "id": row_id,
@@ -552,7 +557,7 @@ def update_markdown_table(
                 has_tier = "Tier" in (lines[header_line] if header_line >= 0 else "")
                 if has_tier:
                     lines[i] = (
-                        f"| {cells[0]} | {d['sent']} | {d['replies']} | {d['rate']}% | {d['confidence']} | Pipeline | Auto-updated |"
+                        f"| {cells[0]} | {d['sent']} | {d['replies']} | {d['rate']}% | {d['confidence']} | {tier} | Auto-updated |"
                     )
                 else:
                     lines[i] = (

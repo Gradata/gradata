@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 from pathlib import Path
 
@@ -23,6 +24,11 @@ def atomic_write_text(path: str | Path, text: str, *, encoding: str = "utf-8") -
     finally:
         with contextlib.suppress(FileNotFoundError):
             tmp.unlink()
+
+
+def atomic_write_json(path: str | Path, data: object, *, indent: int = 2) -> None:
+    """Write JSON to *path* via a sibling temp file and atomic replace."""
+    atomic_write_text(path, json.dumps(data, indent=indent) + "\n")
 
 
 def _fsync_dir(path: Path) -> None:

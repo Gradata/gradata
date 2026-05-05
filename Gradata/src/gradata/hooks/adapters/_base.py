@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -42,7 +43,10 @@ class InstallResult:
 def adapter_config_path(agent: str, *, home: Path | None = None) -> Path:
     if agent not in _CONFIGS:
         raise ValueError(f"unknown agent: {agent}")
-    return (home or Path.home()) / _CONFIGS[agent]
+    resolved_home = home or Path(
+        os.environ.get("HOME") or os.environ.get("USERPROFILE") or os.path.expanduser("~")
+    )
+    return resolved_home / _CONFIGS[agent]
 
 
 def get_adapter(agent: str):
@@ -52,7 +56,7 @@ def get_adapter(agent: str):
 
 
 def hook_signature(agent: str, brain_dir: Path) -> str:
-    return f"gradata:{agent}:{brain_dir.resolve()}"
+    return f"gradata:{agent}:{brain_dir.resolve().as_posix()}"
 
 
 def hook_command(brain_dir: Path) -> str:

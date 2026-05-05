@@ -25,18 +25,16 @@ def test_extraction_skipped_when_converged(tmp_path):
         "total_sessions": 5,
     }
 
-    with (
-        patch.object(brain, "_get_convergence", return_value=converged_result),
-        patch(
+    with patch.object(brain, "_get_convergence", return_value=converged_result):
+        with patch(
             "gradata.enhancements.edit_classifier.extract_behavioral_instruction"
-        ) as mock_extract,
-    ):
-        brain.correct(
-            "The system is working good",
-            "The system is working well",
-            category="DRAFTING",
-        )
-        mock_extract.assert_not_called()
+        ) as mock_extract:
+            brain.correct(
+                "The system is working good",
+                "The system is working well",
+                category="DRAFTING",
+            )
+            mock_extract.assert_not_called()
 
 
 def test_extraction_runs_when_diverging(tmp_path):

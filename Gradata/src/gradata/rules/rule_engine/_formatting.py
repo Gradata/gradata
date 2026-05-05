@@ -8,6 +8,7 @@ No I/O, no external state.
 from __future__ import annotations
 
 import hashlib
+import logging
 import random
 import secrets
 from collections import defaultdict
@@ -15,6 +16,8 @@ from collections import defaultdict
 from gradata._types import Lesson, LessonState, RuleTransferScope
 
 from ._models import AppliedRule
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Deduplication and Merging
@@ -506,6 +509,6 @@ def capture_example_from_correction(
                 # Cap to keep injection budget bounded.
                 lesson.examples = existing[-3:]
     except Exception:
-        pass
+        logger.exception("failed to attach structured correction example")
 
     return lesson

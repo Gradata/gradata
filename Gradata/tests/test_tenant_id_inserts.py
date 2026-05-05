@@ -46,7 +46,8 @@ def _make_rule_provenance(db_path: Path) -> None:
             correction_event_id TEXT,
             session INTEGER,
             timestamp TEXT NOT NULL,
-            user_context TEXT
+            user_context TEXT,
+            tenant_id TEXT
         )"""
     )
     conn.commit()

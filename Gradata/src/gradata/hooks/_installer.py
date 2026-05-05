@@ -15,6 +15,7 @@ from pathlib import Path
 
 _log = logging.getLogger(__name__)
 
+from gradata._atomic import atomic_write_json
 from gradata.hooks._profiles import Profile
 
 # ---------------------------------------------------------------------------
@@ -292,7 +293,7 @@ def _load_settings() -> dict:
 
 def _save_settings(settings: dict) -> None:
     SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    SETTINGS_PATH.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
+    atomic_write_json(SETTINGS_PATH, settings)
 
 
 def _is_gradata_hook(hook_group: dict) -> bool:

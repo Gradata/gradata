@@ -40,7 +40,11 @@ def main(data: dict) -> dict | None:
         if lessons_path.is_file():
             text = lessons_path.read_text(encoding="utf-8")
             snapshot["lesson_count"] = len(
-                [line for line in text.splitlines() if line.strip() and not line.startswith("#")]
+                [
+                    line
+                    for line in text.splitlines()
+                    if (stripped := line.strip()) and not stripped.startswith("#")
+                ]
             )
 
         if hasattr(os, "getuid"):

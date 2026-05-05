@@ -18,6 +18,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sqlite3
 import sys
@@ -27,6 +28,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from gradata.brain import Brain
+
+logger = logging.getLogger(__name__)
 
 
 # ── Schema: SQLite tables created for every new brain ──────────────────
@@ -464,8 +467,10 @@ def onboard(
                     )
                 )
             write_lessons_safe(lessons_path, format_lessons(lessons))
+        except (OSError, ValueError) as exc:
+            logger.warning("optional seed rules failed: %s", exc)
         except Exception:
-            pass  # Seed rules are optional — don't block onboarding
+            logger.exception("unexpected optional seed rules failure")
 
     # ── Success output ─────────────────────────────────────────────────
 

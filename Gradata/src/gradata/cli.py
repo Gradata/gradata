@@ -278,7 +278,7 @@ def _cmd_install_agent(args) -> None:
     from gradata.hooks.adapters._base import AGENTS, adapter_config_path, get_adapter
 
     agent = args.agent
-    brain_dir = Path(args.brain or env_str("BRAIN_DIR") or "./brain").expanduser().resolve()
+    brain_dir = _resolve_brain_root(args)
     agents = [a for a in AGENTS if adapter_config_path(a).exists()] if agent == "all" else [agent]
 
     if not agents:
@@ -599,6 +599,9 @@ def _resolve_brain_root(args):
     brain_dir = getattr(args, "brain_dir", None)
     if brain_dir:
         return Path(brain_dir)
+    brain = getattr(args, "brain", None)
+    if brain:
+        return Path(brain)
     return Path("brain")
 
 

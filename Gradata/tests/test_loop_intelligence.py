@@ -519,6 +519,7 @@ class TestUpdateMarkdownTable:
             {"roi": {"sent": 15, "replies": 5, "rate": 33.3, "confidence": "[EMERGING]"}},
         )
         assert "15" in r and "33.3" in r
+        assert "Auto-updated" not in r
 
     def test_adds_new_row(self):
         r = update_markdown_table(

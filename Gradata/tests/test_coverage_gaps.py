@@ -13,6 +13,7 @@ Priority targets (by coverage %):
 Run: pytest sdk/tests/test_coverage_gaps.py -v
 """
 
+import importlib
 import json
 import os
 import sqlite3
@@ -29,7 +30,6 @@ def _init_brain(tmp_path: Path, name: str = "GapBrain", domain: str = "Testing")
     """Create a fresh isolated brain and re-wire all cached module-level vars."""
     brain_dir = tmp_path / "brain"
     os.environ["BRAIN_DIR"] = str(brain_dir)
-    brain = Brain.init(brain_dir, name=name, domain=domain, embedding="local", interactive=False)
 
     import gradata._brain_manifest as _bm
     import gradata._events as _ev
@@ -37,6 +37,14 @@ def _init_brain(tmp_path: Path, name: str = "GapBrain", domain: str = "Testing")
     import gradata._paths as _p
     import gradata._query as _q
     import gradata._tag_taxonomy as _tt
+
+    importlib.reload(_p)
+    importlib.reload(_ev)
+    importlib.reload(_bm)
+    importlib.reload(_ex)
+    importlib.reload(_q)
+    importlib.reload(_tt)
+    brain = Brain.init(brain_dir, name=name, domain=domain, embedding="local", interactive=False)
 
     _ev.BRAIN_DIR = _p.BRAIN_DIR
     _ev.EVENTS_JSONL = _p.EVENTS_JSONL

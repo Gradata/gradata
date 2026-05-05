@@ -12,12 +12,19 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         data = read_json(agent_config_path)
         servers = data.setdefault("mcpServers", {})
         existing = servers.get("gradata")
-        command = mcp_command(brain_dir)
-        desired = {"command": command[0], "args": command[1:]}
-        if existing == desired:
+        mcp = mcp_command(brain_dir)
+        command, args = mcp[0], mcp[1:]
+        if (
+            isinstance(existing, dict)
+            and existing.get("command") == command
+            and existing.get("args") == args
+        ):
             return InstallResult(
                 AGENT, agent_config_path, "already_present", "MCP server already present"
             )
+        desired = existing if isinstance(existing, dict) else {}
+        desired["command"] = command
+        desired["args"] = args
         servers["gradata"] = desired
         write_json(agent_config_path, data)
         return InstallResult(AGENT, agent_config_path, "added", "installed MCP server")
