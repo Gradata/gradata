@@ -17,7 +17,6 @@ import pytest
 
 from gradata import Brain
 
-
 # ---------------------------------------------------------------------------
 # Core helper — rewires module-level path caches after Brain.init()
 # ---------------------------------------------------------------------------
@@ -46,9 +45,9 @@ def init_brain(
     )
 
     # --- rewire module-level path caches ---
-    import gradata._paths as _p
-    import gradata._events as _ev
     import gradata._brain_manifest as _bm
+    import gradata._events as _ev
+    import gradata._paths as _p
 
     _ev.BRAIN_DIR = _p.BRAIN_DIR
     _ev.EVENTS_JSONL = _p.EVENTS_JSONL
@@ -214,7 +213,7 @@ def brain_db(brain_dir: Path) -> Path:
     callers get a ready-to-use SQLite file without duplicating schema setup.
     """
     db_path = brain_dir / "system.db"
-    from gradata._events import _ensure_table  # noqa: PLC0415
+    from gradata._events import _ensure_table
 
     conn = sqlite3.connect(str(db_path))
     try:

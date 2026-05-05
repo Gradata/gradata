@@ -26,7 +26,12 @@ class TestIsAddition:
             # Too short addition
             ("hello", "hello!!!", False, 10),
             # Major rewrite not addition
-            ("The quick brown fox jumps over the lazy dog.", "A fast red cat leaps across the sleeping puppy.", False, 10),
+            (
+                "The quick brown fox jumps over the lazy dog.",
+                "A fast red cat leaps across the sleeping puppy.",
+                False,
+                10,
+            ),
             # Empty old, nonempty new
             ("", "import os\nimport sys", True, 10),
             # Empty old, short new

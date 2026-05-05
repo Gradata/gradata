@@ -10,9 +10,9 @@ from __future__ import annotations
 import os
 import sys
 import tempfile
+from pathlib import Path
 
 import pytest
-from pathlib import Path
 
 # Fix Windows console encoding
 if sys.platform == "win32":
@@ -30,7 +30,6 @@ from gradata._types import Lesson, LessonState
 from gradata.enhancements.meta_rules import (
     MetaRule,
     discover_meta_rules,
-    ensure_table,
     format_meta_rules_for_prompt,
     load_meta_rules,
     merge_into_meta,
@@ -230,7 +229,7 @@ def test_refresh_meta_rules():
     ids = [m.id for m in result]
     assert "META-old" in ids, "Valid existing meta-rule should survive refresh"
     # Validated session should be updated
-    meta_old = [m for m in result if m.id == "META-old"][0]
+    meta_old = next(m for m in result if m.id == "META-old")
     assert meta_old.last_validated_session == 42
     print(f"[PASS] refresh_meta_rules -> {len(result)} meta-rules")
 

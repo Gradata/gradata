@@ -20,10 +20,21 @@ def _check(name: str, passed: bool, detail: str = ""):
 
 def check_event_pipes(ctx: "BrainContext | None" = None):
     known_types = [
-        "CORRECTION", "GATE_RESULT", "GATE_OVERRIDE", "OUTPUT",
-        "AUDIT_SCORE", "LESSON_CHANGE", "CALIBRATION", "HEALTH_CHECK",
-        "COST_EVENT", "TOOL_FAILURE", "HALLUCINATION", "STALE_DATA",
-        "VERIFICATION", "STEP_COMPLETE", "DEFER",
+        "CORRECTION",
+        "GATE_RESULT",
+        "GATE_OVERRIDE",
+        "OUTPUT",
+        "AUDIT_SCORE",
+        "LESSON_CHANGE",
+        "CALIBRATION",
+        "HEALTH_CHECK",
+        "COST_EVENT",
+        "TOOL_FAILURE",
+        "HALLUCINATION",
+        "STALE_DATA",
+        "VERIFICATION",
+        "STEP_COMPLETE",
+        "DEFER",
     ]
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
@@ -34,8 +45,11 @@ def check_event_pipes(ctx: "BrainContext | None" = None):
     except Exception:
         emitted_types = set()
     for t in known_types:
-        _check(f"event_pipe:{t}", t in emitted_types,
-               "has emissions" if t in emitted_types else "no emissions found")
+        _check(
+            f"event_pipe:{t}",
+            t in emitted_types,
+            "has emissions" if t in emitted_types else "no emissions found",
+        )
 
 
 def check_index_completeness(ctx: BrainContext | None = None):
@@ -57,7 +71,9 @@ def check_index_completeness(ctx: BrainContext | None = None):
         brain_files.add(rel)
     missing = brain_files - indexed_files
     if missing:
-        _check("index:completeness", False, f"{len(missing)} files not indexed: {list(missing)[:5]}")
+        _check(
+            "index:completeness", False, f"{len(missing)} files not indexed: {list(missing)[:5]}"
+        )
     else:
         _check("index:completeness", True, f"{len(brain_files)} files all indexed")
 
@@ -71,8 +87,10 @@ def check_facts_freshness(ctx: "BrainContext | None" = None):
     try:
         db = ctx.db_path if ctx else _p.DB_PATH
         conn = sqlite3.connect(str(db))
-        tables = [r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        tables = [
+            r[0]
+            for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        ]
         if "facts" not in tables:
             _check("facts:table_exists", False, "facts table missing")
             conn.close()
@@ -99,6 +117,7 @@ def check_facts_freshness(ctx: "BrainContext | None" = None):
 def check_embeddings(ctx: BrainContext | None = None):
     """Check SQLite brain_embeddings table for indexed chunks."""
     import sqlite3
+
     db = ctx.db_path if ctx else _p.DB_PATH
     try:
         conn = sqlite3.connect(str(db))
@@ -114,8 +133,10 @@ def check_fts5(ctx: BrainContext | None = None):
     db = ctx.db_path if ctx else _p.DB_PATH
     try:
         conn = sqlite3.connect(str(db))
-        tables = [r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        tables = [
+            r[0]
+            for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        ]
         if "brain_fts" not in tables:
             _check("fts5:table", False, "brain_fts virtual table missing")
             conn.close()
@@ -156,5 +177,10 @@ def run_audit(ctx: "BrainContext | None" = None) -> dict:
     passed = sum(1 for c in CHECKS if c["passed"])
     total = len(CHECKS)
     score = round(passed / total * 100, 1) if total > 0 else 0
-    return {"timestamp": datetime.now().isoformat(), "passed": passed, "total": total,
-            "score": score, "checks": CHECKS}
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "passed": passed,
+        "total": total,
+        "score": score,
+        "checks": CHECKS,
+    }

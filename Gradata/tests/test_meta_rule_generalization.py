@@ -6,8 +6,6 @@ Tests that meta-rules synthesized from one domain/context can:
 3. Produce meaningful transfer when domain overlaps
 """
 
-import pytest
-
 from gradata._types import Lesson, LessonState
 from gradata.enhancements.meta_rules import (
     MetaRule,

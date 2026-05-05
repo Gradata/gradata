@@ -24,6 +24,7 @@ distributions?); that is left as follow-up work when such data exists.
 Seeds are fixed for determinism; bounds are set well outside the 99% CI
 for n=400 Monte Carlo trials at p=0.05 to avoid flake.
 """
+
 from __future__ import annotations
 
 import random
@@ -34,16 +35,16 @@ import pytest
 from gradata._stats import trend_analysis
 
 ALPHA = 0.05
-N_TRIALS = 400     # bounds below are conservative (~99.9% CI) to avoid flake
-SERIES_LEN = 30    # realistic session count
-SHORT_N = 10       # power-growth comparison
+N_TRIALS = 400  # bounds below are conservative (~99.9% CI) to avoid flake
+SERIES_LEN = 30  # realistic session count
+SHORT_N = 10  # power-growth comparison
 
 
 def _rejection_rate(series_factory, n_trials: int = N_TRIALS) -> float:
     """Fraction of runs where Mann-Kendall rejects H0 at alpha=0.05."""
     reject = 0
     for i in range(n_trials):
-        rng = random.Random(1000 + i)  # noqa: S311 -- deterministic test RNG
+        rng = random.Random(1000 + i)
         _, p = trend_analysis(series_factory(rng))
         if p < ALPHA:
             reject += 1
@@ -104,6 +105,7 @@ def test_power_grows_with_n():
     Bound of +0.10 is well above one standard error (~0.035 at 400 trials) so a
     seed-dependent single-trial flip cannot fail this.
     """
+
     def factory(n: int) -> Callable[[random.Random], list[float]]:
         return lambda rng: [max(0.0, 10 - 0.15 * i + rng.gauss(0, 1.5)) for i in range(n)]
 
@@ -152,7 +154,7 @@ def test_fifty_element_cap_is_applied():
     up-trend. If the cap were broken (kept first-50 or middle), the
     prefix+tail result would not match the tail-only result.
     """
-    tail = [float(i) for i in range(50)]                  # up-trend 0..49
+    tail = [float(i) for i in range(50)]  # up-trend 0..49
     heavy_down_prefix = [float(100 - i) for i in range(50)]  # down-trend 100..51
     slope_tail, p_tail = trend_analysis(tail)
     slope_combined, p_combined = trend_analysis(heavy_down_prefix + tail)

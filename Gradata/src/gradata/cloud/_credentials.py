@@ -10,6 +10,7 @@ file so the repo's pre-tool secret scanner stays quiet.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 from pathlib import Path
@@ -50,10 +51,8 @@ def write_to_keyfile(credential: str) -> Path:
     """Persist credential to ``~/.gradata/key`` with 0600 permissions."""
     KEYFILE_DIR.mkdir(parents=True, exist_ok=True)
     KEYFILE_PATH.write_text(credential.strip() + "\n", encoding="utf-8")
-    try:
+    with contextlib.suppress(OSError):
         os.chmod(KEYFILE_PATH, 0o600)
-    except OSError:
-        pass
     return KEYFILE_PATH
 
 

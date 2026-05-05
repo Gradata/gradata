@@ -9,25 +9,25 @@ Tests cover:
 - format_brain_scores includes all required sections
 - compute_brain_scores falls back gracefully when _events unavailable
 """
+
 import sqlite3
-import tempfile
 from pathlib import Path
 
 import pytest
 
 from gradata.enhancements.scoring.brain_scores import (
     BrainScores,
+    _bar,
     _fallback_brain_scores,
     _reshape,
-    _bar,
-    format_brain_scores,
     compute_brain_scores,
+    format_brain_scores,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_db(tmp_path: Path) -> Path:
     """Create a minimal events SQLite database in tmp_path."""
@@ -62,6 +62,7 @@ def insert_events(db: Path, rows: list[tuple]) -> None:
 # BrainScores dataclass defaults
 # ---------------------------------------------------------------------------
 
+
 class TestBrainScoresDefaults:
     def test_default_system_health_is_zero(self):
         s = BrainScores()
@@ -87,6 +88,7 @@ class TestBrainScoresDefaults:
 # ---------------------------------------------------------------------------
 # _reshape — dict → BrainScores
 # ---------------------------------------------------------------------------
+
 
 class TestReshape:
     def test_maps_all_known_keys(self):
@@ -133,6 +135,7 @@ class TestReshape:
 # _fallback_brain_scores — system_health from gate sessions
 # ---------------------------------------------------------------------------
 
+
 class TestFallbackBrainScores:
     def test_empty_db_returns_zero_scores(self, tmp_path):
         db = make_db(tmp_path)
@@ -144,19 +147,30 @@ class TestFallbackBrainScores:
     def test_all_sessions_have_gate_events_gives_100_system_health(self, tmp_path):
         db = make_db(tmp_path)
         # 4 sessions, all with GATE_RESULT
-        insert_events(db, [
-            (1, "GATE_RESULT"), (2, "GATE_RESULT"), (3, "GATE_RESULT"), (4, "GATE_RESULT"),
-        ])
+        insert_events(
+            db,
+            [
+                (1, "GATE_RESULT"),
+                (2, "GATE_RESULT"),
+                (3, "GATE_RESULT"),
+                (4, "GATE_RESULT"),
+            ],
+        )
         scores = _fallback_brain_scores(db, last_n_sessions=10)
         assert scores.system_health == 100.0
 
     def test_half_sessions_have_gate_events_gives_50_system_health(self, tmp_path):
         db = make_db(tmp_path)
         # Sessions 1,2 have GATE_RESULT; sessions 3,4 only have OUTPUT
-        insert_events(db, [
-            (1, "GATE_RESULT"), (2, "GATE_RESULT"),
-            (3, "OUTPUT"), (4, "OUTPUT"),
-        ])
+        insert_events(
+            db,
+            [
+                (1, "GATE_RESULT"),
+                (2, "GATE_RESULT"),
+                (3, "OUTPUT"),
+                (4, "OUTPUT"),
+            ],
+        )
         scores = _fallback_brain_scores(db, last_n_sessions=10)
         assert scores.system_health == pytest.approx(50.0)
 
@@ -210,6 +224,7 @@ class TestFallbackBrainScores:
 # _bar — ASCII progress bar
 # ---------------------------------------------------------------------------
 
+
 class TestBar:
     def test_zero_value_gives_empty_bar(self):
         result = _bar(0.0)
@@ -227,7 +242,7 @@ class TestBar:
         assert result.count("#") == 10
         # The dot count may include dots in the percentage string, count only
         # the bar section between the brackets
-        bar_section = result[1:result.index("]")]
+        bar_section = result[1 : result.index("]")]
         assert bar_section.count(".") == 10
 
     def test_value_above_max_clamped(self):
@@ -243,6 +258,7 @@ class TestBar:
 # ---------------------------------------------------------------------------
 # format_brain_scores
 # ---------------------------------------------------------------------------
+
 
 class TestFormatBrainScores:
     def test_format_includes_all_score_sections(self):
@@ -294,6 +310,7 @@ class TestFormatBrainScores:
 # compute_brain_scores — fallback path via missing _events attribute
 # ---------------------------------------------------------------------------
 
+
 class TestComputeBrainScoresFallback:
     def test_falls_back_to_fallback_scorer_when_events_unavailable(self, tmp_path):
         """When _events.compute_brain_scores is unavailable, the fallback scorer
@@ -301,7 +318,6 @@ class TestComputeBrainScoresFallback:
         db = make_db(tmp_path)
         insert_events(db, [(1, "OUTPUT"), (2, "OUTPUT"), (3, "OUTPUT")])
 
-        import unittest.mock as mock
         import gradata._events as _events
 
         # Temporarily remove the function to trigger fallback

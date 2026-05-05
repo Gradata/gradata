@@ -13,8 +13,6 @@ from __future__ import annotations
 import random
 from pathlib import Path
 
-import pytest
-
 from gradata._triggers import (
     CorrectionExample,
     TriggerIndex,
@@ -24,7 +22,6 @@ from gradata._triggers import (
     measure_recall,
     save,
 )
-
 
 # ─── n-gram extraction ───────────────────────────────────────────────────────
 

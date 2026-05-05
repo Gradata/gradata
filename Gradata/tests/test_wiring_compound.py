@@ -4,11 +4,10 @@ promotion, and scipy-backed Beta PPF.
 
 Covers the autoresearch synthesis §1–§2 wiring gaps identified 2026-04-15.
 """
+
 from __future__ import annotations
 
-import os
 import sqlite3
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -82,9 +81,14 @@ class TestBetaLBGate:
 
         monkeypatch.setenv("GRADATA_BETA_LB_GATE", "0")
         lesson = Lesson(
-            date="2026-04-15", category="test", description="test rule",
-            state=LessonState.PATTERN, confidence=0.95, fire_count=5,
-            alpha=1.0, beta_param=1.0,  # no meaningful posterior
+            date="2026-04-15",
+            category="test",
+            description="test rule",
+            state=LessonState.PATTERN,
+            confidence=0.95,
+            fire_count=5,
+            alpha=1.0,
+            beta_param=1.0,  # no meaningful posterior
         )
         # Gate off → always True (defers to existing checks)
         assert _passes_beta_lb_gate(lesson) is True
@@ -95,9 +99,14 @@ class TestBetaLBGate:
 
         monkeypatch.setenv("GRADATA_BETA_LB_GATE", "1")
         lesson = Lesson(
-            date="2026-04-15", category="test", description="weak",
-            state=LessonState.PATTERN, confidence=0.95, fire_count=5,
-            alpha=2.0, beta_param=3.0,  # LB far below 0.70
+            date="2026-04-15",
+            category="test",
+            description="weak",
+            state=LessonState.PATTERN,
+            confidence=0.95,
+            fire_count=5,
+            alpha=2.0,
+            beta_param=3.0,  # LB far below 0.70
         )
         assert _passes_beta_lb_gate(lesson) is False
 
@@ -107,9 +116,14 @@ class TestBetaLBGate:
 
         monkeypatch.setenv("GRADATA_BETA_LB_GATE", "1")
         lesson = Lesson(
-            date="2026-04-15", category="test", description="strong",
-            state=LessonState.PATTERN, confidence=0.95, fire_count=20,
-            alpha=50.0, beta_param=2.0,  # LB ~0.87 > 0.70
+            date="2026-04-15",
+            category="test",
+            description="strong",
+            state=LessonState.PATTERN,
+            confidence=0.95,
+            fire_count=20,
+            alpha=50.0,
+            beta_param=2.0,  # LB ~0.87 > 0.70
         )
         assert _passes_beta_lb_gate(lesson) is True
 
@@ -120,9 +134,14 @@ class TestBetaLBGate:
         monkeypatch.setenv("GRADATA_BETA_LB_GATE", "1")
         monkeypatch.setenv("GRADATA_BETA_LB_MIN_FIRES", "10")
         lesson = Lesson(
-            date="2026-04-15", category="test", description="few fires",
-            state=LessonState.PATTERN, confidence=0.95, fire_count=5,
-            alpha=50.0, beta_param=2.0,
+            date="2026-04-15",
+            category="test",
+            description="few fires",
+            state=LessonState.PATTERN,
+            confidence=0.95,
+            fire_count=5,
+            alpha=50.0,
+            beta_param=2.0,
         )
         assert _passes_beta_lb_gate(lesson) is False
 
@@ -133,9 +152,14 @@ class TestBetaLBGate:
         monkeypatch.setenv("GRADATA_BETA_LB_GATE", "1")
         monkeypatch.setenv("GRADATA_BETA_LB_THRESHOLD", "0.95")  # very strict
         lesson = Lesson(
-            date="2026-04-15", category="test", description="moderate",
-            state=LessonState.PATTERN, confidence=0.95, fire_count=20,
-            alpha=10.0, beta_param=2.0,  # LB ~0.58 — fails 0.95
+            date="2026-04-15",
+            category="test",
+            description="moderate",
+            state=LessonState.PATTERN,
+            confidence=0.95,
+            fire_count=20,
+            alpha=10.0,
+            beta_param=2.0,  # LB ~0.58 — fails 0.95
         )
         assert _passes_beta_lb_gate(lesson) is False
 
@@ -157,8 +181,7 @@ class TestCanaryEnrollment:
 
         with sqlite3.connect(str(fresh_brain.db_path)) as conn:
             row = conn.execute(
-                "SELECT category, status, start_session FROM rule_canary "
-                "WHERE category = ?",
+                "SELECT category, status, start_session FROM rule_canary WHERE category = ?",
                 ("test_cat",),
             ).fetchone()
 

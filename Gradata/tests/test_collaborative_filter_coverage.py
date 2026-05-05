@@ -11,8 +11,6 @@ import hashlib
 import math
 from types import SimpleNamespace
 
-import pytest
-
 from gradata.enhancements.bandits.collaborative_filter import (
     BrainFingerprint,
     RuleFingerprint,
@@ -21,10 +19,10 @@ from gradata.enhancements.bandits.collaborative_filter import (
     compute_brain_similarity,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _lesson(
     category: str,
@@ -72,6 +70,7 @@ def _fingerprint(cat_dist: dict[str, int], domain: str = "test") -> BrainFingerp
 # RuleFingerprint dataclass
 # ---------------------------------------------------------------------------
 
+
 class TestRuleFingerprint:
     def test_fields_stored(self):
         rf = RuleFingerprint(
@@ -101,6 +100,7 @@ class TestRuleFingerprint:
 # TransferRecommendation dataclass
 # ---------------------------------------------------------------------------
 
+
 class TestTransferRecommendation:
     def test_fields_stored(self):
         rec = TransferRecommendation(
@@ -123,6 +123,7 @@ class TestTransferRecommendation:
 # BrainFingerprint dataclass + from_lessons
 # ---------------------------------------------------------------------------
 
+
 class TestBrainFingerprintFromLessons:
     def test_empty_lessons_gives_empty_fingerprint(self):
         fp = BrainFingerprint.from_lessons([], domain="sales", total_sessions=5)
@@ -144,8 +145,8 @@ class TestBrainFingerprintFromLessons:
     def test_threshold_is_exclusive_at_05(self):
         """Confidence == 0.5 is below threshold (strictly < 0.5 excluded)."""
         lessons = [
-            _lesson("TONE", "be concise", 0.50),   # exactly 0.5 — included
-            _lesson("TONE", "be brief", 0.499),     # just below — excluded
+            _lesson("TONE", "be concise", 0.50),  # exactly 0.5 — included
+            _lesson("TONE", "be brief", 0.499),  # just below — excluded
         ]
         fp = BrainFingerprint.from_lessons(lessons)
         assert len(fp.rules) == 1
@@ -196,6 +197,7 @@ class TestBrainFingerprintFromLessons:
 # compute_brain_similarity
 # ---------------------------------------------------------------------------
 
+
 class TestComputeBrainSimilarity:
     def test_identical_distributions_returns_1(self):
         cats = {"TONE": 5, "FORMAT": 3}
@@ -239,8 +241,8 @@ class TestComputeBrainSimilarity:
 
     def test_known_cosine_value(self):
         """Manual cosine: a=[2,0] b=[1,1] -> dot=2, |a|=2, |b|=sqrt(2) -> 2/(2*sqrt(2))=sqrt(2)/2."""
-        a = _fingerprint({"X": 2})           # sorted cats: X, Y -> [2, 0]
-        b = _fingerprint({"X": 1, "Y": 1})   # [1, 1]
+        a = _fingerprint({"X": 2})  # sorted cats: X, Y -> [2, 0]
+        b = _fingerprint({"X": 1, "Y": 1})  # [1, 1]
         expected = round(2 / (2 * math.sqrt(2)), 4)
         assert compute_brain_similarity(a, b) == expected
 
@@ -254,6 +256,7 @@ class TestComputeBrainSimilarity:
 # ---------------------------------------------------------------------------
 # apply_transfer_boost
 # ---------------------------------------------------------------------------
+
 
 class TestApplyTransferBoost:
     def _mutable_lesson(

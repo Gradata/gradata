@@ -1,12 +1,12 @@
 """Tests for freshness tracking on graduated rules."""
+
 import pytest
+
 from gradata.enhancements.freshness import (
+    FreshnessInfo,
     Trend,
     compute_trend,
-    FreshnessInfo,
-    update_freshness,
     mark_fired,
-    SEVERITY_WEIGHTS,
 )
 
 

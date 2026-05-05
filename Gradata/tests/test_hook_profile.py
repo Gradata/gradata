@@ -5,13 +5,13 @@ Every other Gradata hook in ``_installer.HOOK_REGISTRY`` routes through
 runners bypass ``run_hook`` (they use ``sys.exit(main())`` not
 ``run_hook(main, meta)``) so they MUST do their own profile check.
 """
+
 from __future__ import annotations
 
 import io
 from pathlib import Path
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -96,6 +96,7 @@ class TestStandardProfileRuns:
 
         # Skip if node isn't available (CI sanity — we only care about gating)
         import shutil
+
         if shutil.which("node") is None:
             pytest.skip("node not installed")
 
@@ -144,6 +145,7 @@ class TestStrictProfileRuns:
         monkeypatch.setattr("sys.stdin", io.StringIO('{"tool_name":"Edit"}'))
 
         import shutil
+
         if shutil.which("node") is None:
             pytest.skip("node not installed")
 

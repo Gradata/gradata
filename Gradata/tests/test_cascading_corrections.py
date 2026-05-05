@@ -1,4 +1,5 @@
 """Tests for correction-of-correction scenarios."""
+
 from tests.conftest import init_brain
 
 

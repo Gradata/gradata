@@ -19,9 +19,7 @@ _SCRIPT = _REPO / "scripts" / "migrate_legacy_scopes.py"
 
 def _load_migrate_module():
     """Dynamically load the script as a module (scripts/ isn't a package)."""
-    spec = importlib.util.spec_from_file_location(
-        "_migrate_legacy_scopes_under_test", _SCRIPT
-    )
+    spec = importlib.util.spec_from_file_location("_migrate_legacy_scopes_under_test", _SCRIPT)
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod
@@ -125,9 +123,7 @@ def test_plan_migration_sets_scope_json(migrate_mod, brain_with_mixed_lessons):
     assert new_lessons[4].scope_json in ("", None)
 
 
-def test_cli_dry_run_does_not_write(
-    migrate_mod, brain_with_mixed_lessons, caplog, monkeypatch
-):
+def test_cli_dry_run_does_not_write(migrate_mod, brain_with_mixed_lessons, caplog, monkeypatch):
     lessons_path = brain_with_mixed_lessons / "lessons.md"
     before = lessons_path.read_text(encoding="utf-8")
 
@@ -142,17 +138,11 @@ def test_cli_apply_writes_scope_json(migrate_mod, brain_with_mixed_lessons):
     from gradata.enhancements.self_improvement import parse_lessons
 
     lessons_path = brain_with_mixed_lessons / "lessons.md"
-    rc = migrate_mod.run_cli(
-        ["--brain", str(brain_with_mixed_lessons), "--apply"]
-    )
+    rc = migrate_mod.run_cli(["--brain", str(brain_with_mixed_lessons), "--apply"])
     assert rc == 0
 
     lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
-    scoped_domains = {
-        json.loads(l.scope_json).get("domain")
-        for l in lessons
-        if l.scope_json
-    }
+    scoped_domains = {json.loads(l.scope_json).get("domain") for l in lessons if l.scope_json}
     assert "code" in scoped_domains
     assert "email" in scoped_domains
 

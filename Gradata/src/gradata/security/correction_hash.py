@@ -77,8 +77,7 @@ def _canonicalize_source_context(source_context: Any) -> str:
     if isinstance(source_context, str):
         return source_context
     try:
-        return json.dumps(source_context, sort_keys=True, separators=(",", ":"),
-                          default=str)
+        return json.dumps(source_context, sort_keys=True, separators=(",", ":"), default=str)
     except (TypeError, ValueError):
         return str(source_context)
 
@@ -110,9 +109,7 @@ def compute_correction_hash(
     ctx_repr = _canonicalize_source_context(source_context)
     # Length-prefixed concatenation so "ab"+"c" and "a"+"bc" hash differently.
     payload = (
-        f"{len(before)}:{before}\x00"
-        f"{len(after)}:{after}\x00"
-        f"{len(ctx_repr)}:{ctx_repr}"
+        f"{len(before)}:{before}\x00{len(after)}:{after}\x00{len(ctx_repr)}:{ctx_repr}"
     ).encode()
     return hashlib.sha256(payload).hexdigest()
 
@@ -174,7 +171,9 @@ def build_provenance(
     source_kind, requires_review = classify_source_context(source_context)
     return {
         "provenance_hash": compute_correction_hash(
-            before_text, after_text, source_context,
+            before_text,
+            after_text,
+            source_context,
         ),
         "source_kind": source_kind,
         "requires_review": requires_review,

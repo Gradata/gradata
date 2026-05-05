@@ -1,4 +1,5 @@
 """Tests for the self-healing engine."""
+
 from __future__ import annotations
 
 import pytest
@@ -19,8 +20,11 @@ def brain_with_rule(tmp_path):
 
     brain = Brain.init(str(tmp_path / "test-brain"))
     rule = Lesson(
-        date="2026-04-01", state=LessonState.RULE, confidence=0.92,
-        category="TONE", description="Never use exclamation marks",
+        date="2026-04-01",
+        state=LessonState.RULE,
+        confidence=0.92,
+        category="TONE",
+        description="Never use exclamation marks",
         fire_count=8,
     )
     lessons_path = brain._find_lessons_path(create=True)
@@ -35,8 +39,11 @@ class TestDetectRuleFailure:
         from gradata.enhancements.self_healing import detect_rule_failure
 
         rule = Lesson(
-            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
-            category="TONE", description="Never use exclamation marks in emails",
+            date="2026-04-01",
+            state=LessonState.RULE,
+            confidence=0.92,
+            category="TONE",
+            description="Never use exclamation marks in emails",
             fire_count=8,
         )
         result = detect_rule_failure(
@@ -54,8 +61,11 @@ class TestDetectRuleFailure:
         from gradata.enhancements.self_healing import detect_rule_failure
 
         rule = Lesson(
-            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
-            category="FORMAT", description="Use bullet points in reports",
+            date="2026-04-01",
+            state=LessonState.RULE,
+            confidence=0.92,
+            category="FORMAT",
+            description="Use bullet points in reports",
             fire_count=5,
         )
         result = detect_rule_failure(
@@ -69,8 +79,11 @@ class TestDetectRuleFailure:
         from gradata.enhancements.self_healing import detect_rule_failure
 
         pattern = Lesson(
-            date="2026-04-01", state=LessonState.PATTERN, confidence=0.65,
-            category="TONE", description="Watch tone in emails",
+            date="2026-04-01",
+            state=LessonState.PATTERN,
+            confidence=0.65,
+            category="TONE",
+            description="Watch tone in emails",
             fire_count=4,
         )
         result = detect_rule_failure(
@@ -85,9 +98,13 @@ class TestDetectRuleFailure:
         from gradata.enhancements.self_healing import detect_rule_failure
 
         killed = Lesson(
-            date="2026-04-01", state=LessonState.KILLED, confidence=0.95,
-            category="TONE", description="Old tone rule",
-            fire_count=10, kill_reason="manual_rollback",
+            date="2026-04-01",
+            state=LessonState.KILLED,
+            confidence=0.95,
+            category="TONE",
+            description="Old tone rule",
+            fire_count=10,
+            kill_reason="manual_rollback",
         )
         result = detect_rule_failure(
             lessons=[killed],
@@ -100,8 +117,11 @@ class TestDetectRuleFailure:
         from gradata.enhancements.self_healing import detect_rule_failure
 
         rule = Lesson(
-            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
-            category="TONE", description="Never use exclamation marks",
+            date="2026-04-01",
+            state=LessonState.RULE,
+            confidence=0.92,
+            category="TONE",
+            description="Never use exclamation marks",
             fire_count=8,
         )
         memory_ctx = {"active_memories": ["user prefers formal tone"], "domain": "sales"}
@@ -118,13 +138,19 @@ class TestDetectRuleFailure:
         from gradata.enhancements.self_healing import detect_rule_failure
 
         rule_a = Lesson(
-            date="2026-04-01", state=LessonState.RULE, confidence=0.91,
-            category="TONE", description="Be formal",
+            date="2026-04-01",
+            state=LessonState.RULE,
+            confidence=0.91,
+            category="TONE",
+            description="Be formal",
             fire_count=6,
         )
         rule_b = Lesson(
-            date="2026-04-02", state=LessonState.RULE, confidence=0.95,
-            category="TONE", description="Never use slang",
+            date="2026-04-02",
+            state=LessonState.RULE,
+            confidence=0.95,
+            category="TONE",
+            description="Never use slang",
             fire_count=10,
         )
         result = detect_rule_failure(
@@ -140,7 +166,7 @@ class TestBrainCorrectRuleFailure:
     """brain.correct() emits RULE_FAILURE when a RULE should have caught the correction."""
 
     def test_correction_in_ruled_category_emits_rule_failure(self, brain_with_rule):
-        result = brain_with_rule.correct(
+        brain_with_rule.correct(
             draft="Great to hear from you! Let's connect!",
             final="Great to hear from you. Let's connect.",
             category="TONE",
@@ -153,8 +179,9 @@ class TestBrainCorrectRuleFailure:
         assert failure["data"]["failed_rule_confidence"] >= 0.80
 
     def test_correction_in_unruled_category_no_rule_failure(self, brain_with_rule):
-        result = brain_with_rule.correct(
-            draft="wrong format", final="correct format",
+        brain_with_rule.correct(
+            draft="wrong format",
+            final="correct format",
             category="FORMAT",
         )
         events = brain_with_rule.query_events(event_type="RULE_FAILURE", limit=10)
@@ -182,7 +209,7 @@ class TestPatchRule:
         assert "professional emails" in tone_rules[0].description
 
     def test_patch_preserves_confidence_and_metadata(self, brain_with_rule):
-        result = brain_with_rule.patch_rule(
+        brain_with_rule.patch_rule(
             category="TONE",
             old_description="Never use exclamation marks",
             new_description="Avoid exclamation marks in formal contexts",
@@ -269,14 +296,16 @@ class TestReviewRuleFailures:
     def test_generates_patch_for_rule_failure(self):
         from gradata.enhancements.self_healing import review_rule_failures
 
-        failures = [{
-            "data": {
-                "failed_rule_category": "TONE",
-                "failed_rule_description": "Never use exclamation marks",
-                "failed_rule_confidence": 0.92,
-                "correction_description": "Removed exclamation marks from casual Slack message",
+        failures = [
+            {
+                "data": {
+                    "failed_rule_category": "TONE",
+                    "failed_rule_description": "Never use exclamation marks",
+                    "failed_rule_confidence": 0.92,
+                    "correction_description": "Removed exclamation marks from casual Slack message",
+                }
             }
-        }]
+        ]
         patches = review_rule_failures(failures)
         assert len(patches) == 1
         assert patches[0]["category"] == "TONE"
@@ -296,14 +325,16 @@ class TestReviewRuleFailures:
         # A failure where the correction has no new context words beyond
         # stop words -- the heuristic can't narrow the rule so
         # proposed == original and retroactive test rejects it
-        failures = [{
-            "data": {
-                "failed_rule_category": "TONE",
-                "failed_rule_description": "Use bullet points in reports",
-                "failed_rule_confidence": 0.90,
-                "correction_description": "Use bullet points in reports",
+        failures = [
+            {
+                "data": {
+                    "failed_rule_category": "TONE",
+                    "failed_rule_description": "Use bullet points in reports",
+                    "failed_rule_confidence": 0.90,
+                    "correction_description": "Use bullet points in reports",
+                }
             }
-        }]
+        ]
         patches = review_rule_failures(failures)
         # The patch can't narrow (correction == rule), so it returns unchanged
         passing = [p for p in patches if p.get("retroactive_test", {}).get("passes")]
@@ -319,7 +350,10 @@ class TestNudgeThreshold:
         correction_events = [
             {"data": {"category": "TONE", "summary": "Removed exclamation marks"}, "session": 1},
             {"data": {"category": "TONE", "summary": "Toned down exclamation marks"}, "session": 2},
-            {"data": {"category": "TONE", "summary": "Removed exclamation marks from email"}, "session": 3},
+            {
+                "data": {"category": "TONE", "summary": "Removed exclamation marks from email"},
+                "session": 3,
+            },
         ]
         lessons = []  # No rules
         result = check_nudge_threshold(correction_events, lessons, category="TONE")
@@ -344,8 +378,12 @@ class TestNudgeThreshold:
             {"data": {"category": "TONE", "summary": "Fixed tone"}, "session": i} for i in range(5)
         ]
         rule = Lesson(
-            date="2026-04-01", state=LessonState.RULE, confidence=0.90,
-            category="TONE", description="Watch your tone", fire_count=5,
+            date="2026-04-01",
+            state=LessonState.RULE,
+            confidence=0.90,
+            category="TONE",
+            description="Watch your tone",
+            fire_count=5,
         )
         result = check_nudge_threshold(correction_events, [rule], category="TONE")
         assert result["should_nudge"] is False
@@ -356,9 +394,21 @@ class TestNudgeThreshold:
         from gradata.enhancements.self_healing import check_nudge_threshold
 
         correction_events = [
-            {"data": {"category": "TONE", "summary": "Removed exclamation marks from email"}, "session": 1},
-            {"data": {"category": "TONE", "summary": "Toned down exclamation marks in draft"}, "session": 2},
-            {"data": {"category": "TONE", "summary": "Removed exclamation marks from sales email"}, "session": 3},
+            {
+                "data": {"category": "TONE", "summary": "Removed exclamation marks from email"},
+                "session": 1,
+            },
+            {
+                "data": {"category": "TONE", "summary": "Toned down exclamation marks in draft"},
+                "session": 2,
+            },
+            {
+                "data": {
+                    "category": "TONE",
+                    "summary": "Removed exclamation marks from sales email",
+                },
+                "session": 3,
+            },
         ]
         result = check_nudge_threshold(correction_events, [], category="TONE")
         assert result["should_nudge"] is True
@@ -376,9 +426,13 @@ class TestNarrowRuleScope:
         from gradata.enhancements.self_healing import narrow_rule_scope
 
         rule = Lesson(
-            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
-            category="TONE", description="Never use exclamation marks",
-            fire_count=8, scope_json="",
+            date="2026-04-01",
+            state=LessonState.RULE,
+            confidence=0.92,
+            category="TONE",
+            description="Never use exclamation marks",
+            fire_count=8,
+            scope_json="",
         )
         result = narrow_rule_scope(
             rule,
@@ -392,8 +446,11 @@ class TestNarrowRuleScope:
         from gradata.enhancements.self_healing import narrow_rule_scope
 
         rule = Lesson(
-            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
-            category="TONE", description="Never use exclamation marks",
+            date="2026-04-01",
+            state=LessonState.RULE,
+            confidence=0.92,
+            category="TONE",
+            description="Never use exclamation marks",
             fire_count=8,
         )
         result = narrow_rule_scope(rule, failure_context={})
@@ -405,8 +462,11 @@ class TestNarrowRuleScope:
         from gradata.enhancements.self_healing import narrow_rule_scope
 
         rule = Lesson(
-            date="2026-04-01", state=LessonState.RULE, confidence=0.92,
-            category="TONE", description="Never use exclamation marks",
+            date="2026-04-01",
+            state=LessonState.RULE,
+            confidence=0.92,
+            category="TONE",
+            description="Never use exclamation marks",
             fire_count=8,
             scope_json=json.dumps({"excluded_domains": ["casual_slack"]}),
         )
@@ -433,14 +493,16 @@ class TestAutoHeal:
         }
 
     def test_passing_candidate_auto_patches_and_emits_event(self, brain_with_rule):
-        failures = [{
-            "data": {
-                "failed_rule_category": "TONE",
-                "failed_rule_description": "Never use exclamation marks",
-                "failed_rule_confidence": 0.92,
-                "correction_description": "Removed exclamation marks from casual Slack message",
+        failures = [
+            {
+                "data": {
+                    "failed_rule_category": "TONE",
+                    "failed_rule_description": "Never use exclamation marks",
+                    "failed_rule_confidence": 0.92,
+                    "correction_description": "Removed exclamation marks from casual Slack message",
+                }
             }
-        }]
+        ]
         result = brain_with_rule.auto_heal(failure_events=failures)
         assert result["examined"] == 1
         assert result["patched"] == 1
@@ -453,14 +515,16 @@ class TestAutoHeal:
 
     def test_failing_retroactive_test_is_skipped(self, brain_with_rule):
         # Correction word-identical to rule -> no delta -> retroactive_test rejects
-        failures = [{
-            "data": {
-                "failed_rule_category": "TONE",
-                "failed_rule_description": "Never use exclamation marks",
-                "failed_rule_confidence": 0.92,
-                "correction_description": "Never use exclamation marks",
+        failures = [
+            {
+                "data": {
+                    "failed_rule_category": "TONE",
+                    "failed_rule_description": "Never use exclamation marks",
+                    "failed_rule_confidence": 0.92,
+                    "correction_description": "Never use exclamation marks",
+                }
             }
-        }]
+        ]
         result = brain_with_rule.auto_heal(failure_events=failures)
         assert result["patched"] == 0
         assert result["skipped"] == 1
@@ -497,9 +561,14 @@ class TestAutoHeal:
 
         # Seed 3 rules in distinct categories
         lessons = [
-            Lesson(date="2026-04-01", state=LessonState.RULE, confidence=0.92,
-                   category=f"CAT_{i}", description=f"Rule number {i}",
-                   fire_count=5)
+            Lesson(
+                date="2026-04-01",
+                state=LessonState.RULE,
+                confidence=0.92,
+                category=f"CAT_{i}",
+                description=f"Rule number {i}",
+                fire_count=5,
+            )
             for i in range(3)
         ]
         lessons_path = brain_with_rule._find_lessons_path(create=True)
@@ -620,14 +689,16 @@ class TestCorrectAutoHealIntegration:
         exposes PatchReceipt fields (rule_id, old/new_confidence, patch_diff,
         revert_command) so downstream tooling can show the edit.
         """
-        failures = [{
-            "data": {
-                "failed_rule_category": "TONE",
-                "failed_rule_description": "Never use exclamation marks",
-                "failed_rule_confidence": 0.92,
-                "correction_description": "Removed exclamation marks from casual Slack message",
+        failures = [
+            {
+                "data": {
+                    "failed_rule_category": "TONE",
+                    "failed_rule_description": "Never use exclamation marks",
+                    "failed_rule_confidence": 0.92,
+                    "correction_description": "Removed exclamation marks from casual Slack message",
+                }
             }
-        }]
+        ]
         summary = brain_with_rule.auto_heal(failure_events=failures)
         assert summary["patched"] == 1
         receipt = summary["patches"][0]

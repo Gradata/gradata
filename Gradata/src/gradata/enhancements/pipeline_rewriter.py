@@ -18,13 +18,14 @@ The four thresholds this module reasons about:
   - ``MIN_APPLICATIONS_FOR_PATTERN`` (3) — fire_count to promote to PATTERN
   - ``MIN_APPLICATIONS_FOR_RULE`` (5)    — fire_count to promote to RULE
 """
+
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable
 
 
 @dataclass
@@ -76,11 +77,7 @@ def _failures_by_description(rule_failure_events: list[dict]) -> dict[str, int]:
     by_desc: dict[str, int] = {}
     for event in rule_failure_events:
         data = event.get("data", {}) or {}
-        desc = (
-            data.get("failed_rule_description")
-            or data.get("description")
-            or ""
-        ).strip()
+        desc = (data.get("failed_rule_description") or data.get("description") or "").strip()
         if not desc:
             continue
         by_desc[desc] = by_desc.get(desc, 0) + 1
@@ -126,13 +123,15 @@ def analyze_pipeline(
             if fires > 0:
                 rate = failures / max(fires, 1)
                 if rate >= over_promoted_failure_rate:
-                    diag.over_promoted_rules.append({
-                        "category": getattr(lesson, "category", ""),
-                        "description": desc[:80],
-                        "fire_count": fires,
-                        "failure_count": failures,
-                        "failure_rate": round(rate, 3),
-                    })
+                    diag.over_promoted_rules.append(
+                        {
+                            "category": getattr(lesson, "category", ""),
+                            "description": desc[:80],
+                            "fire_count": fires,
+                            "failure_count": failures,
+                            "failure_rate": round(rate, 3),
+                        }
+                    )
 
     # ── Proposal generation ────────────────────────────────────────────────
     # Each proposal is conservative: at most one step in one direction, with
@@ -147,46 +146,52 @@ def analyze_pipeline(
         # Many INSTINCTs have enough fires but confidence isn't reaching 0.60.
         # Either confidence scoring is broken OR the bar is too high. Propose
         # a modest drop to 0.55 so the population can flow; human re-examines.
-        diag.proposals.append(ThresholdProposal(
-            constant="PATTERN_THRESHOLD",
-            current=pattern_threshold,
-            proposed=round(max(0.50, pattern_threshold - 0.05), 2),
-            evidence_count=diag.stuck_at_instinct,
-            rationale=(
-                f"{diag.stuck_at_instinct} INSTINCT lessons have "
-                f"fire_count>={min_apps_pattern} but confidence<{pattern_threshold}. "
-                "Promotions are bottlenecked on the confidence bar, not fire_count."
-            ),
-        ))
+        diag.proposals.append(
+            ThresholdProposal(
+                constant="PATTERN_THRESHOLD",
+                current=pattern_threshold,
+                proposed=round(max(0.50, pattern_threshold - 0.05), 2),
+                evidence_count=diag.stuck_at_instinct,
+                rationale=(
+                    f"{diag.stuck_at_instinct} INSTINCT lessons have "
+                    f"fire_count>={min_apps_pattern} but confidence<{pattern_threshold}. "
+                    "Promotions are bottlenecked on the confidence bar, not fire_count."
+                ),
+            )
+        )
 
     if diag.over_promoted_rules:
         # Rules are graduating then failing frequently. Raise the hardest
         # gate: fire_count floor for RULE promotion.
-        diag.proposals.append(ThresholdProposal(
-            constant="MIN_APPLICATIONS_FOR_RULE",
-            current=float(min_apps_rule),
-            proposed=float(min_apps_rule + 1),
-            evidence_count=len(diag.over_promoted_rules),
-            rationale=(
-                f"{len(diag.over_promoted_rules)} graduated RULEs have "
-                f"failure_rate>={over_promoted_failure_rate:.0%}. "
-                "Raise fire_count floor to demand more evidence before promotion."
-            ),
-        ))
+        diag.proposals.append(
+            ThresholdProposal(
+                constant="MIN_APPLICATIONS_FOR_RULE",
+                current=float(min_apps_rule),
+                proposed=float(min_apps_rule + 1),
+                evidence_count=len(diag.over_promoted_rules),
+                rationale=(
+                    f"{len(diag.over_promoted_rules)} graduated RULEs have "
+                    f"failure_rate>={over_promoted_failure_rate:.0%}. "
+                    "Raise fire_count floor to demand more evidence before promotion."
+                ),
+            )
+        )
 
     if total >= 20 and rule_pop == 0:
         # No RULEs at all across a non-trivial population — either
         # MIN_APPLICATIONS_FOR_RULE or RULE_THRESHOLD is starving promotion.
-        diag.proposals.append(ThresholdProposal(
-            constant="MIN_APPLICATIONS_FOR_RULE",
-            current=float(min_apps_rule),
-            proposed=float(max(3, min_apps_rule - 1)),
-            evidence_count=total,
-            rationale=(
-                f"Zero RULEs in a population of {total}. Fire-count floor may "
-                "be starving promotion; try one step lower."
-            ),
-        ))
+        diag.proposals.append(
+            ThresholdProposal(
+                constant="MIN_APPLICATIONS_FOR_RULE",
+                current=float(min_apps_rule),
+                proposed=float(max(3, min_apps_rule - 1)),
+                evidence_count=total,
+                rationale=(
+                    f"Zero RULEs in a population of {total}. Fire-count floor may "
+                    "be starving promotion; try one step lower."
+                ),
+            )
+        )
 
     if not diag.proposals:
         diag.notes.append("No threshold adjustments recommended — pipeline looks healthy.")
@@ -207,8 +212,10 @@ def write_adr(diag: PipelineDiagnostic, output_dir: Path) -> Path:
     lines: list[str] = []
     lines.append(f"# ADR — Pipeline threshold proposals ({ts})")
     lines.append("")
-    lines.append("_Auto-generated read-only proposals from `pipeline_rewriter.py`. "
-                 "Review, edit, and apply by hand to `self_improvement/_confidence.py`._")
+    lines.append(
+        "_Auto-generated read-only proposals from `pipeline_rewriter.py`. "
+        "Review, edit, and apply by hand to `self_improvement/_confidence.py`._"
+    )
     lines.append("")
     lines.append("## Diagnostic snapshot")
     lines.append("")

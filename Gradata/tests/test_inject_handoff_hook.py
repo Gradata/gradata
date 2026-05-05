@@ -135,7 +135,7 @@ class TestEmission:
 
         inject_handoff.main({})
         assert any(c[0] == "handoff.injected" for c in calls)
-        injected = [c for c in calls if c[0] == "handoff.injected"][0][1]
+        injected = next(c for c in calls if c[0] == "handoff.injected")[1]
         assert injected["file"] == "x.handoff.md"
         assert injected["chars"] > 0
 

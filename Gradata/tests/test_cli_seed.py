@@ -1,4 +1,5 @@
 """Tests for `gradata seed` — Day-0 brain bootstrapping."""
+
 from __future__ import annotations
 
 import argparse

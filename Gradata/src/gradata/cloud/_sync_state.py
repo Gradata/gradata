@@ -51,10 +51,8 @@ def _ensure_schema(conn: sqlite3.Connection, db_path: Path) -> None:
         ("last_push_event_id", "TEXT"),
         ("last_pull_cursor", "TEXT"),
     ):
-        try:
+        with contextlib.suppress(sqlite3.OperationalError):
             conn.execute(f"ALTER TABLE sync_state ADD COLUMN {col} {decl}")
-        except sqlite3.OperationalError:
-            pass  # column already present
 
     # ON CONFLICT(tenant_id, device_id) requires a UNIQUE constraint on the
     # composite key. If a non-UNIQUE index exists from an older run, upgrade

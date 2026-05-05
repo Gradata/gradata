@@ -11,10 +11,7 @@ from __future__ import annotations
 import json
 import re
 
-import pytest
-
 from gradata.enhancements._sanitize import sanitize_lesson_content
-
 
 # ---------------------------------------------------------------------------
 # XML context — HIGH: </brain-rules> tag termination
@@ -96,7 +93,7 @@ class TestJsContext:
     """Attacker crafts lesson to break out of the generated JavaScript string."""
 
     def test_console_log_injection_escaped(self) -> None:
-        """"; console.log(process.env); // must not execute."""
+        """ "; console.log(process.env); // must not execute."""
         payload = '"; console.log(process.env); //'
         result = sanitize_lesson_content(payload, "js")
         # Quotes must be escaped so they cannot terminate the string
@@ -254,7 +251,9 @@ class TestCallSiteIntegration:
         """llm_synthesizer imports and uses sanitize_lesson_content."""
         # Verify the module contains the sanitize call (not just that it imports)
         import inspect
+
         import gradata.enhancements.llm_synthesizer as mod
+
         src = inspect.getsource(mod)
         assert "sanitize_lesson_content" in src
         assert '"llm_prompt"' in src
@@ -262,7 +261,9 @@ class TestCallSiteIntegration:
     def test_meta_rules_import(self) -> None:
         """meta_rules imports and uses sanitize_lesson_content."""
         import inspect
+
         import gradata.enhancements.meta_rules as mod
+
         src = inspect.getsource(mod)
         assert "sanitize_lesson_content" in src
         assert '"llm_prompt"' in src
@@ -270,7 +271,9 @@ class TestCallSiteIntegration:
     def test_rule_to_hook_import(self) -> None:
         """rule_to_hook imports and uses sanitize_lesson_content."""
         import inspect
+
         import gradata.enhancements.rule_to_hook as mod
+
         src = inspect.getsource(mod)
         assert "sanitize_lesson_content" in src
         assert '"js_template"' in src
@@ -278,7 +281,9 @@ class TestCallSiteIntegration:
     def test_inject_brain_rules_import(self) -> None:
         """inject_brain_rules imports and uses sanitize_lesson_content."""
         import inspect
+
         import gradata.hooks.inject_brain_rules as mod
+
         src = inspect.getsource(mod)
         assert "sanitize_lesson_content" in src
         assert '"xml"' in src

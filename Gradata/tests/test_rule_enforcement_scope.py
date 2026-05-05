@@ -1,4 +1,5 @@
 """Tests for rule_enforcement scope-prefilter (LLM-agnostic)."""
+
 from __future__ import annotations
 
 import json

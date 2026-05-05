@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 # ── Fixture: spin up a daemon on a random port ─────────────────────────
 
+
 @pytest.fixture
 def daemon_url(brain_dir: Path):
     """Start a GradataDaemon in a background thread, yield its base URL."""
@@ -52,12 +53,17 @@ def _post(base_url: str, path: str, body: dict) -> dict:
 
 # ── /brain-recall ──────────────────────────────────────────────────────
 
+
 def test_brain_recall_empty_brain(daemon_url: str) -> None:
-    resp = _post(daemon_url, "/brain-recall", {
-        "file_path": "src/app.py",
-        "content_preview": "hello world",
-        "session_id": "s1",
-    })
+    resp = _post(
+        daemon_url,
+        "/brain-recall",
+        {
+            "file_path": "src/app.py",
+            "content_preview": "hello world",
+            "session_id": "s1",
+        },
+    )
     assert "context" in resp
     assert "relevant_rules" in resp
     assert isinstance(resp["relevant_rules"], list)
@@ -66,11 +72,16 @@ def test_brain_recall_empty_brain(daemon_url: str) -> None:
 
 # ── /enforce-rules ─────────────────────────────────────────────────────
 
+
 def test_enforce_rules_no_violations(daemon_url: str) -> None:
-    resp = _post(daemon_url, "/enforce-rules", {
-        "content": "some normal content",
-        "file_path": "src/app.py",
-    })
+    resp = _post(
+        daemon_url,
+        "/enforce-rules",
+        {
+            "content": "some normal content",
+            "file_path": "src/app.py",
+        },
+    )
     assert resp["pass"] is True
     assert resp["violations"] == []
 
@@ -109,10 +120,14 @@ def daemon_with_lessons(brain_dir: Path):
 
 def test_enforce_rules_with_rule(daemon_with_lessons: str) -> None:
     """Seed a RULE-state lesson, then check enforcement catches it."""
-    resp = _post(daemon_with_lessons, "/enforce-rules", {
-        "content": "This is great — really great stuff with em dashes",
-        "file_path": "email.md",
-    })
+    resp = _post(
+        daemon_with_lessons,
+        "/enforce-rules",
+        {
+            "content": "This is great — really great stuff with em dashes",
+            "file_path": "email.md",
+        },
+    )
     # If the brain loaded the rule, we should get a violation.
     # If it didn't parse (empty brain), pass=True is also acceptable.
     assert "violations" in resp
@@ -121,23 +136,33 @@ def test_enforce_rules_with_rule(daemon_with_lessons: str) -> None:
 
 # ── /log-event ─────────────────────────────────────────────────────────
 
+
 def test_log_event(daemon_url: str) -> None:
-    resp = _post(daemon_url, "/log-event", {
-        "event_type": "file_save",
-        "data": {"file": "app.py", "lines": 42},
-        "session_id": "s1",
-    })
+    resp = _post(
+        daemon_url,
+        "/log-event",
+        {
+            "event_type": "file_save",
+            "data": {"file": "app.py", "lines": 42},
+            "session_id": "s1",
+        },
+    )
     assert resp["logged"] is True
 
 
 # ── /tag-delta ─────────────────────────────────────────────────────────
 
+
 def test_tag_delta_new_file(daemon_url: str) -> None:
-    resp = _post(daemon_url, "/tag-delta", {
-        "file_path": "src/new_module.py",
-        "old_content": "",
-        "new_content": "def hello():\n    return 'world'\n",
-    })
+    resp = _post(
+        daemon_url,
+        "/tag-delta",
+        {
+            "file_path": "src/new_module.py",
+            "old_content": "",
+            "new_content": "def hello():\n    return 'world'\n",
+        },
+    )
     assert "new_file" in resp["tags"]
     assert resp["category"] == "CODE"
 
@@ -145,21 +170,30 @@ def test_tag_delta_new_file(daemon_url: str) -> None:
 def test_tag_delta_refactor(daemon_url: str) -> None:
     old = "def foo():\n    x = 1\n    return x\n"
     new = "def foo():\n    value = 1\n    return value\n"
-    resp = _post(daemon_url, "/tag-delta", {
-        "file_path": "src/utils.py",
-        "old_content": old,
-        "new_content": new,
-    })
+    resp = _post(
+        daemon_url,
+        "/tag-delta",
+        {
+            "file_path": "src/utils.py",
+            "old_content": old,
+            "new_content": new,
+        },
+    )
     assert "refactor" in resp["tags"]
 
 
 # ── /checkpoint ────────────────────────────────────────────────────────
 
+
 def test_checkpoint(daemon_url: str) -> None:
-    resp = _post(daemon_url, "/checkpoint", {
-        "session_id": "s1",
-        "reason": "pre_compact",
-    })
+    resp = _post(
+        daemon_url,
+        "/checkpoint",
+        {
+            "session_id": "s1",
+            "reason": "pre_compact",
+        },
+    )
     assert resp["checkpointed"] is True
     assert isinstance(resp["pending_lessons"], int)
     assert resp["pending_lessons"] >= 0
@@ -167,10 +201,15 @@ def test_checkpoint(daemon_url: str) -> None:
 
 # ── /maintain ──────────────────────────────────────────────────────────
 
+
 def test_maintain_manifest(daemon_url: str) -> None:
-    resp = _post(daemon_url, "/maintain", {
-        "tasks": ["manifest"],
-    })
+    resp = _post(
+        daemon_url,
+        "/maintain",
+        {
+            "tasks": ["manifest"],
+        },
+    )
     assert "manifest" in resp["completed"]
     assert isinstance(resp["duration_ms"], int)
     assert resp["duration_ms"] >= 0

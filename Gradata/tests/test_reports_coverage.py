@@ -32,17 +32,16 @@ from gradata.enhancements.scoring.reports import (
     generate_rule_audit,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers to build minimal SQLite DBs inside tmp_path
 # ---------------------------------------------------------------------------
+
 
 def _make_db(db_path: Path) -> sqlite3.Connection:
     """Create the events table and return an open connection."""
     conn = sqlite3.connect(str(db_path))
     conn.execute(
-        "CREATE TABLE events "
-        "(id INTEGER PRIMARY KEY, type TEXT, session INTEGER, data_json TEXT)"
+        "CREATE TABLE events (id INTEGER PRIMARY KEY, type TEXT, session INTEGER, data_json TEXT)"
     )
     conn.commit()
     return conn
@@ -61,15 +60,20 @@ def _insert(conn: sqlite3.Connection, type_: str, session: int, data: dict | Non
 # HealthReport dataclass
 # ===========================================================================
 
+
 class TestHealthReportDataclass:
     def test_healthy_when_no_issues(self):
         r = HealthReport(
             brain_dir="/tmp/b",
-            sessions_total=5, events_total=50,
+            sessions_total=5,
+            events_total=50,
             event_types={"OUTPUT": 40, "CORRECTION": 10},
-            corrections_total=10, outputs_total=40,
-            correction_rate=0.25, first_draft_acceptance=0.75,
-            rules_active=3, lessons_active=7,
+            corrections_total=10,
+            outputs_total=40,
+            correction_rate=0.25,
+            first_draft_acceptance=0.75,
+            rules_active=3,
+            lessons_active=7,
             timestamp="2026-01-01T00:00:00",
             issues=[],
         )
@@ -78,11 +82,15 @@ class TestHealthReportDataclass:
     def test_not_healthy_when_issues_present(self):
         r = HealthReport(
             brain_dir="/tmp/b",
-            sessions_total=0, events_total=0,
+            sessions_total=0,
+            events_total=0,
             event_types={},
-            corrections_total=0, outputs_total=0,
-            correction_rate=0.0, first_draft_acceptance=0.0,
-            rules_active=0, lessons_active=0,
+            corrections_total=0,
+            outputs_total=0,
+            correction_rate=0.0,
+            first_draft_acceptance=0.0,
+            rules_active=0,
+            lessons_active=0,
             timestamp="2026-01-01T00:00:00",
             issues=["system.db not found"],
         )
@@ -92,6 +100,7 @@ class TestHealthReportDataclass:
 # ===========================================================================
 # generate_health_report — missing DB
 # ===========================================================================
+
 
 class TestGenerateHealthReportMissingDb:
     def test_returns_report_when_db_absent(self, tmp_path):
@@ -112,6 +121,7 @@ class TestGenerateHealthReportMissingDb:
 # ===========================================================================
 # generate_health_report — empty events table (no events)
 # ===========================================================================
+
 
 class TestGenerateHealthReportEmptyDb:
     @pytest.fixture
@@ -147,6 +157,7 @@ class TestGenerateHealthReportEmptyDb:
 # ===========================================================================
 # generate_health_report — populated DB
 # ===========================================================================
+
 
 class TestGenerateHealthReportPopulated:
     @pytest.fixture
@@ -241,6 +252,7 @@ class TestGenerateHealthReportMissingEventsTable:
 # generate_health_report — lessons.md parsing
 # ===========================================================================
 
+
 class TestHealthReportLessonsFile:
     def test_counts_instinct_and_pattern_and_rule(self, tmp_path):
         db_path = tmp_path / "system.db"
@@ -270,6 +282,7 @@ class TestHealthReportLessonsFile:
 # ===========================================================================
 # format_health_report
 # ===========================================================================
+
 
 class TestFormatHealthReport:
     def _make_report(self, issues=None, event_types=None):
@@ -341,6 +354,7 @@ class TestFormatHealthReport:
 # ===========================================================================
 # export_session_csv
 # ===========================================================================
+
 
 class TestExportSessionCsv:
     def test_missing_db_returns_header_only(self, tmp_path):
@@ -426,6 +440,7 @@ class TestExportSessionCsv:
 # ===========================================================================
 # generate_rule_audit
 # ===========================================================================
+
 
 class TestGenerateRuleAudit:
     def test_missing_db_returns_no_database_message(self, tmp_path):
@@ -524,6 +539,7 @@ class TestGenerateRuleAudit:
 # generate_metrics_report — smoke test (delegates to metrics module)
 # ===========================================================================
 
+
 class TestFirstDraftAcceptanceOperationalError:
     """Hit the except OperationalError branch inside the FDA block (lines 107-108).
 
@@ -573,12 +589,14 @@ class TestFirstDraftAcceptanceOperationalError:
 class TestGenerateMetricsReport:
     def test_missing_db_returns_string(self, tmp_path):
         from gradata.enhancements.scoring.reports import generate_metrics_report
+
         db_path = tmp_path / "nope.db"
         result = generate_metrics_report(db_path)
         assert isinstance(result, str)
 
     def test_empty_db_returns_string(self, tmp_path):
         from gradata.enhancements.scoring.reports import generate_metrics_report
+
         db_path = tmp_path / "system.db"
         conn = _make_db(db_path)
         conn.close()
@@ -587,6 +605,7 @@ class TestGenerateMetricsReport:
 
     def test_custom_window_accepted(self, tmp_path):
         from gradata.enhancements.scoring.reports import generate_metrics_report
+
         db_path = tmp_path / "nope.db"
         result = generate_metrics_report(db_path, window=5)
         assert isinstance(result, str)

@@ -1,5 +1,6 @@
 """Tests for Meta-Harness C graduation scoring (opt-in alternative to
 hand-tuned thresholds)."""
+
 from __future__ import annotations
 
 import os
@@ -78,8 +79,11 @@ def test_stale_lesson_loses_recency():
 
 def test_components_in_unit_range():
     features = GraduationFeatures(
-        confidence=1.0, fire_count=100, failure_count=0,
-        sessions_since_fire=0, total_sessions_observed=1000,
+        confidence=1.0,
+        fire_count=100,
+        failure_count=0,
+        sessions_since_fire=0,
+        total_sessions_observed=1000,
     )
     score = compute_graduation_score(features)
     for name, val in score.components.items():
@@ -93,13 +97,21 @@ def test_failure_rate_clamps_at_one():
 
 
 def test_severity_signal_nudges_confidence():
-    base = compute_graduation_score(GraduationFeatures(
-        confidence=0.60, fire_count=3, total_sessions_observed=5,
-    ))
-    boosted = compute_graduation_score(GraduationFeatures(
-        confidence=0.60, fire_count=3, total_sessions_observed=5,
-        severity_weighted_signal=1.0,
-    ))
+    base = compute_graduation_score(
+        GraduationFeatures(
+            confidence=0.60,
+            fire_count=3,
+            total_sessions_observed=5,
+        )
+    )
+    boosted = compute_graduation_score(
+        GraduationFeatures(
+            confidence=0.60,
+            fire_count=3,
+            total_sessions_observed=5,
+            severity_weighted_signal=1.0,
+        )
+    )
     assert boosted.score > base.score
 
 
@@ -113,7 +125,8 @@ def test_should_graduate_lesson_returns_transition_signal():
         fire_count=5,
     )
     transition, target, score = should_graduate_lesson(
-        lesson, total_sessions_observed=10,
+        lesson,
+        total_sessions_observed=10,
     )
     assert transition is True
     assert target in ("PATTERN", "RULE")

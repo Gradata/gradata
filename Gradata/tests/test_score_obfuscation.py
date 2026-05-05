@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 import time
 
 from gradata.security.score_obfuscation import (
@@ -12,7 +10,6 @@ from gradata.security.score_obfuscation import (
     obfuscate_instruction,
     truncate_score,
 )
-
 
 # ---------------------------------------------------------------------------
 # truncate_score
@@ -122,9 +119,9 @@ class TestFormatRulesNoRawFloats:
     def test_no_raw_floats_in_prompt(self) -> None:
         """After the rule_engine change, format_rules_for_prompt should
         emit tier labels without confidence floats in the instruction field."""
+        from gradata._scope import RuleScope
         from gradata._types import Lesson, LessonState
         from gradata.rules.rule_engine import apply_rules, format_rules_for_prompt
-        from gradata._scope import RuleScope
 
         lesson = Lesson(
             date="2026-04-07",

@@ -28,9 +28,10 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING
 
 from gradata._types import ELIGIBLE_STATES, Lesson, LessonState
 
@@ -255,7 +256,7 @@ def _lesson_sort_key(l: Lesson) -> tuple:
 
 
 def project(
-    brain: "Brain",
+    brain: Brain,
     *,
     output_dir: Path | None = None,
     include_states: Iterable[LessonState] = ELIGIBLE_STATES,

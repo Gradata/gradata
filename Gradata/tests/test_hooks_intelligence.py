@@ -9,7 +9,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # ── agent_precontext ──
-
 from gradata.hooks.agent_precontext import main as precontext_main
 
 
@@ -147,7 +146,8 @@ def test_tool_failure_filters_false_positive():
 
 # ── tool_finding_capture ──
 
-from gradata.hooks.tool_finding_capture import main as finding_main, FINDINGS_FILE
+from gradata.hooks.tool_finding_capture import FINDINGS_FILE
+from gradata.hooks.tool_finding_capture import main as finding_main
 
 
 @pytest.fixture(autouse=False)
@@ -316,7 +316,8 @@ def test_pre_compact_no_brain():
 
 # ── duplicate_guard ──
 
-from gradata.hooks.duplicate_guard import main as guard_main, _similarity, _normalize
+from gradata.hooks.duplicate_guard import _normalize, _similarity
+from gradata.hooks.duplicate_guard import main as guard_main
 
 
 def test_duplicate_guard_blocks_similar(tmp_path):

@@ -151,7 +151,7 @@ class Example:
         return {"good": self.good, "bad": self.bad}
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Example":
+    def from_dict(cls, data: dict) -> Example:
         return cls(good=str(data.get("good", "")), bad=str(data.get("bad", "")))
 
 

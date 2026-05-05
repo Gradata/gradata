@@ -8,29 +8,26 @@ Run: pytest sdk/tests/test_cli.py -v
 """
 
 import argparse
+import contextlib
 import json
-import os
-import sys
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from gradata import Brain
 from gradata.cli import (
+    cmd_doctor,
     cmd_init,
     cmd_manifest,
     cmd_search,
     cmd_stats,
     cmd_validate,
-    cmd_doctor,
     main,
 )
-
 
 # ---------------------------------------------------------------------------
 # cmd_init
 # ---------------------------------------------------------------------------
+
 
 class TestCmdInit:
     def test_init_creates_brain_dir(self, tmp_path):
@@ -104,6 +101,7 @@ class TestCmdInit:
 # cmd_search
 # ---------------------------------------------------------------------------
 
+
 class TestCmdSearch:
     def test_search_no_results(self, fresh_brain, capsys):
         """Search on empty brain prints 'No results found.'"""
@@ -120,6 +118,7 @@ class TestCmdSearch:
     def test_search_with_results(self, brain_with_content, capsys):
         """Search finds indexed content after FTS rebuild."""
         from gradata._query import fts_rebuild
+
         fts_rebuild()
 
         args = argparse.Namespace(
@@ -149,6 +148,7 @@ class TestCmdSearch:
 # ---------------------------------------------------------------------------
 # cmd_manifest
 # ---------------------------------------------------------------------------
+
 
 class TestCmdManifest:
     def test_manifest_text_output(self, brain_with_events, capsys):
@@ -187,6 +187,7 @@ class TestCmdManifest:
 # cmd_stats
 # ---------------------------------------------------------------------------
 
+
 class TestCmdStats:
     def test_stats_returns_dict(self, fresh_brain):
         """brain.stats() returns dict with expected keys."""
@@ -218,6 +219,7 @@ class TestCmdStats:
 # ---------------------------------------------------------------------------
 # cmd_validate
 # ---------------------------------------------------------------------------
+
 
 class TestCmdValidate:
     def test_validate_clean_brain(self, brain_with_events, capsys):
@@ -267,6 +269,7 @@ class TestCmdValidate:
 # cmd_doctor
 # ---------------------------------------------------------------------------
 
+
 class TestCmdDoctor:
     def test_doctor_runs(self, fresh_brain, capsys):
         """Doctor command produces output without crashing."""
@@ -275,10 +278,8 @@ class TestCmdDoctor:
             json=True,
         )
         # doctor may sys.exit(1) if status is "broken" — catch it
-        try:
+        with contextlib.suppress(SystemExit):
             cmd_doctor(args)
-        except SystemExit:
-            pass
         captured = capsys.readouterr()
         data = json.loads(captured.out)
         assert "status" in data
@@ -289,10 +290,8 @@ class TestCmdDoctor:
             brain_dir=str(fresh_brain.dir),
             json=True,
         )
-        try:
+        with contextlib.suppress(SystemExit):
             cmd_doctor(args)
-        except SystemExit:
-            pass
         captured = capsys.readouterr()
         data = json.loads(captured.out)
         assert data["status"] in ("healthy", "degraded", "broken")
@@ -301,6 +300,7 @@ class TestCmdDoctor:
 # ---------------------------------------------------------------------------
 # Argument parsing edge cases
 # ---------------------------------------------------------------------------
+
 
 class TestArgParsing:
     def test_no_command_shows_help(self, capsys):
@@ -334,11 +334,17 @@ class TestArgParsing:
     def test_brain_dir_flag(self, tmp_path):
         """--brain-dir flag is parsed correctly."""
         target = tmp_path / "flag-brain"
-        with patch("sys.argv", [
-            "gradata", "--brain-dir", str(tmp_path),
-            "init", str(target),
-            "--no-interactive",
-        ]):
+        with patch(
+            "sys.argv",
+            [
+                "gradata",
+                "--brain-dir",
+                str(tmp_path),
+                "init",
+                str(target),
+                "--no-interactive",
+            ],
+        ):
             main()
         assert target.is_dir()
 
@@ -346,10 +352,8 @@ class TestArgParsing:
         """An unrecognised subcommand prints help (no crash)."""
         with patch("sys.argv", ["gradata", "foobar"]):
             # argparse treats unknown subcommands as error on Python 3.12+
-            try:
+            with contextlib.suppress(SystemExit):
                 main()
-            except SystemExit:
-                pass
         captured = capsys.readouterr()
         # Should have printed something (help or error)
         assert len(captured.out) > 0 or len(captured.err) > 0

@@ -4,6 +4,7 @@ Statistical engine for Gradata SDK.
 Portable statistical functions for convergence analysis, quality scoring,
 and trend detection. All functions work with any data volume including 0.
 """
+
 from __future__ import annotations
 
 import math
@@ -12,6 +13,7 @@ from collections import Counter, defaultdict
 # ============================================================================
 # 0. TREND ANALYSIS (Theil-Sen + Mann-Kendall)
 # ============================================================================
+
 
 def trend_analysis(y: list[float]) -> tuple[float, float]:
     """Combined Theil-Sen slope + Mann-Kendall p-value in a single O(n^2) pass.
@@ -76,7 +78,7 @@ def cusum_changepoints(data: list[int] | list[float], threshold: float = 1.0) ->
     variance = sum((x - mean) ** 2 for x in data) / n
     if variance == 0:
         return []
-    std_dev = variance ** 0.5
+    std_dev = variance**0.5
     limit = threshold * std_dev
 
     changepoints: list[int] = []
@@ -100,13 +102,17 @@ def cusum_changepoints(data: list[int] | list[float], threshold: float = 1.0) ->
 # 1. BAYESIAN BETA-BINOMIAL
 # ============================================================================
 
-def beta_posterior(successes: int, trials: int, prior_alpha: float = 1.0, prior_beta: float = 1.0) -> dict:
+
+def beta_posterior(
+    successes: int, trials: int, prior_alpha: float = 1.0, prior_beta: float = 1.0
+) -> dict:
     alpha = prior_alpha + successes
     beta_param = prior_beta + trials - successes
     mean = alpha / (alpha + beta_param)
 
     try:
         from scipy.stats import beta as beta_dist
+
         ci_low = beta_dist.ppf(0.025, alpha, beta_param)
         ci_high = beta_dist.ppf(0.975, alpha, beta_param)
     except ImportError:
@@ -117,6 +123,7 @@ def beta_posterior(successes: int, trials: int, prior_alpha: float = 1.0, prior_
     def prob_above(baseline: float) -> float:
         try:
             from scipy.stats import beta as beta_dist
+
             return float(1 - beta_dist.cdf(baseline, alpha, beta_param))
         except ImportError:
             if mean > baseline:
@@ -138,27 +145,36 @@ def beta_posterior(successes: int, trials: int, prior_alpha: float = 1.0, prior_
         "ci_95": (round(float(ci_low), 4), round(float(ci_high), 4)),
         "prob_above_baseline": round(p_above, 3),
         "confidence_label": label,
-        "alpha": alpha, "beta": beta_param, "n": trials,
+        "alpha": alpha,
+        "beta": beta_param,
+        "n": trials,
     }
-
 
 
 # ============================================================================
 # 2. WILSON CONFIDENCE INTERVALS
 # ============================================================================
 
+
 def wilson_ci(successes: int, total: int, z: float = 1.96) -> dict:
     if total == 0:
-        return {"point_estimate": 0, "ci_low": 0, "ci_high": 0, "margin": 0, "display": "0% (no data)"}
+        return {
+            "point_estimate": 0,
+            "ci_low": 0,
+            "ci_high": 0,
+            "margin": 0,
+            "display": "0% (no data)",
+        }
     p = successes / total
-    denom = 1 + z ** 2 / total
-    center = (p + z ** 2 / (2 * total)) / denom
-    margin = z * math.sqrt((p * (1 - p) + z ** 2 / (4 * total)) / total) / denom
+    denom = 1 + z**2 / total
+    center = (p + z**2 / (2 * total)) / denom
+    margin = z * math.sqrt((p * (1 - p) + z**2 / (4 * total)) / total) / denom
     ci_low = max(0, center - margin)
     ci_high = min(1, center + margin)
     return {
         "point_estimate": round(p, 4),
-        "ci_low": round(ci_low, 4), "ci_high": round(ci_high, 4),
+        "ci_low": round(ci_low, 4),
+        "ci_high": round(ci_high, 4),
         "margin": round(margin, 4),
         "display": f"{p:.1%} (CI: {ci_low:.1%}-{ci_high:.1%})",
     }
@@ -168,14 +184,18 @@ def wilson_ci(successes: int, total: int, z: float = 1.96) -> dict:
 # 3. ROLLING WINDOW COMPARISON
 # ============================================================================
 
+
 def rolling_comparison(values: list, window: int = 10) -> dict:
     if not values:
         return {"lifetime_avg": 0, "recent_avg": 0, "delta": 0, "trend": "NO_DATA", "pct_change": 0}
     lifetime_avg = sum(values) / len(values)
     if len(values) <= window:
         return {
-            "lifetime_avg": round(lifetime_avg, 4), "recent_avg": round(lifetime_avg, 4),
-            "delta": 0, "trend": "INSUFFICIENT_WINDOW", "pct_change": 0,
+            "lifetime_avg": round(lifetime_avg, 4),
+            "recent_avg": round(lifetime_avg, 4),
+            "delta": 0,
+            "trend": "INSUFFICIENT_WINDOW",
+            "pct_change": 0,
         }
     recent = values[-window:]
     recent_avg = sum(recent) / len(recent)
@@ -188,14 +208,18 @@ def rolling_comparison(values: list, window: int = 10) -> dict:
     else:
         trend = "DEGRADING"
     return {
-        "lifetime_avg": round(lifetime_avg, 4), "recent_avg": round(recent_avg, 4),
-        "delta": round(delta, 4), "trend": trend, "pct_change": round(pct, 1),
+        "lifetime_avg": round(lifetime_avg, 4),
+        "recent_avg": round(recent_avg, 4),
+        "delta": round(delta, 4),
+        "trend": trend,
+        "pct_change": round(pct, 1),
     }
 
 
 # ============================================================================
 # 4. BRIER SCORE
 # ============================================================================
+
 
 def brier_score(predictions_and_outcomes: list) -> dict:
     if not predictions_and_outcomes:
@@ -220,6 +244,7 @@ def brier_score(predictions_and_outcomes: list) -> dict:
 # 5. EWMA CONTROL CHARTS
 # ============================================================================
 
+
 def ewma_control(values: list, lambda_param: float = 0.2, sigma_multiplier: float = 2.0) -> dict:
     if len(values) < 3:
         return {"ewma_current": None, "alerts": [], "status": "INSUFFICIENT_DATA"}
@@ -237,10 +262,18 @@ def ewma_control(values: list, lambda_param: float = 0.2, sigma_multiplier: floa
         ucl = mean + sigma_multiplier * ewma_sigma
         lcl = mean - sigma_multiplier * ewma_sigma
         if ewma[i] > ucl or ewma[i] < lcl:
-            alerts.append({"index": i, "value": round(values[i], 4),
-                          "ewma": round(ewma[i], 4), "type": "above" if ewma[i] > ucl else "below"})
+            alerts.append(
+                {
+                    "index": i,
+                    "value": round(values[i], 4),
+                    "ewma": round(ewma[i], 4),
+                    "type": "above" if ewma[i] > ucl else "below",
+                }
+            )
     return {
-        "ewma_current": round(ewma[-1], 4), "mean": round(mean, 4), "sigma": round(sigma, 4),
+        "ewma_current": round(ewma[-1], 4),
+        "mean": round(mean, 4),
+        "sigma": round(sigma, 4),
         "ucl": round(mean + sigma_multiplier * sigma, 4),
         "lcl": round(max(0, mean - sigma_multiplier * sigma), 4),
         "alerts": alerts[-3:],
@@ -251,6 +284,7 @@ def ewma_control(values: list, lambda_param: float = 0.2, sigma_multiplier: floa
 # ============================================================================
 # 6. CORRECTION HALF-LIFE
 # ============================================================================
+
 
 def correction_half_life(corrections: list) -> dict:
     if not corrections:
@@ -281,17 +315,29 @@ def correction_half_life(corrections: list) -> dict:
         else:
             status = "SAME_SESSION"
         results[cat] = {
-            "occurrences": count, "first_session": sessions_sorted[0],
-            "last_session": sessions_sorted[-1], "span": span,
-            "density": round(count / max(span, 1), 3), "status": status,
+            "occurrences": count,
+            "first_session": sessions_sorted[0],
+            "last_session": sessions_sorted[-1],
+            "span": span,
+            "density": round(count / max(span, 1), 3),
+            "status": status,
         }
-    overall = "LEARNING" if learned > recurring else "STRUGGLING" if recurring > learned else "MIXED"
-    return {"categories": results, "total_categories": len(results), "learned": learned, "recurring": recurring, "overall": overall}
+    overall = (
+        "LEARNING" if learned > recurring else "STRUGGLING" if recurring > learned else "MIXED"
+    )
+    return {
+        "categories": results,
+        "total_categories": len(results),
+        "learned": learned,
+        "recurring": recurring,
+        "overall": overall,
+    }
 
 
 # ============================================================================
 # 7. TASK SUCCESS RATE BY TYPE
 # ============================================================================
+
 
 def task_success_rate(events: list) -> dict:
     if not events:
@@ -306,7 +352,12 @@ def task_success_rate(events: list) -> dict:
     for t, counts in by_type.items():
         rate = counts["passed"] / counts["total"] if counts["total"] > 0 else 0
         ci = wilson_ci(counts["passed"], counts["total"])
-        results[t] = {"pass_rate": round(rate, 3), "total": counts["total"], "passed": counts["passed"], "ci": ci["display"]}
+        results[t] = {
+            "pass_rate": round(rate, 3),
+            "total": counts["total"],
+            "passed": counts["passed"],
+            "ci": ci["display"],
+        }
     total = sum(c["total"] for c in by_type.values())
     passed = sum(c["passed"] for c in by_type.values())
     return {
@@ -320,6 +371,7 @@ def task_success_rate(events: list) -> dict:
 # 8. MTBF / MTTR
 # ============================================================================
 
+
 def mtbf_mttr(corrections: list, total_sessions: int) -> dict:
     if not corrections or total_sessions == 0:
         return {"by_type": {}, "overall_mtbf": None}
@@ -332,13 +384,23 @@ def mtbf_mttr(corrections: list, total_sessions: int) -> dict:
         mtbf = total_sessions / count if count > 0 else total_sessions
         sessions_sorted = sorted(sessions)
         if len(sessions_sorted) > 1:
-            gaps = [sessions_sorted[i+1] - sessions_sorted[i] for i in range(len(sessions_sorted)-1)]
+            gaps = [
+                sessions_sorted[i + 1] - sessions_sorted[i] for i in range(len(sessions_sorted) - 1)
+            ]
             mttr = sum(gaps) / len(gaps)
         else:
             mttr = None
-        results[t] = {"corrections": count, "mtbf": round(mtbf, 1), "mttr": round(mttr, 1) if mttr else None}
+        results[t] = {
+            "corrections": count,
+            "mtbf": round(mtbf, 1),
+            "mttr": round(mttr, 1) if mttr else None,
+        }
     overall_mtbf = total_sessions / len(corrections) if corrections else total_sessions
-    return {"by_type": results, "overall_mtbf": round(overall_mtbf, 1), "total_corrections": len(corrections)}
+    return {
+        "by_type": results,
+        "overall_mtbf": round(overall_mtbf, 1),
+        "total_corrections": len(corrections),
+    }
 
 
 # ============================================================================

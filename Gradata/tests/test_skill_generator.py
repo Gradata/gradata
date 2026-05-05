@@ -15,12 +15,10 @@ Covers:
 
 Run: pytest tests/test_skill_generator.py -xvs
 """
+
 from __future__ import annotations
 
-import os
 from pathlib import Path
-
-import pytest
 
 from gradata._types import Lesson, LessonState
 from gradata.enhancements.rule_pipeline import (
@@ -29,10 +27,10 @@ from gradata.enhancements.rule_pipeline import (
     run_rule_pipeline,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_lesson(
     state: LessonState = LessonState.RULE,
@@ -60,8 +58,8 @@ def _write_skill(skill_path: Path, content: str) -> None:
 # 1. Rule below 0.90 confidence -> no skill generated
 # ---------------------------------------------------------------------------
 
-class TestGenerateSkillFileQualityGate:
 
+class TestGenerateSkillFileQualityGate:
     def test_low_confidence_returns_none(self, tmp_path):
         lesson = _make_lesson(confidence=0.85)
         result = _generate_skill_file(lesson, tmp_path)
@@ -101,8 +99,8 @@ class TestGenerateSkillFileQualityGate:
 # 3. Valid rule generates SKILL.md with correct frontmatter
 # ---------------------------------------------------------------------------
 
-class TestGenerateSkillFileOutput:
 
+class TestGenerateSkillFileOutput:
     def test_creates_skill_md_file(self, tmp_path):
         lesson = _make_lesson()
         result = _generate_skill_file(lesson, tmp_path)
@@ -181,8 +179,8 @@ class TestGenerateSkillFileOutput:
 # 4. Generated skill passes review_generated_skill validation
 # ---------------------------------------------------------------------------
 
-class TestReviewGeneratedSkillValid:
 
+class TestReviewGeneratedSkillValid:
     def test_generated_skill_passes_review(self, tmp_path):
         lesson = _make_lesson()
         skill_path = _generate_skill_file(lesson, tmp_path)
@@ -214,18 +212,24 @@ class TestReviewGeneratedSkillValid:
 # 5. Skill with placeholder text fails review
 # ---------------------------------------------------------------------------
 
-class TestReviewPlaceholder:
 
+class TestReviewPlaceholder:
     def test_todo_in_content_fails(self, tmp_path):
         skill_path = tmp_path / "SKILL.md"
-        _write_skill(skill_path, "---\nconfidence: 0.92\ndescription: A real description here\n---\n\n## Directive\n\nTODO: fill this in\n")
+        _write_skill(
+            skill_path,
+            "---\nconfidence: 0.92\ndescription: A real description here\n---\n\n## Directive\n\nTODO: fill this in\n",
+        )
         review = review_generated_skill(skill_path)
         assert review["valid"] is False
         assert any("placeholder" in i.lower() for i in review["issues"])
 
     def test_requires_in_content_fails(self, tmp_path):
         skill_path = tmp_path / "SKILL.md"
-        _write_skill(skill_path, "---\nconfidence: 0.92\ndescription: A real description here\n---\n\n## Directive\n\n(requires human review)\n")
+        _write_skill(
+            skill_path,
+            "---\nconfidence: 0.92\ndescription: A real description here\n---\n\n## Directive\n\n(requires human review)\n",
+        )
         review = review_generated_skill(skill_path)
         assert review["valid"] is False
         assert any("placeholder" in i.lower() for i in review["issues"])
@@ -235,8 +239,8 @@ class TestReviewPlaceholder:
 # 6. Skill with low confidence fails review
 # ---------------------------------------------------------------------------
 
-class TestReviewLowConfidence:
 
+class TestReviewLowConfidence:
     def test_confidence_below_threshold_fails(self, tmp_path):
         skill_path = tmp_path / "SKILL.md"
         content = (
@@ -272,8 +276,8 @@ class TestReviewLowConfidence:
 # 7. Missing directive section fails review
 # ---------------------------------------------------------------------------
 
-class TestReviewMissingDirective:
 
+class TestReviewMissingDirective:
     def test_missing_directive_section_fails(self, tmp_path):
         skill_path = tmp_path / "SKILL.md"
         content = (
@@ -325,8 +329,8 @@ class TestReviewMissingDirective:
 # 8. Pipeline generates skills when GRADATA_ENABLE_SKILL_EXPORT set
 # ---------------------------------------------------------------------------
 
-class TestPipelineSkillExport:
 
+class TestPipelineSkillExport:
     def _make_lessons_md(self, rule_desc: str = "Always validate input at boundaries") -> str:
         return (
             f"[2026-01-01] [RULE:0.92] PROCESS: {rule_desc}\n"

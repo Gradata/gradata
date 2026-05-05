@@ -139,9 +139,7 @@ class TestExportSkill:
         text = export_skill(tmp_path, name="demo", description=r"line1\nline2")
         assert r'description: "line1\\nline2"' in text
 
-    def test_whitespace_only_description_falls_back_to_auto(
-        self, tmp_path: Path
-    ) -> None:
+    def test_whitespace_only_description_falls_back_to_auto(self, tmp_path: Path) -> None:
         _write_lessons(tmp_path, SAMPLE_LESSONS)
         text = export_skill(tmp_path, name="demo", description="   \t\n  ")
         # Auto description must not be empty and must not be just whitespace.

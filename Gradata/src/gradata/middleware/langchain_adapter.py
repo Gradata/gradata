@@ -37,6 +37,7 @@ from gradata.middleware._core import (
 
 try:
     from langchain_core.callbacks import BaseCallbackHandler as _BaseCallbackHandler
+
     _LANGCHAIN_AVAILABLE = True
 except ImportError:
     _BaseCallbackHandler = object  # type: ignore[assignment,misc]

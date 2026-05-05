@@ -41,6 +41,7 @@ pytestmark = pytest.mark.dualwrite
 # Helpers — kill-9 simulation via subprocess so we can pull the plug mid-write
 # ---------------------------------------------------------------------------
 
+
 def _spawn_writer(brain_dir: Path, n_events: int, kill_after: int | None = None) -> int:
     """Spawn a child process that writes n_events to a fresh Brain.
 
@@ -57,9 +58,9 @@ for i in range({n_events}):
     b.observe(f'lesson-{{i}}', kind='correction')
     time.sleep(0.01)
 """
-    p = subprocess.Popen([sys.executable, '-c', code])
+    p = subprocess.Popen([sys.executable, "-c", code])
     if kill_after is not None:
-        jsonl = brain_dir / 'events.jsonl'
+        jsonl = brain_dir / "events.jsonl"
         deadline = time.time() + 10.0
         while time.time() < deadline:
             if jsonl.exists() and sum(1 for _ in jsonl.open()) >= kill_after:
@@ -71,19 +72,20 @@ for i in range({n_events}):
 
 
 def _count_jsonl(brain_dir: Path) -> int:
-    p = brain_dir / 'events.jsonl'
+    p = brain_dir / "events.jsonl"
     return sum(1 for _ in p.open()) if p.exists() else 0
 
 
 def _count_sqlite_events(brain_dir: Path) -> int:
     """Count rows in the events table of system.db. Tolerant to schema drift."""
     import sqlite3
-    db = brain_dir / 'system.db'
+
+    db = brain_dir / "system.db"
     if not db.exists():
         return 0
     conn = sqlite3.connect(str(db))
     try:
-        for table in ('events', 'event_log', 'lessons'):
+        for table in ("events", "event_log", "lessons"):
             try:
                 cur = conn.execute(f"SELECT COUNT(*) FROM {table}")
                 return cur.fetchone()[0]
@@ -98,13 +100,15 @@ def _count_sqlite_events(brain_dir: Path) -> int:
 # Tests
 # ---------------------------------------------------------------------------
 
+
 def test_dualwrite_jsonl_first_then_sqlite(tmp_path, monkeypatch):
     """Happy path. Both stores agree after a normal write batch."""
-    monkeypatch.setenv('BRAIN_DIR', str(tmp_path))
+    monkeypatch.setenv("BRAIN_DIR", str(tmp_path))
     from gradata import Brain
+
     b = Brain()
     for i in range(10):
-        b.observe(f'lesson-{i}', kind='correction')
+        b.observe(f"lesson-{i}", kind="correction")
     assert _count_jsonl(tmp_path) == _count_sqlite_events(tmp_path) == 10
 
 
@@ -126,20 +130,24 @@ def test_reconcile_replays_missing_sqlite_rows(tmp_path):
         pytest.skip("no drift to reconcile — try a more aggressive kill-after")
 
     # Trigger reconcile — either via Brain.__init__ auto-replay or doctor CLI
-    os.environ['BRAIN_DIR'] = str(tmp_path)
+    os.environ["BRAIN_DIR"] = str(tmp_path)
     from gradata import Brain
+
     Brain()  # should auto-replay on init
 
-    assert _count_sqlite_events(tmp_path) == j_before, "reconcile failed to replay JSONL into SQLite"
+    assert _count_sqlite_events(tmp_path) == j_before, (
+        "reconcile failed to replay JSONL into SQLite"
+    )
 
 
 def test_reconcile_idempotent(tmp_path, monkeypatch):
     """Running reconcile twice produces the same state."""
-    monkeypatch.setenv('BRAIN_DIR', str(tmp_path))
+    monkeypatch.setenv("BRAIN_DIR", str(tmp_path))
     from gradata import Brain
+
     b = Brain()
     for i in range(5):
-        b.observe(f'lesson-{i}', kind='correction')
+        b.observe(f"lesson-{i}", kind="correction")
     snapshot1 = (_count_jsonl(tmp_path), _count_sqlite_events(tmp_path))
     Brain()  # reopen → reconcile pass
     snapshot2 = (_count_jsonl(tmp_path), _count_sqlite_events(tmp_path))
@@ -157,35 +165,50 @@ def test_doctor_reconcile_reports_drift(tmp_path):
     if drift <= 0:
         pytest.skip("no drift — fixture didn't crash mid-write")
 
-    env = {**os.environ, 'BRAIN_DIR': str(tmp_path)}
+    env = {**os.environ, "BRAIN_DIR": str(tmp_path)}
     r = subprocess.run(
-        [sys.executable, '-m', 'gradata.cli', 'doctor', '--reconcile'],
-        capture_output=True, text=True, env=env, timeout=30,
+        [sys.executable, "-m", "gradata.cli", "doctor", "--reconcile"],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=30,
     )
     assert r.returncode == 0, f"doctor --reconcile failed: {r.stderr}"
-    assert 'reconcil' in (r.stdout + r.stderr).lower()
+    assert "reconcil" in (r.stdout + r.stderr).lower()
     assert _count_sqlite_events(tmp_path) == j_before
 
 
 def test_concurrent_writers_serialize(tmp_path):
     """Two writers should not produce interleaved partial events in JSONL."""
-    p1 = subprocess.Popen([sys.executable, '-c', f"""
+    p1 = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            f"""
 import os; os.environ['BRAIN_DIR'] = {str(tmp_path)!r}
 from gradata import Brain
 b = Brain()
 for i in range(20): b.observe(f'A-{{i}}', kind='correction')
-"""])
-    p2 = subprocess.Popen([sys.executable, '-c', f"""
+""",
+        ]
+    )
+    p2 = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            f"""
 import os; os.environ['BRAIN_DIR'] = {str(tmp_path)!r}
 from gradata import Brain
 b = Brain()
 for i in range(20): b.observe(f'B-{{i}}', kind='correction')
-"""])
+""",
+        ]
+    )
     p1.wait()
     p2.wait()
 
     # Every line in events.jsonl must be a complete JSON object
-    jsonl = tmp_path / 'events.jsonl'
+    jsonl = tmp_path / "events.jsonl"
     with jsonl.open() as f:
         for ln, line in enumerate(f, 1):
             try:
@@ -193,5 +216,6 @@ for i in range(20): b.observe(f'B-{{i}}', kind='correction')
             except json.JSONDecodeError as e:
                 pytest.fail(f"corrupted line {ln}: {e}")
 
-    assert _count_jsonl(tmp_path) == _count_sqlite_events(tmp_path), \
+    assert _count_jsonl(tmp_path) == _count_sqlite_events(tmp_path), (
         "concurrent writers desynced jsonl/sqlite"
+    )

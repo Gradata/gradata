@@ -28,13 +28,13 @@ class GraduatedRule:
     """A rule that has graduated through the learning pipeline."""
 
     rule_id: str
-    category: str          # TONE, DRAFTING, SECURITY, PROCESS, etc.
-    principle: str         # The rule text
-    confidence: float      # 0.60+ for PATTERN, 0.90+ for RULE
+    category: str  # TONE, DRAFTING, SECURITY, PROCESS, etc.
+    principle: str  # The rule text
+    confidence: float  # 0.60+ for PATTERN, 0.90+ for RULE
     scope: dict = field(default_factory=dict)  # task_type, agent_type, audience, etc.
     source_type: str = "lesson"  # "lesson", "meta_rule", "distilled"
-    tags: tuple[str, ...] = ()   # Freeform tags for pattern matching
-    agent_type: str = ""         # Scoped to specific agent (empty = universal)
+    tags: tuple[str, ...] = ()  # Freeform tags for pattern matching
+    agent_type: str = ""  # Scoped to specific agent (empty = universal)
 
     @property
     def is_rule_tier(self) -> bool:
@@ -164,20 +164,21 @@ class RuleContext:
     def for_guardrails(self) -> list[GraduatedRule]:
         """Rules that should become guardrail checks (SECURITY, ACCURACY, SAFETY)."""
         guard_categories = {"SECURITY", "ACCURACY", "SAFETY", "HONESTY", "DATA_INTEGRITY"}
-        return [r for r in self.query(min_confidence=0.60, limit=20)
-                if r.category in guard_categories]
+        return [
+            r for r in self.query(min_confidence=0.60, limit=20) if r.category in guard_categories
+        ]
 
     def for_evaluator(self, task_type: str = "") -> list[GraduatedRule]:
         """Rules that should become evaluation dimensions (DRAFTING, STYLE, FORMAT)."""
         eval_categories = {"DRAFTING", "STYLE", "FORMAT", "TONE", "CONTENT", "STRUCTURE"}
-        rules = [r for r in self.query(min_confidence=0.60, limit=20)
-                 if r.category in eval_categories]
+        rules = [
+            r for r in self.query(min_confidence=0.60, limit=20) if r.category in eval_categories
+        ]
         if task_type:
             scoped = [r for r in rules if r.scope.get("task_type") == task_type]
             universal = [r for r in rules if not r.scope.get("task_type")]
             return (scoped + universal)[:10]
         return rules[:10]
-
 
     def for_agent(self, agent_type: str) -> list[GraduatedRule]:
         """Rules scoped to a specific agent type."""
@@ -203,10 +204,13 @@ class RuleContext:
             "total_rules": len(rules),
             "rule_tier": sum(1 for r in rules if r.is_rule_tier),
             "pattern_tier": sum(1 for r in rules if r.is_pattern_tier),
-            "categories": dict(sorted(
-                {k: len(v) for k, v in self._by_category.items()}.items(),
-                key=lambda x: x[1], reverse=True
-            )),
+            "categories": dict(
+                sorted(
+                    {k: len(v) for k, v in self._by_category.items()}.items(),
+                    key=lambda x: x[1],
+                    reverse=True,
+                )
+            ),
             "agents": list(self._by_agent.keys()),
         }
 

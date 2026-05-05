@@ -1,4 +1,5 @@
 """Tests for the consolidated PostToolUse dispatcher."""
+
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -49,6 +50,7 @@ def test_bash_routes_to_correct_handlers():
 def test_results_merged_with_concatenated_strings():
     """When multiple handlers return results, ``result`` strings concatenate
     (newline-joined) and other fields are merged."""
+
     def fake_invoke(name: str, data: dict) -> dict | None:
         if name == "auto_correct":
             return {"result": "captured", "severity": "minor"}
@@ -68,6 +70,7 @@ def test_results_merged_with_concatenated_strings():
 
 def test_handler_exception_does_not_block_others():
     """A failing handler must not prevent later handlers from running."""
+
     def fake_invoke(name: str, data: dict) -> dict | None:
         if name == "auto_correct":
             raise RuntimeError("boom")  # _invoke catches this internally

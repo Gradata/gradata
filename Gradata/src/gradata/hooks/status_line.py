@@ -17,6 +17,7 @@ Cheap enough to run on every status-line refresh (single DB query + one
 file read). Silent-fails to a minimal fallback so a broken brain never
 wedges the status bar.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -39,8 +40,7 @@ def _current_session(db_path: Path) -> int:
     try:
         with contextlib.closing(sqlite3.connect(str(db_path))) as conn:
             row = conn.execute(
-                "SELECT MAX(CAST(session AS INTEGER)) FROM events "
-                "WHERE session IS NOT NULL"
+                "SELECT MAX(CAST(session AS INTEGER)) FROM events WHERE session IS NOT NULL"
             ).fetchone()
             if row and row[0] is not None:
                 return int(row[0])

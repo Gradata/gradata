@@ -18,6 +18,7 @@ Flow:
     5. Run bootstrap steps from manifest
     6. Print activation instructions
 """
+
 from __future__ import annotations
 
 import json
@@ -102,6 +103,7 @@ def _run_bootstrap(target_dir: Path, manifest: dict) -> list[dict]:
     # Allowlist: only permit safe commands (python, uv) — no arbitrary shell execution
     import re as _re
     import shlex as _shlex
+
     _ALLOWED_CMD = _re.compile(r"^(python3?|uv|pip)\s+[\w\s./\-]+$")
 
     for step in bootstrap:
@@ -115,10 +117,13 @@ def _run_bootstrap(target_dir: Path, manifest: dict) -> list[dict]:
 
         # Security: reject commands not in allowlist
         if not _ALLOWED_CMD.match(command):
-            results.append({
-                "step": name, "status": "blocked",
-                "note": f"Command not in allowlist: {command[:80]}",
-            })
+            results.append(
+                {
+                    "step": name,
+                    "status": "blocked",
+                    "note": f"Command not in allowlist: {command[:80]}",
+                }
+            )
             continue
 
         # Run from target directory — NO shell=True
@@ -137,11 +142,13 @@ def _run_bootstrap(target_dir: Path, manifest: dict) -> list[dict]:
                 results.append({"step": name, "status": "ok"})
             else:
                 status = "FAIL" if required else "warn"
-                results.append({
-                    "step": name,
-                    "status": status,
-                    "error": result.stderr[:200] if result.stderr else "non-zero exit",
-                })
+                results.append(
+                    {
+                        "step": name,
+                        "status": status,
+                        "error": result.stderr[:200] if result.stderr else "non-zero exit",
+                    }
+                )
         except subprocess.TimeoutExpired:
             results.append({"step": name, "status": "timeout"})
         except Exception as e:
@@ -167,20 +174,24 @@ def list_installed() -> list[dict]:
         if meta_file.exists():
             try:
                 meta = json.loads(meta_file.read_text(encoding="utf-8"))
-                info.update({
-                    "version": meta.get("brain_version"),
-                    "domain": meta.get("domain"),
-                    "installed": meta.get("installed_at", "?")[:10],
-                })
+                info.update(
+                    {
+                        "version": meta.get("brain_version"),
+                        "domain": meta.get("domain"),
+                        "installed": meta.get("installed_at", "?")[:10],
+                    }
+                )
             except Exception:
                 pass
         elif manifest_file.exists():
             try:
                 manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
-                info.update({
-                    "version": manifest.get("metadata", {}).get("brain_version"),
-                    "domain": manifest.get("metadata", {}).get("domain"),
-                })
+                info.update(
+                    {
+                        "version": manifest.get("metadata", {}).get("brain_version"),
+                        "domain": manifest.get("metadata", {}).get("domain"),
+                    }
+                )
             except Exception:
                 pass
 

@@ -29,10 +29,11 @@ if TYPE_CHECKING:
 @dataclass
 class EditClassification:
     """A single classified edit from a diff."""
-    category: str       # TONE | CONTENT | STRUCTURE | FACTUAL | STYLE
-    confidence: float   # 0.0-1.0
-    severity: str       # inherited from DiffResult.severity
-    description: str    # human-readable summary
+
+    category: str  # TONE | CONTENT | STRUCTURE | FACTUAL | STYLE
+    confidence: float  # 0.0-1.0
+    severity: str  # inherited from DiffResult.severity
+    description: str  # human-readable summary
 
 
 # ---------------------------------------------------------------------------
@@ -42,40 +43,112 @@ class EditClassification:
 # _FACTUAL_RE and _STOP_WORDS imported from gradata._text_utils above.
 
 _TONE_WORDS = {
-    "actually", "just", "really", "basically", "honestly",
-    "perhaps", "maybe", "possibly", "might", "could",
-    "I think", "I believe", "I feel", "in my opinion",
-    "very", "extremely", "quite", "rather", "somewhat",
-    "sorry", "unfortunately", "please", "kindly",
+    "actually",
+    "just",
+    "really",
+    "basically",
+    "honestly",
+    "perhaps",
+    "maybe",
+    "possibly",
+    "might",
+    "could",
+    "I think",
+    "I believe",
+    "I feel",
+    "in my opinion",
+    "very",
+    "extremely",
+    "quite",
+    "rather",
+    "somewhat",
+    "sorry",
+    "unfortunately",
+    "please",
+    "kindly",
 }
 
 # Formality markers: presence in old but not new = casualized, vice versa = formalized
 _FORMAL_MARKERS = {
-    "dear", "sir", "madam", "hereby", "pursuant", "kindly", "henceforth",
-    "sincerely", "regards", "esteemed", "valued", "cordially", "formally",
-    "respectively", "herewith", "aforementioned", "earliest convenience",
-    "we would be delighted", "we are pleased", "we appreciate your",
-    "it is my pleasure", "do not hesitate",
+    "dear",
+    "sir",
+    "madam",
+    "hereby",
+    "pursuant",
+    "kindly",
+    "henceforth",
+    "sincerely",
+    "regards",
+    "esteemed",
+    "valued",
+    "cordially",
+    "formally",
+    "respectively",
+    "herewith",
+    "aforementioned",
+    "earliest convenience",
+    "we would be delighted",
+    "we are pleased",
+    "we appreciate your",
+    "it is my pleasure",
+    "do not hesitate",
 }
 _CASUAL_MARKERS = {
-    "hey", "hi", "yo", "quick", "btw", "fyi", "gonna", "wanna",
-    "cool", "awesome", "nice", "thanks", "cheers", "lol", "asap",
-    "hop on", "chat", "catch up", "touch base", "ping",
+    "hey",
+    "hi",
+    "yo",
+    "quick",
+    "btw",
+    "fyi",
+    "gonna",
+    "wanna",
+    "cool",
+    "awesome",
+    "nice",
+    "thanks",
+    "cheers",
+    "lol",
+    "asap",
+    "hop on",
+    "chat",
+    "catch up",
+    "touch base",
+    "ping",
 }
 
 # Process/behavioral correction markers
 _PROCESS_WORDS = {
-    "first", "before", "after", "then", "always", "never", "must",
-    "step", "workflow", "process", "checklist", "gate", "verify",
-    "plan", "review", "approve", "check", "validate", "research",
-    "pull", "extract", "transcript", "adversary", "audit",
-    "pipeline", "sequence", "order", "prerequisite",
+    "first",
+    "before",
+    "after",
+    "then",
+    "always",
+    "never",
+    "must",
+    "step",
+    "workflow",
+    "process",
+    "checklist",
+    "gate",
+    "verify",
+    "plan",
+    "review",
+    "approve",
+    "check",
+    "validate",
+    "research",
+    "pull",
+    "extract",
+    "transcript",
+    "adversary",
+    "audit",
+    "pipeline",
+    "sequence",
+    "order",
+    "prerequisite",
 }
 
-_STRUCTURE_MARKERS = re.compile(
-    r"^(\s*[-*+]\s|\s*\d+[.)]\s|\s*#{1,6}\s|</?[a-z])", re.MULTILINE
-)
-
+_STRUCTURE_MARKERS = re.compile(r"^(\s*[-*+]\s|\s*\d+[.)]\s|\s*#{1,6}\s|</?[a-z])", re.MULTILINE)
 
 
 def _word_set(text: str) -> set[str]:
@@ -87,7 +160,8 @@ def _meaningful_words(words: set[str]) -> list[str]:
     """Filter to meaningful words (no stop words), sorted by length desc."""
     return sorted(
         (w for w in words if w not in _STOP_WORDS and len(w) > 2),
-        key=len, reverse=True,
+        key=len,
+        reverse=True,
     )
 
 
@@ -104,72 +178,82 @@ def _classify_section(old_text: str, new_text: str, severity: str) -> list[EditC
     new_facts = set(_FACTUAL_RE.findall(new_text))
     if old_facts != new_facts and (old_facts or new_facts):
         changed = (old_facts - new_facts) | (new_facts - old_facts)
-        results.append(EditClassification(
-            category="FACTUAL",
-            confidence=0.85,
-            severity=severity,
-            description=f"Changed factual content: {', '.join(list(changed)[:3])}",
-        ))
+        results.append(
+            EditClassification(
+                category="FACTUAL",
+                confidence=0.85,
+                severity=severity,
+                description=f"Changed factual content: {', '.join(list(changed)[:3])}",
+            )
+        )
 
     # STYLE: mostly punctuation/formatting changes
     word_diff = len(old_words.symmetric_difference(new_words))
     char_diff = sum(1 for a, b in zip(old_text, new_text, strict=False) if a != b)
     is_punctuation_heavy = (
-        word_diff <= 2
-        and char_diff > 0
-        and char_diff <= max(5, len(old_text) * 0.15)
+        word_diff <= 2 and char_diff > 0 and char_diff <= max(5, len(old_text) * 0.15)
     )
     if is_punctuation_heavy:
-        results.append(EditClassification(
-            category="STYLE",
-            confidence=0.75,
-            severity=severity,
-            description="Punctuation or formatting change",
-        ))
+        results.append(
+            EditClassification(
+                category="STYLE",
+                confidence=0.75,
+                severity=severity,
+                description="Punctuation or formatting change",
+            )
+        )
 
     # STRUCTURE: same words but different arrangement
     if old_words == new_words and old_text.strip() != new_text.strip():
-        results.append(EditClassification(
-            category="STRUCTURE",
-            confidence=0.80,
-            severity=severity,
-            description="Content reordered or reformatted",
-        ))
+        results.append(
+            EditClassification(
+                category="STRUCTURE",
+                confidence=0.80,
+                severity=severity,
+                description="Content reordered or reformatted",
+            )
+        )
 
     # STRUCTURE: heading/list markers changed
     old_markers = len(_STRUCTURE_MARKERS.findall(old_text))
     new_markers = len(_STRUCTURE_MARKERS.findall(new_text))
     if abs(old_markers - new_markers) >= 2:
-        results.append(EditClassification(
-            category="STRUCTURE",
-            confidence=0.70,
-            severity=severity,
-            description="List or heading structure changed",
-        ))
+        results.append(
+            EditClassification(
+                category="STRUCTURE",
+                confidence=0.70,
+                severity=severity,
+                description="List or heading structure changed",
+            )
+        )
 
     # PROCESS: behavioral/workflow corrections
     process_in_new = sum(1 for w in _PROCESS_WORDS if w in new_words and w not in old_words)
     process_in_old = sum(1 for w in _PROCESS_WORDS if w in old_words and w not in new_words)
     if process_in_new >= 2 or (process_in_new >= 1 and process_in_old == 0):
         added_process = [w for w in _PROCESS_WORDS if w in new_words and w not in old_words]
-        results.append(EditClassification(
-            category="PROCESS",
-            confidence=0.75,
-            severity=severity,
-            description=f"Behavioral/process correction (added: {', '.join(list(added_process)[:4])})",
-        ))
+        results.append(
+            EditClassification(
+                category="PROCESS",
+                confidence=0.75,
+                severity=severity,
+                description=f"Behavioral/process correction (added: {', '.join(list(added_process)[:4])})",
+            )
+        )
 
     # TONE: hedging/formality words added or removed
     tone_added = sum(1 for w in _TONE_WORDS if w in new_lower and w not in old_lower)
     tone_removed = sum(1 for w in _TONE_WORDS if w in old_lower and w not in new_lower)
     if tone_added + tone_removed >= 2:
         direction = "softened" if tone_added > tone_removed else "strengthened"
-        results.append(EditClassification(
-            category="TONE",
-            confidence=0.70,
-            severity=severity,
-            description=f"Tone {direction} ({tone_added} added, {tone_removed} removed)",
-        ))
+        results.append(
+            EditClassification(
+                category="TONE",
+                confidence=0.70,
+                severity=severity,
+                description=f"Tone {direction} ({tone_added} added, {tone_removed} removed)",
+            )
+        )
 
     # TONE: formality shift (formal→casual or casual→formal)
     formal_in_old = sum(1 for m in _FORMAL_MARKERS if m in old_lower)
@@ -179,12 +263,14 @@ def _classify_section(old_text: str, new_text: str, severity: str) -> list[EditC
     formality_shift = (formal_in_old - formal_in_new) + (casual_in_new - casual_in_old)
     if abs(formality_shift) >= 1:
         direction = "casualized" if formality_shift > 0 else "formalized"
-        results.append(EditClassification(
-            category="TONE",
-            confidence=0.80,
-            severity=severity,
-            description=f"Tone {direction} (formality shift: {formality_shift:+d})",
-        ))
+        results.append(
+            EditClassification(
+                category="TONE",
+                confidence=0.80,
+                severity=severity,
+                description=f"Tone {direction} (formality shift: {formality_shift:+d})",
+            )
+        )
 
     # CONTENT: always check for substantive word changes
     added = new_words - old_words
@@ -197,21 +283,25 @@ def _classify_section(old_text: str, new_text: str, severity: str) -> list[EditC
             desc_parts.append(f"cut: {', '.join(removed_meaningful[:5])}")
         if added_meaningful:
             desc_parts.append(f"added: {', '.join(added_meaningful[:5])}")
-        results.append(EditClassification(
-            category="CONTENT",
-            confidence=0.60,
-            severity=severity,
-            description=f"Content change ({'; '.join(desc_parts)})",
-        ))
+        results.append(
+            EditClassification(
+                category="CONTENT",
+                confidence=0.60,
+                severity=severity,
+                description=f"Content change ({'; '.join(desc_parts)})",
+            )
+        )
 
     # Fallback: if nothing matched, still return a CONTENT classification
     if not results:
-        results.append(EditClassification(
-            category="CONTENT",
-            confidence=0.50,
-            severity=severity,
-            description="Content change (modified)",
-        ))
+        results.append(
+            EditClassification(
+                category="CONTENT",
+                confidence=0.50,
+                severity=severity,
+                description="Content change (modified)",
+            )
+        )
 
     return results
 
@@ -232,11 +322,13 @@ def classify_edits(diff: DiffResult) -> list[EditClassification]:
 
     results: list[EditClassification] = []
     for section in diff.changed_sections:
-        results.extend(_classify_section(
-            section.old_text,
-            section.new_text,
-            diff.severity,
-        ))
+        results.extend(
+            _classify_section(
+                section.old_text,
+                section.new_text,
+                diff.severity,
+            )
+        )
     return results
 
 
@@ -270,8 +362,7 @@ def summarize_edits(classifications: list[EditClassification]) -> str:
         counts[c.category] += 1
         severities[c.category] = c.severity
     fallback_parts = [
-        f"{count} {cat} ({severities.get(cat, 'unknown')})"
-        for cat, count in counts.most_common()
+        f"{count} {cat} ({severities.get(cat, 'unknown')})" for cat, count in counts.most_common()
     ]
     total = sum(counts.values())
     return f"{total} edit{'s' if total != 1 else ''}: {', '.join(fallback_parts)}"
@@ -431,15 +522,18 @@ def _get_llm_provider():
     global _provider_instance
     if _provider_instance is None:
         from gradata.enhancements.llm_provider import get_provider
+
         _provider_instance = get_provider()
     return _provider_instance
 
 
 def _call_llm_for_instruction(
-    diff: DiffResult, classification: EditClassification,
+    diff: DiffResult,
+    classification: EditClassification,
 ) -> str | None:
     """Call LLM to extract a behavioral instruction. Returns None on any failure."""
     import logging
+
     _log = logging.getLogger("gradata")
 
     old_text = ""
@@ -460,6 +554,8 @@ def _call_llm_for_instruction(
 
     try:
         provider = _get_llm_provider()
+        if provider is None:
+            return None
         text = provider.complete(prompt, max_tokens=100, timeout=_EXTRACTION_TIMEOUT)
         if text and 5 < len(text) < 200:
             return text

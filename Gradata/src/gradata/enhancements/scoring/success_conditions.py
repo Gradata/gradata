@@ -58,7 +58,8 @@ class SuccessReport:
 def _get_session_metrics(conn: sqlite3.Connection, window: int) -> list[dict]:
     """Get per-session metric summaries from events."""
     try:
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT session,
                    SUM(CASE WHEN type='OUTPUT' THEN 1 ELSE 0 END) as outputs,
                    SUM(CASE WHEN type='CORRECTION' THEN 1 ELSE 0 END) as corrections,
@@ -68,7 +69,9 @@ def _get_session_metrics(conn: sqlite3.Connection, window: int) -> list[dict]:
             GROUP BY session
             ORDER BY session DESC
             LIMIT ?
-        """, (window,)).fetchall()
+        """,
+            (window,),
+        ).fetchall()
     except sqlite3.OperationalError:
         return []
 
@@ -111,29 +114,37 @@ def evaluate_success_conditions(db_path: Path, window: int = 20) -> SuccessRepor
 
         if n < 4:
             return SuccessReport(
-                conditions=[ConditionResult(
-                    name="insufficient_data", met=False,
-                    current_value=float(n), baseline_value=4.0,
-                    trend="n/a", detail=f"Need 4+ sessions, have {n}",
-                )],
-                all_met=False, sessions_evaluated=n, window_size=window,
+                conditions=[
+                    ConditionResult(
+                        name="insufficient_data",
+                        met=False,
+                        current_value=float(n),
+                        baseline_value=4.0,
+                        trend="n/a",
+                        detail=f"Need 4+ sessions, have {n}",
+                    )
+                ],
+                all_met=False,
+                sessions_evaluated=n,
+                window_size=window,
             )
 
         # 1. Correction rate decreases (rewrite rate proxy)
         correction_rates = [
-            m["corrections"] / m["outputs"] if m["outputs"] > 0 else 0.0
-            for m in metrics
+            m["corrections"] / m["outputs"] if m["outputs"] > 0 else 0.0 for m in metrics
         ]
         baseline_cr, current_cr = _split_halves(correction_rates)
         cr_improving = current_cr <= baseline_cr
-        conditions.append(ConditionResult(
-            name="correction_rate_decreases",
-            met=cr_improving,
-            current_value=round(current_cr, 4),
-            baseline_value=round(baseline_cr, 4),
-            trend="improving" if cr_improving else "degrading",
-            detail=f"Correction rate: {baseline_cr:.1%} -> {current_cr:.1%}",
-        ))
+        conditions.append(
+            ConditionResult(
+                name="correction_rate_decreases",
+                met=cr_improving,
+                current_value=round(current_cr, 4),
+                baseline_value=round(baseline_cr, 4),
+                trend="improving" if cr_improving else "degrading",
+                detail=f"Correction rate: {baseline_cr:.1%} -> {current_cr:.1%}",
+            )
+        )
 
         # 2. Edit distance decreases (from CORRECTION events)
         try:
@@ -147,14 +158,16 @@ def evaluate_success_conditions(db_path: Path, window: int = 20) -> SuccessRepor
                 ed_values = [r[1] for r in ed_rows if r[1] is not None]
                 baseline_ed, current_ed = _split_halves(ed_values)
                 ed_improving = current_ed <= baseline_ed
-                conditions.append(ConditionResult(
-                    name="edit_distance_decreases",
-                    met=ed_improving,
-                    current_value=round(current_ed, 4),
-                    baseline_value=round(baseline_ed, 4),
-                    trend="improving" if ed_improving else "degrading",
-                    detail=f"Avg edit distance: {baseline_ed:.2f} -> {current_ed:.2f}",
-                ))
+                conditions.append(
+                    ConditionResult(
+                        name="edit_distance_decreases",
+                        met=ed_improving,
+                        current_value=round(current_ed, 4),
+                        baseline_value=round(baseline_ed, 4),
+                        trend="improving" if ed_improving else "degrading",
+                        detail=f"Avg edit distance: {baseline_ed:.2f} -> {current_ed:.2f}",
+                    )
+                )
         except sqlite3.OperationalError:
             pass
 
@@ -173,14 +186,16 @@ def evaluate_success_conditions(db_path: Path, window: int = 20) -> SuccessRepor
                 fda_values = [r[1] for r in fda_rows if r[1] is not None]
                 baseline_fda, current_fda = _split_halves(fda_values)
                 fda_improving = current_fda >= baseline_fda
-                conditions.append(ConditionResult(
-                    name="acceptance_rate_increases",
-                    met=fda_improving,
-                    current_value=round(current_fda, 4),
-                    baseline_value=round(baseline_fda, 4),
-                    trend="improving" if fda_improving else "degrading",
-                    detail=f"First-draft acceptance: {baseline_fda:.1%} -> {current_fda:.1%}",
-                ))
+                conditions.append(
+                    ConditionResult(
+                        name="acceptance_rate_increases",
+                        met=fda_improving,
+                        current_value=round(current_fda, 4),
+                        baseline_value=round(baseline_fda, 4),
+                        trend="improving" if fda_improving else "degrading",
+                        detail=f"First-draft acceptance: {baseline_fda:.1%} -> {current_fda:.1%}",
+                    )
+                )
         except sqlite3.OperationalError:
             pass
 
@@ -197,14 +212,16 @@ def evaluate_success_conditions(db_path: Path, window: int = 20) -> SuccessRepor
                 rule_values = [r[1] for r in rule_rows if r[1] is not None]
                 baseline_rs, current_rs = _split_halves(rule_values)
                 rs_improving = current_rs >= baseline_rs
-                conditions.append(ConditionResult(
-                    name="rule_success_increases",
-                    met=rs_improving,
-                    current_value=round(current_rs, 4),
-                    baseline_value=round(baseline_rs, 4),
-                    trend="improving" if rs_improving else "degrading",
-                    detail=f"Rule success rate: {baseline_rs:.1%} -> {current_rs:.1%}",
-                ))
+                conditions.append(
+                    ConditionResult(
+                        name="rule_success_increases",
+                        met=rs_improving,
+                        current_value=round(current_rs, 4),
+                        baseline_value=round(baseline_rs, 4),
+                        trend="improving" if rs_improving else "degrading",
+                        detail=f"Rule success rate: {baseline_rs:.1%} -> {current_rs:.1%}",
+                    )
+                )
         except sqlite3.OperationalError:
             pass
 
@@ -221,32 +238,42 @@ def evaluate_success_conditions(db_path: Path, window: int = 20) -> SuccessRepor
                 mf_values = [r[1] for r in misfire_rows if r[1] is not None]
                 baseline_mf, current_mf = _split_halves(mf_values)
                 mf_ok = current_mf <= max(baseline_mf, 0.10)  # allow up to 10%
-                conditions.append(ConditionResult(
-                    name="misfires_stay_low",
-                    met=mf_ok,
-                    current_value=round(current_mf, 4),
-                    baseline_value=round(baseline_mf, 4),
-                    trend="stable" if abs(current_mf - baseline_mf) < 0.05 else
-                          ("improving" if current_mf < baseline_mf else "degrading"),
-                    detail=f"Misfire rate: {baseline_mf:.1%} -> {current_mf:.1%}",
-                ))
+                conditions.append(
+                    ConditionResult(
+                        name="misfires_stay_low",
+                        met=mf_ok,
+                        current_value=round(current_mf, 4),
+                        baseline_value=round(baseline_mf, 4),
+                        trend="stable"
+                        if abs(current_mf - baseline_mf) < 0.05
+                        else ("improving" if current_mf < baseline_mf else "degrading"),
+                        detail=f"Misfire rate: {baseline_mf:.1%} -> {current_mf:.1%}",
+                    )
+                )
         except sqlite3.OperationalError:
             pass
 
         # 6. Output not becoming bland (from metrics module)
         try:
             from gradata.enhancements.metrics import compute_metrics
+
             m = compute_metrics(db_path, window)
-            blandness = m.get("blandness_score", 0.0) if isinstance(m, dict) else getattr(m, "blandness_score", 0.0)
+            blandness = (
+                m.get("blandness_score", 0.0)
+                if isinstance(m, dict)
+                else getattr(m, "blandness_score", 0.0)
+            )
             bland_ok = blandness < 0.70
-            conditions.append(ConditionResult(
-                name="output_not_bland",
-                met=bland_ok,
-                current_value=round(blandness, 4),
-                baseline_value=0.70,
-                trend="varied" if bland_ok else "generic",
-                detail=f"Blandness: {blandness:.2f} (threshold: 0.70)",
-            ))
+            conditions.append(
+                ConditionResult(
+                    name="output_not_bland",
+                    met=bland_ok,
+                    current_value=round(blandness, 4),
+                    baseline_value=0.70,
+                    trend="varied" if bland_ok else "generic",
+                    detail=f"Blandness: {blandness:.2f} (threshold: 0.70)",
+                )
+            )
         except Exception:
             pass
 
@@ -275,9 +302,13 @@ def format_success_report(report: SuccessReport) -> str:
         lines.append(f"  [{icon}] {c.name}: {c.detail} ({c.trend})")
 
     if report.all_met:
-        lines.append("\nBrain is compounding. All success conditions from the Build Directive are met.")
+        lines.append(
+            "\nBrain is compounding. All success conditions from the Build Directive are met."
+        )
     else:
         failed = [c for c in report.conditions if not c.met]
-        lines.append(f"\n{len(failed)} condition(s) not met. Focus on: {', '.join(c.name for c in failed)}")
+        lines.append(
+            f"\n{len(failed)} condition(s) not met. Focus on: {', '.join(c.name for c in failed)}"
+        )
 
     return "\n".join(lines)

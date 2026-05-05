@@ -1,4 +1,5 @@
 """Tests for edit distance convergence tracking."""
+
 from __future__ import annotations
 
 import tempfile
@@ -17,10 +18,18 @@ def _make_brain(corrections: list[tuple[int, float]]) -> Brain:
     (Path(d) / "lessons.md").write_text("", encoding="utf-8")
     brain = Brain(d)
     for session, ed in corrections:
-        brain.emit("CORRECTION", "test", {
-            "category": "TEST", "severity": "minor",
-            "edit_distance": ed, "summary": "test correction",
-        }, [f"category:TEST"], session)
+        brain.emit(
+            "CORRECTION",
+            "test",
+            {
+                "category": "TEST",
+                "severity": "minor",
+                "edit_distance": ed,
+                "summary": "test correction",
+            },
+            ["category:TEST"],
+            session,
+        )
     return brain
 
 
@@ -39,11 +48,16 @@ def test_edit_distance_trend_improving():
     """Declining edit distances across sessions show 'improving' trend."""
     # 5 sessions with declining average edit distance
     corrections = [
-        (1, 0.8), (1, 0.7),
-        (2, 0.6), (2, 0.65),
-        (3, 0.5), (3, 0.45),
-        (4, 0.35), (4, 0.3),
-        (5, 0.2), (5, 0.15),
+        (1, 0.8),
+        (1, 0.7),
+        (2, 0.6),
+        (2, 0.65),
+        (3, 0.5),
+        (3, 0.45),
+        (4, 0.35),
+        (4, 0.3),
+        (5, 0.2),
+        (5, 0.15),
     ]
     brain = _make_brain(corrections)
     result = brain.convergence()
@@ -54,11 +68,16 @@ def test_edit_distance_trend_improving():
 def test_edit_distance_trend_worsening():
     """Increasing edit distances show 'worsening' trend."""
     corrections = [
-        (1, 0.1), (1, 0.15),
-        (2, 0.3), (2, 0.25),
-        (3, 0.4), (3, 0.45),
-        (4, 0.6), (4, 0.55),
-        (5, 0.7), (5, 0.75),
+        (1, 0.1),
+        (1, 0.15),
+        (2, 0.3),
+        (2, 0.25),
+        (3, 0.4),
+        (3, 0.45),
+        (4, 0.6),
+        (4, 0.55),
+        (5, 0.7),
+        (5, 0.75),
     ]
     brain = _make_brain(corrections)
     result = brain.convergence()

@@ -4,16 +4,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import patch
 
 from gradata.cloud.client import CloudClient
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_client(brain_dir: Path) -> CloudClient:
     client = CloudClient(brain_dir, api_key="gd_test", endpoint="https://api.gradata.ai/api/v1")
@@ -32,6 +30,7 @@ def _write_events(path: Path, events: list[dict]) -> None:
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 class TestSyncNoEvents:
     def test_no_events_file_returns_zero(self, tmp_path: Path):
@@ -168,4 +167,7 @@ class TestSyncEventIdDeterminism:
         """Different ts/type/source → different event_id."""
         ev_a = {"ts": "2026-01-01T10:00:00Z", "type": "CORRECTION", "source": "brain"}
         ev_b = {"ts": "2026-01-01T10:00:00Z", "type": "LESSON_FIRED", "source": "brain"}
-        assert CloudClient._format_event(ev_a)["event_id"] != CloudClient._format_event(ev_b)["event_id"]
+        assert (
+            CloudClient._format_event(ev_a)["event_id"]
+            != CloudClient._format_event(ev_b)["event_id"]
+        )

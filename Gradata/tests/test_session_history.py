@@ -1,4 +1,3 @@
-import pytest
 from gradata.services.session_history import SessionHistory
 
 

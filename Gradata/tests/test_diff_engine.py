@@ -72,8 +72,10 @@ def _fake_embedder(vectors: dict[str, list[float]]):
 
     Keeps tests fast and independent of sentence-transformers.
     """
+
     def _embed(texts):
         return [vectors.get(t, [0.0, 0.0, 0.0]) for t in texts]
+
     return _embed
 
 
@@ -84,30 +86,36 @@ class TestComputeSemanticDistance:
         assert d == 0.0
 
     def test_orthogonal_vectors_unit_distance(self):
-        embedder = _fake_embedder({
-            "a": [1.0, 0.0, 0.0],
-            "b": [0.0, 1.0, 0.0],
-        })
+        embedder = _fake_embedder(
+            {
+                "a": [1.0, 0.0, 0.0],
+                "b": [0.0, 1.0, 0.0],
+            }
+        )
         d = compute_semantic_distance("a", "b", embedder=embedder)
         assert d is not None
         assert abs(d - 1.0) < 1e-6
 
     def test_opposite_vectors_clamped_to_one(self):
-        embedder = _fake_embedder({
-            "x": [1.0, 0.0, 0.0],
-            "y": [-1.0, 0.0, 0.0],
-        })
+        embedder = _fake_embedder(
+            {
+                "x": [1.0, 0.0, 0.0],
+                "y": [-1.0, 0.0, 0.0],
+            }
+        )
         d = compute_semantic_distance("x", "y", embedder=embedder)
         assert d == 1.0  # cos_dist=2.0 clamped to 1.0
 
     def test_polarity_flip_vs_morphology(self):
         """The motivating case: 'helpful' -> 'unhelpful' should yield higher
         semantic distance than 'helpful' -> 'helpfully'."""
-        embedder = _fake_embedder({
-            "helpful": [1.0, 0.0, 0.0],
-            "helpfully": [0.98, 0.2, 0.0],     # near-identical meaning
-            "unhelpful": [-0.95, 0.1, 0.0],    # flipped
-        })
+        embedder = _fake_embedder(
+            {
+                "helpful": [1.0, 0.0, 0.0],
+                "helpfully": [0.98, 0.2, 0.0],  # near-identical meaning
+                "unhelpful": [-0.95, 0.1, 0.0],  # flipped
+            }
+        )
         morph = compute_semantic_distance("helpful", "helpfully", embedder=embedder)
         flip = compute_semantic_distance("helpful", "unhelpful", embedder=embedder)
         assert morph is not None and flip is not None
@@ -116,6 +124,7 @@ class TestComputeSemanticDistance:
     def test_no_embedder_returns_none_when_unavailable(self, monkeypatch):
         """If sentence-transformers isn't importable, returns None."""
         import gradata.enhancements.diff_engine as de
+
         # Force the lazy loader to believe the dep is missing.
         monkeypatch.setattr(de, "_default_embedder_cache", None, raising=False)
         monkeypatch.setattr(de, "_default_embedder_unavailable", True, raising=False)
@@ -145,8 +154,10 @@ class TestCombineDistances:
 
     def test_weights_configurable(self):
         blended = combine_distances(
-            1.0, 0.0,
-            surface_weight=0.5, semantic_weight=0.5,
+            1.0,
+            0.0,
+            surface_weight=0.5,
+            semantic_weight=0.5,
         )
         assert abs(blended - 0.5) < 1e-6
 
@@ -163,10 +174,12 @@ class TestComputeDiffWithSemantic:
         assert r.severity in ("as-is", "minor", "moderate", "major", "discarded")
 
     def test_use_semantic_with_injected_embedder(self):
-        embedder = _fake_embedder({
-            "hello": [1.0, 0.0, 0.0],
-            "hello world": [0.9, 0.2, 0.0],
-        })
+        embedder = _fake_embedder(
+            {
+                "hello": [1.0, 0.0, 0.0],
+                "hello world": [0.9, 0.2, 0.0],
+            }
+        )
         r = compute_diff("hello", "hello world", embedder=embedder)
         assert r.semantic_distance is not None
         assert r.blended_distance is not None
@@ -176,19 +189,27 @@ class TestComputeDiffWithSemantic:
         """Same surface edit distance, opposite semantic — severity should
         rise under the blended classifier."""
         # Morphology pair: small semantic delta.
-        morph_embedder = _fake_embedder({
-            "this is helpful": [1.0, 0.0, 0.0],
-            "this is helpfully": [0.99, 0.01, 0.0],
-        })
-        flip_embedder = _fake_embedder({
-            "this is helpful": [1.0, 0.0, 0.0],
-            "this is unhelpful": [-1.0, 0.0, 0.0],
-        })
+        morph_embedder = _fake_embedder(
+            {
+                "this is helpful": [1.0, 0.0, 0.0],
+                "this is helpfully": [0.99, 0.01, 0.0],
+            }
+        )
+        flip_embedder = _fake_embedder(
+            {
+                "this is helpful": [1.0, 0.0, 0.0],
+                "this is unhelpful": [-1.0, 0.0, 0.0],
+            }
+        )
         morph = compute_diff(
-            "this is helpful", "this is helpfully", embedder=morph_embedder,
+            "this is helpful",
+            "this is helpfully",
+            embedder=morph_embedder,
         )
         flip = compute_diff(
-            "this is helpful", "this is unhelpful", embedder=flip_embedder,
+            "this is helpful",
+            "this is unhelpful",
+            embedder=flip_embedder,
         )
         # Same-ish surface distance; semantic flip must push blended higher.
         assert flip.blended_distance is not None
@@ -198,6 +219,7 @@ class TestComputeDiffWithSemantic:
     def test_use_semantic_true_without_dep_gracefully_falls_back(self, monkeypatch):
         """use_semantic=True but embedder unavailable → surface-only severity."""
         import gradata.enhancements.diff_engine as de
+
         monkeypatch.setattr(de, "_default_embedder_cache", None, raising=False)
         monkeypatch.setattr(de, "_default_embedder_unavailable", True, raising=False)
         r = compute_diff("hello", "hello world", use_semantic=True)
@@ -207,14 +229,19 @@ class TestComputeDiffWithSemantic:
         assert r.severity in ("as-is", "minor", "moderate", "major", "discarded")
 
     def test_custom_weights_propagate(self):
-        embedder = _fake_embedder({
-            "a": [1.0, 0.0, 0.0],
-            "b": [-1.0, 0.0, 0.0],
-        })
+        embedder = _fake_embedder(
+            {
+                "a": [1.0, 0.0, 0.0],
+                "b": [-1.0, 0.0, 0.0],
+            }
+        )
         # Full weight on surface → blended equals surface for-severity value.
         r = compute_diff(
-            "a", "b",
-            embedder=embedder, surface_weight=1.0, semantic_weight=0.0,
+            "a",
+            "b",
+            embedder=embedder,
+            surface_weight=1.0,
+            semantic_weight=0.0,
         )
         # Surface was computed from edit_distance (short text).
         assert r.blended_distance is not None

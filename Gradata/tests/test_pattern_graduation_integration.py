@@ -5,8 +5,8 @@ Tests BOTH directions:
   Backward: graduated rules -> pattern adaptation (criteria, guards, dimensions, etc.)
 """
 
-import sys
 import importlib
+import sys
 from pathlib import Path
 
 import pytest
@@ -15,7 +15,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from gradata.brain import Brain
 from gradata.rules.rule_context import GraduatedRule, get_rule_context
-
 
 # ---------------------------------------------------------------------------
 # Shared content
@@ -50,24 +49,33 @@ LESSONS_CONTENT = """\
 """
 
 TEST_RULES = [
-    GraduatedRule("r1",  "TONE",     "Keep emails concise",           0.75, {},                         "lesson", (),           ""),
-    GraduatedRule("r2",  "PROCESS",  "Always plan before implementing",0.92, {},                         "lesson", ("planning",),""),
-    GraduatedRule("r3",  "SECURITY", "Never expose API keys",          0.65, {},                         "lesson", (),           "coder"),
-    GraduatedRule("r4",  "DRAFTING", "Use colons over dashes",         0.80, {"task_type": "email"},     "lesson", (),           ""),
-    GraduatedRule("r5",  "ACCURACY", "Double-check numbers",           0.95, {},                         "lesson", (),           ""),
-    GraduatedRule("r6",  "SAFETY",   "Validate inputs",                0.70, {"agent_type": "coder"},    "lesson", (),           "coder"),
-    GraduatedRule("r7",  "PROCESS",  "Run tests after changes",        0.85, {},                         "lesson", (),           ""),
-    GraduatedRule("r8",  "STYLE",    "No em dashes in emails",         0.78, {"task_type": "email"},     "lesson", (),           ""),
-    GraduatedRule("r9",  "PROCESS",  "Audit before building",          0.88, {},                         "lesson", (),           ""),
-    GraduatedRule("r10", "HONESTY",  "Never fabricate numbers",        0.91, {},                         "lesson", (),           ""),
-    GraduatedRule("r11", "PROCESS",  "Batch parallel operations",      0.72, {},                         "lesson", (),           ""),
-    GraduatedRule("r12", "PROCESS",  "Keep files under 500 lines",     0.68, {},                         "lesson", (),           "coder"),
+    GraduatedRule("r1", "TONE", "Keep emails concise", 0.75, {}, "lesson", (), ""),
+    GraduatedRule(
+        "r2", "PROCESS", "Always plan before implementing", 0.92, {}, "lesson", ("planning",), ""
+    ),
+    GraduatedRule("r3", "SECURITY", "Never expose API keys", 0.65, {}, "lesson", (), "coder"),
+    GraduatedRule(
+        "r4", "DRAFTING", "Use colons over dashes", 0.80, {"task_type": "email"}, "lesson", (), ""
+    ),
+    GraduatedRule("r5", "ACCURACY", "Double-check numbers", 0.95, {}, "lesson", (), ""),
+    GraduatedRule(
+        "r6", "SAFETY", "Validate inputs", 0.70, {"agent_type": "coder"}, "lesson", (), "coder"
+    ),
+    GraduatedRule("r7", "PROCESS", "Run tests after changes", 0.85, {}, "lesson", (), ""),
+    GraduatedRule(
+        "r8", "STYLE", "No em dashes in emails", 0.78, {"task_type": "email"}, "lesson", (), ""
+    ),
+    GraduatedRule("r9", "PROCESS", "Audit before building", 0.88, {}, "lesson", (), ""),
+    GraduatedRule("r10", "HONESTY", "Never fabricate numbers", 0.91, {}, "lesson", (), ""),
+    GraduatedRule("r11", "PROCESS", "Batch parallel operations", 0.72, {}, "lesson", (), ""),
+    GraduatedRule("r12", "PROCESS", "Keep files under 500 lines", 0.68, {}, "lesson", (), "coder"),
 ]
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def brain(brain_dir: Path) -> Brain:
@@ -91,9 +99,11 @@ def seeded_rule_context():
 # BACKWARD FLOW TESTS  (graduated rules -> pattern adaptation)
 # ---------------------------------------------------------------------------
 
+
 def test_T01_criteria_from_graduated_rules():
     """criteria_from_graduated_rules() returns at least one criterion."""
     from gradata.contrib.patterns.reflection import criteria_from_graduated_rules
+
     criteria = criteria_from_graduated_rules()
     assert len(criteria) > 0, "Expected at least one criterion from graduated rules"
 
@@ -101,6 +111,7 @@ def test_T01_criteria_from_graduated_rules():
 def test_T02_guards_from_graduated_rules():
     """guards_from_graduated_rules() returns at least one guard."""
     from gradata.contrib.patterns.guardrails import guards_from_graduated_rules
+
     guards = guards_from_graduated_rules()
     assert len(guards) > 0, "Expected at least one guard from graduated rules"
 
@@ -108,6 +119,7 @@ def test_T02_guards_from_graduated_rules():
 def test_T03_dimensions_from_graduated_rules():
     """dimensions_from_graduated_rules() returns at least one dimension."""
     from gradata.contrib.patterns.evaluator import dimensions_from_graduated_rules
+
     dims = dimensions_from_graduated_rules()
     assert len(dims) > 0, "Expected at least one dimension from graduated rules"
 
@@ -122,6 +134,7 @@ def test_T04_rules_budget_deep():
 def test_T05_gates_from_graduated_rules():
     """gates_from_graduated_rules() returns at least one gate dict."""
     from gradata.enhancements.pattern_integration import gates_from_graduated_rules
+
     gates = gates_from_graduated_rules()
     assert len(gates) > 0, "Expected at least one gate from graduated rules"
     assert "name" in gates[0] and "confidence" in gates[0]
@@ -130,6 +143,7 @@ def test_T05_gates_from_graduated_rules():
 def test_T06_routing_adjustments():
     """routing_adjustments() returns a non-empty category-to-density mapping."""
     from gradata.enhancements.pattern_integration import routing_adjustments
+
     adj = routing_adjustments()
     assert len(adj) > 0, "Expected at least one routing adjustment category"
 
@@ -137,6 +151,7 @@ def test_T06_routing_adjustments():
 def test_T07_importance_categories():
     """importance_categories() returns a non-empty list."""
     from gradata.enhancements.pattern_integration import importance_categories
+
     cats = importance_categories()
     assert len(cats) > 0, "Expected at least one importance category"
 
@@ -144,6 +159,7 @@ def test_T07_importance_categories():
 def test_T08_delegation_criteria_for_coder():
     """delegation_criteria_for_agent('coder') returns rules scoped to coder."""
     from gradata.enhancements.pattern_integration import delegation_criteria_for_agent
+
     crit = delegation_criteria_for_agent("coder")
     assert len(crit) > 0, "Expected at least one rule for agent type 'coder'"
 
@@ -151,6 +167,7 @@ def test_T08_delegation_criteria_for_coder():
 def test_T09_suggested_mode_override():
     """suggested_mode_override() returns None or a string."""
     from gradata.enhancements.pattern_integration import suggested_mode_override
+
     mode = suggested_mode_override()
     assert mode is None or isinstance(mode, str), f"Expected None or str, got {type(mode)}"
 
@@ -158,6 +175,7 @@ def test_T09_suggested_mode_override():
 def test_T10_register_brain_tools(brain):
     """register_brain_tools(brain) registers exactly 2 tools."""
     from gradata.enhancements.pattern_integration import register_brain_tools
+
     count = register_brain_tools(brain)
     assert count == 2, f"Expected 2 tools registered, got {count}"
 
@@ -165,6 +183,7 @@ def test_T10_register_brain_tools(brain):
 def test_T11_mcp_rule_tools():
     """mcp_rule_tools() returns exactly 2 MCP tool schemas."""
     from gradata.enhancements.pattern_integration import mcp_rule_tools
+
     schemas = mcp_rule_tools()
     assert len(schemas) == 2, f"Expected 2 MCP tool schemas, got {len(schemas)}"
     names = [s["name"] for s in schemas]
@@ -174,6 +193,7 @@ def test_T11_mcp_rule_tools():
 def test_T12_scope_confidence_boost_process():
     """scope_confidence_boost('PROCESS') returns a positive boost."""
     from gradata.enhancements.pattern_integration import scope_confidence_boost
+
     boost = scope_confidence_boost("PROCESS")
     assert boost > 0, f"Expected positive boost for PROCESS category, got {boost}"
 
@@ -181,6 +201,7 @@ def test_T12_scope_confidence_boost_process():
 def test_T13_topic_boosts_from_rules():
     """topic_boosts_from_rules() returns at least one category with boost > 1.0."""
     from gradata.enhancements.pattern_integration import topic_boosts_from_rules
+
     boosts = topic_boosts_from_rules()
     cats_above_1 = {k: v for k, v in boosts.items() if v > 1.0}
     assert len(cats_above_1) > 0, "Expected at least one category with topic boost > 1.0"
@@ -189,6 +210,7 @@ def test_T13_topic_boosts_from_rules():
 def test_T14_loop_threshold_adjustment():
     """loop_threshold_adjustment() returns a dict with 'warn' and 'stop' keys."""
     from gradata.enhancements.pattern_integration import loop_threshold_adjustment
+
     thresholds = loop_threshold_adjustment()
     assert "warn" in thresholds, "Expected 'warn' key in loop threshold adjustments"
     assert "stop" in thresholds, "Expected 'stop' key in loop threshold adjustments"
@@ -197,6 +219,7 @@ def test_T14_loop_threshold_adjustment():
 def test_T15_strict_categories_from_rules():
     """strict_categories_from_rules() returns at least one strict category."""
     from gradata.enhancements.pattern_integration import strict_categories_from_rules
+
     strict = strict_categories_from_rules()
     assert len(strict) > 0, "Expected at least one strict category from rules"
 
@@ -204,6 +227,7 @@ def test_T15_strict_categories_from_rules():
 def test_T16_create_graduation_middleware():
     """create_graduation_middleware() returns a middleware with name='graduation'."""
     from gradata.enhancements.pattern_integration import create_graduation_middleware
+
     mw = create_graduation_middleware()
     assert mw is not None
     assert mw.name == "graduation", f"Expected middleware name='graduation', got '{mw.name}'"
@@ -213,10 +237,11 @@ def test_T16_create_graduation_middleware():
 # FORWARD FLOW TESTS  (patterns -> graduation pipeline)
 # ---------------------------------------------------------------------------
 
+
 def test_T17_process_reflection_result(brain):
     """process_reflection_result() returns processed=True for a passing reflection."""
+    from gradata.contrib.patterns.reflection import CriterionScore, CritiqueResult, ReflectionResult
     from gradata.enhancements.pattern_integration import process_reflection_result
-    from gradata.contrib.patterns.reflection import ReflectionResult, CritiqueResult, CriterionScore
 
     mock_critique = CritiqueResult(
         scores={"accuracy": CriterionScore(name="accuracy", passed=True, reason="ok", score=9.0)},
@@ -236,8 +261,8 @@ def test_T17_process_reflection_result(brain):
 
 def test_T18_process_guardrail_result(brain):
     """process_guardrail_result() returns processed=True for a blocked guardrail result."""
-    from gradata.enhancements.pattern_integration import process_guardrail_result
     from gradata.contrib.patterns.guardrails import GuardedResult
+    from gradata.enhancements.pattern_integration import process_guardrail_result
 
     class MockGuardCheck:
         def __init__(self):
@@ -262,6 +287,7 @@ def test_T18_process_guardrail_result(brain):
 def test_T19_feed_q_router(brain):
     """feed_q_router() returns a result dict (processed may be False in cold brain)."""
     from gradata.enhancements.pattern_integration import feed_q_router
+
     result = feed_q_router(brain, "moderate", agent_type="coder")
     # Router may not be warm-started in a fresh test brain; accept either outcome
     assert isinstance(result, dict), f"Expected dict result, got {type(result)}"
@@ -271,6 +297,7 @@ def test_T19_feed_q_router(brain):
 def test_T20_process_loop_event(brain):
     """process_loop_event() returns processed=True for a WARN loop event."""
     from gradata.enhancements.pattern_integration import process_loop_event
+
     result = process_loop_event(brain, "WARN", "Bash")
     assert result.get("processed", False), f"Expected processed=True, got: {result}"
 
@@ -278,6 +305,7 @@ def test_T20_process_loop_event(brain):
 def test_T21_process_parallel_failures(brain):
     """process_parallel_failures() returns processed=True."""
     from gradata.enhancements.pattern_integration import process_parallel_failures
+
     result = process_parallel_failures(brain, ["task_1"], 3)
     assert result.get("processed", False), f"Expected processed=True, got: {result}"
 
@@ -285,6 +313,7 @@ def test_T21_process_parallel_failures(brain):
 def test_T22_process_escalation(brain):
     """process_escalation() returns processed=True for DONE_WITH_CONCERNS."""
     from gradata.enhancements.pattern_integration import process_escalation
+
     result = process_escalation(brain, "DONE_WITH_CONCERNS", ["data may be stale"])
     assert result.get("processed", False), f"Expected processed=True, got: {result}"
 
@@ -293,11 +322,12 @@ def test_T22_process_escalation(brain):
 # INTEGRATION TESTS
 # ---------------------------------------------------------------------------
 
+
 def test_T23_full_cycle(brain):
     """Full forward+bridge+backward cycle all succeed in sequence."""
+    from gradata.contrib.patterns.reflection import criteria_from_graduated_rules
     from gradata.enhancements.pattern_integration import process_loop_event
     from gradata.enhancements.rule_context_bridge import bootstrap_rule_context
-    from gradata.contrib.patterns.reflection import criteria_from_graduated_rules
 
     # Forward: emit a loop event
     loop_result = process_loop_event(brain, "WARN", "Read")
@@ -310,7 +340,7 @@ def test_T23_full_cycle(brain):
 
     # Backward: criteria are now populated from the freshly loaded rules
     criteria = criteria_from_graduated_rules()
-    assert len(criteria) > 0, f"Expected criteria after bootstrap, got none"
+    assert len(criteria) > 0, "Expected criteria after bootstrap, got none"
 
 
 def test_T24_rule_context_stats_consistency(seeded_rule_context):
@@ -373,10 +403,12 @@ def test_T25_no_circular_imports():
 # END-TO-END PIPELINE TESTS  (merged from test_end_to_end.py)
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def e2e_brain(tmp_path: Path) -> Brain:
     """Create a fresh brain for end-to-end tests."""
     import os
+
     brain_dir = tmp_path / "e2e_brain"
     os.environ["BRAIN_DIR"] = str(brain_dir)
     b = Brain.init(brain_dir, name="E2EBrain", domain="Testing", interactive=False)
@@ -404,7 +436,10 @@ class TestFullPipeline:
             ("We would like to schedule a meeting at your convenience.", "Can we chat Thursday?"),
             ("Please find attached the requested documentation.", "Here's the doc you asked for."),
             ("I am writing to follow up on our previous discussion.", "Following up on our chat."),
-            ("We are delighted to present our quarterly results.", "Here are this quarter's numbers."),
+            (
+                "We are delighted to present our quarterly results.",
+                "Here are this quarter's numbers.",
+            ),
         ]
         for draft, final in pairs:
             e2e_brain.correct(draft=draft, final=final, category="TONE")

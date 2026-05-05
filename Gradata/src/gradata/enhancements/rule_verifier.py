@@ -36,7 +36,6 @@ TOOL_RULE_MATRIX: dict[str, list[str]] = {
 }
 
 
-
 def should_verify(tool_type: str, rule_category: str) -> bool:
     """Pre-execution gate: is this rule relevant for this tool/task?
 
@@ -69,11 +68,7 @@ def get_relevant_rules(tool_type: str, all_rules: list[dict]) -> list[dict]:
     Returns:
         Filtered list of rule dicts relevant to the tool type.
     """
-    return [
-        rule for rule in all_rules
-        if should_verify(tool_type, rule.get("category", "UNKNOWN"))
-    ]
-
+    return [rule for rule in all_rules if should_verify(tool_type, rule.get("category", "UNKNOWN"))]
 
 
 # ---------------------------------------------------------------------------
@@ -155,27 +150,33 @@ def verify_rules(
         for regex, should_be_absent, violation_desc in checks:
             match = regex.search(output)
             if should_be_absent and match:
-                results.append(RuleVerification(
-                    rule_category=cat,
-                    rule_description=desc[:200],
-                    passed=False,
-                    violation_detail=violation_desc,
-                    output_snippet=output[max(0, match.start() - 30):match.end() + 30][:200],
-                ))
+                results.append(
+                    RuleVerification(
+                        rule_category=cat,
+                        rule_description=desc[:200],
+                        passed=False,
+                        violation_detail=violation_desc,
+                        output_snippet=output[max(0, match.start() - 30) : match.end() + 30][:200],
+                    )
+                )
             elif not should_be_absent and not match:
-                results.append(RuleVerification(
-                    rule_category=cat,
-                    rule_description=desc[:200],
-                    passed=False,
-                    violation_detail=violation_desc,
-                    output_snippet=output[:200],
-                ))
+                results.append(
+                    RuleVerification(
+                        rule_category=cat,
+                        rule_description=desc[:200],
+                        passed=False,
+                        violation_detail=violation_desc,
+                        output_snippet=output[:200],
+                    )
+                )
             else:
-                results.append(RuleVerification(
-                    rule_category=cat,
-                    rule_description=desc[:200],
-                    passed=True,
-                ))
+                results.append(
+                    RuleVerification(
+                        rule_category=cat,
+                        rule_description=desc[:200],
+                        passed=True,
+                    )
+                )
     return results
 
 
@@ -200,6 +201,7 @@ CREATE TABLE IF NOT EXISTS rule_verifications (
 def ensure_table(db_path: Path) -> None:
     from gradata._db import ensure_table as _ensure
     from gradata._db import get_connection
+
     conn = get_connection(db_path)
     _ensure(conn, _CREATE_TABLE)
     conn.close()
@@ -219,8 +221,15 @@ def log_verification(
                 "INSERT INTO rule_verifications "
                 "(session, rule_category, rule_description, passed, violation_detail, output_snippet, timestamp) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (session, r.rule_category, r.rule_description, r.passed,
-                 r.violation_detail, r.output_snippet, now),
+                (
+                    session,
+                    r.rule_category,
+                    r.rule_description,
+                    r.passed,
+                    r.violation_detail,
+                    r.output_snippet,
+                    now,
+                ),
             )
 
 
@@ -229,7 +238,9 @@ def get_verification_stats(db_path: Path) -> dict:
     ensure_table(db_path)
     with sqlite3.connect(str(db_path)) as conn:
         total = conn.execute("SELECT COUNT(*) FROM rule_verifications").fetchone()[0]
-        passed = conn.execute("SELECT COUNT(*) FROM rule_verifications WHERE passed = 1").fetchone()[0]
+        passed = conn.execute(
+            "SELECT COUNT(*) FROM rule_verifications WHERE passed = 1"
+        ).fetchone()[0]
         violations = conn.execute(
             "SELECT rule_category, COUNT(*) FROM rule_verifications "
             "WHERE passed = 0 GROUP BY rule_category ORDER BY COUNT(*) DESC"

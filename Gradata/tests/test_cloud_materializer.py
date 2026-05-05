@@ -14,8 +14,6 @@ import pytest
 
 from gradata.cloud.materializer import (
     CONFLICT_THRESHOLD,
-    Conflict,
-    MaterializeResult,
     materialize,
 )
 

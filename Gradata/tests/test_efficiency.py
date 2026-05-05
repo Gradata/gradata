@@ -1,4 +1,5 @@
 """Tests for brain.efficiency() — effort-saved metric."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -32,7 +33,7 @@ def test_efficiency_ratio_declining(tmp_path):
     assert "effort_ratio" in result
     assert result["effort_ratio"] < 1.0
     assert result["corrections_initial"] == 10.0  # avg(10,12,8)
-    assert result["corrections_recent"] == 4.0    # avg(5,4,3)
+    assert result["corrections_recent"] == 4.0  # avg(5,4,3)
 
 
 def test_efficiency_ratio_no_improvement(tmp_path):

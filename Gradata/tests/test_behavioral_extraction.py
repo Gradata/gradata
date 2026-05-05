@@ -1,14 +1,15 @@
 """Tests for behavioral instruction extraction."""
+
 from __future__ import annotations
 
 import tempfile
 from pathlib import Path
 
+from gradata.enhancements.diff_engine import ChangedSection, DiffResult
 from gradata.enhancements.edit_classifier import (
     EditClassification,
     extract_behavioral_instruction,
 )
-from gradata.enhancements.diff_engine import DiffResult, ChangedSection
 from gradata.enhancements.instruction_cache import InstructionCache
 
 
@@ -25,7 +26,9 @@ def _make_diff(old: str, new: str) -> DiffResult:
 def test_template_fallback_getattr():
     diff = _make_diff("data[0]", "getattr(data, 'field', None)")
     classification = EditClassification(
-        category="CODE", confidence=0.6, severity="moderate",
+        category="CODE",
+        confidence=0.6,
+        severity="moderate",
         description="Content change (added: getattr)",
     )
     with tempfile.TemporaryDirectory() as d:
@@ -38,7 +41,9 @@ def test_template_fallback_getattr():
 def test_cache_hit_skips_llm():
     diff = _make_diff("old code", "new code")
     classification = EditClassification(
-        category="CODE", confidence=0.6, severity="moderate",
+        category="CODE",
+        confidence=0.6,
+        severity="moderate",
         description="Content change (added: getattr)",
     )
     with tempfile.TemporaryDirectory() as d:
@@ -52,13 +57,18 @@ def test_cache_hit_skips_llm():
 def test_returns_none_without_cache_or_llm():
     diff = _make_diff("something obscure", "something else obscure")
     classification = EditClassification(
-        category="CONTENT", confidence=0.5, severity="minor",
+        category="CONTENT",
+        confidence=0.5,
+        severity="minor",
         description="Content change (added: xyzzy123)",
     )
     with tempfile.TemporaryDirectory() as d:
         cache = InstructionCache(Path(d) / "cache.json")
         result = extract_behavioral_instruction(
-            diff, classification, cache=cache, llm_enabled=False,
+            diff,
+            classification,
+            cache=cache,
+            llm_enabled=False,
         )
         assert result is None
 
@@ -66,7 +76,9 @@ def test_returns_none_without_cache_or_llm():
 def test_formality_template():
     diff = _make_diff("Dear Sir, We are pleased to inform you", "Hey, check this out")
     classification = EditClassification(
-        category="TONE", confidence=0.8, severity="moderate",
+        category="TONE",
+        confidence=0.8,
+        severity="moderate",
         description="Tone casualized (formality shift: +4)",
     )
     with tempfile.TemporaryDirectory() as d:
@@ -79,7 +91,9 @@ def test_formality_template():
 def test_process_template():
     diff = _make_diff("Let me implement this", "Let me plan first, then implement")
     classification = EditClassification(
-        category="PROCESS", confidence=0.75, severity="moderate",
+        category="PROCESS",
+        confidence=0.75,
+        severity="moderate",
         description="Behavioral/process correction (added: plan, first)",
     )
     with tempfile.TemporaryDirectory() as d:

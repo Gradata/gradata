@@ -14,10 +14,7 @@ No mocking required — the function is pure and has no I/O.
 
 from __future__ import annotations
 
-import pytest
-
 from gradata.enhancements._sanitize import sanitize_lesson_content
-
 
 # ---------------------------------------------------------------------------
 # XML context  — HIGH: </brain-rules> tag-termination (inject_brain_rules.py)
@@ -207,8 +204,7 @@ class TestJsFullSanitization:
         result = sanitize_lesson_content(payload, "js")
         # The escape table turns \ -> \\ so the result must contain \\
         assert result == "a" + single_backslash * 2 + "b", (
-            "Backslash was not doubled by JS escaping — "
-            "string breakout via backslash is possible"
+            "Backslash was not doubled by JS escaping — string breakout via backslash is possible"
         )
 
     def test_negative_backtick_removed(self):

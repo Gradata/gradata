@@ -184,12 +184,14 @@ def _analyze_line_opcodes(
         if tag == "equal":
             continue
 
-        sections.append(ChangedSection(
-            start_line=j1,
-            end_line=j2,
-            old_text="\n".join(draft_lines[i1:i2]),
-            new_text="\n".join(final_lines[j1:j2]),
-        ))
+        sections.append(
+            ChangedSection(
+                start_line=j1,
+                end_line=j2,
+                old_text="\n".join(draft_lines[i1:i2]),
+                new_text="\n".join(final_lines[j1:j2]),
+            )
+        )
 
         old_count = i2 - i1
         new_count = j2 - j1
@@ -277,8 +279,7 @@ def _load_default_embedder() -> Embedder | None:
         model = SentenceTransformer(_DEFAULT_EMBEDDER_MODEL)
     except Exception as exc:  # pragma: no cover - env/network failure
         _default_embedder_unavailable = True
-        _log.debug("Default embedder load failed (%s); semantic distance disabled.",
-                   exc)
+        _log.debug("Default embedder load failed (%s); semantic distance disabled.", exc)
         return None
 
     def _embed(texts: Sequence[str]) -> Sequence[Sequence[float]]:
@@ -484,14 +485,14 @@ def compute_diff(
     # Severity: prefer blended when semantic is available, else surface logic.
     # Surface logic: compression distance for long texts, edit_distance for short.
     surface_for_severity = (
-        compression_dist
-        if len(draft) + len(final) >= MIN_COMPRESSION_LENGTH
-        else edit_distance
+        compression_dist if len(draft) + len(final) >= MIN_COMPRESSION_LENGTH else edit_distance
     )
     if semantic_dist is not None:
         blended = combine_distances(
-            surface_for_severity, semantic_dist,
-            surface_weight=surface_weight, semantic_weight=semantic_weight,
+            surface_for_severity,
+            semantic_dist,
+            surface_weight=surface_weight,
+            semantic_weight=semantic_weight,
         )
         severity = _classify_severity(blended)
     else:

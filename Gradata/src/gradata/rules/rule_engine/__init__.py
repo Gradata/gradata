@@ -12,6 +12,7 @@ All public symbols remain importable from this package, so existing callers
 (``from gradata.rules.rule_engine import apply_rules``) continue to work
 without modification.
 """
+
 from __future__ import annotations
 
 from ._engine import (

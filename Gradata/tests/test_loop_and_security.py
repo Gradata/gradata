@@ -14,11 +14,8 @@ import json
 import tempfile
 from pathlib import Path
 
-import pytest
-
-from gradata.enhancements.observation_hooks import observe_tool_use
 from gradata.contrib.patterns.q_learning_router import QLearningRouter
-
+from gradata.enhancements.observation_hooks import observe_tool_use
 
 # ===========================================================================
 # THE MOST IMPORTANT TEST: Full Learning Loop End-to-End
@@ -52,6 +49,7 @@ class TestFullLearningLoop:
             assert content.strip() != "", "lessons.md is empty, loop is broken"
 
             from gradata.enhancements.self_improvement import parse_lessons
+
             lessons = parse_lessons(content)
             assert len(lessons) > 0, f"No lessons parsed from: {content[:200]}"
 
@@ -79,6 +77,7 @@ class TestFullLearningLoop:
             )
 
             from gradata.enhancements.self_improvement import parse_lessons
+
             content = (brain.dir / "lessons.md").read_text(encoding="utf-8")
             assert len(parse_lessons(content)) > 0
 
@@ -123,7 +122,9 @@ class TestFullLearningLoop:
         """THE critical test: correct() → end_session() promotes → apply_brain_rules() returns rules."""
         from gradata.brain import Brain
         from gradata.enhancements.self_improvement import (
-            parse_lessons, format_lessons, LessonState,
+            LessonState,
+            format_lessons,
+            parse_lessons,
         )
 
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
@@ -167,7 +168,8 @@ class TestFullLearningLoop:
         """end_session() should bump confidence on surviving lessons."""
         from gradata.brain import Brain
         from gradata.enhancements.self_improvement import (
-            parse_lessons, format_lessons, LessonState,
+            format_lessons,
+            parse_lessons,
         )
 
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
@@ -196,9 +198,11 @@ class TestFullLearningLoop:
 
             # Run end_session with corrections in OTHER categories
             # — TONE lesson survives (no TONE corrections) → confidence bumps
-            result = brain.end_session(session_corrections=[
-                {"category": "ACCURACY", "severity": "minor"},
-            ])
+            result = brain.end_session(
+                session_corrections=[
+                    {"category": "ACCURACY", "severity": "minor"},
+                ]
+            )
 
             text_after = lessons_path.read_text(encoding="utf-8")
             lessons_after = parse_lessons(text_after)
@@ -206,7 +210,7 @@ class TestFullLearningLoop:
 
             # Lessons should either be promoted or have higher confidence
             has_progress = (
-                any(a > b for a, b in zip(conf_after, conf_before))
+                any(a > b for a, b in zip(conf_after, conf_before, strict=False))
                 or result.get("promotions", 0) > 0
                 or result.get("graduated", 0) > 0
             )
@@ -219,7 +223,9 @@ class TestFullLearningLoop:
         """export_rules() returns portable markdown with graduated rules."""
         from gradata.brain import Brain
         from gradata.enhancements.self_improvement import (
-            parse_lessons, format_lessons, LessonState,
+            LessonState,
+            format_lessons,
+            parse_lessons,
         )
 
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
@@ -254,7 +260,9 @@ class TestFullLearningLoop:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             brain = Brain.init(tmpdir, domain="Test")
             brain.correct(
-                draft="formal text", final="casual text", category="TONE",
+                draft="formal text",
+                final="casual text",
+                category="TONE",
             )
             result = brain.export_rules(min_state="PATTERN")
             assert result == ""
@@ -263,7 +271,8 @@ class TestFullLearningLoop:
         """lineage() returns state transition history after graduation."""
         from gradata.brain import Brain
         from gradata.enhancements.self_improvement import (
-            parse_lessons, format_lessons, LessonState,
+            format_lessons,
+            parse_lessons,
         )
 
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
@@ -322,15 +331,17 @@ class TestFullLearningLoop:
 
     def test_agent_profile_returns_skills(self):
         """agent_profile() returns correction categories and skill state."""
-        from gradata.brain import Brain
-        from gradata.enhancements.self_improvement import parse_lessons, format_lessons
         from gradata._types import LessonState
+        from gradata.brain import Brain
+        from gradata.enhancements.self_improvement import format_lessons, parse_lessons
 
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             brain = Brain.init(tmpdir, domain="Test")
             brain.correct(
-                draft="formal text", final="casual text",
-                category="TONE", agent_type="email-drafter",
+                draft="formal text",
+                final="casual text",
+                category="TONE",
+                agent_type="email-drafter",
             )
             # Force one lesson to PATTERN
             lessons_path = brain.dir / "lessons.md"
@@ -403,9 +414,9 @@ class TestFullLearningLoop:
 
     def test_export_skill_creates_openspace_directory(self):
         """export_skill() creates SKILL.md + .skill_id + provenance.json."""
-        from gradata.brain import Brain
-        from gradata.enhancements.self_improvement import parse_lessons, format_lessons
         from gradata._types import LessonState
+        from gradata.brain import Brain
+        from gradata.enhancements.self_improvement import format_lessons, parse_lessons
 
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             brain = Brain.init(tmpdir, domain="Sales")
@@ -446,7 +457,6 @@ class TestFullLearningLoop:
 
 
 class TestPIISanitization:
-
     def test_email_redacted(self):
         obs = observe_tool_use("Test", input_data="Send to user@example.com please")
         assert "user@example.com" not in obs.input_summary
@@ -468,7 +478,6 @@ class TestPIISanitization:
 
 
 class TestQTableIntegrity:
-
     def test_save_load_with_hmac(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             fp = Path(tmpdir) / "router.json"
@@ -497,13 +506,17 @@ class TestQTableIntegrity:
     def test_legacy_no_hmac_still_loads(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             fp = Path(tmpdir) / "router.json"
-            fp.write_text(json.dumps({
-                "version": "1.0.0",
-                "q_table": {},
-                "epsilon": 0.5,
-                "update_count": 10,
-                "stats": {},
-            }))
+            fp.write_text(
+                json.dumps(
+                    {
+                        "version": "1.0.0",
+                        "q_table": {},
+                        "epsilon": 0.5,
+                        "update_count": 10,
+                        "stats": {},
+                    }
+                )
+            )
             r = QLearningRouter()
             assert r.load(fp) is True
 
@@ -514,9 +527,9 @@ class TestQTableIntegrity:
 
 
 class TestAutoCorrectHookCoverage:
-
     def test_hook_matches_edit_and_write(self):
         from gradata.hooks.auto_correct import generate_hook_config
+
         config = generate_hook_config()
         matchers = [h["matcher"] for h in config["hooks"]["PostToolUse"]]
         assert "Edit" in matchers

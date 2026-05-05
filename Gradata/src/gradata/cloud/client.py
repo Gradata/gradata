@@ -201,9 +201,7 @@ class CloudClient:
             except _TooLargeError:
                 # Server returned 413 — halve the batch and retry this chunk.
                 current_batch = max(1, current_batch // 2)
-                logger.warning(
-                    "Sync: 413 from server — reducing batch size to %d", current_batch
-                )
+                logger.warning("Sync: 413 from server — reducing batch size to %d", current_batch)
                 continue
             except Exception as e:
                 logger.error("Sync: POST failed at offset=%d: %s", offset, e)
@@ -220,9 +218,7 @@ class CloudClient:
             # Reset batch size to default for next chunk after a 413 recovery.
             current_batch = batch_size
 
-        logger.info(
-            "Sync: ingested %d events (watermark=%r)", total_ingested, last_watermark
-        )
+        logger.info("Sync: ingested %d events (watermark=%r)", total_ingested, last_watermark)
         return total_ingested
 
     # ── Sync state helpers ────────────────────────────────────────────────────
@@ -278,9 +274,7 @@ class CloudClient:
             event_id = existing_eid[:64]
         else:
             try:
-                data_blob = json.dumps(
-                    ev.get("data", {}), sort_keys=True, default=str
-                )
+                data_blob = json.dumps(ev.get("data", {}), sort_keys=True, default=str)
             except Exception:
                 data_blob = str(ev.get("data", ""))
             raw = f"{ts}:{event_type}:{source}:{ev.get('session', '')}:{data_blob}"
@@ -289,9 +283,7 @@ class CloudClient:
         session_raw = ev.get("session")
         session_val: int | None
         try:
-            if session_raw is None:
-                session_val = None
-            elif isinstance(session_raw, bool):
+            if session_raw is None or isinstance(session_raw, bool):
                 session_val = None
             elif isinstance(session_raw, int):
                 session_val = session_raw

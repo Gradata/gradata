@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 from pathlib import Path
 
@@ -20,10 +21,8 @@ def atomic_write_text(path: str | Path, text: str, *, encoding: str = "utf-8") -
         os.replace(tmp, target)
         _fsync_dir(target.parent)
     finally:
-        try:
+        with contextlib.suppress(FileNotFoundError):
             tmp.unlink()
-        except FileNotFoundError:
-            pass
 
 
 def _fsync_dir(path: Path) -> None:

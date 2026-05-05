@@ -190,7 +190,8 @@ class TestBrainCorrectIntegration:
 
         brain = init_brain(tmp_path)
         event = brain.correct(
-            draft="a", final="b",
+            draft="a",
+            final="b",
             category="CODE",
             context={"source": "definitely_trusted_promise"},
             session=1,

@@ -28,6 +28,7 @@ def _now_iso() -> str:
     """ISO-8601 UTC timestamp for audit columns."""
     return datetime.now(UTC).isoformat()
 
+
 # Default canary period: 3 sessions
 CANARY_SESSIONS = 3
 # Rollback target confidence (back to INSTINCT range)
@@ -35,8 +36,8 @@ ROLLBACK_CONFIDENCE = 0.50
 
 
 class CanaryStatus(Enum):
-    CANARY = "canary"           # first 3 sessions after graduation
-    ACTIVE = "active"           # passed canary period
+    CANARY = "canary"  # first 3 sessions after graduation
+    ACTIVE = "active"  # passed canary period
     ROLLED_BACK = "rolled_back"  # caused regression, disabled
 
 
@@ -92,7 +93,9 @@ def _get_db_path(ctx=None) -> Path:
     except Exception:
         pass
 
-    raise ValueError("Cannot resolve rule_canary DB path: no context, BRAIN_DIR, or relative path found")
+    raise ValueError(
+        "Cannot resolve rule_canary DB path: no context, BRAIN_DIR, or relative path found"
+    )
 
 
 def promote_to_canary(rule_category: str, session: int, db_path: Path | None = None) -> None:
@@ -214,6 +217,7 @@ def rollback_rule(rule_category: str, reason: str, db_path: Path | None = None) 
         # Emit RULE_ROLLBACK event
         try:
             from gradata._events import emit
+
             emit(
                 "RULE_ROLLBACK",
                 "rule_canary:rollback_rule",
@@ -248,6 +252,7 @@ def promote_to_active(rule_category: str, db_path: Path | None = None) -> None:
         # Emit CANARY_PROMOTED event
         try:
             from gradata._events import emit
+
             emit(
                 "CANARY_PROMOTED",
                 "rule_canary:promote_to_active",

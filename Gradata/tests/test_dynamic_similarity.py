@@ -1,7 +1,8 @@
 """Tests for per-category similarity thresholds."""
+
 from __future__ import annotations
 
-from gradata._config import CATEGORY_SIMILARITY_THRESHOLDS, get_similarity_threshold
+from gradata._config import get_similarity_threshold
 
 
 def test_factual_has_higher_threshold():

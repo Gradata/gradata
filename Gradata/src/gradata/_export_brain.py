@@ -14,29 +14,59 @@ import gradata._paths as _p
 from gradata._paths import BrainContext
 
 
-def _VAULT_DIR(): return _p.BRAIN_DIR / "vault"
-def _LESSONS_ACTIVE(): return _p.LESSONS_FILE
-def _LESSONS_ARCHIVE(): return _p.BRAIN_DIR / "lessons-archive.md"
-def _QUALITY_RUBRICS(): return _p.BRAIN_DIR / "quality-rubrics.md"
-def _DOMAIN_CONFIG(): return _p.WORKING_DIR / "domain" / "DOMAIN.md"
-def _DOMAIN_SOUL(): return _p.WORKING_DIR / "domain" / "soul.md"
-def _CARL_LOOP(): return _p.CARL_DIR / "loop"
-def _CARL_GLOBAL(): return _p.CARL_DIR / "global"
+def _VAULT_DIR():
+    return _p.BRAIN_DIR / "vault"
+
+
+def _LESSONS_ACTIVE():
+    return _p.LESSONS_FILE
+
+
+def _LESSONS_ARCHIVE():
+    return _p.BRAIN_DIR / "lessons-archive.md"
+
+
+def _QUALITY_RUBRICS():
+    return _p.BRAIN_DIR / "quality-rubrics.md"
+
+
+def _DOMAIN_CONFIG():
+    return _p.WORKING_DIR / "domain" / "DOMAIN.md"
+
+
+def _DOMAIN_SOUL():
+    return _p.WORKING_DIR / "domain" / "soul.md"
+
+
+def _CARL_LOOP():
+    return _p.CARL_DIR / "loop"
+
+
+def _CARL_GLOBAL():
+    return _p.CARL_DIR / "global"
+
 
 # Sensitive data patterns
-RE_EMAIL = re.compile(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}')
-RE_PHONE = re.compile(r'(?:\+?1[\s\-.]?)?\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}')
-RE_API_KEY = re.compile(r'(?:api[_\-]?key|token|secret|password|bearer)\s*[:=]\s*\S+', re.IGNORECASE)
-RE_USER_PATH = re.compile(r'C:[/\\]Users[/\\]\w+', re.IGNORECASE)
-RE_CRM_URL = re.compile(r'https?://[a-z0-9\-]+\.(?:pipedrive|hubspot|salesforce|zoho)\.com\S*', re.IGNORECASE)
-RE_CRM_DEAL_ID = re.compile(r'(?:pipedrive_deal_id|hubspot_deal_id|sf_opportunity_id|deal[_\-]?id)\s*[:=]\s*\d+', re.IGNORECASE)
+RE_EMAIL = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
+RE_PHONE = re.compile(r"(?:\+?1[\s\-.]?)?\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}")
+RE_API_KEY = re.compile(
+    r"(?:api[_\-]?key|token|secret|password|bearer)\s*[:=]\s*\S+", re.IGNORECASE
+)
+RE_USER_PATH = re.compile(r"C:[/\\]Users[/\\]\w+", re.IGNORECASE)
+RE_CRM_URL = re.compile(
+    r"https?://[a-z0-9\-]+\.(?:pipedrive|hubspot|salesforce|zoho)\.com\S*", re.IGNORECASE
+)
+RE_CRM_DEAL_ID = re.compile(
+    r"(?:pipedrive_deal_id|hubspot_deal_id|sf_opportunity_id|deal[_\-]?id)\s*[:=]\s*\d+",
+    re.IGNORECASE,
+)
 
 
 def read_version() -> str:
     if not _p.VERSION_FILE.exists():
         return "v0.0.0"
     text = _p.VERSION_FILE.read_text(encoding="utf-8")
-    match = re.search(r'Current Version:\s*(v[\d.]+)', text)
+    match = re.search(r"Current Version:\s*(v[\d.]+)", text)
     return match.group(1) if match else "v0.0.0"
 
 
@@ -44,10 +74,10 @@ def read_domain_name() -> str:
     if not _DOMAIN_CONFIG().exists():
         return "Unknown"
     text = _DOMAIN_CONFIG().read_text(encoding="utf-8")
-    match = re.search(r'Talent:\s*(\w+)', text)
+    match = re.search(r"Talent:\s*(\w+)", text)
     if match:
         return match.group(1)
-    match = re.search(r'^#\s+(.+)', text, re.MULTILINE)
+    match = re.search(r"^#\s+(.+)", text, re.MULTILINE)
     return match.group(1).strip() if match else "Unknown"
 
 
@@ -55,7 +85,7 @@ def read_session_count() -> int:
     if not _p.VERSION_FILE.exists():
         return 0
     text = _p.VERSION_FILE.read_text(encoding="utf-8")
-    sessions = re.findall(r'Session\s+(\d+)', text)
+    sessions = re.findall(r"Session\s+(\d+)", text)
     return max(int(s) for s in sessions) if sessions else 0
 
 
@@ -63,7 +93,7 @@ def count_lessons(filepath: Path) -> int:
     if not filepath.exists():
         return 0
     text = filepath.read_text(encoding="utf-8")
-    return len(re.findall(r'^\[20\d{2}-\d{2}-\d{2}\]', text, re.MULTILINE))
+    return len(re.findall(r"^\[20\d{2}-\d{2}-\d{2}\]", text, re.MULTILINE))
 
 
 def build_prospect_map(prospects_dir: Path) -> dict[str, str]:
@@ -92,11 +122,11 @@ def build_prospect_map(prospects_dir: Path) -> dict[str, str]:
 
         try:
             text = f.read_text(encoding="utf-8")
-            fm_name = re.search(r'^name:\s*(.+)$', text, re.MULTILINE)
+            fm_name = re.search(r"^name:\s*(.+)$", text, re.MULTILINE)
             if fm_name and fm_name.group(1).strip():
                 val = fm_name.group(1).strip()
                 name_map[val] = f"[PROSPECT_{counter}]"
-            fm_company = re.search(r'^company:\s*(.+)$', text, re.MULTILINE)
+            fm_company = re.search(r"^company:\s*(.+)$", text, re.MULTILINE)
             if fm_company and fm_company.group(1).strip():
                 name_map[fm_company.group(1).strip()] = f"[COMPANY_{counter}]"
         except Exception:
@@ -104,7 +134,9 @@ def build_prospect_map(prospects_dir: Path) -> dict[str, str]:
         counter += 1
 
     # Auto-detect owner name from brain manifest if available
-    manifest_path = _p.BRAIN_DIR / "brain.manifest.json" if hasattr(_p, 'BRAIN_DIR') and _p.BRAIN_DIR else None
+    manifest_path = (
+        _p.BRAIN_DIR / "brain.manifest.json" if hasattr(_p, "BRAIN_DIR") and _p.BRAIN_DIR else None
+    )
     if manifest_path and manifest_path.exists():
         try:
             with open(manifest_path, encoding="utf-8") as f:
@@ -119,12 +151,12 @@ def build_prospect_map(prospects_dir: Path) -> dict[str, str]:
 
 
 def sanitize_content(text: str, name_map: dict[str, str]) -> str:
-    text = RE_EMAIL.sub('[EMAIL_REDACTED]', text)
-    text = RE_PHONE.sub('[PHONE_REDACTED]', text)
-    text = RE_API_KEY.sub('[API_KEY_REDACTED]', text)
-    text = RE_CRM_URL.sub('[CRM_URL_REDACTED]', text)
-    text = RE_CRM_DEAL_ID.sub('deal_id: [DEAL_REDACTED]', text)
-    text = RE_USER_PATH.sub('[USER_HOME]', text)
+    text = RE_EMAIL.sub("[EMAIL_REDACTED]", text)
+    text = RE_PHONE.sub("[PHONE_REDACTED]", text)
+    text = RE_API_KEY.sub("[API_KEY_REDACTED]", text)
+    text = RE_CRM_URL.sub("[CRM_URL_REDACTED]", text)
+    text = RE_CRM_DEAL_ID.sub("deal_id: [DEAL_REDACTED]", text)
+    text = RE_USER_PATH.sub("[USER_HOME]", text)
     for real_name in sorted(name_map, key=len, reverse=True):
         if len(real_name) >= 3:
             text = text.replace(real_name, name_map[real_name])
@@ -173,8 +205,9 @@ def collect_domain_files() -> list[tuple[str, Path]]:
     return files
 
 
-def export_brain(include_prospects: bool = True, domain_only: bool = False,
-                  ctx: BrainContext | None = None) -> Path:
+def export_brain(
+    include_prospects: bool = True, domain_only: bool = False, ctx: BrainContext | None = None
+) -> Path:
     brain_dir = ctx.brain_dir if ctx else _p.BRAIN_DIR
     prospects_dir = ctx.prospects_dir if ctx else _p.PROSPECTS_DIR
 
@@ -213,18 +246,23 @@ def export_brain(include_prospects: bool = True, domain_only: bool = False,
     now = datetime.now(UTC)
     try:
         from gradata._brain_manifest import generate_manifest
+
         manifest = generate_manifest(ctx=ctx)
         manifest["export"] = {
             "exported_at": now.isoformat(),
-            "mode": "domain-only" if domain_only else ("no-prospects" if not include_prospects else "full"),
+            "mode": "domain-only"
+            if domain_only
+            else ("no-prospects" if not include_prospects else "full"),
             "files": [path for path, _ in sanitized],
         }
     except Exception:
         manifest = {
             "schema_version": "1.0.0",
             "metadata": {
-                "brain_version": version, "domain": domain,
-                "sessions_trained": sessions, "maturity_phase": "INFANT",
+                "brain_version": version,
+                "domain": domain,
+                "sessions_trained": sessions,
+                "maturity_phase": "INFANT",
                 "generated_at": now.isoformat(),
             },
             "quality": {"lessons_graduated": graduated, "lessons_active": active},

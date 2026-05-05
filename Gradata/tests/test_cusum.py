@@ -1,4 +1,5 @@
 """Tests for CUSUM changepoint detection."""
+
 from __future__ import annotations
 
 from gradata._stats import cusum_changepoints

@@ -1,19 +1,23 @@
 """Tests for safety hooks: secret_scan, config_protection, rule_enforcement."""
+
 import os
 from pathlib import Path
 from unittest.mock import patch
 
-from gradata.hooks.secret_scan import main as scan_main
 from gradata.hooks.config_protection import main as protect_main
 from gradata.hooks.rule_enforcement import main as enforce_main
-
+from gradata.hooks.secret_scan import main as scan_main
 
 # ── secret_scan tests ──
+
 
 def test_secret_scan_blocks_openai_key():
     data = {
         "tool_name": "Write",
-        "tool_input": {"file_path": "config.py", "content": "key = 'sk-abc123def456ghi789jkl012mno345pqr'"},
+        "tool_input": {
+            "file_path": "config.py",
+            "content": "key = 'sk-abc123def456ghi789jkl012mno345pqr'",
+        },
     }
     result = scan_main(data)
     assert result is not None
@@ -49,7 +53,10 @@ def test_secret_scan_no_content():
 def test_secret_scan_blocks_private_key():
     data = {
         "tool_name": "Write",
-        "tool_input": {"file_path": "key.pem", "content": "-----BEGIN RSA PRIVATE KEY-----\nfoo\n-----END RSA PRIVATE KEY-----"},
+        "tool_input": {
+            "file_path": "key.pem",
+            "content": "-----BEGIN RSA PRIVATE KEY-----\nfoo\n-----END RSA PRIVATE KEY-----",
+        },
     }
     result = scan_main(data)
     assert result is not None
@@ -67,6 +74,7 @@ def test_secret_scan_blocks_db_connection():
 
 
 # ── config_protection tests ──
+
 
 def test_config_protection_blocks_eslint():
     data = {"tool_input": {"file_path": "/project/.eslintrc.json"}}
@@ -96,6 +104,7 @@ def test_config_protection_no_file_path():
 
 # ── rule_enforcement tests ──
 
+
 def test_rule_enforcement_injects_rules(tmp_path):
     lessons = tmp_path / "lessons.md"
     lessons.write_text(
@@ -104,7 +113,9 @@ def test_rule_enforcement_injects_rules(tmp_path):
         "[2026-04-01] [RULE:0.95] CODE: Never hardcode secrets\n",
         encoding="utf-8",
     )
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path), "GRADATA_RULE_ENFORCEMENT": "1"}):
+    with patch.dict(
+        os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path), "GRADATA_RULE_ENFORCEMENT": "1"}
+    ):
         result = enforce_main({})
     assert result is not None
     assert "ACTIVE RULES" in result["result"]
@@ -117,7 +128,9 @@ def test_rule_enforcement_injects_rules(tmp_path):
 def test_rule_enforcement_no_rules(tmp_path):
     lessons = tmp_path / "lessons.md"
     lessons.write_text("[2026-04-01] [INSTINCT:0.35] CODE: Add docstrings\n", encoding="utf-8")
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path), "GRADATA_RULE_ENFORCEMENT": "1"}):
+    with patch.dict(
+        os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path), "GRADATA_RULE_ENFORCEMENT": "1"}
+    ):
         result = enforce_main({})
     assert result is None
 
@@ -126,7 +139,9 @@ def test_rule_enforcement_truncates_long_descriptions(tmp_path):
     lessons = tmp_path / "lessons.md"
     long_desc = "A" * 200
     lessons.write_text(f"[2026-04-01] [RULE:0.90] CODE: {long_desc}\n", encoding="utf-8")
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path), "GRADATA_RULE_ENFORCEMENT": "1"}):
+    with patch.dict(
+        os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path), "GRADATA_RULE_ENFORCEMENT": "1"}
+    ):
         result = enforce_main({})
     assert result is not None
     assert "..." in result["result"]

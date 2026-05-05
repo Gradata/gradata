@@ -53,7 +53,7 @@ class TestFireCountGuards:
             confidence=PATTERN_THRESHOLD + 0.05,
             fire_count=MIN_APPLICATIONS_FOR_PATTERN - 1,  # 2 fires, need 3
         )
-        active, graduated = graduate([lesson])
+        _active, _graduated = graduate([lesson])
         assert lesson.state == LessonState.INSTINCT, (
             f"Promoted to {lesson.state} with only {lesson.fire_count} fires"
         )
@@ -65,7 +65,7 @@ class TestFireCountGuards:
             confidence=PATTERN_THRESHOLD + 0.05,
             fire_count=MIN_APPLICATIONS_FOR_PATTERN,
         )
-        active, graduated = graduate([lesson])
+        _active, _graduated = graduate([lesson])
         assert lesson.state == LessonState.PATTERN
 
     def test_no_rule_without_5_fires(self) -> None:
@@ -75,7 +75,7 @@ class TestFireCountGuards:
             confidence=RULE_THRESHOLD + 0.01,
             fire_count=MIN_APPLICATIONS_FOR_RULE - 1,  # 4 fires, need 5
         )
-        active, graduated = graduate([lesson])
+        _active, _graduated = graduate([lesson])
         assert lesson.state == LessonState.PATTERN, (
             f"Promoted to {lesson.state} with only {lesson.fire_count} fires"
         )
@@ -88,7 +88,7 @@ class TestFireCountGuards:
             confidence=RULE_THRESHOLD + 0.01,
             fire_count=MIN_APPLICATIONS_FOR_RULE,
         )
-        active, graduated = graduate([lesson])
+        _active, _graduated = graduate([lesson])
         assert lesson.state == LessonState.RULE
 
 
@@ -295,7 +295,8 @@ class TestPenaltyCap:
                     "direction": "REINFORCING",
                     "severity_label": "rewrite",
                 }
-            ] * 10,
+            ]
+            * 10,
             severity_data={"DRAFTING": "rewrite"},
         )
         # Cannot chain INSTINCT -> PATTERN -> RULE in a single tick
@@ -329,24 +330,21 @@ class TestPenaltyCap:
                 [lesson],
                 [{"category": "DRAFTING", "direction": "CONTRADICTING"}],
             )
-            assert lesson.confidence <= prev + 1e-9, (
-                "Contradict event must not increase confidence"
-            )
+            assert lesson.confidence <= prev + 1e-9, "Contradict event must not increase confidence"
             prev = lesson.confidence
         for _ in range(5):
             update_confidence(
                 [lesson],
                 [{"category": "DRAFTING", "direction": "REINFORCING"}],
             )
-            assert lesson.confidence >= prev - 1e-9, (
-                "Reinforce event must not decrease confidence"
-            )
+            assert lesson.confidence >= prev - 1e-9, "Reinforce event must not decrease confidence"
             prev = lesson.confidence
 
 
 # ---------------------------------------------------------------------------
 # Regression: Bug C1 — _pre_session_confidence never reset between sessions
 # ---------------------------------------------------------------------------
+
 
 class TestPreSessionConfidenceReset:
     """Regression for C1: session-id based snapshot reset.
@@ -417,6 +415,7 @@ class TestPreSessionConfidenceReset:
 # Regression: Bug C2 — MIN_APPLICATIONS_FOR_RULE must be 5
 # ---------------------------------------------------------------------------
 
+
 class TestMinApplicationsForRule:
     """Regression for C2: MIN_APPLICATIONS_FOR_RULE was accidentally lowered to 3.
 
@@ -449,6 +448,7 @@ class TestMinApplicationsForRule:
 # Regression: Bug H1 — INITIAL_CONFIDENCE (0.60) == PATTERN_THRESHOLD (0.60)
 # ---------------------------------------------------------------------------
 
+
 class TestInitialConfidenceNotPromotable:
     """Regression for H1: lessons born at INITIAL_CONFIDENCE must not immediately
     satisfy the PATTERN_THRESHOLD promotion check.
@@ -461,6 +461,7 @@ class TestInitialConfidenceNotPromotable:
     def test_new_lesson_at_initial_confidence_cannot_promote(self) -> None:
         """A lesson at exactly INITIAL_CONFIDENCE == PATTERN_THRESHOLD must not promote."""
         from gradata.enhancements.self_improvement import INITIAL_CONFIDENCE, PATTERN_THRESHOLD
+
         assert INITIAL_CONFIDENCE == PATTERN_THRESHOLD, (
             "H1 precondition: test is only relevant when INITIAL_CONFIDENCE == PATTERN_THRESHOLD"
         )

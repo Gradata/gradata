@@ -2,8 +2,6 @@
 
 from unittest.mock import patch
 
-import pytest
-
 from gradata.rules.rule_tracker import VALID_SUPPRESSION_REASONS, log_suppression
 
 _EMIT_PATH = "gradata._events.emit"
@@ -20,7 +18,7 @@ class TestLogSuppression:
     def test_data_contains_rule_id_and_reason(self):
         with patch(_EMIT_PATH) as mock_emit:
             log_suppression(rule_id="TONE:abc123", reason="domain_disabled", relevance=0.0)
-            kwargs = mock_emit.call_args[1]
+            mock_emit.call_args[1]
             # emit is called with keyword args from log_suppression
             call_args = mock_emit.call_args
             # Get data from positional or keyword args

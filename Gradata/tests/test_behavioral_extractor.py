@@ -1,7 +1,7 @@
 """Tests for behavioral_extractor — recurring pattern detection."""
 
-from gradata.enhancements.behavioral_extractor import detect_recurring_patterns, RecurringPattern
 from gradata._types import Lesson, LessonState
+from gradata.enhancements.behavioral_extractor import detect_recurring_patterns
 
 
 class TestRecurringPatterns:

@@ -1,9 +1,6 @@
 """Tests for CausalChain tracking in the learning pipeline."""
 
-import pytest
-
-from gradata.enhancements.causal_chains import CausalChain, CausalLink, CausalRelation
-
+from gradata.enhancements.causal_chains import CausalChain, CausalRelation
 
 # ---------------------------------------------------------------------------
 # 1. Add correction_to_rule link and trace back

@@ -4,11 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import pytest
-
 from gradata._types import Lesson, LessonState
 from gradata.enhancements.meta_rules import llm_synthesize_rules
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -153,7 +150,7 @@ class TestLLMSynthesis:
                 side_effect=fake_call,
             ),
         ):
-            result = llm_synthesize_rules(lessons, provider="anthropic", max_calls=1)
+            llm_synthesize_rules(lessons, provider="anthropic", max_calls=1)
 
         assert call_count == 1
 

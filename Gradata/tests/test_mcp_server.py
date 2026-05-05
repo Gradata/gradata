@@ -9,22 +9,15 @@ from __future__ import annotations
 
 import io
 import json
-import tempfile
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 # ---------------------------------------------------------------------------
 # Helpers — import the module under test
 # ---------------------------------------------------------------------------
-
 from gradata.mcp_server import (
     INTERNAL_ERROR,
-    INVALID_PARAMS,
     METHOD_NOT_FOUND,
-    _TOOL_SCHEMAS,
     _dispatch,
     _err,
     _handle_initialize,
@@ -37,10 +30,10 @@ from gradata.mcp_server import (
     run_server,
 )
 
-
 # ---------------------------------------------------------------------------
 # Framing helpers
 # ---------------------------------------------------------------------------
+
 
 def _frame(obj: dict[str, Any]) -> bytes:
     """Encode a dict as a Content-Length-framed JSON-RPC message."""
@@ -122,9 +115,7 @@ class TestMessageFraming:
         header_end = raw.index(b"\r\n\r\n")
         header = raw[:header_end].decode()
         length_str = next(
-            line.split(":")[1].strip()
-            for line in header.split("\r\n")
-            if "Content-Length" in line
+            line.split(":")[1].strip() for line in header.split("\r\n") if "Content-Length" in line
         )
         actual_body = raw[header_end + 4 :]
         assert int(length_str) == len(actual_body)
@@ -191,7 +182,7 @@ class TestHandlers:
     def test_tools_list_returns_all_tools(self):
         resp = _handle_tools_list(2)
         tools = resp["result"]["tools"]
-        assert len(tools) == 11
+        assert len(tools) == 12
 
     def test_tools_list_tool_names(self):
         resp = _handle_tools_list(2)
@@ -208,6 +199,7 @@ class TestHandlers:
             "brain_capabilities",
             "brain_benchmark",
             "brain_briefing",
+            "gradata_recall",
         }
         assert names == expected
 
@@ -280,9 +272,7 @@ class TestDispatch:
             "brain_log_output",
             {"text": "hello", "output_type": "email", "self_score": 8.5},
         )
-        brain.log_output.assert_called_once_with(
-            "hello", output_type="email", self_score=8.5
-        )
+        brain.log_output.assert_called_once_with("hello", output_type="email", self_score=8.5)
         assert "content" in result
 
     def test_dispatch_brain_manifest_calls_manifest(self):

@@ -32,9 +32,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger("gradata.rule_integrity")
 
 # Shared regex for parsing lesson lines: [STATE:CONF] CATEGORY: description
-_LESSON_PATTERN = re.compile(
-    r"\[(?:INSTINCT|PATTERN|RULE):(\d+\.\d+)\]\s+(\w+):\s+(.+)"
-)
+_LESSON_PATTERN = re.compile(r"\[(?:INSTINCT|PATTERN|RULE):(\d+\.\d+)\]\s+(\w+):\s+(.+)")
 
 # ---------------------------------------------------------------------------
 # Key Management
@@ -256,9 +254,7 @@ def load_signatures(ctx: BrainContext) -> dict[str, str]:
         return {row[0]: row[1] for row in rows}
 
 
-def sign_and_store(
-    ctx: BrainContext, rule_text: str, category: str, confidence: float
-) -> str:
+def sign_and_store(ctx: BrainContext, rule_text: str, category: str, confidence: float) -> str:
     """Sign a rule and store the signature in the database.
 
     Convenience function for use at graduation time.
@@ -289,9 +285,7 @@ def _load_signature(ctx: BrainContext, category: str) -> str:
         return row[0] if row else ""
 
 
-def verify_from_db(
-    ctx: BrainContext, rule_text: str, category: str, confidence: float
-) -> bool:
+def verify_from_db(ctx: BrainContext, rule_text: str, category: str, confidence: float) -> bool:
     """Verify a rule against the signature stored in system.db.
 
     Returns True if:

@@ -3,6 +3,7 @@
 Covers the filters added after a shadow run against the live brain revealed
 40% false positives from claude-mem observer echoes and system wrappers.
 """
+
 from __future__ import annotations
 
 import json
@@ -19,7 +20,6 @@ from gradata._mine_transcripts import (
     _session_uuid_to_int,
     run_mine,
 )
-
 
 # ── Signal detection ──
 
@@ -239,6 +239,7 @@ def test_run_mine_commit_writes_jsonl_and_db(tmp_path):
     import sqlite3
 
     from gradata import Brain
+
     brain_dir = tmp_path / "brain"
     Brain.init(brain_dir)
 
@@ -301,6 +302,7 @@ def test_run_mine_commit_upserts_correction_patterns(tmp_path):
     import sqlite3
 
     from gradata import Brain
+
     brain_dir = tmp_path / "brain"
     Brain.init(brain_dir)
 
@@ -325,9 +327,7 @@ def test_run_mine_commit_upserts_correction_patterns(tmp_path):
     )
 
     with sqlite3.connect(str(brain_dir / "system.db")) as conn:
-        rows = conn.execute(
-            "SELECT category, session_id FROM correction_patterns"
-        ).fetchall()
+        rows = conn.execute("SELECT category, session_id FROM correction_patterns").fetchall()
     assert len(rows) == 2
     assert all(r[0] == "DRAFTING" for r in rows)
     assert len({r[1] for r in rows}) == 2  # 2 distinct session_ids
@@ -339,6 +339,7 @@ def test_run_mine_commit_patterns_idempotent(tmp_path):
     import sqlite3
 
     from gradata import Brain
+
     brain_dir = tmp_path / "brain"
     Brain.init(brain_dir)
 
@@ -368,6 +369,7 @@ def test_run_mine_commit_is_idempotent(tmp_path):
     import sqlite3
 
     from gradata import Brain
+
     brain_dir = tmp_path / "brain"
     Brain.init(brain_dir)
 

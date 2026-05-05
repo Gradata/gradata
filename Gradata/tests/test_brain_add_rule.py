@@ -10,6 +10,7 @@ Covers:
     * extra ``data`` dict applies only to known Lesson fields
     * schema evolution guarantee: round-trip via parse_lessons / format_lessons
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -27,8 +28,13 @@ def brain(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Brain:
     # and can't leak into unrelated tests (the raw os.environ.__setitem__
     # approach persisted beyond the test that set it).
     monkeypatch.setenv("BRAIN_DIR", str(tmp_path / "brain"))
-    b = Brain.init(tmp_path / "brain", name="AddRuleTest", domain="Testing",
-                   embedding="local", interactive=False)
+    b = Brain.init(
+        tmp_path / "brain",
+        name="AddRuleTest",
+        domain="Testing",
+        embedding="local",
+        interactive=False,
+    )
     return b
 
 
@@ -50,8 +56,7 @@ class TestAddRuleHappyPath:
         assert l.confidence == 0.90
 
     def test_accepts_custom_state_and_confidence(self, brain: Brain) -> None:
-        result = brain.add_rule("Prototype idea", "DRAFTING",
-                                state="INSTINCT", confidence=0.3)
+        result = brain.add_rule("Prototype idea", "DRAFTING", state="INSTINCT", confidence=0.3)
         assert result["added"] is True
         assert result["state"] == "INSTINCT"
         assert result["confidence"] == 0.30
@@ -125,7 +130,8 @@ class TestAddRuleConfidenceClamp:
 class TestAddRuleData:
     def test_known_data_fields_applied(self, brain: Brain) -> None:
         result = brain.add_rule(
-            "Use colons", "DRAFTING",
+            "Use colons",
+            "DRAFTING",
             data={"root_cause": "em-dashes are slop", "agent_type": "writer"},
         )
         assert result["added"] is True
@@ -138,7 +144,8 @@ class TestAddRuleData:
     def test_unknown_data_keys_silently_ignored(self, brain: Brain) -> None:
         # Must not raise — graceful degradation for forward/back compat
         result = brain.add_rule(
-            "R", "CAT",
+            "R",
+            "CAT",
             data={"nonexistent_field": "xyz", "root_cause": "keep this"},
         )
         assert result["added"] is True
@@ -148,9 +155,14 @@ class TestAddRuleData:
     def test_protected_fields_ignored_in_data(self, brain: Brain) -> None:
         # data={"description": ...} must NOT override the explicit arg
         result = brain.add_rule(
-            "Real description", "CAT",
-            data={"description": "OVERRIDE", "category": "OTHER",
-                  "confidence": 0.0, "state": LessonState.INSTINCT},
+            "Real description",
+            "CAT",
+            data={
+                "description": "OVERRIDE",
+                "category": "OTHER",
+                "confidence": 0.0,
+                "state": LessonState.INSTINCT,
+            },
         )
         assert result["added"] is True
         lessons = parse_lessons((brain.dir / "lessons.md").read_text(encoding="utf-8"))

@@ -1,6 +1,6 @@
 """Tests for _tag_taxonomy — cognitive load tag and enrichment."""
 
-from gradata._tag_taxonomy import TAXONOMY, validate_tag, enrich_tags
+from gradata._tag_taxonomy import TAXONOMY, enrich_tags, validate_tag
 
 
 class TestCognitiveLoadTaxonomy:
@@ -11,11 +11,11 @@ class TestCognitiveLoadTaxonomy:
         assert spec["values"] == {"intrinsic", "extraneous", "germane"}
 
     def test_validate_valid(self):
-        valid, msg = validate_tag("cognitive_load:intrinsic")
+        valid, _msg = validate_tag("cognitive_load:intrinsic")
         assert valid
-        valid, msg = validate_tag("cognitive_load:extraneous")
+        valid, _msg = validate_tag("cognitive_load:extraneous")
         assert valid
-        valid, msg = validate_tag("cognitive_load:germane")
+        valid, _msg = validate_tag("cognitive_load:germane")
         assert valid
 
     def test_validate_invalid(self):

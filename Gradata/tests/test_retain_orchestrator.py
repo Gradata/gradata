@@ -17,15 +17,14 @@ import sqlite3
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from gradata._events import RetainOrchestrator
-
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 
-def _make_event(event_type: str = "TEST", source: str = "test", ts: str = "2026-01-01T00:00:00+00:00") -> dict:
+def _make_event(
+    event_type: str = "TEST", source: str = "test", ts: str = "2026-01-01T00:00:00+00:00"
+) -> dict:
     return {
         "ts": ts,
         "session": 1,
@@ -255,6 +254,7 @@ class TestPhase2FailurePreventsPhase3:
 
         # _locked_append uses the builtin open(); patch it in gradata._events
         import builtins
+
         original_open = builtins.open
 
         def _bad_open(path, *args, **kwargs):
@@ -275,6 +275,7 @@ class TestPhase2FailurePreventsPhase3:
         orch.queue(_make_event())
 
         import builtins
+
         original_open = builtins.open
 
         def _bad_open(path, *args, **kwargs):
@@ -323,6 +324,7 @@ class TestSQLiteWrite:
         # Pre-create table via _ensure_table
         with contextlib.closing(sqlite3.connect(str(db_path))) as conn:
             from gradata._events import _ensure_table
+
             _ensure_table(conn)
 
         orch = RetainOrchestrator(tmp_path)
@@ -338,4 +340,4 @@ class TestSQLiteWrite:
         assert rows[0][1] == "test"
 
 
-import contextlib  # noqa: E402 — imported at end to keep test logic readable
+import contextlib

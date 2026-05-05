@@ -277,10 +277,7 @@ def test_scoped_correct_preserves_explicit_applies_to(tmp_path):
     )
 
     events = brain.query_events(event_type="CORRECTION") if hasattr(brain, "query_events") else []
-    targeted = [
-        e for e in events
-        if (e.get("data") or {}).get("applies_to") == "code:formatting"
-    ]
+    targeted = [e for e in events if (e.get("data") or {}).get("applies_to") == "code:formatting"]
     assert targeted, "explicit applies_to must not be overwritten"
 
 
@@ -520,5 +517,7 @@ def test_agent_precontext_env_domain_overridden_by_tool_input(tmp_path, monkeypa
     result = agent_precontext.main(data)
     assert result is not None
     block = result.get("result", "")
-    assert "CODE-RULE" in block, "tool_input.scope_domain='code' must win over env GRADATA_SCOPE_DOMAIN='sales'"
+    assert "CODE-RULE" in block, (
+        "tool_input.scope_domain='code' must win over env GRADATA_SCOPE_DOMAIN='sales'"
+    )
     assert "SALES-RULE" not in block

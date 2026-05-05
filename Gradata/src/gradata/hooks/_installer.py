@@ -4,6 +4,7 @@ This is NOT the brain marketplace installer (src/gradata/_installer.py).
 This module manages Claude Code hook registration in ~/.claude/settings.json,
 controlling which Gradata hooks activate at each profile tier.
 """
+
 from __future__ import annotations
 
 import json
@@ -21,26 +22,159 @@ from gradata.hooks._profiles import Profile
 # ---------------------------------------------------------------------------
 
 HOOK_REGISTRY: list[tuple[str, str, str | None, Profile, int, str]] = [
-    ("auto_correct",         "PostToolUse",      "Edit|Write",           Profile.MINIMAL,  5000,  "Gradata: capture corrections from edits"),
-    ("inject_brain_rules",   "SessionStart",     None,                   Profile.MINIMAL,  10000, "Gradata: inject graduated rules at session start"),
-    ("session_close",        "Stop",             None,                   Profile.MINIMAL,  15000, "Gradata: emit SESSION_END + run graduation sweep"),
-    ("secret_scan",          "PreToolUse",       "Write|Edit|MultiEdit", Profile.STANDARD, 5000,  "Gradata: block secrets in written content"),
-    ("config_protection",    "PreToolUse",       "Write|Edit|MultiEdit", Profile.STANDARD, 3000,  "Gradata: block linter config weakening"),
-    ("rule_enforcement",     "PreToolUse",       "Write|Edit|MultiEdit", Profile.STANDARD, 5000,  "Gradata: inject RULE reminders before edits"),
-    ("generated_runner",     "PreToolUse",       "Write|Edit|MultiEdit|Bash", Profile.STANDARD, 10000, "Gradata: run user-installed generated hooks from gradata rule add"),
-    ("generated_runner_post","PostToolUse",      "Write|Edit|MultiEdit",      Profile.STANDARD, 35000, "Gradata: run user-installed post-tool hooks (e.g. auto_test)"),
-    ("agent_precontext",     "PreToolUse",       "Agent",                Profile.STANDARD, 8000,  "Gradata: inject rules into sub-agent prompts"),
-    ("agent_graduation",     "PostToolUse",      "Agent",                Profile.STANDARD, 10000, "Gradata: record agent outcomes for graduation"),
-    ("tool_failure_emit",    "PostToolUse",      "Bash",                 Profile.STANDARD, 5000,  "Gradata: track tool failures with backoff"),
-    ("tool_finding_capture", "PostToolUse",      "Bash|Edit|Write",      Profile.STANDARD, 5000,  "Gradata: bridge lint/test findings to corrections"),
-    ("config_validate",      "SessionStart",     None,                   Profile.STANDARD, 5000,  "Gradata: validate settings.json integrity"),
-    ("context_inject",       "UserPromptSubmit", None,                   Profile.STANDARD, 8000,  "Gradata: inject brain context on user message"),
-    ("pre_compact",          "PreCompact",       "manual|auto",          Profile.STANDARD, 5000,  "Gradata: save state before context compression"),
-    ("duplicate_guard",      "PreToolUse",       "Write",                Profile.STRICT,   3000,  "Gradata: block new files when similar exists"),
-    ("brain_maintain",       "Stop",             None,                   Profile.STRICT,   20000, "Gradata: FTS rebuild + brain maintenance"),
-    ("session_persist",      "Stop",             None,                   Profile.STRICT,   10000, "Gradata: crash-safe session handoff"),
-    ("implicit_feedback",    "UserPromptSubmit", None,                   Profile.STRICT,   5000,  "Gradata: detect pushback as implicit corrections"),
-    ("stale_hook_check",     "SessionStart",     None,                   Profile.STANDARD, 5000,  "Gradata: warn on stale generated hooks at session start"),
+    (
+        "auto_correct",
+        "PostToolUse",
+        "Edit|Write",
+        Profile.MINIMAL,
+        5000,
+        "Gradata: capture corrections from edits",
+    ),
+    (
+        "inject_brain_rules",
+        "SessionStart",
+        None,
+        Profile.MINIMAL,
+        10000,
+        "Gradata: inject graduated rules at session start",
+    ),
+    (
+        "session_close",
+        "Stop",
+        None,
+        Profile.MINIMAL,
+        15000,
+        "Gradata: emit SESSION_END + run graduation sweep",
+    ),
+    (
+        "secret_scan",
+        "PreToolUse",
+        "Write|Edit|MultiEdit",
+        Profile.STANDARD,
+        5000,
+        "Gradata: block secrets in written content",
+    ),
+    (
+        "config_protection",
+        "PreToolUse",
+        "Write|Edit|MultiEdit",
+        Profile.STANDARD,
+        3000,
+        "Gradata: block linter config weakening",
+    ),
+    (
+        "rule_enforcement",
+        "PreToolUse",
+        "Write|Edit|MultiEdit",
+        Profile.STANDARD,
+        5000,
+        "Gradata: inject RULE reminders before edits",
+    ),
+    (
+        "generated_runner",
+        "PreToolUse",
+        "Write|Edit|MultiEdit|Bash",
+        Profile.STANDARD,
+        10000,
+        "Gradata: run user-installed generated hooks from gradata rule add",
+    ),
+    (
+        "generated_runner_post",
+        "PostToolUse",
+        "Write|Edit|MultiEdit",
+        Profile.STANDARD,
+        35000,
+        "Gradata: run user-installed post-tool hooks (e.g. auto_test)",
+    ),
+    (
+        "agent_precontext",
+        "PreToolUse",
+        "Agent",
+        Profile.STANDARD,
+        8000,
+        "Gradata: inject rules into sub-agent prompts",
+    ),
+    (
+        "agent_graduation",
+        "PostToolUse",
+        "Agent",
+        Profile.STANDARD,
+        10000,
+        "Gradata: record agent outcomes for graduation",
+    ),
+    (
+        "tool_failure_emit",
+        "PostToolUse",
+        "Bash",
+        Profile.STANDARD,
+        5000,
+        "Gradata: track tool failures with backoff",
+    ),
+    (
+        "tool_finding_capture",
+        "PostToolUse",
+        "Bash|Edit|Write",
+        Profile.STANDARD,
+        5000,
+        "Gradata: bridge lint/test findings to corrections",
+    ),
+    (
+        "config_validate",
+        "SessionStart",
+        None,
+        Profile.STANDARD,
+        5000,
+        "Gradata: validate settings.json integrity",
+    ),
+    (
+        "context_inject",
+        "UserPromptSubmit",
+        None,
+        Profile.STANDARD,
+        8000,
+        "Gradata: inject brain context on user message",
+    ),
+    (
+        "pre_compact",
+        "PreCompact",
+        "manual|auto",
+        Profile.STANDARD,
+        5000,
+        "Gradata: save state before context compression",
+    ),
+    (
+        "duplicate_guard",
+        "PreToolUse",
+        "Write",
+        Profile.STRICT,
+        3000,
+        "Gradata: block new files when similar exists",
+    ),
+    (
+        "brain_maintain",
+        "Stop",
+        None,
+        Profile.STRICT,
+        20000,
+        "Gradata: FTS rebuild + brain maintenance",
+    ),
+    ("session_persist", "Stop", None, Profile.STRICT, 10000, "Gradata: crash-safe session handoff"),
+    (
+        "implicit_feedback",
+        "UserPromptSubmit",
+        None,
+        Profile.STRICT,
+        5000,
+        "Gradata: detect pushback as implicit corrections",
+    ),
+    (
+        "stale_hook_check",
+        "SessionStart",
+        None,
+        Profile.STANDARD,
+        5000,
+        "Gradata: warn on stale generated hooks at session start",
+    ),
 ]
 
 # ---------------------------------------------------------------------------
@@ -82,6 +216,7 @@ SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
 # ---------------------------------------------------------------------------
 # Generate settings dict
 # ---------------------------------------------------------------------------
+
 
 def generate_settings(profile: str = "standard", project_dir: Path | None = None) -> dict:
     """Generate a Claude Code settings dict with hooks for the given profile.
@@ -144,6 +279,7 @@ def generate_settings(profile: str = "standard", project_dir: Path | None = None
 # Settings I/O
 # ---------------------------------------------------------------------------
 
+
 def _load_settings() -> dict:
     if SETTINGS_PATH.is_file():
         try:
@@ -156,9 +292,7 @@ def _load_settings() -> dict:
 
 def _save_settings(settings: dict) -> None:
     SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    SETTINGS_PATH.write_text(
-        json.dumps(settings, indent=2) + "\n", encoding="utf-8"
-    )
+    SETTINGS_PATH.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
 
 
 def _is_gradata_hook(hook_group: dict) -> bool:
@@ -177,8 +311,10 @@ def _is_gradata_hook(hook_group: dict) -> bool:
 # Public API
 # ---------------------------------------------------------------------------
 
-def install(profile: str = "standard", project_dir: Path | None = None,
-            include_watchdog: bool = False) -> None:
+
+def install(
+    profile: str = "standard", project_dir: Path | None = None, include_watchdog: bool = False
+) -> None:
     """Install Gradata hooks into ~/.claude/settings.json.
 
     Args:
@@ -213,14 +349,24 @@ def install(profile: str = "standard", project_dir: Path | None = None,
     # If include_watchdog forces the JS hooks on a profile that would have
     # filtered them out, splice them in explicitly.
     if include_watchdog and project_dir is not None:
-        for subdir, filename, event, matcher, _min_profile, timeout, description in JS_HOOK_REGISTRY:
+        for (
+            subdir,
+            filename,
+            event,
+            matcher,
+            _min_profile,
+            timeout,
+            description,
+        ) in JS_HOOK_REGISTRY:
             script_path = Path(project_dir) / ".claude" / "hooks" / subdir / filename
             entry = {
-                "hooks": [{
-                    "type": "command",
-                    "command": f"node {script_path}",
-                    "timeout": timeout,
-                }],
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": f"node {script_path}",
+                        "timeout": timeout,
+                    }
+                ],
                 "description": description,
             }
             if matcher:
@@ -334,12 +480,14 @@ def status() -> None:
             if _is_gradata_hook(group):
                 desc = group.get("description", "?")
                 for hook in group.get("hooks", []):
-                    gradata_hooks.append({
-                        "event": event,
-                        "command": hook.get("command", "?"),
-                        "description": desc,
-                        "timeout": hook.get("timeout", "?"),
-                    })
+                    gradata_hooks.append(
+                        {
+                            "event": event,
+                            "command": hook.get("command", "?"),
+                            "description": desc,
+                            "timeout": hook.get("timeout", "?"),
+                        }
+                    )
 
     if gradata_hooks:
         _log.info("Gradata hooks: %d INSTALLED", len(gradata_hooks))

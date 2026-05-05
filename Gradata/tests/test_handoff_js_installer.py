@@ -1,21 +1,20 @@
 """Tests for the JS hook bundling/installer flow (issue #135)."""
+
 from __future__ import annotations
 
 import json
 import os
-import subprocess
 import shutil
-import sys
+import subprocess
 import tempfile
 from pathlib import Path
 
 import pytest
 
 from gradata.hooks._installer import (
-    JS_HOOK_REGISTRY,
     _JS_ASSETS_ROOT,
-    install_js_hooks,
     generate_settings,
+    install_js_hooks,
 )
 
 
@@ -135,9 +134,7 @@ def test_handoff_watchdog_emits_directive_when_pressure_high(tmp_path: Path):
     bridge_path.write_text(json.dumps({"used_pct": 85}), encoding="utf-8")
 
     # Clean up any existing handoff/sentinel for this session
-    for name in (
-        f"gradata-handoff-fired-{session_id}.flag",
-    ):
+    for name in (f"gradata-handoff-fired-{session_id}.flag",):
         p = Path(tmpdir) / name
         if p.exists():
             p.unlink()

@@ -2,10 +2,7 @@
 
 import copy
 
-import pytest
-
 from gradata.security.manifest_signing import sign_manifest, verify_manifest
-
 
 SAMPLE_MANIFEST = {
     "brain_id": "test-brain-001",
@@ -33,7 +30,7 @@ class TestSignManifest:
     def test_does_not_mutate_original(self):
         original = copy.deepcopy(SAMPLE_MANIFEST)
         sign_manifest(SAMPLE_MANIFEST, SALT)
-        assert SAMPLE_MANIFEST == original
+        assert original == SAMPLE_MANIFEST
         assert "signature" not in SAMPLE_MANIFEST
 
 

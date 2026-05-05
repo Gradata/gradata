@@ -15,6 +15,7 @@ Callers should ALWAYS go through :func:`get_config_dir` instead of building
 paths from ``Path.home()`` directly. That keeps future work (XDG compliance,
 Windows %APPDATA%, sandboxed test overrides) in one place.
 """
+
 from __future__ import annotations
 
 import os

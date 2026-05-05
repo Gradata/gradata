@@ -102,6 +102,7 @@ __all__ = list(_LAZY_IMPORTS.keys())
 def __getattr__(name: str):
     if name in _LAZY_IMPORTS:
         import importlib
+
         rel_module, attr = _LAZY_IMPORTS[name]
         mod = importlib.import_module(rel_module, __package__)
         return getattr(mod, attr)

@@ -1,4 +1,5 @@
 """Tests for multi-strategy retrieval fusion with correction-aware boosting."""
+
 from __future__ import annotations
 
 import pytest
@@ -14,6 +15,7 @@ from gradata.enhancements.scoring.retrieval_fusion import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def make_rule(rule_id: str, score: float = 1.0, metadata: dict | None = None) -> ScoredRule:
     return ScoredRule(
         rule_id=rule_id,
@@ -27,6 +29,7 @@ def make_rule(rule_id: str, score: float = 1.0, metadata: dict | None = None) ->
 # ---------------------------------------------------------------------------
 # reciprocal_rank_fusion
 # ---------------------------------------------------------------------------
+
 
 class TestRRFSingleList:
     def test_rank_order_matches_list_order(self):
@@ -165,6 +168,7 @@ class TestRRFKParameter:
 # apply_correction_boost
 # ---------------------------------------------------------------------------
 
+
 class TestCorrectionBoost:
     def test_correction_born_rules_get_boosted(self):
         """from_correction=True should increase combined_score above rrf_score."""
@@ -221,8 +225,12 @@ class TestCorrectionBoost:
             source="semantic",
             metadata={"from_correction": True, "recency_score": 0.5, "severity_score": 0.5},
         )
-        mr_high = MergedRule(rule=rule_neutral_correction, rrf_score=1.0, rrf_rank=1, combined_score=1.0)
-        mr_neutral = MergedRule(rule=rule_neutral_severity, rrf_score=1.0, rrf_rank=2, combined_score=1.0)
+        mr_high = MergedRule(
+            rule=rule_neutral_correction, rrf_score=1.0, rrf_rank=1, combined_score=1.0
+        )
+        mr_neutral = MergedRule(
+            rule=rule_neutral_severity, rrf_score=1.0, rrf_rank=2, combined_score=1.0
+        )
 
         apply_correction_boost([mr_high, mr_neutral])
 
@@ -279,9 +287,9 @@ class TestCorrectionBoost:
 
         apply_correction_boost([mr], correction_alpha=0.30, recency_alpha=0.20, severity_alpha=0.10)
 
-        cb = 1.0 + 0.30 * (1.0 - 0.5)   # 1.15
-        rb = 1.0 + 0.20 * (0.8 - 0.5)   # 1.06
-        sb = 1.0 + 0.10 * (0.9 - 0.5)   # 1.04
+        cb = 1.0 + 0.30 * (1.0 - 0.5)  # 1.15
+        rb = 1.0 + 0.20 * (0.8 - 0.5)  # 1.06
+        sb = 1.0 + 0.10 * (0.9 - 0.5)  # 1.04
         expected = 0.5 * cb * rb * sb
 
         assert mr.combined_score == pytest.approx(expected, rel=1e-6)

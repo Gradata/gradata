@@ -16,4 +16,4 @@ warnings.warn(
     stacklevel=2,
 )
 
-from gradata.services.session_history import *  # noqa: E402,F401,F403
+from gradata.services.session_history import *  # noqa: F403

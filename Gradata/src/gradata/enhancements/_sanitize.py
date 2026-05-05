@@ -61,7 +61,7 @@ SanitizeContext = Literal["xml", "js", "js_template", "llm_prompt"]
 
 _XML_ESCAPE_TABLE = str.maketrans(
     {
-        "&": "&amp;",   # Must be first to avoid double-escaping
+        "&": "&amp;",  # Must be first to avoid double-escaping
         "<": "&lt;",
         ">": "&gt;",
         '"': "&quot;",
@@ -83,9 +83,8 @@ def _escape_xml(text: str) -> str:
 # handled by json.dumps().  json.dumps() handles \, ", \n, \r, \t, \0 — so
 # the residual risk is backtick (template literal injection) and </script> tag.
 _JS_BREAKOUT_RE = re.compile(
-    r"`"           # template literal delimiter
-    r"|<\s*/\s*script\s*>"  # </script> tag to break out of <script> blocks
-    ,
+    r"`"  # template literal delimiter
+    r"|<\s*/\s*script\s*>",  # </script> tag to break out of <script> blocks
     re.IGNORECASE,
 )
 
@@ -137,34 +136,49 @@ def _escape_js_template(text: str) -> str:
 # Design: named groups so we can log *which* pattern triggered.
 _PROMPT_INJECTION_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     # Classic openers
-    ("ignore_previous", re.compile(
-        r"\b(?:ignore|disregard|forget)\s+(?:previous|prior|all\s+previous|the\s+above|everything\s+above)"
-        r"\s+(?:instructions?|rules?|prompts?|context)?",
-        re.IGNORECASE,
-    )),
+    (
+        "ignore_previous",
+        re.compile(
+            r"\b(?:ignore|disregard|forget)\s+(?:previous|prior|all\s+previous|the\s+above|everything\s+above)"
+            r"\s+(?:instructions?|rules?|prompts?|context)?",
+            re.IGNORECASE,
+        ),
+    ),
     # Role hijack
-    ("role_hijack", re.compile(
-        r"\b(?:you\s+are\s+now|from\s+now\s+on\s+you\s+are|act\s+as\s+(?:if\s+you\s+(?:are|were)|a\b)|"
-        r"pretend\s+you\s+are|new\s+role\s*:|new\s+instructions?\s*:)",
-        re.IGNORECASE,
-    )),
+    (
+        "role_hijack",
+        re.compile(
+            r"\b(?:you\s+are\s+now|from\s+now\s+on\s+you\s+are|act\s+as\s+(?:if\s+you\s+(?:are|were)|a\b)|"
+            r"pretend\s+you\s+are|new\s+role\s*:|new\s+instructions?\s*:)",
+            re.IGNORECASE,
+        ),
+    ),
     # System prompt manipulation
-    ("system_prompt", re.compile(
-        r"\b(?:system\s+prompt|reveal\s+your\s+(?:prompt|instructions?)|"
-        r"show\s+your\s+(?:instructions?|prompt)|print\s+your\s+system)",
-        re.IGNORECASE,
-    )),
+    (
+        "system_prompt",
+        re.compile(
+            r"\b(?:system\s+prompt|reveal\s+your\s+(?:prompt|instructions?)|"
+            r"show\s+your\s+(?:instructions?|prompt)|print\s+your\s+system)",
+            re.IGNORECASE,
+        ),
+    ),
     # Override / bypass
-    ("override", re.compile(
-        r"\b(?:override\s+(?:previous|your)|bypass\s+your|jailbreak|dan\s+mode|"
-        r"developer\s+mode\s+enabled|do\s+anything\s+now)",
-        re.IGNORECASE,
-    )),
+    (
+        "override",
+        re.compile(
+            r"\b(?:override\s+(?:previous|your)|bypass\s+your|jailbreak|dan\s+mode|"
+            r"developer\s+mode\s+enabled|do\s+anything\s+now)",
+            re.IGNORECASE,
+        ),
+    ),
     # Instruction injection markers common in indirect prompt injection
-    ("instruction_marker", re.compile(
-        r"(?:^|\n)\s*(?:SYSTEM|HUMAN|ASSISTANT|USER|INSTRUCTION)\s*:\s*",
-        re.IGNORECASE | re.MULTILINE,
-    )),
+    (
+        "instruction_marker",
+        re.compile(
+            r"(?:^|\n)\s*(?:SYSTEM|HUMAN|ASSISTANT|USER|INSTRUCTION)\s*:\s*",
+            re.IGNORECASE | re.MULTILINE,
+        ),
+    ),
 )
 
 _FILTER_PLACEHOLDER = "[FILTERED]"
@@ -218,6 +232,7 @@ def sanitize_lesson_content(text: str, context: SanitizeContext) -> str:
 
     # Unknown context: return as-is but log so we notice gaps.
     import logging
+
     logging.getLogger(__name__).warning(
         "sanitize_lesson_content: unknown context %r — returning text unchanged", context
     )

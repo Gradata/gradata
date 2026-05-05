@@ -17,9 +17,12 @@ three fields graduation actually drives — ``state``, ``confidence``,
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from gradata._types import Lesson, LessonState
-from gradata.cloud.materializer import MaterializeResult
+
+if TYPE_CHECKING:
+    from gradata.cloud.materializer import MaterializeResult
 
 _log = logging.getLogger(__name__)
 

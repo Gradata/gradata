@@ -16,32 +16,29 @@ Run: pytest sdk/tests/test_multi_brain_simulation.py -v
 from __future__ import annotations
 
 import random
-import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import NamedTuple
 
 import pytest
 
-from gradata._types import ELIGIBLE_STATES, Lesson, LessonState, RuleTransferScope
 from gradata._scope import RuleScope
+from gradata._types import ELIGIBLE_STATES, Lesson, LessonState
 from gradata.enhancements.meta_rules import (
     discover_meta_rules,
     ensure_table,
-    save_meta_rules,
     load_meta_rules,
+    save_meta_rules,
 )
-from gradata.rules.rule_engine import apply_rules
 from gradata.enhancements.self_improvement import (
-    ACCEPTANCE_BONUS,
     CONTRADICTION_PENALTY,
     INITIAL_CONFIDENCE,
     PATTERN_THRESHOLD,
     RULE_THRESHOLD,
     SEVERITY_WEIGHTS,
-    SURVIVAL_SEVERITY_WEIGHTS,
     SURVIVAL_BONUS,
+    SURVIVAL_SEVERITY_WEIGHTS,
 )
+from gradata.rules.rule_engine import apply_rules
 
 # ---------------------------------------------------------------------------
 # Deterministic seed — every run produces identical results
@@ -73,6 +70,7 @@ def _violation_delta(severity: str) -> float:
 # Persona definition
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class PersonaSpec:
     """Definition of a simulated persona's correction habits.
@@ -88,7 +86,7 @@ class PersonaSpec:
     name: str
     primary_categories: list[str]
     secondary_categories: list[str]
-    severity_weights: list[float]       # maps to SEVERITIES order
+    severity_weights: list[float]  # maps to SEVERITIES order
     corrections_per_session: tuple[int, int] = (1, 3)
 
 
@@ -128,8 +126,12 @@ PERSONAS: list[PersonaSpec] = [
     PersonaSpec(
         name="Junior Developer",
         primary_categories=[
-            "DRAFTING", "ACCURACY", "PROCESS", "ARCHITECTURE",
-            "COMMUNICATION", "VERIFICATION",
+            "DRAFTING",
+            "ACCURACY",
+            "PROCESS",
+            "ARCHITECTURE",
+            "COMMUNICATION",
+            "VERIFICATION",
         ],
         secondary_categories=["CONSTRAINT", "THOROUGHNESS", "DATA_INTEGRITY"],
         severity_weights=[0.20, 0.30, 0.25, 0.15, 0.10],
@@ -176,6 +178,7 @@ PERSONAS: list[PersonaSpec] = [
 # ---------------------------------------------------------------------------
 # Synthetic lesson / correction generators
 # ---------------------------------------------------------------------------
+
 
 def _make_lesson(
     category: str,
@@ -323,10 +326,7 @@ def _update_confidence(lesson: Lesson, severity: str, survived: bool) -> Lesson:
     Returns:
         The mutated lesson.
     """
-    if survived:
-        delta = _survival_delta(severity)
-    else:
-        delta = _violation_delta(severity)
+    delta = _survival_delta(severity) if survived else _violation_delta(severity)
 
     new_conf = round(lesson.confidence + delta, 2)
     lesson.confidence = max(0.0, min(1.0, new_conf))
@@ -383,13 +383,11 @@ class BrainState:
         n_corrections = self.rng.randint(lo, hi)
 
         # Build the weighted category pool: primaries appear 3x more often
-        cat_pool = (
-            self.persona.primary_categories * 3
-            + self.persona.secondary_categories
-        )
+        cat_pool = self.persona.primary_categories * 3 + self.persona.secondary_categories
 
         # Count lessons per category for growth decisions
         from collections import Counter
+
         cat_counts: Counter[str] = Counter(l.category for l in self.lessons)
 
         modified: list[Lesson] = []
@@ -452,31 +450,30 @@ def _build_brain(persona: PersonaSpec, n_sessions: int, seed: int) -> BrainState
 # Pytest fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="module")
 def all_brains() -> list[BrainState]:
     """All 10 personas each run through 50 sessions. Module-scoped for speed."""
     return [
-        _build_brain(persona, n_sessions=50, seed=_SEED + i)
-        for i, persona in enumerate(PERSONAS)
+        _build_brain(persona, n_sessions=50, seed=_SEED + i) for i, persona in enumerate(PERSONAS)
     ]
 
 
 @pytest.fixture(scope="module")
 def graduated_lessons_per_brain(all_brains: list[BrainState]) -> list[list[Lesson]]:
     """Extract PATTERN+RULE lessons for each brain."""
-    return [
-        [l for l in brain.lessons if l.state in ELIGIBLE_STATES]
-        for brain in all_brains
-    ]
+    return [[l for l in brain.lessons if l.state in ELIGIBLE_STATES] for brain in all_brains]
 
 
 # ---------------------------------------------------------------------------
 # Test 1: Persona graduation divergence
 # ---------------------------------------------------------------------------
 
+
 def _top_categories(lessons: list[Lesson], n: int = 10) -> set[str]:
     """Return the top-n categories by total confidence among graduated lessons."""
     from collections import Counter
+
     counts: Counter[str] = Counter()
     for l in lessons:
         counts[l.category] += l.confidence
@@ -510,7 +507,7 @@ def test_persona_graduation_divergence(graduated_lessons_per_brain: list[list[Le
             distances.append(dist)
 
     max_distance = max(distances)
-    avg_distance = sum(distances) / len(distances)
+    sum(distances) / len(distances)
 
     assert max_distance > 0.30, (
         f"Expected at least one persona pair with Jaccard distance > 0.30, "
@@ -544,6 +541,7 @@ def test_persona_graduation_divergence(graduated_lessons_per_brain: list[list[Le
 # Test 2: Correction-to-meta-rule pipeline
 # ---------------------------------------------------------------------------
 
+
 def test_correction_to_meta_rule_pipeline(graduated_lessons_per_brain: list[list[Lesson]]) -> None:
     """Every persona should produce at least 1 meta-rule after 50 sessions.
 
@@ -570,17 +568,14 @@ def test_correction_to_meta_rule_pipeline(graduated_lessons_per_brain: list[list
             assert len(mr.source_lesson_ids) >= 3, (
                 f"Meta-rule '{mr.id}' for '{persona_name}' has fewer than 3 source lessons."
             )
-            assert mr.confidence > 0.0, (
-                f"Meta-rule '{mr.id}' has zero confidence."
-            )
-            assert mr.principle, (
-                f"Meta-rule '{mr.id}' has an empty principle string."
-            )
+            assert mr.confidence > 0.0, f"Meta-rule '{mr.id}' has zero confidence."
+            assert mr.principle, f"Meta-rule '{mr.id}' has an empty principle string."
 
 
 # ---------------------------------------------------------------------------
 # Test 3: Cross-brain rule isolation
 # ---------------------------------------------------------------------------
+
 
 def test_cross_brain_rule_isolation(tmp_path: Path) -> None:
     """Corrections applied to brain A must not affect brain B.
@@ -596,7 +591,7 @@ def test_cross_brain_rule_isolation(tmp_path: Path) -> None:
     ensure_table(db_b)
 
     # Build brain A with 50 sessions
-    rng = random.Random(_SEED)
+    random.Random(_SEED)
     brain_a = _build_brain(PERSONAS[0], n_sessions=50, seed=_SEED)
     graduated_a = [l for l in brain_a.lessons if l.state in ELIGIBLE_STATES]
 
@@ -619,14 +614,13 @@ def test_cross_brain_rule_isolation(tmp_path: Path) -> None:
     # Verify A's IDs don't appear in B
     a_ids = {mr.id for mr in loaded_a}
     b_ids = {mr.id for mr in loaded_b}
-    assert a_ids.isdisjoint(b_ids), (
-        f"Shared meta-rule IDs between isolated brains: {a_ids & b_ids}"
-    )
+    assert a_ids.isdisjoint(b_ids), f"Shared meta-rule IDs between isolated brains: {a_ids & b_ids}"
 
 
 # ---------------------------------------------------------------------------
 # Test 4: Severity-weighted confidence convergence
 # ---------------------------------------------------------------------------
+
 
 def test_severity_weighted_convergence() -> None:
     """Rewrite-severity corrections produce larger confidence changes than trivial.
@@ -639,12 +633,20 @@ def test_severity_weighted_convergence() -> None:
     n_rounds = 20
 
     lesson_trivial = _make_lesson(
-        "ACCURACY", "trivial", session=1, rng=rng,
-        confidence=INITIAL_CONFIDENCE, index=0,
+        "ACCURACY",
+        "trivial",
+        session=1,
+        rng=rng,
+        confidence=INITIAL_CONFIDENCE,
+        index=0,
     )
     lesson_rewrite = _make_lesson(
-        "ACCURACY", "rewrite", session=1, rng=rng,
-        confidence=INITIAL_CONFIDENCE, index=0,
+        "ACCURACY",
+        "rewrite",
+        session=1,
+        rng=rng,
+        confidence=INITIAL_CONFIDENCE,
+        index=0,
     )
 
     # Alternate survive/violate pattern for both — same pattern, different severity
@@ -652,7 +654,7 @@ def test_severity_weighted_convergence() -> None:
     cumulative_rewrite = 0.0
 
     for round_idx in range(n_rounds):
-        survived = (round_idx % 3 != 0)  # violate every 3rd round
+        survived = round_idx % 3 != 0  # violate every 3rd round
 
         conf_before_trivial = lesson_trivial.confidence
         conf_before_rewrite = lesson_rewrite.confidence
@@ -692,6 +694,7 @@ def test_severity_weighted_convergence() -> None:
 # Test 5: Rule injection scaling (max_rules cap)
 # ---------------------------------------------------------------------------
 
+
 def test_rule_injection_scaling() -> None:
     """apply_rules() must respect the max_rules=10 cap with 50+ eligible lessons.
 
@@ -701,9 +704,16 @@ def test_rule_injection_scaling() -> None:
     """
     rng = random.Random(_SEED)
     categories = [
-        "DRAFTING", "ACCURACY", "PROCESS", "ARCHITECTURE",
-        "COMMUNICATION", "VERIFICATION", "THOROUGHNESS",
-        "CONSTRAINT", "POSITIONING", "DATA_INTEGRITY",
+        "DRAFTING",
+        "ACCURACY",
+        "PROCESS",
+        "ARCHITECTURE",
+        "COMMUNICATION",
+        "VERIFICATION",
+        "THOROUGHNESS",
+        "CONSTRAINT",
+        "POSITIONING",
+        "DATA_INTEGRITY",
     ]
 
     lessons: list[Lesson] = []
@@ -724,9 +734,7 @@ def test_rule_injection_scaling() -> None:
     scope = RuleScope()  # wildcard scope — all lessons eligible
     applied = apply_rules(lessons, scope, max_rules=10)
 
-    assert len(applied) <= 10, (
-        f"apply_rules() returned {len(applied)} rules, expected <= 10."
-    )
+    assert len(applied) <= 10, f"apply_rules() returned {len(applied)} rules, expected <= 10."
     assert len(applied) > 0, "apply_rules() returned 0 rules from 60 eligible lessons."
 
     # All returned rules must be PATTERN or RULE state
@@ -745,6 +753,7 @@ def test_rule_injection_scaling() -> None:
 # ---------------------------------------------------------------------------
 # Test 6: Meta-rule emergence threshold
 # ---------------------------------------------------------------------------
+
 
 def test_meta_rule_emergence_threshold() -> None:
     """Meta-rules emerge at >= 3 eligible lessons; fewer than 3 produce none.
@@ -771,8 +780,7 @@ def test_meta_rule_emergence_threshold() -> None:
     meta_rules_two = discover_meta_rules(two_lessons, min_group_size=3, current_session=2)
 
     assert len(meta_rules_two) == 0, (
-        f"Expected 0 meta-rules from 2 lessons (below threshold=3), "
-        f"got {len(meta_rules_two)}."
+        f"Expected 0 meta-rules from 2 lessons (below threshold=3), got {len(meta_rules_two)}."
     )
 
     # --- Step 2: 3 lessons — at threshold ---
@@ -780,8 +788,7 @@ def test_meta_rule_emergence_threshold() -> None:
     meta_rules_three = discover_meta_rules(three_lessons, min_group_size=3, current_session=3)
 
     assert len(meta_rules_three) >= 1, (
-        f"Expected >= 1 meta-rule from 3 lessons (at threshold=3), "
-        f"got {len(meta_rules_three)}."
+        f"Expected >= 1 meta-rule from 3 lessons (at threshold=3), got {len(meta_rules_three)}."
     )
 
     # The emerged meta-rule should reference all 3 source lessons
@@ -791,14 +798,14 @@ def test_meta_rule_emergence_threshold() -> None:
         f"got {len(top_meta.source_lesson_ids)}."
     )
     assert "DRAFTING" in top_meta.source_categories, (
-        f"Meta-rule source_categories should include 'DRAFTING', "
-        f"got {top_meta.source_categories}."
+        f"Meta-rule source_categories should include 'DRAFTING', got {top_meta.source_categories}."
     )
 
 
 # ---------------------------------------------------------------------------
 # Test 7: Persona adaptation score
 # ---------------------------------------------------------------------------
+
 
 def _compute_adaptation_score(
     lessons: list[Lesson],
@@ -846,7 +853,7 @@ def test_persona_adaptation_score(all_brains: list[BrainState]) -> None:
       3. Adaptation score is bounded in [0.0, 1.0].
     """
     scores: list[float] = []
-    for i, brain in enumerate(all_brains):
+    for _i, brain in enumerate(all_brains):
         persona = brain.persona
         all_cats = persona.primary_categories + persona.secondary_categories
         score = _compute_adaptation_score(
@@ -860,11 +867,7 @@ def test_persona_adaptation_score(all_brains: list[BrainState]) -> None:
         )
 
     # All personas should have learned at least something
-    zero_score_personas = [
-        PERSONAS[i].name
-        for i, score in enumerate(scores)
-        if score == 0.0
-    ]
+    zero_score_personas = [PERSONAS[i].name for i, score in enumerate(scores) if score == 0.0]
     assert not zero_score_personas, (
         f"These personas have adaptation score = 0 after 50 sessions: "
         f"{zero_score_personas}. No categories were learned."
@@ -898,6 +901,7 @@ def test_persona_adaptation_score(all_brains: list[BrainState]) -> None:
 # Test 8: Compound score validation across personas
 # ---------------------------------------------------------------------------
 
+
 def test_compound_score_across_personas(all_brains: list[BrainState]) -> None:
     """compound_score should produce meaningful, non-zero scores for all personas.
 
@@ -912,7 +916,9 @@ def test_compound_score_across_personas(all_brains: list[BrainState]) -> None:
     persona_scores: list[float] = []
     for brain in all_brains:
         graduated = [l for l in brain.lessons if l.state == LessonState.RULE]
-        active = [l for l in brain.lessons if l.state in (LessonState.INSTINCT, LessonState.PATTERN)]
+        active = [
+            l for l in brain.lessons if l.state in (LessonState.INSTINCT, LessonState.PATTERN)
+        ]
         total_corrections = brain.session_count * 2  # approximate
 
         score = _compound_score(
@@ -930,11 +936,7 @@ def test_compound_score_across_personas(all_brains: list[BrainState]) -> None:
         )
 
     # All personas should have non-zero scores after 50 sessions
-    zero_personas = [
-        all_brains[i].persona.name
-        for i, s in enumerate(persona_scores)
-        if s == 0.0
-    ]
+    zero_personas = [all_brains[i].persona.name for i, s in enumerate(persona_scores) if s == 0.0]
     assert not zero_personas, (
         f"These personas have compound_score = 0 after 50 sessions: {zero_personas}"
     )
@@ -946,7 +948,14 @@ def test_compound_score_across_personas(all_brains: list[BrainState]) -> None:
     def _score_brain(b: BrainState) -> float:
         grad = [l for l in b.lessons if l.state == LessonState.RULE]
         act = [l for l in b.lessons if l.state in (LessonState.INSTINCT, LessonState.PATTERN)]
-        return _compound_score(0.02, severity_ratio=None, lessons_graduated=len(grad), lessons_active=len(act), sessions=b.session_count, total_corrections=b.session_count * 2)
+        return _compound_score(
+            0.02,
+            severity_ratio=None,
+            lessons_graduated=len(grad),
+            lessons_active=len(act),
+            sessions=b.session_count,
+            total_corrections=b.session_count * 2,
+        )
 
     early_score = _score_brain(early_brain)
     late_score = _score_brain(late_brain)

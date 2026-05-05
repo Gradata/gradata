@@ -95,20 +95,22 @@ def synthesise_principle_llm(
 
     bullet_text = "\n".join(bullets)
     prompt = (
-        f"Given these {len(bullets)} user corrections all related to \"{theme}\":\n"
+        f'Given these {len(bullets)} user corrections all related to "{theme}":\n'
         f"{bullet_text}\n\n"
         "Write ONE actionable behavioral principle (1-2 sentences) that captures the pattern.\n"
-        "Format: \"When [context], [do X] instead of [Y].\"\n"
+        'Format: "When [context], [do X] instead of [Y]."\n'
         "Do not list individual words. Focus on the behavioral change.\n"
         "Return ONLY the principle, no preamble."
     )
 
-    payload = json.dumps({
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 150,
-        "temperature": 0.3,
-    }).encode()
+    payload = json.dumps(
+        {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 150,
+            "temperature": 0.3,
+        }
+    ).encode()
 
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -135,13 +137,23 @@ def synthesise_principle_llm(
             log.debug("LLM-synthesised principle for theme '%s': %s", theme, content[:80])
             return content
 
-        except (urllib.error.URLError, urllib.error.HTTPError, OSError, KeyError,
-                json.JSONDecodeError, IndexError) as exc:
+        except (
+            urllib.error.URLError,
+            urllib.error.HTTPError,
+            OSError,
+            KeyError,
+            json.JSONDecodeError,
+            IndexError,
+        ) as exc:
             if attempt < _MAX_RETRIES:
                 log.debug("LLM synthesis attempt %d failed (%s), retrying...", attempt + 1, exc)
                 time.sleep(_RETRY_DELAY)
             else:
-                log.debug("LLM synthesis failed after %d attempts: %s — circuit open", _MAX_RETRIES + 1, exc)
+                log.debug(
+                    "LLM synthesis failed after %d attempts: %s — circuit open",
+                    _MAX_RETRIES + 1,
+                    exc,
+                )
                 _circuit_open = True
                 return None
 

@@ -17,14 +17,15 @@ code path under test; network reachability is out-of-scope.
 
 from __future__ import annotations
 
+import contextlib
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 # Short fake credential values — intentionally under 8 chars so the
 # secret scanner does not flag them as real credentials.
-_FK = "sk-test"   # fake key, 7 chars
-_FT = "brr-x"    # fake bearer, 5 chars
+_FK = "sk-test"  # fake key, 7 chars
+_FT = "brr-x"  # fake bearer, 5 chars
 
 
 # ---------------------------------------------------------------------------
@@ -38,26 +39,31 @@ class TestRequireHttpsHelper:
     def test_positive_https_remote_passes(self):
         """HTTPS to a remote host must be accepted — no exception raised."""
         from gradata._http import require_https
+
         require_https("https://api.gradata.ai/v1", "api_base")
 
     def test_positive_http_localhost_exempt(self):
         """localhost over HTTP is allowed (local dev: Ollama, vLLM)."""
         from gradata._http import require_https
+
         require_https("http://localhost:11434/v1", "GRADATA_LLM_BASE")
 
     def test_positive_http_127_exempt(self):
         """127.0.0.1 over HTTP is allowed."""
         from gradata._http import require_https
+
         require_https("http://127.0.0.1:8080/v1", "test")
 
     def test_positive_http_ipv6_loopback_exempt(self):
         """[::1] loopback over HTTP is allowed."""
         from gradata._http import require_https
+
         require_https("http://[::1]:8080/v1", "test")
 
     def test_positive_empty_url_passes(self):
         """Empty string is a no-op (caller's validation responsibility)."""
         from gradata._http import require_https
+
         require_https("", "test")
 
     def test_negative_http_remote_rejected(self):
@@ -67,18 +73,21 @@ class TestRequireHttpsHelper:
         API keys to attacker-controlled servers (SSRF / credential exfil).
         """
         from gradata._http import require_https
+
         with pytest.raises(ValueError, match="HTTPS"):
             require_https("http://evil.internal/steal", "test")
 
     def test_negative_error_message_contains_label(self):
         """The ValueError message must include the label so the log is actionable."""
         from gradata._http import require_https
+
         with pytest.raises(ValueError, match="GRADATA_LLM_BASE"):
             require_https("http://attacker.example.com/v1", "GRADATA_LLM_BASE")
 
     def test_negative_http_remote_not_confused_with_https_scheme(self):
         """http:// scheme to a remote host is caught regardless of hostname."""
         from gradata._http import require_https
+
         with pytest.raises(ValueError):
             require_https("http://api-evil.com/v1", "test")
 
@@ -103,6 +112,7 @@ class TestLLMSynthesizerHttpsGuard:
         server via a network request.
         """
         from gradata.enhancements.llm_synthesizer import synthesise_principle_llm
+
         result = synthesise_principle_llm(
             self._make_lessons(),
             theme="style",
@@ -166,18 +176,21 @@ class TestGenericHTTPProviderHttpsGuard:
         auth token to the attacker endpoint on every completion call.
         """
         from gradata.enhancements.llm_provider import GenericHTTPProvider
+
         with pytest.raises(ValueError, match="HTTPS"):
             GenericHTTPProvider(base_url="http://evil.example.com/v1", auth_token=_FT)
 
     def test_positive_http_localhost_accepted(self):
         """http://localhost is allowed (Ollama default)."""
         from gradata.enhancements.llm_provider import GenericHTTPProvider
+
         provider = GenericHTTPProvider(base_url="http://localhost:11434/v1")
         assert provider.base_url.startswith("http://localhost")
 
     def test_positive_https_remote_accepted(self):
         """https:// to a remote host is accepted."""
         from gradata.enhancements.llm_provider import GenericHTTPProvider
+
         provider = GenericHTTPProvider(base_url="https://api.gradata.ai/llm/v1")
         assert provider.base_url.startswith("https://")
 
@@ -199,6 +212,7 @@ class TestCloudSyncHttpsGuard:
         """Build a CloudClient with a real (but non-existent) brain dir so
         load_config() falls back to defaults, then override config fields."""
         from gradata.cloud.sync import CloudClient, CloudConfig
+
         brain_dir = tmp_path / "brain"
         brain_dir.mkdir(exist_ok=True)
         client = CloudClient(brain_dir=brain_dir)
@@ -228,10 +242,8 @@ class TestCloudSyncHttpsGuard:
         client = self._make_client("https://api.gradata.ai", tmp_path)
         with patch("urllib.request.urlopen") as mock_ul:
             mock_ul.side_effect = Exception("network unavailable")
-            try:
+            with contextlib.suppress(Exception):
                 client._post("/telemetry", {"data": "x"})
-            except Exception:
-                pass
             assert mock_ul.called, "HTTPS URL should have passed the guard and called urlopen"
 
     def test_positive_http_localhost_passes_guard(self, tmp_path):
@@ -239,10 +251,8 @@ class TestCloudSyncHttpsGuard:
         client = self._make_client("http://localhost:8000", tmp_path)
         with patch("urllib.request.urlopen") as mock_ul:
             mock_ul.side_effect = Exception("network unavailable")
-            try:
+            with contextlib.suppress(Exception):
                 client._post("/telemetry", {"data": "x"})
-            except Exception:
-                pass
             assert mock_ul.called, "localhost should have passed the guard"
 
 
@@ -261,6 +271,7 @@ class TestCloudClientConstructorHttpsGuard:
         attacker who re-enabled sync at a lower level could bypass the guard.
         """
         from gradata.cloud.sync import CloudClient, CloudConfig
+
         brain_dir = tmp_path / "brain"
         brain_dir.mkdir(exist_ok=True)
         bad_config = CloudConfig(api_base="http://evil.test", sync_enabled=False)
@@ -270,6 +281,7 @@ class TestCloudClientConstructorHttpsGuard:
     def test_positive_https_remote_accepted_sync_disabled(self, tmp_path):
         """CloudClient with https:// api_base succeeds even when sync is off."""
         from gradata.cloud.sync import CloudClient, CloudConfig
+
         brain_dir = tmp_path / "brain"
         brain_dir.mkdir(exist_ok=True)
         good_config = CloudConfig(api_base="https://cloud.gradata.ai", sync_enabled=False)
@@ -292,11 +304,13 @@ class TestCloudClientEndpointGuard:
     def test_negative_http_remote_endpoint_raises(self, tmp_path):
         """Constructing CloudClient with http:// remote endpoint raises ValueError."""
         from gradata.cloud.client import CloudClient
+
         with pytest.raises(ValueError, match="HTTPS"):
             CloudClient(brain_dir=tmp_path, endpoint="http://evil.internal/api")
 
     def test_positive_https_endpoint_accepted(self, tmp_path):
         """https:// endpoint is accepted."""
         from gradata.cloud.client import CloudClient
+
         client = CloudClient(brain_dir=tmp_path, endpoint="https://api.gradata.ai")
         assert client.endpoint.startswith("https://")

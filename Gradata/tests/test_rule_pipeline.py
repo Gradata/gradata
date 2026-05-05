@@ -24,7 +24,6 @@ from gradata.enhancements.rule_pipeline import (
 )
 from gradata.enhancements.self_improvement import format_lessons
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

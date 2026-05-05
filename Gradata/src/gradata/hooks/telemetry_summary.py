@@ -9,6 +9,7 @@ Usage::
 
 Reads ``{GRADATA_BRAIN_DIR}/telemetry.jsonl`` (written by ``run_hook``).
 """
+
 from __future__ import annotations
 
 import argparse

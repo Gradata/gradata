@@ -30,9 +30,9 @@ import contextlib
 import json
 import logging
 import sqlite3
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from collections.abc import Iterable
 
 _log = logging.getLogger(__name__)
 

@@ -70,8 +70,7 @@ class LLMProvider(ABC):
         self._cb_fails += 1
         if self._cb_fails >= _CB_THRESHOLD:
             self._cb_opened_at = time.monotonic()
-            _log.debug("%s provider circuit opened after %d failures",
-                       self.name, self._cb_fails)
+            _log.debug("%s provider circuit opened after %d failures", self.name, self._cb_fails)
 
     def _record_success(self) -> None:
         self._cb_fails = 0
@@ -83,13 +82,15 @@ class LLMProvider(ABC):
         """Pre-prompt hook: neutralize prompt-injection in lesson content."""
         try:
             from gradata.enhancements._sanitize import sanitize_lesson_content
+
             return sanitize_lesson_content(prompt, "llm_prompt")
         except Exception:
             return prompt
 
     # -- public entry -------------------------------------------------------
-    def complete(self, prompt: str, *, max_tokens: int = 100,
-                 timeout: float = 12.0, sanitize: bool = False) -> str | None:
+    def complete(
+        self, prompt: str, *, max_tokens: int = 100, timeout: float = 12.0, sanitize: bool = False
+    ) -> str | None:
         if self._circuit_open():
             _log.debug("%s provider: circuit open, skipping", self.name)
             return None
@@ -108,8 +109,7 @@ class LLMProvider(ABC):
         return out
 
     @abstractmethod
-    def _complete_impl(self, prompt: str, *, max_tokens: int, timeout: float) -> str | None:
-        ...
+    def _complete_impl(self, prompt: str, *, max_tokens: int, timeout: float) -> str | None: ...
 
 
 # ---------------------------------------------------------------------------
@@ -122,8 +122,7 @@ class AnthropicProvider(LLMProvider):
 
     name = "anthropic"
 
-    def __init__(self, model: str = "claude-haiku-4-5-20251001",
-                 auth_token: str | None = None):
+    def __init__(self, model: str = "claude-haiku-4-5-20251001", auth_token: str | None = None):
         super().__init__()
         self.model = model
         self._auth = auth_token
@@ -148,8 +147,14 @@ class AnthropicProvider(LLMProvider):
 
 
 def _openai_complete(
-    *, model: str, prompt: str, max_tokens: int, timeout: float,
-    api_key: str | None = None, base_url: str | None = None, log_label: str = "OpenAI",
+    *,
+    model: str,
+    prompt: str,
+    max_tokens: int,
+    timeout: float,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    log_label: str = "OpenAI",
 ) -> str | None:
     try:
         import openai
@@ -176,8 +181,9 @@ class OpenAIProvider(LLMProvider):
 
     name = "openai"
 
-    def __init__(self, model: str = "gpt-4o-mini", auth_token: str | None = None,
-                 base_url: str | None = None):
+    def __init__(
+        self, model: str = "gpt-4o-mini", auth_token: str | None = None, base_url: str | None = None
+    ):
         super().__init__()
         self.model = model
         self._auth = auth_token
@@ -187,8 +193,13 @@ class OpenAIProvider(LLMProvider):
 
     def _complete_impl(self, prompt: str, *, max_tokens: int, timeout: float) -> str | None:
         return _openai_complete(
-            model=self.model, prompt=prompt, max_tokens=max_tokens, timeout=timeout,
-            api_key=self._auth, base_url=self.base_url, log_label="OpenAI",
+            model=self.model,
+            prompt=prompt,
+            max_tokens=max_tokens,
+            timeout=timeout,
+            api_key=self._auth,
+            base_url=self.base_url,
+            log_label="OpenAI",
         )
 
 
@@ -197,8 +208,9 @@ class GenericHTTPProvider(LLMProvider):
 
     name = "generic"
 
-    def __init__(self, base_url: str | None = None, model: str | None = None,
-                 auth_token: str | None = None):
+    def __init__(
+        self, base_url: str | None = None, model: str | None = None, auth_token: str | None = None
+    ):
         super().__init__()
         self.base_url = base_url or os.environ.get(
             "GRADATA_LLM_BASE_URL", "http://localhost:11434/v1"
@@ -209,8 +221,13 @@ class GenericHTTPProvider(LLMProvider):
 
     def _complete_impl(self, prompt: str, *, max_tokens: int, timeout: float) -> str | None:
         return _openai_complete(
-            model=self.model, prompt=prompt, max_tokens=max_tokens, timeout=timeout,
-            api_key=self._auth or "local", base_url=self.base_url, log_label="Generic HTTP",
+            model=self.model,
+            prompt=prompt,
+            max_tokens=max_tokens,
+            timeout=timeout,
+            api_key=self._auth or "local",
+            base_url=self.base_url,
+            log_label="Generic HTTP",
         )
 
 
@@ -255,8 +272,16 @@ class CLIProvider(LLMProvider):
             return argv
         if self.cli_name == "codex":
             model = self.model or "gpt-5.5"
-            return [exe, "exec", "--skip-git-repo-check", "--sandbox",
-                    "read-only", "-m", model, prompt]
+            return [
+                exe,
+                "exec",
+                "--skip-git-repo-check",
+                "--sandbox",
+                "read-only",
+                "-m",
+                model,
+                prompt,
+            ]
         if self.cli_name == "gemini":
             argv = [exe, "-p", prompt]
             if self.model:
@@ -284,8 +309,9 @@ class CLIProvider(LLMProvider):
             _log.debug("CLI %s invocation failed: %s", self.cli_name, exc)
             return None
         if proc.returncode != 0:
-            _log.debug("CLI %s returned %d: %s",
-                       self.cli_name, proc.returncode, (proc.stderr or "")[:200])
+            _log.debug(
+                "CLI %s returned %d: %s", self.cli_name, proc.returncode, (proc.stderr or "")[:200]
+            )
             return None
         out = (proc.stdout or "").strip()
         return out or None
@@ -308,8 +334,9 @@ class GradataCloudProvider(LLMProvider):
     def __init__(self, api_key: str | None = None, endpoint: str | None = None):
         super().__init__()
         self._auth = api_key or env_str("GRADATA_API_KEY", "")
-        self.endpoint = (endpoint or env_str("GRADATA_ENDPOINT",
-                                             "https://api.gradata.cloud")).rstrip("/")
+        self.endpoint = (
+            endpoint or env_str("GRADATA_ENDPOINT", "https://api.gradata.cloud")
+        ).rstrip("/")
         require_https(self.endpoint, "GRADATA_ENDPOINT")
 
     def _complete_impl(self, prompt: str, *, max_tokens: int, timeout: float) -> str | None:
@@ -360,19 +387,29 @@ class GoogleGemmaProvider(LLMProvider):
     def _complete_impl(self, prompt: str, *, max_tokens: int, timeout: float) -> str | None:
         if not self._auth:
             return None
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
-        payload = json.dumps({
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.3},
-        }).encode()
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
+        )
+        payload = json.dumps(
+            {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.3},
+            }
+        ).encode()
         headers = {"Content-Type": "application/json", "x-goog-api-key": self._auth}
         try:
             req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 body = json.loads(resp.read().decode())
             text = body["candidates"][0]["content"]["parts"][0]["text"].strip()
-        except (urllib.error.URLError, urllib.error.HTTPError, OSError, KeyError,
-                json.JSONDecodeError, IndexError) as exc:
+        except (
+            urllib.error.URLError,
+            urllib.error.HTTPError,
+            OSError,
+            KeyError,
+            json.JSONDecodeError,
+            IndexError,
+        ) as exc:
             _log.debug("Gemma native call failed: %s", exc)
             return None
         return text if 5 < len(text) < 5000 else None
@@ -433,9 +470,7 @@ def get_provider(name: str | None = None, **kwargs) -> LLMProvider | None:
         name = resolved
     cls = _PROVIDERS.get(name)
     if cls is None:
-        raise ValueError(
-            f"Unknown LLM provider: {name!r}. Choose from: {list(_PROVIDERS)}"
-        )
+        raise ValueError(f"Unknown LLM provider: {name!r}. Choose from: {list(_PROVIDERS)}")
     try:
         return cls(**kwargs)
     except ValueError as exc:

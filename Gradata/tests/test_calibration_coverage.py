@@ -17,10 +17,10 @@ from gradata.enhancements.scoring.calibration import (
     CalibrationTracker,
 )
 
-
 # ---------------------------------------------------------------------------
 # CalibrationBin dataclass
 # ---------------------------------------------------------------------------
+
 
 class TestCalibrationBin:
     """Verify the CalibrationBin dataclass stores and exposes fields correctly."""
@@ -51,6 +51,7 @@ class TestCalibrationBin:
 # CalibrationReport dataclass
 # ---------------------------------------------------------------------------
 
+
 class TestCalibrationReport:
     """Verify CalibrationReport stores all fields correctly."""
 
@@ -75,6 +76,7 @@ class TestCalibrationReport:
 # CalibrationTracker — construction and basic property
 # ---------------------------------------------------------------------------
 
+
 class TestCalibrationTrackerInit:
     def test_default_n_bins(self):
         tracker = CalibrationTracker()
@@ -97,16 +99,20 @@ class TestCalibrationTrackerInit:
 # record() — clamping and storage
 # ---------------------------------------------------------------------------
 
+
 class TestRecord:
-    @pytest.mark.parametrize("raw, expected", [
-        (0.5,  0.5),
-        (0.0,  0.0),
-        (1.0,  1.0),
-        (-0.5, 0.0),   # clamped to 0
-        (1.5,  1.0),   # clamped to 1
-        (99.0, 1.0),   # way over
-        (-99.0, 0.0),  # way under
-    ])
+    @pytest.mark.parametrize(
+        "raw, expected",
+        [
+            (0.5, 0.5),
+            (0.0, 0.0),
+            (1.0, 1.0),
+            (-0.5, 0.0),  # clamped to 0
+            (1.5, 1.0),  # clamped to 1
+            (99.0, 1.0),  # way over
+            (-99.0, 0.0),  # way under
+        ],
+    )
     def test_clamping(self, raw, expected):
         tracker = CalibrationTracker()
         tracker.record(predicted=raw, outcome=True)
@@ -126,7 +132,7 @@ class TestRecord:
 
     def test_n_predictions_property(self):
         tracker = CalibrationTracker()
-        for i in range(5):
+        for _i in range(5):
             tracker.record(0.5, True)
         assert tracker.n_predictions == 5
 
@@ -134,6 +140,7 @@ class TestRecord:
 # ---------------------------------------------------------------------------
 # load()
 # ---------------------------------------------------------------------------
+
 
 class TestLoad:
     def test_load_extends_predictions(self):
@@ -164,6 +171,7 @@ class TestLoad:
 # to_pairs()
 # ---------------------------------------------------------------------------
 
+
 class TestToPairs:
     def test_empty(self):
         tracker = CalibrationTracker()
@@ -192,6 +200,7 @@ class TestToPairs:
 # compute() — empty case
 # ---------------------------------------------------------------------------
 
+
 class TestComputeEmpty:
     def test_empty_returns_zero_report(self):
         tracker = CalibrationTracker()
@@ -207,6 +216,7 @@ class TestComputeEmpty:
 # ---------------------------------------------------------------------------
 # compute() — Brier score accuracy
 # ---------------------------------------------------------------------------
+
 
 class TestBrierScore:
     def test_perfect_predictions_brier_zero(self):
@@ -233,12 +243,15 @@ class TestBrierScore:
         report = tracker.compute()
         assert math.isclose(report.brier_score, 0.04, rel_tol=1e-4)
 
-    @pytest.mark.parametrize("predicted, outcome, expected_brier", [
-        (0.5, True,  0.25),   # (0.5 - 1)^2
-        (0.5, False, 0.25),   # (0.5 - 0)^2
-        (0.0, True,  1.0),    # (0 - 1)^2
-        (0.0, False, 0.0),    # (0 - 0)^2
-    ])
+    @pytest.mark.parametrize(
+        "predicted, outcome, expected_brier",
+        [
+            (0.5, True, 0.25),  # (0.5 - 1)^2
+            (0.5, False, 0.25),  # (0.5 - 0)^2
+            (0.0, True, 1.0),  # (0 - 1)^2
+            (0.0, False, 0.0),  # (0 - 0)^2
+        ],
+    )
     def test_brier_single_parametrized(self, predicted, outcome, expected_brier):
         tracker = CalibrationTracker()
         tracker.record(predicted, outcome)
@@ -257,6 +270,7 @@ class TestBrierScore:
 # ---------------------------------------------------------------------------
 # compute() — sharpness
 # ---------------------------------------------------------------------------
+
 
 class TestSharpness:
     def test_constant_predictions_sharpness_zero(self):
@@ -291,6 +305,7 @@ class TestSharpness:
 # ---------------------------------------------------------------------------
 # compute() — reliability bins
 # ---------------------------------------------------------------------------
+
 
 class TestBins:
     def test_single_bin_populated(self):
@@ -342,7 +357,7 @@ class TestBins:
     def test_empty_bins_skipped(self):
         """Bins with no predictions are omitted from the output list."""
         tracker = CalibrationTracker()
-        tracker.record(0.05, True)   # bin 0: [0.0, 0.1)
+        tracker.record(0.05, True)  # bin 0: [0.0, 0.1)
         tracker.record(0.95, False)  # bin 9: [0.9, 1.0)
         report = tracker.compute()
         assert len(report.bins) == 2
@@ -351,8 +366,12 @@ class TestBins:
         """Total count across all bins equals n_predictions."""
         tracker = CalibrationTracker()
         pairs = [
-            (0.05, True), (0.15, False), (0.35, True),
-            (0.55, True), (0.75, False), (0.95, True),
+            (0.05, True),
+            (0.15, False),
+            (0.35, True),
+            (0.55, True),
+            (0.75, False),
+            (0.95, True),
         ]
         tracker.load(pairs)
         report = tracker.compute()
@@ -362,8 +381,8 @@ class TestBins:
     def test_custom_n_bins_respected(self):
         """n_bins=5 → bin width 0.2; predictions in separate ranges → 2 bins."""
         tracker = CalibrationTracker(n_bins=5)
-        tracker.record(0.05, True)    # bin [0.0, 0.2)
-        tracker.record(0.45, False)   # bin [0.4, 0.6)
+        tracker.record(0.05, True)  # bin [0.0, 0.2)
+        tracker.record(0.45, False)  # bin [0.4, 0.6)
         report = tracker.compute()
         assert len(report.bins) == 2
         assert report.bins[0].bin_start == 0.0
@@ -373,6 +392,7 @@ class TestBins:
 # ---------------------------------------------------------------------------
 # compute() — overconfidence detection
 # ---------------------------------------------------------------------------
+
 
 class TestOverconfidence:
     def test_overconfident_true_when_predicted_higher(self):
@@ -409,6 +429,7 @@ class TestOverconfidence:
 # ---------------------------------------------------------------------------
 # compute() — ECE (calibration_error)
 # ---------------------------------------------------------------------------
+
 
 class TestCalibrationError:
     def test_ece_zero_for_perfect_calibration(self):
@@ -452,6 +473,7 @@ class TestCalibrationError:
 # n_predictions property
 # ---------------------------------------------------------------------------
 
+
 class TestNPredictionsProperty:
     def test_reflects_record_calls(self):
         tracker = CalibrationTracker()
@@ -477,6 +499,7 @@ class TestNPredictionsProperty:
 # ---------------------------------------------------------------------------
 # Integration: full realistic session
 # ---------------------------------------------------------------------------
+
 
 class TestIntegration:
     def test_realistic_session(self):

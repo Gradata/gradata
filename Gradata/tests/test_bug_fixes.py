@@ -4,9 +4,7 @@ Each test verifies the fix at the data level, not just the API surface.
 """
 
 import json
-import os
 import sqlite3
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -233,7 +231,7 @@ class TestBug7DomainAgnostic:
             },
             "extra_categories": ["CODE_QUALITY", "SECURITY"],
         }
-        brain = _make_brain(tmp_path, taxonomy=eng_taxonomy)
+        _make_brain(tmp_path, taxonomy=eng_taxonomy)
 
         from gradata._tag_taxonomy import TAXONOMY
 
@@ -250,7 +248,7 @@ class TestBug7DomainAgnostic:
                 "values": ["interview_prep", "job_description", "offer_letter"],
             },
         }
-        brain = _make_brain(tmp_path, taxonomy=recruit_taxonomy)
+        _make_brain(tmp_path, taxonomy=recruit_taxonomy)
 
         from gradata._tag_taxonomy import TAXONOMY
 
@@ -355,17 +353,17 @@ class TestBug9MissingClasses:
     def test_pattern_exports_from_contrib(self):
         """Pattern symbols importable from gradata.contrib.patterns and gradata.rules."""
         from gradata.contrib.patterns import (
-            SmartRAG,
-            NaiveRAG,
-            HumanLoopGate,
-            Pipeline,
-            Stage,
-            ParallelBatch,
-            EpisodicMemory,
-            InputGuard,
-            OutputGuard,
-            MCPBridge,
             Delegation,
+            EpisodicMemory,
+            HumanLoopGate,
+            InputGuard,
+            MCPBridge,
+            NaiveRAG,
+            OutputGuard,
+            ParallelBatch,
+            Pipeline,
+            SmartRAG,
+            Stage,
         )
         from gradata.rules.rule_tracker import RuleApplication
         from gradata.rules.scope import AudienceTier

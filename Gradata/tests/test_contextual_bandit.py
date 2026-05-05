@@ -9,18 +9,21 @@ Tests cover:
 - select() with k > candidates returns all candidates
 - RuleArm expected_value property
 """
+
 import random
+
 import pytest
+
 from gradata.enhancements.bandits.contextual_bandit import (
     RuleArm,
     RuleBandit,
     SelectionResult,
 )
 
-
 # ---------------------------------------------------------------------------
 # RuleArm
 # ---------------------------------------------------------------------------
+
 
 class TestRuleArm:
     def test_expected_value_is_alpha_over_alpha_plus_beta(self):
@@ -41,6 +44,7 @@ class TestRuleArm:
 # ---------------------------------------------------------------------------
 # RuleBandit — reward update
 # ---------------------------------------------------------------------------
+
 
 class TestRuleBanditUpdate:
     def test_accepted_update_increments_alpha(self):
@@ -92,6 +96,7 @@ class TestRuleBanditUpdate:
 # ---------------------------------------------------------------------------
 # RuleBandit — selection
 # ---------------------------------------------------------------------------
+
 
 class TestRuleBanditSelect:
     def test_select_returns_selection_result(self):
@@ -167,7 +172,8 @@ class TestRuleBanditSelect:
 
         # Rule A should win selection in this context most of the time
         win_a = sum(
-            1 for _ in range(100)
+            1
+            for _ in range(100)
             if "A" in bandit.select(["A", "B"], context={"task": "email_draft"}, k=1).selected_rules
         )
         assert win_a >= 70
@@ -176,6 +182,7 @@ class TestRuleBanditSelect:
 # ---------------------------------------------------------------------------
 # Export / load roundtrip
 # ---------------------------------------------------------------------------
+
 
 class TestArmPersistence:
     def test_export_arms_contains_all_arms(self):
@@ -189,9 +196,17 @@ class TestArmPersistence:
 
     def test_load_arms_restores_alpha_beta(self):
         bandit = RuleBandit()
-        bandit.load_arms([
-            {"rule_id": "R1", "alpha": 8.0, "beta": 2.0, "total_pulls": 10, "context_scores": {}},
-        ])
+        bandit.load_arms(
+            [
+                {
+                    "rule_id": "R1",
+                    "alpha": 8.0,
+                    "beta": 2.0,
+                    "total_pulls": 10,
+                    "context_scores": {},
+                },
+            ]
+        )
         arm = bandit.get_or_create_arm("R1")
         assert arm.alpha == 8.0
         assert arm.beta == 2.0
@@ -223,10 +238,13 @@ class TestArmPersistence:
 # Context key construction
 # ---------------------------------------------------------------------------
 
+
 class TestContextKeyBuilding:
     def test_context_key_uses_task_audience_domain(self):
         bandit = RuleBandit()
-        key = bandit._build_context_key({"task": "email_draft", "audience": "executive", "domain": "saas"})
+        key = bandit._build_context_key(
+            {"task": "email_draft", "audience": "executive", "domain": "saas"}
+        )
         assert "task:email_draft" in key
         assert "audience:executive" in key
         assert "domain:saas" in key

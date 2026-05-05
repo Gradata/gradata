@@ -1,9 +1,11 @@
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 from gradata.services.embeddings import (
     EmbeddingClient,
-    cosine_similarity,
     cluster_lessons_by_similarity,
+    cosine_similarity,
 )
 
 

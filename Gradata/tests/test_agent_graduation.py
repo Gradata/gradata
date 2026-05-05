@@ -1,19 +1,13 @@
 """Tests for agent graduation — compounding behavioral adaptation for agents."""
 
-import json
 import pytest
-from pathlib import Path
+
 from gradata.enhancements.graduation.agent_graduation import (
-    AgentGraduationTracker,
-    AgentProfile,
-    DeterministicRule,
-    EnforcementResult,
-    compile_deterministic_rule,
-    GATE_CONFIRM_TO_PREVIEW,
-    GATE_MIN_OUTPUTS_PREVIEW,
-    GATE_MIN_OUTPUTS_AUTO,
-    GATE_PREVIEW_TO_AUTO,
     GATE_DEMOTION_THRESHOLD,
+    GATE_MIN_OUTPUTS_AUTO,
+    GATE_MIN_OUTPUTS_PREVIEW,
+    AgentGraduationTracker,
+    compile_deterministic_rule,
 )
 from gradata.enhancements.self_improvement import LessonState
 
@@ -407,7 +401,7 @@ class TestAgentFireCountGate:
 
     def test_approval_only_increments_matching_category(self, tracker):
         """Approving a TONE edit must not increment fire_count for DRAFTING lessons."""
-        from gradata.enhancements.self_improvement import Lesson, INITIAL_CONFIDENCE
+        from gradata.enhancements.self_improvement import INITIAL_CONFIDENCE, Lesson
 
         profile = tracker._load_profile("writer")
         tone_lesson = Lesson(
@@ -452,7 +446,7 @@ class TestAgentFireCountGate:
 
     def test_approval_without_edit_category_increments_all(self, tracker):
         """Backward compat: no edit_category increments all lessons (legacy behaviour)."""
-        from gradata.enhancements.self_improvement import Lesson, INITIAL_CONFIDENCE
+        from gradata.enhancements.self_improvement import INITIAL_CONFIDENCE, Lesson
 
         profile = tracker._load_profile("writer")
         profile.lessons = [

@@ -1,12 +1,13 @@
 """Tests for Disposition and DispositionTracker in behavioral_engine."""
 
 import pytest
-from gradata.enhancements.behavioral_engine import Disposition, DispositionTracker
 
+from gradata.enhancements.behavioral_engine import Disposition, DispositionTracker
 
 # ---------------------------------------------------------------------------
 # Disposition defaults
 # ---------------------------------------------------------------------------
+
 
 class TestDispositionDefaults:
     def test_default_values(self):
@@ -25,6 +26,7 @@ class TestDispositionDefaults:
 # ---------------------------------------------------------------------------
 # Clamping
 # ---------------------------------------------------------------------------
+
 
 class TestDispositionClamp:
     def test_clamp_upper_boundary(self):
@@ -59,6 +61,7 @@ class TestDispositionClamp:
 # ---------------------------------------------------------------------------
 # behavioral_instructions
 # ---------------------------------------------------------------------------
+
 
 class TestBehavioralInstructions:
     def test_all_neutral_returns_empty(self):
@@ -114,6 +117,7 @@ class TestBehavioralInstructions:
 # format_for_prompt
 # ---------------------------------------------------------------------------
 
+
 class TestFormatForPrompt:
     def test_format_contains_all_scales(self):
         d = Disposition(skepticism=2.0, literalism=4.0, empathy=3.0)
@@ -144,6 +148,7 @@ class TestFormatForPrompt:
 # ---------------------------------------------------------------------------
 # DispositionTracker
 # ---------------------------------------------------------------------------
+
 
 class TestDispositionTrackerBasics:
     def test_get_creates_default_on_first_access(self):
@@ -207,8 +212,14 @@ class TestDispositionTrackerUpdateFromCorrection:
 
     def test_all_known_categories_update_without_error(self):
         categories = [
-            "too_literal", "too_inferential", "too_trusting", "too_skeptical",
-            "too_cold", "too_warm", "hallucination", "missed_context",
+            "too_literal",
+            "too_inferential",
+            "too_trusting",
+            "too_skeptical",
+            "too_cold",
+            "too_warm",
+            "hallucination",
+            "missed_context",
         ]
         tracker = DispositionTracker()
         for cat in categories:
@@ -226,13 +237,16 @@ class TestDispositionTrackerUpdateFromCorrection:
         assert sales_disp.empathy == 3.0
         assert ops_disp.skepticism == 3.0
 
-    @pytest.mark.parametrize("severity,expected_delta", [
-        ("trivial", 0.1),
-        ("minor", 0.15),
-        ("moderate", 0.2),
-        ("major", 0.25),
-        ("rewrite", 0.3),
-    ])
+    @pytest.mark.parametrize(
+        "severity,expected_delta",
+        [
+            ("trivial", 0.1),
+            ("minor", 0.15),
+            ("moderate", 0.2),
+            ("major", 0.25),
+            ("rewrite", 0.3),
+        ],
+    )
     def test_severity_deltas_correct(self, severity, expected_delta):
         tracker = DispositionTracker()
         disp = tracker.update_from_correction("x", "too_trusting", severity)
@@ -248,6 +262,7 @@ class TestDispositionTrackerUpdateFromCorrection:
 # ---------------------------------------------------------------------------
 # to_dict / from_dict roundtrip
 # ---------------------------------------------------------------------------
+
 
 class TestDispositionTrackerSerialization:
     def test_to_dict_structure(self):

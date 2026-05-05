@@ -404,6 +404,7 @@ def apply_rules_with_tree(
     scope: RuleScope,
     *,
     max_rules: int = 5,
+    ranker: str = "hybrid",
     event_bus: EventBus | None = None,
     rule_graph: RuleGraph | None = None,
 ) -> list[AppliedRule]:
@@ -432,9 +433,16 @@ def apply_rules_with_tree(
     """
     from gradata.rules.rule_tree import RuleTree
 
+    if ranker == "flat":
+        return apply_rules(lessons, scope, max_rules=max_rules, bus=event_bus, graph=rule_graph)
+    if ranker not in {"hybrid", "tree_only"}:
+        ranker = "hybrid"
+
     # Check if any lessons have paths
     has_paths = any(l.path for l in lessons)
     if not has_paths:
+        if ranker == "tree_only":
+            return []
         # Fallback: use existing flat apply_rules
         return apply_rules(lessons, scope, max_rules=max_rules, bus=event_bus, graph=rule_graph)
 
@@ -495,9 +503,7 @@ def apply_rules_with_tree(
         selected_ids: set[str] = set()
         for lesson, relevance in scored:
             rid = _make_rule_id(lesson)
-            dominated = any(
-                rule_graph.conflict_count(rid, sel) >= 3 for sel in selected_ids
-            )
+            dominated = any(rule_graph.conflict_count(rid, sel) >= 3 for sel in selected_ids)
             if not dominated:
                 filtered_scored.append((lesson, relevance))
                 selected_ids.add(rid)

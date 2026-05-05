@@ -1,11 +1,14 @@
-import pytest
 from gradata.rules.rule_ranker import rank_rules
+
 
 class TestRuleRanker:
     def _make_rule(self, desc, confidence=0.8, category="CODE", fire_count=5, session=1):
         return {
-            "description": desc, "confidence": confidence,
-            "category": category, "fire_count": fire_count, "last_session": session,
+            "description": desc,
+            "confidence": confidence,
+            "category": category,
+            "fire_count": fire_count,
+            "last_session": session,
         }
 
     def test_higher_confidence_ranks_higher(self):
@@ -18,7 +21,9 @@ class TestRuleRanker:
             self._make_rule("validate email before upload", confidence=0.8),
             self._make_rule("always clamp confidence to 0-1", confidence=0.8),
         ]
-        ranked = rank_rules(rules, current_session=10, context_keywords=["confidence", "clamp", "meta_rules"])
+        ranked = rank_rules(
+            rules, current_session=10, context_keywords=["confidence", "clamp", "meta_rules"]
+        )
         assert ranked[0]["description"] == "always clamp confidence to 0-1"
 
     def test_no_context_uses_default(self):
@@ -30,7 +35,10 @@ class TestRuleRanker:
         assert rank_rules([], current_session=1) == []
 
     def test_effectiveness_boosts(self):
-        rules = [self._make_rule("proven", confidence=0.75), self._make_rule("unproven", confidence=0.85)]
+        rules = [
+            self._make_rule("proven", confidence=0.75),
+            self._make_rule("unproven", confidence=0.85),
+        ]
         effectiveness = {
             "proven": {"effective": True, "sessions_survived": 10},
             "unproven": {"effective": False, "sessions_survived": 0},

@@ -12,10 +12,6 @@ Fix the build or update the spec — never let them diverge silently.
 
 import importlib
 import sqlite3
-from pathlib import Path
-
-import pytest
-
 
 # ---------------------------------------------------------------------------
 # Section 2: Architecture — 3 layers exist
@@ -235,7 +231,7 @@ class TestGuardrails:
         assert reg.stats()["total_contracts"] == 0
 
     def test_quality_gate_8_0_threshold(self):
-        from gradata.contrib.enhancements.quality_gates import QualityGate, GENERAL_RUBRICS
+        from gradata.contrib.enhancements.quality_gates import GENERAL_RUBRICS, QualityGate
 
         gate = QualityGate(GENERAL_RUBRICS, threshold=8.0)
         assert gate is not None
@@ -268,7 +264,7 @@ class TestDomainAgnostic:
         assert hasattr(AudienceTier, "PEER")
 
     def test_register_custom_task_type(self):
-        from gradata.rules.scope import register_task_type, classify_scope
+        from gradata.rules.scope import classify_scope, register_task_type
 
         register_task_type("legal_review", ["review contract", "compliance check"], "legal")
         task, _ = classify_scope("review contract for compliance")
@@ -315,7 +311,7 @@ class TestZeroDeps:
 
     def test_patterns_import_no_deps(self):
         """All patterns are pure stdlib."""
-        from gradata.contrib.patterns import pipeline, reflection, guardrails
+        from gradata.contrib.patterns import guardrails, pipeline, reflection
 
         assert pipeline is not None
         assert reflection is not None
@@ -351,7 +347,7 @@ class TestResearchBackedConstants:
 
     def test_loss_aversion_ratio_calibrated(self):
         """Calibrated from 2992 events: 1:1 ratio (sweep_penalty_ratio.py)."""
-        from gradata.enhancements.self_improvement import CONTRADICTION_PENALTY, ACCEPTANCE_BONUS
+        from gradata.enhancements.self_improvement import ACCEPTANCE_BONUS, CONTRADICTION_PENALTY
 
         ratio = abs(CONTRADICTION_PENALTY) / ACCEPTANCE_BONUS
         assert 0.8 <= ratio <= 1.5, f"Loss aversion ratio {ratio} outside [0.8, 1.5]"

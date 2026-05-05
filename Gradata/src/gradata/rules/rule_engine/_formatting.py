@@ -419,7 +419,7 @@ def format_rule_constitutional(category: str, description: str) -> str:
     desc = description.strip()
     for prefix in _IMPERATIVE_PREFIXES:
         if desc.startswith(prefix):
-            desc = desc[len(prefix):]
+            desc = desc[len(prefix) :]
             break
 
     return f"<principle>You value {value} — {desc.lower()}</principle>"
@@ -505,7 +505,7 @@ def capture_example_from_correction(
                 existing.append(_Example(good=good_text, bad=bad_text))
                 # Cap to keep injection budget bounded.
                 lesson.examples = existing[-3:]
-    except Exception:  # noqa: BLE001 — never fail correction capture on Example back-compat
+    except Exception:
         pass
 
     return lesson

@@ -34,10 +34,10 @@ class LessonEntry:
     """A single lesson or correction entry for distillation analysis."""
 
     date: str
-    status: str          # "INSTINCT:0.30", "PATTERN:0.80", "RULE", "CORRECTION"
-    category: str        # "DRAFTING", "ACCURACY", "PROCESS", etc.
+    status: str  # "INSTINCT:0.30", "PATTERN:0.80", "RULE", "CORRECTION"
+    category: str  # "DRAFTING", "ACCURACY", "PROCESS", etc.
     description: str
-    source: str          # "lessons.md", "lessons-archive.md", "events.jsonl"
+    source: str  # "lessons.md", "lessons-archive.md", "events.jsonl"
 
 
 @dataclass
@@ -45,12 +45,12 @@ class DistillationProposal:
     """A proposed rule promotion based on repeated patterns."""
 
     category: str
-    count: int                          # Number of entries in this category
-    principle: str                      # Representative description
-    evidence_sources: list[str]         # Which files contributed
-    status_breakdown: dict[str, int]    # e.g., {"PATTERN:0.80": 3, "CORRECTION": 2}
-    already_covered_by: str | None      # Name of existing rule if covered
-    action: str                         # "PROPOSE" or "ALREADY_COVERED"
+    count: int  # Number of entries in this category
+    principle: str  # Representative description
+    evidence_sources: list[str]  # Which files contributed
+    status_breakdown: dict[str, int]  # e.g., {"PATTERN:0.80": 3, "CORRECTION": 2}
+    already_covered_by: str | None  # Name of existing rule if covered
+    action: str  # "PROPOSE" or "ALREADY_COVERED"
     entries: list[dict] = field(default_factory=list)  # Evidence entries
 
 

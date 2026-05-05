@@ -7,10 +7,6 @@ the public contract every OSS user will exercise on day one.
 
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
 from gradata.enhancements import rule_synthesizer as rs
 
 

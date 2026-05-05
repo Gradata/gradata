@@ -1,4 +1,5 @@
 """Tests for lesson graduation notification events."""
+
 from __future__ import annotations
 
 from gradata.brain import Brain
@@ -64,8 +65,15 @@ def test_graduation_event_includes_all_fields(tmp_path):
     brain.end_session()
 
     if events:
-        required_keys = {"category", "description", "old_state", "new_state",
-                         "fire_count", "confidence", "message"}
+        required_keys = {
+            "category",
+            "description",
+            "old_state",
+            "new_state",
+            "fire_count",
+            "confidence",
+            "message",
+        }
         assert required_keys.issubset(events[0].keys())
 
 

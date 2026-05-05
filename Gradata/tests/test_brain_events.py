@@ -7,22 +7,18 @@ pointing at an in-memory / temp SQLite for every test.
 
 Run: cd sdk && python -m pytest tests/test_brain_events.py -v
 """
+
 from __future__ import annotations
 
-import json
 import sqlite3
-import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
-
-from tests.conftest import init_brain
-
 
 # ---------------------------------------------------------------------------
 # 1. BrainEventsMixin — brain.emit()
 # ---------------------------------------------------------------------------
+
 
 class TestBrainEmit:
     """brain.emit() writes structured events and returns the enriched dict."""
@@ -79,9 +75,7 @@ class TestBrainEmit:
         fresh_brain.emit("SQLITE_CHECK", "pytest", data={"x": 1})
         db = fresh_brain.ctx.db_path
         with sqlite3.connect(str(db)) as conn:
-            rows = conn.execute(
-                "SELECT type FROM events WHERE type='SQLITE_CHECK'"
-            ).fetchall()
+            rows = conn.execute("SELECT type FROM events WHERE type='SQLITE_CHECK'").fetchall()
         assert len(rows) >= 1
 
     def test_multiple_events_accumulate(self, fresh_brain):
@@ -89,9 +83,7 @@ class TestBrainEmit:
             fresh_brain.emit("BATCH", "pytest", data={"i": i})
         db = fresh_brain.ctx.db_path
         with sqlite3.connect(str(db)) as conn:
-            count = conn.execute(
-                "SELECT COUNT(*) FROM events WHERE type='BATCH'"
-            ).fetchone()[0]
+            count = conn.execute("SELECT COUNT(*) FROM events WHERE type='BATCH'").fetchone()[0]
         assert count == 5
 
     def test_unicode_data_round_trips(self, fresh_brain):
@@ -117,6 +109,7 @@ class TestBrainEmit:
 # ---------------------------------------------------------------------------
 # 2. BrainEventsMixin — brain.query_events()
 # ---------------------------------------------------------------------------
+
 
 class TestBrainQueryEvents:
     """brain.query_events() retrieves events from the SQLite store."""
@@ -171,6 +164,7 @@ class TestBrainQueryEvents:
 # ---------------------------------------------------------------------------
 # 3. _events module — emit() directly with BrainContext
 # ---------------------------------------------------------------------------
+
 
 class TestEventsModule:
     """Unit tests for gradata._events.emit() using BrainContext injection."""
@@ -270,38 +264,48 @@ class TestEventsModule:
 # 4. BrainEventsMixin — brain.observe() (passive memory extraction)
 # ---------------------------------------------------------------------------
 
+
 class TestBrainObserve:
     """brain.observe() extracts facts from conversations or returns [] gracefully."""
 
     def test_returns_list_when_extractor_unavailable(self, fresh_brain):
         """If gradata_cloud and enhancements.memory_extraction are both absent,
         observe() must return an empty list without raising."""
-        with patch.dict("sys.modules", {
-            "gradata_cloud": None,
-            "gradata_cloud.scoring": None,
-            "gradata_cloud.scoring.memory_extraction": None,
-            "gradata.enhancements.memory_extraction": None,
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "gradata_cloud": None,
+                "gradata_cloud.scoring": None,
+                "gradata_cloud.scoring.memory_extraction": None,
+                "gradata.enhancements.memory_extraction": None,
+            },
+        ):
             result = fresh_brain.observe([{"role": "user", "content": "hello"}])
         assert isinstance(result, list)
 
     def test_empty_messages_returns_empty_list(self, fresh_brain):
-        with patch.dict("sys.modules", {
-            "gradata_cloud": None,
-            "gradata_cloud.scoring": None,
-            "gradata_cloud.scoring.memory_extraction": None,
-            "gradata.enhancements.memory_extraction": None,
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "gradata_cloud": None,
+                "gradata_cloud.scoring": None,
+                "gradata_cloud.scoring.memory_extraction": None,
+                "gradata.enhancements.memory_extraction": None,
+            },
+        ):
             result = fresh_brain.observe([])
         assert result == []
 
     def test_observe_returns_list_type(self, fresh_brain):
         # Even if memory extraction is available, must return list
-        with patch.dict("sys.modules", {
-            "gradata_cloud": None,
-            "gradata_cloud.scoring": None,
-            "gradata_cloud.scoring.memory_extraction": None,
-            "gradata.enhancements.memory_extraction": None,
-        }):
+        with patch.dict(
+            "sys.modules",
+            {
+                "gradata_cloud": None,
+                "gradata_cloud.scoring": None,
+                "gradata_cloud.scoring.memory_extraction": None,
+                "gradata.enhancements.memory_extraction": None,
+            },
+        ):
             result = fresh_brain.observe([{"role": "assistant", "content": "I can help."}])
         assert isinstance(result, list)

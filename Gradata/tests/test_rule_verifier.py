@@ -26,10 +26,10 @@ from gradata.enhancements.rule_verifier import (
     verify_rules,
 )
 
-
 # ===========================================================================
 # auto_detect_verification
 # ===========================================================================
+
 
 class TestAutoDetectVerification:
     """auto_detect_verification() scans rule descriptions for checkable patterns."""
@@ -38,7 +38,7 @@ class TestAutoDetectVerification:
         checks = auto_detect_verification("Never use em dashes in emails")
         assert len(checks) >= 1
         # Should detect em dash pattern as should_be_absent=True
-        regex, absent, desc = checks[0]
+        _regex, absent, desc = checks[0]
         assert absent is True
         assert "em dash" in desc
 
@@ -52,14 +52,14 @@ class TestAutoDetectVerification:
         checks = auto_detect_verification("Always include a booking link in outreach")
         assert len(checks) >= 1
         # Booking link should be should_be_absent=False (must be present)
-        regex, absent, desc = checks[0]
+        _regex, absent, desc = checks[0]
         assert absent is False
         assert "booking" in desc
 
     def test_bold_rule(self):
         checks = auto_detect_verification("No bold mid-paragraph text")
         assert len(checks) >= 1
-        regex, absent, desc = checks[0]
+        _regex, absent, _desc = checks[0]
         assert absent is True
 
     def test_no_match_returns_empty(self):
@@ -80,6 +80,7 @@ class TestAutoDetectVerification:
 # ===========================================================================
 # verify_rules
 # ===========================================================================
+
 
 class TestVerifyRules:
     """verify_rules() checks AI output against applied rules."""
@@ -127,7 +128,7 @@ class TestVerifyRules:
         output = 'Book a time here: <a href="https://example.com/book/30min">Link</a>'
         results = verify_rules(output, rules)
         # The hyperlink check should pass since <a href= is present
-        hyperlink_results = [r for r in results if "hyperlink" in r.violation_detail or r.passed]
+        [r for r in results if "hyperlink" in r.violation_detail or r.passed]
         assert any(r.passed for r in results)
 
     def test_non_checkable_rules_skipped(self):
@@ -178,11 +179,10 @@ class TestVerifyRules:
 # RuleVerification dataclass
 # ===========================================================================
 
+
 class TestRuleVerification:
     def test_defaults(self):
-        rv = RuleVerification(
-            rule_category="TEST", rule_description="desc", passed=True
-        )
+        rv = RuleVerification(rule_category="TEST", rule_description="desc", passed=True)
         assert rv.violation_detail == ""
         assert rv.output_snippet == ""
 
@@ -201,6 +201,7 @@ class TestRuleVerification:
 # ===========================================================================
 # SQLite persistence
 # ===========================================================================
+
 
 class TestVerificationPersistence:
     """log_verification() and get_verification_stats() SQLite roundtrip."""
@@ -226,7 +227,9 @@ class TestVerificationPersistence:
             assert stats["violations_by_category"]["DRAFTING"] == 1
             assert stats["violations_by_category"]["PRICING"] == 1
         finally:
-            import gc; gc.collect()  # release SQLite connections on Windows
+            import gc
+
+            gc.collect()  # release SQLite connections on Windows
             db_path.unlink(missing_ok=True)
 
     def test_empty_db_stats(self):
@@ -240,7 +243,9 @@ class TestVerificationPersistence:
             assert stats["pass_rate"] == 1.0
             assert stats["violations_by_category"] == {}
         finally:
-            import gc; gc.collect()
+            import gc
+
+            gc.collect()
             db_path.unlink(missing_ok=True)
 
     def test_multiple_sessions(self):
@@ -256,5 +261,7 @@ class TestVerificationPersistence:
             assert stats["total_checks"] == 2
             assert stats["passed"] == 1
         finally:
-            import gc; gc.collect()
+            import gc
+
+            gc.collect()
             db_path.unlink(missing_ok=True)
