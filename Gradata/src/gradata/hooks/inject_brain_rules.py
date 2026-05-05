@@ -58,6 +58,35 @@ MAX_META_RULES = int(os.environ.get("GRADATA_MAX_META_RULES", "5"))
 MAX_BRAIN_PROMPT_CHARS = int(os.environ.get("GRADATA_MAX_BRAIN_PROMPT_CHARS", "4000"))
 
 
+def _truncate_prompt_blocks(blocks: list[str], max_chars: int) -> str:
+    result_parts: list[str] = []
+    used = 0
+    for block in blocks:
+        if not block:
+            continue
+        if used + len(block) <= max_chars:
+            result_parts.append(block)
+            used += len(block)
+            continue
+        remaining = max_chars - used
+        if remaining <= 0:
+            break
+        partial = block[:remaining].rstrip()
+        close_start = partial.rfind("</")
+        if close_start >= 0:
+            close_end = partial.find(">", close_start)
+            if close_end >= 0:
+                partial = partial[: close_end + 1].rstrip()
+            else:
+                partial = partial[:close_start].rstrip()
+        else:
+            partial = ""
+        if partial:
+            result_parts.append(partial)
+        break
+    return "".join(result_parts).rstrip()
+
+
 def _filter_injectable_metas(metas: list) -> list:
     injectable = []
     for m in metas:
@@ -802,11 +831,14 @@ def main(data: dict) -> dict | None:
     # place we call the LLM; injection is pure read-compose.
     bp_text = _read_brain_prompt(Path(brain_dir))
     if bp_text:
+        if len(bp_text) > max_prompt_chars:
+            bp_text = bp_text[:max_prompt_chars].rstrip()
         return {"result": bp_text}
 
-    result = mandatory_block + disposition_block + rules_block + meta_block
-    if len(result) > max_prompt_chars:
-        result = result[:max_prompt_chars].rstrip()
+    result = _truncate_prompt_blocks(
+        [mandatory_block, disposition_block, rules_block, meta_block],
+        max_prompt_chars,
+    )
     return {"result": result}
 
 

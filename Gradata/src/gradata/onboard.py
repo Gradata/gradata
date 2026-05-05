@@ -468,7 +468,7 @@ def onboard(
                 )
             write_lessons_safe(lessons_path, format_lessons(lessons))
         except (OSError, ValueError) as exc:
-            logger.warning("optional seed rules failed: %s", exc)
+            logger.warning("optional seed rules failed: %s", exc, exc_info=True)
         except Exception:
             logger.exception("unexpected optional seed rules failure")
 

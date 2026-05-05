@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from gradata._atomic import atomic_write_text
@@ -14,6 +15,10 @@ from gradata.hooks.adapters._base import (
 AGENT = "codex"
 
 
+def _toml_string(value: str) -> str:
+    return json.dumps(value)
+
+
 def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
     try:
         sig = hook_signature(AGENT, brain_dir)
@@ -24,7 +29,11 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         existing = (
             agent_config_path.read_text(encoding="utf-8") if agent_config_path.exists() else ""
         )
-        block = f'\n[[hooks.pre_tool]]\nid = "{sig}"\ncommand = "{hook_command(brain_dir)}"\n'
+        block = (
+            "\n[[hooks.pre_tool]]\n"
+            f"id = {_toml_string(sig)}\n"
+            f"command = {_toml_string(hook_command(brain_dir))}\n"
+        )
         atomic_write_text(agent_config_path, existing.rstrip() + block)
         return InstallResult(AGENT, agent_config_path, "added", "installed pre_tool hook")
     except Exception as exc:

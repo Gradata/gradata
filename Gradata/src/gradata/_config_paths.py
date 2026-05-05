@@ -49,7 +49,11 @@ def get_config_dir() -> Path:
 
 def get_config_file(name: str) -> Path:
     """Return ``<config_dir>/<name>``. Convenience wrapper."""
+    if not str(name).strip():
+        raise ValueError("config file name must be a relative path inside the config directory")
     requested = Path(name)
+    if requested == Path("."):
+        raise ValueError("config file name must be a relative path inside the config directory")
     if requested.is_absolute() or ".." in requested.parts:
         raise ValueError("config file name must be a relative path inside the config directory")
     config_dir = get_config_dir()

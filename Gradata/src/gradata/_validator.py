@@ -248,6 +248,14 @@ def _verify_training_depth(manifest: dict, conn: sqlite3.Connection) -> dict:
             )
         except (TypeError, ValueError):
             logger.warning("timestamp-span validation failed", exc_info=True)
+            results.append(
+                {
+                    "check": "training_span_days",
+                    "value": None,
+                    "pass": False,
+                    "note": "malformed timestamps — could not compute training span",
+                }
+            )
 
     # 2d. CORRECTION events exist (brain was actually corrected = real interaction)
     try:

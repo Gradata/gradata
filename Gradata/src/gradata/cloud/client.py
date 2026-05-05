@@ -171,6 +171,8 @@ class CloudClient:
         if not pending:
             logger.debug("Sync: no new events since watermark=%r", last_watermark)
             return 0
+        if batch_size <= 0:
+            raise ValueError("batch_size must be greater than 0")
 
         manifest = self._read_local_manifest()
         total_ingested = 0
@@ -301,7 +303,7 @@ class CloudClient:
                 session_val = int(session_raw)
             else:
                 session_val = int(str(session_raw))
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, OverflowError):
             session_val = None
         return {
             "event_id": event_id,

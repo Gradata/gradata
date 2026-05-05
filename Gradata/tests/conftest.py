@@ -115,6 +115,20 @@ def _isolate_brain_dir_env():
         os.environ["BRAIN_DIR"] = prev
 
 
+@pytest.fixture(autouse=True)
+def _isolate_user_configs_for_adapter_tests(
+    request: pytest.FixtureRequest,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Keep hook adapter tests away from real ~/.codex, ~/.hermes, etc."""
+    if request.node.path.name not in {"test_hook_adapters.py", "test_cli_install_agent.py"}:
+        return
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / ".config"))
+
+
 # Hook kill-switch env vars from #133 — when set to "0" in a dev shell they
 # disable the corresponding hook. Tests assume hooks are enabled, so scrub
 # them process-wide for the duration of the session and restore on teardown.

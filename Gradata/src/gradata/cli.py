@@ -35,13 +35,19 @@ def _get_brain(args):
     """Resolve brain directory from env, args, or cwd.
 
     Precedence mirrors :func:`_resolve_brain_root` exactly —
-    ``GRADATA_BRAIN`` env > ``--brain-dir`` arg > cwd — so both helpers
+    explicit args > ``BRAIN_DIR`` env > ``GRADATA_BRAIN`` env > cwd — so both helpers
     always target the same brain (important for export, tests with tmp
     brains, etc.).
     """
     from gradata import Brain
 
-    brain_dir = env_str("GRADATA_BRAIN") or getattr(args, "brain_dir", None) or Path.cwd()
+    brain_dir = (
+        getattr(args, "brain_dir", None)
+        or getattr(args, "brain", None)
+        or env_str("BRAIN_DIR")
+        or env_str("GRADATA_BRAIN")
+        or Path.cwd()
+    )
     return Brain(brain_dir)
 
 
@@ -307,13 +313,19 @@ def cmd_recall(args) -> None:
     from gradata.mcp_tools import gradata_recall
 
     brain_root = _resolve_brain_root(args)
+    lessons_path: Path | None = None
+    try:
+        brain = _get_brain(args)
+        lessons_path = brain._find_lessons_path()
+    except Exception:
+        lessons_path = None
     print(
         gradata_recall(
             args.situation,
             max_tokens=args.max_tokens,
             ranker=args.ranker,
             include_all_sources=args.include_all_sources,
-            lessons_path=brain_root / "lessons.md",
+            lessons_path=lessons_path or brain_root / "lessons.md",
             meta_rules_path=brain_root / "meta-rules.json",
         )
     )
@@ -592,17 +604,17 @@ def cmd_demo(args):
 
 
 def _resolve_brain_root(args):
-    """Figure out where brain lives. Prefer env override for tests, then --brain-dir arg, then default."""
-    override = env_str("GRADATA_BRAIN") or env_str("BRAIN_DIR")
-    if override:
-        return Path(override)
+    """Figure out where brain lives using the same precedence as _get_brain."""
     brain_dir = getattr(args, "brain_dir", None)
     if brain_dir:
         return Path(brain_dir)
     brain = getattr(args, "brain", None)
     if brain:
         return Path(brain)
-    return Path("brain")
+    override = env_str("BRAIN_DIR") or env_str("GRADATA_BRAIN")
+    if override:
+        return Path(override)
+    return Path.cwd()
 
 
 def cmd_rule_add(args):

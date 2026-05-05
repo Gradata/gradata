@@ -52,8 +52,10 @@ def _ensure_fts_table(conn: sqlite3.Connection):
     if "tenant_id" not in cols:
         try:
             conn.execute("ALTER TABLE brain_fts_content ADD COLUMN tenant_id TEXT")
-        except sqlite3.OperationalError:
-            logger.warning("brain_fts_content tenant_id migration failed", exc_info=True)
+        except sqlite3.OperationalError as exc:
+            if "duplicate column" not in str(exc).lower():
+                logger.warning("brain_fts_content tenant_id migration failed", exc_info=True)
+                raise
     conn.execute("""
         CREATE VIRTUAL TABLE IF NOT EXISTS brain_fts USING fts5(
             source, file_type, text, embed_date,

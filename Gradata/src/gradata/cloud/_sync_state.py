@@ -58,6 +58,7 @@ def _ensure_schema(conn: sqlite3.Connection, db_path: Path) -> None:
             conn.execute(f"ALTER TABLE sync_state ADD COLUMN {col} {decl}")
         except sqlite3.OperationalError:
             _log.warning("sync_state schema migration failed for column %s", col, exc_info=True)
+            raise
 
     # ON CONFLICT(tenant_id, device_id) requires a UNIQUE constraint on the
     # composite key. If a non-UNIQUE index exists from an older run, upgrade

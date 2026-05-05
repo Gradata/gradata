@@ -884,9 +884,9 @@ class Brain(BrainInspectionMixin):
         ranker: str | None = None,
     ) -> str:
         """Get applicable brain rules for a task, formatted for prompt injection."""
-        from gradata._config import current_brain_config
+        from gradata._config import _load_brain_config
 
-        cfg = current_brain_config()
+        cfg = _load_brain_config(self.dir)
         if max_rules is None:
             max_rules = 10
         if max_recall_tokens is None:

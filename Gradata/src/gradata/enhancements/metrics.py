@@ -92,34 +92,32 @@ def compute_metrics(
         if not db.exists():
             return {}
 
-        conn = sqlite3.connect(str(db))
+        with sqlite3.connect(str(db)) as conn:
+            # Get last N sessions
+            max_session = (
+                conn.execute(
+                    "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
+                ).fetchone()[0]
+                or 0
+            )
+            min_session = max(1, max_session - window + 1)
 
-        # Get last N sessions
-        max_session = (
-            conn.execute(
-                "SELECT MAX(session) FROM events WHERE typeof(session)='integer'"
-            ).fetchone()[0]
-            or 0
-        )
-        min_session = max(1, max_session - window + 1)
-
-        # Correction density
-        outputs = (
-            conn.execute(
-                "SELECT COUNT(*) FROM events WHERE type='OUTPUT' AND session >= ?", (min_session,)
-            ).fetchone()[0]
-            or 0
-        )
-        corrections = (
-            conn.execute(
-                "SELECT COUNT(*) FROM events WHERE type='CORRECTION' AND session >= ?",
-                (min_session,),
-            ).fetchone()[0]
-            or 0
-        )
+            # Correction density
+            outputs = (
+                conn.execute(
+                    "SELECT COUNT(*) FROM events WHERE type='OUTPUT' AND session >= ?",
+                    (min_session,),
+                ).fetchone()[0]
+                or 0
+            )
+            corrections = (
+                conn.execute(
+                    "SELECT COUNT(*) FROM events WHERE type='CORRECTION' AND session >= ?",
+                    (min_session,),
+                ).fetchone()[0]
+                or 0
+            )
         density = corrections / outputs if outputs > 0 else 0.0
-
-        conn.close()
 
         return {
             "window_size": window,

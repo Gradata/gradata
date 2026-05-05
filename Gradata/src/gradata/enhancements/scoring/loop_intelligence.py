@@ -550,11 +550,12 @@ def update_markdown_table(
                 continue
 
             row_key = cells[0].strip().lower().replace(" ", "-")
-            is_pipeline = tier in line or tier.lower() != "cold"
+            has_tier = "Tier" in (lines[header_line] if header_line >= 0 else "")
+            row_tier = cells[5].strip().lower() if has_tier and len(cells) > 5 else ""
+            is_target_tier = (not has_tier) or (row_tier == tier.lower())
 
-            if row_key in data and is_pipeline:
+            if row_key in data and is_target_tier:
                 d = data[row_key]
-                has_tier = "Tier" in (lines[header_line] if header_line >= 0 else "")
                 if has_tier:
                     lines[i] = (
                         f"| {cells[0]} | {d['sent']} | {d['replies']} | {d['rate']}% | {d['confidence']} | {tier} | Auto-updated |"
@@ -575,7 +576,7 @@ def update_markdown_table(
         for val, d in data.items():
             display = val.replace("-", " ").title()
             if has_tier:
-                new_row = f"| {display} | {d['sent']} | {d['replies']} | {d['rate']}% | {d['confidence']} | Pipeline | Auto-added |"
+                new_row = f"| {display} | {d['sent']} | {d['replies']} | {d['rate']}% | {d['confidence']} | {tier} | Auto-added |"
             else:
                 new_row = f"| {display} | {d['sent']} | {d['replies']} | {d['rate']}% | {d['confidence']} |"
             lines.insert(insert_at, new_row)

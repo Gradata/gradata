@@ -9,6 +9,8 @@ from pathlib import Path
 def _run_cli(tmp_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["HOME"] = str(tmp_path)
+    env["USERPROFILE"] = str(tmp_path)
+    env["XDG_CONFIG_HOME"] = str(tmp_path / ".config")
     env["PYTHONPATH"] = str(Path.cwd() / "src")
     return subprocess.run(
         [sys.executable, "-m", "gradata.cli", *args],

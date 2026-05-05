@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import importlib
 import json
+import logging
 import os
+import shlex
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -30,6 +33,7 @@ _CONFIGS = {
     "hermes": Path(".hermes/config.yaml"),
     "opencode": Path(".config/opencode/config.json"),
 }
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -43,10 +47,12 @@ class InstallResult:
 def adapter_config_path(agent: str, *, home: Path | None = None) -> Path:
     if agent not in _CONFIGS:
         raise ValueError(f"unknown agent: {agent}")
-    resolved_home = home or Path(
-        os.environ.get("HOME") or os.environ.get("USERPROFILE") or os.path.expanduser("~")
-    )
+    resolved_home = home or _resolve_home_dir()
     return resolved_home / _CONFIGS[agent]
+
+
+def _resolve_home_dir() -> Path:
+    return Path(os.environ.get("HOME") or os.environ.get("USERPROFILE") or os.path.expanduser("~"))
 
 
 def get_adapter(agent: str):
@@ -60,11 +66,14 @@ def hook_signature(agent: str, brain_dir: Path) -> str:
 
 
 def hook_command(brain_dir: Path) -> str:
-    return f'BRAIN_DIR="{brain_dir}" python -m gradata.hooks.inject_brain_rules'
+    return (
+        f"BRAIN_DIR={shlex.quote(str(brain_dir))} "
+        f"{shlex.quote(sys.executable)} -m gradata.hooks.inject_brain_rules"
+    )
 
 
 def mcp_command(brain_dir: Path) -> list[str]:
-    return ["python", "-m", "gradata.mcp_server", "--brain-dir", str(brain_dir)]
+    return [sys.executable, "-m", "gradata.mcp_server", "--brain-dir", str(brain_dir)]
 
 
 def read_json(path: Path) -> dict:
@@ -73,8 +82,11 @@ def read_json(path: Path) -> dict:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
-        return {}
-    return data if isinstance(data, dict) else {}
+        logger.warning("failed to read JSON config %s", path, exc_info=True)
+        raise
+    if not isinstance(data, dict):
+        raise TypeError(f"JSON config must contain an object: {path}")
+    return data
 
 
 def write_json(path: Path, data: dict) -> None:

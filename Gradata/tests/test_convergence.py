@@ -2,24 +2,27 @@
 
 from __future__ import annotations
 
-import contextlib
 import importlib
-import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import gradata._paths as _p
 from gradata.brain import Brain
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def _make_brain_with_corrections(
     tmp_path: Path,
     _num_sessions: int,
     corrections_per: list[int],
+    monkeypatch: pytest.MonkeyPatch,
     categories: list[str] | None = None,
 ) -> Brain:
     """Create a brain with simulated correction events across sessions."""
     d = tmp_path / "brain"
-    os.environ["BRAIN_DIR"] = str(d)
+    monkeypatch.setenv("BRAIN_DIR", str(d))
     importlib.reload(_p)
     brain = Brain.init(d, domain="test", interactive=False)
     for session_num, count in enumerate(corrections_per, start=1):
@@ -27,41 +30,40 @@ def _make_brain_with_corrections(
             categories[session_num - 1] if categories and session_num <= len(categories) else "TEST"
         )
         for _ in range(count):
-            with contextlib.suppress(Exception):
-                brain.emit(
-                    "CORRECTION",
-                    "test",
-                    {
-                        "category": cat,
-                        "severity": "minor",
-                        "edit_distance": 0.1,
-                        "summary": "test correction",
-                    },
-                    [f"category:{cat}"],
-                    session_num,
-                )
+            brain.emit(
+                "CORRECTION",
+                "test",
+                {
+                    "category": cat,
+                    "severity": "minor",
+                    "edit_distance": 0.1,
+                    "summary": "test correction",
+                },
+                [f"category:{cat}"],
+                session_num,
+            )
     return brain
 
 
 # --- Basic structure tests ---
 
 
-def test_convergence_returns_dict(tmp_path):
-    brain = _make_brain_with_corrections(tmp_path, 3, [5, 3, 1])
+def test_convergence_returns_dict(tmp_path, monkeypatch):
+    brain = _make_brain_with_corrections(tmp_path, 3, [5, 3, 1], monkeypatch)
     result = brain.convergence()
     assert isinstance(result, dict)
     assert "sessions" in result
     assert "corrections_per_session" in result
 
 
-def test_convergence_counts_match(tmp_path):
-    brain = _make_brain_with_corrections(tmp_path, 3, [5, 3, 1])
+def test_convergence_counts_match(tmp_path, monkeypatch):
+    brain = _make_brain_with_corrections(tmp_path, 3, [5, 3, 1], monkeypatch)
     result = brain.convergence()
     assert result["corrections_per_session"] == [5, 3, 1]
 
 
-def test_convergence_empty_brain(tmp_path):
-    brain = _make_brain_with_corrections(tmp_path, 0, [])
+def test_convergence_empty_brain(tmp_path, monkeypatch):
+    brain = _make_brain_with_corrections(tmp_path, 0, [], monkeypatch)
     result = brain.convergence()
     assert result["corrections_per_session"] == []
 
@@ -69,37 +71,37 @@ def test_convergence_empty_brain(tmp_path):
 # --- Mann-Kendall trend tests ---
 
 
-def test_convergence_monotonic_decline_is_converging(tmp_path):
+def test_convergence_monotonic_decline_is_converging(tmp_path, monkeypatch):
     """Strong monotonic decline should be detected by Mann-Kendall."""
-    brain = _make_brain_with_corrections(tmp_path, 7, [10, 9, 7, 5, 4, 2, 1])
+    brain = _make_brain_with_corrections(tmp_path, 7, [10, 9, 7, 5, 4, 2, 1], monkeypatch)
     result = brain.convergence()
     assert result["trend"] == "converging"
 
 
-def test_convergence_monotonic_increase_is_diverging(tmp_path):
+def test_convergence_monotonic_increase_is_diverging(tmp_path, monkeypatch):
     """Increasing corrections = diverging."""
-    brain = _make_brain_with_corrections(tmp_path, 7, [1, 2, 4, 5, 7, 9, 10])
+    brain = _make_brain_with_corrections(tmp_path, 7, [1, 2, 4, 5, 7, 9, 10], monkeypatch)
     result = brain.convergence()
     assert result["trend"] == "diverging"
 
 
-def test_convergence_flat_is_converged(tmp_path):
+def test_convergence_flat_is_converged(tmp_path, monkeypatch):
     """No trend = converged (already stable)."""
-    brain = _make_brain_with_corrections(tmp_path, 7, [3, 3, 3, 3, 3, 3, 3])
+    brain = _make_brain_with_corrections(tmp_path, 7, [3, 3, 3, 3, 3, 3, 3], monkeypatch)
     result = brain.convergence()
     assert result["trend"] == "converged"
 
 
-def test_convergence_noisy_decline_still_converging(tmp_path):
+def test_convergence_noisy_decline_still_converging(tmp_path, monkeypatch):
     """Noisy but overall declining should still detect trend."""
-    brain = _make_brain_with_corrections(tmp_path, 8, [10, 8, 9, 6, 7, 4, 3, 2])
+    brain = _make_brain_with_corrections(tmp_path, 8, [10, 8, 9, 6, 7, 4, 3, 2], monkeypatch)
     result = brain.convergence()
     assert result["trend"] == "converging"
 
 
-def test_convergence_insufficient_data(tmp_path):
+def test_convergence_insufficient_data(tmp_path, monkeypatch):
     """Need at least 3 sessions for trend detection."""
-    brain = _make_brain_with_corrections(tmp_path, 2, [5, 3])
+    brain = _make_brain_with_corrections(tmp_path, 2, [5, 3], monkeypatch)
     result = brain.convergence()
     assert result["trend"] == "insufficient_data"
 
@@ -107,17 +109,17 @@ def test_convergence_insufficient_data(tmp_path):
 # --- Mann-Kendall p-value ---
 
 
-def test_convergence_includes_p_value(tmp_path):
+def test_convergence_includes_p_value(tmp_path, monkeypatch):
     """Mann-Kendall should return a p-value for the trend."""
-    brain = _make_brain_with_corrections(tmp_path, 7, [10, 9, 7, 5, 4, 2, 1])
+    brain = _make_brain_with_corrections(tmp_path, 7, [10, 9, 7, 5, 4, 2, 1], monkeypatch)
     result = brain.convergence()
     assert "p_value" in result
     assert result["p_value"] < 0.05  # strong monotonic trend
 
 
-def test_convergence_flat_high_p_value(tmp_path):
+def test_convergence_flat_high_p_value(tmp_path, monkeypatch):
     """Flat data should have high p-value (no significant trend)."""
-    brain = _make_brain_with_corrections(tmp_path, 7, [3, 3, 3, 3, 3, 3, 3])
+    brain = _make_brain_with_corrections(tmp_path, 7, [3, 3, 3, 3, 3, 3, 3], monkeypatch)
     result = brain.convergence()
     assert result["p_value"] > 0.05
 
@@ -125,9 +127,9 @@ def test_convergence_flat_high_p_value(tmp_path):
 # --- Per-category convergence ---
 
 
-def test_convergence_per_category(tmp_path):
+def test_convergence_per_category(tmp_path, monkeypatch):
     """Should return per-category breakdown."""
-    brain = _make_brain_with_corrections(tmp_path, 0, [])
+    brain = _make_brain_with_corrections(tmp_path, 0, [], monkeypatch)
     # Session 1: 3 TONE, 2 CODE corrections
     for _ in range(3):
         brain.emit(
