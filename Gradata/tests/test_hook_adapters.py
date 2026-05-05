@@ -46,8 +46,10 @@ def test_codex_adapter_writes_valid_toml_with_quoted_brain_path(tmp_path: Path) 
     hook = parsed["hooks"]["pre_tool"][0]
     assert hook["id"].startswith("gradata:codex:")
     # Round-trip: the brain dir must appear in the hook id (which is
-    # build-from-brain-dir before any shell-escaping)
-    assert str(brain_dir) in hook["id"]
+    # build-from-brain-dir before any shell-escaping).
+    # Adapter normalizes to POSIX path for cross-platform stable signature,
+    # so compare against as_posix() not raw str() (Windows uses backslashes).
+    assert brain_dir.as_posix() in hook["id"]
 
 
 def test_adapter_install_does_not_touch_real_user_config(tmp_path: Path) -> None:
