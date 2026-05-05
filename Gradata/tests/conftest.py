@@ -22,6 +22,11 @@ from gradata import Brain
 # ---------------------------------------------------------------------------
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """Accept CI timeout flag even when pytest-timeout is not installed."""
+    parser.addoption("--timeout", action="store", default=None, help="Accepted for CI parity")
+
+
 def init_brain(
     tmp_path: Path,
     name: str = "TestBrain",

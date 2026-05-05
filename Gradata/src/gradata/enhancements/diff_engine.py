@@ -27,6 +27,7 @@ import logging
 import zlib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from typing import Any, cast
 
 _log = logging.getLogger("gradata.diff_engine")
 
@@ -286,7 +287,9 @@ def _load_default_embedder() -> Embedder | None:
         # sentence-transformers returns numpy arrays; convert to plain lists
         # so the math below works on pure Python.
         vecs = model.encode(list(texts))
-        return [list(v) for v in vecs]
+        if hasattr(vecs, "tolist"):
+            return cast("Sequence[Sequence[float]]", vecs.tolist())
+        return cast("Sequence[Sequence[float]]", [list(cast("Any", v)) for v in vecs])
 
     _default_embedder_cache = _embed
     return _embed
