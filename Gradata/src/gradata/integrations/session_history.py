@@ -10,8 +10,8 @@ from __future__ import annotations
 import warnings
 
 warnings.warn(
-    "gradata.integrations.session_history is deprecated and will be removed "
-    "in v0.9.0. Import from gradata.services.session_history instead.",
+    "gradata.integrations.session_history is deprecated; use "
+    "gradata.services.session_history instead. Removal target: v0.9.0.",
     DeprecationWarning,
     stacklevel=2,
 )

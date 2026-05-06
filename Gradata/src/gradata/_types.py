@@ -205,7 +205,7 @@ class Lesson:
     # Reserved for a future AST-transform registry (shell substitution, path enforcement, etc.).
     determinism_class: str | None = None
     # Preston-Rhodes synthesis slot: task / context / examples / persona / format / tone.
-    # Assigned at graduation time by prompt_synthesizer.classify_slot. Empty on legacy
+    # Assigned at graduation time by prompt_compactor.classify_slot. Empty on legacy
     # lessons; the synthesizer falls back to category-based inference at render time.
     slot: str = ""
     # ── Issue #129: examples + output_shape (prompt-injection standard) ──

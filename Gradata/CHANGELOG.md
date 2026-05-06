@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Renamed the deterministic anchor-preserving prompt injection module to
+  `gradata.enhancements.prompt_compactor`; the legacy
+  `prompt_synthesizer` module remains as a deprecated compatibility shim.
+
+### Deprecated
+
+- `gradata.integrations.session_history` remains available as a shim for
+  `gradata.services.session_history`, with removal targeted for v0.9.0.
+
 ## [0.6.0] - 2026-04-15 — "We opened up"
 
 **Strategic pivot:** the moat is not the algorithm code, it's the hosted service.

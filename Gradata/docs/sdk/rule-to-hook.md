@@ -108,7 +108,10 @@ When rules are exported to a prompt format, the lesson state maps to a priority 
 | `PATTERN` | `SHOULD` | Strong preference. Violating needs justification. |
 | `INSTINCT` | `MAY` | Advisory only. Not exported unless `--include-instincts`. |
 
-The adapters in `gradata.integrations.*` read these priority markers when they build the system prompt.
+Prompt adapters read these priority markers when they build the system prompt.
+These exported lesson priorities are distinct from `DirectiveRegistry` entries:
+directives are static/direct user contracts, while `MetaRule` entries are
+learned emergent principles with confidence and provenance.
 
 ## Example: regex rule → hook
 

@@ -1,4 +1,10 @@
-"""Meta-Harness C — agent-rewritten graduation scoring.
+"""Opt-in alternate graduation scoring engine.
+
+This module is not the canonical production ``graduate()`` pipeline. The live
+lesson engine remains ``gradata.enhancements.self_improvement.graduate``; this
+file exists for direct callers and explicit opt-in scoring experiments.
+
+Meta-Harness C — agent-rewritten graduation scoring.
 
 Replaces the hand-tuned three-way guard in the graduation pipeline
 (``confidence >= THRESHOLD and fire_count >= MIN_APPLICATIONS``) with a
