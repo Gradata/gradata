@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import pytest
+
+# httpx is an optional dep (extras=[llm]). Skip these tests when it's not
+# installed — base zero-deps environment must still pass CI.
+pytest.importorskip("httpx")
+
 from gradata.llm.byo_key import BYOKeyProvider
 
 
