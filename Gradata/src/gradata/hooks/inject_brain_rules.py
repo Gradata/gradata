@@ -8,6 +8,8 @@ session context instead of brute-force top-10 by confidence.
 from __future__ import annotations
 
 import contextlib
+import hashlib
+import json
 import logging
 import os
 import shutil
@@ -152,6 +154,175 @@ def _score(lesson) -> float:
     conf_norm = (conf - MIN_CONFIDENCE) / (1.0 - MIN_CONFIDENCE)
     state_bonus = 1.0 if state == "RULE" else 0.7
     return 0.4 * state_bonus + 0.3 * conf_norm + 0.3 * conf
+
+
+def _agent_type(data: dict) -> str:
+    for key in ("agent_type", "agent", "client", "tool"):
+        value = str(data.get(key, "") or "").strip()
+        if value:
+            return value
+    return "unknown"
+
+
+def _session_id(data: dict) -> str:
+    for key in ("session_id", "session_number"):
+        value = str(data.get(key, "") or "").strip()
+        if value:
+            return value
+    return str(int(datetime.now(UTC).timestamp()))
+
+
+def _rule_set_hash(rule_ids: list[str], lessons_mtime_ns: int) -> str:
+    digest = hashlib.sha256("\n".join(sorted(rule_ids)).encode("utf-8")).hexdigest()
+    return f"{digest}:mtime={lessons_mtime_ns}"
+
+
+def _split_rule_set_hash(value: str) -> tuple[str, int | None]:
+    digest, marker, mtime = value.partition(":mtime=")
+    if not marker:
+        return digest, None
+    try:
+        return digest, int(mtime)
+    except ValueError:
+        return digest, None
+
+
+def _changed_ratio(previous: set[str], current: set[str]) -> float:
+    if not previous and not current:
+        return 0.0
+    return len(previous ^ current) / max(len(current), len(previous), 1)
+
+
+def _ensure_injection_log(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS injection_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_type TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            ts INTEGER NOT NULL,
+            rule_ids TEXT NOT NULL,
+            full_set_hash TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_injection_log_agent_ts ON injection_log(agent_type, ts)"
+    )
+
+
+def _last_injection(conn: sqlite3.Connection, agent_type: str) -> dict | None:
+    row = conn.execute(
+        "SELECT session_id, ts, rule_ids, full_set_hash FROM injection_log "
+        "WHERE agent_type = ? ORDER BY ts DESC, id DESC LIMIT 1",
+        (agent_type,),
+    ).fetchone()
+    if row is None:
+        return None
+    try:
+        rule_ids = json.loads(row[2])
+    except (TypeError, json.JSONDecodeError):
+        rule_ids = []
+    if not isinstance(rule_ids, list):
+        rule_ids = []
+    return {
+        "session_id": row[0],
+        "ts": int(row[1]),
+        "rule_ids": [str(r) for r in rule_ids],
+        "full_set_hash": str(row[3]),
+    }
+
+
+def _log_injection(
+    conn: sqlite3.Connection,
+    *,
+    agent_type: str,
+    session_id: str,
+    rule_ids: list[str],
+    full_set_hash: str,
+) -> None:
+    conn.execute(
+        "INSERT INTO injection_log "
+        "(agent_type, session_id, ts, rule_ids, full_set_hash) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (
+            agent_type,
+            session_id,
+            int(datetime.now(UTC).timestamp()),
+            json.dumps(rule_ids),
+            full_set_hash,
+        ),
+    )
+
+
+def _delta_rule_ids(
+    *,
+    brain_dir: Path,
+    data: dict,
+    current_rule_ids: list[str],
+    lessons_mtime_ns: int,
+) -> tuple[list[str], str, bool]:
+    """Return rule IDs to inject, status header, and whether to log/apply.
+
+    Logging failures degrade to full injection without blocking SessionStart.
+    """
+    total = len(current_rule_ids)
+    current_set = set(current_rule_ids)
+    full_hash = _rule_set_hash(current_rule_ids, lessons_mtime_ns)
+    header_prefix = f"currently learned: {total} rules"
+    db_path = brain_dir / "system.db"
+    agent = _agent_type(data)
+    session_id = _session_id(data)
+
+    try:
+        from gradata._db import get_connection
+
+        conn = get_connection(db_path)
+        try:
+            _ensure_injection_log(conn)
+            last = _last_injection(conn, agent)
+            selected = list(current_rule_ids)
+            new_count = total
+            if last is not None:
+                previous_set = set(last["rule_ids"])
+                old_digest, old_mtime = _split_rule_set_hash(last["full_set_hash"])
+                new_digest, _ = _split_rule_set_hash(full_hash)
+                if old_digest == new_digest and old_mtime == lessons_mtime_ns:
+                    selected = []
+                    new_count = 0
+                elif old_digest == new_digest and old_mtime != lessons_mtime_ns:
+                    selected = list(current_rule_ids)
+                    new_count = total
+                else:
+                    ratio = _changed_ratio(previous_set, current_set)
+                    if ratio > 0.30:
+                        selected = list(current_rule_ids)
+                        new_count = total
+                    else:
+                        selected = [rid for rid in current_rule_ids if rid not in previous_set]
+                        new_count = len(selected)
+
+            _log_injection(
+                conn,
+                agent_type=agent,
+                session_id=session_id,
+                rule_ids=current_rule_ids,
+                full_set_hash=full_hash,
+            )
+            conn.commit()
+            if new_count == 0:
+                header = (
+                    f"{header_prefix}, 0 new since last session; "
+                    f"you already know everything; {total} rules active"
+                )
+            else:
+                header = f"{header_prefix}, {new_count} new since last session"
+            return selected, header, True
+        finally:
+            conn.close()
+    except Exception as exc:
+        _log.debug("delta injection state failed (%s) - falling back to full inject", exc)
+        return list(current_rule_ids), f"{header_prefix}, {total} new since last session", False
 
 
 _BRAIN_PROMPT_MARKER = "AUTO-GENERATED"
@@ -368,8 +539,10 @@ def main(data: dict) -> dict | None:
         brain_cfg = None
     max_rules = MAX_RULES
     max_prompt_chars = MAX_BRAIN_PROMPT_CHARS
+    delta_injection = False
     if brain_cfg is not None:
         max_prompt_chars = min(max_prompt_chars, brain_cfg.max_recall_tokens * 4)
+        delta_injection = bool(getattr(brain_cfg, "delta_injection", False))
 
     lessons_path = Path(brain_dir) / "lessons.md"
     if not lessons_path.is_file():
@@ -634,6 +807,25 @@ def main(data: dict) -> dict | None:
                 }
             )
 
+        delta_header = ""
+        if delta_injection:
+            full_rule_ids = [str(item.get("rule_id") or "") for item in synth_input]
+            selected_ids, delta_header, _logged = _delta_rule_ids(
+                brain_dir=Path(brain_dir),
+                data=data,
+                current_rule_ids=full_rule_ids,
+                lessons_mtime_ns=lessons_path.stat().st_mtime_ns,
+            )
+            selected_id_set = set(selected_ids)
+            synth_input = [item for item in synth_input if item.get("rule_id") in selected_id_set]
+            if injection_manifest:
+                selected_anchors = {rid[:4] for rid in selected_id_set}
+                injection_manifest = {
+                    anchor: entry
+                    for anchor, entry in injection_manifest.items()
+                    if anchor in selected_anchors
+                }
+
         if synth_input:
             from gradata.enhancements.prompt_synthesizer import synthesize_brain_injection
 
@@ -645,6 +837,8 @@ def main(data: dict) -> dict | None:
             rules_block = f"<brain-rules>\n{synth.text}\n</brain-rules>" if synth.text else ""
         else:
             rules_block = ""
+        if delta_header:
+            rules_block = f"{delta_header}\n{rules_block}".rstrip()
 
     # Persist injection manifest so correction-capture can attribute misfires
     # to specific rules (Meta-Harness A). Silent failure: missing manifest
