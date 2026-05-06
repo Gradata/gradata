@@ -516,6 +516,7 @@ def cmd_tune(args):
         prompt_template=prompt,
         rounds=args.rounds,
         beam_width=args.beam,
+        branch_factor=args.branch,
         openai_api_base=args.openai_api_base,
     )
     optimized = str(result["optimized_prompt"])
@@ -1416,7 +1417,7 @@ def main():
     p_tune.add_argument("prompt_file", help="Prompt template file")
     p_tune.add_argument("--rounds", type=int, default=2, help="APO beam-search rounds")
     p_tune.add_argument("--beam", type=int, default=2, help="APO beam width")
-    p_tune.add_argument("--branch", default=None, help="Reserved branch label for caller workflows")
+    p_tune.add_argument("--branch", type=int, default=2, help="APO branch factor")
     p_tune.add_argument("--brain", type=str, default=None, help="Brain directory")
     p_tune.add_argument("--out", type=str, default=None, help="Optimized prompt output path")
     p_tune.add_argument(

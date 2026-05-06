@@ -150,6 +150,7 @@ def test_run_apo_tune_smoke(fresh_brain, monkeypatch):
     result = run_apo_tune(
         fresh_brain.dir,
         prompt_template="Seed: {task_input}",
+        runner_fn=lambda _prompt, task: str(task["expected"]),
         rounds=1,
         beam_width=1,
         branch_factor=1,
@@ -164,7 +165,28 @@ def test_run_apo_tune_smoke(fresh_brain, monkeypatch):
     assert result["optimized_score"] == pytest.approx(1.0)
 
 
-def test_cli_tune_smoke(tmp_path):
+def test_run_apo_tune_rejects_missing_runner_fn(fresh_brain, monkeypatch):
+    _install_fake_agentlightning(monkeypatch)
+    fresh_brain.correct("Make this concise", "Concise.")
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "runner_fn is required: APO needs a real prompt executor, not the expected-label oracle"
+        ),
+    ):
+        run_apo_tune(
+            fresh_brain.dir,
+            prompt_template="Seed: {task_input}",
+            runner_fn=None,
+            rounds=1,
+            beam_width=1,
+            branch_factor=1,
+            openai_client=object(),
+        )
+
+
+def test_cli_tune_rejects_missing_executor(tmp_path):
     brain_dir = tmp_path / "brain"
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path.cwd() / "src")
@@ -224,11 +246,12 @@ def test_cli_tune_smoke(tmp_path):
             "--out",
             str(out_path),
         ],
-        check=True,
+        check=False,
         capture_output=True,
         env=env,
         text=True,
     )
 
-    assert "optimized prompt written" in result.stdout
-    assert out_path.read_text(encoding="utf-8") == "Prompt: {task_input}"
+    assert result.returncode != 0
+    assert "runner_fn is required" in result.stderr
+    assert not out_path.exists()

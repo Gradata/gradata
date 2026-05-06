@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
@@ -38,8 +37,11 @@ def run_apo_tune(
     prompt = prompt_template if prompt_template is not None else skill_name
     if not prompt:
         raise ValueError("prompt_template is required")
-    if openai_api_base:
-        os.environ["OPENAI_API_BASE"] = openai_api_base
+    if runner_fn is None:
+        raise ValueError(
+            "runner_fn is required: APO needs a real prompt executor, not the "
+            "expected-label oracle. Pass a callable that runs the prompt against your LLM."
+        )
 
     brain = Brain(brain_dir)
     dataset = _correction_dataset(brain.dir)
@@ -52,8 +54,7 @@ def run_apo_tune(
         }
 
     train, val = _split_dataset(dataset)
-    effective_runner = runner_fn or _expected_runner
-    baseline_score = _score_prompt(brain, prompt, val, effective_runner)
+    baseline_score = _score_prompt(brain, prompt, val, runner_fn)
 
     if rounds <= 0:
         return {
@@ -64,7 +65,7 @@ def run_apo_tune(
         }
 
     agl = _load_agentlightning()
-    async_client = openai_client or _new_async_openai()
+    async_client = openai_client or _new_async_openai(openai_api_base)
     trainer_type = trainer_cls or agl["Trainer"]
     apo_type = apo_cls or agl["APO"]
 
@@ -85,11 +86,11 @@ def run_apo_tune(
         algorithm=algorithm,
         max_rollouts=max(1, len(train) + len(val)) * max(2, rounds * max(1, branch_factor)),
     )
-    agent = GradataLitAgent(brain, prompt, effective_runner)
+    agent = GradataLitAgent(brain, prompt, runner_fn)
     trainer.fit(agent, train_dataset=train, val_dataset=val)
 
     best_prompt = _best_prompt_text(algorithm, fallback=prompt)
-    optimized_score = _score_prompt(brain, best_prompt, val, effective_runner)
+    optimized_score = _score_prompt(brain, best_prompt, val, runner_fn)
     return {
         "baseline_score": baseline_score,
         "optimized_score": optimized_score,
@@ -116,13 +117,15 @@ def _load_agentlightning() -> dict[str, Any]:
     }
 
 
-def _new_async_openai() -> Any:
+def _new_async_openai(openai_api_base: str | None = None) -> Any:
     try:
         from openai import AsyncOpenAI
     except ImportError as exc:
         raise ImportError(
             "APO tuning requires the `openai` package from gradata[tune-apo]."
         ) from exc
+    if openai_api_base:
+        return AsyncOpenAI(base_url=openai_api_base)
     return AsyncOpenAI()
 
 
@@ -195,13 +198,6 @@ def _render_prompt(prompt_template: str, task: dict[str, Any]) -> str:
         return prompt_template.format(**task)
     except (KeyError, IndexError, ValueError):
         return prompt_template
-
-
-def _expected_runner(prompt: str, task: dict[str, Any]) -> str:
-    expected = task.get("expected")
-    if isinstance(expected, str) and expected:
-        return expected
-    return prompt
 
 
 def _best_prompt_text(algorithm: Any, *, fallback: str) -> str:

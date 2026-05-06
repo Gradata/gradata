@@ -42,6 +42,7 @@ class _GradataLitAgentMixin:
     brain: Brain
     prompt_template: str
     runner_fn: RunnerFn
+    emit_reward: Callable[..., Any]
     last_output: str | None
     last_reward: float | None
 
@@ -54,6 +55,7 @@ class _GradataLitAgentMixin:
         self.brain = brain
         self.prompt_template = prompt_template
         self.runner_fn = runner_fn
+        self.emit_reward = _load_emit_reward()
         self.last_output = None
         self.last_reward = None
 
@@ -70,9 +72,7 @@ class _GradataLitAgentMixin:
         prompt = self._render_prompt(prompt_template, task)
         output = self.runner_fn(prompt, task)
         reward = gradata_reward(self.brain, task, output)
-
-        emit_reward = _load_emit_reward()
-        emit_reward(reward)
+        self.emit_reward(reward)
 
         self.last_output = output
         self.last_reward = reward
