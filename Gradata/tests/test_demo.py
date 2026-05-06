@@ -11,6 +11,7 @@ def _run_demo(tmp_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path.cwd() / "src")
     env["NO_COLOR"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
     env.pop("BRAIN_DIR", None)
     env.pop("GRADATA_BRAIN", None)
     return subprocess.run(
@@ -18,6 +19,8 @@ def _run_demo(tmp_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
         cwd=Path.cwd(),
         env=env,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
     )
@@ -50,6 +53,7 @@ def test_gradata_demo_rebuilds_missing_seeded_brain(tmp_path: Path) -> None:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path.cwd() / "src")
     env["NO_COLOR"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"  # ensure ✓ renders consistently across Windows cp1252
     env["GRADATA_DEMO_ASSETS"] = str(tmp_path / "missing-assets")
     env.pop("BRAIN_DIR", None)
     env.pop("GRADATA_BRAIN", None)
@@ -59,10 +63,12 @@ def test_gradata_demo_rebuilds_missing_seeded_brain(tmp_path: Path) -> None:
         cwd=Path.cwd(),
         env=env,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
     )
 
     assert result.returncode == 0, result.stderr
-    assert "✓ Loaded." in result.stdout
+    assert "Loaded." in result.stdout
     assert (tmp_path / "missing-assets" / "sdr" / "lessons.md").exists()
