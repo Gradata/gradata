@@ -41,7 +41,7 @@ def _ensure_slot(lesson: Lesson) -> None:
     if getattr(lesson, "slot", ""):
         return
     try:
-        from gradata.enhancements.prompt_synthesizer import classify_slot
+        from gradata.enhancements.prompt_compactor import classify_slot
 
         lesson.slot = classify_slot(lesson)
     except Exception:  # pragma: no cover - classifier is best-effort

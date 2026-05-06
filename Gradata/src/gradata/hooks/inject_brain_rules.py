@@ -827,7 +827,7 @@ def main(data: dict) -> dict | None:
                 }
 
         if synth_input:
-            from gradata.enhancements.prompt_synthesizer import synthesize_brain_injection
+            from gradata.enhancements.prompt_compactor import synthesize_brain_injection
 
             persona_path = Path(brain_dir).parent / "domain" / "soul.md"
             synth = synthesize_brain_injection(

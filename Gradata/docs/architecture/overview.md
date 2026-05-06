@@ -79,6 +79,20 @@ User Prompt
     → AI generates better draft
 ```
 
+## Behavioral Contracts vs Learned Principles
+
+Gradata keeps direct user contracts separate from learned principles:
+
+- `DirectiveRegistry` stores static, direct user contracts. These are explicit
+  constraints supplied by a user, domain profile, or application integration,
+  and they should be treated as user-owned requirements.
+- `MetaRule` stores learned emergent principles. These are inferred from
+  corrections, supporting lessons, and observed behavior, and they carry
+  confidence and provenance because they are learned rather than declared.
+
+Both can influence prompt injection, but they should not be merged into one data
+model. The boundary is source of authority: direct contract vs emergent lesson.
+
 ## Storage
 
 Everything lives in one directory:

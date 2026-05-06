@@ -1,4 +1,8 @@
-"""
+"""Judgment decay algorithms outside the current production loop.
+
+The canonical live graduation path does not call this module today. It remains
+available for tests, direct callers, and future wiring.
+
 Judgment Decay — Confidence Decay for Unused Lessons
 ====================================================
 Layer 1 Enhancement: imports from patterns/ (memory, reflection)
