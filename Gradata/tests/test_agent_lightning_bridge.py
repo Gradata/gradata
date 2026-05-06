@@ -17,7 +17,7 @@ pytestmark = pytest.mark.skipif(
     reason="agentlightning is not installed",
 )
 
-from gradata.integrations.agent_lightning import GradataLitAgent, gradata_reward, run_apo_tune
+from gradata.tuning.agent_lightning import GradataLitAgent, gradata_reward, run_apo_tune
 
 
 class FakePromptTemplate:

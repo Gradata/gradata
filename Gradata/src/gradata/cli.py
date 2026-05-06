@@ -507,7 +507,7 @@ def cmd_correct(args):
 
 def cmd_tune(args):
     """Tune a prompt file with Agent-Lightning APO and Gradata corrections."""
-    from gradata.integrations.agent_lightning.runner import run_apo_tune
+    from gradata.tuning.agent_lightning.runner import run_apo_tune
 
     prompt_path = Path(args.prompt_file)
     prompt = prompt_path.read_text(encoding="utf-8")

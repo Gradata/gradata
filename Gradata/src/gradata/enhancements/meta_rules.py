@@ -23,8 +23,8 @@ Ranking, validation, formatting, and persistence are in:
   - ``super_meta_rules`` (tier-2/3 logic)
 
 LLM-assisted distillation of the principle text is handled separately
-by ``rule_synthesizer`` at session close, using the user's own provider
-credentials (Anthropic SDK or Claude Code Max OAuth via ``claude -p``).
+by ``llm_synthesizer`` when configured, using the user's own OpenAI-compatible
+provider credentials.
 """
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ class MetaRule:
         heuristics. Empirically (2026-04-14 ablation) these regress
         correctness when injected into prompts. Excluded from injection.
       - ``"llm_synth"``: produced by local LLM synthesis (user's own
-        Anthropic key or Claude Code Max OAuth via rule_synthesizer.py).
+        configured OpenAI-compatible provider key via llm_synthesizer.py).
         Eligible for injection.
       - ``"human_curated"``: hand-written or human-edited principle. Always
         eligible for injection.
@@ -408,9 +408,8 @@ def merge_into_meta(
     """Synthesise a cluster of graduated lessons into a single meta-rule.
 
     Principle text is built from the highest-confidence lesson in the
-    cluster. The ``rule_synthesizer`` module handles the separate LLM
-    distillation used at session close; this function is the deterministic
-    building block that feeds it.
+    cluster. The ``llm_synthesizer`` module handles optional LLM
+    distillation; this function is the deterministic building block.
     """
     lesson_ids = [_lesson_id(l) for l in rules]
     mid = _meta_id(lesson_ids)

@@ -1,0 +1,9 @@
+Given these 3 user corrections all related to "content":
+- Use specific infrastructure terms instead of generic follow-ups.
+- Replace hedging with concrete modernization language.
+- Swap vague openers for precise technical references.
+
+Write ONE actionable behavioral principle (1-2 sentences) that captures the pattern.
+Format: "When [context], [do X] instead of [Y]."
+Do not list individual words. Focus on the behavioral change.
+Return ONLY the principle, no preamble.
