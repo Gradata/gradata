@@ -41,10 +41,10 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-
 # ---------------------------------------------------------------------------
 # Transcript Parsing
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Utterance:
@@ -99,7 +99,9 @@ def parse_transcript(
         start = float(s.get("start_time", 0))
         end = float(s.get("end_time", 0))
         if text.strip():
-            utterances.append(Utterance(speaker=speaker, text=text.strip(), start_time=start, end_time=end))
+            utterances.append(
+                Utterance(speaker=speaker, text=text.strip(), start_time=start, end_time=end)
+            )
 
     # Infer user speaker if not provided
     if not user_speaker and utterances:
@@ -121,7 +123,8 @@ def parse_transcript(
 _OPEN_Q = re.compile(
     r"^\s*(?:what|how|why|tell me|describe|explain|walk me through|"
     r"can you (?:share|tell|describe|walk)|what would|how does|how do|"
-    r"what if|what's your|how would)\b", re.I
+    r"what if|what's your|how would)\b",
+    re.I,
 )
 
 # Pain/impact probing questions
@@ -131,14 +134,16 @@ _PAIN_Q = re.compile(
     r"what (?:does|would) that (?:mean|cost|look like)|"
     r"how much (?:time|money|effort)|what's at stake|"
     r"biggest (?:challenge|problem|issue|pain)|"
-    r"what would it mean (?:for|if|to))", re.I
+    r"what would it mean (?:for|if|to))",
+    re.I,
 )
 
 # Closed questions (yes/no oriented)
 _CLOSED_Q = re.compile(
     r"^\s*(?:do you|are you|is (?:it|that|there)|have you|"
     r"did you|can you|would you|will you|could you|"
-    r"does (?:it|that|your))\b", re.I
+    r"does (?:it|that|your))\b",
+    re.I,
 )
 
 # Story/proof indicators
@@ -147,7 +152,8 @@ _STORY_MARKERS = re.compile(
     r"for example|similar (?:to|situation)|case study|"
     r"(?:company|agency|team) (?:like yours|similar to)|"
     r"we worked with|they (?:saw|achieved|reduced|increased)|"
-    r"the result was|within (?:\d+|a few) (?:weeks|months|days))", re.I
+    r"the result was|within (?:\d+|a few) (?:weeks|months|days))",
+    re.I,
 )
 
 # Objection markers (from prospect)
@@ -157,7 +163,8 @@ _OBJECTION_MARKERS = re.compile(
     r"not (?:the right|a good) time|need to (?:think|discuss|talk)|"
     r"not sure (?:if|about|we)|sounds (?:expensive|complicated)|"
     r"what if (?:it|we)|concerned about|worried about|"
-    r"how (?:is|are) you different|why (?:should|would) (?:we|I))", re.I
+    r"how (?:is|are) you different|why (?:should|would) (?:we|I))",
+    re.I,
 )
 
 # Close/commitment language (from user)
@@ -168,7 +175,8 @@ _CLOSE_MARKERS = re.compile(
     r"does (?:that|this) (?:work|sound)|"
     r"how about (?:we|I)|shall (?:we|I)|"
     r"I'll (?:send|share|prepare|get)|"
-    r"let's (?:plan|schedule|set|do))", re.I
+    r"let's (?:plan|schedule|set|do))",
+    re.I,
 )
 
 # Specific commitment markers
@@ -176,7 +184,8 @@ _SPECIFIC_COMMIT = re.compile(
     r"(?:by (?:Monday|Tuesday|Wednesday|Thursday|Friday|tomorrow|end of (?:day|week))|"
     r"(?:at|on) (?:\d{1,2}(?::\d{2})?\s*(?:am|pm|PT|ET|CT))|"
     r"\d{1,2}/\d{1,2}|"
-    r"(?:this|next) (?:Monday|Tuesday|Wednesday|Thursday|Friday|week))", re.I
+    r"(?:this|next) (?:Monday|Tuesday|Wednesday|Thursday|Friday|week))",
+    re.I,
 )
 
 
@@ -184,41 +193,41 @@ _SPECIFIC_COMMIT = re.compile(
 # Feature Extraction
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CallFeatures:
     """Extracted behavioral features from a single call transcript."""
 
-    call_type: str = "unknown"           # discovery, demo, follow_up, break_up
+    call_type: str = "unknown"  # discovery, demo, follow_up, break_up
     duration_minutes: float = 0.0
     total_words: int = 0
     user_words: int = 0
     prospect_words: int = 0
-    talk_ratio: float = 0.0              # user_words / total_words
-    turn_count: int = 0                  # total speaker turns
+    talk_ratio: float = 0.0  # user_words / total_words
+    turn_count: int = 0  # total speaker turns
     user_turns: int = 0
-    avg_turn_length: float = 0.0         # avg words per user turn
-    longest_monologue: int = 0           # longest consecutive user speech
-    question_count: int = 0              # questions user asked
+    avg_turn_length: float = 0.0  # avg words per user turn
+    longest_monologue: int = 0  # longest consecutive user speech
+    question_count: int = 0  # questions user asked
     open_question_count: int = 0
     closed_question_count: int = 0
     pain_question_count: int = 0
-    open_question_ratio: float = 0.0     # open / total questions
-    story_count: int = 0                 # case study/proof deployments
-    objection_count: int = 0             # objections from prospect
-    objection_responses: int = 0         # user responses to objections
-    close_attempts: int = 0              # next-step/commitment asks
-    commitment_count: int = 0            # total commitments made
-    specific_commitments: int = 0        # commitments with dates/times
+    open_question_ratio: float = 0.0  # open / total questions
+    story_count: int = 0  # case study/proof deployments
+    objection_count: int = 0  # objections from prospect
+    objection_responses: int = 0  # user responses to objections
+    close_attempts: int = 0  # next-step/commitment asks
+    commitment_count: int = 0  # total commitments made
+    specific_commitments: int = 0  # commitments with dates/times
     commitment_specificity: float = 0.0  # specific / total commitments
-    discovery_minutes: float = 0.0       # time before first product mention
-    first_pitch_minute: float = 0.0      # when user first pitched
+    discovery_minutes: float = 0.0  # time before first product mention
+    first_pitch_minute: float = 0.0  # when user first pitched
 
     def to_dict(self) -> dict[str, Any]:
-        return {k: round(v, 2) if isinstance(v, float) else v
-                for k, v in self.__dict__.items()}
+        return {k: round(v, 2) if isinstance(v, float) else v for k, v in self.__dict__.items()}
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "CallFeatures":
+    def from_dict(cls, d: dict[str, Any]) -> CallFeatures:
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
 
@@ -312,9 +321,9 @@ def extract_call_features(
 
     # Commitments
     commitment_count = close_attempts  # close attempts that include specifics
-    specific_commits = sum(1 for u in user_utts
-                          if _CLOSE_MARKERS.search(u.text)
-                          and _SPECIFIC_COMMIT.search(u.text))
+    specific_commits = sum(
+        1 for u in user_utts if _CLOSE_MARKERS.search(u.text) and _SPECIFIC_COMMIT.search(u.text)
+    )
     commit_specificity = specific_commits / commitment_count if commitment_count > 0 else 0.0
 
     # Discovery depth: time before first "product" mention
@@ -322,7 +331,8 @@ def extract_call_features(
     _PITCH_MARKERS = re.compile(
         r"(?:let me (?:show|walk|demo)|here's (?:how|what)|"
         r"our (?:platform|tool|product|solution|system)|"
-        r"the way (?:it|we) work|feature|dashboard|integration)", re.I
+        r"the way (?:it|we) work|feature|dashboard|integration)",
+        re.I,
     )
     first_pitch_time = 0.0
     for u in user_utts:
@@ -364,13 +374,14 @@ def extract_call_features(
 # Call Profile (aggregated from multiple calls)
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CallOutcome:
     """Outcome of a single call, paired with its features."""
 
     features: CallFeatures
-    outcome: str           # "advanced" | "stalled" | "lost" | "closed_won"
-    next_stage: str = ""   # e.g., "demo_scheduled", "proposal_sent"
+    outcome: str  # "advanced" | "stalled" | "lost" | "closed_won"
+    next_stage: str = ""  # e.g., "demo_scheduled", "proposal_sent"
     notes: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -390,8 +401,8 @@ class CallProfile:
     sample_count: int = 0
     outcomes: list[CallOutcome] = field(default_factory=list)
     avg_features: CallFeatures = field(default_factory=CallFeatures)
-    win_features: CallFeatures | None = None    # avg features when outcome=advanced/closed_won
-    loss_features: CallFeatures | None = None   # avg features when outcome=stalled/lost
+    win_features: CallFeatures | None = None  # avg features when outcome=advanced/closed_won
+    loss_features: CallFeatures | None = None  # avg features when outcome=stalled/lost
     confidence: float = 0.0
     patterns: list[str] = field(default_factory=list)  # graduated pattern descriptions
 
@@ -496,13 +507,10 @@ def _discover_patterns(
     # Talk ratio
     if win.talk_ratio < loss.talk_ratio - 0.08:
         patterns.append(
-            f"Talk less: wins avg {win.talk_ratio:.0%} talk ratio vs "
-            f"losses {loss.talk_ratio:.0%}"
+            f"Talk less: wins avg {win.talk_ratio:.0%} talk ratio vs losses {loss.talk_ratio:.0%}"
         )
     elif win.talk_ratio > loss.talk_ratio + 0.08:
-        patterns.append(
-            f"Talk more: wins avg {win.talk_ratio:.0%} vs losses {loss.talk_ratio:.0%}"
-        )
+        patterns.append(f"Talk more: wins avg {win.talk_ratio:.0%} vs losses {loss.talk_ratio:.0%}")
 
     # Pain questions
     if win.pain_question_count > loss.pain_question_count + 1:
@@ -542,14 +550,16 @@ def _discover_patterns(
     # Objection handling
     if win.objection_responses > 0 and loss.objection_responses == 0:
         patterns.append("Address objections directly — wins always respond, losses ignore")
-    elif (win.objection_count > 0 and loss.objection_count > 0
-          and win.objection_responses / max(1, win.objection_count)
-          > loss.objection_responses / max(1, loss.objection_count) + 0.2):
+    elif (
+        win.objection_count > 0
+        and loss.objection_count > 0
+        and win.objection_responses / max(1, win.objection_count)
+        > loss.objection_responses / max(1, loss.objection_count) + 0.2
+    ):
         win_rate = win.objection_responses / max(1, win.objection_count)
         loss_rate = loss.objection_responses / max(1, loss.objection_count)
         patterns.append(
-            f"Handle more objections: wins respond to {win_rate:.0%} vs "
-            f"losses {loss_rate:.0%}"
+            f"Handle more objections: wins respond to {win_rate:.0%} vs losses {loss_rate:.0%}"
         )
 
     # Monologue length
@@ -608,10 +618,14 @@ def generate_cheat_sheet(profile: CallProfile, prospect_context: str = "") -> st
 
     if target.talk_ratio > 0:
         emoji = "<<" if target.talk_ratio < 0.40 else ">>" if target.talk_ratio > 0.55 else "=="
-        lines.append(f"- Talk ratio: {target.talk_ratio:.0%} {emoji} (you {'listen more' if target.talk_ratio < 0.45 else 'drive more'})")
+        lines.append(
+            f"- Talk ratio: {target.talk_ratio:.0%} {emoji} (you {'listen more' if target.talk_ratio < 0.45 else 'drive more'})"
+        )
 
     if target.question_count > 0:
-        lines.append(f"- Ask {target.question_count}+ questions ({target.pain_question_count}+ pain questions)")
+        lines.append(
+            f"- Ask {target.question_count}+ questions ({target.pain_question_count}+ pain questions)"
+        )
 
     if target.discovery_minutes > 0:
         lines.append(f"- Spend {target.discovery_minutes:.0f}+ min in discovery before pitching")
@@ -642,6 +656,7 @@ def generate_cheat_sheet(profile: CallProfile, prospect_context: str = "") -> st
 # Post-Call Audit
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AuditCheck:
     """Result of a single post-call audit check."""
@@ -658,7 +673,7 @@ class PostCallAudit:
     """Complete post-call audit against graduated patterns."""
 
     checks: list[AuditCheck]
-    score: float              # 0.0-1.0, fraction of checks passed
+    score: float  # 0.0-1.0, fraction of checks passed
     call_type: str
     summary: str
 
@@ -668,8 +683,13 @@ class PostCallAudit:
             "call_type": self.call_type,
             "summary": self.summary,
             "checks": [
-                {"rule": c.rule, "passed": c.passed, "actual": c.actual,
-                 "target": c.target, "severity": c.severity}
+                {
+                    "rule": c.rule,
+                    "passed": c.passed,
+                    "actual": c.actual,
+                    "target": c.target,
+                    "severity": c.severity,
+                }
                 for c in self.checks
             ],
         }
@@ -694,102 +714,126 @@ def post_call_audit(
     """
     if profile.sample_count < 5:
         return PostCallAudit(
-            checks=[], score=1.0, call_type=features.call_type,
+            checks=[],
+            score=1.0,
+            call_type=features.call_type,
             summary="Not enough data for audit (need 5+ calls with outcomes)",
         )
 
     target = profile.win_features if profile.win_features else profile.avg_features
-    severity = "critical" if profile.confidence >= 0.90 else "warning" if profile.confidence >= 0.60 else "info"
+    severity = (
+        "critical"
+        if profile.confidence >= 0.90
+        else "warning"
+        if profile.confidence >= 0.60
+        else "info"
+    )
 
     checks: list[AuditCheck] = []
 
     # Talk ratio
     if target.talk_ratio > 0:
         ok = abs(features.talk_ratio - target.talk_ratio) < 0.15
-        checks.append(AuditCheck(
-            rule=f"Talk ratio near {target.talk_ratio:.0%}",
-            passed=ok,
-            actual=f"{features.talk_ratio:.0%}",
-            target=f"{target.talk_ratio:.0%} +/- 15%",
-            severity=severity,
-        ))
+        checks.append(
+            AuditCheck(
+                rule=f"Talk ratio near {target.talk_ratio:.0%}",
+                passed=ok,
+                actual=f"{features.talk_ratio:.0%}",
+                target=f"{target.talk_ratio:.0%} +/- 15%",
+                severity=severity,
+            )
+        )
 
     # Pain questions
     if target.pain_question_count > 0:
         ok = features.pain_question_count >= target.pain_question_count
-        checks.append(AuditCheck(
-            rule=f"Ask {target.pain_question_count}+ pain questions",
-            passed=ok,
-            actual=str(features.pain_question_count),
-            target=f"{target.pain_question_count}+",
-            severity=severity,
-        ))
+        checks.append(
+            AuditCheck(
+                rule=f"Ask {target.pain_question_count}+ pain questions",
+                passed=ok,
+                actual=str(features.pain_question_count),
+                target=f"{target.pain_question_count}+",
+                severity=severity,
+            )
+        )
 
     # Questions total
     if target.question_count > 0:
         ok = features.question_count >= max(1, target.question_count - 2)
-        checks.append(AuditCheck(
-            rule=f"Ask {target.question_count}+ questions total",
-            passed=ok,
-            actual=str(features.question_count),
-            target=f"{target.question_count}+",
-            severity="info",  # less critical than pain questions
-        ))
+        checks.append(
+            AuditCheck(
+                rule=f"Ask {target.question_count}+ questions total",
+                passed=ok,
+                actual=str(features.question_count),
+                target=f"{target.question_count}+",
+                severity="info",  # less critical than pain questions
+            )
+        )
 
     # Story deployment
     if target.story_count > 0:
         ok = features.story_count >= target.story_count
-        checks.append(AuditCheck(
-            rule=f"Deploy {target.story_count}+ stories/proof points",
-            passed=ok,
-            actual=str(features.story_count),
-            target=f"{target.story_count}+",
-            severity=severity,
-        ))
+        checks.append(
+            AuditCheck(
+                rule=f"Deploy {target.story_count}+ stories/proof points",
+                passed=ok,
+                actual=str(features.story_count),
+                target=f"{target.story_count}+",
+                severity=severity,
+            )
+        )
 
     # Discovery depth
     if target.discovery_minutes > 2:
         ok = features.discovery_minutes >= target.discovery_minutes * 0.7
-        checks.append(AuditCheck(
-            rule=f"Spend {target.discovery_minutes:.0f}+ min in discovery",
-            passed=ok,
-            actual=f"{features.discovery_minutes:.0f} min",
-            target=f"{target.discovery_minutes:.0f}+ min",
-            severity=severity,
-        ))
+        checks.append(
+            AuditCheck(
+                rule=f"Spend {target.discovery_minutes:.0f}+ min in discovery",
+                passed=ok,
+                actual=f"{features.discovery_minutes:.0f} min",
+                target=f"{target.discovery_minutes:.0f}+ min",
+                severity=severity,
+            )
+        )
 
     # Close attempt
     if target.close_attempts > 0:
         ok = features.close_attempts >= 1
-        checks.append(AuditCheck(
-            rule="Make at least 1 close/next-step attempt",
-            passed=ok,
-            actual=str(features.close_attempts),
-            target="1+",
-            severity="critical" if profile.confidence >= 0.60 else "info",
-        ))
+        checks.append(
+            AuditCheck(
+                rule="Make at least 1 close/next-step attempt",
+                passed=ok,
+                actual=str(features.close_attempts),
+                target="1+",
+                severity="critical" if profile.confidence >= 0.60 else "info",
+            )
+        )
 
     # Commitment specificity
     if target.commitment_specificity > 0.3:
         ok = features.commitment_specificity >= 0.5 or features.commitment_count == 0
-        checks.append(AuditCheck(
-            rule="Commitments should include specific dates/times",
-            passed=ok,
-            actual=f"{features.commitment_specificity:.0%} specific",
-            target="50%+",
-            severity=severity,
-        ))
+        checks.append(
+            AuditCheck(
+                rule="Commitments should include specific dates/times",
+                passed=ok,
+                actual=f"{features.commitment_specificity:.0%} specific",
+                target="50%+",
+                severity=severity,
+            )
+        )
 
     # Monologue length
     if target.longest_monologue > 0 and target.longest_monologue < 200:
         ok = features.longest_monologue <= target.longest_monologue * 1.5
-        checks.append(AuditCheck(
-            rule=f"Keep monologues under {round(target.longest_monologue * 1.5)} words",
-            passed=ok,
-            actual=f"{features.longest_monologue} words",
-            target=f"<{round(target.longest_monologue * 1.5)} words",
-            severity="info",
-        ))
+        checks.append(
+            AuditCheck(
+                rule=f"Keep monologues under {round(target.longest_monologue * 1.5)} words",
+                passed=ok,
+                actual=f"{features.longest_monologue} words",
+                target=f"<{round(target.longest_monologue * 1.5)} words",
+                severity="info",
+            )
+        )
 
     passed = sum(1 for c in checks if c.passed)
     score = passed / len(checks) if checks else 1.0

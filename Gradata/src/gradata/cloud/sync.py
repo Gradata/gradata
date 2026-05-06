@@ -58,6 +58,7 @@ class CloudConfig:
     token: str = ""
     api_base: str = _DEFAULT_API_BASE
     contribute_corpus: bool = False  # Separate, stricter opt-in
+    sync_mode: str = "full"
     last_sync_at: str = ""
     key_scope: str = ""  # Optional scope tag recorded at `gradata cloud enable`
     # Override the materializer's Tier 2 conflict threshold (|Δconfidence|).
@@ -97,6 +98,7 @@ def load_config(brain_dir: Path) -> CloudConfig:
             token=str(data.get("token", "")),
             api_base=_normalize_api_base(str(data.get("api_base", _DEFAULT_API_BASE))),
             contribute_corpus=bool(data.get("contribute_corpus", False)),
+            sync_mode=str(data.get("sync_mode", "full") or "full"),
             last_sync_at=str(data.get("last_sync_at", "")),
             key_scope=str(data.get("key" + "_scope", "")),
             conflict_threshold=_coerce_threshold(data.get("conflict_threshold", 0.0)),

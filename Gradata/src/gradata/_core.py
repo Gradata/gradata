@@ -1231,11 +1231,15 @@ def _cloud_sync_session(
     """Best-effort cloud sync at session end. Never raises, never blocks."""
     try:
         import hashlib
-        import os
         from pathlib import Path
 
-        # 1. Resolve cloud credentials: ~/.gradata/config.toml or env var
-        api_key = os.environ.get("GRADATA_API_KEY", "")
+        # 1. Resolve cloud credentials: per-brain cloud-config.json, keyfile,
+        # legacy ~/.gradata/config.toml, or env var.
+        from gradata.cloud import _credentials as _cloud_creds
+        from gradata.cloud.sync import load_config as _load_cloud_config
+
+        brain_cloud_cfg = _load_cloud_config(brain.dir)
+        api_key = _cloud_creds.resolve_credential(fallback=brain_cloud_cfg.token)
         api_url = ""
         brain_id_from_config = ""
 
@@ -1249,6 +1253,7 @@ def _cloud_sync_session(
             except Exception as e:
                 _log.debug("cloud config parse failed: %s", e)
 
+        api_url = _cloud_creds.resolve_endpoint(api_url, fallback=brain_cloud_cfg.api_base)
         if not api_key:
             return  # No cloud credentials — nothing to sync
 
@@ -1337,17 +1342,15 @@ def _cloud_sync_session(
         sync_client.sync_metrics(payload)
         _log.debug("Cloud telemetry synced for session %d", session)
 
-        # Finding 11: respect sync_mode — default is metrics_only.
-        # Only sync full events/corrections if explicitly opted in via config.
-        sync_mode = "metrics_only"
+        sync_mode = getattr(brain_cloud_cfg, "sync_mode", "full") or "full"
         try:
             cfg = _parse_toml_cloud(config_path)
-            sync_mode = cfg.get("sync_mode", "metrics_only")
+            sync_mode = cfg.get("sync_mode", sync_mode)
         except Exception:
             pass
 
         if sync_mode == "full":
-            # 4. Sync events/corrections via the full cloud client (opt-in only)
+            # 4. Sync events/corrections via the full cloud client.
             try:
                 from gradata.cloud.client import CloudClient
 
@@ -1361,9 +1364,14 @@ def _cloud_sync_session(
                     _log.debug("Cloud event sync completed for session %d", session)
             except Exception as e:
                 _log.debug("Cloud event sync failed (non-fatal): %s", e)
+        elif sync_mode == "metrics_only":
+            _log.warning(
+                "Skipping event/correction sync (sync_mode=metrics_only) — dashboard will "
+                "not show corrections. Run `gradata sync --full` to backfill."
+            )
         else:
-            _log.debug(
-                "Cloud sync_mode=%s — skipping event/correction sync for session %d",
+            _log.warning(
+                "Unknown cloud sync_mode=%s — skipping event/correction sync for session %d",
                 sync_mode,
                 session,
             )

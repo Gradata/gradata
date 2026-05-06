@@ -118,9 +118,7 @@ def load_domain_set(
             if isinstance(data, list):
                 return {str(d).strip().lower() for d in data if str(d).strip()}
         except ImportError:
-            logger.warning(
-                "PyYAML not installed; falling back to inferred domain set."
-            )
+            logger.warning("PyYAML not installed; falling back to inferred domain set.")
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning("Could not parse %s: %s", domains_file, exc)
 

@@ -145,6 +145,12 @@ def main(data: dict) -> dict | None:
         brain_dir = _resolve_agent_brain_dir()
         if not brain_dir:
             return None
+        try:
+            from gradata._config import BrainConfig
+
+            max_prompt_chars = BrainConfig.load(brain_dir).max_recall_tokens * 4
+        except ImportError:
+            max_prompt_chars = 2000 * 4
 
         lessons_path = Path(brain_dir) / "lessons.md"
         if not lessons_path.is_file():
@@ -217,6 +223,8 @@ def main(data: dict) -> dict | None:
 
         # Compact header saves ~10 tokens vs XML open/close wrapper.
         block = "[agent-rules]\n" + "\n".join(lines)
+        if len(block) > max_prompt_chars:
+            block = block[:max_prompt_chars].rstrip()
         return {"result": block}
     except Exception:
         return None

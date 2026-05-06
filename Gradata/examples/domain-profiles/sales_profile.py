@@ -26,15 +26,16 @@ Usage:
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 
 
 @dataclass
 class OutreachEvent:
     """A single outreach attempt."""
-    channel: str           # email, call, linkedin, etc.
-    timestamp: str         # ISO 8601
+
+    channel: str  # email, call, linkedin, etc.
+    timestamp: str  # ISO 8601
     prospect: str = ""
     replied: bool = False
     reply_sentiment: str = ""  # positive, neutral, negative
@@ -43,6 +44,7 @@ class OutreachEvent:
 @dataclass
 class FollowupEvent:
     """A follow-up in a sequence."""
+
     prospect: str
     touch_number: int
     days_since_last: int
@@ -53,20 +55,21 @@ class FollowupEvent:
 @dataclass
 class SalesProfileReport:
     """Aggregated sales behavioral metrics."""
+
     # Timing
-    best_send_hours: list[int]           # Hours (0-23) with highest reply rates
-    best_send_days: list[str]            # Days of week with highest reply rates
-    avg_response_time_hours: float       # Average time to reply after outreach
+    best_send_hours: list[int]  # Hours (0-23) with highest reply rates
+    best_send_days: list[str]  # Days of week with highest reply rates
+    avg_response_time_hours: float  # Average time to reply after outreach
 
     # Cadence
     avg_days_between_touches: float
-    cadence_compliance: float            # 0-1, how close to optimal cadence
-    touches_before_reply: float          # Average touches before first reply
-    drop_off_touch: int                  # Touch number where most sequences die
+    cadence_compliance: float  # 0-1, how close to optimal cadence
+    touches_before_reply: float  # Average touches before first reply
+    drop_off_touch: int  # Touch number where most sequences die
 
     # Multi-threading
-    avg_contacts_per_deal: float         # Gong: 2x contacts = higher win rate
-    deals_with_single_contact: int       # Risk indicator
+    avg_contacts_per_deal: float  # Gong: 2x contacts = higher win rate
+    deals_with_single_contact: int  # Risk indicator
     deals_with_multithread: int
 
     # Volume
@@ -92,13 +95,15 @@ class SalesProfile:
         reply_sentiment: str = "",
     ) -> None:
         """Log an outreach attempt."""
-        self._outreach.append(OutreachEvent(
-            channel=channel,
-            timestamp=timestamp,
-            prospect=prospect,
-            replied=replied,
-            reply_sentiment=reply_sentiment,
-        ))
+        self._outreach.append(
+            OutreachEvent(
+                channel=channel,
+                timestamp=timestamp,
+                prospect=prospect,
+                replied=replied,
+                reply_sentiment=reply_sentiment,
+            )
+        )
 
     def log_followup(
         self,
@@ -109,13 +114,15 @@ class SalesProfile:
         replied: bool = False,
     ) -> None:
         """Log a follow-up touch in a sequence."""
-        self._followups.append(FollowupEvent(
-            prospect=prospect,
-            touch_number=touch_number,
-            days_since_last=days_since_last,
-            channel=channel,
-            replied=replied,
-        ))
+        self._followups.append(
+            FollowupEvent(
+                prospect=prospect,
+                touch_number=touch_number,
+                days_since_last=days_since_last,
+                channel=channel,
+                replied=replied,
+            )
+        )
 
     def log_deal_contact(self, deal: str, contact_role: str) -> None:
         """Log a contact associated with a deal (multi-threading tracking)."""
@@ -147,9 +154,7 @@ class SalesProfile:
 
         # Best days by reply rate
         day_rates = {
-            d: sum(replies) / len(replies)
-            for d, replies in reply_days.items()
-            if len(replies) >= 3
+            d: sum(replies) / len(replies) for d, replies in reply_days.items() if len(replies) >= 3
         }
         best_days = sorted(day_rates, key=day_rates.get, reverse=True)[:3]
 
@@ -159,7 +164,8 @@ class SalesProfile:
             replied_followups = [f for f in self._followups if f.replied]
             touches_before = (
                 sum(f.touch_number for f in replied_followups) / len(replied_followups)
-                if replied_followups else 0.0
+                if replied_followups
+                else 0.0
             )
             # Find drop-off: touch number with most non-replied sequences
             touch_counts: dict[int, int] = defaultdict(int)
@@ -178,7 +184,7 @@ class SalesProfile:
                 if gaps:
                     deviations = [
                         abs(a - o) / max(o, 1)
-                        for a, o in zip(gaps[:5], optimal_gaps[:len(gaps)])
+                        for a, o in zip(gaps[:5], optimal_gaps[: len(gaps)], strict=False)
                     ]
                     compliances.append(max(0.0, 1.0 - sum(deviations) / len(deviations)))
             compliance = sum(compliances) / len(compliances) if compliances else 0.0
@@ -194,7 +200,8 @@ class SalesProfile:
         multi = sum(1 for contacts in self._deal_contacts.values() if len(contacts) > 1)
         avg_contacts = (
             sum(len(c) for c in self._deal_contacts.values()) / deal_count
-            if deal_count > 0 else 0.0
+            if deal_count > 0
+            else 0.0
         )
 
         # Reply rates

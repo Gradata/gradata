@@ -50,6 +50,11 @@ class TestBrainEmit:
         event = fresh_brain.emit("X", "s", session=99)
         assert event["session"] == 99
 
+    def test_emit_uses_active_session_when_none_passed(self, fresh_brain):
+        fresh_brain.emit("SESSION_START", "pytest", {"session": 7}, session=7)
+        event = fresh_brain.correct("draft text", "final text")
+        assert event["session"] == 7
+
     def test_empty_data_defaults_to_empty_dict(self, fresh_brain):
         event = fresh_brain.emit("X", "s")
         assert isinstance(event["data"], dict)

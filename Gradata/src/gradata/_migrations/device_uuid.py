@@ -16,17 +16,35 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
+import json
 import os
 import re
-import uuid
+import socket
 from pathlib import Path
 
 DEVICE_FILE = ".device_id"
 _DEVICE_RE = re.compile(r"^dev_[0-9a-f]{32}$")
 
 
-def _new_device_id() -> str:
-    return f"dev_{uuid.uuid4().hex}"
+def _brain_identity(brain: Path) -> str:
+    manifest = brain / "brain.manifest.json"
+    if manifest.is_file():
+        try:
+            data = json.loads(manifest.read_text(encoding="utf-8"))
+            metadata = data.get("metadata", {}) if isinstance(data, dict) else {}
+            for key in ("brain_id", "id", "name"):
+                value = metadata.get(key) or data.get(key)
+                if value:
+                    return str(value)
+        except (OSError, json.JSONDecodeError):
+            pass
+    return str(brain)
+
+
+def _new_device_id(brain: Path) -> str:
+    seed = f"{socket.gethostname()}:{_brain_identity(brain)}"
+    return f"dev_{hashlib.sha256(seed.encode('utf-8')).hexdigest()[:32]}"
 
 
 def _is_valid(s: str) -> bool:
@@ -54,7 +72,7 @@ def get_or_create_device_id(brain_dir: str | Path) -> str:
         # code keeps seeing invalid ids.
         existing_invalid = True
 
-    new_did = _new_device_id()
+    new_did = _new_device_id(brain)
     tmp = brain / f".device_id.tmp.{os.getpid()}"
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     try:

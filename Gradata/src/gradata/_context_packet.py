@@ -382,6 +382,7 @@ def build_packet(
     packet = {}
     if session is None:
         session = _detect_session()
+    session = session or 0
 
     if task_type in ("prospecting", "meeting_prep"):
         packet["user_scope"] = _load_user_scope(ctx=ctx)
