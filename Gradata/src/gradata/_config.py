@@ -74,10 +74,20 @@ RecallRanker = Literal["hybrid", "flat", "tree_only"]
 
 @dataclass(frozen=True)
 class BrainConfig:
-    """Runtime config loaded from a brain directory."""
+    """Runtime config loaded from a brain directory.
+
+    ``delta_injection`` opts SessionStart hooks into sending only newly learned
+    rules after an agent has already seen the current rule set. It defaults to
+    False so existing brains keep full rule injection behavior.
+    """
 
     max_recall_tokens: int = 2000
     ranker: RecallRanker = "hybrid"
+    delta_injection: bool = False
+
+    @classmethod
+    def load(cls, brain_dir: str | Path | None = None) -> BrainConfig:
+        return _load_brain_config(brain_dir)
 
     @classmethod
     def load(cls, brain_dir: str | Path | None = None) -> BrainConfig:
@@ -118,9 +128,16 @@ def _load_brain_config(brain_dir: str | Path | None = None) -> BrainConfig:
     if ranker not in ("hybrid", "flat", "tree_only"):
         ranker = "hybrid"
 
+    delta_injection = data.get("delta_injection", False)
+    if isinstance(delta_injection, str):
+        delta_injection = delta_injection.strip().lower() in {"1", "true", "yes", "on"}
+    else:
+        delta_injection = bool(delta_injection)
+
     return BrainConfig(
         max_recall_tokens=max_recall_tokens,
         ranker=ranker,  # type: ignore[arg-type]
+        delta_injection=delta_injection,
     )
 
 

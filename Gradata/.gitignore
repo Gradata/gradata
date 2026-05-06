@@ -10,3 +10,8 @@ bench/results/
 # pytest-MagicMock test artifact
 MagicMock/
 .hermes-backups/
+
+# Force-include the seeded demo brain (overrides *.db rule above)
+!src/gradata/assets/demo_brains/sdr/system.db
+!src/gradata/assets/demo_brains/sdr/*.db
+!src/gradata/assets/demo_brains/sdr/
