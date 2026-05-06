@@ -219,6 +219,24 @@ def _session_uuid_to_int(session_uuid: str) -> int:
     return int(h, 16) & 0x7FFFFFFF
 
 
+def _stable_event_id(ev: dict, payload: dict) -> str:
+    """Stable replay id so transcript mining is idempotent across runs."""
+    canonical = json.dumps(
+        {
+            "ts": ev.get("ts", ""),
+            "session": 0,
+            "type": ev.get("event", ""),
+            "source": ev.get("source", ""),
+            "data": payload,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        default=str,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:32]
+
+
 def _detect_signals(text: str) -> list[str]:
     if not text or len(text) < 10:
         return []
@@ -423,6 +441,7 @@ def run_mine(
                 session=0,
                 ts=ev["ts"],
                 ctx=brain.ctx,
+                event_id=_stable_event_id(ev, payload),
             )
         except Exception:
             skipped += 1

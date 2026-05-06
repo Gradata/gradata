@@ -7,6 +7,7 @@ read-only at call time.
 
 Requires:  pip install gradata openai
 """
+
 from pathlib import Path
 
 from openai import OpenAI

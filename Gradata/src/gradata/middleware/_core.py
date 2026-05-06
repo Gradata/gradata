@@ -122,6 +122,14 @@ class RuleSource:
         self._static_lessons = lessons
         self.max_rules = max_rules
         self.min_confidence = min_confidence
+        self.max_prompt_chars = 2000 * 4
+        if self._brain_path is not None:
+            try:
+                from gradata._config import BrainConfig
+
+                self.max_prompt_chars = BrainConfig.load(self._brain_path).max_recall_tokens * 4
+            except ImportError:
+                pass
         # mtime-keyed cache of parsed+filtered lessons. Without it, each
         # `load()` call re-reads and re-parses lessons.md — a per-LLM-call hit
         # in middleware (on_llm_start / on_llm_end both call into this).
@@ -281,7 +289,10 @@ def build_brain_rules_block(source: RuleSource) -> str:
         obfuscate_instruction(f"[{l.state}:{l.confidence:.2f}] {l.category}: {l.description}")
         for l in selected
     ]
-    return "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
+    block = "<brain-rules>\n" + "\n".join(lines) + "\n</brain-rules>"
+    if len(block) > source.max_prompt_chars:
+        block = block[: source.max_prompt_chars].rstrip()
+    return block
 
 
 def inject_into_system(system: str | None, block: str) -> str:

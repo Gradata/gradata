@@ -361,9 +361,9 @@ def main(data: dict) -> dict | None:
     if not brain_dir:
         return None
     try:
-        from gradata._config import _load_brain_config
+        from gradata._config import BrainConfig
 
-        brain_cfg = _load_brain_config(brain_dir)
+        brain_cfg = BrainConfig.load(brain_dir)
     except ImportError:
         brain_cfg = None
     max_rules = MAX_RULES

@@ -7,6 +7,7 @@ Dual-writes to events.jsonl (portable) and system.db (queryable).
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import logging
 import os
@@ -20,6 +21,8 @@ from typing import TYPE_CHECKING
 # `from X import Y` copies the value at import time — subsequent set_brain_dir() won't update it.
 import gradata._paths as _p
 from gradata._file_lock import platform_lock
+from gradata._migrations._ulid import new_ulid
+from gradata._migrations.device_uuid import get_or_create_device_id
 from gradata._platform import detect_platform_source
 from gradata._tenant import tenant_for
 
@@ -29,6 +32,48 @@ if TYPE_CHECKING:
 _log = logging.getLogger("gradata.events")
 
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+
+
+def _canonical_content_hash(ev_type: str, source: str | None, data: dict | None) -> str:
+    """Return deterministic SHA256 for the redacted event content."""
+    canonical = json.dumps(
+        {"type": ev_type, "source": source or "", "data": data or {}},
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        default=str,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _legacy_event_id(event: dict) -> str:
+    """Stable id for legacy JSONL rows that predate event_id."""
+    payload = {
+        "ts": event.get("ts", ""),
+        "session": event.get("session"),
+        "type": event.get("type", ""),
+        "source": event.get("source", ""),
+        "data": event.get("data", {}),
+        "tags": event.get("tags", []),
+    }
+    canonical = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        default=str,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:32]
+
+
+def _coerce_session_for_storage(session: int | str | None) -> int | None:
+    if session is None or isinstance(session, bool):
+        return None
+    try:
+        parsed = int(session)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return parsed if parsed > 0 else None
 
 
 def _redact_string(value: str) -> str:
@@ -117,25 +162,22 @@ def _ensure_table(conn: sqlite3.Connection):
             valid_until TEXT,
             scope TEXT DEFAULT 'local',
             tenant_id TEXT,
+            brain_id TEXT,
+            event_id TEXT,
+            device_id TEXT,
+            content_hash TEXT,
+            correction_chain_id TEXT,
+            origin_agent TEXT,
             schema_version INTEGER DEFAULT 1
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_session ON events(session)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_type ON events(type)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_session_type ON events(session, type)")
-    # Dedup guard keyed by (tenant_id, ts, type, source). Tenant scoping
-    # prevents cross-tenant collisions after multi-tenant rollout while
-    # preserving retry-safe idempotent writes within a tenant.
-    # Suppresses IntegrityError too: legacy DBs may hold pre-existing
-    # duplicate rows that block the UNIQUE index creation — tolerated so
-    # writes still proceed (INSERT OR IGNORE degrades to plain INSERT).
     with contextlib.suppress(sqlite3.OperationalError, sqlite3.IntegrityError):
         conn.execute("DROP INDEX IF EXISTS idx_events_dedup")
     with contextlib.suppress(sqlite3.OperationalError, sqlite3.IntegrityError):
-        conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedup_tenant "
-            "ON events(tenant_id, ts, type, source)"
-        )
+        conn.execute("DROP INDEX IF EXISTS idx_events_dedup_tenant")
     with contextlib.suppress(sqlite3.OperationalError):
         conn.execute("ALTER TABLE events ADD COLUMN valid_from TEXT")
     with contextlib.suppress(sqlite3.OperationalError):
@@ -145,9 +187,26 @@ def _ensure_table(conn: sqlite3.Connection):
     with contextlib.suppress(sqlite3.OperationalError):
         conn.execute("ALTER TABLE events ADD COLUMN tenant_id TEXT")
     with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("ALTER TABLE events ADD COLUMN brain_id TEXT")
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("ALTER TABLE events ADD COLUMN event_id TEXT")
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("ALTER TABLE events ADD COLUMN device_id TEXT")
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("ALTER TABLE events ADD COLUMN content_hash TEXT")
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("ALTER TABLE events ADD COLUMN correction_chain_id TEXT")
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("ALTER TABLE events ADD COLUMN origin_agent TEXT")
+    with contextlib.suppress(sqlite3.OperationalError):
         conn.execute("ALTER TABLE events ADD COLUMN schema_version INTEGER DEFAULT 1")
     with contextlib.suppress(sqlite3.OperationalError):
         conn.execute("CREATE INDEX IF NOT EXISTS idx_events_tenant ON events(tenant_id)")
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_events_brain_event_id "
+            "ON events(brain_id, event_id)"
+        )
     conn.commit()
     if db_file:
         _schema_initialized.add(db_file)
@@ -162,27 +221,45 @@ def _insert_event_projection(
     """Project one canonical JSONL event into SQLite idempotently."""
     _ensure_table(conn)
     tid = tenant_for(brain_dir)
+    brain_id = event.get("brain_id") or tid
+    event_id = event.get("event_id") or _legacy_event_id(event)
+    device_id = event.get("device_id") or get_or_create_device_id(brain_dir)
+    data = event.get("data", {})
+    if not isinstance(data, dict):
+        data = {"_raw": data}
+    content_hash = event.get("content_hash") or _canonical_content_hash(
+        event.get("type", ""),
+        event.get("source", ""),
+        data,
+    )
     cursor = conn.execute(
         "INSERT OR IGNORE INTO events "
-        "(ts, session, type, source, data_json, tags_json, valid_from, valid_until, tenant_id, schema_version) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
+        "(ts, session, type, source, data_json, tags_json, valid_from, valid_until, "
+        "tenant_id, brain_id, event_id, device_id, content_hash, correction_chain_id, origin_agent, schema_version) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
         (
             event.get("ts", ""),
-            event.get("session"),
+            _coerce_session_for_storage(event.get("session")),
             event.get("type", ""),
             event.get("source", ""),
-            json.dumps(event.get("data", {}), default=str),
+            json.dumps(data, default=str),
             json.dumps(event.get("tags", []), default=str),
             event.get("valid_from"),
             event.get("valid_until"),
             tid,
+            brain_id,
+            event_id,
+            device_id,
+            content_hash,
+            event.get("correction_chain_id"),
+            event.get("origin_agent"),
         ),
     )
     if cursor.rowcount == 1:
         return cursor.lastrowid
     existing = conn.execute(
-        "SELECT id FROM events WHERE tenant_id=? AND ts=? AND type=? AND source=?",
-        (tid, event.get("ts", ""), event.get("type", ""), event.get("source", "")),
+        "SELECT id FROM events WHERE brain_id=? AND event_id=?",
+        (brain_id, event_id),
     ).fetchone()
     return existing[0] if existing else None
 
@@ -256,6 +333,7 @@ def emit(
     valid_until: str | None = None,
     ctx: BrainContext | None = None,
     ts: str | None = None,
+    event_id: str | None = None,
 ):
     """Emit an event to the brain's event log.
 
@@ -269,11 +347,15 @@ def emit(
     # Resolve paths: prefer explicit ctx, fall back to globals
     events_jsonl = ctx.events_jsonl if ctx else _p.EVENTS_JSONL
     db_path = ctx.db_path if ctx else _p.DB_PATH
+    brain_dir = db_path.parent
 
     if ts is None:
         ts = datetime.now(UTC).isoformat()
     if session is None:
         session = _detect_session(ctx=ctx)
+        if session is None:
+            session = 1
+    session = _coerce_session_for_storage(session)
 
     if valid_from is None:
         valid_from = ts
@@ -313,7 +395,21 @@ def emit(
     # Redact PII BEFORE any cloud-syncable storage. Fail-closed: if the
     # redactor raises, no data (raw or canonical) may be persisted.
     redacted_data = _redact_payload(data or {})
+    if not isinstance(redacted_data, dict):
+        redacted_data = {"_raw": redacted_data}
     redacted_tags = _redact_payload(enriched_tags)
+    try:
+        tenant_id = tenant_for(brain_dir)
+    except Exception as exc:
+        _log.debug("tenant id resolution failed: %s", exc)
+        tenant_id = hashlib.sha256(str(brain_dir).encode("utf-8")).hexdigest()[:32]
+    event_id = event_id or new_ulid()
+    try:
+        device_id = get_or_create_device_id(brain_dir)
+    except Exception as exc:
+        _log.debug("device id resolution failed: %s", exc)
+        device_id = "dev_" + hashlib.sha256(str(brain_dir).encode("utf-8")).hexdigest()[:32]
+    content_hash = _canonical_content_hash(event_type, source, redacted_data)
     event = {
         "ts": ts,
         "session": session,
@@ -323,6 +419,10 @@ def emit(
         "tags": redacted_tags,
         "valid_from": valid_from,
         "valid_until": valid_until,
+        "brain_id": tenant_id,
+        "event_id": event_id,
+        "device_id": device_id,
+        "content_hash": content_hash,
     }
 
     # Best-effort side-log of the unredacted original. Platform-locked,
@@ -579,15 +679,15 @@ def compute_leading_indicators(session: int, ctx: BrainContext | None = None) ->
     return result
 
 
-def get_current_session() -> int:
+def get_current_session() -> int | None:
     """Public alias for session detection. Used by brain.track_rule()."""
     return _detect_session()
 
 
-def _detect_session(ctx: BrainContext | None = None) -> int:
+def _detect_session(ctx: BrainContext | None = None) -> int | None:
     """Detect current session number from the events table.
 
-    Returns MAX(session) from events, or 0 if unavailable.
+    Returns MAX(session) from events, or None if unavailable.
     """
     db_path = ctx.db_path if ctx else _p.DB_PATH
 
@@ -601,7 +701,7 @@ def _detect_session(ctx: BrainContext | None = None) -> int:
     except Exception:
         pass
 
-    return 0
+    return None
 
 
 # ── Brain-quality functions (promoted from brain shim) ────────────────

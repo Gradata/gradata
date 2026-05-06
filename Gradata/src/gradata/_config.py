@@ -79,6 +79,11 @@ class BrainConfig:
     max_recall_tokens: int = 2000
     ranker: RecallRanker = "hybrid"
 
+    @classmethod
+    def load(cls, brain_dir: str | Path | None = None) -> BrainConfig:
+        """Load runtime config from ``<brain_dir>/brain-config.json``."""
+        return _load_brain_config(brain_dir)
+
 
 BRAIN_CONFIG = BrainConfig()
 

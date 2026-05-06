@@ -13,6 +13,7 @@ Run:
 
 See also: .claude-plugin/README.md for the zero-code install flow.
 """
+
 from pathlib import Path
 
 from gradata.brain import Brain

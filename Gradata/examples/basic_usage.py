@@ -1,5 +1,7 @@
 """Basic Gradata usage — learn from corrections in 10 lines."""
+
 from pathlib import Path
+
 from gradata.brain import Brain
 
 # Create a brain (or open existing)

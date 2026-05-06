@@ -236,7 +236,7 @@ class Brain(BrainInspectionMixin):
         try:
             from gradata._events import get_current_session
 
-            return get_current_session()
+            return get_current_session() or 0
         except Exception as exc:
             logger.debug("get_current_session failed: %s", exc)
             return 0
@@ -1513,7 +1513,7 @@ class Brain(BrainInspectionMixin):
         """Emit an event to the brain's event log."""
         from gradata._events import emit
 
-        return emit(event_type, source, data or {}, tags or [], session or 0, ctx=self.ctx)
+        return emit(event_type, source, data or {}, tags or [], session, ctx=self.ctx)
 
     def query_events(
         self,
@@ -1917,7 +1917,7 @@ class Brain(BrainInspectionMixin):
             try:
                 from gradata._events import get_current_session
 
-                session = get_current_session()
+                session = get_current_session() or 0
             except Exception as e:
                 logger.debug("get_current_session failed, defaulting to 0: %s", e)
                 session = 0

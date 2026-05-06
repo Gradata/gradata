@@ -291,6 +291,12 @@ def main(data: dict) -> dict | None:
     brain_dir = resolve_brain_dir()
     if not brain_dir:
         return None
+    try:
+        from gradata._config import BrainConfig
+
+        max_prompt_chars = BrainConfig.load(brain_dir).max_recall_tokens * 4
+    except ImportError:
+        max_prompt_chars = 2000 * 4
 
     lessons_path = Path(brain_dir) / "lessons.md"
     if not lessons_path.is_file():
@@ -381,6 +387,8 @@ def main(data: dict) -> dict | None:
     if not lines:
         return None
     rules_block = "\n".join(lines)
+    if len(rules_block) > max_prompt_chars:
+        rules_block = rules_block[:max_prompt_chars].rstrip()
     return {"result": rules_block}
 
 

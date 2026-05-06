@@ -877,6 +877,37 @@ def cmd_cloud(args):
     print("usage: gradata cloud {enable|rotate-key|status|disconnect|sync-pull}")
 
 
+def cmd_sync(args):
+    """Run local-to-cloud event sync."""
+    from gradata.cloud import _credentials as _creds
+    from gradata.cloud.client import CloudClient
+    from gradata.cloud.sync import load_config, save_config
+
+    brain_root = Path(
+        env_str("GRADATA_BRAIN") or getattr(args, "brain_dir", None) or Path.cwd()
+    ).resolve()
+    if not getattr(args, "full", False):
+        print("usage: gradata sync --full")
+        return
+
+    cfg = load_config(brain_root)
+    cfg.sync_mode = "full"
+    save_config(brain_root, cfg)
+
+    credential = _creds.resolve_credential(fallback=cfg.token)
+    if not credential:
+        print("error: no cloud credential found. Run `gradata cloud enable --key ...` first.")
+        sys.exit(2)
+    endpoint = _creds.resolve_endpoint(fallback=cfg.api_base) or None
+    cloud = CloudClient(brain_dir=brain_root, api_key=credential, endpoint=endpoint)
+    if not cloud.connect():
+        print("error: cloud connection failed")
+        sys.exit(1)
+    ingested = cloud.sync()
+    print("sync_mode: full")
+    print(f"events_synced: {ingested}")
+
+
 def cmd_mine(args):
     """Backfill brain from Claude Code transcript archive (~/.claude/projects)."""
     from gradata._mine_transcripts import run_mine
@@ -1305,6 +1336,10 @@ def main():
     p_audit = sub.add_parser("audit", help="Data flow audit")
     p_audit.add_argument("--json", action="store_true")
 
+    # sync
+    p_sync = sub.add_parser("sync", help="Sync local events to Gradata Cloud")
+    p_sync.add_argument("--full", action="store_true", help="Backfill unsynced events/corrections")
+
     # recall
     p_recall = sub.add_parser("recall", help="Recall relevant brain rules as XML")
     p_recall.add_argument("situation", help="Current situation or task")
@@ -1574,6 +1609,7 @@ def main():
         "manifest": cmd_manifest,
         "stats": cmd_stats,
         "audit": cmd_audit,
+        "sync": cmd_sync,
         "recall": cmd_recall,
         "export": cmd_export,
         "context": cmd_context,

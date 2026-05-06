@@ -168,17 +168,27 @@ def test_device_id_persisted_to_brain_dir(tmp_path):
     assert re.fullmatch(r"dev_[0-9a-f]{32}", content)
 
 
-def test_new_emit_leaves_identity_columns_null_for_now(tmp_path):
-    """emit() does not yet populate identity columns — only Migration 002 backfill does.
-
-    Wiring emit() to write event_id/device_id/content_hash is deferred; this
-    test pins the current contract so a future change flips it deliberately.
-    """
+def test_new_emit_populates_event_identity_columns(tmp_path):
     brain = init_brain(tmp_path)
-    brain.emit("FRESH", "src", {"k": "v"}, [])
+    from gradata._events import emit
+
+    fixed_ts = "2026-05-06T12:00:00+00:00"
+    first = emit("FRESH", "src", {"k": "v"}, [], ctx=brain.ctx, ts=fixed_ts)
+    second = emit("FRESH", "src", {"k": "v"}, [], ctx=brain.ctx, ts=fixed_ts)
 
     with _conn(brain) as conn:
-        row = conn.execute(
-            "SELECT event_id, device_id, content_hash FROM events WHERE type = 'FRESH'"
-        ).fetchone()
-    assert row == (None, None, None)
+        rows = conn.execute(
+            "SELECT event_id, device_id, content_hash FROM events WHERE type = 'FRESH' ORDER BY id"
+        ).fetchall()
+    assert len(rows) == 2
+    first_event_id, first_device_id, first_hash = rows[0]
+    second_event_id, second_device_id, second_hash = rows[1]
+    assert first["event_id"] == first_event_id
+    assert second["event_id"] == second_event_id
+    assert re.fullmatch(r"[0-9A-HJKMNP-TV-Z]{26}", first_event_id), first_event_id
+    assert re.fullmatch(r"[0-9A-HJKMNP-TV-Z]{26}", second_event_id), second_event_id
+    assert first_event_id != second_event_id
+    assert re.fullmatch(r"dev_[0-9a-f]{32}", first_device_id)
+    assert first_device_id == second_device_id
+    assert re.fullmatch(r"[0-9a-f]{64}", first_hash)
+    assert first_hash == second_hash
