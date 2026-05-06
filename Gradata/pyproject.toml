@@ -32,6 +32,7 @@ encrypted = ["cryptography>=41.0"]  # Encryption at rest for system.db
 cloud = []  # Cloud client uses stdlib only (urllib). Enhancements included in base package.
 adapters-mem0 = ["mem0ai>=1.0.11"]  # Mem0 external memory adapter (opt-in)
 ranking = ["bm25s>=0.2.0"]  # BM25 lexical retrieval for rule ranking (pure-Python, no numpy req)
+llm = ["httpx>=0.27.0"]  # BYO API key provider (Anthropic/OpenAI/Google direct HTTP)
 tune = [
     "agentlightning>=0.3.0",
 ]
@@ -44,6 +45,7 @@ all = [
     "cryptography>=41.0",
     "mem0ai>=1.0.11",
     "bm25s>=0.2.0",
+    "httpx>=0.27.0",
     "agentlightning[apo]>=0.3.0",
 ]
 dev = [

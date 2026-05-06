@@ -640,6 +640,68 @@ def _resolve_brain_root(args):
     return Path.cwd()
 
 
+def cmd_config(args) -> None:
+    """Manage brain-local Gradata configuration."""
+    subcmd = getattr(args, "config_cmd", None)
+    if subcmd != "set-llm":
+        print("usage: gradata config set-llm {cli|api}")
+        return
+
+    brain_root = _resolve_brain_root(args)
+    brain_root.mkdir(parents=True, exist_ok=True)
+    config_path = brain_root / "brain-config.json"
+    try:
+        data = json.loads(config_path.read_text(encoding="utf-8")) if config_path.exists() else {}
+    except (json.JSONDecodeError, OSError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+
+    mode = args.llm_mode
+    if mode == "cli":
+        data["llm_mode"] = "cli"
+        data.pop("llm_vendor", None)
+        data.pop("llm_api_key", None)
+        data.pop("llm_model", None)
+        config_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"LLM provider set to cli in {config_path}")
+        return
+
+    vendor = args.vendor
+    if not vendor:
+        print("error: --vendor is required for api mode", file=sys.stderr)
+        sys.exit(2)
+    key = args.key or _env_key_for_vendor(vendor)
+    if not key:
+        env_name = _env_name_for_vendor(vendor)
+        print(f"error: --key or {env_name} is required for {vendor}", file=sys.stderr)
+        sys.exit(2)
+
+    data["llm_mode"] = "api"
+    data["llm_vendor"] = vendor
+    data["llm_api_key"] = key
+    if args.model:
+        data["llm_model"] = args.model
+    else:
+        data.pop("llm_model", None)
+    config_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(f"LLM provider set to api/{vendor} in {config_path}")
+
+
+def _env_name_for_vendor(vendor: str) -> str:
+    return {
+        "anthropic": "ANTHROPIC_API_KEY",
+        "openai": "OPENAI_API_KEY",
+        "google": "GOOGLE_API_KEY",
+    }[vendor]
+
+
+def _env_key_for_vendor(vendor: str) -> str:
+    import os
+
+    return os.environ.get(_env_name_for_vendor(vendor), "")
+
+
 def cmd_rule_add(args):
     """Fast-track a user-declared rule. Writes at RULE tier conf=1.0, tries to install a hook."""
     from gradata.enhancements import rule_to_hook
@@ -1478,6 +1540,19 @@ def main():
         help="Force-install the JS handoff watchdog hooks (#127) regardless of profile",
     )
 
+    # config — brain-local SDK configuration
+    p_config = sub.add_parser("config", help="Manage brain-local SDK config")
+    config_sub = p_config.add_subparsers(dest="config_cmd")
+    p_set_llm = config_sub.add_parser("set-llm", help="Configure LLM provider mode")
+    p_set_llm.add_argument("llm_mode", choices=["cli", "api"], help="LLM mode")
+    p_set_llm.add_argument(
+        "--vendor",
+        choices=["anthropic", "openai", "google"],
+        help="API vendor for api mode",
+    )
+    p_set_llm.add_argument("--key", default=None, help="API key; defaults to vendor env var")
+    p_set_llm.add_argument("--model", default=None, help="Optional model override")
+
     # seed — pre-populate brain with high-confidence starter rules
     p_seed = sub.add_parser(
         "seed",
@@ -1623,6 +1698,7 @@ def main():
     commands["convergence"] = cmd_convergence
     commands["demo"] = cmd_demo
     commands["hooks"] = cmd_hooks
+    commands["config"] = cmd_config
     commands["rule"] = cmd_rule
     commands["skill"] = cmd_skill
     commands["seed"] = cmd_seed

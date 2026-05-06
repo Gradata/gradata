@@ -124,6 +124,18 @@ Once installed, Gradata recalls relevant behavioral rules before tool use. You c
 gradata recall "drafting cold email to PE-backed ecommerce CMO" --max-tokens 2000
 ```
 
+## Bring your own API key
+
+Gradata defaults to `CLIProvider`, which reuses your installed Claude Code, Codex, or Gemini CLI. If you want clearer API terms, do not want to install a CLI, or want lower call latency, configure Gradata to call your own Anthropic, OpenAI, or Google key directly.
+
+```bash
+pip install "gradata[llm]"
+gradata config set-llm api --vendor anthropic --key sk-ant-...
+gradata config set-llm cli
+```
+
+You can omit `--key` when `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY` is already set. Typical Gradata LLM synthesis usage is about $0.01-0.05 per session, depending on model and how many corrections need synthesis.
+
 ## Auto-Improvement (`gradata tune`)
 
 Use Microsoft's APO algorithm to auto-tune any prompt template against

@@ -70,6 +70,8 @@ DEFAULT_TOP_K = 5
 SIMILARITY_THRESHOLD = 0.35
 
 RecallRanker = Literal["hybrid", "flat", "tree_only"]
+LLMMode = Literal["cli", "api"]
+LLMVendor = Literal["anthropic", "openai", "google"]
 
 
 @dataclass(frozen=True)
@@ -84,6 +86,10 @@ class BrainConfig:
     max_recall_tokens: int = 2000
     ranker: RecallRanker = "hybrid"
     delta_injection: bool = False
+    llm_mode: LLMMode = "cli"
+    llm_vendor: LLMVendor | None = None
+    llm_api_key: str = ""
+    llm_model: str = ""
 
     @classmethod
     def load(cls, brain_dir: str | Path | None = None) -> BrainConfig:
@@ -134,10 +140,29 @@ def _load_brain_config(brain_dir: str | Path | None = None) -> BrainConfig:
     else:
         delta_injection = bool(delta_injection)
 
+    llm_mode = str(data.get("llm_mode", "cli")).strip().lower()
+    if llm_mode not in ("cli", "api"):
+        llm_mode = "cli"
+
+    llm_vendor_raw = data.get("llm_vendor")
+    llm_vendor = str(llm_vendor_raw).strip().lower() if llm_vendor_raw is not None else ""
+    if llm_vendor not in ("anthropic", "openai", "google"):
+        llm_vendor = ""
+
+    llm_api_key = data.get("llm_api_key", "")
+    llm_api_key = llm_api_key if isinstance(llm_api_key, str) else ""
+
+    llm_model = data.get("llm_model", "")
+    llm_model = llm_model if isinstance(llm_model, str) else ""
+
     return BrainConfig(
         max_recall_tokens=max_recall_tokens,
         ranker=ranker,  # type: ignore[arg-type]
         delta_injection=delta_injection,
+        llm_mode=llm_mode,  # type: ignore[arg-type]
+        llm_vendor=llm_vendor or None,  # type: ignore[arg-type]
+        llm_api_key=llm_api_key,
+        llm_model=llm_model,
     )
 
 

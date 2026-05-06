@@ -1,18 +1,19 @@
 """LLM provider abstraction for behavioral extraction and meta-rule synthesis.
 
-Supports five modes:
+Supports six modes:
   * ``anthropic``  — Anthropic Claude SDK (BYO ANTHROPIC_API_KEY)
   * ``openai``     — OpenAI / OpenAI-compatible SDK (BYO OPENAI_API_KEY)
   * ``generic``    — Generic OpenAI-compat HTTP endpoint (Ollama / vLLM / Together)
   * ``cli``        — BYO-CLI: subprocess-shell to ``claude`` / ``codex`` / ``gemini``
                      (uses the user's existing Max-plan OAuth — no API key needed)
+  * ``api``        — BYO API key: direct Anthropic / OpenAI / Google HTTP API calls
   * ``cloud``      — Gradata Cloud relay (subscription-billed, server holds the key)
   * ``gemma``      — Google native Gemma API (free tier)
 
 Provider is selected via:
   1. Brain(llm_provider=...) constructor arg
   2. ``GRADATA_LLM_PROVIDER`` env var
-  3. Default: ``auto`` — resolves cli → anthropic → openai → cloud → None
+  3. BrainConfig ``llm_mode``; default is ``cli``
 
 All providers implement ``complete(prompt, max_tokens, timeout) -> str | None`` and
 share a per-instance circuit breaker (3 consecutive failures = open for 5 min).
@@ -314,6 +315,17 @@ class CLIProvider(LLMProvider):
             )
             return None
         out = (proc.stdout or "").strip()
+        if out:
+            _record_llm_call(
+                {
+                    "provider": self.name,
+                    "vendor": self.cli_name or "unknown",
+                    "model": self.model,
+                    "input_tokens": max(1, len(prompt) // 4),
+                    "output_tokens": max(1, len(out) // 4),
+                    "usd": 0.0,
+                }
+            )
         return out or None
 
 
@@ -454,13 +466,18 @@ def get_provider(name: str | None = None, **kwargs) -> LLMProvider | None:
     Args:
         name: One of ``anthropic``, ``openai``, ``generic``, ``cli``,
               ``cloud``, ``gemma``, or ``auto``. Defaults to
-              ``GRADATA_LLM_PROVIDER`` env var, then ``auto``.
+              ``GRADATA_LLM_PROVIDER`` env var, then BrainConfig.
         **kwargs: Forwarded to the provider constructor.
 
     Returns:
         Provider instance, or ``None`` if ``auto`` couldn't find any
         configured backend (callers fall back to deterministic synthesis).
     """
+    if name is None and "GRADATA_LLM_PROVIDER" not in os.environ:
+        configured = _provider_from_brain_config()
+        if configured is not None:
+            return configured
+
     name = name or os.environ.get("GRADATA_LLM_PROVIDER", "auto")
     name = name.lower()
     if name == "auto":
@@ -477,3 +494,40 @@ def get_provider(name: str | None = None, **kwargs) -> LLMProvider | None:
         # E.g. require_https failure on a misconfigured base URL — degrade gracefully
         _log.warning("Provider %s rejected its config: %s", name, exc)
         return None
+
+
+def _provider_from_brain_config() -> LLMProvider | None:
+    try:
+        from gradata._config import current_brain_config
+
+        cfg = current_brain_config()
+    except Exception as exc:
+        _log.debug("BrainConfig lookup failed: %s", exc)
+        return None
+
+    if cfg.llm_mode == "api":
+        if not cfg.llm_vendor or not cfg.llm_api_key:
+            _log.warning("BrainConfig llm_mode='api' requires llm_vendor and llm_api_key")
+            return None
+        try:
+            from gradata.llm.byo_key import BYOKeyProvider
+
+            return BYOKeyProvider(
+                vendor=cfg.llm_vendor,
+                api_key=cfg.llm_api_key,
+                model=cfg.llm_model or None,
+            )
+        except ValueError as exc:
+            _log.warning("BYO API provider rejected BrainConfig: %s", exc)
+            return None
+
+    return CLIProvider()
+
+
+def _record_llm_call(payload: dict) -> None:
+    try:
+        from gradata.llm.telemetry import record_llm_call
+
+        record_llm_call(payload)
+    except Exception as exc:
+        _log.debug("LLM telemetry failed: %s", exc)
