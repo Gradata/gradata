@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gradata"
-version = "0.6.1"
+version = "0.7.5"
 description = "AI that learns your judgment. Corrections become behavioral rules that converge on your style."
 readme = "README.md"
 license = "Apache-2.0"
