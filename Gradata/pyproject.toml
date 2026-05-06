@@ -67,13 +67,21 @@ packages = ["src/gradata"]
 exclude = ["**/__pycache__", "**/*.pyc", "**/*.db", "**/*( 1)*", "**/* (1)*"]
 artifacts = [
     "src/gradata/hooks/assets/**/*.js",
+    "src/gradata/assets/**/*",
 ]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/gradata/assets/demo_brains/sdr/system.db" = "gradata/assets/demo_brains/sdr/system.db"
 
 [tool.hatch.build.targets.sdist]
 exclude = ["**/__pycache__", "**/*.pyc", "**/*.db", "**/*( 1)*", "**/* (1)*"]
 artifacts = [
     "src/gradata/hooks/assets/**/*.js",
+    "src/gradata/assets/**/*",
 ]
+
+[tool.hatch.build.targets.sdist.force-include]
+"src/gradata/assets/demo_brains/sdr/system.db" = "src/gradata/assets/demo_brains/sdr/system.db"
 
 # Setuptools-compatible package data (issue #135) — for non-hatchling builds
 # of the same source tree. Hatchling uses the artifacts entries above.
@@ -81,6 +89,10 @@ artifacts = [
 gradata = [
     "hooks/assets/claude_code/user-prompt/*.js",
     "hooks/assets/claude_code/session-start/*.js",
+    "assets/demo_brains/sdr/*.md",
+    "assets/demo_brains/sdr/*.jsonl",
+    "assets/demo_brains/sdr/*.json",
+    "assets/demo_brains/sdr/*.db",
 ]
 
 # --- Ruff (linter + formatter) ---

@@ -817,6 +817,8 @@ class Brain(BrainInspectionMixin):
 
         Returns a proof document showing whether and how strongly the brain
         has learned from corrections. Used for marketplace trust verification.
+        Uses train/test holdout split (Welch's t-test) when there are enough
+        sessions; falls back to in-sample trend test for cold starts.
         """
         from gradata._core import brain_prove
 

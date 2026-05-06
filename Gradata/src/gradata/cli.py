@@ -620,20 +620,10 @@ def cmd_convergence(args):
 
 
 def cmd_demo(args):
-    """Copy pre-trained demo brain to target directory."""
-    import shutil
+    """Run the deterministic product demo."""
+    from gradata._demo import run_demo
 
-    target = Path(args.target)
-    demo_src = Path(__file__).parent / "demo" / "brain"
-    if not demo_src.is_dir():
-        print(f"Demo brain not found at {demo_src}")
-        return
-    if target.exists():
-        print(f"Target {target} already exists. Remove it first or pick another path.")
-        return
-    shutil.copytree(demo_src, target)
-    print(f"Demo brain copied to {target}")
-    print(f"Try: gradata convergence --brain-dir {target}")
+    run_demo(scenario=getattr(args, "scenario", "sdr"))
 
 
 def _resolve_brain_root(args):
@@ -1426,8 +1416,13 @@ def main():
 
     sub.add_parser("convergence", help="Show corrections-per-session convergence chart")
 
-    p_demo = sub.add_parser("demo", help="Copy pre-trained demo brain to a directory")
-    p_demo.add_argument("target", nargs="?", default="./demo-brain", help="Target directory")
+    p_demo = sub.add_parser("demo", help="Show a 60-second Gradata before/after demo")
+    p_demo.add_argument(
+        "--scenario",
+        choices=["sdr", "coding"],
+        default="sdr",
+        help="Demo scenario to run (default: sdr)",
+    )
 
     p_hooks = sub.add_parser("hooks", help="Manage Claude Code hook integration")
     p_hooks.add_argument("action", choices=["install", "uninstall", "status"], help="Hook action")
