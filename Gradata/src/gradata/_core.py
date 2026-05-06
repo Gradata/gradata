@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import math
 import re  # used by export functions for slug sanitization
+import statistics
 from datetime import UTC
 from typing import TYPE_CHECKING
 
@@ -2024,6 +2026,241 @@ def brain_convergence(brain: Brain) -> dict:
 _AVG_SECONDS_PER_CORRECTION = 45
 
 
+def _correction_counts_by_session(brain: Brain) -> list[tuple[int, int]]:
+    """Return correction counts grouped by chronological session."""
+    try:
+        from gradata._db import get_connection
+
+        with get_connection(brain.db_path) as conn:
+            return list(
+                conn.execute(
+                    "SELECT session, COUNT(*) as cnt FROM events "
+                    "WHERE type = 'CORRECTION' AND session IS NOT NULL AND session > 0 "
+                    "GROUP BY session ORDER BY session"
+                ).fetchall()
+            )
+    except Exception:
+        return []
+
+
+def _regularized_incomplete_beta(x: float, a: float, b: float) -> float:
+    """Regularized incomplete beta using a continued fraction approximation."""
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+
+    max_iter = 200
+    eps = 3.0e-14
+    fpmin = 1.0e-300
+
+    qab = a + b
+    qap = a + 1.0
+    qam = a - 1.0
+    c = 1.0
+    d = 1.0 - qab * x / qap
+    if abs(d) < fpmin:
+        d = fpmin
+    d = 1.0 / d
+    h = d
+
+    for m in range(1, max_iter + 1):
+        m2 = 2 * m
+        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
+        d = 1.0 + aa * d
+        if abs(d) < fpmin:
+            d = fpmin
+        c = 1.0 + aa / c
+        if abs(c) < fpmin:
+            c = fpmin
+        d = 1.0 / d
+        h *= d * c
+
+        aa = -((a + m) * (qab + m) * x) / ((a + m2) * (qap + m2))
+        d = 1.0 + aa * d
+        if abs(d) < fpmin:
+            d = fpmin
+        c = 1.0 + aa / c
+        if abs(c) < fpmin:
+            c = fpmin
+        d = 1.0 / d
+        delta = d * c
+        h *= delta
+        if abs(delta - 1.0) < eps:
+            break
+
+    log_bt = (
+        math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b) + a * math.log(x) + b * math.log1p(-x)
+    )
+    bt = math.exp(log_bt)
+    if x < (a + 1.0) / (a + b + 2.0):
+        return bt * h / a
+    return 1.0 - bt * _regularized_incomplete_beta(1.0 - x, b, a)
+
+
+def _student_t_two_tailed_pvalue(t_stat: float, degrees_freedom: float) -> float:
+    """Two-tailed p-value for Student's t distribution."""
+    if degrees_freedom <= 0 or math.isnan(t_stat):
+        return 1.0
+    x = degrees_freedom / (degrees_freedom + t_stat * t_stat)
+    p_value = _regularized_incomplete_beta(x, degrees_freedom / 2.0, 0.5)
+    return max(0.0, min(1.0, p_value))
+
+
+def _welch_ttest(train_counts: list[int], test_counts: list[int]) -> float:
+    """Welch's t-test p-value, using scipy when available."""
+    train_mean = statistics.mean(train_counts)
+    test_mean = statistics.mean(test_counts)
+    train_var = statistics.variance(train_counts)
+    test_var = statistics.variance(test_counts)
+
+    if train_mean == test_mean:
+        return 1.0
+    if train_var == 0 and test_var == 0:
+        return 0.0
+
+    try:
+        from scipy import stats  # type: ignore[import-not-found]
+
+        result = stats.ttest_ind(train_counts, test_counts, equal_var=False)
+        p_value = float(result.pvalue)
+        if not math.isnan(p_value):
+            return round(p_value, 6)
+    except Exception:
+        pass
+
+    train_term = train_var / len(train_counts)
+    test_term = test_var / len(test_counts)
+    standard_error = math.sqrt(train_term + test_term)
+    if standard_error == 0:
+        return 0.0
+
+    numerator = (train_term + test_term) ** 2
+    denominator = 0.0
+    if len(train_counts) > 1:
+        denominator += (train_term**2) / (len(train_counts) - 1)
+    if len(test_counts) > 1:
+        denominator += (test_term**2) / (len(test_counts) - 1)
+    if denominator == 0:
+        return 0.0
+
+    t_stat = (train_mean - test_mean) / standard_error
+    degrees_freedom = numerator / denominator
+    return round(_student_t_two_tailed_pvalue(t_stat, degrees_freedom), 6)
+
+
+def _window_stats(session_counts: list[tuple[int, int]]) -> dict:
+    counts = [count for _, count in session_counts]
+    if not counts:
+        return {"sessions": [], "mean": 0.0, "std": 0.0, "n": 0}
+    std = statistics.stdev(counts) if len(counts) > 1 else 0.0
+    return {
+        "sessions": [session for session, _ in session_counts],
+        "mean": round(statistics.mean(counts), 4),
+        "std": round(std, 4),
+        "n": len(counts),
+    }
+
+
+def brain_prove_holdout(
+    brain: Brain,
+    *,
+    train_ratio: float = 0.7,
+    min_train_sessions: int = 3,
+    min_test_sessions: int = 2,
+) -> dict:
+    """
+    Statistically valid proof: train/test split.
+
+    Splits sessions chronologically into a train window (used to GROW the brain)
+    and a test window (the brain's effect on FRESH unseen sessions).
+    Runs Welch's t-test on corrections-per-session between the two windows.
+    """
+    session_counts = _correction_counts_by_session(brain)
+    total_sessions = len(session_counts)
+    if not 0 < train_ratio < 1:
+        train_ratio = 0.7
+
+    split_index = math.ceil(total_sessions * train_ratio)
+    train = session_counts[:split_index]
+    test = session_counts[split_index:]
+    train_window = _window_stats(train)
+    test_window = _window_stats(test)
+
+    insufficient = train_window["n"] < min_train_sessions or test_window["n"] < min_test_sessions
+    if insufficient:
+        summary = (
+            "Insufficient holdout data "
+            f"({train_window['n']} train sessions, {test_window['n']} test sessions)"
+        )
+        return {
+            "proven": False,
+            "confidence_level": "insufficient",
+            "train_window": train_window,
+            "test_window": test_window,
+            "lift_pct": 0.0,
+            "p_value": 1.0,
+            "method": "holdout_welch_ttest",
+            "summary": summary,
+            "evidence": {
+                "method": "holdout_welch_ttest",
+                "p_value": 1.0,
+                "sessions": total_sessions,
+                "correction_count": sum(count for _, count in session_counts),
+            },
+        }
+
+    train_counts = [count for _, count in train]
+    test_counts = [count for _, count in test]
+    p_value = _welch_ttest(train_counts, test_counts)
+    train_mean = train_window["mean"]
+    test_mean = test_window["mean"]
+    lift_pct = round(((train_mean - test_mean) / train_mean) * 100, 2) if train_mean > 0 else 0.0
+
+    proven = test_mean < train_mean and p_value < 0.05 and lift_pct >= 10
+    if p_value < 0.01 and lift_pct >= 30:
+        confidence_level = "strong"
+    elif p_value < 0.05 and lift_pct >= 15:
+        confidence_level = "moderate"
+    elif p_value < 0.10 and lift_pct > 0:
+        confidence_level = "weak"
+    else:
+        confidence_level = "insufficient"
+
+    if proven:
+        summary = (
+            f"Brain reduces held-out corrections by {lift_pct:.0f}% "
+            f"(train mean {train_mean:.2f}, test mean {test_mean:.2f}, p={p_value:.3f})"
+        )
+    else:
+        summary = (
+            "Holdout validation did not prove improvement "
+            f"(train mean {train_mean:.2f}, test mean {test_mean:.2f}, p={p_value:.3f})"
+        )
+
+    return {
+        "proven": proven,
+        "confidence_level": confidence_level,
+        "train_window": train_window,
+        "test_window": test_window,
+        "lift_pct": lift_pct,
+        "p_value": p_value,
+        "method": "holdout_welch_ttest",
+        "summary": summary,
+        "evidence": {
+            "method": "holdout_welch_ttest",
+            "p_value": p_value,
+            "sessions": total_sessions,
+            "correction_count": sum(count for _, count in session_counts),
+            "train_sessions": train_window["n"],
+            "test_sessions": test_window["n"],
+            "train_mean": train_mean,
+            "test_mean": test_mean,
+            "lift_pct": lift_pct,
+        },
+    }
+
+
 def brain_efficiency(brain: Brain, *, estimate_time: bool = False) -> dict:
     """Quantify effort saved by brain learning.
 
@@ -2072,11 +2309,22 @@ def brain_efficiency(brain: Brain, *, estimate_time: bool = False) -> dict:
 
 
 def brain_prove(brain: Brain) -> dict:
-    """Generate statistical proof that this brain improves output quality."""
-    convergence = brain._get_convergence()
-    efficiency = brain_efficiency(brain)
+    """Generate statistical proof that this brain improves output quality.
 
-    # Count graduated rules
+    For >=5 sessions, runs holdout Welch's t-test (statistically valid) and
+    merges legacy evidence keys for backward compatibility with v<=0.7.2 callers.
+    """
+    convergence = brain._get_convergence()
+    # Use holdout only when real session data is available in the DB.
+    # This makes legacy mock-based tests (which mock _get_convergence) deterministic.
+    try:
+        real_sessions = len(_correction_counts_by_session(brain))
+    except Exception:
+        real_sessions = 0
+    use_holdout = real_sessions >= 5
+
+    # Compute legacy evidence (cheap, always useful for backcompat)
+    efficiency = brain_efficiency(brain)
     rule_count = 0
     try:
         lessons_path = brain._find_lessons_path()
@@ -2091,11 +2339,8 @@ def brain_prove(brain: Brain) -> dict:
     except Exception:
         pass
 
-    # Determine which categories have converged
     by_cat = convergence.get("by_category", {})
     categories_converged = [cat for cat, data in by_cat.items() if data.get("trend") == "converged"]
-
-    # Find strongest category (lowest p-value with decreasing trend)
     strongest = None
     best_p = 1.0
     for cat, data in by_cat.items():
@@ -2103,7 +2348,28 @@ def brain_prove(brain: Brain) -> dict:
             best_p = data["p_value"]
             strongest = cat
 
-    # Determine proof strength
+    legacy_evidence = {
+        "convergence_trend": convergence.get("trend", "insufficient_data"),
+        "p_value": convergence.get("p_value", 1.0),
+        "changepoints": convergence.get("changepoints", []),
+        "effort_ratio": efficiency.get("effort_ratio", 1.0),
+        "rule_count": rule_count,
+        "correction_count": convergence.get("total_corrections", 0),
+        "sessions": convergence.get("total_sessions", 0),
+        "categories_converged": categories_converged,
+        "strongest_category": strongest,
+        "edit_distance_trend": convergence.get("edit_distance_trend", "insufficient_data"),
+    }
+
+    if use_holdout:
+        result = brain_prove_holdout(brain)
+        # Merge legacy keys into evidence for backward compatibility
+        merged_evidence = dict(legacy_evidence)
+        merged_evidence.update(result.get("evidence", {}))
+        result["evidence"] = merged_evidence
+        return result
+
+    # Legacy in-sample path (< 5 sessions)
     total_sessions = convergence.get("total_sessions", 0)
     total_corrections = convergence.get("total_corrections", 0)
     trend = convergence.get("trend", "insufficient_data")
@@ -2126,7 +2392,6 @@ def brain_prove(brain: Brain) -> dict:
         confidence_level = "insufficient"
         proven = False
 
-    # Generate summary
     if proven and confidence_level == "strong":
         pct = int((1 - effort_ratio) * 100)
         summary = f"Brain reduces correction effort by {pct}% (p={p_value:.3f}, {rule_count} graduated rules, {total_sessions} sessions)"
@@ -2138,18 +2403,8 @@ def brain_prove(brain: Brain) -> dict:
     return {
         "proven": proven,
         "confidence_level": confidence_level,
-        "evidence": {
-            "convergence_trend": trend,
-            "p_value": p_value,
-            "changepoints": convergence.get("changepoints", []),
-            "effort_ratio": effort_ratio,
-            "rule_count": rule_count,
-            "correction_count": total_corrections,
-            "sessions": total_sessions,
-            "categories_converged": categories_converged,
-            "strongest_category": strongest,
-            "edit_distance_trend": convergence.get("edit_distance_trend", "insufficient_data"),
-        },
+        "method": "in_sample_mann_kendall_legacy",
+        "evidence": legacy_evidence,
         "summary": summary,
     }
 
