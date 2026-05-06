@@ -505,6 +505,39 @@ def cmd_correct(args):
         print(f"  {summary}")
 
 
+def cmd_tune(args):
+    """Tune a prompt file with Agent-Lightning APO and Gradata corrections."""
+    from gradata.integrations.agent_lightning.runner import run_apo_tune
+
+    prompt_path = Path(args.prompt_file)
+    prompt = prompt_path.read_text(encoding="utf-8")
+    result = run_apo_tune(
+        _resolve_brain_root(args),
+        prompt_template=prompt,
+        rounds=args.rounds,
+        beam_width=args.beam,
+        branch_factor=args.branch,
+        openai_api_base=args.openai_api_base,
+    )
+    optimized = str(result["optimized_prompt"])
+
+    if args.out:
+        out_path = Path(args.out)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(optimized, encoding="utf-8")
+        print(f"optimized prompt written to {out_path}")
+    else:
+        print(optimized)
+
+    print(
+        "baseline={baseline:.3f} optimized={optimized:.3f} rounds={rounds}".format(
+            baseline=float(result.get("baseline_score", 0.0)),
+            optimized=float(result.get("optimized_score", 0.0)),
+            rounds=int(result.get("rounds_completed", 0)),
+        )
+    )
+
+
 def cmd_review(args):
     brain = _get_brain(args)
     import json as _json
@@ -1379,6 +1412,18 @@ def main():
     p_correct.add_argument("--category", type=str, help="Correction category override")
     p_correct.add_argument("--session", type=int, help="Session number")
 
+    # tune — optimize a prompt against correction history
+    p_tune = sub.add_parser("tune", help="Tune a prompt with Agent-Lightning APO")
+    p_tune.add_argument("prompt_file", help="Prompt template file")
+    p_tune.add_argument("--rounds", type=int, default=2, help="APO beam-search rounds")
+    p_tune.add_argument("--beam", type=int, default=2, help="APO beam width")
+    p_tune.add_argument("--branch", type=int, default=2, help="APO branch factor")
+    p_tune.add_argument("--brain", type=str, default=None, help="Brain directory")
+    p_tune.add_argument("--out", type=str, default=None, help="Optimized prompt output path")
+    p_tune.add_argument(
+        "--openai-api-base", type=str, default=None, help="OpenAI-compatible API base"
+    )
+
     sub.add_parser("convergence", help="Show corrections-per-session convergence chart")
 
     p_demo = sub.add_parser("demo", help="Copy pre-trained demo brain to a directory")
@@ -1539,6 +1584,7 @@ def main():
         "report": cmd_report,
         "watch": cmd_watch,
         "correct": cmd_correct,
+        "tune": cmd_tune,
         "review": cmd_review,
         "diagnose": cmd_diagnose,
     }

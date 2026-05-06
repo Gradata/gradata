@@ -124,6 +124,22 @@ Once installed, Gradata recalls relevant behavioral rules before tool use. You c
 gradata recall "drafting cold email to PE-backed ecommerce CMO" --max-tokens 2000
 ```
 
+## Auto-Improvement (`gradata tune`)
+
+Use Microsoft's APO algorithm to auto-tune any prompt template against
+your Gradata corrections.
+
+```bash
+pip install "gradata[tune-apo]"
+gradata tune ./my-prompt.md --rounds 2 --brain ./my-brain
+```
+
+The optimizer reads your `Brain`'s correction history, treats every
+matching correction as a reward signal, and produces an optimized prompt
+that scores higher on held-out corrections.
+
+No GPU required — runs on subscription CLIs via litellm proxy.
+
 ## 60-second demo
 
 ```python

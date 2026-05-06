@@ -9,3 +9,4 @@ bench/results/
 
 # pytest-MagicMock test artifact
 MagicMock/
+.hermes-backups/
