@@ -16,6 +16,8 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from gradata._correction_metrics import correction_rate as _correction_rate
+
 # ---------------------------------------------------------------------------
 # Data model
 # ---------------------------------------------------------------------------
@@ -319,7 +321,6 @@ def compute_correction_profile(
         totals = conn.execute(_SQL_CORRECTION_OUTPUT_TOTALS, (min_session,)).fetchone()
         total_corrections: int = int(totals[0] or 0)
         total_outputs: int = int(totals[1] or 0)
-        correction_rate = total_corrections / total_outputs if total_outputs > 0 else 0.0
 
         # --- Per-session densities ---
         session_density_map = _session_densities(conn, min_session)
@@ -369,7 +370,7 @@ def compute_correction_profile(
     return CorrectionProfile(
         total_corrections=total_corrections,
         total_outputs=total_outputs,
-        correction_rate=round(correction_rate, 4),
+        correction_rate=_correction_rate(total_corrections, total_outputs, ndigits=4),
         density_per_session=density_per_session,
         density_trend=density_trend,
         density_pct_change=density_pct_change,

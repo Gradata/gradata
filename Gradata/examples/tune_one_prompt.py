@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gradata.integrations.agent_lightning import run_apo_tune
+from gradata.tuning.agent_lightning import run_apo_tune
 
 
 def main() -> None:

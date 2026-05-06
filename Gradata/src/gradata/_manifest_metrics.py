@@ -28,6 +28,7 @@ def _parse_ts_utc(raw: str) -> datetime:
 from typing import TYPE_CHECKING
 
 import gradata._paths as _p
+from gradata._correction_metrics import correction_rate
 from gradata._db import get_connection
 from gradata._manifest_helpers import _session_window
 from gradata._manifest_quality import (
@@ -101,7 +102,7 @@ def _correction_rate_trend(ctx: "BrainContext | None" = None, window: int = 10) 
                 ).fetchone()[0]
                 or 0
             )
-            return round(corrections / outputs, 4) if outputs > 0 else None
+            return correction_rate(corrections, outputs, ndigits=4, empty=None)
 
         current = _cro(max_session - window + 1, max_session)
         baseline = _cro(max_session - window * 2 + 1, max_session - window)
@@ -351,8 +352,12 @@ def _quality_metrics(ctx: "BrainContext | None" = None) -> dict:
                 ).fetchone()[0]
                 or 0
             )
-            if total_outputs > 0:
-                result["correction_rate"] = round(total_corrections / total_outputs, 3)
+            result["correction_rate"] = correction_rate(
+                total_corrections,
+                total_outputs,
+                ndigits=3,
+                empty=None,
+            )
         conn.close()
     except Exception:
         pass

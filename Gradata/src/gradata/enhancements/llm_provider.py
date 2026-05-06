@@ -236,7 +236,7 @@ class CLIProvider(LLMProvider):
     """BYO-CLI provider — shells to a local CLI (claude / codex / gemini).
 
     Reuses the user's existing Max-plan OAuth or ChatGPT Plus subscription.
-    No API key required. Mirrors ``rule_synthesizer._try_claude_cli`` pattern.
+    No API key required. Mirrors the legacy Claude CLI fallback pattern.
 
     Selection order for ``cli_name``:
       1. explicit constructor arg

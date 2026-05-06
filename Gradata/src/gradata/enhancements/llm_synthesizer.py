@@ -93,15 +93,7 @@ def synthesise_principle_llm(
     if not bullets:
         return None
 
-    bullet_text = "\n".join(bullets)
-    prompt = (
-        f'Given these {len(bullets)} user corrections all related to "{theme}":\n'
-        f"{bullet_text}\n\n"
-        "Write ONE actionable behavioral principle (1-2 sentences) that captures the pattern.\n"
-        'Format: "When [context], [do X] instead of [Y]."\n'
-        "Do not list individual words. Focus on the behavioral change.\n"
-        "Return ONLY the principle, no preamble."
-    )
+    prompt = _build_prompt(bullets, theme)
 
     payload = json.dumps(
         {
@@ -158,3 +150,16 @@ def synthesise_principle_llm(
                 return None
 
     return None  # pragma: no cover — loop always returns on final attempt
+
+
+def _build_prompt(lesson_bullets: list[str], theme: str) -> str:
+    """Build the provider prompt shared with the cloud synthesize route."""
+    bullet_text = "\n".join(lesson_bullets)
+    return (
+        f'Given these {len(lesson_bullets)} user corrections all related to "{theme}":\n'
+        f"{bullet_text}\n\n"
+        "Write ONE actionable behavioral principle (1-2 sentences) that captures the pattern.\n"
+        'Format: "When [context], [do X] instead of [Y]."\n'
+        "Do not list individual words. Focus on the behavioral change.\n"
+        "Return ONLY the principle, no preamble."
+    )

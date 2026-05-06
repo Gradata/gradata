@@ -11,7 +11,8 @@
 
     ``gradata.integrations.embeddings`` and
     ``gradata.integrations.session_history`` now live in
-    :mod:`gradata.services` and are kept here as forwarding shims through
-    v0.9.0 (two-minor-version carry per
+    :mod:`gradata.services`; ``gradata.integrations.agent_lightning`` now
+    lives in :mod:`gradata.tuning`. These paths are kept here as forwarding
+    shims through v0.9.0 (two-minor-version carry per
     ``docs/contributing/deprecation-policy.md``).
 """

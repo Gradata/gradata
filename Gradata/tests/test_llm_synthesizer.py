@@ -1,10 +1,11 @@
 """Tests for LLM-enhanced principle synthesis."""
 
 import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from gradata._types import Lesson, LessonState
-from gradata.enhancements.llm_synthesizer import synthesise_principle_llm
+from gradata.enhancements.llm_synthesizer import _build_prompt, synthesise_principle_llm
 
 
 def _make_lesson(desc: str, category: str = "CONTENT") -> Lesson:
@@ -118,10 +119,21 @@ class TestSynthesiseLLMMocked:
         assert result is None
 
 
+def test_build_prompt_matches_golden_fixture():
+    """SDK prompt contract; cloud-side comparison is tracked out of scope."""
+    bullets = [
+        "- Use specific infrastructure terms instead of generic follow-ups.",
+        "- Replace hedging with concrete modernization language.",
+        "- Swap vague openers for precise technical references.",
+    ]
+    expected = Path("tests/fixtures/synthesize_prompt.golden.txt").read_text(
+        encoding="utf-8"
+    ).rstrip("\n")
+    assert _build_prompt(bullets, "content") == expected
+
+
 class TestMetaRulesDeterministic:
-    """merge_into_meta is deterministic — LLM synthesis is driven separately
-    by ``rule_synthesizer`` at session close, not from inside merge_into_meta.
-    """
+    """merge_into_meta is deterministic; LLM synthesis is driven separately."""
 
     def test_merge_produces_principle(self):
         from gradata.enhancements.meta_rules import merge_into_meta
