@@ -15,8 +15,8 @@ by hand to the constants in ``self_improvement/_confidence.py``.
 The four thresholds this module reasons about:
   - ``PATTERN_THRESHOLD`` (0.60)   — confidence to promote INSTINCT → PATTERN
   - ``RULE_THRESHOLD`` (0.90)      — confidence to promote PATTERN → RULE
-  - ``MIN_APPLICATIONS_FOR_PATTERN`` (3) — fire_count to promote to PATTERN
-  - ``MIN_APPLICATIONS_FOR_RULE`` (5)    — fire_count to promote to RULE
+  - ``MIN_APPLICATIONS_FOR_PATTERN`` (2) — fire_count to promote to PATTERN
+  - ``MIN_APPLICATIONS_FOR_RULE`` (3)    — fire_count to promote to RULE
 """
 
 from __future__ import annotations
@@ -91,8 +91,8 @@ def analyze_pipeline(
     *,
     pattern_threshold: float = 0.60,
     rule_threshold: float = 0.90,
-    min_apps_pattern: int = 3,
-    min_apps_rule: int = 5,
+    min_apps_pattern: int = 2,
+    min_apps_rule: int = 3,
     over_promoted_failure_rate: float = 0.30,
 ) -> PipelineDiagnostic:
     """Compute diagnostics + proposals from the current brain state.

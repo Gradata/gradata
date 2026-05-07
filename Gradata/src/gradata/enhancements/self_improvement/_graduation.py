@@ -25,6 +25,7 @@ from gradata.enhancements.self_improvement._confidence import (
     PATTERN_THRESHOLD,
     RULE_THRESHOLD,
     _classify_correction_direction,
+    graduation_thresholds,
     is_hook_enforced,
 )
 
@@ -113,17 +114,23 @@ def _read_beta_lb_config() -> tuple[bool, float, int]:
         "no",
         "off",
     )
+    defaults = graduation_thresholds()
     try:
-        threshold = float(os.environ.get("GRADATA_BETA_LB_THRESHOLD", "0.85"))
+        threshold = float(
+            os.environ.get("GRADATA_BETA_LB_THRESHOLD", str(defaults.beta_lb_threshold))
+        )
         if not math.isfinite(threshold):
-            threshold = 0.85
+            threshold = defaults.beta_lb_threshold
         threshold = min(max(threshold, 0.0), 1.0)
     except (TypeError, ValueError):
-        threshold = 0.85
+        threshold = defaults.beta_lb_threshold
     try:
-        min_fires = max(0, int(os.environ.get("GRADATA_BETA_LB_MIN_FIRES", "5")))
+        min_fires = max(
+            0,
+            int(os.environ.get("GRADATA_BETA_LB_MIN_FIRES", str(defaults.beta_lb_min_fires))),
+        )
     except (TypeError, ValueError):
-        min_fires = 5
+        min_fires = defaults.beta_lb_min_fires
     return enabled, threshold, min_fires
 
 
@@ -135,8 +142,8 @@ def _passes_beta_lb_gate(
 
     Enabled by default; set ``GRADATA_BETA_LB_GATE=0`` to disable. When enabled,
     requires the 5th-percentile lower bound of Beta(α, β) to meet the
-    configured threshold (``GRADATA_BETA_LB_THRESHOLD``, default 0.85) AND
-    at least ``GRADATA_BETA_LB_MIN_FIRES`` observations (default 5).
+    configured threshold (``GRADATA_BETA_LB_THRESHOLD``, default 0.75) AND
+    at least ``GRADATA_BETA_LB_MIN_FIRES`` observations (default 3).
 
     Pass ``config`` (from :func:`_read_beta_lb_config`) when calling in a
     loop to avoid re-reading env vars per lesson.
@@ -172,8 +179,8 @@ def graduate(
 
     SPEC guardrail: no promotion from silence. fire_count must meet
     minimum thresholds even if confidence is high enough:
-      - INSTINCT -> PATTERN requires fire_count >= 3 (MIN_APPLICATIONS_FOR_PATTERN).
-      - PATTERN -> RULE requires fire_count >= 5 (MIN_APPLICATIONS_FOR_RULE).
+      - INSTINCT -> PATTERN requires MIN_APPLICATIONS_FOR_PATTERN fires by default.
+      - PATTERN -> RULE requires MIN_APPLICATIONS_FOR_RULE fires by default.
     A single session cannot fast-track promotion; the fire-count gates are
     non-bypassable regardless of confidence level.
 
@@ -196,6 +203,7 @@ def graduate(
 
     # Read Beta-LB gate env once; reuse for every lesson in the loop below.
     beta_lb_config = _read_beta_lb_config()
+    thresholds = graduation_thresholds()
     if renter:
         active = [l for l in lessons if l.state in (LessonState.INSTINCT, LessonState.PATTERN)]
         graduated = [
@@ -316,7 +324,7 @@ def graduate(
             not block_promotion
             and lesson.state == LessonState.PATTERN
             and lesson.confidence >= eff_rule_threshold
-            and lesson.fire_count >= MIN_APPLICATIONS_FOR_RULE
+            and lesson.fire_count >= thresholds.min_applications_for_rule
             and _passes_beta_lb_gate(lesson, config=beta_lb_config)
         ):
             blocked = False
@@ -443,7 +451,7 @@ def graduate(
             not block_promotion
             and lesson.state == LessonState.INSTINCT
             and lesson.confidence > eff_pattern_threshold
-            and lesson.fire_count >= MIN_APPLICATIONS_FOR_PATTERN
+            and lesson.fire_count >= thresholds.min_applications_for_pattern
         ):
             _ensure_slot(lesson)
             _old = lesson.state

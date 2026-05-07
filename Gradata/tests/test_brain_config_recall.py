@@ -3,7 +3,12 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from gradata._config import BrainConfig, current_brain_config, reload_config
+from gradata._config import (
+    BrainConfig,
+    GraduationThresholds,
+    current_brain_config,
+    reload_config,
+)
 from gradata._types import Lesson, LessonState
 from gradata.enhancements.self_improvement import format_lessons
 from gradata.mcp_tools import gradata_recall
@@ -21,6 +26,31 @@ def test_brain_config_loads_recall_defaults(tmp_path) -> None:
     reload_config(tmp_path)
 
     assert current_brain_config() == BrainConfig(max_recall_tokens=40, ranker="flat")
+
+
+def test_brain_config_loads_graduation_thresholds(tmp_path) -> None:
+    (tmp_path / "brain-config.json").write_text(
+        json.dumps(
+            {
+                "graduation_thresholds": {
+                    "min_applications_for_pattern": 4,
+                    "min_applications_for_rule": 8,
+                    "beta_lb_threshold": 0.82,
+                    "beta_lb_min_fires": 7,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    reload_config(tmp_path)
+
+    assert current_brain_config().graduation_thresholds == GraduationThresholds(
+        min_applications_for_pattern=4,
+        min_applications_for_rule=8,
+        beta_lb_threshold=0.82,
+        beta_lb_min_fires=7,
+    )
 
 
 def test_gradata_recall_uses_brain_config_default_tokens(tmp_path) -> None:
