@@ -52,8 +52,8 @@ PATTERN_THRESHOLD = 0.60
 # non-deterministic behaviour. The injection gate wins because it is the
 # one that actually governs which rules reach the model.
 RULE_THRESHOLD = 0.90
-MIN_APPLICATIONS_FOR_PATTERN = 3
-MIN_APPLICATIONS_FOR_RULE = 5
+MIN_APPLICATIONS_FOR_PATTERN = 2
+MIN_APPLICATIONS_FOR_RULE = 3
 
 # Misfire is worse than contradiction (rule was completely irrelevant)
 MISFIRE_PENALTY = -0.15
@@ -169,6 +169,18 @@ _MACHINE_CORRECTION_THRESHOLD = 25
 # are consistent). >40% means roughly half say "do X" and half say "don't do X".
 _POISONING_CONTRADICTION_RATE = 0.40
 _POISONING_MIN_CORRECTIONS = 4  # Need at least 4 corrections to detect pattern
+
+
+def graduation_thresholds():
+    """Return effective graduation thresholds from process-local BrainConfig."""
+    try:
+        from gradata._config import current_brain_config
+
+        return current_brain_config().graduation_thresholds
+    except Exception:
+        from gradata._config import GraduationThresholds
+
+        return GraduationThresholds()
 
 
 def detect_correction_poisoning(corrections: list[dict]) -> list[str]:
@@ -732,6 +744,7 @@ def update_confidence(
 
     kill_limit = eff_kill_limits.get(maturity, eff_kill_limits["INFANT"])
 
+    thresholds = graduation_thresholds()
     for lesson in lessons:
         # Skip terminal states
         if lesson.state in (LessonState.KILLED, LessonState.ARCHIVED):
@@ -990,12 +1003,12 @@ def update_confidence(
             not already_transitioned
             and lesson.state == LessonState.PATTERN
             and lesson.confidence >= _uc_rule_thr
-            and lesson.fire_count >= MIN_APPLICATIONS_FOR_RULE
+            and lesson.fire_count >= thresholds.min_applications_for_rule
         ) or (
             not already_transitioned
             and lesson.state == LessonState.INSTINCT
             and lesson.confidence > _uc_pattern_thr
-            and lesson.fire_count >= MIN_APPLICATIONS_FOR_PATTERN
+            and lesson.fire_count >= thresholds.min_applications_for_pattern
         ):
             lesson.state = transition(lesson.state, "promote")
         # Demote PATTERN -> INSTINCT

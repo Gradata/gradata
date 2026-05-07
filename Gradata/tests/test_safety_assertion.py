@@ -412,35 +412,25 @@ class TestPreSessionConfidenceReset:
 
 
 # ---------------------------------------------------------------------------
-# Regression: Bug C2 — MIN_APPLICATIONS_FOR_RULE must be 5
+# Regression: low-volume rule promotion fire-count guard
 # ---------------------------------------------------------------------------
 
 
 class TestMinApplicationsForRule:
-    """Regression for C2: MIN_APPLICATIONS_FOR_RULE was accidentally lowered to 3.
+    """RULE promotion remains fire-count gated at the configured threshold."""
 
-    The docstring in graduate() and the original constant definition both
-    specify 5 (introduced in commit ca81eb6). Commit c37bfab silently
-    lowered it to 3 without a note. Restored to 5.
-    """
+    def test_default_constant_is_low_volume_threshold(self) -> None:
+        assert MIN_APPLICATIONS_FOR_RULE == 3
 
-    def test_constant_is_5(self) -> None:
-        """MIN_APPLICATIONS_FOR_RULE must equal 5 (SPEC + docstring)."""
-        assert MIN_APPLICATIONS_FOR_RULE == 5, (
-            f"Expected 5 (SPEC requirement), got {MIN_APPLICATIONS_FOR_RULE}. "
-            "Do not lower below 5 without updating the graduate() docstring and this test."
-        )
-
-    def test_four_fires_cannot_promote_to_rule(self) -> None:
-        """4 fires (one below threshold) must not promote PATTERN->RULE."""
+    def test_one_below_rule_fire_threshold_cannot_promote(self) -> None:
         lesson = _make_lesson(
             state=LessonState.PATTERN,
             confidence=RULE_THRESHOLD + 0.01,
-            fire_count=4,  # one below MIN_APPLICATIONS_FOR_RULE=5
+            fire_count=MIN_APPLICATIONS_FOR_RULE - 1,
         )
         graduate([lesson])
         assert lesson.state == LessonState.PATTERN, (
-            f"4-fire lesson promoted to {lesson.state}; expected PATTERN (need 5 fires)"
+            f"lesson promoted to {lesson.state} below the rule fire-count threshold"
         )
 
 

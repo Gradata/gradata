@@ -390,5 +390,5 @@ class TestResearchBackedConstants:
 
         assert PATTERN_THRESHOLD == 0.60
         assert RULE_THRESHOLD == 0.90
-        assert MIN_APPLICATIONS_FOR_PATTERN == 3
-        assert MIN_APPLICATIONS_FOR_RULE == 5
+        assert MIN_APPLICATIONS_FOR_PATTERN == 2
+        assert MIN_APPLICATIONS_FOR_RULE == 3

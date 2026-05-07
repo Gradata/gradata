@@ -103,7 +103,7 @@ def test_analyze_flags_zero_rules_in_populated_brain():
         _mk_lesson(LessonState.PATTERN, description=f"p{i}", confidence=0.75, fire_count=4)
         for i in range(25)
     ]
-    diag = analyze_pipeline(lessons, [], [])
+    diag = analyze_pipeline(lessons, [], [], min_apps_rule=5)
     drops = [
         p
         for p in diag.proposals

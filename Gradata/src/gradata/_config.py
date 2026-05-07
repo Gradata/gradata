@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
@@ -75,6 +75,16 @@ LLMVendor = Literal["anthropic", "openai", "google"]
 
 
 @dataclass(frozen=True)
+class GraduationThresholds:
+    """Runtime tuning for the correction-driven graduation pipeline."""
+
+    min_applications_for_pattern: int = 2
+    min_applications_for_rule: int = 3
+    beta_lb_threshold: float = 0.75
+    beta_lb_min_fires: int = 3
+
+
+@dataclass(frozen=True)
 class BrainConfig:
     """Runtime config loaded from a brain directory.
 
@@ -90,6 +100,7 @@ class BrainConfig:
     llm_vendor: LLMVendor | None = None
     llm_api_key: str = ""
     llm_model: str = ""
+    graduation_thresholds: GraduationThresholds = field(default_factory=GraduationThresholds)
 
     @classmethod
     def load(cls, brain_dir: str | Path | None = None) -> BrainConfig:
@@ -154,6 +165,7 @@ def _load_brain_config(brain_dir: str | Path | None = None) -> BrainConfig:
 
     llm_model = data.get("llm_model", "")
     llm_model = llm_model if isinstance(llm_model, str) else ""
+    graduation_thresholds = _load_graduation_thresholds(data.get("graduation_thresholds"))
 
     return BrainConfig(
         max_recall_tokens=max_recall_tokens,
@@ -163,6 +175,52 @@ def _load_brain_config(brain_dir: str | Path | None = None) -> BrainConfig:
         llm_vendor=llm_vendor or None,  # type: ignore[arg-type]
         llm_api_key=llm_api_key,
         llm_model=llm_model,
+        graduation_thresholds=graduation_thresholds,
+    )
+
+
+def _coerce_int(raw, default: int, *, minimum: int = 0) -> int:
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return value if value >= minimum else default
+
+
+def _coerce_float(raw, default: float, *, minimum: float = 0.0, maximum: float = 1.0) -> float:
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return default
+    if value < minimum or value > maximum:
+        return default
+    return value
+
+
+def _load_graduation_thresholds(raw) -> GraduationThresholds:
+    defaults = GraduationThresholds()
+    if not isinstance(raw, dict):
+        return defaults
+    return GraduationThresholds(
+        min_applications_for_pattern=_coerce_int(
+            raw.get("min_applications_for_pattern"),
+            defaults.min_applications_for_pattern,
+            minimum=1,
+        ),
+        min_applications_for_rule=_coerce_int(
+            raw.get("min_applications_for_rule"),
+            defaults.min_applications_for_rule,
+            minimum=1,
+        ),
+        beta_lb_threshold=_coerce_float(
+            raw.get("beta_lb_threshold"),
+            defaults.beta_lb_threshold,
+        ),
+        beta_lb_min_fires=_coerce_int(
+            raw.get("beta_lb_min_fires"),
+            defaults.beta_lb_min_fires,
+            minimum=0,
+        ),
     )
 
 

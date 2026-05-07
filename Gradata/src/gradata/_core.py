@@ -450,6 +450,9 @@ def brain_correct(
                     event["lesson_reinforced"] = True
                     event["lesson_category"] = cat
                     try:
+                        cloud_correction_event_id = event.get("event_id") or event.get(
+                            "cloud_event_id"
+                        )
                         brain.emit(
                             "LESSON_CHANGE",
                             "brain.correct",
@@ -459,6 +462,7 @@ def brain_correct(
                                 "lesson_description": best_match.description[:200],
                                 "fire_count": best_match.fire_count,
                                 "source_correction_id": event.get("id"),
+                                "cloud_correction_event_id": cloud_correction_event_id,
                             },
                             [f"category:{cat}", "provenance"],
                             session,
@@ -585,6 +589,9 @@ def brain_correct(
                             _log.debug("pending_approvals insert failed: %s", e)
                     _log.info("New lesson: [INSTINCT:%.2f] %s", init_conf, cat)
                     try:
+                        cloud_correction_event_id = event.get("event_id") or event.get(
+                            "cloud_event_id"
+                        )
                         brain.emit(
                             "LESSON_CHANGE",
                             "brain.correct",
@@ -598,6 +605,7 @@ def brain_correct(
                                 # the row actually written to disk.
                                 "initial_confidence": init_conf,
                                 "source_correction_id": event.get("id"),
+                                "cloud_correction_event_id": cloud_correction_event_id,
                             },
                             [f"category:{cat}", "provenance"],
                             session,
