@@ -78,9 +78,11 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         if _is_correction(row):
             total_corrections += 1
             categories[_normalize_category(row.get("category"))] += 1
-        if _is_graduation_accepted(row):
+        is_accepted = _is_graduation_accepted(row)
+        is_rejected = _is_rejection(row)
+        if is_accepted and not is_rejected:
             accepted_graduations += 1
-        if _is_rejection(row):
+        elif is_rejected and not is_accepted:
             rejection_count += 1
 
     denominator = accepted_graduations + rejection_count

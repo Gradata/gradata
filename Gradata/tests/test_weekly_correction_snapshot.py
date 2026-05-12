@@ -74,3 +74,15 @@ def test_main_emits_deterministic_json_with_skipped_rows(capsys, monkeypatch):
         "top_rule_categories": [{"category": "tone", "count": 1}],
         "total_corrections": 1,
     }
+
+
+def test_aggregate_treats_rows_as_single_outcome():
+    rows = [
+        {"event": "graduation.accepted", "outcome": "rejected", "accepted": True},
+        {"event": "graduation.rejected", "outcome": "accepted", "accepted": False},
+        {"accepted": True, "status": "rejected"},
+        {"accepted": False, "status": "accepted"},
+    ]
+    data = snapshot.aggregate(rows)
+    assert data["accepted_graduations"] == 0
+    assert data["rejection_count"] == 0
