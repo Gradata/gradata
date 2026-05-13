@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import math
+import os
 import re  # used by export functions for slug sanitization
 import statistics
 from datetime import UTC
@@ -30,6 +31,11 @@ _log = logging.getLogger("gradata")
 _STATE_RANK = {"INSTINCT": 0, "PATTERN": 1, "RULE": 2}
 # Severity ordering for min_severity gating
 _SEV_RANK = {"as-is": 0, "minor": 1, "moderate": 2, "major": 3, "discarded": 4}
+_LOW_SIGNAL_EDIT_DISTANCE_FLOOR = 0.04
+# FORMAT/DRAFTING synonym swaps carry minimal signal; require a larger edit
+# before recording a lesson so we don't learn from synonym-level noise.
+_FORMAT_DRAFTING_EDIT_DISTANCE_FLOOR = 0.07
+_FORMAT_DRAFTING_CATEGORIES = frozenset({"FORMAT", "DRAFTING"})
 
 # Map evaluator dimension names to correction categories
 _DIMENSION_CATEGORY_MAP = {
@@ -52,6 +58,18 @@ def _filter_lessons_by_state(lessons, min_state: str = "PATTERN"):
         for lesson in lessons
         if _STATE_RANK.get(lesson.state.value, -1) >= min_rank and lesson.confidence > 0.0
     ]
+
+
+def _is_meaningful_low_signal_change(draft: str, final: str, category: str) -> bool:
+    """Allow known-meaningful tiny edits to pass the low-signal floor."""
+    cat = (category or "UNKNOWN").upper()
+    if cat in {"ACCURACY", "SECURITY"}:
+        return True
+    # Proper-noun/acronym capitalization fixes can carry meaning even when
+    # edit distance is tiny.
+    if draft != final and draft.lower() == final.lower():
+        return bool(re.search(r"\b[A-Z]{2,}\b|\b[A-Z][a-z]{2,}\b", final))
+    return False
 
 
 # ── correct() ──────────────────────────────────────────────────────────
@@ -99,7 +117,7 @@ def brain_correct(
     agent_type: str | None = None,
     approval_required: bool = False,
     dry_run: bool = False,
-    min_severity: str = "as-is",
+    min_severity: str = "minor",
     scope: str | None = None,
     applies_to: str | None = None,
     auto_heal: bool = False,
@@ -353,8 +371,22 @@ def brain_correct(
             update_confidence,
         )
 
-        if not is_observation_dup and _SEV_RANK.get(diff.severity, 0) >= _SEV_RANK.get(
-            min_severity, 0
+        _cat_upper = (category or "UNKNOWN").upper()
+        _ed_floor = (
+            _FORMAT_DRAFTING_EDIT_DISTANCE_FLOOR
+            if _cat_upper in _FORMAT_DRAFTING_CATEGORIES
+            else _LOW_SIGNAL_EDIT_DISTANCE_FLOOR
+        )
+        low_signal_filtered = (
+            diff.severity in {"as-is", "minor"}
+            and diff.edit_distance < _ed_floor
+            and not _is_meaningful_low_signal_change(draft, final, category or "UNKNOWN")
+        )
+        event["low_signal_filtered"] = low_signal_filtered
+        if (
+            not is_observation_dup
+            and not low_signal_filtered
+            and _SEV_RANK.get(diff.severity, 0) >= _SEV_RANK.get(min_severity, 0)
         ):
             lessons_path = brain._find_lessons_path(create=True)
             if lessons_path:
@@ -1013,6 +1045,18 @@ def brain_end_session(
 
         if all_lessons:  # guard against wiping lessons file when all lessons are killed
             write_lessons_safe(lessons_path, format_lessons(all_lessons))
+
+        # Auto-export AGENTS.md by default so post-graduation rules are
+        # available to AGENTS.md-aware tools without requiring a manual CLI step.
+        auto_export_agents = os.environ.get("GRADATA_AUTO_EXPORT_AGENTS", "1").strip().lower()
+        if auto_export_agents not in {"0", "false", "off", "no"}:
+            try:
+                from gradata.enhancements.rule_export import export_rules
+
+                agents_text = export_rules(brain.dir, target="agents", lessons_path=lessons_path)
+                (brain.dir / "AGENTS.md").write_text(agents_text, encoding="utf-8")
+            except Exception as e:
+                _log.debug("AGENTS.md auto-export skipped: %s", e)
 
         # Archive graduated RULE lessons
         new_rules = [
