@@ -1155,7 +1155,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/79/c4/46d005aec3bf911cb
 
 [[package]]
 name = "gradata"
-version = "0.6.1"
+version = "0.7.5"
 source = { editable = "." }
 
 [package.optional-dependencies]
@@ -1167,12 +1167,14 @@ all = [
     { name = "bm25s" },
     { name = "cryptography" },
     { name = "google-genai" },
+    { name = "httpx" },
     { name = "mem0ai" },
     { name = "sentence-transformers" },
 ]
 dev = [
     { name = "bandit" },
     { name = "coverage" },
+    { name = "httpx" },
     { name = "hypothesis" },
     { name = "pyright" },
     { name = "pytest" },
@@ -1186,6 +1188,9 @@ encrypted = [
 ]
 gemini = [
     { name = "google-genai" },
+]
+llm = [
+    { name = "httpx" },
 ]
 ranking = [
     { name = "bm25s" },
@@ -1210,6 +1215,9 @@ requires-dist = [
     { name = "cryptography", marker = "extra == 'encrypted'", specifier = ">=41.0" },
     { name = "google-genai", marker = "extra == 'all'", specifier = ">=1.0.0" },
     { name = "google-genai", marker = "extra == 'gemini'", specifier = ">=1.0.0" },
+    { name = "httpx", marker = "extra == 'all'", specifier = ">=0.27.0" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.0" },
+    { name = "httpx", marker = "extra == 'llm'", specifier = ">=0.27.0" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.0" },
     { name = "mem0ai", marker = "extra == 'adapters-mem0'", specifier = ">=1.0.11" },
     { name = "mem0ai", marker = "extra == 'all'", specifier = ">=1.0.11" },
@@ -1219,7 +1227,7 @@ requires-dist = [
     { name = "sentence-transformers", marker = "extra == 'all'", specifier = ">=2.0.0" },
     { name = "sentence-transformers", marker = "extra == 'embeddings'", specifier = ">=2.0.0" },
 ]
-provides-extras = ["embeddings", "gemini", "encrypted", "cloud", "adapters-mem0", "ranking", "tune", "tune-apo", "all", "dev"]
+provides-extras = ["embeddings", "gemini", "encrypted", "cloud", "adapters-mem0", "ranking", "llm", "tune", "tune-apo", "all", "dev"]
 
 [[package]]
 name = "graphviz"
