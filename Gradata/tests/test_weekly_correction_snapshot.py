@@ -76,6 +76,30 @@ def test_main_emits_deterministic_json_with_skipped_rows(capsys, monkeypatch):
     }
 
 
+def test_main_emits_deterministic_json_with_input_file(capsys, tmp_path):
+    payload = (
+        '{"event":"correction.created","category":"tone"}\n'
+        '{"event":"lesson.graduated"}\n'
+        '{"event":"graduation.rejected"}\n'
+        "bad-row\n"
+    )
+    input_file = tmp_path / "events.ndjson"
+    input_file.write_text(payload, encoding="utf-8")
+
+    rc = snapshot.main(["--input", str(input_file)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    result = json.loads(out)
+    assert result == {
+        "acceptance_rate": 0.5,
+        "accepted_graduations": 1,
+        "rejection_count": 1,
+        "skipped_rows": 1,
+        "top_rule_categories": [{"category": "tone", "count": 1}],
+        "total_corrections": 1,
+    }
+
+
 def test_aggregate_treats_rows_as_single_outcome():
     rows = [
         {"event": "graduation.accepted", "outcome": "rejected", "accepted": True},
