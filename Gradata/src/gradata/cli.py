@@ -291,6 +291,10 @@ def _cmd_install_agent(args) -> None:
         print("No agent config files detected.")
         return
 
+    import os
+
+    verify_install = os.environ.get("GRADATA_VERIFY_INSTALL", "").strip() in ("1", "true", "yes")
+
     had_failure = False
     for name in agents:
         try:
@@ -305,6 +309,28 @@ def _cmd_install_agent(args) -> None:
         if result.action == "failed":
             had_failure = True
         print(f"{marker} {result.agent} → {result.config_path} ({result.action})")
+
+        # ▸ Flag-gated install verification: write + read a test rule
+        if verify_install and result.action != "failed":
+            try:
+                from gradata import Brain
+
+                brain = Brain(brain_dir)
+                test_id = f"gradata-install-verify-{name}-{os.urandom(4).hex()}"
+                brain.correct(
+                    draft=f"test draft for {name} install verification {test_id}",
+                    final=f"test final for {name} install verification {test_id}",
+                )
+                results = brain.search(f"gradata-install-verify-{name}")
+                if not results:
+                    print(f"  ⚠ verify failed: test rule written but not readable for {name}")
+                    had_failure = True
+                else:
+                    print(f"  ✓ verify: {name} install confirmed (write+read)")
+            except Exception as exc:
+                print(f"  ✗ verify failed for {name}: {exc}")
+                had_failure = True
+
     if had_failure:
         sys.exit(1)
 
