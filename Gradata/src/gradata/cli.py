@@ -314,29 +314,30 @@ def _cmd_install_agent(args) -> None:
         if verify_install and result.action != "failed":
             try:
                 from gradata import Brain
+                import tempfile
 
-                brain = Brain(brain_dir)
                 verification_marker = f"gradata-install-verify-{name}-{os.urandom(4).hex()}"
-                correction = brain.correct(
-                    draft=f"test draft for {name} install verification {verification_marker}",
-                    final=f"test final for {name} install verification {verification_marker}",
-                    dry_run=True,
-                )
-                results = brain.search(verification_marker, mode="events", top_k=3)
-                if not any(
-                    verification_marker in (r.get("text") or "").lower()
-                    for r in results
-                    if r.get("source", "").startswith("event:")
-                ):
-                    print(
-                        f"  ⚠ verify failed: test rule written but not readable for {name}"
+                with tempfile.TemporaryDirectory(prefix="gradata-verify-") as verification_tmp:
+                    verification_dir = Path(verification_tmp) / "brain"
+                    Brain.init(verification_dir)
+                    verification_brain = Brain(verification_dir)
+                    correction = verification_brain.correct(
+                        draft=f"test draft for {name} install verification {verification_marker}",
+                        final=f"test final for {name} install verification {verification_marker}",
+                        dry_run=False,
                     )
-                    had_failure = True
-                elif correction.get("dry_run"):
-                    # Dry-run writes are expected to be non-persistent by design.
-                    print(f"  ✓ verify: {name} install confirmed (dry-run write+read)")
-                else:
-                    print(f"  ✓ verify: {name} install confirmed (write+read)")
+                    results = verification_brain.search(verification_marker, mode="rules", top_k=3)
+                    marker_found = any(
+                        verification_marker in (r.get("text") or "").lower()
+                        for r in results
+                    )
+                    if not marker_found:
+                        print(
+                            f"  ⚠ verify failed: test rule written but not readable for {name}"
+                        )
+                        had_failure = True
+                    else:
+                        print(f"  ✓ verify: {name} install confirmed (write+read)")
             except Exception as exc:
                 print(f"  ✗ verify failed for {name}: {exc}")
                 had_failure = True
