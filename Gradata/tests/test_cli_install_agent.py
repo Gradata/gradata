@@ -8,6 +8,9 @@ from pathlib import Path
 
 def _run_cli(tmp_path: Path, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     base_env = os.environ.copy()
+    for key in list(base_env):
+        if key.startswith("GRADATA_"):
+            base_env.pop(key, None)
     base_env["HOME"] = str(tmp_path)
     base_env["USERPROFILE"] = str(tmp_path)
     base_env["XDG_CONFIG_HOME"] = str(tmp_path / ".config")

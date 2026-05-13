@@ -316,15 +316,25 @@ def _cmd_install_agent(args) -> None:
                 from gradata import Brain
 
                 brain = Brain(brain_dir)
-                test_id = f"gradata-install-verify-{name}-{os.urandom(4).hex()}"
-                brain.correct(
-                    draft=f"test draft for {name} install verification {test_id}",
-                    final=f"test final for {name} install verification {test_id}",
+                verification_marker = f"gradata-install-verify-{name}-{os.urandom(4).hex()}"
+                correction = brain.correct(
+                    draft=f"test draft for {name} install verification {verification_marker}",
+                    final=f"test final for {name} install verification {verification_marker}",
+                    dry_run=True,
                 )
-                results = brain.search(f"gradata-install-verify-{name}")
-                if not results:
-                    print(f"  ⚠ verify failed: test rule written but not readable for {name}")
+                results = brain.search(verification_marker, mode="events", top_k=3)
+                if not any(
+                    verification_marker in (r.get("text") or "").lower()
+                    for r in results
+                    if r.get("source", "").startswith("event:")
+                ):
+                    print(
+                        f"  ⚠ verify failed: test rule written but not readable for {name}"
+                    )
                     had_failure = True
+                elif correction.get("dry_run"):
+                    # Dry-run writes are expected to be non-persistent by design.
+                    print(f"  ✓ verify: {name} install confirmed (dry-run write+read)")
                 else:
                     print(f"  ✓ verify: {name} install confirmed (write+read)")
             except Exception as exc:
