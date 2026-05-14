@@ -347,7 +347,7 @@ class TestServerLifecycle:
         mock_brain.log_output.return_value = {"ts": "t", "type": "OUTPUT", "source": "s"}
 
         with patch("gradata.mcp_server.Brain", return_value=mock_brain):
-            run_server(brain_dir or "/fake/brain", stdin=in_buf, stdout=out_buf)
+            run_server(brain_dir or "/fake/brain", stdin=in_buf, stdout=out_buf, use_daemon=False)
 
         return _read_all_responses(out_buf)
 
@@ -425,7 +425,7 @@ class TestServerLifecycle:
         )
         out_buf = io.BytesIO()
         # Do NOT patch Brain — with brain_dir=None it won't try to instantiate
-        run_server(None, stdin=in_buf, stdout=out_buf)
+        run_server(None, stdin=in_buf, stdout=out_buf, use_daemon=False)
         responses = _read_all_responses(out_buf)
         call_resp = next(r for r in responses if r.get("id") == 2)
         # isError=true or the result content contains the error string

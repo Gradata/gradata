@@ -16,6 +16,10 @@ Endpoints:
     POST /tag-delta    — semantic tagging of file changes
     POST /checkpoint   — save learning state before context compaction
     POST /maintain     — brain maintenance tasks
+    GET  /mcp/tools    — list MCP tool schemas (for stdio bridge)
+    POST /mcp/tool-call — dispatch a single MCP tool call against the
+                          daemon's in-memory Brain (no extra flock — the
+                          stdio MCP server uses this to avoid contention)
 
 Usage:
     python -m gradata.daemon --brain-dir ./my-brain
@@ -128,6 +132,8 @@ class _Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path == "/health":
             self._handle_health()
+        elif self.path == "/mcp/tools":
+            self._handle_mcp_tools_list()
         else:
             self._not_found()
 
@@ -143,6 +149,7 @@ class _Handler(BaseHTTPRequestHandler):
             "/tag-delta": self._handle_tag_delta,
             "/checkpoint": self._handle_checkpoint,
             "/maintain": self._handle_maintain,
+            "/mcp/tool-call": self._handle_mcp_tool_call,
         }
         handler = routes.get(self.path)
         if handler:
@@ -635,6 +642,42 @@ class _Handler(BaseHTTPRequestHandler):
             }
         )
 
+    # ── MCP bridge endpoints ────────────────────────────────────────────
+    #
+    # These let `gradata.mcp_server` (the stdio MCP transport) act as a thin
+    # bridge to this daemon — same brain, same flock, just a different
+    # client-facing wire format. See gradata/mcp_server.py for the client side.
+
+    def _handle_mcp_tools_list(self) -> None:
+        self.daemon._reset_idle_timer()
+        try:
+            from gradata.mcp_server import _TOOL_SCHEMAS
+        except Exception as exc:  # noqa: BLE001 — surface to client
+            self._send_json({"error": f"mcp_server unavailable: {exc}"}, 500)
+            return
+        self._send_json({"tools": _TOOL_SCHEMAS})
+
+    def _handle_mcp_tool_call(self) -> None:
+        self.daemon._reset_idle_timer()
+        body = self._read_json()
+        tool_name = body.get("name", "")
+        arguments = body.get("arguments") or {}
+        if not isinstance(arguments, dict):
+            self._send_json({"error": "arguments must be an object"}, 400)
+            return
+
+        try:
+            from gradata.mcp_server import _dispatch
+        except Exception as exc:  # noqa: BLE001
+            self._send_json({"error": f"mcp_server unavailable: {exc}"}, 500)
+            return
+
+        d = self.daemon
+        # _dispatch() touches the Brain; serialize against other daemon work.
+        with d._brain_lock:
+            result = _dispatch(d._brain, tool_name, arguments)
+        self._send_json(result)
+
 
 # ── Main daemon class ──────────────────────────────────────────────────
 
@@ -752,6 +795,17 @@ class GradataDaemon:
             if self._pid_file:
                 _write_pid_file(self._pid_file, actual_port, self._brain_dir, self._started_at)
 
+            # Always advertise the daemon inside the brain dir so the stdio
+            # MCP bridge (and any other local client) can discover us without
+            # needing an explicit --pid-file. Best-effort; failures are non-fatal.
+            with contextlib.suppress(OSError):
+                _write_pid_file(
+                    self._brain_dir / ".daemon.json",
+                    actual_port,
+                    self._brain_dir,
+                    self._started_at,
+                )
+
             # SIGTERM handler
             _register_signal_handler(self)
 
@@ -805,6 +859,11 @@ class GradataDaemon:
         if self._pid_file and self._pid_file.exists():
             with contextlib.suppress(OSError):
                 self._pid_file.unlink()
+        # Best-effort: clear our auto-advertised daemon.json on shutdown.
+        advert = self._brain_dir / ".daemon.json"
+        if advert.exists():
+            with contextlib.suppress(OSError):
+                advert.unlink()
         if self._process_lock_cm is not None:
             self._process_lock_cm.__exit__(None, None, None)
             self._process_lock_cm = None
