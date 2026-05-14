@@ -33,6 +33,8 @@ import argparse
 import contextlib
 import json
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -56,6 +58,116 @@ except Exception:
 SERVER_NAME = "gradata"
 SERVER_VERSION = "0.1.0"
 PROTOCOL_VERSION = "2024-11-05"
+
+# How long to wait on the daemon for a single tool call. MCP clients
+# already have their own timeouts; keep this generous so slow brain
+# operations (search, benchmark) don't get cut off.
+_DAEMON_RPC_TIMEOUT = 60.0
+_DAEMON_PROBE_TIMEOUT = 1.0
+
+
+# ---------------------------------------------------------------------------
+# Daemon bridge — when a local gradata daemon is running, the MCP stdio
+# server delegates tool calls over HTTP instead of opening the brain itself.
+# That keeps a single process (the daemon) as the sole flock holder.
+# ---------------------------------------------------------------------------
+
+
+class _DaemonClient:
+    """Thin HTTP client for the local gradata daemon's /mcp/* endpoints."""
+
+    def __init__(self, base_url: str) -> None:
+        self.base_url = base_url.rstrip("/")
+
+    @classmethod
+    def discover(cls, brain_dir: Path | None) -> _DaemonClient | None:
+        """Locate a running daemon for *brain_dir*; return a client or None.
+
+        Discovery order:
+            1. $GRADATA_DAEMON_URL env var (full base URL, e.g. http://127.0.0.1:8765)
+            2. $GRADATA_DAEMON_PORT env var on 127.0.0.1
+            3. <brain_dir>/.daemon.json written by daemon.start()
+            4. The conventional 127.0.0.1:8765 port (legacy / dashboard default)
+
+        Returns a client only if /health responds OK within _DAEMON_PROBE_TIMEOUT.
+        """
+        import os
+
+        candidates: list[str] = []
+
+        env_url = os.environ.get("GRADATA_DAEMON_URL")
+        if env_url:
+            candidates.append(env_url)
+
+        env_port = os.environ.get("GRADATA_DAEMON_PORT")
+        if env_port and env_port.isdigit():
+            candidates.append(f"http://127.0.0.1:{env_port}")
+
+        if brain_dir is not None:
+            advert = Path(brain_dir) / ".daemon.json"
+            if advert.exists():
+                try:
+                    info = json.loads(advert.read_text(encoding="utf-8"))
+                    port = int(info.get("port", 0))
+                    if port:
+                        candidates.append(f"http://127.0.0.1:{port}")
+                except (OSError, ValueError, json.JSONDecodeError):
+                    pass
+
+        # Last-resort: the documented HTTP-daemon port. Lets the bridge
+        # find an existing daemon even if .daemon.json hasn't been written
+        # yet (older daemon, fresh install, etc.).
+        candidates.append("http://127.0.0.1:8765")
+
+        seen: set[str] = set()
+        for url in candidates:
+            url = url.rstrip("/")
+            if url in seen:
+                continue
+            seen.add(url)
+            if cls._probe(url):
+                _log.info("MCP bridge: connected to gradata daemon at %s", url)
+                return cls(url)
+        return None
+
+    @staticmethod
+    def _probe(base_url: str) -> bool:
+        try:
+            req = urllib.request.Request(f"{base_url}/health", method="GET")
+            with urllib.request.urlopen(req, timeout=_DAEMON_PROBE_TIMEOUT) as resp:
+                return 200 <= resp.status < 300
+        except (urllib.error.URLError, OSError, ValueError):
+            return False
+
+    def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        """POST a tool call to the daemon's /mcp/tool-call endpoint."""
+        payload = json.dumps({"name": tool_name, "arguments": arguments}).encode("utf-8")
+        req = urllib.request.Request(
+            f"{self.base_url}/mcp/tool-call",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=_DAEMON_RPC_TIMEOUT) as resp:
+                body = resp.read()
+        except urllib.error.HTTPError as exc:
+            # Daemon answered with a non-2xx — treat as a tool-level error.
+            try:
+                body = exc.read()
+                data = json.loads(body.decode("utf-8"))
+            except Exception:
+                data = {"error": f"daemon HTTP {exc.code}: {exc.reason}"}
+            return data if isinstance(data, dict) else {"error": str(data)}
+        except (urllib.error.URLError, OSError) as exc:
+            return {"error": f"daemon unreachable: {exc}"}
+
+        try:
+            data = json.loads(body.decode("utf-8"))
+        except json.JSONDecodeError as exc:
+            return {"error": f"daemon returned invalid JSON: {exc}"}
+        return data if isinstance(data, dict) else {"error": "daemon returned non-object"}
+
 
 # ---------------------------------------------------------------------------
 # Framing helpers
@@ -528,14 +640,27 @@ def _handle_tools_list(req_id: Any) -> dict[str, Any]:
     return _ok(req_id, {"tools": _TOOL_SCHEMAS})
 
 
-def _handle_tools_call(req_id: Any, params: dict[str, Any], brain: Any) -> dict[str, Any]:
-    """Dispatch a tool call and wrap the result."""
+def _handle_tools_call(
+    req_id: Any,
+    params: dict[str, Any],
+    brain: Any,
+    daemon_client: _DaemonClient | None = None,
+) -> dict[str, Any]:
+    """Dispatch a tool call and wrap the result.
+
+    When *daemon_client* is provided, the tool call is forwarded to the
+    running daemon over HTTP (no local Brain access). Otherwise it falls
+    back to dispatching against the in-process *brain*.
+    """
     tool_name = params.get("name", "")
     arguments = params.get("arguments") or {}
     if not isinstance(arguments, dict):
         return _err(req_id, INVALID_PARAMS, "arguments must be an object")
 
-    result = _dispatch(brain, tool_name, arguments)
+    if daemon_client is not None:
+        result = daemon_client.call_tool(tool_name, arguments)
+    else:
+        result = _dispatch(brain, tool_name, arguments)
     if "error" in result and "content" not in result:
         # Tool-level error — still a successful RPC, but isError=true per MCP spec
         return _ok(
@@ -558,7 +683,14 @@ def _handle_ping(req_id: Any) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def run_server(brain_dir: str | Path | None, *, stdin=None, stdout=None) -> None:
+def run_server(
+    brain_dir: str | Path | None,
+    *,
+    stdin=None,
+    stdout=None,
+    daemon_client: _DaemonClient | None = None,
+    use_daemon: bool = True,
+) -> None:
     """Run the MCP stdio server until the client sends shutdown or EOF.
 
     Args:
@@ -566,6 +698,11 @@ def run_server(brain_dir: str | Path | None, *, stdin=None, stdout=None) -> None
                    without a brain and returns errors for tool calls.
         stdin: Readable binary stream (defaults to sys.stdin.buffer).
         stdout: Writable binary stream (defaults to sys.stdout.buffer).
+        daemon_client: Optional pre-built bridge client (mainly for tests).
+        use_daemon: When True (default), try to bridge to a local daemon
+                    over HTTP before falling back to opening the Brain in
+                    this process. Set False to force the legacy in-process
+                    behaviour (e.g. tests that mock Brain directly).
     """
     in_stream: io.RawIOBase = stdin or sys.stdin.buffer  # type: ignore[assignment]
     out_stream: io.RawIOBase = stdout or sys.stdout.buffer  # type: ignore[assignment]
@@ -579,16 +716,22 @@ def run_server(brain_dir: str | Path | None, *, stdin=None, stdout=None) -> None
             # Default: ~/.gradata/brain
             brain_dir = str(Path.home() / ".gradata" / "brain")
 
+    brain_path = Path(brain_dir) if brain_dir is not None else None
+
+    # Prefer the daemon-bridge transport: if a daemon is already running for
+    # this brain, talk to it over HTTP and never grab the flock ourselves.
+    if daemon_client is None and use_daemon:
+        daemon_client = _DaemonClient.discover(brain_path)
+
     # Instantiate Brain from the module-level import (patchable in tests).
     # Auto-initialize if the directory doesn't exist (zero-friction first run).
     brain: Any = None
     lock_cm = None
-    if brain_dir is not None:
+    if daemon_client is None and brain_dir is not None:
         try:
             if Brain is None:
                 raise ImportError("gradata.brain.Brain could not be imported")
-            brain_path = Path(brain_dir)
-            if not brain_path.exists():
+            if brain_path is not None and not brain_path.exists():
                 _log.info("Auto-initializing brain at %s", brain_dir)
                 brain = Brain.init(brain_dir, domain="General")
             else:
@@ -633,7 +776,7 @@ def run_server(brain_dir: str | Path | None, *, stdin=None, stdout=None) -> None
                 response = _handle_tools_list(req_id)
 
             elif method == "tools/call":
-                response = _handle_tools_call(req_id, params, brain)
+                response = _handle_tools_call(req_id, params, brain, daemon_client)
 
             elif method == "shutdown":
                 if not is_notification:
@@ -669,6 +812,15 @@ def main() -> None:
         metavar="PATH",
         help="Path to the brain directory (default: $BRAIN_DIR env var)",
     )
+    parser.add_argument(
+        "--no-daemon",
+        action="store_true",
+        help=(
+            "Disable HTTP-bridge mode and always open the brain in-process. "
+            "By default the server delegates tool calls to a local gradata "
+            "daemon if one is running (recommended — avoids flock contention)."
+        ),
+    )
     args = parser.parse_args()
 
     brain_dir: str | None = args.brain_dir
@@ -677,7 +829,7 @@ def main() -> None:
 
         brain_dir = os.environ.get("BRAIN_DIR")
 
-    run_server(brain_dir)
+    run_server(brain_dir, use_daemon=not args.no_daemon)
 
 
 if __name__ == "__main__":
