@@ -13,6 +13,40 @@ from gradata.hooks.adapters._base import (
 
 AGENT = "hermes"
 
+# Hermes recognises these event names natively. The Claude-Code event names
+# (pre_tool_use / post_tool_use / session_end) are *silently ignored* by the
+# Hermes runtime — only a warning is logged. Earlier versions of this adapter
+# wrote the Claude-Code names by mistake, so we also accept the legacy keys
+# here on read and migrate them on write.
+HERMES_EVENT_NAMES: dict[str, str] = {
+    "pre_tool_use": "pre_tool_call",
+    "post_tool_use": "post_tool_call",
+    "session_end": "on_session_end",
+}
+
+
+def _migrate_legacy_event(hooks: dict, legacy_key: str, current_key: str) -> list:
+    """Return the list living at *current_key*, folding any entries that were
+    historically written under *legacy_key* into it. Removes the legacy key
+    once its entries have been migrated so an old broken install becomes a
+    correct one the next time the user runs ``gradata install --agent hermes``.
+    """
+    current = hooks.setdefault(current_key, [])
+    if not isinstance(current, list):
+        current = []
+        hooks[current_key] = current
+    legacy = hooks.get(legacy_key)
+    if isinstance(legacy, list):
+        for entry in legacy:
+            if entry not in current:
+                current.append(entry)
+        del hooks[legacy_key]
+    elif legacy_key in hooks:
+        # Malformed legacy value (not a list) — drop it; the new key owns the
+        # event from here on.
+        del hooks[legacy_key]
+    return current
+
 
 def _parse_simple_yaml(text: str) -> dict:
     """Parse the small Hermes config shape without requiring PyYAML."""
@@ -124,16 +158,17 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         if not isinstance(hooks, dict):
             hooks = {}
             data["hooks"] = hooks
-        pre_tool_use = hooks.setdefault("pre_tool_use", [])
-        if not isinstance(pre_tool_use, list):
-            pre_tool_use = []
-            hooks["pre_tool_use"] = pre_tool_use
-        if any(isinstance(entry, dict) and entry.get("id") == sig for entry in pre_tool_use):
+        # Hermes uses *_tool_call / on_session_end event names. Writing the
+        # Claude-Code names (pre_tool_use / post_tool_use / session_end) here
+        # results in Hermes silently ignoring the entries (warning only). See
+        # Gradata/gradata#190 for the install-UX epic.
+        pre_tool_call = _migrate_legacy_event(hooks, "pre_tool_use", "pre_tool_call")
+        if any(isinstance(entry, dict) and entry.get("id") == sig for entry in pre_tool_call):
             return InstallResult(
                 AGENT, agent_config_path, "already_present", "hook already present"
             )
-        pre_tool_use.append({"id": sig, "command": hook_command(brain_dir)})
+        pre_tool_call.append({"id": sig, "command": hook_command(brain_dir)})
         atomic_write_text(agent_config_path, _dump_simple_yaml(data))
-        return InstallResult(AGENT, agent_config_path, "added", "installed pre_tool_use hook")
+        return InstallResult(AGENT, agent_config_path, "added", "installed pre_tool_call hook")
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
