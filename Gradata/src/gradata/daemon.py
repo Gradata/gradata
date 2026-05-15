@@ -251,7 +251,14 @@ class _Handler(BaseHTTPRequestHandler):
             self._not_found()
 
     def do_OPTIONS(self) -> None:
-        """CORS preflight — dashboard at https://app.gradata.ai POSTs cross-origin."""
+        """CORS preflight — dashboard at https://app.gradata.ai POSTs cross-origin.
+
+        Chrome's Private Network Access (PNA) requires the
+        Access-Control-Allow-Private-Network response header on preflights
+        from public origins (HTTPS pages) to private IPs (127.0.0.1).
+        Without it the preflight fails silently and the real request is
+        never sent — the "Sync Now" button looks like a no-op.
+        """
         self.send_response(204)
         self._write_cors_headers()
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -259,6 +266,7 @@ class _Handler(BaseHTTPRequestHandler):
             "Access-Control-Allow-Headers",
             "Content-Type, Authorization",
         )
+        self.send_header("Access-Control-Allow-Private-Network", "true")
         self.send_header("Access-Control-Max-Age", "600")
         self.send_header("Content-Length", "0")
         self.end_headers()
