@@ -16,6 +16,7 @@ Endpoints:
     POST /tag-delta    — semantic tagging of file changes
     POST /checkpoint   — save learning state before context compaction
     POST /maintain     — brain maintenance tasks
+    POST /sync         — push new events to Gradata Cloud (dashboard Sync Now)
 
 Usage:
     python -m gradata.daemon --brain-dir ./my-brain
@@ -34,6 +35,8 @@ import signal
 import sqlite3
 import threading
 import time
+import urllib.error
+import urllib.request
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from logging.handlers import RotatingFileHandler
@@ -103,6 +106,122 @@ def _category_from_path(file_path: str) -> str:
 IDLE_TIMEOUT_SECONDS = 600  # 10 minutes
 
 
+# ── Cloud sync ──────────────────────────────────────────────────────────
+
+DEFAULT_CLOUD_SYNC_URL = "https://api.gradata.ai/api/v1/sync"
+SYNC_BATCH_LIMIT = 500
+SYNC_WATERMARK_FILENAME = ".sync_cron_watermark"
+_VALID_CORRECTION_SEVERITIES = {"trivial", "minor", "moderate", "major", "rewrite"}
+_CORRECTION_EVENT_TYPES = {"correction", "Correction", "CORRECTION", "edit", "Edit"}
+
+
+def _resolve_api_key(daemon_api_key: str | None = None) -> str | None:
+    """Resolve the cloud API key from (a) explicit arg, (b) env, (c) ~/.gradata/key."""
+    if daemon_api_key:
+        return daemon_api_key
+    env_key = os.environ.get("GRADATA_API_KEY")
+    if env_key:
+        return env_key
+    key_file = Path.home() / ".gradata" / "key"
+    if key_file.exists():
+        try:
+            text = key_file.read_text(encoding="utf-8").strip()
+            if text:
+                return text
+        except OSError as exc:
+            logger.warning("Could not read %s: %s", key_file, exc)
+    return None
+
+
+def _cloud_post(url: str, body: bytes, api_key: str, timeout: float = 30.0) -> bytes:
+    """POST to the Gradata cloud sync endpoint.
+
+    Isolated so tests can patch this single function without affecting
+    other urllib usage in the same process.
+    """
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "gradata-daemon-sync/1.0",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read()
+
+
+def _build_sync_payload(rows: list[sqlite3.Row]) -> tuple[list[dict], list[dict]]:
+    """Build the (events, deduped_corrections) payload lists from event rows.
+
+    Mirrors the logic in sync_cron.py so the dashboard's Sync Now button pushes
+    exactly the same shape as the cron-based pusher.
+    """
+    events: list[dict] = []
+    corrections: list[dict] = []
+    for row in rows:
+        row_dict = dict(row)
+        event_type = row_dict.get("type", "")
+
+        data: dict = {}
+        raw_data = row_dict.get("data_json")
+        if raw_data:
+            try:
+                data = json.loads(raw_data)
+            except (json.JSONDecodeError, TypeError) as exc:
+                logger.debug("sync: bad data_json on event id=%s: %s", row_dict.get("id"), exc)
+                data = {}
+
+        tags: list = []
+        raw_tags = row_dict.get("tags_json")
+        if raw_tags:
+            try:
+                tags = json.loads(raw_tags)
+            except (json.JSONDecodeError, TypeError) as exc:
+                logger.debug("sync: bad tags_json on event id=%s: %s", row_dict.get("id"), exc)
+                tags = []
+
+        event_id = row_dict.get("event_id") or f"daemon:{row_dict['id']}"
+
+        events.append(
+            {
+                "type": event_type,
+                "source": row_dict.get("source", ""),
+                "data": data,
+                "tags": tags,
+                "session": row_dict.get("session"),
+                "event_id": event_id,
+            }
+        )
+
+        if event_type in _CORRECTION_EVENT_TYPES:
+            desc = data.get("description", "")
+            if not desc:
+                desc = data.get("rule", data.get("lesson", data.get("diff", event_type)))
+            raw_sev = data.get("severity", "minor")
+            severity = raw_sev if raw_sev in _VALID_CORRECTION_SEVERITIES else "minor"
+            corrections.append(
+                {
+                    "session": row_dict.get("session", 0) or 0,
+                    "category": data.get("category", "UNKNOWN"),
+                    "severity": severity,
+                    "description": str(desc)[:500] or f"correction-{row_dict['id']}",
+                }
+            )
+
+    seen: set[tuple] = set()
+    deduped: list[dict] = []
+    for c in corrections:
+        key = (c["session"], c["description"])
+        if key not in seen:
+            seen.add(key)
+            deduped.append(c)
+
+    return events, deduped
+
+
 # ── Threaded HTTP server ────────────────────────────────────────────────
 
 
@@ -131,6 +250,19 @@ class _Handler(BaseHTTPRequestHandler):
         else:
             self._not_found()
 
+    def do_OPTIONS(self) -> None:
+        """CORS preflight — dashboard at https://app.gradata.ai POSTs cross-origin."""
+        self.send_response(204)
+        self._write_cors_headers()
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header(
+            "Access-Control-Allow-Headers",
+            "Content-Type, Authorization",
+        )
+        self.send_header("Access-Control-Max-Age", "600")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def do_POST(self) -> None:
         routes: dict[str, object] = {
             "/apply-rules": self._handle_apply_rules,
@@ -143,6 +275,7 @@ class _Handler(BaseHTTPRequestHandler):
             "/tag-delta": self._handle_tag_delta,
             "/checkpoint": self._handle_checkpoint,
             "/maintain": self._handle_maintain,
+            "/sync": self._handle_sync,
         }
         handler = routes.get(self.path)
         if handler:
@@ -163,11 +296,17 @@ class _Handler(BaseHTTPRequestHandler):
         raw = self.rfile.read(length)
         return json.loads(raw)
 
+    def _write_cors_headers(self) -> None:
+        """Write CORS response headers (called between send_response and end_headers)."""
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Credentials", "true")
+
     def _send_json(self, data: dict, status: int = 200) -> None:
         body = json.dumps(data).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
+        self._write_cors_headers()
         self.end_headers()
         self.wfile.write(body)
 
@@ -635,6 +774,136 @@ class _Handler(BaseHTTPRequestHandler):
             }
         )
 
+    def _handle_sync(self) -> None:
+        """Push new events past the watermark to the Gradata cloud sync endpoint.
+
+        Mirrors the behaviour of sync_cron.py but runs inline so the dashboard's
+        Sync Now button (POST http://127.0.0.1:8765/sync) can trigger it directly.
+        """
+        self.daemon._reset_idle_timer()
+        d = self.daemon
+
+        try:
+            db_path = d._brain.db_path
+            if not Path(db_path).exists():
+                self._send_json(
+                    {
+                        "status": "ok",
+                        "pushed": 0,
+                        "last_sync_at": datetime.now(UTC).isoformat(),
+                    }
+                )
+                return
+
+            watermark_file = d._brain_dir / SYNC_WATERMARK_FILENAME
+            watermark = 0
+            if watermark_file.exists():
+                try:
+                    watermark = int(watermark_file.read_text(encoding="utf-8").strip())
+                except (ValueError, OSError) as exc:
+                    logger.warning("sync: bad watermark file %s: %s", watermark_file, exc)
+                    watermark = 0
+
+            with d._brain_lock:
+                conn = sqlite3.connect(str(db_path))
+                try:
+                    conn.row_factory = sqlite3.Row
+                    rows = conn.execute(
+                        "SELECT * FROM events WHERE id > ? ORDER BY id LIMIT ?",
+                        (watermark, SYNC_BATCH_LIMIT),
+                    ).fetchall()
+                finally:
+                    conn.close()
+
+            if not rows:
+                self._send_json(
+                    {
+                        "status": "ok",
+                        "pushed": 0,
+                        "last_sync_at": datetime.now(UTC).isoformat(),
+                    }
+                )
+                return
+
+            events, corrections = _build_sync_payload(rows)
+            payload = {
+                "corrections": corrections,
+                "events": events,
+                "lessons": [],
+                "meta_rules": [],
+            }
+
+            api_key = _resolve_api_key(d._api_key)
+            if not api_key:
+                self._send_json(
+                    {
+                        "status": "error",
+                        "error": (
+                            "No Gradata API key found. Set GRADATA_API_KEY, write "
+                            "~/.gradata/key, or pass --api-key to the daemon."
+                        ),
+                    },
+                    status=502,
+                )
+                return
+
+            api_url = os.environ.get("GRADATA_CLOUD_API_URL", DEFAULT_CLOUD_SYNC_URL)
+            body = json.dumps(payload).encode("utf-8")
+
+            try:
+                raw_response = _cloud_post(api_url, body, api_key)
+            except urllib.error.HTTPError as exc:
+                detail = exc.read().decode("utf-8", errors="replace")[:500]
+                logger.warning("sync: cloud rejected push HTTP %d: %s", exc.code, detail)
+                self._send_json(
+                    {
+                        "status": "error",
+                        "error": f"cloud HTTP {exc.code}: {detail}",
+                    },
+                    status=502,
+                )
+                return
+            except urllib.error.URLError as exc:
+                logger.warning("sync: network error reaching cloud: %s", exc)
+                self._send_json(
+                    {
+                        "status": "error",
+                        "error": f"network error: {exc.reason}",
+                    },
+                    status=502,
+                )
+                return
+
+            try:
+                result = json.loads(raw_response) if raw_response else {}
+            except (json.JSONDecodeError, TypeError) as exc:
+                logger.warning("sync: cloud returned non-JSON: %s", exc)
+                result = {}
+
+            new_watermark = rows[-1]["id"]
+            tmp_path = watermark_file.with_suffix(watermark_file.suffix + ".tmp")
+            tmp_path.write_text(str(new_watermark), encoding="utf-8")
+            os.replace(tmp_path, watermark_file)
+
+            pushed = result.get("events_synced", 0) + result.get("corrections_synced", 0)
+            if not pushed:
+                # Fall back to local count so the dashboard sees progress
+                pushed = len(rows)
+
+            self._send_json(
+                {
+                    "status": "ok",
+                    "pushed": pushed,
+                    "last_sync_at": datetime.now(UTC).isoformat(),
+                }
+            )
+        except Exception as exc:
+            logger.exception("sync: unhandled error in /sync handler")
+            self._send_json(
+                {"status": "error", "error": str(exc)},
+                status=500,
+            )
+
 
 # ── Main daemon class ──────────────────────────────────────────────────
 
@@ -653,6 +922,7 @@ class GradataDaemon:
         brain_dir: str | Path,
         port: int = 0,
         pid_file: str | Path | None = None,
+        api_key: str | None = None,
     ) -> None:
         from gradata import Brain
 
@@ -668,6 +938,7 @@ class GradataDaemon:
 
         self._port = port
         self._pid_file = Path(pid_file) if pid_file else None
+        self._api_key = api_key
         self._server: _ThreadingHTTPServer | None = None
         self._process_lock_cm = None
         self._process_lock = None
@@ -962,6 +1233,14 @@ def main() -> None:
     parser.add_argument("--brain-dir", required=True, help="Path to the brain directory")
     parser.add_argument("--pid-file", default=None, help="Path to write PID file")
     parser.add_argument("--port", type=int, default=0, help="Port (0 = auto)")
+    parser.add_argument(
+        "--api-key",
+        default=None,
+        help=(
+            "Gradata cloud API key for /sync. Falls back to GRADATA_API_KEY env "
+            "var or ~/.gradata/key file."
+        ),
+    )
     args = parser.parse_args()
 
     brain_dir = Path(args.brain_dir).resolve()
@@ -971,6 +1250,7 @@ def main() -> None:
         brain_dir=brain_dir,
         port=args.port,
         pid_file=args.pid_file,
+        api_key=args.api_key,
     )
     daemon.start()
 
