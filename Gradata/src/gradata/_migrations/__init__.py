@@ -72,6 +72,15 @@ _BASE_TABLES: list[str] = [
         timestamp TEXT NOT NULL,
         user_context TEXT
     )""",
+    """CREATE TABLE IF NOT EXISTS sync_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        payload_json TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK(kind IN ('correction','lesson','event')),
+        enqueued_at REAL NOT NULL,
+        synced_at REAL,
+        attempts INTEGER DEFAULT 0,
+        last_error TEXT
+    )""",
 ]
 
 _MIGRATIONS: list[str] = [
@@ -97,6 +106,7 @@ _MIGRATIONS: list[str] = [
     "ALTER TABLE super_meta_rules ADD COLUMN applies_when TEXT",
     "ALTER TABLE super_meta_rules ADD COLUMN never_when TEXT",
     "ALTER TABLE super_meta_rules ADD COLUMN transfer_scope TEXT DEFAULT 'personal'",
+    "CREATE INDEX IF NOT EXISTS idx_sync_queue_pending ON sync_queue(synced_at) WHERE synced_at IS NULL",
 ]
 
 

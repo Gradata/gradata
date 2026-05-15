@@ -103,6 +103,18 @@ _TABLES_SQL = [
         mention_count INTEGER DEFAULT 1
     )
     """,
+    # Write-through sync queue (cloud upload buffer, #194)
+    """
+    CREATE TABLE IF NOT EXISTS sync_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        payload_json TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK(kind IN ('correction','lesson','event')),
+        enqueued_at REAL NOT NULL,
+        synced_at REAL,
+        attempts INTEGER DEFAULT 0,
+        last_error TEXT
+    )
+    """,
 ]
 
 _INDEXES_SQL = [
@@ -113,6 +125,7 @@ _INDEXES_SQL = [
     "CREATE INDEX IF NOT EXISTS idx_lesson_apps_lesson ON lesson_applications(lesson_id)",
     "CREATE INDEX IF NOT EXISTS idx_lesson_transitions_cat ON lesson_transitions(category)",
     "CREATE INDEX IF NOT EXISTS idx_lesson_transitions_desc ON lesson_transitions(lesson_desc)",
+    "CREATE INDEX IF NOT EXISTS idx_sync_queue_pending ON sync_queue(synced_at) WHERE synced_at IS NULL",
 ]
 
 # ── Subdirectories ────────────────────────────────────────────────────
