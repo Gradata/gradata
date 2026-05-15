@@ -824,6 +824,27 @@ class _Handler(BaseHTTPRequestHandler):
                     conn.close()
 
             if not rows:
+                # Heartbeat: still POST an empty payload so the cloud can bump
+                # `brains.last_sync_at`. Without this the dashboard's
+                # "last sync Nh ago" stays stale even though the button worked.
+                api_key = _resolve_api_key(d._api_key)
+                if not api_key:
+                    self._send_json(
+                        {
+                            "status": "ok",
+                            "pushed": 0,
+                            "last_sync_at": datetime.now(UTC).isoformat(),
+                        }
+                    )
+                    return
+                api_url = os.environ.get("GRADATA_CLOUD_API_URL", DEFAULT_CLOUD_SYNC_URL)
+                heartbeat = json.dumps(
+                    {"corrections": [], "events": [], "lessons": [], "meta_rules": []}
+                ).encode("utf-8")
+                try:
+                    _cloud_post(api_url, heartbeat, api_key)
+                except (urllib.error.HTTPError, urllib.error.URLError) as exc:
+                    logger.info("sync: cloud heartbeat failed (non-fatal): %s", exc)
                 self._send_json(
                     {
                         "status": "ok",
