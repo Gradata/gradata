@@ -103,7 +103,12 @@ def _category_from_path(file_path: str) -> str:
 
 
 # ── Idle timeout ────────────────────────────────────────────────────────
-IDLE_TIMEOUT_SECONDS = 600  # 10 minutes
+# The daemon shuts itself down after this many seconds with no incoming
+# requests. Override via GRADATA_DAEMON_IDLE_TIMEOUT (seconds, integer).
+# Set to 0 to disable idle-shutdown entirely (recommended when the dashboard
+# Sync Now button is the only client — long stretches of no requests are
+# normal and shutting down breaks the button until the watchdog catches up).
+IDLE_TIMEOUT_SECONDS = int(os.environ.get("GRADATA_DAEMON_IDLE_TIMEOUT", "600"))
 
 
 # ── Cloud sync ──────────────────────────────────────────────────────────
@@ -1017,6 +1022,9 @@ class GradataDaemon:
     # ── Idle timer ──────────────────────────────────────────────────────
 
     def _reset_idle_timer(self) -> None:
+        # Idle-shutdown disabled (timeout <= 0): treat as long-running daemon.
+        if IDLE_TIMEOUT_SECONDS <= 0:
+            return
         if self._idle_timer is not None:
             self._idle_timer.cancel()
         self._idle_timer = threading.Timer(IDLE_TIMEOUT_SECONDS, self._idle_shutdown)
