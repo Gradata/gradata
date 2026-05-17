@@ -15,3 +15,10 @@ MagicMock/
 !src/gradata/assets/demo_brains/sdr/system.db
 !src/gradata/assets/demo_brains/sdr/*.db
 !src/gradata/assets/demo_brains/sdr/
+
+# Personal/private audit artifacts — do not commit (see security/scrub-internal-leaks)
+VERIFIED_*.md
+REPORT.md
+LEANOUT_PLAN.md
+docs/internal/*_oliver-admin*
+docs/internal/SDK_GRADUATION_FORENSICS*
