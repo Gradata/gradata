@@ -55,6 +55,33 @@ from gradata._env import env_str
 from gradata.brain_inspection import BrainInspectionMixin
 
 
+def _resolve_sync_api_key() -> str | None:
+    """Resolve cloud API key for the write-through sync worker.
+
+    Order matches ``gradata.daemon._resolve_api_key``:
+    ``GRADATA_API_KEY`` env var, then ``~/.gradata/key`` file.
+    Returns ``None`` when neither is set — write-through is silently
+    disabled (the local correct() path still works normally).
+    """
+    import os
+
+    env_key = os.environ.get("GRADATA_API_KEY")
+    if env_key:
+        return env_key
+    try:
+        key_file = Path.home() / ".gradata" / "key"
+    except (RuntimeError, OSError):
+        return None
+    if key_file.exists():
+        try:
+            text = key_file.read_text(encoding="utf-8").strip()
+            if text:
+                return text
+        except OSError as exc:
+            logger.debug("Could not read %s: %s", key_file, exc)
+    return None
+
+
 class Brain(BrainInspectionMixin):
     """A personal AI brain backed by a directory of knowledge files."""
 
@@ -230,6 +257,51 @@ class Brain(BrainInspectionMixin):
 
         self._brain_salt = load_or_create_salt(self.dir)
 
+        # Write-through sync worker (#194). Drains sync_queue to cloud.
+        # Activated only when an API key is resolvable AND the user has
+        # not opted out via GRADATA_DISABLE_WRITE_THROUGH=1.
+        self._sync_worker = None
+        try:
+            self._maybe_start_sync_worker()
+        except Exception as exc:
+            logger.debug("sync worker start skipped: %s", exc)
+
+    def _maybe_start_sync_worker(self) -> None:
+        """Resolve API key + start :class:`SyncWorker` if configured.
+
+        Resolution order matches ``gradata.daemon._resolve_api_key``:
+        ``GRADATA_API_KEY`` env > ``~/.gradata/key`` file. Opt-out via
+        ``GRADATA_DISABLE_WRITE_THROUGH=1``. Endpoint can be overridden
+        via ``GRADATA_CLOUD_INGEST_URL``. Tick cadence via
+        ``GRADATA_SYNC_TICK_SEC`` (float seconds, default 30).
+        """
+        import os
+
+        if os.environ.get("GRADATA_DISABLE_WRITE_THROUGH") == "1":
+            return
+        api_key = _resolve_sync_api_key()
+        if not api_key:
+            return
+
+        from gradata._sync_worker import SyncWorker
+
+        ingest_url = os.environ.get(
+            "GRADATA_CLOUD_INGEST_URL", "https://api.gradata.ai/api/v1/ingest"
+        )
+        try:
+            tick_sec = float(os.environ.get("GRADATA_SYNC_TICK_SEC", "30"))
+        except (TypeError, ValueError):
+            tick_sec = 30.0
+
+        worker = SyncWorker(
+            brain_dir=self.dir,
+            api_key=api_key,
+            ingest_url=ingest_url,
+            tick_sec=tick_sec,
+        )
+        worker.start()
+        self._sync_worker = worker
+
     @property
     def session(self) -> int:
         """Current session number (from event log)."""
@@ -380,7 +452,14 @@ class Brain(BrainInspectionMixin):
         return self._memory_manager
 
     def close(self):
-        """Cleanup: re-encrypt database if encryption is enabled."""
+        """Cleanup: stop sync worker (drain), re-encrypt database if needed."""
+        worker = getattr(self, "_sync_worker", None)
+        if worker is not None:
+            try:
+                worker.stop(drain=True)
+            except Exception as exc:
+                logger.debug("sync worker stop failed: %s", exc)
+            self._sync_worker = None
         if self._encryption_key:
             from gradata._encryption import close_encrypted_db
 
@@ -462,7 +541,140 @@ class Brain(BrainInspectionMixin):
         except Exception as e:
             logger.debug("telemetry send_once failed: %s", e)
 
+        # Write-through cloud sync (#194). Enqueue the correction into
+        # sync_queue so the background worker can POST it to /api/v1/ingest.
+        # NEVER allow this to break the local correct() return value —
+        # write-through is best-effort and additive to existing paths.
+        if not dry_run:
+            try:
+                self._write_through_enqueue(
+                    draft=draft,
+                    final=final,
+                    category=category,
+                    session_arg=session,
+                    result=result,
+                )
+            except Exception as exc:
+                logger.debug("write-through enqueue failed: %s", exc)
+
         return result
+
+    def _write_through_enqueue(
+        self,
+        *,
+        draft: str,
+        final: str,
+        category: str | None,
+        session_arg: int | None,
+        result: dict | None,
+    ) -> None:
+        """Enqueue this correction into the local sync_queue.
+
+        Builds a payload matching the cloud ``IngestRequest`` shape and
+        the existing daemon ``/sync`` correction sub-shape:
+        ``{session, category, severity, description}``. The cloud
+        receiver dedupes on ``event_id`` so a deterministic id keeps
+        retries idempotent.
+
+        This is a no-op when no sync worker is active (no API key, or
+        ``GRADATA_DISABLE_WRITE_THROUGH=1``). The worker is the only
+        thing that actually flushes the queue — but enqueueing while
+        the worker is offline is still useful: a future Brain open with
+        a key will drain whatever piled up.
+        """
+        import os
+
+        if os.environ.get("GRADATA_DISABLE_WRITE_THROUGH") == "1":
+            return
+        if not getattr(self, "_sync_worker", None):
+            # No API key at construction → no worker → don't accumulate
+            # queue rows that will never drain. Hooks/cron still cover
+            # the no-key case via the events table.
+            return
+
+        import hashlib
+        import sqlite3
+        import time as _time
+
+        # brain_id: use tenant_id if available (matches the cloud schema),
+        # otherwise fall back to the brain directory name.
+        brain_id = self._resolve_brain_id_for_sync()
+
+        # Session: prefer explicit, else current.
+        try:
+            sess = session_arg if session_arg is not None else int(self.session or 0)
+        except Exception:
+            sess = 0
+
+        # Severity + description: pull from the brain_correct result when
+        # available (richer than re-deriving). Fall back to the diff.
+        severity = "minor"
+        description = ""
+        if isinstance(result, dict):
+            sev = result.get("severity")
+            if isinstance(sev, str) and sev:
+                severity = sev
+            desc = result.get("description") or result.get("rule") or result.get("lesson") or ""
+            if isinstance(desc, str):
+                description = desc
+        if not description:
+            description = (final or "")[:500] or "(empty correction)"
+
+        cat = (
+            category
+            or ((result or {}).get("category") if isinstance(result, dict) else None)
+            or "UNKNOWN"
+        )
+
+        correction: dict = {
+            "session": int(sess),
+            "category": str(cat),
+            "severity": str(severity),
+            "description": description[:500],
+        }
+        # Pass draft/final through so the cloud receiver can store full
+        # text if its schema accepts it (the local correction dict only
+        # carries description for the legacy /sync shape).
+        correction["draft"] = (draft or "")[:8000]
+        correction["final"] = (final or "")[:8000]
+
+        # Deterministic event_id: stable across retries.
+        digest = hashlib.sha1(
+            f"{draft}\x00{final}".encode("utf-8"),
+            usedforsecurity=False,
+        ).hexdigest()[:16]
+        ts_ms = int(_time.time() * 1000)
+        event_id = f"correct:{sess}:{ts_ms}:{digest}"
+
+        # Open a FRESH sqlite connection — do not reuse any brain-owned
+        # connection. The worker is on another thread and SQLite
+        # connections are not safely shareable across threads.
+        from gradata._sync_queue import enqueue_correction
+
+        conn = sqlite3.connect(str(self.db_path))
+        try:
+            enqueue_correction(conn, brain_id, correction, event_id=event_id)
+        finally:
+            conn.close()
+
+    def _resolve_brain_id_for_sync(self) -> str:
+        """Best-effort stable brain identifier for cloud /ingest payloads.
+
+        Prefers the tenant UUID (written by the migrations runner). Falls
+        back to the brain directory basename. Never raises.
+        """
+        try:
+            from gradata._migrations.tenant_uuid import get_or_create_tenant_id
+
+            tid = get_or_create_tenant_id(self.dir)
+            if tid:
+                return str(tid)
+        except Exception as exc:
+            logger.debug("tenant_id resolution failed: %s", exc)
+        try:
+            return self.dir.name
+        except Exception:
+            return "unknown-brain"
 
     def record_correction(
         self,

@@ -169,7 +169,13 @@ def test_sync_pushes_events_and_advances_watermark(daemon_with_events) -> None:
 
 
 def test_sync_with_no_events_returns_zero(brain_dir: Path) -> None:
-    """POST /sync with empty brain returns pushed=0 and does NOT call cloud."""
+    """POST /sync with empty brain returns pushed=0 and sends a heartbeat.
+
+    PR #198 changed the empty-payload behavior: the daemon now POSTs an
+    empty heartbeat to the cloud so brains.last_sync_at advances even
+    when there's nothing new to push. Cloud failures during the
+    heartbeat are non-fatal (logged at info, not surfaced to caller).
+    """
     from gradata._events import _ensure_table
 
     db_path = brain_dir / "system.db"
@@ -193,13 +199,17 @@ def test_sync_with_no_events_returns_zero(brain_dir: Path) -> None:
 
     try:
         with patch("gradata.daemon._cloud_post") as mock_post:
+            mock_post.return_value = b'{"events_synced":0,"corrections_synced":0}'
             status, body = _post(base, "/sync")
         assert status == 200
         assert body["status"] == "ok"
         assert body["pushed"] == 0
         assert "last_sync_at" in body
-        # No cloud call when nothing to push
-        mock_post.assert_not_called()
+        # PR #198 heartbeat: empty payload still POSTs to cloud so
+        # brains.last_sync_at advances. Exactly one call expected.
+        assert mock_post.call_count == 1, (
+            f"empty-sync should POST one heartbeat, got {mock_post.call_count}"
+        )
     finally:
         d._server.shutdown()
 
