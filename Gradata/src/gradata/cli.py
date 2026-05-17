@@ -254,6 +254,10 @@ def cmd_doctor(args):
 
 
 def cmd_install(args):
+    if getattr(args, "systemd", False):
+        _cmd_install_systemd(args)
+        return
+
     if getattr(args, "agent", None):
         _cmd_install_agent(args)
         return
@@ -278,6 +282,24 @@ def cmd_install(args):
     report = install(Path(args.archive), target, dry_run=args.dry_run)
     if report["status"] == "failed":
         sys.exit(1)
+
+
+def _cmd_install_systemd(args) -> None:
+    """Write the gradata-daemon systemd user unit (see `--systemd` flag)."""
+    from gradata._systemd_installer import (
+        DEFAULT_PORT,
+        install_systemd_unit,
+        post_install_message,
+    )
+
+    brain_dir = _resolve_brain_root(args)
+    port = int(getattr(args, "port", None) or DEFAULT_PORT)
+    try:
+        target = install_systemd_unit(brain_dir=brain_dir, port=port)
+    except RuntimeError as exc:
+        print(f"✗ systemd install failed: {exc}")
+        sys.exit(1)
+    print(post_install_message(target))
 
 
 def _cmd_install_agent(args) -> None:
@@ -1492,6 +1514,21 @@ def main():
         type=str,
         default=None,
         help="Brain directory for agent hook config (default: BRAIN_DIR or ./brain)",
+    )
+    p_install.add_argument(
+        "--systemd",
+        action="store_true",
+        help=(
+            "Install a systemd --user unit (~/.config/systemd/user/"
+            "gradata-daemon.service) so the daemon survives shell exit "
+            "and restarts on failure."
+        ),
+    )
+    p_install.add_argument(
+        "--port",
+        type=int,
+        default=None,
+        help="Port for the daemon when used with --systemd (default: 8765)",
     )
 
     # health

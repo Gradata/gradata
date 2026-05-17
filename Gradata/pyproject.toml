@@ -71,6 +71,7 @@ exclude = ["**/__pycache__", "**/*.pyc", "**/*.db", "**/*( 1)*", "**/* (1)*"]
 artifacts = [
     "src/gradata/hooks/assets/**/*.js",
     "src/gradata/assets/**/*",
+    "src/gradata/templates/*",
 ]
 
 [tool.hatch.build.targets.wheel.force-include]
@@ -81,6 +82,7 @@ exclude = ["**/__pycache__", "**/*.pyc", "**/*.db", "**/*( 1)*", "**/* (1)*"]
 artifacts = [
     "src/gradata/hooks/assets/**/*.js",
     "src/gradata/assets/**/*",
+    "src/gradata/templates/*",
 ]
 
 [tool.hatch.build.targets.sdist.force-include]
@@ -96,6 +98,7 @@ gradata = [
     "assets/demo_brains/sdr/*.jsonl",
     "assets/demo_brains/sdr/*.json",
     "assets/demo_brains/sdr/*.db",
+    "templates/*.service",
 ]
 
 # --- Ruff (linter + formatter) ---
