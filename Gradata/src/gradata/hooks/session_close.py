@@ -278,8 +278,20 @@ def _run_cloud_sync(brain_dir: str, data: dict) -> None:
     Claude Code never calls ``brain.end_session()`` directly, so
     ``_cloud_sync_session`` never fired from IDE sessions before this hook
     path existed. Gated on GRADATA_API_KEY — no key, no sync, no network.
+
+    As of #194 day 4, Brain.correct() write-through is the default cloud
+    sync path. The session_close hook tick is redundant when write-through
+    is active and was double-writing every correction. Set
+    GRADATA_DISABLE_WRITE_THROUGH=1 to fall back to this legacy path.
     """
     if not os.environ.get("GRADATA_API_KEY"):
+        return
+    # Default behavior: write-through covers it. Skip the legacy tick.
+    if os.environ.get("GRADATA_DISABLE_WRITE_THROUGH") != "1":
+        _log.info(
+            "write-through enabled, skipping legacy cloud sync from session_close "
+            "(set GRADATA_DISABLE_WRITE_THROUGH=1 to restore legacy behavior)"
+        )
         return
     try:
         from gradata._core import cloud_sync_tick
