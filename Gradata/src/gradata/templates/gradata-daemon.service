@@ -1,0 +1,14 @@
+[Unit]
+Description=Gradata daemon (HTTP transport for AI memory brain)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart={python} -m gradata.daemon --brain-dir {brain_dir} --port {port}
+Environment=GRADATA_API_KEY={token}
+Environment=GRADATA_DAEMON_IDLE_TIMEOUT=0
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
