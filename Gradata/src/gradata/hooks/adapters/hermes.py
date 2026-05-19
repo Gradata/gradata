@@ -4,8 +4,13 @@ from pathlib import Path
 
 from gradata._atomic import atomic_write_text
 from gradata.hooks.adapters._base import (
+    EDIT_TOOL_ALIASES,
+    WRITE_TOOL_ALIASES,
     InstallResult,
+    _normalize_tool_name,
     contains_signature,
+    extract_from_edit_args,
+    extract_from_write_args,
     failure,
     hook_command,
     hook_signature,
@@ -172,3 +177,55 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         return InstallResult(AGENT, agent_config_path, "added", "installed pre_tool_call hook")
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
+
+
+# Hermes-specific tool name aliases (in addition to the universal allowlist).
+# Hermes ships ``patch``/``write_file``/``mcp_*`` natively; MCP-dispatched
+# tools arrive as ``mcp_<RawName>`` and need the prefix stripped (done by
+# ``_normalize_tool_name``). See agent/shell_hooks.py::_serialize_payload
+# in the Hermes runtime for the canonical wire shape.
+HERMES_EDIT_TOOLS = EDIT_TOOL_ALIASES | frozenset({"patch", "Patch"})
+HERMES_WRITE_TOOLS = WRITE_TOOL_ALIASES | frozenset({"write_file", "Write_file"})
+
+
+def detect(payload: dict) -> bool:
+    """Hermes stdin signature: top-level ``hook_event_name`` envelope.
+
+    Hermes is the only host that wraps its payload with
+    ``{"hook_event_name": "pre_tool_call" | "post_tool_call" | ...}``
+    AND nests the tool args under ``tool_input``. Both signals are
+    checked because some legacy migrations may emit only one.
+    """
+    if not isinstance(payload, dict):
+        return False
+    if payload.get("hook_event_name") in {
+        "pre_tool_call",
+        "post_tool_call",
+        "on_session_end",
+        "pre_llm_call",
+    }:
+        return True
+    # Fallback: payload uses ``tool_input`` (not ``input``) AND has lowercase
+    # tool name. This catches old Hermes versions before hook_event_name
+    # was added, plus any Hermes-shape relay that strips the envelope.
+    if "tool_input" in payload and "input" not in payload:
+        tool_name = _normalize_tool_name(payload.get("tool_name") or "")
+        if tool_name in HERMES_EDIT_TOOLS or tool_name in HERMES_WRITE_TOOLS:
+            return True
+    return False
+
+
+def extract_correction(
+    payload: dict, tool_output: dict | str | None = None
+) -> tuple[str, str] | None:
+    """Extract (draft, final) from a Hermes post_tool_call payload."""
+    tool_name = _normalize_tool_name(payload.get("tool_name") or "")
+    args = payload.get("tool_input")
+    if not isinstance(args, dict):
+        return None
+
+    if tool_name in HERMES_EDIT_TOOLS:
+        return extract_from_edit_args(args)
+    if tool_name in HERMES_WRITE_TOOLS:
+        return extract_from_write_args(args, tool_output)
+    return None
