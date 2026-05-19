@@ -64,26 +64,54 @@ def _get_brain():
 
 
 def _extract_correction(
-    tool_input: dict, tool_output: dict | str | None = None
+    payload: dict, tool_output: dict | str | None = None
 ) -> tuple[str, str] | None:
-    """Extract before/after text from a tool call.
+    """Extract before/after text from a tool call payload.
 
-    Handles Edit (old_string/new_string) and Write (checks git diff).
+    Handles two stdin shapes:
+
+    1. **Claude Code** — `{"tool_name": "Edit", "input": {"old_string", "new_string"}}`
+       or `{"tool_name": "Write", "input": {"content"}}` with optional
+       `tool_output.old_content` for Write diffs.
+
+    2. **Hermes Agent** (and similar AGENTS.md hosts) —
+       `{"hook_event_name": "post_tool_call", "tool_name": "patch",
+         "tool_input": {"path", "old_string", "new_string"}, ...}`
+       or `{"tool_name": "write_file", "tool_input": {"path", "content"}}`.
+
+    Hermes nests tool args under ``tool_input`` (not ``input``) and uses
+    lowercase tool names (``patch``, ``write_file``, ``mcp_Patch``,
+    ``mcp_Write_file``) rather than ``Edit``/``Write``. Earlier versions
+    of this hook only matched the Claude-Code shape, so every Hermes
+    post_tool_call hook fired but silently captured zero corrections —
+    the canonical "hooks fire but events.jsonl stays idle for days"
+    failure mode. See Gradata/gradata#TBD.
+
     Returns (draft, final) or None if no meaningful correction.
     """
-    tool_name = tool_input.get("tool_name", "")
+    tool_name = payload.get("tool_name", "") or ""
+    # Hermes nests args under "tool_input"; Claude Code under "input".
+    args = payload.get("tool_input") or payload.get("input") or {}
+    if not isinstance(args, dict):
+        args = {}
 
-    if tool_name == "Edit":
-        old = tool_input.get("input", {}).get("old_string", "")
-        new = tool_input.get("input", {}).get("new_string", "")
+    # Normalize tool name for matching. Strip mcp_ prefix (e.g. "mcp_Patch" -> "Patch").
+    name_normalized = tool_name
+    if name_normalized.startswith("mcp_"):
+        name_normalized = name_normalized[4:]
+
+    # Edit-class tools: have old_string + new_string at the args top level.
+    EDIT_TOOLS = {"Edit", "edit", "patch", "Patch", "str_replace", "string_replace"}
+    if name_normalized in EDIT_TOOLS:
+        old = args.get("old_string", "") or ""
+        new = args.get("new_string", "") or ""
         if old and new and old != new:
             return (old, new)
 
-    elif tool_name == "Write":
-        # For Write, we need the previous file content
-        # The hook receives the tool output which may include the old content
-        new_content = tool_input.get("input", {}).get("content", "")
-
+    # Write-class tools: full-file replacement. Need previous content from tool_output.
+    WRITE_TOOLS = {"Write", "write", "write_file", "Write_file", "create_file"}
+    if name_normalized in WRITE_TOOLS:
+        new_content = args.get("content", "") or ""
         if isinstance(tool_output, dict) and tool_output.get("old_content"):
             old_content = tool_output["old_content"]
             if old_content != new_content and old_content and new_content:
