@@ -5,14 +5,65 @@ from pathlib import Path
 
 from gradata._atomic import atomic_write_text
 from gradata.hooks.adapters._base import (
+    EDIT_TOOL_ALIASES,
+    WRITE_TOOL_ALIASES,
     InstallResult,
+    _normalize_tool_name,
     contains_signature,
+    extract_from_edit_args,
+    extract_from_write_args,
     failure,
     hook_command,
     hook_signature,
 )
 
 AGENT = "codex"
+
+# Codex's edit/write tool surface (OpenAI Codex CLI documented tool names).
+CODEX_EDIT_TOOLS = EDIT_TOOL_ALIASES | frozenset({"apply_patch", "str_replace_editor"})
+CODEX_WRITE_TOOLS = WRITE_TOOL_ALIASES
+
+
+def detect(payload: dict) -> bool:
+    """Codex stdin: ``{"tool": "apply_patch", "input": {...}}``.
+
+    Distinguishing features:
+    - ``tool`` field present (not ``tool_name``) — rules out Claude Code
+    - ``input`` field present (not ``args``)         — rules out Gemini
+    - ``event`` field absent                          — rules out OpenCode
+    - ``hook_event_name`` absent                      — rules out Hermes
+    - tool name in Codex's edit/write surface
+    """
+    if not isinstance(payload, dict):
+        return False
+    if payload.get("hook_event_name"):
+        return False
+    if payload.get("event") in {"preTool", "postTool"}:
+        return False
+    if "tool" not in payload:
+        return False
+    if "input" not in payload:
+        return False
+    if "args" in payload:
+        return False
+    tool_name = _normalize_tool_name(payload.get("tool") or "")
+    return tool_name in CODEX_EDIT_TOOLS or tool_name in CODEX_WRITE_TOOLS
+
+
+def extract_correction(
+    payload: dict, tool_output: dict | str | None = None
+) -> tuple[str, str] | None:
+    # Codex uses the lowercase ``tool`` field only.
+    tool_name = _normalize_tool_name(payload.get("tool") or "")
+    args = payload.get("input")
+    if not isinstance(args, dict):
+        return None
+
+    if tool_name in CODEX_EDIT_TOOLS:
+        return extract_from_edit_args(args)
+    if tool_name in CODEX_WRITE_TOOLS:
+        return extract_from_write_args(args, tool_output)
+    return None
 
 
 def _toml_string(value: str) -> str:

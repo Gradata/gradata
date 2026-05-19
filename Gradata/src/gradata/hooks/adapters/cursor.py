@@ -7,6 +7,24 @@ from gradata.hooks.adapters._base import InstallResult, failure, mcp_command, re
 AGENT = "cursor"
 
 
+def detect(payload: dict) -> bool:
+    """Cursor integrates via MCP, not via stdin hooks.
+
+    Corrections are captured through the gradata MCP server's tool
+    surface (``brain_correct`` tool callable from Cursor's chat), not
+    through a stdin pipe to this script. So no stdin payload should be
+    routed to this adapter — detect always returns False.
+    """
+    return False
+
+
+def extract_correction(
+    payload: dict, tool_output: dict | str | None = None
+) -> tuple[str, str] | None:
+    """Cursor doesn't emit auto_correct stdin payloads; nothing to extract."""
+    return None
+
+
 def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
     try:
         data = read_json(agent_config_path)

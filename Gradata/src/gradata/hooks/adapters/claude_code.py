@@ -3,7 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from gradata.hooks.adapters._base import (
+    EDIT_TOOL_ALIASES,
+    WRITE_TOOL_ALIASES,
     InstallResult,
+    _normalize_tool_name,
+    extract_from_edit_args,
+    extract_from_write_args,
     failure,
     hook_command,
     hook_signature,
@@ -12,6 +17,39 @@ from gradata.hooks.adapters._base import (
 )
 
 AGENT = "claude-code"
+
+# Claude Code's canonical tool names (capitalised, no prefix).
+EDIT_TOOLS: frozenset[str] = frozenset({"Edit", "MultiEdit"}) | (EDIT_TOOL_ALIASES & {"Edit"})
+WRITE_TOOLS: frozenset[str] = frozenset({"Write"}) | (WRITE_TOOL_ALIASES & {"Write"})
+
+
+def detect(payload: dict) -> bool:
+    """Claude Code stdin signature: capitalised tool name + args at ``input``.
+
+    The Claude Code hook protocol pipes JSON with ``{"tool_name": "Edit",
+    "input": {...}}``. The capitalised tool name and the ``input`` key
+    (not ``tool_input``) are the disambiguating features.
+    """
+    if not isinstance(payload, dict):
+        return False
+    tool_name = _normalize_tool_name(payload.get("tool_name") or "")
+    return tool_name in EDIT_TOOLS or tool_name in WRITE_TOOLS
+
+
+def extract_correction(
+    payload: dict, tool_output: dict | str | None = None
+) -> tuple[str, str] | None:
+    """Extract (draft, final) from a Claude Code post-tool-use payload."""
+    tool_name = _normalize_tool_name(payload.get("tool_name") or "")
+    args = payload.get("input")
+    if not isinstance(args, dict):
+        return None
+
+    if tool_name in EDIT_TOOLS:
+        return extract_from_edit_args(args)
+    if tool_name in WRITE_TOOLS:
+        return extract_from_write_args(args, tool_output)
+    return None
 
 
 def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:

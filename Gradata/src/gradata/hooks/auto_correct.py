@@ -66,57 +66,33 @@ def _get_brain():
 def _extract_correction(
     payload: dict, tool_output: dict | str | None = None
 ) -> tuple[str, str] | None:
-    """Extract before/after text from a tool call payload.
+    """Dispatch the payload to the right host adapter and extract a correction.
 
-    Handles two stdin shapes:
+    Each adapter under ``gradata.hooks.adapters`` declares which payload
+    shapes belong to its host (``detect()``) and how to read the
+    correction out of one (``extract_correction()``). This dispatcher
+    walks adapters in priority order; the first whose ``detect`` returns
+    True owns the payload.
 
-    1. **Claude Code** — `{"tool_name": "Edit", "input": {"old_string", "new_string"}}`
-       or `{"tool_name": "Write", "input": {"content"}}` with optional
-       `tool_output.old_content` for Write diffs.
+    Returns ``(draft, final)`` or ``None`` if no adapter claims the
+    payload or no correction can be extracted.
 
-    2. **Hermes Agent** (and similar AGENTS.md hosts) —
-       `{"hook_event_name": "post_tool_call", "tool_name": "patch",
-         "tool_input": {"path", "old_string", "new_string"}, ...}`
-       or `{"tool_name": "write_file", "tool_input": {"path", "content"}}`.
-
-    Hermes nests tool args under ``tool_input`` (not ``input``) and uses
-    lowercase tool names (``patch``, ``write_file``, ``mcp_Patch``,
-    ``mcp_Write_file``) rather than ``Edit``/``Write``. Earlier versions
-    of this hook only matched the Claude-Code shape, so every Hermes
-    post_tool_call hook fired but silently captured zero corrections —
-    the canonical "hooks fire but events.jsonl stays idle for days"
-    failure mode. See Gradata/gradata#TBD.
-
-    Returns (draft, final) or None if no meaningful correction.
+    Backwards-compatibility: pre-2026-05-19 this function inlined the
+    Claude Code shape only. The adapter-routed implementation accepts
+    every host's canonical stdin shape. See PR #TBD.
     """
-    tool_name = payload.get("tool_name", "") or ""
-    # Hermes nests args under "tool_input"; Claude Code under "input".
-    args = payload.get("tool_input") or payload.get("input") or {}
-    if not isinstance(args, dict):
-        args = {}
+    from gradata.hooks.adapters._base import iter_adapters_in_priority_order
 
-    # Normalize tool name for matching. Strip mcp_ prefix (e.g. "mcp_Patch" -> "Patch").
-    name_normalized = tool_name
-    if name_normalized.startswith("mcp_"):
-        name_normalized = name_normalized[4:]
+    if not isinstance(payload, dict):
+        return None
 
-    # Edit-class tools: have old_string + new_string at the args top level.
-    EDIT_TOOLS = {"Edit", "edit", "patch", "Patch", "str_replace", "string_replace"}
-    if name_normalized in EDIT_TOOLS:
-        old = args.get("old_string", "") or ""
-        new = args.get("new_string", "") or ""
-        if old and new and old != new:
-            return (old, new)
-
-    # Write-class tools: full-file replacement. Need previous content from tool_output.
-    WRITE_TOOLS = {"Write", "write", "write_file", "Write_file", "create_file"}
-    if name_normalized in WRITE_TOOLS:
-        new_content = args.get("content", "") or ""
-        if isinstance(tool_output, dict) and tool_output.get("old_content"):
-            old_content = tool_output["old_content"]
-            if old_content != new_content and old_content and new_content:
-                return (old_content[:5000], new_content[:5000])
-
+    for _agent_name, adapter in iter_adapters_in_priority_order():
+        try:
+            if adapter.detect(payload):
+                return adapter.extract_correction(payload, tool_output)
+        except Exception:
+            # An adapter must never crash the dispatcher. Fall through.
+            continue
     return None
 
 
