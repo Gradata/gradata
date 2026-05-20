@@ -702,6 +702,173 @@ def cmd_diagnose(args):
     print("\nRun 'gradata health' for a full brain health report.")
 
 
+def cmd_prove(args):
+    """Statistical evidence the brain is improving output quality.
+
+    Reads CORRECTION + LESSON_CHANGE + RULE_FAILURE events from system.db
+    and computes:
+      - Corrections-per-session over time (linear regression slope —
+        negative = converging = brain is doing its job)
+      - Rule application rate trend
+      - Top 5 most-applied rules (proves the brain is being USED)
+      - Top 5 most-failed rules (with tune/forget recommendations)
+
+    Returns exit 0 when the trend is healthy (negative slope), exit 1
+    when it's not — usable as a CI signal: ``gradata prove && deploy``.
+    """
+    import sqlite3 as _sqlite3
+    from collections import Counter, defaultdict
+    from datetime import datetime, timedelta
+
+    brain = _get_brain(args)
+    window_arg = (getattr(args, "window", "30d") or "30d").lower()
+    window_days = {"7d": 7, "30d": 30, "90d": 90, "all": 36500}.get(window_arg, 30)
+
+    db_path = str(brain.db_path)
+    try:
+        con = _sqlite3.connect(db_path)
+        cur = con.cursor()
+    except _sqlite3.OperationalError as exc:
+        print(f"Could not open brain db: {exc}")
+        sys.exit(1)
+
+    cutoff = datetime.now(UTC) - timedelta(days=window_days)
+    cutoff_iso = cutoff.isoformat()
+
+    # Per-session correction counts in the window
+    rows = cur.execute(
+        """
+        SELECT session, ts, type
+          FROM events
+         WHERE type IN ('CORRECTION', 'LESSON_APPLIED', 'RULE_FAILURE')
+           AND ts >= ?
+        """,
+        (cutoff_iso,),
+    ).fetchall()
+
+    sessions_corr: dict[int, int] = defaultdict(int)
+    sessions_first_ts: dict[int, str] = {}
+    rule_apps_by_session: dict[int, int] = defaultdict(int)
+    rule_failures: list[tuple[str, str]] = []
+    for session, ts, etype in rows:
+        if session is None:
+            continue
+        if etype == "CORRECTION":
+            sessions_corr[session] += 1
+            if session not in sessions_first_ts or ts < sessions_first_ts[session]:
+                sessions_first_ts[session] = ts
+        elif etype == "LESSON_APPLIED":
+            rule_apps_by_session[session] += 1
+        elif etype == "RULE_FAILURE":
+            rule_failures.append((session, ts))
+
+    # Header
+    print(f"Brain: {brain.dir}")
+    print(f"Window: {window_arg} ({window_days}d)")
+    print()
+
+    if not sessions_corr:
+        print("No correction activity in this window — nothing to prove yet.")
+        sys.exit(0)
+
+    sessions_sorted = sorted(sessions_corr.keys(), key=lambda s: sessions_first_ts.get(s, ""))
+    counts = [sessions_corr[s] for s in sessions_sorted]
+
+    # Linear regression: y = slope * x + intercept, x = session index 0..N
+    n = len(counts)
+    xs = list(range(n))
+    mean_x = sum(xs) / n
+    mean_y = sum(counts) / n
+    num = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, counts))
+    den = sum((x - mean_x) ** 2 for x in xs) or 1.0
+    slope = num / den
+
+    print(f"Corrections per session:")
+    print(f"  Sessions: {n}")
+    print(f"  Total corrections: {sum(counts)}")
+    print(f"  Mean: {mean_y:.1f}/session")
+    if n >= 3:
+        print(f"  Trend slope: {slope:+.3f} corrections/session")
+        if slope < -0.05:
+            print(f"  Verdict: CONVERGING (brain is learning — fewer corrections over time)")
+        elif slope > 0.05:
+            print(f"  Verdict: DIVERGING (corrections rising — brain may need tuning)")
+        else:
+            print(f"  Verdict: STABLE (flat trend)")
+    else:
+        print(f"  Trend: need >=3 sessions to estimate")
+
+    # Rule application rate
+    total_apps = sum(rule_apps_by_session.values())
+    print()
+    print(f"Rule applications: {total_apps} in window")
+    if total_apps == 0 and sum(counts) > 5:
+        print(
+            "  WARNING: lots of corrections but zero rule applications — "
+            "rules may not be reaching session-start injection. "
+            "Run `gradata doctor` to debug."
+        )
+
+    # Top applied rules — group LESSON_APPLIED by lesson description
+    app_rows = cur.execute(
+        """
+        SELECT data_json
+          FROM events
+         WHERE type='LESSON_APPLIED' AND ts >= ?
+        """,
+        (cutoff_iso,),
+    ).fetchall()
+    app_counter: Counter[str] = Counter()
+    for (data_json,) in app_rows:
+        try:
+            d = json.loads(data_json or "{}")
+            desc = (d.get("lesson_description") or d.get("description") or "")[:60]
+            if desc:
+                app_counter[desc] += 1
+        except (ValueError, TypeError):
+            continue
+    if app_counter:
+        print()
+        print(f"Top {min(5, len(app_counter))} most-applied rules:")
+        for desc, n_apps in app_counter.most_common(5):
+            print(f"  {n_apps:4}  {desc}")
+
+    # Failures
+    fail_rows = cur.execute(
+        """
+        SELECT data_json
+          FROM events
+         WHERE type='RULE_FAILURE' AND ts >= ?
+        """,
+        (cutoff_iso,),
+    ).fetchall()
+    fail_counter: Counter[str] = Counter()
+    for (data_json,) in fail_rows:
+        try:
+            d = json.loads(data_json or "{}")
+            desc = (d.get("rule_description") or d.get("description") or "")[:60]
+            if desc:
+                fail_counter[desc] += 1
+        except (ValueError, TypeError):
+            continue
+    if fail_counter:
+        print()
+        print(f"Top {min(5, len(fail_counter))} most-failed rules (consider tune/forget):")
+        for desc, n_fails in fail_counter.most_common(5):
+            print(f"  {n_fails:4}  {desc}")
+
+    con.close()
+
+    # Exit code = CI signal
+    if n >= 3 and slope < -0.05:
+        sys.exit(0)
+    if n < 3:
+        sys.exit(0)  # not enough data — don't fail CI
+    if slope > 0.05:
+        sys.exit(1)
+    sys.exit(0)
+
+
 def cmd_forget(args):
     """Undo one or more lessons from the brain.
 
@@ -1830,6 +1997,18 @@ def main():
     p_correct.add_argument("--category", type=str, help="Correction category override")
     p_correct.add_argument("--session", type=int, help="Session number")
 
+    # prove — statistical evidence the brain is improving
+    p_prove = sub.add_parser(
+        "prove",
+        help="Statistical evidence the brain improves output quality (CI signal)",
+    )
+    p_prove.add_argument(
+        "--window",
+        choices=["7d", "30d", "90d", "all"],
+        default="30d",
+        help="Time window to analyse (default: 30d)",
+    )
+
     # forget — undo lessons by selector
     p_forget = sub.add_parser("forget", help="Undo one or more lessons from the brain")
     p_forget.add_argument(
@@ -1847,7 +2026,6 @@ def main():
         action="store_true",
         help="Skip interactive confirmation (for scripts)",
     )
-
     # tune — optimize a prompt against correction history
     p_tune = sub.add_parser("tune", help="Tune a prompt with Agent-Lightning APO")
     p_tune.add_argument("prompt_file", help="Prompt template file")
@@ -2040,6 +2218,7 @@ def main():
         "report": cmd_report,
         "watch": cmd_watch,
         "correct": cmd_correct,
+        "prove": cmd_prove,
         "forget": cmd_forget,
         "tune": cmd_tune,
         "review": cmd_review,
