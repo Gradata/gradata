@@ -26,7 +26,6 @@ import json
 import logging
 import sqlite3
 import threading
-import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -34,7 +33,7 @@ from typing import Any
 
 from gradata import _sync_queue
 
-__all__ = ["SyncWorker"]
+__all__ = ["SyncWorker", "drain_sync_queue"]
 
 logger = logging.getLogger("gradata.sync_worker")
 
@@ -43,6 +42,113 @@ _TICK_BATCH = 50
 _HTTP_TIMEOUT = 30.0
 # 4xx status codes that mean "don't retry, this row is poison".
 _PERMANENT_4XX = {400, 401, 403, 404, 410, 422}
+
+
+def drain_sync_queue(
+    brain_dir: Path,
+    api_key: str | None,
+    ingest_url: str = _DEFAULT_INGEST_URL,
+) -> int:
+    """Synchronously drain pending rows in ``sync_queue`` to the cloud ingest endpoint.
+
+    Intended to be called once at daemon startup, **before** the HTTP listener
+    opens, so any rows left behind by a crashed/restarted daemon are flushed
+    immediately instead of waiting for the next correction-triggered tick.
+
+    Behaviour and invariants:
+
+    * **Idempotent.** Calling this multiple times is safe — rows already
+      marked ``synced_at`` are not re-sent (``peek_pending`` filters them out),
+      and the cloud ingest endpoint deduplicates on ``event_id`` anyway.
+    * **Safe to call concurrently** with a running :class:`SyncWorker`. Both
+      paths open their own short-lived sqlite connections, and any race
+      results in (at worst) an at-most-once double-POST that the cloud
+      deduplicates via ``event_id``.
+    * **Best-effort.** A missing ``system.db`` or absent ``api_key`` is
+      treated as "nothing to do" and returns 0 — startup must never fail
+      just because cloud sync is misconfigured.
+    * **Bounded.** Drains in batches of :data:`_TICK_BATCH` until the queue
+      is empty, a transient error halts the run, or a hard cap (64 batches)
+      is hit. The cap prevents pathological startup hangs on huge backlogs;
+      the background worker will pick up anything still pending.
+
+    Args:
+        brain_dir: Path to the brain directory containing ``system.db``.
+        api_key: Bearer token for the cloud API. ``None`` is a no-op.
+        ingest_url: Full URL of the cloud ingest endpoint.
+
+    Returns:
+        Number of rows successfully marked ``synced_at`` during this call.
+    """
+    brain_dir = Path(brain_dir)
+    db_path = brain_dir / "system.db"
+    if not db_path.exists():
+        return 0
+    if not api_key:
+        # Cloud sync not configured — nothing to do. Don't block startup.
+        logger.debug("drain_sync_queue: no api_key, skipping")
+        return 0
+
+    # Quick check: do we even have pending rows? Avoids spinning up a worker
+    # on every cold start when the queue is already clean.
+    try:
+        conn = sqlite3.connect(str(db_path))
+        try:
+            row = conn.execute("SELECT COUNT(*) FROM sync_queue WHERE synced_at IS NULL").fetchone()
+            pending_count = int(row[0]) if row else 0
+        finally:
+            conn.close()
+    except sqlite3.DatabaseError as exc:
+        # No sync_queue table yet (fresh brain) or DB locked — let the
+        # background worker handle it on its first tick.
+        logger.debug("drain_sync_queue: pre-check failed (%s); skipping", exc)
+        return 0
+
+    if pending_count == 0:
+        logger.info("sync queue drained at startup: 0 rows")
+        return 0
+
+    worker = SyncWorker(
+        brain_dir=brain_dir,
+        api_key=api_key,
+        ingest_url=ingest_url,
+        tick_sec=999.0,  # never used; we drive _tick() directly
+    )
+
+    drained = 0
+    _MAX_BATCHES = 64
+    for _ in range(_MAX_BATCHES):
+        before = _count_pending(db_path)
+        if before == 0:
+            break
+        try:
+            worker._tick()
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.warning("drain_sync_queue tick failed: %s", exc, exc_info=True)
+            break
+        after = _count_pending(db_path)
+        # If a tick made no progress (e.g. permanent failures keeping rows
+        # pending, or 429 bail-out), stop — further ticks would just spin.
+        if after >= before:
+            drained += max(0, before - after)
+            break
+        drained += before - after
+
+    logger.info("sync queue drained at startup: %d rows", drained)
+    return drained
+
+
+def _count_pending(db_path: Path) -> int:
+    """Cheap helper: return count of rows where ``synced_at IS NULL``."""
+    try:
+        conn = sqlite3.connect(str(db_path))
+        try:
+            row = conn.execute("SELECT COUNT(*) FROM sync_queue WHERE synced_at IS NULL").fetchone()
+            return int(row[0]) if row else 0
+        finally:
+            conn.close()
+    except sqlite3.DatabaseError:
+        return 0
 
 
 class SyncWorker:
@@ -209,7 +315,7 @@ class SyncWorker:
             },
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT) as resp:  # noqa: S310
+        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT) as resp:
             raw = resp.read()
             status = int(resp.status)
         try:
