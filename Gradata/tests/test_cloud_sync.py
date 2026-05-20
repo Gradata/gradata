@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from gradata.cloud.sync import (
     CloudClient,
     CloudConfig,
@@ -98,6 +100,30 @@ class TestCloudConfig:
 
 
 class TestCloudClient:
+    @pytest.fixture(autouse=True)
+    def isolate_credential_resolution(self, monkeypatch, tmp_path):
+        """Prevent dev's real ~/.gradata/key from leaking into these tests.
+
+        CloudClient.enabled falls through to _resolved_credential() which
+        reads ~/.gradata/key. Without isolation, any dev who has actually
+        used Gradata locally would see test_client_disabled_* tests fail.
+        See GitHub issue #216.
+
+        The keyfile module captures ``Path.home() / ".gradata" / "key"`` at
+        import time, so just setting $HOME isn't enough — we redirect the
+        module-level KEYFILE_PATH/KEYFILE_DIR directly.
+        """
+        from gradata.cloud import _credentials
+
+        fake_home = tmp_path / "home"
+        fake_home.mkdir()
+        monkeypatch.setenv("HOME", str(fake_home))
+        monkeypatch.delenv("GRADATA_API_KEY", raising=False)
+        monkeypatch.setattr(_credentials, "KEYFILE_DIR", fake_home / ".gradata")
+        monkeypatch.setattr(
+            _credentials, "KEYFILE_PATH", fake_home / ".gradata" / "key"
+        )
+
     def test_client_disabled_by_default(self, tmp_path: Path):
         client = CloudClient(tmp_path)
         assert client.enabled is False
