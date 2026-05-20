@@ -1,9 +1,8 @@
 """Using Gradata alongside Claude Code.
 
-With the Claude Code plugin installed (`/plugin install gradata`),
-corrections on `Edit` / `Write` tool calls are captured automatically and
-graduated rules are injected into every session. No code is needed in the
-hot path.
+With `gradata install --agent claude-code` run once, corrections on `Edit` /
+`Write` tool calls are captured automatically and graduated rules are
+injected into every session. No code is needed in the hot path.
 
 This example is the manual equivalent: the same `Brain` API the hooks use,
 run directly so you can inspect what gets stored and what would be injected.
@@ -11,7 +10,8 @@ run directly so you can inspect what gets stored and what would be injected.
 Run:
     python examples/with_claude_code.py
 
-See also: .claude-plugin/README.md for the zero-code install flow.
+See also: the README's "Install for Claude Code" section for the zero-code
+install flow.
 """
 
 from pathlib import Path
