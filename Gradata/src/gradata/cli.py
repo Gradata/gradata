@@ -141,6 +141,166 @@ def cmd_stats(args):
     print(f"  Has embeddings: {stats['has_embeddings']}")
 
 
+def cmd_status(args):
+    """Single human-readable summary of brain health.
+
+    Wraps stats + health + daemon probe + cloud-sync state into one
+    terminal-renderable block. Designed for the user's daily "what's
+    going on with my brain" check — `gradata status` and done.
+
+    Output is plain text (no color codes, no Unicode boxes). Stays
+    under ~40 lines for a typical brain.
+    """
+    import json as _json
+    import sqlite3 as _sqlite3
+    import time as _time
+    import urllib.error as _urllib_error
+    import urllib.request as _urllib_request
+    from datetime import datetime, timezone
+
+    brain = _get_brain(args)
+    stats = brain.stats()
+    brain_dir = stats["brain_dir"]
+
+    print(f"Brain: {brain_dir}")
+    print(f"  Database: {stats['db_size_mb']} MB  ({stats['markdown_files']} markdown files)")
+
+    # Rules / lessons / corrections from events table
+    db_path = f"{brain_dir}/system.db"
+    rules_total = lessons_total = corr_total = 0
+    last_correction_ts = None
+    try:
+        con = _sqlite3.connect(db_path)
+        cur = con.cursor()
+        rules_total = cur.execute(
+            "SELECT COUNT(*) FROM events WHERE type='RULE_GRADUATED'"
+        ).fetchone()[0]
+        lessons_total = cur.execute(
+            "SELECT COUNT(*) FROM events WHERE type IN ('LESSON_ADDED','LESSON_CHANGE')"
+        ).fetchone()[0]
+        corr_total = cur.execute("SELECT COUNT(*) FROM events WHERE type='CORRECTION'").fetchone()[
+            0
+        ]
+        row = cur.execute("SELECT MAX(ts) FROM events WHERE type='CORRECTION'").fetchone()
+        last_correction_ts = row[0] if row else None
+        con.close()
+    except (_sqlite3.OperationalError, OSError):
+        # Fresh brain or schema drift — show zeros, don't crash.
+        pass
+
+    print(f"  Rules graduated: {rules_total}")
+    print(f"  Lessons: {lessons_total}")
+    print(f"  Corrections: {corr_total}")
+    if last_correction_ts:
+        print(f"  Last correction: {last_correction_ts}")
+
+    # Sync queue state
+    pending = total_q = 0
+    try:
+        con = _sqlite3.connect(db_path)
+        pending = con.execute("SELECT COUNT(*) FROM sync_queue WHERE synced_at IS NULL").fetchone()[
+            0
+        ]
+        total_q = con.execute("SELECT COUNT(*) FROM sync_queue").fetchone()[0]
+        con.close()
+    except _sqlite3.OperationalError:
+        pass
+    if total_q:
+        if pending:
+            print(f"  Sync queue: {pending} pending / {total_q} total")
+        else:
+            print(f"  Sync queue: drained ({total_q} synced)")
+
+    # Daemon health (best-effort, never blocks)
+    print()
+    print("Daemon:")
+    try:
+        req = _urllib_request.Request(
+            "http://127.0.0.1:8765/health",
+            headers={"User-Agent": "gradata-status/1.0"},
+        )
+        with _urllib_request.urlopen(req, timeout=2) as r:
+            data = _json.loads(r.read().decode())
+        uptime = data.get("uptime_seconds", 0)
+        hrs = int(uptime // 3600)
+        mins = int((uptime % 3600) // 60)
+        print(f"  Status: up  (uptime {hrs}h{mins}m)")
+        print(f"  Brain dir: {data.get('brain_dir', '?')}")
+        print(f"  SDK version: {data.get('sdk_version', '?')}")
+        if (data.get("brain_dir") or "").rstrip("/") != brain_dir.rstrip("/"):
+            print(f"  WARNING: daemon brain dir != this brain ({brain_dir})")
+    except (_urllib_error.URLError, _urllib_error.HTTPError, TimeoutError, OSError):
+        print("  Status: not running  (run: systemctl --user start gradata-daemon)")
+
+    # Cloud sync state (best-effort)
+    print()
+    print("Cloud:")
+    try:
+        from pathlib import Path as _Path
+
+        key_path = _Path.home() / ".gradata" / "key"
+        token = key_path.read_text(encoding="utf-8").strip() if key_path.is_file() else ""
+        if not token:
+            print("  Status: not configured  (run: gradata cloud enable --key <gd_live_...>)")
+        else:
+            req = _urllib_request.Request(
+                "https://api.gradata.ai/api/v1/brains",
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "User-Agent": "gradata-status/1.0",
+                },
+            )
+            with _urllib_request.urlopen(req, timeout=4) as r:
+                brains = _json.loads(r.read().decode())
+            b = brains[0] if isinstance(brains, list) else brains
+            last_sync = b.get("last_sync") or "(never)"
+            cloud_corr = b.get("correction_count") or 0
+            cloud_lessons = b.get("lesson_count") or 0
+            print(f"  Last sync: {last_sync}")
+            print(f"  Corrections: {cloud_corr}  (local: {corr_total})")
+            print(f"  Lessons: {cloud_lessons}  (local: {lessons_total})")
+            # Lag warning
+            if last_sync and last_sync != "(never)":
+                try:
+                    ls = datetime.fromisoformat(last_sync.replace("Z", "+00:00"))
+                    age_min = (datetime.now(UTC) - ls).total_seconds() / 60
+                    if age_min > 60:
+                        print(f"  WARNING: cloud is {int(age_min)}m behind")
+                except ValueError:
+                    pass
+    except (_urllib_error.URLError, _urllib_error.HTTPError, TimeoutError, OSError) as exc:
+        print(f"  Status: unreachable  ({type(exc).__name__})")
+
+    # Convergence trend — corrections-per-session, last 7 days
+    print()
+    print("Convergence (last 7d):")
+    try:
+        con = _sqlite3.connect(db_path)
+        cur = con.cursor()
+        cutoff = int(_time.time()) - 7 * 86400
+        # Sessions and corrections in the last 7 days
+        sessions_with_data = cur.execute(
+            """
+            SELECT session, COUNT(*) AS n
+              FROM events
+             WHERE type='CORRECTION'
+               AND strftime('%s', ts) >= ?
+             GROUP BY session
+            """,
+            (str(cutoff),),
+        ).fetchall()
+        con.close()
+        if sessions_with_data:
+            sess_n = len(sessions_with_data)
+            corr_n = sum(n for _, n in sessions_with_data)
+            avg = corr_n / sess_n
+            print(f"  Sessions: {sess_n}  ({corr_n} corrections, avg {avg:.1f}/session)")
+        else:
+            print("  No correction activity in the last 7 days")
+    except _sqlite3.OperationalError:
+        print("  (events schema not available)")
+
+
 def cmd_audit(args):
     from gradata._audit import format_audit_text, run_audit
 
@@ -707,6 +867,101 @@ def cmd_prove(args):
     if slope > 0.05:
         sys.exit(1)
     sys.exit(0)
+
+
+def cmd_forget(args):
+    """Undo one or more lessons from the brain.
+
+    Selector syntax (passed as positional ``what`` arg):
+      - ``last``           — undo most recent active lesson
+      - ``last N``         — undo last N active lessons (e.g. ``last 3``)
+      - ``all TONE``       — undo every active lesson in a category
+      - ``<description>``  — fuzzy-match a single lesson by description
+
+    By default the command prints matched lessons and asks for confirmation
+    before applying. Pass ``--yes`` to skip the prompt (for scripts).
+
+    The forget is a soft cancel: lessons are flipped to KILLED state, a
+    LESSON_CHANGE event is emitted (so the sync pipeline replays it), and
+    the rule cache is invalidated so the next ``apply_brain_rules()`` call
+    reflects the change. No event is hard-deleted.
+    """
+    brain = _get_brain(args)
+    what = (args.what or "last").strip()
+    skip_confirm = bool(getattr(args, "yes", False))
+
+    # Preview pass — peek at what the matcher would touch so we can show
+    # the user before applying. We re-use brain.forget() with a tiny dance:
+    # the heavy lifting is in Brain.forget; here we just want a confirm step.
+    try:
+        from gradata._types import LessonState
+        from gradata.enhancements.self_improvement import parse_lessons
+    except ImportError:
+        print("Error: enhancements module not available — cannot forget lessons")
+        sys.exit(1)
+
+    lessons_path = brain._find_lessons_path()
+    if not lessons_path or not lessons_path.is_file():
+        print("No lessons file found — nothing to forget.")
+        sys.exit(0)
+
+    lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+    active = [
+        (i, l)
+        for i, l in enumerate(lessons)
+        if l.state in (LessonState.INSTINCT, LessonState.PATTERN, LessonState.RULE)
+    ]
+    if not active:
+        print("No active lessons — nothing to forget.")
+        sys.exit(0)
+
+    wl = what.lower()
+    preview: list = []
+    if wl == "last" or wl.startswith("last "):
+        parts = wl.split()
+        n = int(parts[1]) if len(parts) == 2 and parts[1].isdigit() else 1
+        preview = [l for _, l in active[-n:]]
+    elif wl.startswith("all "):
+        cat = what[4:].strip()
+        preview = [l for _, l in active if l.category.upper() == cat.upper()]
+    else:
+        # Fuzzy single-target — let rollback's matcher decide
+        matches = [l for _, l in active if what.lower() in (l.description or "").lower()]
+        if not matches:
+            print(f"No active lessons match: {what!r}")
+            sys.exit(1)
+        preview = matches[:1]
+
+    if not preview:
+        print(f"No matches for: {what!r}")
+        sys.exit(1)
+
+    print(f"Will forget {len(preview)} lesson{'s' if len(preview) != 1 else ''}:")
+    for l in preview:
+        desc = (l.description or "")[:80]
+        print(f"  [{l.category:10}] {l.state.value:8} conf={l.confidence:.2f}  {desc}")
+
+    if not skip_confirm:
+        try:
+            ans = input("\nProceed? [y/N] ").strip().lower()
+        except EOFError:
+            ans = ""
+        if ans not in ("y", "yes"):
+            print("Cancelled — no lessons forgotten.")
+            sys.exit(0)
+
+    # Delegate the actual work to Brain.forget — same semantics as the
+    # public Python API.
+    result = brain.forget(what)
+    if isinstance(result, dict) and result.get("error"):
+        print(f"Error: {result['error']}")
+        sys.exit(1)
+
+    items = result if isinstance(result, list) else [result]
+    rolled_back = [r for r in items if r.get("rolled_back")]
+    print(f"\nForgotten: {len(rolled_back)} lesson{'s' if len(rolled_back) != 1 else ''}.")
+    if rolled_back:
+        print("(LESSON_CHANGE events emitted — sync pipeline will replay.)")
 
 
 def cmd_correct(args):
@@ -1609,6 +1864,9 @@ def main():
     # stats
     sub.add_parser("stats", help="Brain statistics")
 
+    # status (umbrella health check: stats + daemon + cloud + convergence)
+    sub.add_parser("status", help="Single-page brain/daemon/cloud summary")
+
     # audit
     p_audit = sub.add_parser("audit", help="Data flow audit")
     p_audit.add_argument("--json", action="store_true")
@@ -1751,6 +2009,23 @@ def main():
         help="Time window to analyse (default: 30d)",
     )
 
+    # forget — undo lessons by selector
+    p_forget = sub.add_parser("forget", help="Undo one or more lessons from the brain")
+    p_forget.add_argument(
+        "what",
+        nargs="?",
+        default="last",
+        help=(
+            "Selector: 'last', 'last N', 'all CATEGORY', or fuzzy description "
+            "substring. Default: 'last'."
+        ),
+    )
+    p_forget.add_argument(
+        "--yes",
+        "-y",
+        action="store_true",
+        help="Skip interactive confirmation (for scripts)",
+    )
     # tune — optimize a prompt against correction history
     p_tune = sub.add_parser("tune", help="Tune a prompt with Agent-Lightning APO")
     p_tune.add_argument("prompt_file", help="Prompt template file")
@@ -1930,6 +2205,7 @@ def main():
         "embed": cmd_embed,
         "manifest": cmd_manifest,
         "stats": cmd_stats,
+        "status": cmd_status,
         "audit": cmd_audit,
         "sync": cmd_sync,
         "recall": cmd_recall,
@@ -1943,6 +2219,7 @@ def main():
         "watch": cmd_watch,
         "correct": cmd_correct,
         "prove": cmd_prove,
+        "forget": cmd_forget,
         "tune": cmd_tune,
         "review": cmd_review,
         "diagnose": cmd_diagnose,
