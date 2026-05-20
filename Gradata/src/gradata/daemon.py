@@ -1037,11 +1037,47 @@ class GradataDaemon:
 
     # ── Start / Stop ────────────────────────────────────────────────────
 
+    def _drain_sync_queue_at_startup(self) -> int:
+        """Flush any rows left in ``sync_queue`` from a previous (crashed) run.
+
+        Called once at startup *before* the HTTP listener is bound, so the
+        first request to the daemon never observes a stale backlog.
+
+        Returns the number of rows drained. Always emits a single log line
+        ``"sync queue drained at startup: N rows"`` (info level) so the
+        operation is discoverable in journalctl / daemon.log.
+
+        Idempotent and safe to call concurrently with the background
+        :class:`gradata._sync_worker.SyncWorker` — see that module for the
+        full concurrency contract.
+        """
+        from gradata._sync_worker import drain_sync_queue
+
+        ingest_url = os.environ.get(
+            "GRADATA_CLOUD_INGEST_URL",
+            "https://api.gradata.ai/api/v1/ingest",
+        )
+        api_key = _resolve_api_key(self._api_key)
+        try:
+            return drain_sync_queue(self._brain_dir, api_key, ingest_url=ingest_url)
+        except Exception as exc:
+            # Startup-drain failure must never prevent the daemon from
+            # coming up. The background SyncWorker will retry on its
+            # normal tick schedule.
+            logger.warning("startup sync drain failed: %s", exc, exc_info=True)
+            return 0
+
     def start(self) -> None:
         """Start the HTTP server (blocking)."""
         self._process_lock_cm = acquire_brain_lock(self._brain_dir)
         self._process_lock = self._process_lock_cm.__enter__()
         try:
+            # GRA-1245: drain any sync_queue rows left over from a previous
+            # (possibly crashed) daemon BEFORE we open the HTTP listener.
+            # This guarantees the first request never observes a stale
+            # backlog of pending corrections.
+            self._drain_sync_queue_at_startup()
+
             port = self._port if self._port != 0 else _pick_port(str(self._brain_dir))
             self._try_bind(port)
 
