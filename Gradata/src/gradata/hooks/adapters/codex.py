@@ -89,3 +89,66 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         return InstallResult(AGENT, agent_config_path, "added", "installed pre_tool hook")
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
+
+
+def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
+    """Reverse install: drop the [[hooks.pre_tool]] block carrying our signature.
+
+    Operates on the raw TOML text — walks line-by-line, identifies the
+    [[hooks.pre_tool]] table that contains our signature, and removes that
+    table + its keys. Preserves all other tables verbatim.
+    """
+    try:
+        if not agent_config_path.is_file():
+            return InstallResult(
+                AGENT, agent_config_path, "already_present", "config file does not exist"
+            )
+        sig = hook_signature(AGENT, brain_dir)
+        text = agent_config_path.read_text(encoding="utf-8")
+        if sig not in text:
+            return InstallResult(AGENT, agent_config_path, "already_present", "hook not present")
+
+        # Walk by table-headers. A new table starts at any line matching
+        # `^\[` (single or double bracket). Drop the table that contains
+        # our sig.
+        out_lines: list[str] = []
+        current_table: list[str] = []
+        current_is_hook = False
+        removed = 0
+
+        def flush(buf: list[str], is_hook: bool) -> None:
+            nonlocal removed
+            if not buf:
+                return
+            if is_hook and any(sig in line for line in buf):
+                removed += 1
+                return  # drop the whole table
+            out_lines.extend(buf)
+
+        for line in text.splitlines(keepends=True):
+            stripped = line.lstrip()
+            if stripped.startswith("[[") or stripped.startswith("["):
+                # Flush the previous table
+                flush(current_table, current_is_hook)
+                current_table = [line]
+                current_is_hook = stripped.startswith("[[hooks.pre_tool]]")
+            else:
+                if current_table:
+                    current_table.append(line)
+                else:
+                    out_lines.append(line)
+        # Final flush
+        flush(current_table, current_is_hook)
+
+        if removed == 0:
+            return InstallResult(
+                AGENT, agent_config_path, "already_present", "hook table not present"
+            )
+
+        new_text = "".join(out_lines).rstrip() + "\n"
+        atomic_write_text(agent_config_path, new_text)
+        return InstallResult(
+            AGENT, agent_config_path, "removed", f"removed {removed} [[hooks.pre_tool]] block"
+        )
+    except Exception as exc:
+        return failure(AGENT, agent_config_path, exc)
