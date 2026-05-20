@@ -177,24 +177,27 @@ brain.prove()      # Paired t-test on correction rate
 
 ---
 
-## Install (pick one)
-
-### Claude Code (recommended)
-
-```
-/plugin marketplace add Gradata/gradata
-/plugin install gradata
-```
-
-Prereq: `pipx install gradata`. See [`.claude-plugin/README.md`](./.claude-plugin/README.md).
-
-### Python SDK
+## Install
 
 ```bash
 pipx install gradata
-gradata init ./my-brain
-gradata install --agent claude-code --brain ./my-brain
+gradata install --agent claude-code --brain ~/.gradata/brain
 ```
+
+Replace `--agent claude-code` with your host: `codex`, `gemini`, `hermes`, `opencode`, or `cursor`. One command, one path — the Python CLI is the single install surface for every host.
+
+After install, your AI agent has 6 SDK subcommands:
+
+```bash
+gradata status     # one-page brain/daemon/cloud summary
+gradata correct    # log a draft -> final correction
+gradata forget     # undo lessons by selector
+gradata prove      # statistical evidence the brain is improving (CI signal)
+gradata recall     # pull rules into the current prompt
+gradata doctor     # check environment + brain health
+```
+
+See `gradata --help` for the full list (init, install, embed, sync, watch, tune, health, report, hooks, rule, skill, seed, cloud, project, mine, audit, manifest, stats, validate, demo, context).
 
 ### JS / TypeScript
 
@@ -359,7 +362,7 @@ graph TB
 - `examples/` — SDK usage examples
 - `packages/npm/` — `@gradata/cli` JS client
 - `gradata-install/` — npm wrapper for one-command IDE setup
-- `.claude-plugin/` + `hooks/` — Claude Code plugin manifest
+- `hooks/` — runtime hook adapters loaded by `gradata install`
 - `brain/` — research scripts (benchmarks, simulations)
 
 ---
