@@ -84,7 +84,7 @@ def test_single_project_brain_dir_exists_no_db(tmp_path, capsys):
     brain_dir.mkdir()
     _write_registry(
         tmp_path,
-        f'[[projects]]\nname = "alpha"\nbrain_dir = "{brain_dir}"\n',
+        f'[[projects]]\nname = "alpha"\nbrain_dir = "{brain_dir.as_posix()}"\n',
     )
     with _patch_home(tmp_path):
         cmd_projects(_Args(json=True))
@@ -92,7 +92,8 @@ def test_single_project_brain_dir_exists_no_db(tmp_path, capsys):
     assert len(payload) == 1
     row = payload[0]
     assert row["name"] == "alpha"
-    assert row["brain_dir"] == str(brain_dir)
+    # Compare via Path normalization so Windows '/' vs '\\' doesn't break the test
+    assert Path(row["brain_dir"]) == Path(brain_dir.as_posix())
     assert row["rules"] == 0
     assert row["last_correction"] is None
     assert row["sync_status"] == "ok"
@@ -110,7 +111,7 @@ brain_dir = "/nope/alpha"
 
 [[projects]]
 name = "beta"
-brain_dir = "{other_dir}"
+brain_dir = "{other_dir.as_posix()}"
 """,
     )
     with _patch_home(tmp_path):
@@ -168,7 +169,7 @@ def test_real_db_with_rule_graduated_event(tmp_path, capsys):
 
     _write_registry(
         tmp_path,
-        f'[[projects]]\nname = "x"\nbrain_dir = "{brain_dir}"\n',
+        f'[[projects]]\nname = "x"\nbrain_dir = "{brain_dir.as_posix()}"\n',
     )
     with _patch_home(tmp_path):
         cmd_projects(_Args(json=True))
