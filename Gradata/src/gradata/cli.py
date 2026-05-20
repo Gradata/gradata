@@ -156,7 +156,7 @@ def cmd_status(args):
     import time as _time
     import urllib.error as _urllib_error
     import urllib.request as _urllib_request
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     brain = _get_brain(args)
     stats = brain.stats()
@@ -299,6 +299,116 @@ def cmd_status(args):
             print("  No correction activity in the last 7 days")
     except _sqlite3.OperationalError:
         print("  (events schema not available)")
+
+
+def cmd_projects(args):
+    """List every project the SDK knows about from ``~/.gradata/projects.toml``.
+
+    Columns:
+      * ``name``             — project identifier from the registry
+      * ``brain_dir``        — path to the brain directory on disk
+      * ``rules``            — count of RULE_GRADUATED events in ``system.db``
+                              (0 if the brain is fresh or the db is unreadable)
+      * ``last_correction``  — MAX(ts) of CORRECTION events, or ``(never)``
+      * ``sync_status``      — ``ok`` if brain_dir exists, ``missing`` if not,
+                              ``error`` if the db is present but unreadable
+
+    The registry schema is:
+
+        [[projects]]
+        name = "my-project"
+        brain_dir = "/path/to/.gradata/brain"
+
+    Missing registry file → friendly message + exit 0 (NOT a crash). Malformed
+    TOML → friendly error + exit 1.
+    """
+    import json as _json
+    import sqlite3 as _sqlite3
+    import tomllib as _tomllib
+    from pathlib import Path as _Path
+
+    registry_path = _Path.home() / ".gradata" / "projects.toml"
+    as_json = getattr(args, "json", False)
+
+    if not registry_path.is_file():
+        if as_json:
+            print("[]")
+        else:
+            print("No projects registered. Run `gradata init <dir>` to add one.")
+        return
+
+    try:
+        with registry_path.open("rb") as fh:
+            data = _tomllib.load(fh)
+    except _tomllib.TOMLDecodeError as exc:
+        print(f"Error: malformed projects.toml ({exc})")
+        raise SystemExit(1) from None
+
+    raw_projects = data.get("projects", []) or []
+    rows = []
+    for proj in raw_projects:
+        name = proj.get("name", "(unnamed)")
+        brain_dir = proj.get("brain_dir", "")
+        rules_count = 0
+        last_correction = None
+        sync_status = "ok"
+
+        brain_path = _Path(brain_dir) if brain_dir else None
+        if not brain_path or not brain_path.is_dir():
+            sync_status = "missing"
+        else:
+            db_path = brain_path / "system.db"
+            if not db_path.is_file():
+                # Brain dir exists but no db yet — treat as fresh, not error.
+                sync_status = "ok"
+            else:
+                try:
+                    con = _sqlite3.connect(str(db_path))
+                    cur = con.cursor()
+                    rules_count = cur.execute(
+                        "SELECT COUNT(*) FROM events WHERE type='RULE_GRADUATED'"
+                    ).fetchone()[0]
+                    row = cur.execute(
+                        "SELECT MAX(ts) FROM events WHERE type='CORRECTION'"
+                    ).fetchone()
+                    last_correction = row[0] if row else None
+                    con.close()
+                except (_sqlite3.OperationalError, _sqlite3.DatabaseError, OSError):
+                    sync_status = "error"
+
+        rows.append(
+            {
+                "name": name,
+                "brain_dir": brain_dir,
+                "rules": rules_count,
+                "last_correction": last_correction,
+                "sync_status": sync_status,
+            }
+        )
+
+    if as_json:
+        print(_json.dumps(rows, indent=2))
+        return
+
+    if not rows:
+        print("No projects registered. Run `gradata init <dir>` to add one.")
+        return
+
+    headers = ("NAME", "BRAIN_DIR", "RULES", "LAST_CORRECTION", "SYNC_STATUS")
+    table: list[tuple[str, str, str, str, str]] = [headers]
+    for r in rows:
+        table.append(
+            (
+                str(r["name"]),
+                str(r["brain_dir"]),
+                str(r["rules"]),
+                str(r["last_correction"] or "(never)"),
+                str(r["sync_status"]),
+            )
+        )
+    widths = [max(len(row[i]) for row in table) for i in range(len(headers))]
+    for row in table:
+        print("  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row)))
 
 
 def cmd_audit(args):
@@ -783,20 +893,20 @@ def cmd_prove(args):
     den = sum((x - mean_x) ** 2 for x in xs) or 1.0
     slope = num / den
 
-    print(f"Corrections per session:")
+    print("Corrections per session:")
     print(f"  Sessions: {n}")
     print(f"  Total corrections: {sum(counts)}")
     print(f"  Mean: {mean_y:.1f}/session")
     if n >= 3:
         print(f"  Trend slope: {slope:+.3f} corrections/session")
         if slope < -0.05:
-            print(f"  Verdict: CONVERGING (brain is learning — fewer corrections over time)")
+            print("  Verdict: CONVERGING (brain is learning — fewer corrections over time)")
         elif slope > 0.05:
-            print(f"  Verdict: DIVERGING (corrections rising — brain may need tuning)")
+            print("  Verdict: DIVERGING (corrections rising — brain may need tuning)")
         else:
-            print(f"  Verdict: STABLE (flat trend)")
+            print("  Verdict: STABLE (flat trend)")
     else:
-        print(f"  Trend: need >=3 sessions to estimate")
+        print("  Trend: need >=3 sessions to estimate")
 
     # Rule application rate
     total_apps = sum(rule_apps_by_session.values())
@@ -1867,6 +1977,10 @@ def main():
     # status (umbrella health check: stats + daemon + cloud + convergence)
     sub.add_parser("status", help="Single-page brain/daemon/cloud summary")
 
+    # projects (registry listing from ~/.gradata/projects.toml)
+    p_projects = sub.add_parser("projects", help="List registered projects")
+    p_projects.add_argument("--json", action="store_true", help="Emit JSON array")
+
     # audit
     p_audit = sub.add_parser("audit", help="Data flow audit")
     p_audit.add_argument("--json", action="store_true")
@@ -2206,6 +2320,7 @@ def main():
         "manifest": cmd_manifest,
         "stats": cmd_stats,
         "status": cmd_status,
+        "projects": cmd_projects,
         "audit": cmd_audit,
         "sync": cmd_sync,
         "recall": cmd_recall,
