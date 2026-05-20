@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Breaking
+
+- **Plugin marketplace install path retired.** The `.claude-plugin/` directory
+  and `/plugin install gradata` flow are gone; use
+  `gradata install --agent claude-code` instead. See PR #211 for the README
+  guide. (GRA-1249, epic GRA-1198)
+
 ### Changed
 
 - Renamed the deterministic anchor-preserving prompt injection module to

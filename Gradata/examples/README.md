@@ -33,4 +33,5 @@ pip install gradata
 python examples/with_claude_code.py
 ```
 
-For the zero-code install, see [.claude-plugin/README.md](../.claude-plugin/README.md).
+For the zero-code install, run `gradata install --agent claude-code` — see the
+top-level [README](../README.md#install-for-claude-code) for details.
