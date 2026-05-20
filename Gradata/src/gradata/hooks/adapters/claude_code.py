@@ -78,3 +78,50 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         return InstallResult(AGENT, agent_config_path, "added", "installed PreToolUse hook")
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
+
+
+def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
+    """Reverse ``install()``: drop the signature-matching PreToolUse entry.
+
+    Idempotent — calling on an already-clean config returns ``already_present``
+    (semantically: 'already in the desired absent state'). Empty containers
+    are pruned. User-owned PreToolUse entries (without our signature) are
+    preserved verbatim.
+    """
+    try:
+        if not agent_config_path.is_file():
+            return InstallResult(
+                AGENT, agent_config_path, "already_present", "config file does not exist"
+            )
+        sig = hook_signature(AGENT, brain_dir)
+        data = read_json(agent_config_path)
+        hooks = data.get("hooks")
+        if not isinstance(hooks, dict):
+            return InstallResult(AGENT, agent_config_path, "already_present", "no hooks block")
+        pre_tool = hooks.get("PreToolUse")
+        if not isinstance(pre_tool, list):
+            return InstallResult(AGENT, agent_config_path, "already_present", "no PreToolUse")
+
+        removed = 0
+        kept: list = []
+        for entry in pre_tool:
+            entry_str = str(entry)
+            if sig in entry_str:
+                # Either the entry's `hooks[].id` carries our sig, or the
+                # whole entry was ours. Drop it.
+                removed += 1
+                continue
+            kept.append(entry)
+        if removed == 0:
+            return InstallResult(AGENT, agent_config_path, "already_present", "hook not present")
+
+        if kept:
+            hooks["PreToolUse"] = kept
+        else:
+            hooks.pop("PreToolUse", None)
+        if not hooks:
+            data.pop("hooks", None)
+        write_json(agent_config_path, data)
+        return InstallResult(AGENT, agent_config_path, "removed", f"removed {removed} hook entry")
+    except Exception as exc:
+        return failure(AGENT, agent_config_path, exc)

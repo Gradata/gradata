@@ -229,3 +229,52 @@ def extract_correction(
     if tool_name in HERMES_WRITE_TOOLS:
         return extract_from_write_args(args, tool_output)
     return None
+
+
+def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
+    """Reverse install: drop signature-matching entries from hooks.pre_tool_call.
+
+    Hermes uses YAML, so we can't reuse the generic JSON helper.
+    Idempotent. Preserves user-owned entries and other hook events.
+    """
+    try:
+        if not agent_config_path.is_file():
+            return InstallResult(
+                AGENT, agent_config_path, "already_present", "config file does not exist"
+            )
+        sig = hook_signature(AGENT, brain_dir)
+        existing = agent_config_path.read_text(encoding="utf-8")
+        if sig not in existing:
+            return InstallResult(AGENT, agent_config_path, "already_present", "hook not present")
+        loaded = _parse_simple_yaml(existing) if existing.strip() else {}
+        data = loaded if isinstance(loaded, dict) else {}
+        hooks = data.get("hooks") if isinstance(data, dict) else None
+        if not isinstance(hooks, dict):
+            return InstallResult(AGENT, agent_config_path, "already_present", "no hooks block")
+
+        removed = 0
+        # Check both current and legacy event names.
+        for key in ("pre_tool_call", "pre_tool_use"):
+            entries = hooks.get(key)
+            if not isinstance(entries, list):
+                continue
+            kept = []
+            for entry in entries:
+                if sig in str(entry):
+                    removed += 1
+                    continue
+                kept.append(entry)
+            if kept:
+                hooks[key] = kept
+            else:
+                hooks.pop(key, None)
+
+        if removed == 0:
+            return InstallResult(AGENT, agent_config_path, "already_present", "hook not present")
+
+        if not hooks:
+            data.pop("hooks", None)
+        atomic_write_text(agent_config_path, _dump_simple_yaml(data))
+        return InstallResult(AGENT, agent_config_path, "removed", f"removed {removed} hook entry")
+    except Exception as exc:
+        return failure(AGENT, agent_config_path, exc)

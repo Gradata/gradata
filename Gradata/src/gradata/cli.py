@@ -156,7 +156,7 @@ def cmd_status(args):
     import time as _time
     import urllib.error as _urllib_error
     import urllib.request as _urllib_request
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     brain = _get_brain(args)
     stats = brain.stats()
@@ -493,6 +493,19 @@ def _cmd_install_agent(args) -> None:
             had_failure = True
         print(f"{marker} {result.agent} → {result.config_path} ({result.action})")
 
+        # Record the install in ~/.gradata/install_manifest.json so that
+        # `gradata uninstall --agent <host>` can safely reverse it later
+        # (and detect user edits via SHA mismatch).
+        if result.action in ("added", "already_present"):
+            try:
+                from gradata._install_manifest import record_install
+                from gradata.hooks.adapters._base import hook_signature as _sig
+
+                record_install(name, config_path, _sig(name, brain_dir))
+            except Exception as exc:
+                # Manifest write is best-effort; don't fail install on it.
+                print(f"  ⚠ install manifest write failed: {exc}")
+
         # ▸ Flag-gated install verification: write + read a test rule
         if verify_install and result.action != "failed":
             try:
@@ -522,6 +535,82 @@ def _cmd_install_agent(args) -> None:
             except Exception as exc:
                 print(f"  ✗ verify failed for {name}: {exc}")
                 had_failure = True
+
+    if had_failure:
+        sys.exit(1)
+
+
+def cmd_uninstall(args) -> None:
+    """Reverse a prior ``gradata install --agent <host>``.
+
+    For each requested host:
+
+    - Look up the install manifest record (recorded by ``cmd_install`` at
+      install time). If absent, fall back to the canonical config path so
+      best-effort uninstall still works on installs that pre-date the
+      manifest.
+    - Compute the current SHA256 of the config file. If it differs from
+      the SHA recorded at install time, print
+      ``skipped <host> — modified since install`` and leave the file
+      alone (preserve user edits).
+    - Otherwise call the adapter's ``uninstall(brain_dir, config_path)``
+      to symmetrically remove the entry the matching ``install()`` wrote.
+    - Always idempotent — running twice doesn't error.
+
+    Unknown hosts are rejected by argparse via the ``--agent`` choices
+    list (matching how ``cmd_install`` handles unknown hosts).
+    """
+    from gradata._install_manifest import drop_record, file_sha256, get_record
+    from gradata.hooks.adapters._base import AGENTS, adapter_config_path, get_adapter
+
+    agent = args.agent
+    brain_dir = _resolve_brain_root(args)
+    agents = list(AGENTS) if agent == "all" else [agent]
+
+    had_failure = False
+    for name in agents:
+        try:
+            adapter = get_adapter(name)
+        except ValueError as exc:
+            # Shouldn't reach here because argparse choices guard this,
+            # but be defensive in case the CLI is invoked programmatically.
+            print(f"✗ {name} → unknown agent ({exc})")
+            had_failure = True
+            continue
+
+        record = get_record(name)
+        config_path = record.config_path if record else adapter_config_path(name)
+
+        # User-edit guard: skip uninstall if the config file's checksum
+        # differs from what was recorded at install time. Only meaningful
+        # when we have a recorded SHA — fall through for legacy installs.
+        if record and record.sha256_after_install:
+            current = file_sha256(config_path)
+            if current and current != record.sha256_after_install:
+                print(f"skipped {name} — modified since install")
+                continue
+
+        try:
+            result = adapter.uninstall(brain_dir, config_path)
+        except Exception as exc:
+            print(f"✗ {name} → unknown (failed: {exc})")
+            had_failure = True
+            continue
+
+        marker = "✓" if result.action != "failed" else "✗"
+        if result.action == "failed":
+            had_failure = True
+        print(f"{marker} {result.agent} → {result.config_path} ({result.action})")
+
+        # Drop manifest record only when we actually removed an entry
+        # (action == "added" in our adapter contract — "already_present"
+        # means nothing was there to remove, so we leave the manifest
+        # record alone in case the user re-installs).
+        if result.action == "added":
+            try:
+                drop_record(name)
+            except Exception as exc:
+                print(f"  ⚠ install manifest update failed: {exc}")
 
     if had_failure:
         sys.exit(1)
@@ -783,20 +872,20 @@ def cmd_prove(args):
     den = sum((x - mean_x) ** 2 for x in xs) or 1.0
     slope = num / den
 
-    print(f"Corrections per session:")
+    print("Corrections per session:")
     print(f"  Sessions: {n}")
     print(f"  Total corrections: {sum(counts)}")
     print(f"  Mean: {mean_y:.1f}/session")
     if n >= 3:
         print(f"  Trend slope: {slope:+.3f} corrections/session")
         if slope < -0.05:
-            print(f"  Verdict: CONVERGING (brain is learning — fewer corrections over time)")
+            print("  Verdict: CONVERGING (brain is learning — fewer corrections over time)")
         elif slope > 0.05:
-            print(f"  Verdict: DIVERGING (corrections rising — brain may need tuning)")
+            print("  Verdict: DIVERGING (corrections rising — brain may need tuning)")
         else:
-            print(f"  Verdict: STABLE (flat trend)")
+            print("  Verdict: STABLE (flat trend)")
     else:
-        print(f"  Trend: need >=3 sessions to estimate")
+        print("  Trend: need >=3 sessions to estimate")
 
     # Rule application rate
     total_apps = sum(rule_apps_by_session.values())
@@ -1955,6 +2044,24 @@ def main():
         help="Port for the daemon when used with --systemd (default: 8765)",
     )
 
+    # uninstall — symmetrical reverse of `install --agent <host>` (GRA-1241)
+    p_uninstall = sub.add_parser(
+        "uninstall",
+        help="Reverse `gradata install --agent <host>` — remove agent hook/MCP config",
+    )
+    p_uninstall.add_argument(
+        "--agent",
+        required=True,
+        choices=["claude-code", "codex", "gemini", "cursor", "hermes", "opencode", "all"],
+        help="Agent whose hook/MCP config to uninstall",
+    )
+    p_uninstall.add_argument(
+        "--brain",
+        type=str,
+        default=None,
+        help="Brain directory the hook points at (default: BRAIN_DIR or ./brain)",
+    )
+
     # health
     p_health = sub.add_parser("health", help="Brain health report")
     p_health.add_argument("--json", action="store_true")
@@ -2214,6 +2321,7 @@ def main():
         "validate": cmd_validate,
         "doctor": cmd_doctor,
         "install": cmd_install,
+        "uninstall": cmd_uninstall,
         "health": cmd_health,
         "report": cmd_report,
         "watch": cmd_watch,

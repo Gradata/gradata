@@ -49,7 +49,7 @@ from typing import Literal, Protocol, runtime_checkable
 
 from gradata._atomic import atomic_write_text
 
-Action = Literal["added", "already_present", "failed"]
+Action = Literal["added", "already_present", "failed", "removed"]
 
 AGENTS = ("claude-code", "codex", "gemini", "cursor", "hermes", "opencode")
 _MODULES = {
@@ -163,6 +163,61 @@ def contains_signature(path: Path, signature: str) -> bool:
 
 def failure(agent: str, config_path: Path, exc: Exception) -> InstallResult:
     return InstallResult(agent, config_path, "failed", str(exc))
+
+
+def uninstall_from_list_in_dict(
+    *,
+    agent: str,
+    brain_dir: Path,
+    agent_config_path: Path,
+    outer_key: str,
+    inner_key: str,
+) -> InstallResult:
+    """Generic uninstall helper for JSON configs shaped as ``{outer:{inner:[entries]}}``.
+
+    Used by gemini (tools.preCall), opencode (hooks.preTool), hermes
+    (hooks.pre_tool_call). Removes every entry whose ``str(entry)``
+    contains our ``hook_signature(agent, brain_dir)``. Idempotent.
+    Empty containers are pruned.
+    """
+    try:
+        if not agent_config_path.is_file():
+            return InstallResult(
+                agent, agent_config_path, "already_present", "config file does not exist"
+            )
+        sig = hook_signature(agent, brain_dir)
+        data = read_json(agent_config_path)
+        outer = data.get(outer_key)
+        if not isinstance(outer, dict):
+            return InstallResult(
+                agent, agent_config_path, "already_present", f"no {outer_key} block"
+            )
+        entries = outer.get(inner_key)
+        if not isinstance(entries, list):
+            return InstallResult(
+                agent, agent_config_path, "already_present", f"no {outer_key}.{inner_key}"
+            )
+
+        removed = 0
+        kept: list = []
+        for entry in entries:
+            if sig in str(entry):
+                removed += 1
+                continue
+            kept.append(entry)
+        if removed == 0:
+            return InstallResult(agent, agent_config_path, "already_present", "hook not present")
+
+        if kept:
+            outer[inner_key] = kept
+        else:
+            outer.pop(inner_key, None)
+        if not outer:
+            data.pop(outer_key, None)
+        write_json(agent_config_path, data)
+        return InstallResult(agent, agent_config_path, "removed", f"removed {removed} hook entry")
+    except Exception as exc:
+        return failure(agent, agent_config_path, exc)
 
 
 # --------------------------------------------------------------------------

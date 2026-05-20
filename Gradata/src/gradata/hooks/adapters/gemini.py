@@ -69,3 +69,16 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         return InstallResult(AGENT, agent_config_path, "added", "installed tools.preCall hook")
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
+
+
+def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
+    """Reverse install: drop signature-matching entries from tools.preCall."""
+    from gradata.hooks.adapters._base import uninstall_from_list_in_dict
+
+    return uninstall_from_list_in_dict(
+        agent=AGENT,
+        brain_dir=brain_dir,
+        agent_config_path=agent_config_path,
+        outer_key="tools",
+        inner_key="preCall",
+    )

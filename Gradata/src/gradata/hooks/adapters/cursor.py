@@ -48,3 +48,25 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         return InstallResult(AGENT, agent_config_path, "added", "installed MCP server")
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
+
+
+def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
+    """Reverse install: drop the ``gradata`` entry from ``mcpServers``."""
+    try:
+        if not agent_config_path.is_file():
+            return InstallResult(
+                AGENT, agent_config_path, "already_present", "config file does not exist"
+            )
+        data = read_json(agent_config_path)
+        servers = data.get("mcpServers")
+        if not isinstance(servers, dict) or "gradata" not in servers:
+            return InstallResult(
+                AGENT, agent_config_path, "already_present", "MCP server not present"
+            )
+        servers.pop("gradata", None)
+        if not servers:
+            data.pop("mcpServers", None)
+        write_json(agent_config_path, data)
+        return InstallResult(AGENT, agent_config_path, "removed", "removed MCP server")
+    except Exception as exc:
+        return failure(AGENT, agent_config_path, exc)
