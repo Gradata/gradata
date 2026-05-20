@@ -702,6 +702,101 @@ def cmd_diagnose(args):
     print("\nRun 'gradata health' for a full brain health report.")
 
 
+def cmd_forget(args):
+    """Undo one or more lessons from the brain.
+
+    Selector syntax (passed as positional ``what`` arg):
+      - ``last``           — undo most recent active lesson
+      - ``last N``         — undo last N active lessons (e.g. ``last 3``)
+      - ``all TONE``       — undo every active lesson in a category
+      - ``<description>``  — fuzzy-match a single lesson by description
+
+    By default the command prints matched lessons and asks for confirmation
+    before applying. Pass ``--yes`` to skip the prompt (for scripts).
+
+    The forget is a soft cancel: lessons are flipped to KILLED state, a
+    LESSON_CHANGE event is emitted (so the sync pipeline replays it), and
+    the rule cache is invalidated so the next ``apply_brain_rules()`` call
+    reflects the change. No event is hard-deleted.
+    """
+    brain = _get_brain(args)
+    what = (args.what or "last").strip()
+    skip_confirm = bool(getattr(args, "yes", False))
+
+    # Preview pass — peek at what the matcher would touch so we can show
+    # the user before applying. We re-use brain.forget() with a tiny dance:
+    # the heavy lifting is in Brain.forget; here we just want a confirm step.
+    try:
+        from gradata._types import LessonState
+        from gradata.enhancements.self_improvement import parse_lessons
+    except ImportError:
+        print("Error: enhancements module not available — cannot forget lessons")
+        sys.exit(1)
+
+    lessons_path = brain._find_lessons_path()
+    if not lessons_path or not lessons_path.is_file():
+        print("No lessons file found — nothing to forget.")
+        sys.exit(0)
+
+    lessons = parse_lessons(lessons_path.read_text(encoding="utf-8"))
+    active = [
+        (i, l)
+        for i, l in enumerate(lessons)
+        if l.state in (LessonState.INSTINCT, LessonState.PATTERN, LessonState.RULE)
+    ]
+    if not active:
+        print("No active lessons — nothing to forget.")
+        sys.exit(0)
+
+    wl = what.lower()
+    preview: list = []
+    if wl == "last" or wl.startswith("last "):
+        parts = wl.split()
+        n = int(parts[1]) if len(parts) == 2 and parts[1].isdigit() else 1
+        preview = [l for _, l in active[-n:]]
+    elif wl.startswith("all "):
+        cat = what[4:].strip()
+        preview = [l for _, l in active if l.category.upper() == cat.upper()]
+    else:
+        # Fuzzy single-target — let rollback's matcher decide
+        matches = [l for _, l in active if what.lower() in (l.description or "").lower()]
+        if not matches:
+            print(f"No active lessons match: {what!r}")
+            sys.exit(1)
+        preview = matches[:1]
+
+    if not preview:
+        print(f"No matches for: {what!r}")
+        sys.exit(1)
+
+    print(f"Will forget {len(preview)} lesson{'s' if len(preview) != 1 else ''}:")
+    for l in preview:
+        desc = (l.description or "")[:80]
+        print(f"  [{l.category:10}] {l.state.value:8} conf={l.confidence:.2f}  {desc}")
+
+    if not skip_confirm:
+        try:
+            ans = input("\nProceed? [y/N] ").strip().lower()
+        except EOFError:
+            ans = ""
+        if ans not in ("y", "yes"):
+            print("Cancelled — no lessons forgotten.")
+            sys.exit(0)
+
+    # Delegate the actual work to Brain.forget — same semantics as the
+    # public Python API.
+    result = brain.forget(what)
+    if isinstance(result, dict) and result.get("error"):
+        print(f"Error: {result['error']}")
+        sys.exit(1)
+
+    items = result if isinstance(result, list) else [result]
+    rolled_back = [r for r in items if r.get("rolled_back")]
+    print(f"\nForgotten: {len(rolled_back)} lesson{'s' if len(rolled_back) != 1 else ''}.")
+    if rolled_back:
+        print("(LESSON_CHANGE events emitted — sync pipeline will replay.)")
+
+
 def cmd_correct(args):
     """Record a correction: the user edited an AI draft."""
     brain = _get_brain(args)
@@ -1735,6 +1830,24 @@ def main():
     p_correct.add_argument("--category", type=str, help="Correction category override")
     p_correct.add_argument("--session", type=int, help="Session number")
 
+    # forget — undo lessons by selector
+    p_forget = sub.add_parser("forget", help="Undo one or more lessons from the brain")
+    p_forget.add_argument(
+        "what",
+        nargs="?",
+        default="last",
+        help=(
+            "Selector: 'last', 'last N', 'all CATEGORY', or fuzzy description "
+            "substring. Default: 'last'."
+        ),
+    )
+    p_forget.add_argument(
+        "--yes",
+        "-y",
+        action="store_true",
+        help="Skip interactive confirmation (for scripts)",
+    )
+
     # tune — optimize a prompt against correction history
     p_tune = sub.add_parser("tune", help="Tune a prompt with Agent-Lightning APO")
     p_tune.add_argument("prompt_file", help="Prompt template file")
@@ -1927,6 +2040,7 @@ def main():
         "report": cmd_report,
         "watch": cmd_watch,
         "correct": cmd_correct,
+        "forget": cmd_forget,
         "tune": cmd_tune,
         "review": cmd_review,
         "diagnose": cmd_diagnose,
