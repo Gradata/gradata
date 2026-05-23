@@ -760,6 +760,13 @@ class Brain(BrainInspectionMixin):
             [f"category:{category}", "self_healing"],
         )
 
+        try:
+            from gradata.enhancements.self_improvement._patches import observe_patch
+
+            observe_patch(self, category, old_description, new_description)
+        except Exception:  # pragma: no cover — defensive
+            pass
+
         return {
             "patched": True,
             "old_description": old_description,
@@ -1192,6 +1199,35 @@ class Brain(BrainInspectionMixin):
                 )
             except Exception as e:
                 logger.debug("rules.injected emit failed: %s", e)
+
+        # Persist per-rule injection telemetry so cloud sync / dashboard views
+        # can show which specific rules were applied in real sessions.
+        if applied:
+            scope_payload = {
+                "task_type": scope.task_type,
+                "domain": scope.domain,
+                "audience": scope.audience,
+            }
+            for applied_rule in applied:
+                try:
+                    self.emit(
+                        "rule_injected",
+                        "brain.apply_brain_rules",
+                        {
+                            "rule_id": applied_rule.rule_id,
+                            "category": applied_rule.lesson.category,
+                            "confidence": applied_rule.lesson.confidence,
+                            "state": applied_rule.lesson.state.value,
+                            "task": task,
+                            "scope": scope_payload,
+                        },
+                        [
+                            f"rule:{applied_rule.rule_id}",
+                            f"category:{applied_rule.lesson.category}",
+                        ],
+                    )
+                except Exception as e:
+                    logger.debug("rule_injected emit failed: %s", e)
 
         result = format_rules_for_prompt(applied)
         if max_recall_tokens > 0 and result:
