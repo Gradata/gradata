@@ -108,6 +108,15 @@ def test_cli_install_agent_all_detects_existing_configs(tmp_path: Path) -> None:
             ],
             id="opencode-pre-tool-hook",
         ),
+        pytest.param(
+            "cursor",
+            Path(".cursor/mcp.json"),
+            [],
+            marks=pytest.mark.skip(
+                reason="GRA-1680: Cursor is MCP-only; no hook/slash-command install path to smoke-test"
+            ),
+            id="cursor-mcp-only-skipped",
+        ),
     ],
 )
 def test_cli_install_agent_smoke_matrix_writes_expected_host_config(
@@ -121,8 +130,8 @@ def test_cli_install_agent_smoke_matrix_writes_expected_host_config(
     Slash-command artifact files are intentionally not asserted here: the SDK's
     current one-command surface (`gradata install --agent ...`) writes native
     host config hooks, and no separate slash-command artifact installer exists.
-    Cursor is MCP-only and covered by adapter-specific tests, not this hook
-    smoke matrix.
+    Cursor is represented as an explicit skipped matrix row because it is
+    MCP-only rather than a hook/slash-command install path.
     """
     brain = tmp_path / "brain"
     brain.mkdir()
