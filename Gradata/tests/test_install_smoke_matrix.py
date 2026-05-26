@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tomllib
@@ -34,6 +35,13 @@ HOST_MATRIX = (
         Path(".config/opencode/config.json"),
         {"preTool"},
         id="opencode",
+    ),
+    pytest.param(
+        "cursor",
+        Path(".cursor/mcp.json"),
+        set(),
+        marks=pytest.mark.skip(reason="GRA-1680: Cursor is MCP-only; no hook/slash-command install path to smoke-test"),
+        id="cursor-mcp-only-skipped",
     ),
 )
 
@@ -85,7 +93,7 @@ def test_cli_install_smoke_matrix_writes_host_hook_config(
     content = config_path.read_text(encoding="utf-8")
     assert f"gradata:{host}:" in content
     assert "BRAIN_DIR=" in content
-    assert str(brain) in content
+    assert brain.resolve().as_posix() in content
 
     if host == "claude-code":
         settings = json.loads(content)
@@ -102,10 +110,10 @@ def test_cli_install_smoke_matrix_writes_host_hook_config(
         for event in expected_events:
             assert f"{event}:" in content
         # Hermes ignores Claude-style legacy names; pin the supported event names.
-        legacy_event_lines = {line.strip() for line in content.splitlines()}
-        assert "pre_tool_use:" not in legacy_event_lines
-        assert "post_tool_use:" not in legacy_event_lines
-        assert "session_end:" not in legacy_event_lines
+        legacy_event_lines = content.splitlines()
+        assert not any(re.search(r"(^|\s)pre_tool_use\s*:", line) for line in legacy_event_lines)
+        assert not any(re.search(r"(^|\s)post_tool_use\s*:", line) for line in legacy_event_lines)
+        assert not any(re.search(r"(^|\s)session_end\s*:", line) for line in legacy_event_lines)
     elif host == "opencode":
         config = json.loads(content)
         pre_tool_hooks = config["hooks"]["preTool"]
