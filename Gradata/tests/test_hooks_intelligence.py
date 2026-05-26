@@ -279,32 +279,24 @@ from gradata.hooks.pre_compact import main as compact_main
 
 
 def test_pre_compact_saves_snapshot(tmp_path):
-    import hashlib
-
     lessons = tmp_path / "lessons.md"
     lessons.write_text("[2026-04-01] [RULE:0.92] PROCESS: Plan first\n# header\n")
 
-    if hasattr(os, "getuid"):
-        uid = os.getuid()
-    else:
-        try:
-            uid = os.getlogin()
-        except OSError:
-            uid = f"pid{os.getpid()}"
-    user_tmp = Path(tempfile.gettempdir()) / f"gradata-{uid}"
-    dir_hash = hashlib.md5(str(tmp_path).encode()).hexdigest()[:8]
-    snapshot_path = user_tmp / f"compact-snapshot-{dir_hash}.json"
+    payload = {"type": "auto", "session_id": "legacy-session"}
+    snapshot_path = tmp_path / ".precompact-snapshots" / "legacy-session.json"
     snapshot_path.unlink(missing_ok=True)
 
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
-        result = compact_main({"type": "auto"})
+        result = compact_main(payload)
 
     assert result is not None
-    assert "State saved" in result["result"]
+    assert "PreCompact snapshot saved" in result["result"]
     assert snapshot_path.exists()
     data = json.loads(snapshot_path.read_text())
     assert data["compact_type"] == "auto"
-    assert data["lesson_count"] >= 1
+    assert data["hook_event_name"] == "PreCompact"
+    assert data["payload"] == payload
+    assert data["context"]["files"]["lessons.md"]["content"].startswith("[2026-04-01]")
     snapshot_path.unlink(missing_ok=True)
 
 
