@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tomllib
 from pathlib import Path
@@ -63,3 +64,29 @@ def test_adapter_install_does_not_touch_real_user_config(tmp_path: Path) -> None
     assert result.action == "added"
     after = real_config.read_text(encoding="utf-8") if real_config.exists() else None
     assert after == before
+
+
+def test_claude_code_install_writes_pre_compact_entry(tmp_path: Path) -> None:
+    brain_dir = tmp_path / "brain"
+    brain_dir.mkdir()
+    config_path = tmp_path / ".claude" / "settings.json"
+
+    result = get_adapter("claude-code").install(brain_dir, config_path)
+
+    assert result.action == "added"
+    settings = json.loads(config_path.read_text(encoding="utf-8"))
+    hooks = settings["hooks"]
+    assert "PreToolUse" in hooks
+    pre_compact = hooks["PreCompact"]
+    assert any(
+        entry.get("matcher") == "manual|auto"
+        and any(
+            hook.get("type") == "command"
+            and "-m gradata.hooks.pre_compact" in hook.get("command", "")
+            and f"BRAIN_DIR={brain_dir}" in hook.get("command", "")
+            and hook.get("id", "").startswith("gradata:claude-code:")
+            and hook.get("id", "").endswith(":precompact")
+            for hook in entry.get("hooks", [])
+        )
+        for entry in pre_compact
+    )
