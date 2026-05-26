@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import tomllib
 from pathlib import Path
 
@@ -83,10 +84,41 @@ def test_claude_code_install_writes_pre_compact_entry(tmp_path: Path) -> None:
         and any(
             hook.get("type") == "command"
             and "-m gradata.hooks.pre_compact" in hook.get("command", "")
-            and f"BRAIN_DIR={brain_dir}" in hook.get("command", "")
+            and f"BRAIN_DIR={shlex.quote(str(brain_dir))}" in hook.get("command", "")
             and hook.get("id", "").startswith("gradata:claude-code:")
             and hook.get("id", "").endswith(":precompact")
             for hook in entry.get("hooks", [])
         )
         for entry in pre_compact
     )
+
+
+def test_claude_code_uninstall_prunes_only_gradata_hooks_from_mixed_entries(tmp_path: Path) -> None:
+    brain_dir = tmp_path / "brain"
+    brain_dir.mkdir()
+    config_path = tmp_path / ".claude" / "settings.json"
+    adapter = get_adapter("claude-code")
+    adapter.install(brain_dir, config_path)
+
+    settings = json.loads(config_path.read_text(encoding="utf-8"))
+    settings["hooks"]["PreToolUse"][0]["hooks"].append(
+        {"type": "command", "command": "echo user pretool", "id": "user:pretool"}
+    )
+    settings["hooks"]["PreCompact"][0]["hooks"].append(
+        {"type": "command", "command": "echo user precompact", "id": "user:precompact"}
+    )
+    config_path.write_text(json.dumps(settings), encoding="utf-8")
+
+    result = adapter.uninstall(brain_dir, config_path)
+
+    assert result.action == "removed"
+    after = json.loads(config_path.read_text(encoding="utf-8"))
+    assert after["hooks"]["PreToolUse"] == [
+        {"matcher": "*", "hooks": [{"type": "command", "command": "echo user pretool", "id": "user:pretool"}]}
+    ]
+    assert after["hooks"]["PreCompact"] == [
+        {
+            "matcher": "manual|auto",
+            "hooks": [{"type": "command", "command": "echo user precompact", "id": "user:precompact"}],
+        }
+    ]

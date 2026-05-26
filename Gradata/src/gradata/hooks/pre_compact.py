@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -22,6 +23,7 @@ HOOK_META = {
 
 SNAPSHOT_DIR_NAME = ".precompact-snapshots"
 MAX_FILE_CHARS = 200_000
+logger = logging.getLogger(__name__)
 _CONTEXT_FILES = (
     "lessons.md",
     "rules.md",
@@ -48,8 +50,10 @@ def _read_context_file(path: Path) -> dict[str, Any] | None:
     if not path.is_file():
         return None
     try:
-        text = path.read_text(encoding="utf-8", errors="replace")
+        with path.open("r", encoding="utf-8", errors="replace") as handle:
+            text = handle.read(MAX_FILE_CHARS + 1)
     except OSError:
+        logger.warning("failed to read PreCompact context file %s", path, exc_info=True)
         return None
     truncated = len(text) > MAX_FILE_CHARS
     if truncated:
@@ -102,6 +106,7 @@ def main(data: dict) -> dict | None:
     try:
         path = write_snapshot(data or {}, Path(brain_dir_str))
     except Exception:
+        logger.warning("failed to write PreCompact snapshot", exc_info=True)
         return None
     return {"result": f"PreCompact snapshot saved to {path}"}
 

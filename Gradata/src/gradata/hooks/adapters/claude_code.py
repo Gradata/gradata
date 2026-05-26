@@ -29,6 +29,36 @@ def _pre_compact_signature(brain_dir: Path) -> str:
     return f"{hook_signature(AGENT, brain_dir)}{PRE_COMPACT_ID_SUFFIX}"
 
 
+def _hook_matches_signature(hook: object, signature: str) -> bool:
+    if isinstance(hook, dict):
+        return hook.get("id") == signature
+    return signature in str(hook)
+
+
+def _prune_matching_hooks(entries: list, signature: str) -> tuple[list, int]:
+    kept_entries: list = []
+    removed = 0
+    for entry in entries:
+        if not isinstance(entry, dict) or not isinstance(entry.get("hooks"), list):
+            if signature in str(entry):
+                removed += 1
+                continue
+            kept_entries.append(entry)
+            continue
+
+        kept_hooks = []
+        for hook in entry["hooks"]:
+            if _hook_matches_signature(hook, signature):
+                removed += 1
+                continue
+            kept_hooks.append(hook)
+        if kept_hooks:
+            pruned = dict(entry)
+            pruned["hooks"] = kept_hooks
+            kept_entries.append(pruned)
+    return kept_entries, removed
+
+
 def detect(payload: dict) -> bool:
     """Claude Code stdin signature: capitalised tool name + args at ``input``.
 
@@ -131,15 +161,8 @@ def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
 
         pre_tool = hooks.get("PreToolUse")
         if isinstance(pre_tool, list):
-            kept: list = []
-            for entry in pre_tool:
-                entry_str = str(entry)
-                if sig in entry_str and pre_compact_sig not in entry_str:
-                    # Either the entry's `hooks[].id` carries our sig, or the
-                    # whole entry was ours. Drop it.
-                    removed += 1
-                    continue
-                kept.append(entry)
+            kept, count = _prune_matching_hooks(pre_tool, sig)
+            removed += count
             if kept:
                 hooks["PreToolUse"] = kept
             else:
@@ -147,12 +170,8 @@ def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
 
         pre_compact = hooks.get("PreCompact")
         if isinstance(pre_compact, list):
-            kept = []
-            for entry in pre_compact:
-                if pre_compact_sig in str(entry):
-                    removed += 1
-                    continue
-                kept.append(entry)
+            kept, count = _prune_matching_hooks(pre_compact, pre_compact_sig)
+            removed += count
             if kept:
                 hooks["PreCompact"] = kept
             else:
