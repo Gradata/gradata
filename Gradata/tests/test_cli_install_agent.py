@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 
 def _run_cli(tmp_path: Path, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     base_env = os.environ.copy()
@@ -53,6 +55,97 @@ def test_cli_install_agent_all_detects_existing_configs(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert "codex" in result.stdout
     assert "hermes" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("agent", "config_relpath", "expected_tokens"),
+    [
+        pytest.param(
+            "claude-code",
+            Path(".claude/settings.json"),
+            [
+                "PreToolUse",
+                "PostToolUse",
+                "Stop",
+                "PreCompact",
+                "UserPromptSubmit",
+                "gradata.hooks.inject_brain_rules",
+                "gradata.hooks.auto_correct",
+                "gradata.hooks.session_close",
+                "gradata.hooks.pre_compact",
+                "gradata.hooks.context_inject",
+            ],
+            id="claude-code-hooks",
+        ),
+        pytest.param(
+            "codex",
+            Path(".codex/config.toml"),
+            [
+                "[[hooks.pre_tool]]",
+                "gradata.hooks.inject_brain_rules",
+            ],
+            id="codex-pre-tool-hook",
+        ),
+        pytest.param(
+            "hermes",
+            Path(".hermes/config.yaml"),
+            [
+                "pre_tool_call:",
+                "post_tool_call:",
+                "on_session_end:",
+                "gradata.hooks.inject_brain_rules",
+                "gradata.hooks.auto_correct",
+                "gradata.hooks.session_close",
+            ],
+            id="hermes-native-hook-names",
+        ),
+        pytest.param(
+            "opencode",
+            Path(".config/opencode/config.json"),
+            [
+                "preTool",
+                "gradata.hooks.inject_brain_rules",
+            ],
+            id="opencode-pre-tool-hook",
+        ),
+    ],
+)
+def test_cli_install_agent_smoke_matrix_writes_expected_host_config(
+    tmp_path: Path,
+    agent: str,
+    config_relpath: Path,
+    expected_tokens: list[str],
+) -> None:
+    """Show-HN smoke matrix for supported hook/MCP config install paths.
+
+    Slash-command artifact files are intentionally not asserted here: the SDK's
+    current one-command surface (`gradata install --agent ...`) writes native
+    host config hooks, and no separate slash-command artifact installer exists.
+    Cursor is MCP-only and covered by adapter-specific tests, not this hook
+    smoke matrix.
+    """
+    brain = tmp_path / "brain"
+    brain.mkdir()
+
+    result = _run_cli(tmp_path, "install", "--agent", agent, "--brain", str(brain))
+
+    assert result.returncode == 0, result.stderr
+    assert agent in result.stdout
+    config = tmp_path / config_relpath
+    assert config.exists()
+    contents = config.read_text(encoding="utf-8")
+    assert f"gradata:{agent}:{brain.resolve().as_posix()}" in contents
+    assert "BRAIN_DIR=" in contents
+    for token in expected_tokens:
+        assert token in contents
+
+    manifest = tmp_path / ".gradata" / "install_manifest.json"
+    assert manifest.exists()
+    assert f'"{agent}"' in manifest.read_text(encoding="utf-8")
+
+    rerun = _run_cli(tmp_path, "install", "--agent", agent, "--brain", str(brain))
+    assert rerun.returncode == 0, rerun.stderr
+    assert "already_present" in rerun.stdout
 
 
 def test_cli_install_agent_verify_flag_off_preserves_current_behavior(tmp_path: Path) -> None:
