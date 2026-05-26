@@ -1843,6 +1843,16 @@ def cmd_hooks(args):
     """Manage Claude Code hook integration."""
     action = args.action
     if action == "install":
+        ide = getattr(args, "ide", "claude-code")
+        if ide != "claude-code":
+            # The legacy one-command installer calls `gradata hooks install
+            # --ide <host>`. Claude Code keeps using the richer hook installer
+            # below; other hosts are wired through the adapter-based install
+            # path used by `gradata install --agent <host>`.
+            args.agent = ide
+            _cmd_install_agent(args)
+            return
+
         from gradata.hooks.claude_code import install_hook
 
         project_dir = getattr(args, "project_dir", None)
@@ -2157,6 +2167,12 @@ def main():
 
     p_hooks = sub.add_parser("hooks", help="Manage Claude Code hook integration")
     p_hooks.add_argument("action", choices=["install", "uninstall", "status"], help="Hook action")
+    p_hooks.add_argument(
+        "--ide",
+        choices=["claude-code", "codex"],
+        default="claude-code",
+        help="IDE/agent to wire up for one-command installers (default: claude-code)",
+    )
     p_hooks.add_argument(
         "--profile",
         choices=["minimal", "standard", "strict"],
