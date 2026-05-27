@@ -9,12 +9,13 @@ from gradata.hooks.adapters._base import (
     WRITE_TOOL_ALIASES,
     InstallResult,
     _normalize_tool_name,
-    contains_signature,
     extract_from_edit_args,
     extract_from_write_args,
     failure,
     hook_command,
     hook_signature,
+    post_tool_hook_command,
+    session_end_hook_command,
 )
 
 AGENT = "codex"
@@ -70,32 +71,65 @@ def _toml_string(value: str) -> str:
     return json.dumps(value)
 
 
+def _hook_table_has_signature(text: str, table_name: str, signature: str) -> bool:
+    """Return True if a specific TOML hook table already contains signature."""
+    current: list[str] = []
+    in_table = False
+
+    def flush() -> bool:
+        return in_table and any(signature in line for line in current)
+
+    for line in text.splitlines(keepends=True):
+        stripped = line.lstrip()
+        if stripped.startswith("[[") or stripped.startswith("["):
+            if flush():
+                return True
+            current = [line]
+            in_table = stripped.startswith(f"[[hooks.{table_name}]]")
+        elif in_table:
+            current.append(line)
+    return flush()
+
+
 def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
     try:
         sig = hook_signature(AGENT, brain_dir)
-        if contains_signature(agent_config_path, sig):
-            return InstallResult(
-                AGENT, agent_config_path, "already_present", "hook already present"
-            )
         existing = (
             agent_config_path.read_text(encoding="utf-8") if agent_config_path.exists() else ""
         )
-        block = (
-            "\n[[hooks.pre_tool]]\n"
-            f"id = {_toml_string(sig)}\n"
-            f"command = {_toml_string(hook_command(brain_dir))}\n"
+        blocks: list[str] = []
+        for table_name, command in (
+            ("pre_tool", hook_command(brain_dir)),
+            ("post_tool", post_tool_hook_command(brain_dir)),
+            ("session_end", session_end_hook_command(brain_dir)),
+        ):
+            if _hook_table_has_signature(existing, table_name, sig):
+                continue
+            blocks.append(
+                f"\n[[hooks.{table_name}]]\n"
+                f"id = {_toml_string(sig)}\n"
+                f"command = {_toml_string(command)}\n"
+            )
+        if not blocks:
+            return InstallResult(
+                AGENT, agent_config_path, "already_present", "hooks already present"
+            )
+        atomic_write_text(agent_config_path, existing.rstrip() + "".join(blocks))
+        return InstallResult(
+            AGENT,
+            agent_config_path,
+            "added",
+            "installed pre_tool, post_tool, and session_end hooks",
         )
-        atomic_write_text(agent_config_path, existing.rstrip() + block)
-        return InstallResult(AGENT, agent_config_path, "added", "installed pre_tool hook")
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
 
 
 def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
-    """Reverse install: drop the [[hooks.pre_tool]] block carrying our signature.
+    """Reverse install: drop hook blocks carrying our signature.
 
     Operates on the raw TOML text — walks line-by-line, identifies the
-    [[hooks.pre_tool]] table that contains our signature, and removes that
+    hook tables that contain our signature, and removes those
     table + its keys. Preserves all other tables verbatim.
     """
     try:
@@ -131,7 +165,9 @@ def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
                 # Flush the previous table
                 flush(current_table, current_is_hook)
                 current_table = [line]
-                current_is_hook = stripped.startswith("[[hooks.pre_tool]]")
+                current_is_hook = stripped.startswith(
+                    ("[[hooks.pre_tool]]", "[[hooks.post_tool]]", "[[hooks.session_end]]")
+                )
             else:
                 if current_table:
                     current_table.append(line)
@@ -148,7 +184,7 @@ def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         new_text = "".join(out_lines).rstrip() + "\n"
         atomic_write_text(agent_config_path, new_text)
         return InstallResult(
-            AGENT, agent_config_path, "removed", f"removed {removed} [[hooks.pre_tool]] block"
+            AGENT, agent_config_path, "removed", f"removed {removed} hook block"
         )
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)

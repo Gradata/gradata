@@ -52,6 +52,76 @@ def test_codex_adapter_writes_valid_toml_with_quoted_brain_path(tmp_path: Path) 
     assert brain_dir.as_posix() in hook["id"]
 
 
+def test_codex_adapter_installs_post_tool_and_session_end_hooks(tmp_path: Path) -> None:
+    brain_dir = tmp_path / "brain"
+    brain_dir.mkdir()
+    config_path = adapter_config_path("codex")
+
+    result = get_adapter("codex").install(brain_dir, config_path)
+
+    assert result.action == "added"
+    parsed = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    hooks = parsed["hooks"]
+    assert "gradata.hooks.inject_brain_rules" in hooks["pre_tool"][0]["command"]
+    assert "gradata.hooks.auto_correct" in hooks["post_tool"][0]["command"]
+    assert "gradata.hooks.session_close" in hooks["session_end"][0]["command"]
+
+
+@pytest.mark.parametrize(
+    ("agent", "expected_hooks"),
+    [
+        (
+            "hermes",
+            {
+                "pre_tool_call": "gradata.hooks.inject_brain_rules",
+                "post_tool_call": "gradata.hooks.auto_correct",
+                "on_session_end": "gradata.hooks.session_close",
+            },
+        ),
+        (
+            "opencode",
+            {
+                "preTool": "gradata.hooks.inject_brain_rules",
+                "postTool": "gradata.hooks.auto_correct",
+                "sessionEnd": "gradata.hooks.session_close",
+            },
+        ),
+    ],
+)
+def test_json_and_yaml_adapters_install_post_tool_and_session_end_hooks(
+    tmp_path: Path, agent: str, expected_hooks: dict[str, str]
+) -> None:
+    brain_dir = tmp_path / "brain"
+    brain_dir.mkdir()
+    config_path = adapter_config_path(agent)
+
+    result = get_adapter(agent).install(brain_dir, config_path)
+
+    assert result.action == "added"
+    text = config_path.read_text(encoding="utf-8")
+    for hook_name, module in expected_hooks.items():
+        assert hook_name in text
+        assert module in text
+
+
+@pytest.mark.parametrize("agent", ["codex", "hermes", "opencode"])
+def test_adapter_uninstall_removes_post_tool_and_session_end_hooks(
+    tmp_path: Path, agent: str
+) -> None:
+    brain_dir = tmp_path / "brain"
+    brain_dir.mkdir()
+    adapter = get_adapter(agent)
+    config_path = adapter_config_path(agent)
+
+    assert adapter.install(brain_dir, config_path).action == "added"
+    assert adapter.uninstall(brain_dir, config_path).action == "removed"
+
+    text = config_path.read_text(encoding="utf-8") if config_path.exists() else ""
+    assert "gradata.hooks.auto_correct" not in text
+    assert "gradata.hooks.session_close" not in text
+    assert f"gradata:{agent}:" not in text
+
+
 def test_adapter_install_does_not_touch_real_user_config(tmp_path: Path) -> None:
     real_config = _REAL_HOME / ".codex" / "config.toml"
     before = real_config.read_text(encoding="utf-8") if real_config.exists() else None

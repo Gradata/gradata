@@ -129,11 +129,23 @@ def hook_signature(agent: str, brain_dir: Path) -> str:
     return f"gradata:{agent}:{brain_dir.resolve().as_posix()}"
 
 
-def hook_command(brain_dir: Path) -> str:
+def hook_command_for_module(brain_dir: Path, module: str) -> str:
     return (
         f"BRAIN_DIR={shlex.quote(str(brain_dir))} "
-        f"{shlex.quote(sys.executable)} -m gradata.hooks.inject_brain_rules"
+        f"{shlex.quote(sys.executable)} -m {module}"
     )
+
+
+def hook_command(brain_dir: Path) -> str:
+    return hook_command_for_module(brain_dir, "gradata.hooks.inject_brain_rules")
+
+
+def post_tool_hook_command(brain_dir: Path) -> str:
+    return hook_command_for_module(brain_dir, "gradata.hooks.auto_correct")
+
+
+def session_end_hook_command(brain_dir: Path) -> str:
+    return hook_command_for_module(brain_dir, "gradata.hooks.session_close")
 
 
 def mcp_command(brain_dir: Path) -> list[str]:

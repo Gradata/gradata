@@ -12,7 +12,9 @@ from gradata.hooks.adapters._base import (
     failure,
     hook_command,
     hook_signature,
+    post_tool_hook_command,
     read_json,
+    session_end_hook_command,
     write_json,
 )
 
@@ -49,26 +51,70 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         sig = hook_signature(AGENT, brain_dir)
         data = read_json(agent_config_path)
         hooks = data.setdefault("hooks", {})
-        pre_tool = hooks.setdefault("preTool", [])
-        if any(sig in str(item) for item in pre_tool):
+        added: list[str] = []
+        for key, command in (
+            ("preTool", hook_command(brain_dir)),
+            ("postTool", post_tool_hook_command(brain_dir)),
+            ("sessionEnd", session_end_hook_command(brain_dir)),
+        ):
+            entries = hooks.setdefault(key, [])
+            if not isinstance(entries, list):
+                entries = []
+                hooks[key] = entries
+            if any(sig in str(item) for item in entries):
+                continue
+            entries.append({"id": sig, "command": command})
+            added.append(key)
+        if not added:
             return InstallResult(
-                AGENT, agent_config_path, "already_present", "hook already present"
+                AGENT, agent_config_path, "already_present", "hooks already present"
             )
-        pre_tool.append({"id": sig, "command": hook_command(brain_dir)})
         write_json(agent_config_path, data)
-        return InstallResult(AGENT, agent_config_path, "added", "installed preTool hook")
+        return InstallResult(
+            AGENT,
+            agent_config_path,
+            "added",
+            "installed preTool, postTool, and sessionEnd hooks",
+        )
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
 
 
 def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
-    """Reverse install: drop signature-matching entries from hooks.preTool."""
-    from gradata.hooks.adapters._base import uninstall_from_list_in_dict
+    """Reverse install: drop signature-matching entries from OpenCode hooks."""
+    try:
+        if not agent_config_path.is_file():
+            return InstallResult(
+                AGENT, agent_config_path, "already_present", "config file does not exist"
+            )
+        sig = hook_signature(AGENT, brain_dir)
+        data = read_json(agent_config_path)
+        hooks = data.get("hooks")
+        if not isinstance(hooks, dict):
+            return InstallResult(AGENT, agent_config_path, "already_present", "no hooks block")
 
-    return uninstall_from_list_in_dict(
-        agent=AGENT,
-        brain_dir=brain_dir,
-        agent_config_path=agent_config_path,
-        outer_key="hooks",
-        inner_key="preTool",
-    )
+        removed = 0
+        for key in ("preTool", "postTool", "sessionEnd"):
+            entries = hooks.get(key)
+            if not isinstance(entries, list):
+                continue
+            kept = []
+            for entry in entries:
+                if sig in str(entry):
+                    removed += 1
+                    continue
+                kept.append(entry)
+            if kept:
+                hooks[key] = kept
+            else:
+                hooks.pop(key, None)
+
+        if removed == 0:
+            return InstallResult(AGENT, agent_config_path, "already_present", "hook not present")
+
+        if not hooks:
+            data.pop("hooks", None)
+        write_json(agent_config_path, data)
+        return InstallResult(AGENT, agent_config_path, "removed", f"removed {removed} hook entry")
+    except Exception as exc:
+        return failure(AGENT, agent_config_path, exc)

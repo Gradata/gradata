@@ -8,12 +8,13 @@ from gradata.hooks.adapters._base import (
     WRITE_TOOL_ALIASES,
     InstallResult,
     _normalize_tool_name,
-    contains_signature,
     extract_from_edit_args,
     extract_from_write_args,
     failure,
     hook_command,
     hook_signature,
+    post_tool_hook_command,
+    session_end_hook_command,
 )
 
 AGENT = "hermes"
@@ -149,11 +150,6 @@ def _format_scalar(value) -> str:
 def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
     try:
         sig = hook_signature(AGENT, brain_dir)
-        if contains_signature(agent_config_path, sig):
-            return InstallResult(
-                AGENT, agent_config_path, "already_present", "hook already present"
-            )
-
         existing = (
             agent_config_path.read_text(encoding="utf-8") if agent_config_path.exists() else ""
         )
@@ -167,14 +163,28 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         # Claude-Code names (pre_tool_use / post_tool_use / session_end) here
         # results in Hermes silently ignoring the entries (warning only). See
         # Gradata/gradata#190 for the install-UX epic.
-        pre_tool_call = _migrate_legacy_event(hooks, "pre_tool_use", "pre_tool_call")
-        if any(isinstance(entry, dict) and entry.get("id") == sig for entry in pre_tool_call):
+        added: list[str] = []
+        for current_key, legacy_key, command in (
+            ("pre_tool_call", "pre_tool_use", hook_command(brain_dir)),
+            ("post_tool_call", "post_tool_use", post_tool_hook_command(brain_dir)),
+            ("on_session_end", "session_end", session_end_hook_command(brain_dir)),
+        ):
+            entries = _migrate_legacy_event(hooks, legacy_key, current_key)
+            if any(isinstance(entry, dict) and entry.get("id") == sig for entry in entries):
+                continue
+            entries.append({"id": sig, "command": command})
+            added.append(current_key)
+        if not added:
             return InstallResult(
-                AGENT, agent_config_path, "already_present", "hook already present"
+                AGENT, agent_config_path, "already_present", "hooks already present"
             )
-        pre_tool_call.append({"id": sig, "command": hook_command(brain_dir)})
         atomic_write_text(agent_config_path, _dump_simple_yaml(data))
-        return InstallResult(AGENT, agent_config_path, "added", "installed pre_tool_call hook")
+        return InstallResult(
+            AGENT,
+            agent_config_path,
+            "added",
+            "installed pre_tool_call, post_tool_call, and on_session_end hooks",
+        )
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
 
@@ -232,7 +242,7 @@ def extract_correction(
 
 
 def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
-    """Reverse install: drop signature-matching entries from hooks.pre_tool_call.
+    """Reverse install: drop signature-matching hook entries.
 
     Hermes uses YAML, so we can't reuse the generic JSON helper.
     Idempotent. Preserves user-owned entries and other hook events.
@@ -253,8 +263,15 @@ def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
             return InstallResult(AGENT, agent_config_path, "already_present", "no hooks block")
 
         removed = 0
-        # Check both current and legacy event names.
-        for key in ("pre_tool_call", "pre_tool_use"):
+        # Check current and legacy event names.
+        for key in (
+            "pre_tool_call",
+            "post_tool_call",
+            "on_session_end",
+            "pre_tool_use",
+            "post_tool_use",
+            "session_end",
+        ):
             entries = hooks.get(key)
             if not isinstance(entries, list):
                 continue
