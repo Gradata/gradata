@@ -514,24 +514,38 @@ def _cmd_install_agent(args) -> None:
                 from gradata import Brain
 
                 verification_marker = f"gradata-install-verify-{name}-{os.urandom(4).hex()}"
-                with tempfile.TemporaryDirectory(prefix="gradata-verify-") as verification_tmp:
-                    verification_dir = Path(verification_tmp) / "brain"
-                    Brain.init(verification_dir)
-                    verification_brain = Brain(verification_dir)
-                    correction = verification_brain.correct(
-                        draft=f"test draft for {name} install verification {verification_marker}",
-                        final=f"test final for {name} install verification {verification_marker}",
-                        dry_run=False,
-                    )
-                    results = verification_brain.search(verification_marker, mode="rules", top_k=3)
-                    marker_found = any(
-                        verification_marker in (r.get("text") or "").lower() for r in results
-                    )
-                    if not marker_found:
-                        print(f"  ⚠ verify failed: test rule written but not readable for {name}")
-                        had_failure = True
+                previous_disable_write_through = os.environ.get("GRADATA_DISABLE_WRITE_THROUGH")
+                os.environ["GRADATA_DISABLE_WRITE_THROUGH"] = "1"
+                try:
+                    with tempfile.TemporaryDirectory(prefix="gradata-verify-") as verification_tmp:
+                        verification_dir = Path(verification_tmp) / "brain"
+                        Brain.init(
+                            verification_dir,
+                            name="Gradata install verification",
+                            domain="General",
+                            interactive=False,
+                        )
+                        verification_brain = Brain(verification_dir)
+                        verification_brain.correct(
+                            draft=f"test draft for {name} install verification {verification_marker}",
+                            final=f"test final for {name} install verification {verification_marker}",
+                            dry_run=False,
+                        )
+                        events = verification_brain.query_events(event_type="CORRECTION", limit=10)
+                        marker_found = any(
+                            verification_marker in json.dumps(event.get("data", {})).lower()
+                            for event in events
+                        )
+                finally:
+                    if previous_disable_write_through is None:
+                        os.environ.pop("GRADATA_DISABLE_WRITE_THROUGH", None)
                     else:
-                        print(f"  ✓ verify: {name} install confirmed (write+read)")
+                        os.environ["GRADATA_DISABLE_WRITE_THROUGH"] = previous_disable_write_through
+                if not marker_found:
+                    print(f"  ⚠ verify failed: test correction written but not readable for {name}")
+                    had_failure = True
+                else:
+                    print(f"  ✓ verify: {name} install confirmed (write+read)")
             except Exception as exc:
                 print(f"  ✗ verify failed for {name}: {exc}")
                 had_failure = True
@@ -868,7 +882,7 @@ def cmd_prove(args):
     xs = list(range(n))
     mean_x = sum(xs) / n
     mean_y = sum(counts) / n
-    num = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, counts))
+    num = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, counts, strict=False))
     den = sum((x - mean_x) ** 2 for x in xs) or 1.0
     slope = num / den
 

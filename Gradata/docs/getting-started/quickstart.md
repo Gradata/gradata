@@ -2,6 +2,16 @@
 
 Get a brain learning from your corrections in under 5 minutes.
 
+## 0. Optional: prove the local quickstart works offline
+
+Before connecting Cloud sync, agent hooks, or API keys, run the repo smoke test:
+
+```bash
+python3 scripts/smoke_quickstart.py
+```
+
+It creates a temporary local brain, records one correction, recalls rules, renders a manifest, and exits without network credentials or a daemon. This is the fastest pre-Hacker News proof that the SDK/CLI path works on your machine.
+
 ## 1. Create a Brain
 
 ```python
