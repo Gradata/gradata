@@ -106,6 +106,14 @@ gradata install --agent claude-code --brain ./my-brain
 gradata audit
 ```
 
+Want to prove the SDK/CLI path first, without Cloud sync, API keys, or a daemon? From a checkout, run:
+
+```bash
+python3 scripts/smoke_quickstart.py
+```
+
+The smoke script creates a temporary local brain, records one correction, recalls rules, and renders a manifest using only stdlib + the local package.
+
 Supported agent targets:
 
 ```bash

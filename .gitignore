@@ -175,6 +175,7 @@ Gradata/scripts/*
 !Gradata/scripts/publish-npm.sh
 !Gradata/scripts/cloud/
 !Gradata/scripts/migrate_legacy_scopes.py
+!Gradata/scripts/smoke_quickstart.py
 
 # npm sub-package build outputs (source tracked, outputs ignored)
 Gradata/packages/npm/node_modules/
