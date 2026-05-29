@@ -93,12 +93,31 @@ Environment variables:
 
 ---
 
+## Attach an agent
+
+After creating a brain, wire it into the agent you use every day:
+
+```bash
+gradata install --agent claude-code --brain ./my-brain
+```
+
+Supported targets are `claude-code`, `codex`, `gemini`, `cursor`, `hermes`,
+`opencode`, and `all`.
+
 ## Verify
 
 ```bash
 gradata --help
-gradata doctor            # environment health check
-gradata stats             # show brain stats
+gradata --brain-dir ./my-brain doctor --no-cloud  # environment health check
+gradata --brain-dir ./my-brain stats              # show brain stats
+gradata --brain-dir ./my-brain audit              # data-flow audit
+```
+
+For a non-mutating offline smoke test that exercises init, agent-install dry
+run, correction, recall, stats, and audit:
+
+```bash
+PYTHONPATH=src python examples/offline_quickstart_smoke.py
 ```
 
 From Python:

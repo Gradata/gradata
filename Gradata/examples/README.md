@@ -25,8 +25,8 @@ python examples/with_openai.py
 
 ## with_claude_code.py
 
-Manual walkthrough of what the Claude Code plugin does automatically —
-same `Brain.correct()` / `Brain.apply_brain_rules()` API the hooks call.
+Manual walkthrough of what the Claude Code hooks do automatically —
+same `Brain.correct()` / `Brain.apply_brain_rules()` API the agent integration calls.
 
 ```bash
 pip install gradata
@@ -34,4 +34,4 @@ python examples/with_claude_code.py
 ```
 
 For the zero-code install, run `gradata install --agent claude-code` — see the
-top-level [README](../README.md#install-for-claude-code) for details.
+top-level [README](../README.md#quickstart) for details.
