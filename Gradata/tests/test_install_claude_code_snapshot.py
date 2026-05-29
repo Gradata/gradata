@@ -94,12 +94,22 @@ def _normalized_snapshot(settings: dict) -> str:
     import re
 
     serialized = json.dumps(settings, indent=2, sort_keys=True)
-    # Normalize: BRAIN_DIR=/tmp/pytest-N/.../brain → BRAIN_DIR=__BRAIN_DIR__
-    serialized = re.sub(r"BRAIN_DIR=/tmp/[^ ]+/brain", "BRAIN_DIR=__BRAIN_DIR__", serialized)
+    # Normalize: BRAIN_DIR=<platform temp path>/brain → BRAIN_DIR=__BRAIN_DIR__
+    serialized = re.sub(
+        r"BRAIN_DIR=(?:/|[A-Za-z]:\\\\)[^\"]*?/brain",
+        "BRAIN_DIR=__BRAIN_DIR__",
+        serialized,
+    )
     # Normalize: hook signature ID
     serialized = re.sub(
-        r'"gradata:claude-code:/tmp/[^"]+brain"',
+        r'"gradata:claude-code:(?:/|[A-Za-z]:\\\\)[^"]+brain"',
         '"gradata:claude-code:__BRAIN_DIR__"',
+        serialized,
+    )
+    # Normalize: interpreter path in command strings.
+    serialized = re.sub(
+        r"(BRAIN_DIR=__BRAIN_DIR__ )\S*(?:python|python(?:\d+(?:\.\d+)?))( -m gradata\.hooks\.)",
+        r"\1__PYTHON_EXECUTABLE__\2",
         serialized,
     )
     return serialized + "\n"

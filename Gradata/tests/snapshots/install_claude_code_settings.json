@@ -4,19 +4,19 @@
       {
         "hooks": [
           {
-            "command": "BRAIN_DIR=__BRAIN_DIR__ /usr/bin/python3 -m gradata.hooks.auto_correct",
+            "command": "BRAIN_DIR=__BRAIN_DIR__ __PYTHON_EXECUTABLE__ -m gradata.hooks.auto_correct",
             "id": "gradata:claude-code:__BRAIN_DIR__",
             "type": "command"
           }
         ],
-        "matcher": "Edit|Write"
+        "matcher": "Edit|Write|MultiEdit"
       }
     ],
     "PreCompact": [
       {
         "hooks": [
           {
-            "command": "BRAIN_DIR=__BRAIN_DIR__ /usr/bin/python3 -m gradata.hooks.pre_compact",
+            "command": "BRAIN_DIR=__BRAIN_DIR__ __PYTHON_EXECUTABLE__ -m gradata.hooks.pre_compact",
             "id": "gradata:claude-code:__BRAIN_DIR__",
             "type": "command"
           }
@@ -28,7 +28,7 @@
       {
         "hooks": [
           {
-            "command": "BRAIN_DIR=__BRAIN_DIR__ /usr/bin/python3 -m gradata.hooks.inject_brain_rules",
+            "command": "BRAIN_DIR=__BRAIN_DIR__ __PYTHON_EXECUTABLE__ -m gradata.hooks.inject_brain_rules",
             "id": "gradata:claude-code:__BRAIN_DIR__",
             "type": "command"
           }
@@ -40,7 +40,7 @@
       {
         "hooks": [
           {
-            "command": "BRAIN_DIR=__BRAIN_DIR__ /usr/bin/python3 -m gradata.hooks.session_close",
+            "command": "BRAIN_DIR=__BRAIN_DIR__ __PYTHON_EXECUTABLE__ -m gradata.hooks.session_close",
             "id": "gradata:claude-code:__BRAIN_DIR__",
             "type": "command"
           }
@@ -51,7 +51,7 @@
       {
         "hooks": [
           {
-            "command": "BRAIN_DIR=__BRAIN_DIR__ /usr/bin/python3 -m gradata.hooks.context_inject",
+            "command": "BRAIN_DIR=__BRAIN_DIR__ __PYTHON_EXECUTABLE__ -m gradata.hooks.context_inject",
             "id": "gradata:claude-code:__BRAIN_DIR__",
             "type": "command"
           }

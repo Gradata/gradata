@@ -91,7 +91,7 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         if not has_post_tool:
             post_tool.append(
                 {
-                    "matcher": "Edit|Write",
+                    "matcher": "Edit|Write|MultiEdit",
                     "hooks": [
                         {
                             "type": "command",
