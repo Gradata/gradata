@@ -2,25 +2,6 @@
 
 Get a brain learning from your corrections in under 5 minutes.
 
-## Offline smoke test (no cloud key required)
-
-If you are evaluating Gradata before connecting cloud sync, run the offline smoke path first:
-
-```bash
-git clone https://github.com/Gradata/gradata.git
-cd gradata
-python3 examples/offline_quickstart_smoke.py
-```
-
-The smoke script runs directly from the source checkout before any cloud sync setup. It creates a temporary local brain, runs `gradata init --no-interactive`, records one output and one correction through the SDK, generates `brain.manifest.json`, and searches the local SQLite-backed brain. It clears cloud credentials in its own environment and does not require Reddit/X/LinkedIn/Meta/TikTok or Gradata Cloud credentials.
-
-If you only want to verify the installed CLI entrypoint:
-
-```bash
-python3 -m pip install gradata
-gradata --help
-```
-
 ## 1. Create a Brain
 
 ```python
