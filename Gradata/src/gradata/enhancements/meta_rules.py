@@ -32,6 +32,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field, replace
@@ -81,12 +82,118 @@ class MetaRule:
     never_when: list[str] = field(default_factory=list)
     transfer_scope: RuleTransferScope = RuleTransferScope.PERSONAL
     source: str = "deterministic"  # provenance of the principle text — see class docstring
+    # Number of sessions in the last 30d whose context matched this rule's
+    # scope/applies_when. ``None`` means legacy/missing data; scoring falls
+    # back to confidence for backwards compatibility.
+    applicability_observed_count: int | None = None
+    # Confidence after applicability weighting. ``None`` on legacy rows; use
+    # :func:`meta_rule_final_score` to get the effective score.
+    final_score: float | None = None
 
 
 # Sources whose principle text is trusted enough to inject into LLM prompts.
 # Deterministic auto-generated principles regress correctness empirically
 # (2026-04-14 ablation, 432 trials, judged blind).
 INJECTABLE_META_SOURCES = frozenset({"llm_synth", "human_curated"})
+
+
+def _read_applicability_weight() -> float:
+    """Read GRADATA_APPLICABILITY_WEIGHT, clamped to [0, 1]. Default 0.5."""
+    try:
+        weight = float(env_str("GRADATA_APPLICABILITY_WEIGHT", "0.5"))
+    except (TypeError, ValueError):
+        return 0.5
+    if not math.isfinite(weight):
+        return 0.5
+    return min(max(weight, 0.0), 1.0)
+
+
+def applicability_norm(observed_count: int | None, window_sessions: int = 100) -> float | None:
+    """Normalize last-30d applicability observations into [0, 1].
+
+    ``None`` is returned for missing legacy data so callers can preserve the
+    historical confidence-only behavior. ``window_sessions`` defaults to 100,
+    matching the persisted ``applicability_observed_count`` interpretation as
+    "matched sessions out of the recent observation window".
+    """
+    if observed_count is None:
+        return None
+    try:
+        count = max(0, int(observed_count))
+        denom = max(1, int(window_sessions))
+    except (TypeError, ValueError):
+        return None
+    return min(count / denom, 1.0)
+
+
+def applicability_score(
+    beta_lb_confidence: float,
+    observed_count: int | None,
+    *,
+    window_sessions: int = 100,
+    weight: float | None = None,
+) -> float:
+    """Return the meta-rule graduation score with applicability weighting.
+
+    Formula (default weight=0.5):
+        final_score = beta_lb_confidence * (0.5 + 0.5 * applicability_norm)
+
+    Generalized by ``GRADATA_APPLICABILITY_WEIGHT``:
+        final_score = beta_lb_confidence * ((1 - weight) + weight * applicability_norm)
+
+    If applicability data is missing/invalid, returns ``beta_lb_confidence``
+    unchanged for backwards compatibility.
+    """
+    base = max(0.0, min(1.0, float(beta_lb_confidence or 0.0)))
+    norm = applicability_norm(observed_count, window_sessions=window_sessions)
+    if norm is None:
+        return base
+    w = _read_applicability_weight() if weight is None else min(max(float(weight), 0.0), 1.0)
+    return round(base * ((1.0 - w) + w * norm), 4)
+
+
+def meta_rule_final_score(meta: MetaRule) -> float:
+    """Effective ranking score; legacy rows without data use confidence."""
+    if meta.final_score is not None:
+        return float(meta.final_score)
+    return applicability_score(meta.confidence, meta.applicability_observed_count)
+
+
+def meta_rule_applies_to_context(meta: MetaRule, context: dict) -> bool:
+    """Return whether a recent session context is inside a meta-rule's scope."""
+    for key, expected in (meta.scope or {}).items():
+        actual = context.get(key)
+        if isinstance(expected, (list, tuple, set)):
+            if actual not in expected:
+                return False
+        elif str(actual) != str(expected):
+            return False
+    return evaluate_conditions(meta, context)
+
+
+def count_meta_rule_applicability(meta: MetaRule, session_contexts: list[dict]) -> int:
+    """Count last-30d sessions whose context matched ``scope``/conditions."""
+    return sum(1 for ctx in session_contexts if meta_rule_applies_to_context(meta, ctx))
+
+
+def _with_applicability_score(
+    meta: MetaRule,
+    *,
+    session_contexts: list[dict] | None = None,
+    window_sessions: int | None = None,
+) -> MetaRule:
+    """Populate final_score only when applicability data is present."""
+    observed = meta.applicability_observed_count
+    if session_contexts is not None:
+        observed = count_meta_rule_applicability(meta, session_contexts)
+    if observed is None:
+        return meta
+    denominator = window_sessions if window_sessions is not None else 100
+    return replace(
+        meta,
+        applicability_observed_count=observed,
+        final_score=applicability_score(meta.confidence, observed, window_sessions=denominator),
+    )
 
 
 def is_injectable_meta_rule(meta: MetaRule) -> bool:
@@ -393,8 +500,23 @@ def discover_meta_rules(
             if len(cluster) >= min_group_size:
                 metas.append(merge_into_meta(cluster, session=current_session))
 
+    session_contexts = kwargs.get("applicability_contexts")
+    if session_contexts is not None and not isinstance(session_contexts, list):
+        session_contexts = None
+    window_sessions = kwargs.get("applicability_window_sessions")
+    if not isinstance(window_sessions, int):
+        window_sessions = len(session_contexts) if session_contexts is not None else None
+
     metas = _apply_decay(metas, current_session)
-    metas.sort(key=lambda m: m.confidence, reverse=True)
+    metas = [
+        _with_applicability_score(
+            m,
+            session_contexts=session_contexts,
+            window_sessions=window_sessions,
+        )
+        for m in metas
+    ]
+    metas.sort(key=meta_rule_final_score, reverse=True)
     _log.info("Discovered %d meta-rules from %d eligible lessons", len(metas), len(eligible))
     return metas
 
@@ -641,7 +763,7 @@ def rank_meta_rules_by_context(
     weighted: list[tuple[MetaRule, float]] = []
     for meta in metas:
         weight = get_context_weight(meta, ctx)
-        weighted_confidence = meta.confidence * weight
+        weighted_confidence = meta_rule_final_score(meta) * weight
         weighted.append((meta, weighted_confidence))
 
     weighted.sort(key=lambda t: t[1], reverse=True)
@@ -682,6 +804,12 @@ def refresh_meta_rules(
         "Meta-rule discovery not implemented in open-source build; validating existing meta-rules only"
     )
     corrections = recent_corrections or []
+    session_contexts = kwargs.get("applicability_contexts")
+    if session_contexts is not None and not isinstance(session_contexts, list):
+        session_contexts = None
+    window_sessions = kwargs.get("applicability_window_sessions")
+    if not isinstance(window_sessions, int):
+        window_sessions = len(session_contexts) if session_contexts is not None else None
 
     # Validate existing meta-rules (invalidation still works locally).
     # Use dataclasses.replace so callers holding references to the input list
@@ -691,7 +819,15 @@ def refresh_meta_rules(
         if validate_meta_rule(meta, corrections):
             valid.append(replace(meta, last_validated_session=current_session))
 
-    valid.sort(key=lambda m: m.confidence, reverse=True)
+    valid = [
+        _with_applicability_score(
+            m,
+            session_contexts=session_contexts,
+            window_sessions=window_sessions,
+        )
+        for m in valid
+    ]
+    valid.sort(key=meta_rule_final_score, reverse=True)
     return valid
 
 
