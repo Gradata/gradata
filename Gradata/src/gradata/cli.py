@@ -514,16 +514,25 @@ def _cmd_install_agent(args) -> None:
                 from gradata import Brain
 
                 verification_marker = f"gradata-install-verify-{name}-{os.urandom(4).hex()}"
-                with tempfile.TemporaryDirectory(prefix="gradata-verify-") as verification_tmp:
+                with tempfile.TemporaryDirectory(
+                    prefix="gradata-verify-",
+                    ignore_cleanup_errors=True,
+                ) as verification_tmp:
                     verification_dir = Path(verification_tmp) / "brain"
-                    Brain.init(verification_dir)
-                    verification_brain = Brain(verification_dir)
-                    correction = verification_brain.correct(
-                        draft=f"test draft for {name} install verification {verification_marker}",
-                        final=f"test final for {name} install verification {verification_marker}",
-                        dry_run=False,
-                    )
-                    results = verification_brain.search(verification_marker, mode="rules", top_k=3)
+                    verification_brain = Brain.init(verification_dir)
+                    try:
+                        verification_brain.correct(
+                            draft=f"test draft for {name} install verification {verification_marker}",
+                            final=f"test final for {name} install verification {verification_marker}",
+                            dry_run=False,
+                        )
+                        results = verification_brain.search(
+                            verification_marker,
+                            mode="rules",
+                            top_k=3,
+                        )
+                    finally:
+                        verification_brain.close()
                     marker_found = any(
                         verification_marker in (r.get("text") or "").lower() for r in results
                     )
