@@ -518,17 +518,18 @@ def _cmd_install_agent(args) -> None:
                     verification_dir = Path(verification_tmp) / "brain"
                     Brain.init(verification_dir)
                     verification_brain = Brain(verification_dir)
-                    correction = verification_brain.correct(
+                    verification_brain.correct(
                         draft=f"test draft for {name} install verification {verification_marker}",
                         final=f"test final for {name} install verification {verification_marker}",
                         dry_run=False,
                     )
-                    results = verification_brain.search(verification_marker, mode="rules", top_k=3)
+                    events = verification_brain.query_events(event_type="CORRECTION", limit=10)
                     marker_found = any(
-                        verification_marker in (r.get("text") or "").lower() for r in results
+                        verification_marker in json.dumps(event.get("data", {})).lower()
+                        for event in events
                     )
                     if not marker_found:
-                        print(f"  ⚠ verify failed: test rule written but not readable for {name}")
+                        print(f"  ⚠ verify failed: test correction written but not readable for {name}")
                         had_failure = True
                     else:
                         print(f"  ✓ verify: {name} install confirmed (write+read)")
