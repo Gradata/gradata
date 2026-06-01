@@ -1,0 +1,1 @@
+Use descriptive variable names to improve code readability and maintainability. Avoid single-letter names except for well-known conventions like loop counters.
