@@ -519,7 +519,7 @@ def _cmd_install_agent(args) -> None:
                     ignore_cleanup_errors=True,
                 ) as verification_tmp:
                     verification_dir = Path(verification_tmp) / "brain"
-                    verification_brain = Brain.init(verification_dir)
+                    verification_brain = Brain.init(verification_dir, interactive=False)
                     try:
                         verification_brain.correct(
                             draft=f"test draft for {name} install verification {verification_marker}",
