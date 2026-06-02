@@ -1,0 +1,62 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "BRAIN_DIR=__BRAIN_DIR__ __PYTHON_EXECUTABLE__ -m gradata.hooks.auto_correct",
+            "id": "gradata:claude-code:__BRAIN_DIR__",
+            "type": "command"
+          }
+        ],
+        "matcher": "Edit|Write|MultiEdit"
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "command": "BRAIN_DIR=__BRAIN_DIR__ __PYTHON_EXECUTABLE__ -m gradata.hooks.pre_compact",
+            "id": "gradata:claude-code:__BRAIN_DIR__",
+            "type": "command"
+          }
+        ],
+        "matcher": "manual|auto"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "BRAIN_DIR=__BRAIN_DIR__ __PYTHON_EXECUTABLE__ -m gradata.hooks.inject_brain_rules",
+            "id": "gradata:claude-code:__BRAIN_DIR__",
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "BRAIN_DIR=__BRAIN_DIR__ __PYTHON_EXECUTABLE__ -m gradata.hooks.session_close",
+            "id": "gradata:claude-code:__BRAIN_DIR__",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "BRAIN_DIR=__BRAIN_DIR__ __PYTHON_EXECUTABLE__ -m gradata.hooks.context_inject",
+            "id": "gradata:claude-code:__BRAIN_DIR__",
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}
