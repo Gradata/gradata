@@ -2,7 +2,6 @@
 
 import json
 import os
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -279,33 +278,39 @@ from gradata.hooks.pre_compact import main as compact_main
 
 
 def test_pre_compact_saves_snapshot(tmp_path):
-    import hashlib
-
-    lessons = tmp_path / "lessons.md"
-    lessons.write_text("[2026-04-01] [RULE:0.92] PROCESS: Plan first\n# header\n")
-
-    if hasattr(os, "getuid"):
-        uid = os.getuid()
-    else:
-        try:
-            uid = os.getlogin()
-        except OSError:
-            uid = f"pid{os.getpid()}"
-    user_tmp = Path(tempfile.gettempdir()) / f"gradata-{uid}"
-    dir_hash = hashlib.md5(str(tmp_path).encode()).hexdigest()[:8]
-    snapshot_path = user_tmp / f"compact-snapshot-{dir_hash}.json"
-    snapshot_path.unlink(missing_ok=True)
+    (tmp_path / "brain_prompt.md").write_text("remember: Plan first\n", encoding="utf-8")
+    (tmp_path / ".last_injection.json").write_text(
+        json.dumps({"rules": ["Plan first"]}),
+        encoding="utf-8",
+    )
 
     with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
-        result = compact_main({"type": "auto"})
+        result = compact_main(
+            {
+                "hook_event_name": "PreCompact",
+                "session_id": "intelligence-auto",
+                "trigger": "auto",
+                "cwd": "/repo",
+                "transcript_path": "/tmp/transcript.jsonl",
+                "custom_instructions": "be concise",
+            }
+        )
 
-    assert result is not None
-    assert "State saved" in result["result"]
+    assert result is None
+    snapshot_path = tmp_path / ".precompact-snapshots" / "intelligence-auto.json"
     assert snapshot_path.exists()
-    data = json.loads(snapshot_path.read_text())
-    assert data["compact_type"] == "auto"
-    assert data["lesson_count"] >= 1
-    snapshot_path.unlink(missing_ok=True)
+    data = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    assert data["event"] == "PreCompact"
+    assert data["session_id"] == "intelligence-auto"
+    assert data["trigger"] == "auto"
+    assert data["cwd"] == "/repo"
+    assert data["transcript_path"] == "/tmp/transcript.jsonl"
+    assert data["custom_instructions"] == "be concise"
+    assert data["payload"]["hook_event_name"] == "PreCompact"
+    assert data["payload"]["trigger"] == "auto"
+    assert data["relevant_context"]["brain_prompt_md"] == "remember: Plan first\n"
+    assert data["relevant_context"]["last_injection"] == {"rules": ["Plan first"]}
+    assert data["limits"]["transcript_content_captured"] is False
 
 
 def test_pre_compact_no_brain():
