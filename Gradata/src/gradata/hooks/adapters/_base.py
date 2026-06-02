@@ -136,6 +136,34 @@ def hook_command(brain_dir: Path) -> str:
     )
 
 
+def auto_correct_command(brain_dir: Path) -> str:
+    return (
+        f"BRAIN_DIR={shlex.quote(str(brain_dir))} "
+        f"{shlex.quote(sys.executable)} -m gradata.hooks.auto_correct"
+    )
+
+
+def session_close_command(brain_dir: Path) -> str:
+    return (
+        f"BRAIN_DIR={shlex.quote(str(brain_dir))} "
+        f"{shlex.quote(sys.executable)} -m gradata.hooks.session_close"
+    )
+
+
+def pre_compact_command(brain_dir: Path) -> str:
+    return (
+        f"BRAIN_DIR={shlex.quote(str(brain_dir))} "
+        f"{shlex.quote(sys.executable)} -m gradata.hooks.pre_compact"
+    )
+
+
+def context_inject_command(brain_dir: Path) -> str:
+    return (
+        f"BRAIN_DIR={shlex.quote(str(brain_dir))} "
+        f"{shlex.quote(sys.executable)} -m gradata.hooks.context_inject"
+    )
+
+
 def mcp_command(brain_dir: Path) -> list[str]:
     return [sys.executable, "-m", "gradata.mcp_server", "--brain-dir", str(brain_dir)]
 
