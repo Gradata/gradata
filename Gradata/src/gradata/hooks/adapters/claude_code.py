@@ -7,11 +7,15 @@ from gradata.hooks.adapters._base import (
     WRITE_TOOL_ALIASES,
     InstallResult,
     _normalize_tool_name,
+    auto_correct_command,
+    context_inject_command,
     extract_from_edit_args,
     extract_from_write_args,
     failure,
     hook_command,
     hook_signature,
+    pre_compact_command,
+    session_close_command,
     read_json,
     write_json,
 )
@@ -58,24 +62,84 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         data = read_json(agent_config_path)
         hooks = data.setdefault("hooks", {})
         pre_tool = hooks.setdefault("PreToolUse", [])
-        if any(sig in str(item) for item in pre_tool):
+        post_tool = hooks.setdefault("PostToolUse", [])
+        stop = hooks.setdefault("Stop", [])
+        pre_compact = hooks.setdefault("PreCompact", [])
+        user_prompt = hooks.setdefault("UserPromptSubmit", [])
+        has_pre_tool = any(sig in str(item) for item in pre_tool)
+        has_post_tool = any(sig in str(item) for item in post_tool)
+        has_stop = any(sig in str(item) for item in stop)
+        has_pre_compact = any(sig in str(item) for item in pre_compact)
+        has_user_prompt = any(sig in str(item) for item in user_prompt)
+        if has_pre_tool and has_post_tool and has_stop and has_pre_compact and has_user_prompt:
             return InstallResult(
                 AGENT, agent_config_path, "already_present", "hook already present"
             )
-        pre_tool.append(
-            {
-                "matcher": "*",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": hook_command(brain_dir),
-                        "id": sig,
-                    }
-                ],
-            }
-        )
+        if not has_pre_tool:
+            pre_tool.append(
+                {
+                    "matcher": "*",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": hook_command(brain_dir),
+                            "id": sig,
+                        }
+                    ],
+                }
+            )
+        if not has_post_tool:
+            post_tool.append(
+                {
+                    "matcher": "Edit|Write",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": auto_correct_command(brain_dir),
+                            "id": sig,
+                        }
+                    ],
+                }
+            )
+        if not has_stop:
+            stop.append(
+                {
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": session_close_command(brain_dir),
+                            "id": sig,
+                        }
+                    ],
+                }
+            )
+        if not has_pre_compact:
+            pre_compact.append(
+                {
+                    "matcher": "manual|auto",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": pre_compact_command(brain_dir),
+                            "id": sig,
+                        }
+                    ],
+                }
+            )
+        if not has_user_prompt:
+            user_prompt.append(
+                {
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": context_inject_command(brain_dir),
+                            "id": sig,
+                        }
+                    ],
+                }
+            )
         write_json(agent_config_path, data)
-        return InstallResult(AGENT, agent_config_path, "added", "installed PreToolUse hook")
+        return InstallResult(AGENT, agent_config_path, "added", "installed Claude Code hooks")
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
 
