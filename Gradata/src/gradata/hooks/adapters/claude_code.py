@@ -12,15 +12,51 @@ from gradata.hooks.adapters._base import (
     failure,
     hook_command,
     hook_signature,
+    pre_compact_hook_command,
     read_json,
     write_json,
 )
 
 AGENT = "claude-code"
+PRE_COMPACT_ID_SUFFIX = ":precompact"
 
 # Claude Code's canonical tool names (capitalised, no prefix).
 EDIT_TOOLS: frozenset[str] = frozenset({"Edit", "MultiEdit"}) | (EDIT_TOOL_ALIASES & {"Edit"})
 WRITE_TOOLS: frozenset[str] = frozenset({"Write"}) | (WRITE_TOOL_ALIASES & {"Write"})
+
+
+def _pre_compact_signature(brain_dir: Path) -> str:
+    return f"{hook_signature(AGENT, brain_dir)}{PRE_COMPACT_ID_SUFFIX}"
+
+
+def _hook_matches_signature(hook: object, signature: str) -> bool:
+    if isinstance(hook, dict):
+        return hook.get("id") == signature
+    return signature in str(hook)
+
+
+def _prune_matching_hooks(entries: list, signature: str) -> tuple[list, int]:
+    kept_entries: list = []
+    removed = 0
+    for entry in entries:
+        if not isinstance(entry, dict) or not isinstance(entry.get("hooks"), list):
+            if signature in str(entry):
+                removed += 1
+                continue
+            kept_entries.append(entry)
+            continue
+
+        kept_hooks = []
+        for hook in entry["hooks"]:
+            if _hook_matches_signature(hook, signature):
+                removed += 1
+                continue
+            kept_hooks.append(hook)
+        if kept_hooks:
+            pruned = dict(entry)
+            pruned["hooks"] = kept_hooks
+            kept_entries.append(pruned)
+    return kept_entries, removed
 
 
 def detect(payload: dict) -> bool:
@@ -55,33 +91,55 @@ def extract_correction(
 def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
     try:
         sig = hook_signature(AGENT, brain_dir)
+        pre_compact_sig = _pre_compact_signature(brain_dir)
         data = read_json(agent_config_path)
         hooks = data.setdefault("hooks", {})
+
+        added = 0
         pre_tool = hooks.setdefault("PreToolUse", [])
-        if any(sig in str(item) for item in pre_tool):
+        if not any(sig in str(item) for item in pre_tool):
+            pre_tool.append(
+                {
+                    "matcher": "*",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": hook_command(brain_dir),
+                            "id": sig,
+                        }
+                    ],
+                }
+            )
+            added += 1
+
+        pre_compact = hooks.setdefault("PreCompact", [])
+        if not any(pre_compact_sig in str(item) for item in pre_compact):
+            pre_compact.append(
+                {
+                    "matcher": "manual|auto",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": pre_compact_hook_command(brain_dir),
+                            "id": pre_compact_sig,
+                        }
+                    ],
+                }
+            )
+            added += 1
+
+        if added == 0:
             return InstallResult(
                 AGENT, agent_config_path, "already_present", "hook already present"
             )
-        pre_tool.append(
-            {
-                "matcher": "*",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": hook_command(brain_dir),
-                        "id": sig,
-                    }
-                ],
-            }
-        )
         write_json(agent_config_path, data)
-        return InstallResult(AGENT, agent_config_path, "added", "installed PreToolUse hook")
+        return InstallResult(AGENT, agent_config_path, "added", "installed PreToolUse and PreCompact hooks")
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
 
 
 def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
-    """Reverse ``install()``: drop the signature-matching PreToolUse entry.
+    """Reverse ``install()``: drop signature-matching hook entries.
 
     Idempotent — calling on an already-clean config returns ``already_present``
     (semantically: 'already in the desired absent state'). Empty containers
@@ -94,31 +152,33 @@ def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
                 AGENT, agent_config_path, "already_present", "config file does not exist"
             )
         sig = hook_signature(AGENT, brain_dir)
+        pre_compact_sig = _pre_compact_signature(brain_dir)
         data = read_json(agent_config_path)
         hooks = data.get("hooks")
         if not isinstance(hooks, dict):
             return InstallResult(AGENT, agent_config_path, "already_present", "no hooks block")
-        pre_tool = hooks.get("PreToolUse")
-        if not isinstance(pre_tool, list):
-            return InstallResult(AGENT, agent_config_path, "already_present", "no PreToolUse")
-
         removed = 0
-        kept: list = []
-        for entry in pre_tool:
-            entry_str = str(entry)
-            if sig in entry_str:
-                # Either the entry's `hooks[].id` carries our sig, or the
-                # whole entry was ours. Drop it.
-                removed += 1
-                continue
-            kept.append(entry)
+
+        pre_tool = hooks.get("PreToolUse")
+        if isinstance(pre_tool, list):
+            kept, count = _prune_matching_hooks(pre_tool, sig)
+            removed += count
+            if kept:
+                hooks["PreToolUse"] = kept
+            else:
+                hooks.pop("PreToolUse", None)
+
+        pre_compact = hooks.get("PreCompact")
+        if isinstance(pre_compact, list):
+            kept, count = _prune_matching_hooks(pre_compact, pre_compact_sig)
+            removed += count
+            if kept:
+                hooks["PreCompact"] = kept
+            else:
+                hooks.pop("PreCompact", None)
+
         if removed == 0:
             return InstallResult(AGENT, agent_config_path, "already_present", "hook not present")
-
-        if kept:
-            hooks["PreToolUse"] = kept
-        else:
-            hooks.pop("PreToolUse", None)
         if not hooks:
             data.pop("hooks", None)
         write_json(agent_config_path, data)
