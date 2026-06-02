@@ -33,23 +33,14 @@ _log = logging.getLogger("gradata.cli")
 
 
 def _get_brain(args):
-    """Resolve brain directory from env, args, or cwd.
+    """Build a Brain from the shared CLI brain-root resolver.
 
-    Precedence mirrors :func:`_resolve_brain_root` exactly —
-    explicit args > ``BRAIN_DIR`` env > ``GRADATA_BRAIN`` env > cwd — so both helpers
-    always target the same brain (important for export, tests with tmp
-    brains, etc.).
+    Delegating to :func:`_resolve_brain_root` keeps command handlers and direct
+    Brain construction in sync for explicit args, env vars, and cwd fallback.
     """
     from gradata import Brain
 
-    brain_dir = (
-        getattr(args, "brain_dir", None)
-        or getattr(args, "brain", None)
-        or env_str("BRAIN_DIR")
-        or env_str("GRADATA_BRAIN")
-        or Path.cwd()
-    )
-    return Brain(brain_dir)
+    return Brain(_resolve_brain_root(args))
 
 
 def cmd_init(args):

@@ -237,10 +237,11 @@ def extract_correction(
 
 
 def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
-    """Reverse install: drop signature-matching entries from hooks.pre_tool_call.
+    """Reverse install: drop signature-matching entries from all hook events.
 
-    Hermes uses YAML, so we can't reuse the generic JSON helper.
-    Idempotent. Preserves user-owned entries and other hook events.
+    Hermes uses YAML, so we can't reuse the generic JSON helper. Idempotent.
+    Preserves user-owned entries while removing every Gradata entry written by
+    this adapter across current and legacy event names.
     """
     try:
         if not agent_config_path.is_file():

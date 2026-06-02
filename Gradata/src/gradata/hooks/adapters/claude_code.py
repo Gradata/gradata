@@ -91,12 +91,12 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
 
 
 def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
-    """Reverse ``install()``: drop the signature-matching PreToolUse entry.
+    """Reverse ``install()`` across all hook events.
 
     Idempotent — calling on an already-clean config returns ``already_present``
     (semantically: 'already in the desired absent state'). Empty containers
-    are pruned. User-owned PreToolUse entries (without our signature) are
-    preserved verbatim.
+    are pruned. User-owned entries (without our signature) are preserved
+    verbatim while every signature-matching Gradata entry is removed.
     """
     try:
         if not agent_config_path.is_file():
