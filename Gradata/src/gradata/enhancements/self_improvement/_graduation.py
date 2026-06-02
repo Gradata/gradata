@@ -28,6 +28,9 @@ from gradata.enhancements.self_improvement._confidence import (
     graduation_thresholds,
     is_hook_enforced,
 )
+from gradata.enhancements.self_improvement._graduation_flags import (
+    read_beta_lb_threshold,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -105,7 +108,6 @@ def _read_beta_lb_config() -> tuple[bool, float, int]:
     Called once per ``graduate()`` invocation so per-lesson gate checks can
     skip repeated ``os.environ.get`` lookups inside the graduation loop.
     """
-    import math
     import os
 
     enabled = os.environ.get("GRADATA_BETA_LB_GATE", "1").lower() not in (
@@ -115,15 +117,7 @@ def _read_beta_lb_config() -> tuple[bool, float, int]:
         "off",
     )
     defaults = graduation_thresholds()
-    try:
-        threshold = float(
-            os.environ.get("GRADATA_BETA_LB_THRESHOLD", str(defaults.beta_lb_threshold))
-        )
-        if not math.isfinite(threshold):
-            threshold = defaults.beta_lb_threshold
-        threshold = min(max(threshold, 0.0), 1.0)
-    except (TypeError, ValueError):
-        threshold = defaults.beta_lb_threshold
+    threshold = read_beta_lb_threshold(defaults.beta_lb_threshold)
     try:
         min_fires = max(
             0,

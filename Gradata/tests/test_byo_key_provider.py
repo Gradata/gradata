@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import pytest
+
 from gradata.llm.byo_key import BYOKeyProvider
+
+pytest.importorskip("httpx")
 
 
 class _Response:

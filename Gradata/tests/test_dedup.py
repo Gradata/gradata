@@ -209,5 +209,170 @@ def test_brain_correct_annotates_fingerprint_and_seen_count(fresh_brain):
     assert result.get("observation_seen_count") == 1
 
 
+def test_brain_correct_semantic_near_duplicate_is_deduped(fresh_brain):
+    brain = fresh_brain
+    a1 = "We should probably maybe include the exact API endpoint in docs."
+    b1 = "Include the exact API endpoint in docs."
+    a2 = "We should maybe include the exact API endpoint in docs."
+    b2 = "Please include the exact API endpoint in docs."
+
+    first = brain.correct(a1, b1, category="DRAFTING", session=2)
+    assert first.get("observation_deduped") is not True
+
+    second = brain.correct(a2, b2, category="DRAFTING", session=2)
+    assert second.get("observation_deduped") is True
+    assert second.get("observation_dedup_reason") == "semantic"
+
+
+def test_low_signal_floor_filters_tiny_non_meaningful_corrections(fresh_brain):
+    brain = fresh_brain
+    # Tiny punctuation-only edit; should be dropped by low-signal floor.
+    draft = "This sentence has enough tokens that a single punctuation mark is low-signal"
+    final = f"{draft}."
+    result = brain.correct(draft, final, category="FORMAT", session=3)
+    assert result.get("low_signal_filtered") is True
+    assert result.get("lessons_created", 0) == 0
+
+
+def test_dedup_does_not_inflate_lineage_correction_ids(fresh_brain):
+    brain = fresh_brain
+    draft = "we can maybe maybe probably ship this friday"
+    final = "We can ship this Friday."
+
+    brain.correct(draft, final, category="DRAFTING", session=4)
+    for _ in range(5):
+        brain.correct(draft, final, category="DRAFTING", session=4)
+
+    lessons = [l for l in brain._load_lessons() if l.category == "DRAFTING"]
+    assert lessons, "Expected at least one DRAFTING lesson"
+    lineages = [len(l.correction_event_ids) for l in lessons]
+    # Duplicate observations must not add new lineage IDs.
+    assert max(lineages) == 1
+
+
+# ── Cycle 3: category-aware noise filtering ──────────────────────────────────
+
+
+def test_category_aware_floor_constants():
+    """The FORMAT/DRAFTING floor (0.07) must be higher than the base floor (0.04)."""
+    from gradata._core import (
+        _FORMAT_DRAFTING_CATEGORIES,
+        _FORMAT_DRAFTING_EDIT_DISTANCE_FLOOR,
+        _LOW_SIGNAL_EDIT_DISTANCE_FLOOR,
+    )
+
+    assert _FORMAT_DRAFTING_EDIT_DISTANCE_FLOOR == 0.07
+    assert _FORMAT_DRAFTING_EDIT_DISTANCE_FLOOR > _LOW_SIGNAL_EDIT_DISTANCE_FLOOR
+    assert "FORMAT" in _FORMAT_DRAFTING_CATEGORIES
+    assert "DRAFTING" in _FORMAT_DRAFTING_CATEGORIES
+    assert "SECURITY" not in _FORMAT_DRAFTING_CATEGORIES
+    assert "ACCURACY" not in _FORMAT_DRAFTING_CATEGORIES
+
+
+def test_format_drafting_floor_filters_medium_ed_corrections(fresh_brain):
+    """FORMAT/DRAFTING corrections with 0.04 ≤ ed < 0.07 are filtered as noise.
+
+    Cycle-3 hypothesis: raise the low-signal floor to 0.07 for FORMAT/DRAFTING
+    so synonym-swap edits that slip past the old 0.04 floor are blocked.
+    We inject a controlled DiffResult (ed=0.05, severity='minor') so the test
+    is deterministic regardless of diff-engine tuning.
+    """
+    from unittest.mock import patch
+
+    from gradata.enhancements.diff_engine import DiffResult
+
+    synthetic_diff = DiffResult(
+        edit_distance=0.05,
+        compression_distance=0.05,
+        changed_sections=[],
+        severity="minor",
+        summary_stats={},
+    )
+
+    with patch("gradata.enhancements.diff_engine.compute_diff", return_value=synthetic_diff):
+        result = fresh_brain.correct(
+            "We should utilize the existing approach here.",
+            "We should use the existing approach here.",
+            category="DRAFTING",
+            session=10,
+        )
+
+    assert result.get("low_signal_filtered") is True, (
+        "Expected DRAFTING correction with ed=0.05 (< 0.07 floor) to be filtered as noise"
+    )
+    assert result.get("lessons_created", 0) == 0
+
+
+def test_format_floor_does_not_filter_above_threshold(fresh_brain):
+    """FORMAT/DRAFTING corrections with ed ≥ 0.07 must NOT be filtered."""
+    from unittest.mock import patch
+
+    from gradata.enhancements.diff_engine import DiffResult
+
+    synthetic_diff = DiffResult(
+        edit_distance=0.08,
+        compression_distance=0.08,
+        changed_sections=[],
+        severity="minor",
+        summary_stats={},
+    )
+
+    with patch("gradata.enhancements.diff_engine.compute_diff", return_value=synthetic_diff):
+        result = fresh_brain.correct(
+            "We should utilize this approach.",
+            "We should use this approach.",
+            category="FORMAT",
+            session=12,
+        )
+
+    assert result.get("low_signal_filtered") is not True, (
+        "FORMAT correction with ed=0.08 (≥ 0.07 floor) must not be filtered"
+    )
+
+
+def test_format_drafting_floor_passes_larger_ed_corrections(fresh_brain):
+    """FORMAT/DRAFTING corrections with ed ≥ 0.07 must NOT be filtered."""
+    brain = fresh_brain
+    # Multi-word restructure in DRAFTING; edit distance should exceed 0.07.
+    draft = "Maybe we could perhaps consider thinking about simplifying this."
+    final = "Simplify this."
+    result = brain.correct(draft, final, category="DRAFTING", session=11)
+    assert result.get("low_signal_filtered") is not True, (
+        f"Expected substantial DRAFTING edit to pass; ed={result.get('edit_distance')}"
+    )
+
+
+def test_security_accuracy_always_pass_low_ed(fresh_brain):
+    """SECURITY/ACCURACY corrections pass regardless of severity or edit distance."""
+    brain = fresh_brain
+    # Tiny but semantically critical: "not" inserted changes meaning entirely.
+    draft = "Users are allowed to delete other users' accounts."
+    final = "Users are not allowed to delete other users' accounts."
+    for cat in ("SECURITY", "ACCURACY"):
+        result = brain.correct(draft, final, category=cat, session=20)
+        assert result.get("low_signal_filtered") is not True, (
+            f"{cat} correction was incorrectly filtered as low-signal"
+        )
+
+
+def test_non_format_drafting_keeps_original_floor(fresh_brain):
+    """Categories outside FORMAT/DRAFTING still use the 0.04 floor, not 0.07."""
+    brain = fresh_brain
+    # TONE edit above 0.04 but below 0.07 — should NOT be filtered.
+    draft = (
+        "We are unable to process your request at this moment in time and "
+        "we apologize for the inconvenience this has caused you today."
+    )
+    final = (
+        "We cannot process your request right now and we are sorry for the "
+        "inconvenience this has caused you today."
+    )
+    result = brain.correct(draft, final, category="TONE", session=21)
+    # ed is likely above 0.04 for this rewrite; should pass as signal
+    assert result.get("low_signal_filtered") is not True, (
+        f"TONE correction above 0.04 floor should not be filtered; ed={result.get('edit_distance')}"
+    )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
