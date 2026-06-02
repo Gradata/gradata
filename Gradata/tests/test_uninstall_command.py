@@ -9,6 +9,7 @@ unknown hosts.
 from __future__ import annotations
 
 import json
+from contextlib import suppress
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -159,10 +160,8 @@ def test_cli_unknown_agent_clean_error(tmp_path, capsys, brain_dir):
     # Check that an unknown but valid host name (e.g. one not installed) goes
     # through the fallback canonical-path machinery without exception.
     args.agent = "claude-code"  # valid name, but not installed
-    try:
+    with suppress(SystemExit):
         cmd_uninstall(args)
-    except SystemExit:
-        pass  # cmd_uninstall may exit with code on failure — that's OK
     out = capsys.readouterr().out + capsys.readouterr().err
     # Should NOT contain a traceback
     assert "Traceback" not in out

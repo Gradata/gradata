@@ -42,10 +42,14 @@ def test_install_is_idempotent_under_new_name(tmp_path: Path) -> None:
 
     assert first.action == "added"
     assert second.action == "already_present"
-    # Only one entry, under the correct key.
+    # One entry per native Hermes event, without duplicate installs.
     text = config.read_text(encoding="utf-8")
     sig = f"gradata:hermes:{brain.resolve().as_posix()}"
-    assert text.count(sig) == 1, text
+    assert text.count(sig) == 3, text
+    lines = text.splitlines()
+    assert lines.count("  pre_tool_call:") == 1, text
+    assert lines.count("  post_tool_call:") == 1, text
+    assert lines.count("  on_session_end:") == 1, text
 
 
 def test_install_migrates_legacy_pre_tool_use_entry(tmp_path: Path) -> None:

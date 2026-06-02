@@ -258,21 +258,23 @@ def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
             return InstallResult(AGENT, agent_config_path, "already_present", "no hooks block")
 
         removed = 0
-        # Check both current and legacy event names.
-        for key in ("pre_tool_call", "pre_tool_use"):
-            entries = hooks.get(key)
-            if not isinstance(entries, list):
-                continue
-            kept = []
-            for entry in entries:
-                if sig in str(entry):
-                    removed += 1
+        # Check both current and legacy event names for every hook this adapter installs.
+        for current, legacy, _module in HOOKS:
+            keys = (current,) if legacy is None else (current, legacy)
+            for key in keys:
+                entries = hooks.get(key)
+                if not isinstance(entries, list):
                     continue
-                kept.append(entry)
-            if kept:
-                hooks[key] = kept
-            else:
-                hooks.pop(key, None)
+                kept = []
+                for entry in entries:
+                    if sig in str(entry):
+                        removed += 1
+                        continue
+                    kept.append(entry)
+                if kept:
+                    hooks[key] = kept
+                else:
+                    hooks.pop(key, None)
 
         if removed == 0:
             return InstallResult(AGENT, agent_config_path, "already_present", "hook not present")
