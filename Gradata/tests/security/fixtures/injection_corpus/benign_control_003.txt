@@ -1,0 +1,1 @@
+Log warnings for unhandled promise rejections in Node.js applications to catch silent failures early in the development cycle.

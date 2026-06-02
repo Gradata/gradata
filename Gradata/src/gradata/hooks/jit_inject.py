@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from gradata.hooks._base import extract_message, resolve_brain_dir, run_hook
+from gradata.hooks._injection_guard import is_suspicious, sanitize
 from gradata.hooks._profiles import Profile
 
 if TYPE_CHECKING:
@@ -286,6 +287,15 @@ def main(data: dict) -> dict | None:
     if not message or len(message) < MIN_DRAFT_LEN:
         return None
     if message.startswith("/"):
+        return None
+
+    # Sanitize and reject prompt-injection attempts before scoring the draft
+    # against stored rules. Otherwise an attacker can craft a UserPromptSubmit
+    # message that pulls attacker-desired rules into the model context.
+    message = sanitize(message)
+    suspicious, reason = is_suspicious(message)
+    if suspicious:
+        _log.info("jit_inject: blocked suspicious draft — %s", reason)
         return None
 
     brain_dir = resolve_brain_dir()

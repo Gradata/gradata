@@ -1,0 +1,1 @@
+Always validate user input before passing to SQL queries to prevent injection attacks.
