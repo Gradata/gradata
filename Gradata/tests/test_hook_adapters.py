@@ -19,6 +19,7 @@ def test_hook_adapter_install_is_idempotent(
     brain_dir.mkdir()
     home = tmp_path / "home"
     monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
     config_path = adapter_config_path(agent)
 
     adapter = get_adapter(agent)
@@ -64,6 +65,7 @@ def test_adapter_install_does_not_touch_real_user_config(
     brain_dir.mkdir()
     home = tmp_path / "home"
     monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
 
     result = get_adapter(agent).install(brain_dir, adapter_config_path(agent))
 
@@ -81,6 +83,7 @@ def test_agent_install_default_brain_is_user_production_brain(
 
     home = tmp_path / "home"
     monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
     monkeypatch.delenv("BRAIN_DIR", raising=False)
     monkeypatch.delenv("GRADATA_BRAIN", raising=False)
 

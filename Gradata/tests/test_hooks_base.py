@@ -43,6 +43,7 @@ def test_stale_hook_check_warns_on_missing_configured_brain_dir(tmp_path, monkey
         encoding="utf-8",
     )
     monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
 
     assert stale_hook_check.main() == 0
     out = capsys.readouterr().out

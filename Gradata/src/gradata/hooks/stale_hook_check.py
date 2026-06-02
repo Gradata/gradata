@@ -144,7 +144,7 @@ def _extract_brain_dir_from_command(command: str) -> Path | None:
     try:
         parts = shlex.split(command, posix=True)
     except ValueError:
-        parts = command.split()
+        return None
     for part in parts:
         if part.startswith("BRAIN_DIR="):
             value = part.split("=", 1)[1].strip()
@@ -271,7 +271,8 @@ def main() -> int:
         print()
         for path in missing_brain_dirs:
             print(f"  - missing BRAIN_DIR: {path}")
-        print("      fix:     gradata install --agent claude-code --brain ~/.gradata/brain")
+        target_brain = env_str("BRAIN_DIR") or env_str("GRADATA_BRAIN") or "~/.gradata/brain"
+        print(f"      fix:     gradata install --agent claude-code --brain {shlex.quote(target_brain)}")
         print()
 
     return 0

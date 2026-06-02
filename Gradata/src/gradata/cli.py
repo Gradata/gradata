@@ -877,7 +877,7 @@ def cmd_prove(args):
     xs = list(range(n))
     mean_x = sum(xs) / n
     mean_y = sum(counts) / n
-    num = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, counts))
+    num = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, counts, strict=True))
     den = sum((x - mean_x) ** 2 for x in xs) or 1.0
     slope = num / den
 
@@ -1204,18 +1204,28 @@ def cmd_demo(args):
     run_demo(scenario=getattr(args, "scenario", "sdr"))
 
 
+def _resolve_path_with_precedence(
+    args,
+    *,
+    arg_names: tuple[str, ...] = ("brain_dir", "brain"),
+    env_names: tuple[str, ...] = ("BRAIN_DIR", "GRADATA_BRAIN"),
+    default: Path,
+) -> Path:
+    """Resolve a path from CLI args, then env vars, then a caller default."""
+    for name in arg_names:
+        value = getattr(args, name, None)
+        if value:
+            return Path(value)
+    for name in env_names:
+        value = env_str(name)
+        if value:
+            return Path(value)
+    return default
+
+
 def _resolve_brain_root(args):
     """Figure out where brain lives using the same precedence as _get_brain."""
-    brain_dir = getattr(args, "brain_dir", None)
-    if brain_dir:
-        return Path(brain_dir)
-    brain = getattr(args, "brain", None)
-    if brain:
-        return Path(brain)
-    override = env_str("BRAIN_DIR") or env_str("GRADATA_BRAIN")
-    if override:
-        return Path(override)
-    return Path.cwd()
+    return _resolve_path_with_precedence(args, default=Path.cwd())
 
 
 def _resolve_agent_brain_root(args):
@@ -1225,16 +1235,7 @@ def _resolve_agent_brain_root(args):
     their implicit target must be the production user brain, not the current
     test/project directory. Explicit ``--brain``/``BRAIN_DIR`` still wins.
     """
-    brain_dir = getattr(args, "brain_dir", None)
-    if brain_dir:
-        return Path(brain_dir)
-    brain = getattr(args, "brain", None)
-    if brain:
-        return Path(brain)
-    override = env_str("BRAIN_DIR") or env_str("GRADATA_BRAIN")
-    if override:
-        return Path(override)
-    return Path.home() / ".gradata" / "brain"
+    return _resolve_path_with_precedence(args, default=Path.home() / ".gradata" / "brain")
 
 
 def cmd_config(args) -> None:
