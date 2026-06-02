@@ -12,6 +12,7 @@ from gradata.hooks.adapters._base import (
     failure,
     hook_command,
     hook_signature,
+    pre_compact_command,
     read_json,
     write_json,
 )
@@ -58,24 +59,41 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         data = read_json(agent_config_path)
         hooks = data.setdefault("hooks", {})
         pre_tool = hooks.setdefault("PreToolUse", [])
-        if any(sig in str(item) for item in pre_tool):
+        pre_compact = hooks.setdefault("PreCompact", [])
+        has_pre_tool = any(sig in str(item) for item in pre_tool)
+        has_pre_compact = any(sig in str(item) for item in pre_compact)
+        if has_pre_tool and has_pre_compact:
             return InstallResult(
                 AGENT, agent_config_path, "already_present", "hook already present"
             )
-        pre_tool.append(
-            {
-                "matcher": "*",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": hook_command(brain_dir),
-                        "id": sig,
-                    }
-                ],
-            }
-        )
+        if not has_pre_tool:
+            pre_tool.append(
+                {
+                    "matcher": "*",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": hook_command(brain_dir),
+                            "id": sig,
+                        }
+                    ],
+                }
+            )
+        if not has_pre_compact:
+            pre_compact.append(
+                {
+                    "matcher": "manual|auto",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": pre_compact_command(brain_dir),
+                            "id": sig,
+                        }
+                    ],
+                }
+            )
         write_json(agent_config_path, data)
-        return InstallResult(AGENT, agent_config_path, "added", "installed PreToolUse hook")
+        return InstallResult(AGENT, agent_config_path, "added", "installed Claude Code hooks")
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
 
@@ -98,27 +116,26 @@ def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         hooks = data.get("hooks")
         if not isinstance(hooks, dict):
             return InstallResult(AGENT, agent_config_path, "already_present", "no hooks block")
-        pre_tool = hooks.get("PreToolUse")
-        if not isinstance(pre_tool, list):
-            return InstallResult(AGENT, agent_config_path, "already_present", "no PreToolUse")
-
         removed = 0
-        kept: list = []
-        for entry in pre_tool:
-            entry_str = str(entry)
-            if sig in entry_str:
-                # Either the entry's `hooks[].id` carries our sig, or the
-                # whole entry was ours. Drop it.
-                removed += 1
+        for lifecycle in ("PreToolUse", "PreCompact"):
+            entries = hooks.get(lifecycle)
+            if not isinstance(entries, list):
                 continue
-            kept.append(entry)
+            kept: list = []
+            for entry in entries:
+                entry_str = str(entry)
+                if sig in entry_str:
+                    # Either the entry's `hooks[].id` carries our sig, or the
+                    # whole entry was ours. Drop it.
+                    removed += 1
+                    continue
+                kept.append(entry)
+            if kept:
+                hooks[lifecycle] = kept
+            else:
+                hooks.pop(lifecycle, None)
         if removed == 0:
             return InstallResult(AGENT, agent_config_path, "already_present", "hook not present")
-
-        if kept:
-            hooks["PreToolUse"] = kept
-        else:
-            hooks.pop("PreToolUse", None)
         if not hooks:
             data.pop("hooks", None)
         write_json(agent_config_path, data)
