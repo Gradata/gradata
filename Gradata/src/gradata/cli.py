@@ -467,7 +467,7 @@ def _cmd_install_agent(args) -> None:
     from gradata.hooks.adapters._base import AGENTS, adapter_config_path, get_adapter
 
     agent = args.agent
-    brain_dir = _resolve_brain_root(args)
+    brain_dir = _resolve_agent_brain_root(args)
     agents = [a for a in AGENTS if adapter_config_path(a).exists()] if agent == "all" else [agent]
 
     if not agents:
@@ -573,7 +573,7 @@ def cmd_uninstall(args) -> None:
     from gradata.hooks.adapters._base import AGENTS, adapter_config_path, get_adapter
 
     agent = args.agent
-    brain_dir = _resolve_brain_root(args)
+    brain_dir = _resolve_agent_brain_root(args)
     agents = list(AGENTS) if agent == "all" else [agent]
 
     had_failure = False
@@ -1216,6 +1216,25 @@ def _resolve_brain_root(args):
     if override:
         return Path(override)
     return Path.cwd()
+
+
+def _resolve_agent_brain_root(args):
+    """Resolve the brain path embedded into agent hook configs.
+
+    Agent hooks are user-level integrations that can fire from any project, so
+    their implicit target must be the production user brain, not the current
+    test/project directory. Explicit ``--brain``/``BRAIN_DIR`` still wins.
+    """
+    brain_dir = getattr(args, "brain_dir", None)
+    if brain_dir:
+        return Path(brain_dir)
+    brain = getattr(args, "brain", None)
+    if brain:
+        return Path(brain)
+    override = env_str("BRAIN_DIR") or env_str("GRADATA_BRAIN")
+    if override:
+        return Path(override)
+    return Path.home() / ".gradata" / "brain"
 
 
 def cmd_config(args) -> None:
@@ -2035,7 +2054,7 @@ def main():
         "--brain",
         type=str,
         default=None,
-        help="Brain directory for agent hook config (default: BRAIN_DIR or ./brain)",
+        help="Brain directory for agent hook config (default: BRAIN_DIR or ~/.gradata/brain)",
     )
     p_install.add_argument(
         "--systemd",
@@ -2068,7 +2087,7 @@ def main():
         "--brain",
         type=str,
         default=None,
-        help="Brain directory the hook points at (default: BRAIN_DIR or ./brain)",
+        help="Brain directory the hook points at (default: BRAIN_DIR or ~/.gradata/brain)",
     )
 
     # health

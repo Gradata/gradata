@@ -17,6 +17,8 @@ def test_hook_adapter_install_is_idempotent(
 ) -> None:
     brain_dir = tmp_path / "brain"
     brain_dir.mkdir()
+    home = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home))
     config_path = adapter_config_path(agent)
 
     adapter = get_adapter(agent)
@@ -37,7 +39,7 @@ def test_codex_adapter_writes_valid_toml_with_quoted_brain_path(tmp_path: Path) 
     # through tomllib.loads — quoting bug from Round 2 stays caught.
     brain_dir = tmp_path / "brain with spaces"
     brain_dir.mkdir()
-    config_path = adapter_config_path("codex")
+    config_path = adapter_config_path("codex", home=tmp_path / "home")
 
     result = get_adapter("codex").install(brain_dir, config_path)
 
@@ -52,14 +54,34 @@ def test_codex_adapter_writes_valid_toml_with_quoted_brain_path(tmp_path: Path) 
     assert brain_dir.as_posix() in hook["id"]
 
 
-def test_adapter_install_does_not_touch_real_user_config(tmp_path: Path) -> None:
-    real_config = _REAL_HOME / ".codex" / "config.toml"
+@pytest.mark.parametrize("agent", AGENTS)
+def test_adapter_install_does_not_touch_real_user_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, agent: str
+) -> None:
+    real_config = adapter_config_path(agent, home=_REAL_HOME)
     before = real_config.read_text(encoding="utf-8") if real_config.exists() else None
     brain_dir = tmp_path / "brain"
     brain_dir.mkdir()
+    home = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home))
 
-    result = get_adapter("codex").install(brain_dir, adapter_config_path("codex"))
+    result = get_adapter(agent).install(brain_dir, adapter_config_path(agent))
 
     assert result.action == "added"
     after = real_config.read_text(encoding="utf-8") if real_config.exists() else None
     assert after == before
+
+
+def test_agent_install_default_brain_is_user_production_brain(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from argparse import Namespace
+
+    from gradata.cli import _resolve_agent_brain_root
+
+    home = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.delenv("BRAIN_DIR", raising=False)
+    monkeypatch.delenv("GRADATA_BRAIN", raising=False)
+
+    assert _resolve_agent_brain_root(Namespace(brain=None, brain_dir=None)) == home / ".gradata" / "brain"
