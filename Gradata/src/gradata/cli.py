@@ -564,7 +564,7 @@ def cmd_uninstall(args) -> None:
     from gradata.hooks.adapters._base import AGENTS, adapter_config_path, get_adapter
 
     agent = args.agent
-    brain_dir = _resolve_agent_brain_root(args)
+    fallback_brain_dir = _resolve_agent_brain_root(args)
     agents = list(AGENTS) if agent == "all" else [agent]
 
     had_failure = False
@@ -580,6 +580,9 @@ def cmd_uninstall(args) -> None:
 
         record = get_record(name)
         config_path = record.config_path if record else adapter_config_path(name)
+        brain_dir = _brain_dir_from_hook_signature(record.signature) if record else None
+        if brain_dir is None:
+            brain_dir = fallback_brain_dir
 
         # User-edit guard: skip uninstall if the config file's checksum
         # differs from what was recorded at install time. Only meaningful
@@ -1199,19 +1202,30 @@ def _resolve_path_with_precedence(
     args,
     *,
     arg_names: tuple[str, ...] = ("brain_dir", "brain"),
-    env_names: tuple[str, ...] = ("BRAIN_DIR", "GRADATA_BRAIN"),
+    env_names: tuple[str, ...] = ("GRADATA_BRAIN", "BRAIN_DIR"),
     default: Path,
 ) -> Path:
-    """Resolve a path from CLI args, then env vars, then a caller default."""
-    for name in arg_names:
-        value = getattr(args, name, None)
-        if value:
-            return Path(value)
+    """Resolve a path from env vars, then CLI args, then a caller default."""
     for name in env_names:
         value = env_str(name)
         if value:
             return Path(value)
+    for name in arg_names:
+        value = getattr(args, name, None)
+        if value:
+            return Path(value)
     return default
+
+
+def _brain_dir_from_hook_signature(signature: str) -> Path | None:
+    """Extract the install-time brain path from ``gradata:<agent>:<path>``."""
+    prefix, sep, remainder = signature.partition(":")
+    if prefix != "gradata" or sep != ":":
+        return None
+    _agent, sep, brain_path = remainder.partition(":")
+    if not sep or not brain_path:
+        return None
+    return Path(brain_path)
 
 
 def _resolve_brain_root(args):
@@ -2046,7 +2060,7 @@ def main():
         "--brain",
         type=str,
         default=None,
-        help="Brain directory for agent hook config (default: BRAIN_DIR or ~/.gradata/brain)",
+        help="Brain directory for agent hook config (default: GRADATA_BRAIN, BRAIN_DIR, or ~/.gradata/brain)",
     )
     p_install.add_argument(
         "--systemd",
@@ -2079,7 +2093,7 @@ def main():
         "--brain",
         type=str,
         default=None,
-        help="Brain directory the hook points at (default: BRAIN_DIR or ~/.gradata/brain)",
+        help="Brain directory the hook points at (default: GRADATA_BRAIN, BRAIN_DIR, or ~/.gradata/brain)",
     )
 
     # health

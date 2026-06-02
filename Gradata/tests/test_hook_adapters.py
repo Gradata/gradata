@@ -87,4 +87,29 @@ def test_agent_install_default_brain_is_user_production_brain(
     monkeypatch.delenv("BRAIN_DIR", raising=False)
     monkeypatch.delenv("GRADATA_BRAIN", raising=False)
 
-    assert _resolve_agent_brain_root(Namespace(brain=None, brain_dir=None)) == home / ".gradata" / "brain"
+    assert (
+        _resolve_agent_brain_root(Namespace(brain=None, brain_dir=None))
+        == home / ".gradata" / "brain"
+    )
+
+
+def test_agent_brain_resolution_preserves_env_first_contract(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from argparse import Namespace
+
+    from gradata.cli import _resolve_agent_brain_root
+
+    monkeypatch.setenv("GRADATA_BRAIN", str(tmp_path / "gradata-brain"))
+    monkeypatch.setenv("BRAIN_DIR", str(tmp_path / "brain-dir"))
+
+    assert (
+        _resolve_agent_brain_root(Namespace(brain=str(tmp_path / "cli"), brain_dir=None))
+        == tmp_path / "gradata-brain"
+    )
+
+    monkeypatch.delenv("GRADATA_BRAIN")
+    assert (
+        _resolve_agent_brain_root(Namespace(brain=str(tmp_path / "cli"), brain_dir=None))
+        == tmp_path / "brain-dir"
+    )

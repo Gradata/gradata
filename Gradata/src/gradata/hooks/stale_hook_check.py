@@ -138,19 +138,27 @@ def _settings_path() -> Path:
 
 
 def _extract_brain_dir_from_command(command: str) -> Path | None:
-    """Return the BRAIN_DIR assignment from a Gradata hook command, if any."""
+    """Return the BRAIN_DIR assignment from a Gradata hook command, if any.
+
+    Do not run the whole command through ``shlex.split(posix=True)``: on
+    Windows-style paths it treats backslashes as escapes and corrupts paths like
+    ``C:\\Users\\...`` into ``C:Users...``. Extract the assignment first, then
+    only unquote the value when the user explicitly quoted it.
+    """
     if "gradata.hooks." not in command or "BRAIN_DIR=" not in command:
         return None
-    try:
-        parts = shlex.split(command, posix=True)
-    except ValueError:
+    match = re.search(r"(?:^|\s)BRAIN_DIR=(?P<value>'[^']*'|\"[^\"]*\"|\S+)", command)
+    if not match:
         return None
-    for part in parts:
-        if part.startswith("BRAIN_DIR="):
-            value = part.split("=", 1)[1].strip()
-            if value:
-                return Path(value).expanduser()
-    return None
+    value = match.group("value").strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        try:
+            value = shlex.split(value, posix=True)[0]
+        except (IndexError, ValueError):
+            value = value[1:-1]
+    if not value:
+        return None
+    return Path(value).expanduser()
 
 
 def _missing_hook_brain_dirs(settings_path: Path | None = None) -> list[Path]:
