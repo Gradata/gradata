@@ -5,6 +5,22 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
+
+AGENT_INSTALL_SMOKE_MATRIX = [
+    pytest.param(
+        "claude-code", ".claude/settings.json", "gradata:claude-code", id="claude-code-hook"
+    ),
+    pytest.param("codex", ".codex/config.toml", "gradata:codex", id="codex-hook"),
+    pytest.param("hermes", ".hermes/config.yaml", "gradata:hermes", id="hermes-hook"),
+    pytest.param(
+        "opencode", ".config/opencode/config.json", "gradata:opencode", id="opencode-hook"
+    ),
+    pytest.param("gemini", ".gemini/settings.json", "gradata:gemini", id="gemini-hook"),
+    pytest.param("cursor", ".cursor/mcp.json", "gradata.mcp_server", id="cursor-mcp"),
+]
+
 
 def _run_cli(tmp_path: Path, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     base_env = os.environ.copy()
@@ -38,6 +54,34 @@ def test_cli_install_agent_writes_config_under_fake_home(tmp_path: Path) -> None
     assert config.exists()
     assert "gradata:codex" in config.read_text(encoding="utf-8")
     assert "codex" in result.stdout
+
+
+@pytest.mark.parametrize(("agent", "config_relpath", "expected_marker"), AGENT_INSTALL_SMOKE_MATRIX)
+def test_cli_install_agent_smoke_matrix_with_mocked_home(
+    tmp_path: Path,
+    agent: str,
+    config_relpath: str,
+    expected_marker: str,
+) -> None:
+    """SDK-native one-command install writes each supported host config under fake HOME.
+
+    This is the pre-Show-HN smoke matrix replacing gradata-plugin install checks.
+    Hosts that are unsupported should be represented here as explicit pytest.skip(...)
+    entries with the tracked reason; the current SDK matrix has no silent skips.
+    """
+    brain = tmp_path / "brain"
+    brain.mkdir()
+
+    result = _run_cli(tmp_path, "install", "--agent", agent, "--brain", str(brain))
+
+    assert result.returncode == 0, result.stderr
+    config = tmp_path / config_relpath
+    assert config.exists(), result.stdout
+    config_text = config.read_text(encoding="utf-8")
+    assert expected_marker in config_text
+    assert str(brain) in config_text
+    assert agent in result.stdout
+    assert "added" in result.stdout or "already_present" in result.stdout
 
 
 def test_cli_install_agent_all_detects_existing_configs(tmp_path: Path) -> None:
