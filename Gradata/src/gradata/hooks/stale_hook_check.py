@@ -163,16 +163,15 @@ def _extract_brain_dir_from_command(command: str) -> Path | None:
 
 def _missing_hook_brain_dirs(settings_path: Path | None = None) -> list[Path]:
     """Find Gradata hook BRAIN_DIR targets in Claude settings that no longer exist."""
-    if settings_path is None and (env_str("GRADATA_HOOK_ROOT") or env_str("GRADATA_HOOK_ROOT_POST")):
+    if settings_path is None and (
+        env_str("GRADATA_HOOK_ROOT") or env_str("GRADATA_HOOK_ROOT_POST")
+    ):
         # Test/dev hook roots are intentionally isolated; do not let a developer's
         # real ~/.claude/settings.json leak warnings into those runs.
         return []
     path = settings_path or _settings_path()
-    if not path.is_file():
-        return []
-    try:
-        settings = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    settings = _read_settings(path)
+    if not settings:
         return []
     hooks = settings.get("hooks", {})
     if not isinstance(hooks, dict):
@@ -196,6 +195,71 @@ def _missing_hook_brain_dirs(settings_path: Path | None = None) -> list[Path]:
                     missing.append(brain_dir)
                     seen.add(key)
     return missing
+
+
+def _read_settings(path: Path) -> dict | None:
+    if not path.is_file():
+        return None
+    try:
+        settings = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return settings if isinstance(settings, dict) else None
+
+
+def _remove_missing_hook_brain_dirs(settings_path: Path | None = None) -> list[Path]:
+    """Remove Gradata hook commands whose BRAIN_DIR targets no longer exist."""
+    path = settings_path or _settings_path()
+    settings = _read_settings(path)
+    if not settings:
+        return []
+    hooks = settings.get("hooks")
+    if not isinstance(hooks, dict):
+        return []
+    removed: list[Path] = []
+    seen: set[str] = set()
+    for event in list(hooks):
+        groups = hooks.get(event)
+        if not isinstance(groups, list):
+            continue
+        kept_groups: list = []
+        for group in groups:
+            if not isinstance(group, dict):
+                kept_groups.append(group)
+                continue
+            group_hooks = group.get("hooks")
+            if not isinstance(group_hooks, list):
+                kept_groups.append(group)
+                continue
+            kept_hook_entries: list = []
+            for hook in group_hooks:
+                if not isinstance(hook, dict):
+                    kept_hook_entries.append(hook)
+                    continue
+                brain_dir = _extract_brain_dir_from_command(str(hook.get("command", "")))
+                if brain_dir is None or brain_dir.exists():
+                    kept_hook_entries.append(hook)
+                    continue
+                key = brain_dir.as_posix()
+                if key not in seen:
+                    removed.append(brain_dir)
+                    seen.add(key)
+            if kept_hook_entries:
+                new_group = dict(group)
+                new_group["hooks"] = kept_hook_entries
+                kept_groups.append(new_group)
+        if kept_groups:
+            hooks[event] = kept_groups
+        else:
+            hooks.pop(event, None)
+    if removed:
+        if hooks:
+            settings["hooks"] = hooks
+        else:
+            settings.pop("hooks", None)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(settings, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return removed
 
 
 def _hook_dirs() -> list[Path]:
@@ -280,7 +344,9 @@ def main() -> int:
         for path in missing_brain_dirs:
             print(f"  - missing BRAIN_DIR: {path}")
         target_brain = env_str("GRADATA_BRAIN") or env_str("BRAIN_DIR") or "~/.gradata/brain"
-        print(f"      fix:     gradata install --agent claude-code --brain {shlex.quote(target_brain)}")
+        print(
+            f"      fix:     gradata install --agent claude-code --brain {shlex.quote(target_brain)}"
+        )
         print()
 
     return 0

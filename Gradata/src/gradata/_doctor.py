@@ -233,6 +233,33 @@ def _check_disk_space(brain_path):
         return {"name": "disk_space", "status": "error", "detail": str(e)}
 
 
+def _check_missing_hook_brain_dirs(auto_remove: bool = True):
+    """Warn on, and optionally remove, Claude hooks pointing at deleted brains."""
+    try:
+        from gradata.hooks.stale_hook_check import (
+            _missing_hook_brain_dirs,
+            _remove_missing_hook_brain_dirs,
+        )
+
+        missing = _remove_missing_hook_brain_dirs() if auto_remove else _missing_hook_brain_dirs()
+    except Exception as e:
+        return {"name": "hook_brain_dirs", "status": "error", "detail": str(e)}
+    if not missing:
+        return {
+            "name": "hook_brain_dirs",
+            "status": "ok",
+            "detail": "no missing hook BRAIN_DIR targets",
+        }
+    listed = ", ".join(str(path) for path in missing[:5])
+    suffix = "" if len(missing) <= 5 else f" (+{len(missing) - 5} more)"
+    action = "removed" if auto_remove else "found"
+    return {
+        "name": "hook_brain_dirs",
+        "status": "warn",
+        "detail": f"{action} {len(missing)} Gradata hook(s) pointing at missing BRAIN_DIR: {listed}{suffix}",
+    }
+
+
 def _gradata_config_path() -> Path:
     env = os.environ.get("GRADATA_CONFIG")
     if env:
@@ -495,6 +522,7 @@ def diagnose(
             _check_manifest(brain_path),
             _check_vectorstore(brain_path),
             _check_disk_space(brain_path),
+            _check_missing_hook_brain_dirs(),
         ]
         if include_cloud:
             checks.extend(_cloud_checks())
