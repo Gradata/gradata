@@ -113,3 +113,19 @@ def test_agent_brain_resolution_preserves_env_first_contract(
         _resolve_agent_brain_root(Namespace(brain=str(tmp_path / "cli"), brain_dir=None))
         == tmp_path / "brain-dir"
     )
+
+
+def test_agent_brain_resolution_absolutizes_relative_cli_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from argparse import Namespace
+
+    from gradata.cli import _resolve_agent_brain_root
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("GRADATA_BRAIN", raising=False)
+    monkeypatch.delenv("BRAIN_DIR", raising=False)
+
+    assert _resolve_agent_brain_root(Namespace(brain="relative-brain", brain_dir=None)) == (
+        tmp_path / "relative-brain"
+    )

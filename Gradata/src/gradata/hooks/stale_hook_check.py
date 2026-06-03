@@ -279,7 +279,7 @@ def main() -> int:
         print()
         for path in missing_brain_dirs:
             print(f"  - missing BRAIN_DIR: {path}")
-        target_brain = env_str("BRAIN_DIR") or env_str("GRADATA_BRAIN") or "~/.gradata/brain"
+        target_brain = env_str("GRADATA_BRAIN") or env_str("BRAIN_DIR") or "~/.gradata/brain"
         print(f"      fix:     gradata install --agent claude-code --brain {shlex.quote(target_brain)}")
         print()
 

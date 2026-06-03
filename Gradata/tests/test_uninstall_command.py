@@ -162,6 +162,7 @@ def test_cli_uninstall_reuses_manifest_brain_signature(tmp_path, brain_dir, monk
     result = claude_code.install(installed, cfg)
     assert result.action == "added"
     record_install("claude-code", cfg, hook_signature("claude-code", installed))
+    assert hook_signature("claude-code", installed) in cfg.read_text(encoding="utf-8")
 
     cmd_uninstall(SimpleNamespace(agent="claude-code", brain=str(wrong_arg)))
 

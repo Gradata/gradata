@@ -1240,7 +1240,8 @@ def _resolve_agent_brain_root(args):
     their implicit target must be the production user brain, not the current
     test/project directory. Explicit ``--brain``/``BRAIN_DIR`` still wins.
     """
-    return _resolve_path_with_precedence(args, default=Path.home() / ".gradata" / "brain")
+    brain_root = _resolve_path_with_precedence(args, default=Path.home() / ".gradata" / "brain")
+    return brain_root.expanduser().resolve()
 
 
 def cmd_config(args) -> None:
