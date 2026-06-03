@@ -7,6 +7,7 @@ from gradata.hooks.adapters._base import (
     WRITE_TOOL_ALIASES,
     InstallResult,
     _normalize_tool_name,
+    auto_correct_command,
     extract_from_edit_args,
     extract_from_write_args,
     failure,
@@ -57,36 +58,58 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         sig = hook_signature(AGENT, brain_dir)
         data = read_json(agent_config_path)
         hooks = data.setdefault("hooks", {})
+
+        # PreToolUse: inject_brain_rules
         pre_tool = hooks.setdefault("PreToolUse", [])
-        if any(sig in str(item) for item in pre_tool):
-            return InstallResult(
-                AGENT, agent_config_path, "already_present", "hook already present"
+        pre_present = any(sig in str(item) for item in pre_tool)
+        if not pre_present:
+            pre_tool.append(
+                {
+                    "matcher": "*",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": hook_command(brain_dir),
+                            "id": sig,
+                        }
+                    ],
+                }
             )
-        pre_tool.append(
-            {
-                "matcher": "*",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": hook_command(brain_dir),
-                        "id": sig,
-                    }
-                ],
-            }
-        )
+
+        # PostToolUse: auto_correct (Edit|Write capture)
+        post_tool = hooks.setdefault("PostToolUse", [])
+        post_present = any(sig in str(item) for item in post_tool)
+        if not post_present:
+            post_tool.append(
+                {
+                    "matcher": "Edit|Write",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": auto_correct_command(brain_dir),
+                            "id": sig,
+                        }
+                    ],
+                }
+            )
+
         write_json(agent_config_path, data)
-        return InstallResult(AGENT, agent_config_path, "added", "installed PreToolUse hook")
+        added = (0 if pre_present else 1) + (0 if post_present else 1)
+        if added == 0:
+            return InstallResult(
+                AGENT, agent_config_path, "already_present", "both hooks already present"
+            )
+        return InstallResult(AGENT, agent_config_path, "added", f"installed {added} hook(s)")
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
 
 
 def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
-    """Reverse ``install()``: drop the signature-matching PreToolUse entry.
+    """Reverse install(): drop signature-matching PreToolUse + PostToolUse entries.
 
-    Idempotent — calling on an already-clean config returns ``already_present``
+    Idempotent -- calling on an already-clean config returns already_present
     (semantically: 'already in the desired absent state'). Empty containers
-    are pruned. User-owned PreToolUse entries (without our signature) are
-    preserved verbatim.
+    are pruned. User-owned entries (without our signature) are preserved.
     """
     try:
         if not agent_config_path.is_file():
@@ -98,30 +121,33 @@ def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         hooks = data.get("hooks")
         if not isinstance(hooks, dict):
             return InstallResult(AGENT, agent_config_path, "already_present", "no hooks block")
-        pre_tool = hooks.get("PreToolUse")
-        if not isinstance(pre_tool, list):
-            return InstallResult(AGENT, agent_config_path, "already_present", "no PreToolUse")
 
-        removed = 0
-        kept: list = []
-        for entry in pre_tool:
-            entry_str = str(entry)
-            if sig in entry_str:
-                # Either the entry's `hooks[].id` carries our sig, or the
-                # whole entry was ours. Drop it.
-                removed += 1
+        total_removed = 0
+        for event_key in ("PreToolUse", "PostToolUse"):
+            entries = hooks.get(event_key)
+            if not isinstance(entries, list):
                 continue
-            kept.append(entry)
-        if removed == 0:
+
+            kept: list = []
+            for entry in entries:
+                if sig in str(entry):
+                    total_removed += 1
+                    continue
+                kept.append(entry)
+
+            if kept:
+                hooks[event_key] = kept
+            else:
+                hooks.pop(event_key, None)
+
+        if total_removed == 0:
             return InstallResult(AGENT, agent_config_path, "already_present", "hook not present")
 
-        if kept:
-            hooks["PreToolUse"] = kept
-        else:
-            hooks.pop("PreToolUse", None)
         if not hooks:
             data.pop("hooks", None)
         write_json(agent_config_path, data)
-        return InstallResult(AGENT, agent_config_path, "removed", f"removed {removed} hook entry")
+        return InstallResult(
+            AGENT, agent_config_path, "removed", f"removed {total_removed} hook entry"
+        )
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
