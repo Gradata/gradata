@@ -12,7 +12,9 @@ from gradata.hooks.adapters._base import (
     failure,
     hook_command,
     hook_signature,
+    post_tool_hook_command,
     read_json,
+    session_end_hook_command,
     write_json,
 )
 
@@ -52,41 +54,67 @@ def extract_correction(
     return None
 
 
+# Canonical hook entries for the MINIMAL profile.
+# (event, matcher, command_fn, description)
+_HOOK_ENTRIES = [
+    ("PreToolUse", "*", hook_command, "Gradata: inject graduated rules at session start"),
+    ("PostToolUse", "Edit|Write", post_tool_hook_command, "Gradata: capture corrections from edits"),
+    ("Stop", None, session_end_hook_command, "Gradata: emit SESSION_END + run graduation sweep"),
+]
+
+
 def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
+    """Install the MINIMAL hook set: PreToolUse (inject), PostToolUse
+    (auto_correct), and Stop (session_close).
+
+    Idempotent -- if the signature is already present in any event, all hooks
+    are skipped (no partial reinstall).
+    """
     try:
         sig = hook_signature(AGENT, brain_dir)
         data = read_json(agent_config_path)
         hooks = data.setdefault("hooks", {})
-        pre_tool = hooks.setdefault("PreToolUse", [])
-        if any(sig in str(item) for item in pre_tool):
-            return InstallResult(
-                AGENT, agent_config_path, "already_present", "hook already present"
-            )
-        pre_tool.append(
-            {
-                "matcher": "*",
+
+        # Check any existing hook for our signature
+        for _event, _matcher, _cmd_fn, _desc in _HOOK_ENTRIES:
+            for existing in hooks.get(_event, []):
+                if sig in str(existing):
+                    return InstallResult(
+                        AGENT, agent_config_path, "already_present", "hook already present"
+                    )
+
+        # Install all three hooks
+        for event, matcher, cmd_fn, _desc in _HOOK_ENTRIES:
+            entry = {
                 "hooks": [
                     {
                         "type": "command",
-                        "command": hook_command(brain_dir),
+                        "command": cmd_fn(brain_dir),
                         "id": sig,
                     }
                 ],
             }
-        )
+            if matcher:
+                entry["matcher"] = matcher
+            hooks.setdefault(event, []).append(entry)
+
         write_json(agent_config_path, data)
-        return InstallResult(AGENT, agent_config_path, "added", "installed PreToolUse hook")
+        return InstallResult(
+            AGENT, agent_config_path, "added",
+            "installed PreToolUse + PostToolUse + Stop hooks",
+        )
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
 
 
 def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
-    """Reverse ``install()``: drop the signature-matching PreToolUse entry.
+    """Reverse ``install()``: drop signature-matching entries from ALL
+    hook events.
 
-    Idempotent — calling on an already-clean config returns ``already_present``
-    (semantically: 'already in the desired absent state'). Empty containers
-    are pruned. User-owned PreToolUse entries (without our signature) are
-    preserved verbatim.
+    Idempotent -- calling on an already-clean config returns
+    ``already_present`` (semantically: 'already in the desired absent
+    state'). Empty containers are pruned. User-owned entries (without
+    our signature) are preserved.
     """
     try:
         if not agent_config_path.is_file():
@@ -97,31 +125,37 @@ def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         data = read_json(agent_config_path)
         hooks = data.get("hooks")
         if not isinstance(hooks, dict):
-            return InstallResult(AGENT, agent_config_path, "already_present", "no hooks block")
-        pre_tool = hooks.get("PreToolUse")
-        if not isinstance(pre_tool, list):
-            return InstallResult(AGENT, agent_config_path, "already_present", "no PreToolUse")
+            return InstallResult(
+                AGENT, agent_config_path, "already_present", "no hooks block"
+            )
 
-        removed = 0
-        kept: list = []
-        for entry in pre_tool:
-            entry_str = str(entry)
-            if sig in entry_str:
-                # Either the entry's `hooks[].id` carries our sig, or the
-                # whole entry was ours. Drop it.
-                removed += 1
+        total_removed = 0
+        for event, _matcher, _cmd_fn, _desc in _HOOK_ENTRIES:
+            entries = hooks.get(event)
+            if not isinstance(entries, list):
                 continue
-            kept.append(entry)
-        if removed == 0:
+            removed = 0
+            kept: list = []
+            for entry in entries:
+                if sig in str(entry):
+                    removed += 1
+                    continue
+                kept.append(entry)
+            if removed > 0:
+                total_removed += removed
+                if kept:
+                    hooks[event] = kept
+                else:
+                    hooks.pop(event, None)
+
+        if total_removed == 0:
             return InstallResult(AGENT, agent_config_path, "already_present", "hook not present")
 
-        if kept:
-            hooks["PreToolUse"] = kept
-        else:
-            hooks.pop("PreToolUse", None)
         if not hooks:
             data.pop("hooks", None)
         write_json(agent_config_path, data)
-        return InstallResult(AGENT, agent_config_path, "removed", f"removed {removed} hook entry")
+        return InstallResult(
+            AGENT, agent_config_path, "removed", f"removed {total_removed} hook entries"
+        )
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
