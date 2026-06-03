@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from gradata.hooks._base import extract_message, resolve_brain_dir, run_hook
+from gradata.hooks._injection_guard import is_suspicious, sanitize as sanitize_draft
 from gradata.hooks._profiles import Profile
 
 if TYPE_CHECKING:
@@ -287,6 +288,17 @@ def main(data: dict) -> dict | None:
         return None
     if message.startswith("/"):
         return None
+
+    # ── Injection guard ═══════════════════════════════════════════════════
+    # Behind GRADATA_INJECTION_GUARD (default OFF when absent — safe for
+    # upgrades; installer sets '1' for new installs).
+    guard_enabled = os.environ.get("GRADATA_INJECTION_GUARD", "").strip().lower()
+    if guard_enabled in {"1", "true", "yes", "on"}:
+        suspicious, reason = is_suspicious(message)
+        if suspicious:
+            _log.warning("jit_inject: blocked suspicious draft (%s, len=%d)", reason, len(message))
+            return None
+        message = sanitize_draft(message)
 
     brain_dir = resolve_brain_dir()
     if not brain_dir:
