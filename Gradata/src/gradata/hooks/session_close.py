@@ -105,8 +105,20 @@ def _run_graduation(brain_dir: str) -> None:
         lessons = parse_lessons(text)
         if not lessons:
             return
-        active, _ = graduate(lessons)
-        lessons_path.write_text(format_lessons(active), encoding="utf-8")
+        active, graduated = graduate(lessons)
+        all_lessons = active + graduated
+        lessons_path.write_text(format_lessons(all_lessons), encoding="utf-8")
+        if graduated:
+            try:
+                from gradata.enhancements.rule_export import DEFAULT_PATHS, export_rules
+
+                agents_path = Path(brain_dir) / DEFAULT_PATHS["agents"]
+                agents_path.write_text(
+                    export_rules(Path(brain_dir), target="agents", lessons_path=lessons_path),
+                    encoding="utf-8",
+                )
+            except Exception as e:
+                _log.debug("AGENTS.md auto-export skipped: %s", e)
     except Exception as e:
         _log.debug("graduation skipped: %s", e)
 
