@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+
 from gradata._types import Lesson, LessonState
 from gradata.brain import Brain
 from gradata.enhancements.self_improvement._graduation import _emit_rule_graduated
@@ -36,12 +38,16 @@ def test_rule_graduated_event_includes_rule_identity_payload():
         brain=brain,
     )
 
+    expected_rule_id = hashlib.sha256(
+        b"PROCESS:Always verify work before reporting done"
+    ).hexdigest()[:16]
+
     assert len(brain.calls) == 1
     event_type, source, payload, tags = brain.calls[0]
     assert event_type == "RULE_GRADUATED"
     assert source == "graduate"
     assert tags == []
-    assert payload["rule_id"]
+    assert payload["rule_id"] == expected_rule_id
     assert payload["pattern"] == "Always verify work before reporting done"
     assert payload["lesson_description"] == "Always verify work before reporting done"
     assert payload["source_correction_id"] == "evt_correction_123"
@@ -50,6 +56,9 @@ def test_rule_graduated_event_includes_rule_identity_payload():
     assert payload["description"] == "Always verify work before reporting done"
     assert payload["old_state"] == "PATTERN"
     assert payload["new_state"] == "RULE"
+    assert payload["confidence"] == 0.95
+    assert payload["fire_count"] == 5
+    assert payload["reason"] == "pattern_to_rule"
 
 
 def test_graduation_event_emitted_on_pattern_promotion(tmp_path):
