@@ -436,11 +436,27 @@ def run_rule_pipeline(
     pre_states = {id(l): l.state for l in all_lessons}
     _graduate(all_lessons)
     for lesson in all_lessons:
-        if pre_states.get(id(lesson)) != lesson.state and lesson.state in (
+        old_state = pre_states.get(id(lesson))
+        if old_state != lesson.state and lesson.state in (
             LessonState.PATTERN,
             LessonState.RULE,
         ):
             result.graduated.append(f"{lesson.category}:{lesson.description[:30]}")
+            if lesson.state == LessonState.RULE:
+                try:
+                    from gradata.enhancements.rule_file_materializer import (
+                        write_rule_file_for_lesson,
+                    )
+
+                    write_rule_file_for_lesson(
+                        lesson,
+                        lessons_path.parent,
+                        old_state=old_state,
+                        reason="pattern_to_rule",
+                        session=current_session,
+                    )
+                except Exception as exc:
+                    _log.debug("Phase 2: rule file materialization failed: %s", exc)
 
     # Synthesize meta-rules from graduated rules
     try:

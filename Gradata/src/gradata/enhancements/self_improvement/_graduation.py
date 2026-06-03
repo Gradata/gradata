@@ -91,6 +91,11 @@ def _emit_rule_graduated(
     if brain is not None and hasattr(brain, "emit"):
         try:
             brain.emit("RULE_GRADUATED", "graduate", payload, [])
+            brain_dir = getattr(brain, "dir", None)
+            if brain_dir is not None:
+                from gradata.enhancements.rule_file_materializer import write_rule_file
+
+                write_rule_file(payload, brain_dir)
         except Exception as exc:
             # Do NOT fall through to the module-level emit here. ``brain.emit``
             # may have partially persisted (event written but bus publish
