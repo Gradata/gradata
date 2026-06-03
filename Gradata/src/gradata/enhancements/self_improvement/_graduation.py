@@ -8,6 +8,7 @@ All constants are imported from _confidence to avoid duplication.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 
 from gradata._types import (
@@ -65,9 +66,22 @@ def _emit_rule_graduated(
     back to the module-level ``gradata._events.emit`` which uses globals
     rewired by tests/conftest.
     """
+    category = getattr(lesson, "category", "") or ""
+    description = getattr(lesson, "description", "") or ""
+    source_correction_ids = list(getattr(lesson, "correction_event_ids", []) or [])
+    source_correction_id = source_correction_ids[0] if source_correction_ids else None
+    rule_id_seed = f"{category}:{description}"
+    rule_id = hashlib.sha256(rule_id_seed.encode("utf-8")).hexdigest()[:16]
     payload = {
-        "category": getattr(lesson, "category", "") or "",
-        "description": getattr(lesson, "description", "") or "",
+        # Provenance fields required by downstream rule-file materializers.
+        "rule_id": rule_id,
+        "pattern": description,
+        "source_correction_id": source_correction_id,
+        "source_correction_ids": source_correction_ids,
+        "lesson_description": description,
+        # Existing fields retained for backwards compatibility.
+        "category": category,
+        "description": description,
         "old_state": getattr(old_state, "name", str(old_state)),
         "new_state": getattr(new_state, "name", str(new_state)),
         "confidence": float(getattr(lesson, "confidence", 0.0)),
