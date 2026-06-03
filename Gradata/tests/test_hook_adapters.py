@@ -174,3 +174,41 @@ def test_claude_code_install_replaces_stale_same_event_module_hook(
     inject_commands = [cmd for cmd in commands if "gradata.hooks.inject_brain_rules" in cmd]
     assert len(inject_commands) == 1
     assert str(stale_brain) not in inject_commands[0]
+
+
+def test_claude_code_reinstall_removes_stale_duplicate_when_current_hook_exists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    brain_dir = tmp_path / "brain"
+    brain_dir.mkdir()
+    config_path = adapter_config_path("claude-code")
+    adapter = get_adapter("claude-code")
+    assert adapter.install(brain_dir, config_path).action == "added"
+    assert adapter.install(brain_dir, config_path).action == "already_present"
+
+    stale_brain = tmp_path / "missing-brain"
+    settings = json.loads(config_path.read_text(encoding="utf-8"))
+    settings["hooks"]["PreToolUse"].append(
+        {
+            "matcher": "*",
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": f"BRAIN_DIR={stale_brain} python -m gradata.hooks.inject_brain_rules",
+                }
+            ],
+        }
+    )
+    config_path.write_text(json.dumps(settings), encoding="utf-8")
+
+    assert adapter.install(brain_dir, config_path).action == "added"
+    settings = json.loads(config_path.read_text(encoding="utf-8"))
+    commands = [
+        hook["command"] for group in settings["hooks"]["PreToolUse"] for hook in group["hooks"]
+    ]
+    inject_commands = [cmd for cmd in commands if "gradata.hooks.inject_brain_rules" in cmd]
+    assert len(inject_commands) == 1
+    assert str(stale_brain) not in inject_commands[0]
