@@ -103,7 +103,7 @@ Install Gradata, create a brain, then attach it to the agent you use every day:
 pip install gradata
 gradata init ./my-brain
 gradata install --agent claude-code --brain ./my-brain
-gradata audit
+gradata --brain-dir ./my-brain audit
 ```
 
 Supported agent targets:
@@ -122,6 +122,13 @@ Once installed, Gradata recalls relevant behavioral rules before tool use. You c
 
 ```bash
 gradata recall "drafting cold email to PE-backed ecommerce CMO" --max-tokens 2000
+```
+
+To verify the onboarding path without cloud credentials or mutating your real
+agent config, run the offline smoke script from a source checkout:
+
+```bash
+PYTHONPATH=src python examples/offline_quickstart_smoke.py
 ```
 
 ## Bring your own API key
