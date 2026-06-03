@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tomllib
 from pathlib import Path
@@ -129,3 +130,47 @@ def test_agent_brain_resolution_absolutizes_relative_cli_path(
     assert _resolve_agent_brain_root(Namespace(brain="relative-brain", brain_dir=None)) == (
         tmp_path / "relative-brain"
     )
+
+
+def test_claude_code_install_replaces_stale_same_event_module_hook(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Installing Claude hooks must not accumulate temp-brain duplicates."""
+    home = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    stale_brain = tmp_path / "missing-brain"
+    config_path = adapter_config_path("claude-code")
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "PreToolUse": [
+                        {
+                            "matcher": "*",
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": f"BRAIN_DIR={stale_brain} python -m gradata.hooks.inject_brain_rules",
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    brain_dir = tmp_path / "brain"
+    brain_dir.mkdir()
+
+    result = get_adapter("claude-code").install(brain_dir, config_path)
+
+    assert result.action == "added"
+    settings = json.loads(config_path.read_text(encoding="utf-8"))
+    pre_tool_use = settings["hooks"]["PreToolUse"]
+    commands = [hook["command"] for group in pre_tool_use for hook in group["hooks"]]
+    inject_commands = [cmd for cmd in commands if "gradata.hooks.inject_brain_rules" in cmd]
+    assert len(inject_commands) == 1
+    assert str(stale_brain) not in inject_commands[0]
