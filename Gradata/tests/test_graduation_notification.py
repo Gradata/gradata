@@ -2,7 +2,54 @@
 
 from __future__ import annotations
 
+from gradata._types import Lesson, LessonState
 from gradata.brain import Brain
+from gradata.enhancements.self_improvement._graduation import _emit_rule_graduated
+
+
+def test_rule_graduated_event_includes_rule_identity_payload():
+    """RULE_GRADUATED carries provenance needed by rule-file materializers."""
+
+    class FakeBrain:
+        def __init__(self):
+            self.calls = []
+
+        def emit(self, event_type, source, data, tags):
+            self.calls.append((event_type, source, data, tags))
+
+    brain = FakeBrain()
+    lesson = Lesson(
+        date="2026-06-03",
+        state=LessonState.RULE,
+        confidence=0.95,
+        category="PROCESS",
+        description="Always verify work before reporting done",
+        fire_count=5,
+        correction_event_ids=["evt_correction_123"],
+    )
+
+    _emit_rule_graduated(
+        lesson,
+        LessonState.PATTERN,
+        LessonState.RULE,
+        "pattern_to_rule",
+        brain=brain,
+    )
+
+    assert len(brain.calls) == 1
+    event_type, source, payload, tags = brain.calls[0]
+    assert event_type == "RULE_GRADUATED"
+    assert source == "graduate"
+    assert tags == []
+    assert payload["rule_id"]
+    assert payload["pattern"] == "Always verify work before reporting done"
+    assert payload["lesson_description"] == "Always verify work before reporting done"
+    assert payload["source_correction_id"] == "evt_correction_123"
+    assert payload["source_correction_ids"] == ["evt_correction_123"]
+    assert payload["category"] == "PROCESS"
+    assert payload["description"] == "Always verify work before reporting done"
+    assert payload["old_state"] == "PATTERN"
+    assert payload["new_state"] == "RULE"
 
 
 def test_graduation_event_emitted_on_pattern_promotion(tmp_path):
