@@ -132,6 +132,24 @@ def cmd_stats(args):
     print(f"  Has embeddings: {stats['has_embeddings']}")
 
 
+def cmd_telemetry(args):
+    """Telemetry visibility commands."""
+    from gradata import _telemetry
+
+    if args.telemetry_cmd == "wau":
+        data = _telemetry.fetch_wau()
+        if args.json:
+            print(json.dumps(data, indent=2, sort_keys=True))
+            return
+        print(f"WAU: {data.get('wau', 0)}")
+        if data.get("week_start"):
+            print(f"Week start: {data['week_start']}")
+        if data.get("error"):
+            print(f"Status: {data['error']}")
+        return
+    raise SystemExit("unknown telemetry command")
+
+
 def cmd_status(args):
     """Single human-readable summary of brain health.
 
@@ -1988,6 +2006,12 @@ def main():
     # stats
     sub.add_parser("stats", help="Brain statistics")
 
+    # telemetry
+    p_telemetry = sub.add_parser("telemetry", help="Anonymous opt-in telemetry commands")
+    telemetry_sub = p_telemetry.add_subparsers(dest="telemetry_cmd", required=True)
+    p_wau = telemetry_sub.add_parser("wau", help="Show live weekly active user count")
+    p_wau.add_argument("--json", action="store_true", help="Output raw aggregate JSON")
+
     # status (umbrella health check: stats + daemon + cloud + convergence)
     sub.add_parser("status", help="Single-page brain/daemon/cloud summary")
 
@@ -2347,6 +2371,7 @@ def main():
         "embed": cmd_embed,
         "manifest": cmd_manifest,
         "stats": cmd_stats,
+        "telemetry": cmd_telemetry,
         "status": cmd_status,
         "audit": cmd_audit,
         "sync": cmd_sync,

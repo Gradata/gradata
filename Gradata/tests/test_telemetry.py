@@ -136,6 +136,26 @@ class TestSendEvent:
             payload = post.call_args[0][0]
             assert payload["event"] == "brain_initialized"
 
+    def test_session_ping_posts_wau_to_ping_endpoint(self, monkeypatch):
+        _telemetry.set_enabled(True)
+        monkeypatch.setenv(_telemetry.ENV_ENDPOINT, "https://api.example.com/telemetry/event")
+        with patch.object(_telemetry, "_post", return_value=True) as post:
+            _telemetry.send_session_ping(blocking=True)
+            post.assert_called_once()
+            assert post.call_args[0][0]["event"] == "wau_ping"
+        assert _telemetry._ping_endpoint() == "https://api.example.com/telemetry/ping"
+
+    def test_session_ping_noop_when_disabled(self):
+        with patch.object(_telemetry, "_post") as post:
+            _telemetry.send_session_ping(blocking=True)
+            post.assert_not_called()
+
+    def test_fetch_wau_returns_error_dict_on_failure(self, monkeypatch):
+        monkeypatch.setenv(_telemetry.ENV_ENDPOINT, "http://127.0.0.1:9/telemetry/event")
+        data = _telemetry.fetch_wau(timeout=0.01)
+        assert data["wau"] == 0
+        assert data["error"] == "unavailable"
+
     def test_respects_kill_switch(self, monkeypatch):
         _telemetry.set_enabled(True)
         monkeypatch.setenv(_telemetry.ENV_KILL_SWITCH, "0")
