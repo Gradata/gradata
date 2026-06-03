@@ -153,3 +153,33 @@ def test_rule_graduation_message(tmp_path):
     if rule_events:
         assert "permanent" in rule_events[0]["message"].lower()
         assert "confidence" in rule_events[0]["message"].lower()
+
+
+def test_rule_graduation_auto_exports_agents_md(tmp_path, monkeypatch):
+    """Synthetic PATTERN -> RULE graduation writes AGENTS.md by default, idempotently."""
+    monkeypatch.setenv("GRADATA_BETA_LB_GATE", "0")
+    (tmp_path / "lessons.md").write_text(
+        "# Lessons\n\n"
+        "[2026-06-03] [PATTERN:0.95] PROCESS: Always verify work before reporting done\n"
+        "  Root cause: User correction\n"
+        "  Fire count: 5 | Sessions since fire: 0 | Misfires: 0\n",
+        encoding="utf-8",
+    )
+    brain = Brain(str(tmp_path))
+
+    result = brain.end_session(session_corrections=[], skip_meta_rules=True)
+
+    agents_path = tmp_path / "AGENTS.md"
+    assert result["promotions"] == 1
+    assert result["agents_exported"] is True
+    assert agents_path.exists()
+    agents_text = agents_path.read_text(encoding="utf-8")
+    assert "# AGENTS.md" in agents_text
+    assert "## PROCESS" in agents_text
+    assert "- Always verify work before reporting done" in agents_text
+
+    # Re-running end_session rewrites from canonical RULE lessons rather than appending.
+    second = brain.end_session(session_corrections=[], skip_meta_rules=True)
+    assert second["promotions"] == 0
+    assert agents_path.read_text(encoding="utf-8") == agents_text
+    assert agents_text.count("Always verify work before reporting done") == 1

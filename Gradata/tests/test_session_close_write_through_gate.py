@@ -7,6 +7,7 @@ to avoid double-writes. Only runs when GRADATA_DISABLE_WRITE_THROUGH=1.
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import patch
 
 from gradata.hooks import session_close
@@ -40,3 +41,26 @@ def test_run_cloud_sync_skipped_when_no_api_key(monkeypatch):
     with patch("gradata._core.cloud_sync_tick") as mock_tick:
         session_close._run_cloud_sync("/tmp/fake-brain", {"session_number": 1})
     mock_tick.assert_not_called()
+
+
+def test_run_graduation_exports_agents_md_for_new_rule(tmp_path: Path, monkeypatch):
+    """Session-close graduation smoke: synthetic RULE promotion populates AGENTS.md."""
+    monkeypatch.setenv("GRADATA_BETA_LB_GATE", "0")
+    (tmp_path / "lessons.md").write_text(
+        "# Lessons\n\n"
+        "[2026-06-03] [PATTERN:0.95] PROCESS: Always verify work before reporting done\n"
+        "  Root cause: User correction\n"
+        "  Fire count: 5 | Sessions since fire: 0 | Misfires: 0\n",
+        encoding="utf-8",
+    )
+
+    session_close._run_graduation(str(tmp_path))
+
+    lessons_text = (tmp_path / "lessons.md").read_text(encoding="utf-8")
+    agents_text = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
+    assert "[RULE:0.95] PROCESS: Always verify work before reporting done" in lessons_text
+    assert "- Always verify work before reporting done" in agents_text
+
+    session_close._run_graduation(str(tmp_path))
+    assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8") == agents_text
+    assert agents_text.count("Always verify work before reporting done") == 1

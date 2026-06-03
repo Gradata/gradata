@@ -1014,6 +1014,23 @@ def brain_end_session(
         if all_lessons:  # guard against wiping lessons file when all lessons are killed
             write_lessons_safe(lessons_path, format_lessons(all_lessons))
 
+        # Product contract: post-graduation export is ON by default.  Any
+        # newly graduated RULE should be visible to agent runtimes without a
+        # manual `gradata export` step.  The exporter rewrites AGENTS.md from
+        # canonical RULE-tier lessons, so rerunning end_session is idempotent
+        # and cannot append duplicate entries.
+        agents_exported = False
+        if transitions:
+            try:
+                from gradata.enhancements.rule_export import DEFAULT_PATHS, export_rules
+
+                agents_text = export_rules(brain.dir, target="agents", lessons_path=lessons_path)
+                agents_path = brain.dir / DEFAULT_PATHS["agents"]
+                agents_path.write_text(agents_text, encoding="utf-8")
+                agents_exported = True
+            except Exception as e:
+                _log.debug("AGENTS.md auto-export failed: %s", e)
+
         # Archive graduated RULE lessons
         new_rules = [
             l
@@ -1126,6 +1143,7 @@ def brain_end_session(
             "kills": kills,
             "new_rules": [l.description[:60] for l in new_rules] if new_rules else [],
             "graduated_rules": graduated_rules,
+            "agents_exported": agents_exported,
             "meta_rules_discovered": meta_rules_discovered,
         }
 
