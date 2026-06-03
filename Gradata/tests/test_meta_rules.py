@@ -29,11 +29,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from gradata._types import Lesson, LessonState
 from gradata.enhancements.meta_rules import (
     MetaRule,
+    applicability_score,
     discover_meta_rules,
     format_meta_rules_for_prompt,
     load_meta_rules,
     merge_into_meta,
+    meta_rule_final_score,
     parse_lessons_from_markdown,
+    rank_meta_rules_by_context,
     refresh_meta_rules,
     save_meta_rules,
     validate_meta_rule,
@@ -172,6 +175,7 @@ def test_sqlite_roundtrip():
             last_validated_session=42,
             scope={"task_type": "email_draft"},
             examples=["Example 1"],
+            applicability_observed_count=80,
         ),
         MetaRule(
             id="META-test2",
@@ -192,9 +196,62 @@ def test_sqlite_roundtrip():
     assert loaded[0].confidence >= loaded[1].confidence  # sorted desc
     assert loaded[0].scope == {"task_type": "email_draft"}
     assert loaded[0].examples == ["Example 1"]
+    assert loaded[0].applicability_observed_count == 80
 
     Path(db_path).unlink(missing_ok=True)
     print("[PASS] SQLite roundtrip")
+
+
+def test_applicability_score_broad_beats_niche_same_confidence(monkeypatch):
+    """At equal beta-LB confidence, broad 80/100 should outrank niche 5/100."""
+    monkeypatch.delenv("GRADATA_APPLICABILITY_WEIGHT", raising=False)
+    beta_lb_confidence = 0.90
+
+    niche_score = applicability_score(beta_lb_confidence, 5, window_sessions=100)
+    broad_score = applicability_score(beta_lb_confidence, 80, window_sessions=100)
+
+    assert niche_score == pytest.approx(0.90 * (0.5 + 0.5 * 0.05))
+    assert broad_score == pytest.approx(0.90 * (0.5 + 0.5 * 0.80))
+    assert niche_score < broad_score
+
+    niche = MetaRule(
+        id="META-niche",
+        principle="Niche scoped principle",
+        source_categories=["DRAFTING"],
+        source_lesson_ids=["a", "b", "c"],
+        confidence=beta_lb_confidence,
+        created_session=1,
+        last_validated_session=1,
+        applicability_observed_count=5,
+    )
+    broad = MetaRule(
+        id="META-broad",
+        principle="Broad scoped principle",
+        source_categories=["DRAFTING"],
+        source_lesson_ids=["d", "e", "f"],
+        confidence=beta_lb_confidence,
+        created_session=1,
+        last_validated_session=1,
+        applicability_observed_count=80,
+    )
+    ranked = rank_meta_rules_by_context([niche, broad], max_rules=2)
+    assert ranked[0].id == "META-broad"
+
+
+def test_applicability_missing_data_preserves_legacy_confidence(monkeypatch):
+    """Legacy rows without applicability data behave as confidence-only."""
+    monkeypatch.setenv("GRADATA_APPLICABILITY_WEIGHT", "0.5")
+    meta = MetaRule(
+        id="META-legacy",
+        principle="Legacy principle",
+        source_categories=["DRAFTING"],
+        source_lesson_ids=["a", "b", "c"],
+        confidence=0.77,
+        created_session=1,
+        last_validated_session=1,
+    )
+    assert applicability_score(0.77, None) == 0.77
+    assert meta_rule_final_score(meta) == 0.77
 
 
 def test_refresh_meta_rules():

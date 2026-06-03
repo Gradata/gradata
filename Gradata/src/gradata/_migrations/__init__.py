@@ -95,6 +95,7 @@ _MIGRATIONS: list[str] = [
     "ALTER TABLE meta_rules ADD COLUMN applies_when TEXT",
     "ALTER TABLE meta_rules ADD COLUMN never_when TEXT",
     "ALTER TABLE meta_rules ADD COLUMN transfer_scope TEXT DEFAULT 'personal'",
+    "ALTER TABLE meta_rules ADD COLUMN applicability_observed_count INTEGER",
     "CREATE INDEX IF NOT EXISTS idx_provenance_rule_id ON rule_provenance(rule_id)",
     """CREATE TABLE IF NOT EXISTS rule_relationships (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
