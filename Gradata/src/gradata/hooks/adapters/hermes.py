@@ -17,6 +17,11 @@ from gradata.hooks.adapters._base import (
 )
 
 AGENT = "hermes"
+HOOKS: tuple[tuple[str, str | None, str], ...] = (
+    ("pre_tool_call", "pre_tool_use", "inject_brain_rules"),
+    ("post_tool_call", "post_tool_use", "auto_correct"),
+    ("on_session_end", "session_end", "session_close"),
+)
 
 # Hermes recognises these event names natively. The Claude-Code event names
 # (pre_tool_use / post_tool_use / session_end) are *silently ignored* by the
@@ -163,18 +168,18 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         if not isinstance(hooks, dict):
             hooks = {}
             data["hooks"] = hooks
-        # Hermes uses *_tool_call / on_session_end event names. Writing the
-        # Claude-Code names (pre_tool_use / post_tool_use / session_end) here
-        # results in Hermes silently ignoring the entries (warning only). See
-        # Gradata/gradata#190 for the install-UX epic.
-        pre_tool_call = _migrate_legacy_event(hooks, "pre_tool_use", "pre_tool_call")
-        if any(isinstance(entry, dict) and entry.get("id") == sig for entry in pre_tool_call):
+        for current, legacy, _module in HOOKS:
+            _migrate_legacy_event(hooks, legacy or "", current)
+        if any(sig in str(item) for groups in hooks.values() for item in (groups if isinstance(groups, list) else [])):
             return InstallResult(
                 AGENT, agent_config_path, "already_present", "hook already present"
             )
-        pre_tool_call.append({"id": sig, "command": hook_command(brain_dir)})
+        for current, _legacy, module in HOOKS:
+            hooks.setdefault(current, []).append(
+                {"id": f"{sig}:{current}:{module}", "command": hook_command(brain_dir, module)}
+            )
         atomic_write_text(agent_config_path, _dump_simple_yaml(data))
-        return InstallResult(AGENT, agent_config_path, "added", "installed pre_tool_call hook")
+        return InstallResult(AGENT, agent_config_path, "added", "installed Hermes hooks")
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
 
@@ -232,10 +237,11 @@ def extract_correction(
 
 
 def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
-    """Reverse install: drop signature-matching entries from hooks.pre_tool_call.
+    """Reverse install: drop signature-matching entries from all hook events.
 
-    Hermes uses YAML, so we can't reuse the generic JSON helper.
-    Idempotent. Preserves user-owned entries and other hook events.
+    Hermes uses YAML, so we can't reuse the generic JSON helper. Idempotent.
+    Preserves user-owned entries while removing every Gradata entry written by
+    this adapter across current and legacy event names.
     """
     try:
         if not agent_config_path.is_file():
@@ -253,21 +259,23 @@ def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
             return InstallResult(AGENT, agent_config_path, "already_present", "no hooks block")
 
         removed = 0
-        # Check both current and legacy event names.
-        for key in ("pre_tool_call", "pre_tool_use"):
-            entries = hooks.get(key)
-            if not isinstance(entries, list):
-                continue
-            kept = []
-            for entry in entries:
-                if sig in str(entry):
-                    removed += 1
+        # Check both current and legacy event names for every hook this adapter installs.
+        for current, legacy, _module in HOOKS:
+            keys = (current,) if legacy is None else (current, legacy)
+            for key in keys:
+                entries = hooks.get(key)
+                if not isinstance(entries, list):
                     continue
-                kept.append(entry)
-            if kept:
-                hooks[key] = kept
-            else:
-                hooks.pop(key, None)
+                kept = []
+                for entry in entries:
+                    if sig in str(entry):
+                        removed += 1
+                        continue
+                    kept.append(entry)
+                if kept:
+                    hooks[key] = kept
+                else:
+                    hooks.pop(key, None)
 
         if removed == 0:
             return InstallResult(AGENT, agent_config_path, "already_present", "hook not present")

@@ -16,6 +16,41 @@ from gradata.hooks._installer import HOOK_REGISTRY, generate_settings
 from gradata.hooks._profiles import Profile
 
 
+def test_stale_hook_check_warns_on_missing_configured_brain_dir(tmp_path, monkeypatch, capsys):
+    from gradata.hooks import stale_hook_check
+
+    missing = tmp_path / "pytest-brain"
+    home = tmp_path / "home"
+    settings = home / ".claude" / "settings.json"
+    settings.parent.mkdir(parents=True)
+    settings.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "PreToolUse": [
+                        {
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": f"BRAIN_DIR={missing} python -m gradata.hooks.inject_brain_rules",
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+
+    assert stale_hook_check.main() == 0
+    out = capsys.readouterr().out
+    assert "stale Claude settings hook warnings" in out
+    assert str(missing) in out
+
+
 # _profiles.py tests
 def test_profile_ordering():
     assert Profile.MINIMAL < Profile.STANDARD < Profile.STRICT

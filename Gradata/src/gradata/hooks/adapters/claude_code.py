@@ -17,6 +17,13 @@ from gradata.hooks.adapters._base import (
 )
 
 AGENT = "claude-code"
+HOOKS: tuple[tuple[str, str | None, str], ...] = (
+    ("PreToolUse", "*", "inject_brain_rules"),
+    ("PostToolUse", "Edit|Write", "auto_correct"),
+    ("Stop", None, "session_close"),
+    ("PreCompact", "manual|auto", "pre_compact"),
+    ("UserPromptSubmit", None, "context_inject"),
+)
 
 # Claude Code's canonical tool names (capitalised, no prefix).
 EDIT_TOOLS: frozenset[str] = frozenset({"Edit", "MultiEdit"}) | (EDIT_TOOL_ALIASES & {"Edit"})
@@ -57,36 +64,39 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         sig = hook_signature(AGENT, brain_dir)
         data = read_json(agent_config_path)
         hooks = data.setdefault("hooks", {})
-        pre_tool = hooks.setdefault("PreToolUse", [])
-        if any(sig in str(item) for item in pre_tool):
+        if any(sig in str(item) for groups in hooks.values() for item in (groups if isinstance(groups, list) else [])):
             return InstallResult(
                 AGENT, agent_config_path, "already_present", "hook already present"
             )
-        pre_tool.append(
-            {
+        for event, matcher, module in HOOKS:
+            group = {
                 "matcher": "*",
                 "hooks": [
                     {
                         "type": "command",
-                        "command": hook_command(brain_dir),
-                        "id": sig,
+                        "command": hook_command(brain_dir, module),
+                        "id": f"{sig}:{event}:{module}",
                     }
                 ],
             }
-        )
+            if matcher is None:
+                group.pop("matcher")
+            else:
+                group["matcher"] = matcher
+            hooks.setdefault(event, []).append(group)
         write_json(agent_config_path, data)
-        return InstallResult(AGENT, agent_config_path, "added", "installed PreToolUse hook")
+        return InstallResult(AGENT, agent_config_path, "added", "installed Claude Code hooks")
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
 
 
 def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
-    """Reverse ``install()``: drop the signature-matching PreToolUse entry.
+    """Reverse ``install()`` across all hook events.
 
     Idempotent — calling on an already-clean config returns ``already_present``
     (semantically: 'already in the desired absent state'). Empty containers
-    are pruned. User-owned PreToolUse entries (without our signature) are
-    preserved verbatim.
+    are pruned. User-owned entries (without our signature) are preserved
+    verbatim while every signature-matching Gradata entry is removed.
     """
     try:
         if not agent_config_path.is_file():
@@ -98,27 +108,23 @@ def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         hooks = data.get("hooks")
         if not isinstance(hooks, dict):
             return InstallResult(AGENT, agent_config_path, "already_present", "no hooks block")
-        pre_tool = hooks.get("PreToolUse")
-        if not isinstance(pre_tool, list):
-            return InstallResult(AGENT, agent_config_path, "already_present", "no PreToolUse")
-
         removed = 0
-        kept: list = []
-        for entry in pre_tool:
-            entry_str = str(entry)
-            if sig in entry_str:
-                # Either the entry's `hooks[].id` carries our sig, or the
-                # whole entry was ours. Drop it.
-                removed += 1
+        for event in list(hooks):
+            entries = hooks.get(event)
+            if not isinstance(entries, list):
                 continue
-            kept.append(entry)
+            kept: list = []
+            for entry in entries:
+                if sig in str(entry):
+                    removed += 1
+                    continue
+                kept.append(entry)
+            if kept:
+                hooks[event] = kept
+            else:
+                hooks.pop(event, None)
         if removed == 0:
             return InstallResult(AGENT, agent_config_path, "already_present", "hook not present")
-
-        if kept:
-            hooks["PreToolUse"] = kept
-        else:
-            hooks.pop("PreToolUse", None)
         if not hooks:
             data.pop("hooks", None)
         write_json(agent_config_path, data)

@@ -9,6 +9,7 @@ unknown hosts.
 from __future__ import annotations
 
 import json
+from contextlib import suppress
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -149,6 +150,25 @@ def test_install_manifest_round_trip(tmp_path, brain_dir, monkeypatch):
     assert rec.sha256_after_install == file_sha256(cfg)
 
 
+def test_cli_uninstall_reuses_manifest_brain_signature(tmp_path, brain_dir, monkeypatch):
+    """Uninstall removes the hook installed for the recorded brain, not current env/args."""
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("GRADATA_BRAIN", str(tmp_path / "wrong-env-brain"))
+    cfg = tmp_path / "claude_settings.json"
+    installed = brain_dir
+    wrong_arg = tmp_path / "wrong-arg-brain"
+    wrong_arg.mkdir()
+
+    result = claude_code.install(installed, cfg)
+    assert result.action == "added"
+    record_install("claude-code", cfg, hook_signature("claude-code", installed))
+    assert hook_signature("claude-code", installed) in cfg.read_text(encoding="utf-8")
+
+    cmd_uninstall(SimpleNamespace(agent="claude-code", brain=str(wrong_arg)))
+
+    assert hook_signature("claude-code", installed) not in cfg.read_text(encoding="utf-8")
+
+
 def test_cli_unknown_agent_clean_error(tmp_path, capsys, brain_dir):
     """`gradata uninstall --agent foobar` returns a clean argparse error."""
     args = SimpleNamespace(agent="foobar", brain=str(brain_dir))
@@ -159,10 +179,9 @@ def test_cli_unknown_agent_clean_error(tmp_path, capsys, brain_dir):
     # Check that an unknown but valid host name (e.g. one not installed) goes
     # through the fallback canonical-path machinery without exception.
     args.agent = "claude-code"  # valid name, but not installed
-    try:
+    with suppress(SystemExit):
         cmd_uninstall(args)
-    except SystemExit:
-        pass  # cmd_uninstall may exit with code on failure — that's OK
-    out = capsys.readouterr().out + capsys.readouterr().err
+    captured = capsys.readouterr()
+    out = captured.out + captured.err
     # Should NOT contain a traceback
     assert "Traceback" not in out

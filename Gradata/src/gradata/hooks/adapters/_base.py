@@ -129,10 +129,10 @@ def hook_signature(agent: str, brain_dir: Path) -> str:
     return f"gradata:{agent}:{brain_dir.resolve().as_posix()}"
 
 
-def hook_command(brain_dir: Path) -> str:
+def hook_command(brain_dir: Path, module: str = "inject_brain_rules") -> str:
     return (
         f"BRAIN_DIR={shlex.quote(str(brain_dir))} "
-        f"{shlex.quote(sys.executable)} -m gradata.hooks.inject_brain_rules"
+        f"{shlex.quote(sys.executable)} -m gradata.hooks.{module}"
     )
 
 

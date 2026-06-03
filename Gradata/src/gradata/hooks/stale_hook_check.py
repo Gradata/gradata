@@ -12,6 +12,7 @@ Never blocks: prints a warning, exits 0.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import shlex
@@ -126,10 +127,75 @@ def _parse_lessons(brain_root: Path) -> tuple[dict[str, str], list[str]]:
 
 
 def _brain_root() -> Path:
-    override = env_str("GRADATA_BRAIN")
+    override = env_str("BRAIN_DIR") or env_str("GRADATA_BRAIN")
     if override:
         return Path(override)
-    return Path("brain")
+    return Path.home() / ".gradata" / "brain"
+
+
+def _settings_path() -> Path:
+    return Path.home() / ".claude" / "settings.json"
+
+
+def _extract_brain_dir_from_command(command: str) -> Path | None:
+    """Return the BRAIN_DIR assignment from a Gradata hook command, if any.
+
+    Do not run the whole command through ``shlex.split(posix=True)``: on
+    Windows-style paths it treats backslashes as escapes and corrupts paths like
+    ``C:\\Users\\...`` into ``C:Users...``. Extract the assignment first, then
+    only unquote the value when the user explicitly quoted it.
+    """
+    if "gradata.hooks." not in command or "BRAIN_DIR=" not in command:
+        return None
+    match = re.search(r"(?:^|\s)BRAIN_DIR=(?P<value>'[^']*'|\"[^\"]*\"|\S+)", command)
+    if not match:
+        return None
+    value = match.group("value").strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        try:
+            value = shlex.split(value, posix=True)[0]
+        except (IndexError, ValueError):
+            value = value[1:-1]
+    if not value:
+        return None
+    return Path(value).expanduser()
+
+
+def _missing_hook_brain_dirs(settings_path: Path | None = None) -> list[Path]:
+    """Find Gradata hook BRAIN_DIR targets in Claude settings that no longer exist."""
+    if settings_path is None and (env_str("GRADATA_HOOK_ROOT") or env_str("GRADATA_HOOK_ROOT_POST")):
+        # Test/dev hook roots are intentionally isolated; do not let a developer's
+        # real ~/.claude/settings.json leak warnings into those runs.
+        return []
+    path = settings_path or _settings_path()
+    if not path.is_file():
+        return []
+    try:
+        settings = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    hooks = settings.get("hooks", {})
+    if not isinstance(hooks, dict):
+        return []
+    missing: list[Path] = []
+    seen: set[str] = set()
+    for groups in hooks.values():
+        if not isinstance(groups, list):
+            continue
+        for group in groups:
+            if not isinstance(group, dict):
+                continue
+            for hook in group.get("hooks", []):
+                if not isinstance(hook, dict):
+                    continue
+                brain_dir = _extract_brain_dir_from_command(str(hook.get("command", "")))
+                if brain_dir is None or brain_dir.exists():
+                    continue
+                key = brain_dir.as_posix()
+                if key not in seen:
+                    missing.append(brain_dir)
+                    seen.add(key)
+    return missing
 
 
 def _hook_dirs() -> list[Path]:
@@ -204,6 +270,18 @@ def main() -> int:
             safe_text = shlex.quote(current_text)
             print(f"      fix:     gradata rule remove {safe_slug} && gradata rule add {safe_text}")
             print()
+
+    missing_brain_dirs = _missing_hook_brain_dirs()
+    if missing_brain_dirs:
+        print("Gradata: stale Claude settings hook warnings")
+        print("These Gradata hooks point at brain directories that no longer exist.")
+        print("Reinstall hooks so corrections are written to the active production brain.")
+        print()
+        for path in missing_brain_dirs:
+            print(f"  - missing BRAIN_DIR: {path}")
+        target_brain = env_str("GRADATA_BRAIN") or env_str("BRAIN_DIR") or "~/.gradata/brain"
+        print(f"      fix:     gradata install --agent claude-code --brain {shlex.quote(target_brain)}")
+        print()
 
     return 0
 
