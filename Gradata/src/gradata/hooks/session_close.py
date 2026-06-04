@@ -90,7 +90,7 @@ def _has_new_triggers(brain_dir: Path, since: str | None, until: str) -> bool:
             row = conn.execute(sql, params).fetchone()
         return row is not None
     except sqlite3.Error as e:
-        _log.debug("trigger check failed: %s", e)
+        _log.debug("trigger check failed: %s", e, exc_info=True)
         return False
 
 
@@ -118,9 +118,9 @@ def _run_graduation(brain_dir: str) -> None:
                     encoding="utf-8",
                 )
             except Exception as e:
-                _log.debug("AGENTS.md auto-export skipped: %s", e)
+                _log.debug("AGENTS.md auto-export skipped: %s", e, exc_info=True)
     except Exception as e:
-        _log.debug("graduation skipped: %s", e)
+        _log.debug("graduation skipped: %s", e, exc_info=True)
 
 
 def _run_tree_consolidation(brain_dir: str) -> None:
@@ -154,7 +154,7 @@ def _run_tree_consolidation(brain_dir: str) -> None:
         if results["climbed"] > 0 or results["contracted"] > 0:
             lessons_path.write_text(format_lessons(lessons), encoding="utf-8")
     except Exception as e:
-        _log.debug("tree consolidation skipped: %s", e)
+        _log.debug("tree consolidation skipped: %s", e, exc_info=True)
 
 
 def _run_pipeline(brain_dir: str, data: dict) -> None:
@@ -179,7 +179,7 @@ def _run_pipeline(brain_dir: str, data: dict) -> None:
                 len(result.hooks_promoted),
             )
     except Exception as e:
-        _log.debug("pipeline skipped: %s", e)
+        _log.debug("pipeline skipped: %s", e, exc_info=True)
 
 
 def _resolve_pending_applications(brain_dir: str, data: dict) -> None:
@@ -281,7 +281,7 @@ def _resolve_pending_applications(brain_dir: str, data: dict) -> None:
             )
             conn.commit()
     except Exception as exc:
-        _log.debug("lesson_applications resolve skipped: %s", exc)
+        _log.debug("lesson_applications resolve skipped: %s", exc, exc_info=True)
 
 
 def _drain_pending_approvals(brain_dir: str, data: dict) -> None:
@@ -353,7 +353,7 @@ def _drain_pending_approvals(brain_dir: str, data: dict) -> None:
                 ctx=ctx,
             )
     except Exception as exc:
-        _log.debug("pending_approvals drain skipped: %s", exc)
+        _log.debug("pending_approvals drain skipped: %s", exc, exc_info=True)
 
 
 def _run_cloud_sync(brain_dir: str, data: dict) -> None:
@@ -383,7 +383,7 @@ def _run_cloud_sync(brain_dir: str, data: dict) -> None:
         session_num = int(data.get("session_number") or 0)
         cloud_sync_tick(brain_dir, session_num)
     except Exception as e:
-        _log.warning("cloud sync tick skipped: %s", e)
+        _log.warning("cloud sync tick skipped: %s", e, exc_info=True)
 
 
 def _flush_retain_queue(brain_dir: str) -> None:
@@ -395,7 +395,7 @@ def _flush_retain_queue(brain_dir: str) -> None:
         if result.get("written"):
             _log.info("RetainOrchestrator: flushed %d events", result["written"])
     except Exception as e:
-        _log.debug("retain flush skipped: %s", e)
+        _log.debug("retain flush skipped: %s", e, exc_info=True)
 
 
 def main(data: dict) -> dict | None:
