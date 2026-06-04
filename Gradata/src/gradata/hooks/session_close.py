@@ -90,7 +90,7 @@ def _has_new_triggers(brain_dir: Path, since: str | None, until: str) -> bool:
             row = conn.execute(sql, params).fetchone()
         return row is not None
     except sqlite3.Error as e:
-        _log.debug("trigger check failed: %s", e)
+        _log.debug("trigger check failed: %s", e, exc_info=True)
         return False
 
 
@@ -118,9 +118,9 @@ def _run_graduation(brain_dir: str) -> None:
                     encoding="utf-8",
                 )
             except Exception as e:
-                _log.debug("AGENTS.md auto-export skipped: %s", e)
+                _log.debug("AGENTS.md auto-export skipped: %s", e, exc_info=True)
     except Exception as e:
-        _log.debug("graduation skipped: %s", e)
+        _log.debug("graduation skipped: %s", e, exc_info=True)
 
 
 def _run_tree_consolidation(brain_dir: str) -> None:
@@ -154,7 +154,7 @@ def _run_tree_consolidation(brain_dir: str) -> None:
         if results["climbed"] > 0 or results["contracted"] > 0:
             lessons_path.write_text(format_lessons(lessons), encoding="utf-8")
     except Exception as e:
-        _log.debug("tree consolidation skipped: %s", e)
+        _log.debug("tree consolidation skipped: %s", e, exc_info=True)
 
 
 def _run_pipeline(brain_dir: str, data: dict) -> None:
@@ -179,7 +179,7 @@ def _run_pipeline(brain_dir: str, data: dict) -> None:
                 len(result.hooks_promoted),
             )
     except Exception as e:
-        _log.debug("pipeline skipped: %s", e)
+        _log.debug("pipeline skipped: %s", e, exc_info=True)
 
 
 def _resolve_pending_applications(brain_dir: str, data: dict) -> None:
@@ -281,7 +281,79 @@ def _resolve_pending_applications(brain_dir: str, data: dict) -> None:
             )
             conn.commit()
     except Exception as exc:
-        _log.debug("lesson_applications resolve skipped: %s", exc)
+        _log.debug("lesson_applications resolve skipped: %s", exc, exc_info=True)
+
+
+def _drain_pending_approvals(brain_dir: str, data: dict) -> None:
+    """Make unresolved pending_approvals visible to the session-end processor.
+
+    GRA-2060 found approval-gated corrections sitting in ``pending_approvals``
+    with no hook/processor path consuming the table. Human-review rows should
+    remain open, but they must not remain silent: each unresolved row gets an
+    idempotent ``PENDING_APPROVAL`` event so downstream surfaces can list or
+    alert on it.
+    """
+    try:
+        import json as _json
+
+        from gradata._events import emit
+        from gradata._paths import BrainContext
+
+        db = Path(brain_dir) / "system.db"
+        if not db.is_file():
+            return
+        session_num = int(data.get("session_number") or 0) or None
+        with sqlite3.connect(db) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT id, lesson_category, lesson_description, severity, "
+                "correction_event_id, agent_type, created_at "
+                "FROM pending_approvals WHERE resolution IS NULL"
+            ).fetchall()
+            if not rows:
+                return
+
+            existing_payloads = conn.execute(
+                "SELECT data_json FROM events WHERE type = 'PENDING_APPROVAL'"
+            ).fetchall()
+            already_emitted: set[int] = set()
+            for (raw_payload,) in existing_payloads:
+                try:
+                    payload = (
+                        _json.loads(raw_payload) if isinstance(raw_payload, str) else raw_payload
+                    )
+                except (TypeError, _json.JSONDecodeError):
+                    continue
+                if isinstance(payload, dict):
+                    approval_id = payload.get("approval_id")
+                    if isinstance(approval_id, int):
+                        already_emitted.add(approval_id)
+
+        ctx = BrainContext.from_brain_dir(brain_dir)
+        for row in rows:
+            approval_id = int(row["id"])
+            if approval_id in already_emitted:
+                continue
+            emit(
+                "PENDING_APPROVAL",
+                "session_close.pending_approvals",
+                {
+                    "approval_id": approval_id,
+                    "status": "awaiting_human_review",
+                    "source_issue": "GRA-2060",
+                    "lesson_category": row["lesson_category"],
+                    "lesson_description": row["lesson_description"],
+                    "severity": row["severity"],
+                    "correction_event_id": row["correction_event_id"],
+                    "agent_type": row["agent_type"],
+                    "created_at": row["created_at"],
+                },
+                ["review", "pending_approval", "source_issue:GRA-2060"],
+                session=session_num,
+                ctx=ctx,
+            )
+    except Exception as exc:
+        _log.debug("pending_approvals drain skipped: %s", exc, exc_info=True)
 
 
 def _run_cloud_sync(brain_dir: str, data: dict) -> None:
@@ -311,7 +383,7 @@ def _run_cloud_sync(brain_dir: str, data: dict) -> None:
         session_num = int(data.get("session_number") or 0)
         cloud_sync_tick(brain_dir, session_num)
     except Exception as e:
-        _log.warning("cloud sync tick skipped: %s", e)
+        _log.warning("cloud sync tick skipped: %s", e, exc_info=True)
 
 
 def _flush_retain_queue(brain_dir: str) -> None:
@@ -323,7 +395,7 @@ def _flush_retain_queue(brain_dir: str) -> None:
         if result.get("written"):
             _log.info("RetainOrchestrator: flushed %d events", result["written"])
     except Exception as e:
-        _log.debug("retain flush skipped: %s", e)
+        _log.debug("retain flush skipped: %s", e, exc_info=True)
 
 
 def main(data: dict) -> dict | None:
@@ -346,6 +418,7 @@ def main(data: dict) -> dict | None:
     _run_pipeline(brain_dir_str, data)
     _run_tree_consolidation(brain_dir_str)
     _resolve_pending_applications(brain_dir_str, data)
+    _drain_pending_approvals(brain_dir_str, data)
     _run_cloud_sync(brain_dir_str, data)
 
     _write_stamp(brain_dir, upper_bound)
