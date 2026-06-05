@@ -56,6 +56,53 @@ def test_codex_adapter_writes_valid_toml_with_quoted_brain_path(tmp_path: Path) 
     assert brain_dir.as_posix() in hook["id"]
 
 
+def test_codex_adapter_installs_pre_post_and_session_hooks(tmp_path: Path) -> None:
+    brain_dir = tmp_path / "brain"
+    brain_dir.mkdir()
+    config_path = adapter_config_path("codex", home=tmp_path / "home")
+
+    result = get_adapter("codex").install(brain_dir, config_path)
+
+    assert result.action == "added"
+    parsed = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    assert set(parsed["hooks"]) >= {"pre_tool", "post_tool", "session_end"}
+    assert "gradata.hooks.inject_brain_rules" in parsed["hooks"]["pre_tool"][0]["command"]
+    assert "gradata.hooks.auto_correct" in parsed["hooks"]["post_tool"][0]["command"]
+    assert "gradata.hooks.session_close" in parsed["hooks"]["session_end"][0]["command"]
+
+
+def test_hermes_adapter_installs_pre_post_and_session_hooks(tmp_path: Path) -> None:
+    brain_dir = tmp_path / "brain"
+    brain_dir.mkdir()
+    config_path = adapter_config_path("hermes", home=tmp_path / "home")
+
+    result = get_adapter("hermes").install(brain_dir, config_path)
+
+    assert result.action == "added"
+    text = config_path.read_text(encoding="utf-8")
+    assert "pre_tool_call:" in text
+    assert "post_tool_call:" in text
+    assert "on_session_end:" in text
+    assert "gradata.hooks.inject_brain_rules" in text
+    assert "gradata.hooks.auto_correct" in text
+    assert "gradata.hooks.session_close" in text
+
+
+def test_opencode_adapter_installs_pre_post_and_session_hooks(tmp_path: Path) -> None:
+    brain_dir = tmp_path / "brain"
+    brain_dir.mkdir()
+    config_path = adapter_config_path("opencode", home=tmp_path / "home")
+
+    result = get_adapter("opencode").install(brain_dir, config_path)
+
+    assert result.action == "added"
+    parsed = json.loads(config_path.read_text(encoding="utf-8"))
+    assert set(parsed["hooks"]) >= {"preTool", "postTool", "sessionEnd"}
+    assert "gradata.hooks.inject_brain_rules" in parsed["hooks"]["preTool"][0]["command"]
+    assert "gradata.hooks.auto_correct" in parsed["hooks"]["postTool"][0]["command"]
+    assert "gradata.hooks.session_close" in parsed["hooks"]["sessionEnd"][0]["command"]
+
+
 @pytest.mark.parametrize("agent", AGENTS)
 def test_adapter_install_does_not_touch_real_user_config(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, agent: str
