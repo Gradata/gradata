@@ -9,7 +9,6 @@ from gradata.hooks.adapters._base import (
     WRITE_TOOL_ALIASES,
     InstallResult,
     _normalize_tool_name,
-    contains_signature,
     extract_from_edit_args,
     extract_from_write_args,
     failure,
@@ -18,6 +17,11 @@ from gradata.hooks.adapters._base import (
 )
 
 AGENT = "codex"
+HOOKS: tuple[tuple[str, str], ...] = (
+    ("pre_tool", "inject_brain_rules"),
+    ("post_tool", "auto_correct"),
+    ("session_end", "session_close"),
+)
 
 # Codex's edit/write tool surface (OpenAI Codex CLI documented tool names).
 CODEX_EDIT_TOOLS = EDIT_TOOL_ALIASES | frozenset({"apply_patch", "str_replace_editor"})
@@ -73,30 +77,82 @@ def _toml_string(value: str) -> str:
 def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
     try:
         sig = hook_signature(AGENT, brain_dir)
-        if contains_signature(agent_config_path, sig):
-            return InstallResult(
-                AGENT, agent_config_path, "already_present", "hook already present"
-            )
         existing = (
             agent_config_path.read_text(encoding="utf-8") if agent_config_path.exists() else ""
         )
-        block = (
-            "\n[[hooks.pre_tool]]\n"
-            f"id = {_toml_string(sig)}\n"
-            f"command = {_toml_string(hook_command(brain_dir))}\n"
-        )
-        atomic_write_text(agent_config_path, existing.rstrip() + block)
-        return InstallResult(AGENT, agent_config_path, "added", "installed pre_tool hook")
+        if _has_exact_installed_hook_set(existing, sig):
+            return InstallResult(
+                AGENT, agent_config_path, "already_present", "hook already present"
+            )
+        cleaned = _remove_gradata_hook_tables(existing)
+        blocks = []
+        for event, module in HOOKS:
+            blocks.append(
+                f"[[hooks.{event}]]\n"
+                f"id = {_toml_string(f'{sig}:{event}:{module}')}\n"
+                f"command = {_toml_string(hook_command(brain_dir, module))}\n"
+            )
+        atomic_write_text(agent_config_path, cleaned.rstrip() + "\n" + "\n".join(blocks))
+        return InstallResult(AGENT, agent_config_path, "added", "installed Codex hooks")
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
 
 
-def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
-    """Reverse install: drop the [[hooks.pre_tool]] block carrying our signature.
+def _is_gradata_module_table(table: list[str], module: str | None = None) -> bool:
+    text = "".join(table)
+    if "gradata.hooks." not in text and f"gradata:{AGENT}:" not in text:
+        return False
+    if module is None:
+        return True
+    return f"gradata.hooks.{module}" in text or f":{module}" in text
 
-    Operates on the raw TOML text — walks line-by-line, identifies the
-    [[hooks.pre_tool]] table that contains our signature, and removes that
-    table + its keys. Preserves all other tables verbatim.
+
+def _split_toml_tables(text: str) -> list[list[str]]:
+    tables: list[list[str]] = []
+    current: list[str] = []
+    for line in text.splitlines(keepends=True):
+        stripped = line.lstrip()
+        if stripped.startswith("[[") or stripped.startswith("["):
+            if current:
+                tables.append(current)
+            current = [line]
+        else:
+            current.append(line)
+    if current:
+        tables.append(current)
+    return tables
+
+
+def _remove_gradata_hook_tables(text: str) -> str:
+    kept: list[str] = []
+    for table in _split_toml_tables(text):
+        header = table[0].lstrip() if table else ""
+        if header.startswith("[[hooks.") and _is_gradata_module_table(table):
+            continue
+        kept.extend(table)
+    return "".join(kept).rstrip() + ("\n" if kept else "")
+
+
+def _has_exact_installed_hook_set(text: str, sig: str) -> bool:
+    for event, module in HOOKS:
+        expected_header = f"[[hooks.{event}]]"
+        expected_id = f"{sig}:{event}:{module}"
+        matches = [
+            table
+            for table in _split_toml_tables(text)
+            if table and table[0].strip() == expected_header and _is_gradata_module_table(table, module)
+        ]
+        if len(matches) != 1 or expected_id not in "".join(matches[0]):
+            return False
+    return True
+
+
+def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
+    """Reverse install: drop Codex hook blocks carrying our signature.
+
+    Operates on the raw TOML text — walks line-by-line, identifies hook
+    tables that contain our signature, and removes those tables + keys.
+    Preserves all other tables verbatim.
     """
     try:
         if not agent_config_path.is_file():
@@ -131,7 +187,7 @@ def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
                 # Flush the previous table
                 flush(current_table, current_is_hook)
                 current_table = [line]
-                current_is_hook = stripped.startswith("[[hooks.pre_tool]]")
+                current_is_hook = stripped.startswith("[[hooks.")
             else:
                 if current_table:
                     current_table.append(line)
@@ -148,7 +204,7 @@ def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         new_text = "".join(out_lines).rstrip() + "\n"
         atomic_write_text(agent_config_path, new_text)
         return InstallResult(
-            AGENT, agent_config_path, "removed", f"removed {removed} [[hooks.pre_tool]] block"
+            AGENT, agent_config_path, "removed", f"removed {removed} Codex hook block"
         )
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
