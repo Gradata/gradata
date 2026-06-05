@@ -63,28 +63,35 @@ _HOOK_ENTRIES = [
 ]
 
 
+def _entry_has_hook_id(entry: object, hook_id: str) -> bool:
+    if not isinstance(entry, dict):
+        return False
+    hooks = entry.get("hooks")
+    if not isinstance(hooks, list):
+        return False
+    return any(isinstance(hook, dict) and hook.get("id") == hook_id for hook in hooks)
+
+
 def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
-    """Install the MINIMAL hook set: PreToolUse (inject), PostToolUse
+    """Install/repair the MINIMAL hook set: PreToolUse (inject), PostToolUse
     (auto_correct), and Stop (session_close).
 
-    Idempotent -- if the signature is already present in any event, all hooks
-    are skipped (no partial reinstall).
+    Idempotent per event -- existing signed entries are preserved, while missing
+    signed entries are added so partially deleted installs self-heal.
     """
     try:
         sig = hook_signature(AGENT, brain_dir)
         data = read_json(agent_config_path)
         hooks = data.setdefault("hooks", {})
 
-        # Check any existing hook for our signature
-        for _event, _matcher, _cmd_fn, _desc in _HOOK_ENTRIES:
-            for existing in hooks.get(_event, []):
-                if sig in str(existing):
-                    return InstallResult(
-                        AGENT, agent_config_path, "already_present", "hook already present"
-                    )
-
-        # Install all three hooks
+        added: list[str] = []
         for event, matcher, cmd_fn, _desc in _HOOK_ENTRIES:
+            entries = hooks.setdefault(event, [])
+            if not isinstance(entries, list):
+                entries = []
+                hooks[event] = entries
+            if any(_entry_has_hook_id(existing, sig) for existing in entries):
+                continue
             entry = {
                 "hooks": [
                     {
@@ -96,12 +103,19 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
             }
             if matcher:
                 entry["matcher"] = matcher
-            hooks.setdefault(event, []).append(entry)
+            entries.append(entry)
+            added.append(event)
 
+        if not added:
+            return InstallResult(
+                AGENT, agent_config_path, "already_present", "hooks already present"
+            )
         write_json(agent_config_path, data)
         return InstallResult(
-            AGENT, agent_config_path, "added",
-            "installed PreToolUse + PostToolUse + Stop hooks",
+            AGENT,
+            agent_config_path,
+            "added",
+            f"installed {' + '.join(added)} hooks",
         )
     except Exception as exc:
         return failure(AGENT, agent_config_path, exc)
@@ -137,7 +151,7 @@ def uninstall(brain_dir: Path, agent_config_path: Path) -> InstallResult:
             removed = 0
             kept: list = []
             for entry in entries:
-                if sig in str(entry):
+                if _entry_has_hook_id(entry, sig):
                     removed += 1
                     continue
                 kept.append(entry)

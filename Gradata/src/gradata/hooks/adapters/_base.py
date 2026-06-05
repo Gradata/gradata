@@ -130,8 +130,9 @@ def hook_signature(agent: str, brain_dir: Path) -> str:
 
 
 def hook_command_for_module(brain_dir: Path, module: str) -> str:
+    resolved_brain_dir = brain_dir.resolve()
     return (
-        f"BRAIN_DIR={shlex.quote(str(brain_dir))} "
+        f"BRAIN_DIR={shlex.quote(str(resolved_brain_dir))} "
         f"{shlex.quote(sys.executable)} -m {module}"
     )
 

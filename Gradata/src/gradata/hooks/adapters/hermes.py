@@ -164,21 +164,28 @@ def install(brain_dir: Path, agent_config_path: Path) -> InstallResult:
         # results in Hermes silently ignoring the entries (warning only). See
         # Gradata/gradata#190 for the install-UX epic.
         added: list[str] = []
+        migrated = False
         for current_key, legacy_key, command in (
             ("pre_tool_call", "pre_tool_use", hook_command(brain_dir)),
             ("post_tool_call", "post_tool_use", post_tool_hook_command(brain_dir)),
             ("on_session_end", "session_end", session_end_hook_command(brain_dir)),
         ):
+            had_legacy = legacy_key in hooks
             entries = _migrate_legacy_event(hooks, legacy_key, current_key)
+            migrated = migrated or had_legacy
             if any(isinstance(entry, dict) and entry.get("id") == sig for entry in entries):
                 continue
             entries.append({"id": sig, "command": command})
             added.append(current_key)
-        if not added:
+        if not added and not migrated:
             return InstallResult(
                 AGENT, agent_config_path, "already_present", "hooks already present"
             )
         atomic_write_text(agent_config_path, _dump_simple_yaml(data))
+        if not added:
+            return InstallResult(
+                AGENT, agent_config_path, "already_present", "migrated legacy hook keys"
+            )
         return InstallResult(
             AGENT,
             agent_config_path,
