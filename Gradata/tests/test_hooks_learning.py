@@ -377,7 +377,7 @@ def test_session_close_fires_on_correction(tmp_path):
     assert (tmp_path / ".last_close_ts").is_file()
 
 
-def test_session_close_graduates_fixture_to_agents_md(tmp_path):
+def test_session_close_graduates_fixture_to_agents_md(brain_dir, monkeypatch):
     """Stop/session sweep promotes eligible lessons and refreshes AGENTS.md.
 
     This is the deterministic CI fixture for the product loop: a session has
@@ -387,7 +387,8 @@ def test_session_close_graduates_fixture_to_agents_md(tmp_path):
     """
     import sqlite3
 
-    lessons = tmp_path / "lessons.md"
+    monkeypatch.setenv("BRAIN_DIR", str(brain_dir))
+    lessons = brain_dir / "lessons.md"
     lessons.write_text(
         "[2026-04-01] [INSTINCT:0.35] CODE: Prefer pytest fixtures over shared globals\n"
         "  Fire count: 0 | Sessions since fire: 0 | Misfires: 0\n"
@@ -404,7 +405,7 @@ def test_session_close_graduates_fixture_to_agents_md(tmp_path):
     before = parse_lessons(lessons.read_text(encoding="utf-8"))
     assert sum(1 for lesson in before if lesson.state.name == "INSTINCT") == 3
 
-    db = tmp_path / "system.db"
+    db = brain_dir / "system.db"
     with sqlite3.connect(db) as conn:
         conn.execute(
             "CREATE TABLE events (id INTEGER PRIMARY KEY, ts TEXT, type TEXT)"
@@ -413,8 +414,7 @@ def test_session_close_graduates_fixture_to_agents_md(tmp_path):
             "INSERT INTO events (ts, type) VALUES ('2000-01-01T00:00:00Z', 'CORRECTION')"
         )
 
-    with patch.dict(os.environ, {"GRADATA_BRAIN_DIR": str(tmp_path)}):
-        close_main({"session_number": 7})
+    close_main({"session_number": 7})
 
     after = parse_lessons(lessons.read_text(encoding="utf-8"))
     promoted = [
@@ -425,13 +425,13 @@ def test_session_close_graduates_fixture_to_agents_md(tmp_path):
     ]
     assert promoted, "expected Stop hook waterfall to promote eligible PATTERN to RULE"
 
-    agents = tmp_path / "AGENTS.md"
+    agents = brain_dir / "AGENTS.md"
     assert agents.is_file()
     agents_text = agents.read_text(encoding="utf-8")
     assert "# AGENTS.md" in agents_text
     assert "## PROCESS" in agents_text
     assert "Always verify Paperclip completion with a merged PR artifact URL" in agents_text
-    assert (tmp_path / ".last_close_ts").is_file()
+    assert (brain_dir / ".last_close_ts").is_file()
 
 
 def test_session_close_no_brain(tmp_path):
