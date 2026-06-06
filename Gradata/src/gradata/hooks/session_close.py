@@ -157,6 +157,17 @@ def _run_tree_consolidation(brain_dir: str) -> None:
         _log.debug("tree consolidation skipped: %s", e, exc_info=True)
 
 
+def _export_agents_rules(brain_dir: str, lessons_path: Path) -> None:
+    """Refresh AGENTS.md from the current RULE-tier lessons."""
+    from gradata.enhancements.rule_export import DEFAULT_PATHS, export_rules
+
+    agents_path = Path(brain_dir) / DEFAULT_PATHS["agents"]
+    agents_path.write_text(
+        export_rules(Path(brain_dir), target="agents", lessons_path=lessons_path),
+        encoding="utf-8",
+    )
+
+
 def _run_pipeline(brain_dir: str, data: dict) -> None:
     try:
         from gradata.enhancements.rule_pipeline import run_rule_pipeline
@@ -171,10 +182,21 @@ def _run_pipeline(brain_dir: str, data: dict) -> None:
             db_path=db_path,
             current_session=current_session,
         )
-        if result.graduated or result.meta_rules_created or result.hooks_promoted:
+        if result.graduated or result.patterns_lifted:
+            try:
+                _export_agents_rules(brain_dir, lessons_path)
+            except Exception as e:
+                _log.debug("AGENTS.md pipeline export skipped: %s", e, exc_info=True)
+        if (
+            result.graduated
+            or result.meta_rules_created
+            or result.hooks_promoted
+            or result.patterns_lifted
+        ):
             _log.info(
-                "Pipeline: %d graduated, %d meta-rules, %d hooks",
+                "Pipeline: %d graduated, %d lifted patterns, %d meta-rules, %d hooks",
                 len(result.graduated),
+                result.patterns_lifted,
                 len(result.meta_rules_created),
                 len(result.hooks_promoted),
             )
