@@ -36,8 +36,12 @@ per process, or use process-level locks for multi-worker deployments.
 from __future__ import annotations
 
 import dataclasses
+import hashlib
+import json
 import logging
 import sys
+import time
+from collections import OrderedDict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -90,6 +94,7 @@ class Brain(BrainInspectionMixin):
         brain_dir: str | Path | None = None,
         working_dir: str | Path | None = None,
         encryption_key: str | None = None,
+        cache_ttl: float = 30.0,
     ):
         from gradata._paths import resolve_brain_dir
 
@@ -123,6 +128,9 @@ class Brain(BrainInspectionMixin):
         from gradata.rules.cache import RuleCache
 
         self._rule_cache = RuleCache()
+        self._recall_cache_ttl = max(0.0, float(cache_ttl))
+        self._recall_cache: OrderedDict[tuple[str, str], tuple[float, str]] = OrderedDict()
+        self._recall_cache_size = 256
 
         # Capability probe cached once: apply_brain_rules() is a hot path
         # and we don't want find_spec() in every call.
@@ -508,7 +516,7 @@ class Brain(BrainInspectionMixin):
         also skipped when ``dry_run=True``, ``approval_required=True``, or
         when the brain is in renter mode.
         """
-        self._rule_cache.invalidate()  # Correction invalidates cached rules
+        self.invalidate_cache()  # Correction invalidates cached rules
         from gradata._core import brain_correct
 
         result = brain_correct(
@@ -640,7 +648,7 @@ class Brain(BrainInspectionMixin):
 
         # Deterministic event_id: stable across retries.
         digest = hashlib.sha1(
-            f"{draft}\x00{final}".encode("utf-8"),
+            f"{draft}\x00{final}".encode(),
             usedforsecurity=False,
         ).hexdigest()[:16]
         ts_ms = int(_time.time() * 1000)
@@ -1095,6 +1103,78 @@ class Brain(BrainInspectionMixin):
 
     # ── Rules ──────────────────────────────────────────────────────────
 
+    def invalidate_cache(self) -> None:
+        """Clear in-process recall/rule caches for this Brain instance."""
+        self._recall_cache.clear()
+        self._rule_cache.invalidate()
+
+    def _recall_cache_key(
+        self,
+        task: str,
+        scope: object,
+        *,
+        ranker: str,
+        max_rules: int,
+        max_recall_tokens: int,
+    ) -> tuple[str, str]:
+        task_hash = hashlib.sha256(task.encode("utf-8")).hexdigest()
+        scope_payload = {
+            "task_type": getattr(scope, "task_type", ""),
+            "domain": getattr(scope, "domain", ""),
+            "audience": getattr(scope, "audience", ""),
+            "ranker": ranker,
+            "max_rules": max_rules,
+            "max_recall_tokens": max_recall_tokens,
+        }
+        scope_hash = hashlib.sha256(
+            json.dumps(scope_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        return task_hash, scope_hash
+
+    def _get_recall_cache(self, key: tuple[str, str]) -> str | None:
+        if self._recall_cache_ttl <= 0:
+            return None
+        cached = self._recall_cache.get(key)
+        if cached is None:
+            return None
+        expires_at, result = cached
+        if expires_at <= time.monotonic():
+            self._recall_cache.pop(key, None)
+            return None
+        self._recall_cache.move_to_end(key)
+        return result
+
+    def _put_recall_cache(self, key: tuple[str, str], result: str) -> None:
+        if self._recall_cache_ttl <= 0:
+            return
+        self._recall_cache[key] = (time.monotonic() + self._recall_cache_ttl, result)
+        self._recall_cache.move_to_end(key)
+        while len(self._recall_cache) > self._recall_cache_size:
+            self._recall_cache.popitem(last=False)
+
+    def recall(
+        self,
+        task: str,
+        context: dict | None = None,
+        agent_type: str | None = None,
+        max_rules: int | None = None,
+        max_recall_tokens: int | None = None,
+        ranker: str | None = None,
+    ) -> str:
+        """Recall applicable brain rules for a task.
+
+        Thin public alias for apply_brain_rules(), backed by the same 30s
+        in-process LRU cache keyed by task hash and derived scope.
+        """
+        return self.apply_brain_rules(
+            task,
+            context=context,
+            agent_type=agent_type,
+            max_rules=max_rules,
+            max_recall_tokens=max_recall_tokens,
+            ranker=ranker,
+        )
+
     def apply_brain_rules(
         self,
         task: str,
@@ -1140,15 +1220,14 @@ class Brain(BrainInspectionMixin):
             return ""
         scope = build_scope(ctx)
 
-        # Check rule cache first (Pattern 2: skip re-ranking if scope unchanged)
-        from gradata.rules.cache import RuleCache
-
-        cache_key = RuleCache.make_key(
-            f"{scope.task_type}:{ranker}:{max_recall_tokens}:{max_rules}",
-            scope.domain,
-            scope.audience,
+        cache_key = self._recall_cache_key(
+            task,
+            scope,
+            ranker=ranker,
+            max_rules=max_rules,
+            max_recall_tokens=max_recall_tokens,
         )
-        cached = self._rule_cache.get(cache_key)
+        cached = self._get_recall_cache(cache_key)
         if cached is not None:
             return cached
 
@@ -1241,7 +1320,7 @@ class Brain(BrainInspectionMixin):
                     else:
                         result = "<brain-rules>"
                     result = f"{result}\n</brain-rules>"
-        self._rule_cache.put(cache_key, result)
+        self._put_recall_cache(cache_key, result)
         return result
 
     def scoped_rules(
