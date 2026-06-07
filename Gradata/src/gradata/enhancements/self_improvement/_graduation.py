@@ -69,13 +69,20 @@ def _graduation_quarantine_reason(lesson: Lesson) -> str:
     text = f"{lesson.category}: {lesson.description}"
     try:
         from gradata.hooks._injection_guard import is_suspicious, sanitize
-
-        normalized = sanitize(text)
-        suspicious, reason = is_suspicious(normalized)
-        if suspicious:
-            return reason or "prompt_injection_pattern"
-    except Exception:
+    except ImportError:
         normalized = text
+    else:
+        try:
+            normalized = sanitize(text)
+            suspicious, reason = is_suspicious(normalized)
+            if suspicious:
+                return reason or "prompt_injection_pattern"
+        except Exception:
+            _log.warning(
+                "Graduation prompt-injection detector failed; quarantining candidate",
+                exc_info=True,
+            )
+            return "prompt_injection_detection_error"
 
     for pattern, reason in _GRADUATION_INJECTION_PATTERNS:
         if pattern.search(normalized):
