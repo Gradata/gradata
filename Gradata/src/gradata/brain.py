@@ -54,17 +54,25 @@ import contextlib
 from gradata._env import env_str
 from gradata.brain_inspection import BrainInspectionMixin
 
+AUTH_ERROR_MESSAGE = (
+    "No API key found. Set GRADATA_API_KEY or pass api_key=... to Brain(). "
+    "Get one at https://gradata.ai/keys"
+)
 
-def _resolve_sync_api_key() -> str | None:
+
+def _resolve_sync_api_key(api_key: str | None = None) -> str | None:
     """Resolve cloud API key for the write-through sync worker.
 
     Order matches ``gradata.daemon._resolve_api_key``:
     ``GRADATA_API_KEY`` env var, then ``~/.gradata/key`` file.
-    Returns ``None`` when neither is set — write-through is silently
-    disabled (the local correct() path still works normally).
+    An explicit ``api_key=`` wins, then ``GRADATA_API_KEY``, then
+    ``~/.gradata/key``. Returns ``None`` when neither is set so callers
+    can decide whether local-only operation is allowed.
     """
     import os
 
+    if api_key:
+        return api_key
     env_key = os.environ.get("GRADATA_API_KEY")
     if env_key:
         return env_key
@@ -90,8 +98,16 @@ class Brain(BrainInspectionMixin):
         brain_dir: str | Path | None = None,
         working_dir: str | Path | None = None,
         encryption_key: str | None = None,
+        api_key: str | None = None,
+        _skip_auth_check: bool = False,
     ):
         from gradata._paths import resolve_brain_dir
+
+        self._api_key = _resolve_sync_api_key(api_key)
+        if not _skip_auth_check and not self._api_key:
+            from gradata.exceptions import GradataAuthError
+
+            raise GradataAuthError(AUTH_ERROR_MESSAGE)
 
         self.dir = resolve_brain_dir(brain_dir)
         if not self.dir.exists():
@@ -279,7 +295,7 @@ class Brain(BrainInspectionMixin):
 
         if os.environ.get("GRADATA_DISABLE_WRITE_THROUGH") == "1":
             return
-        api_key = _resolve_sync_api_key()
+        api_key = self._api_key or _resolve_sync_api_key()
         if not api_key:
             return
 

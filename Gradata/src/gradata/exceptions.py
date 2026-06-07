@@ -22,6 +22,10 @@ class BrainNotConfiguredError(BrainError):
     """Brain directory is required but could not be resolved."""
 
 
+class GradataAuthError(BrainError):
+    """Authentication is required for a Gradata Cloud operation."""
+
+
 class BrainLockedError(BrainError):
     """Brain directory is already held by another daemon/server process."""
 

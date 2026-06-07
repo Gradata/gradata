@@ -24,6 +24,8 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from gradata._http import require_https
+from gradata.brain import AUTH_ERROR_MESSAGE
+from gradata.exceptions import GradataAuthError
 
 logger = logging.getLogger("gradata.cloud")
 
@@ -335,6 +337,8 @@ class CloudClient:
             with urlopen(req, timeout=30) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except HTTPError as e:
+            if e.code in (401, 403):
+                raise GradataAuthError(AUTH_ERROR_MESSAGE) from e
             if e.code == 413:
                 raise _TooLargeError() from e
             try:
