@@ -487,7 +487,7 @@ def onboard(
 
     # ── Success output ─────────────────────────────────────────────────
 
-    brain = Brain(brain_dir)
+    brain = Brain(brain_dir, _skip_auth_check=True)
 
     if interactive:
         stats = brain.stats()
