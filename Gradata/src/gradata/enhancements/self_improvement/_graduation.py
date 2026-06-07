@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 
 from gradata._types import (
     Lesson,
@@ -21,8 +22,6 @@ from gradata.enhancements.self_improvement._confidence import (
     _GRADUATION_DEDUP_THRESHOLD,
     KILL_LIMITS,
     MACHINE_KILL_LIMITS,
-    MIN_APPLICATIONS_FOR_PATTERN,
-    MIN_APPLICATIONS_FOR_RULE,
     PATTERN_THRESHOLD,
     RULE_THRESHOLD,
     _classify_correction_direction,
@@ -31,6 +30,57 @@ from gradata.enhancements.self_improvement._confidence import (
 )
 
 _log = logging.getLogger(__name__)
+
+_GRADUATION_INJECTION_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        re.compile(
+            r"(?i)\b(?:exfiltrate|dump|leak|reveal|print|send)\s+"
+            r"(?:all\s+)?(?:secrets?|credentials?|api\s*keys?|tokens?|system\s+prompts?)\b"
+        ),
+        "credential_or_system_prompt_exfiltration",
+    ),
+    (
+        re.compile(
+            r"(?i)\b(?:disable|bypass|override)\s+"
+            r"(?:tool|hook|guard|sandbox|approval|permission)s?\b"
+        ),
+        "tool_or_guard_override",
+    ),
+    (
+        re.compile(
+            r"(?i)\b(?:run|execute|call)\s+(?:any\s+)?tool\s+"
+            r"(?:without|ignoring|bypassing)\s+(?:approval|permission|confirmation)\b"
+        ),
+        "tool_approval_bypass",
+    ),
+)
+
+
+def _graduation_quarantine_reason(lesson: Lesson) -> str:
+    """Return a prompt-injection reason for a rule candidate, else empty.
+
+    This intentionally conservative gate only runs at the durable RULE
+    boundary. Hook-time injection detection protects prompt selection; this
+    gate prevents obvious instruction-hijack lessons from being persisted as
+    RULE-tier memory or exported into AGENTS.md. Quarantined candidates stay in
+    lessons.md with ``Pending approval: yes`` and a ``Kill reason`` review note
+    instead of being silently discarded.
+    """
+    text = f"{lesson.category}: {lesson.description}"
+    try:
+        from gradata.hooks._injection_guard import is_suspicious, sanitize
+
+        normalized = sanitize(text)
+        suspicious, reason = is_suspicious(normalized)
+        if suspicious:
+            return reason or "prompt_injection_pattern"
+    except Exception:
+        normalized = text
+
+    for pattern, reason in _GRADUATION_INJECTION_PATTERNS:
+        if pattern.search(normalized):
+            return reason
+    return ""
 
 
 def _ensure_slot(lesson: Lesson) -> None:
@@ -346,6 +396,18 @@ def graduate(
             and lesson.fire_count >= thresholds.min_applications_for_rule
             and _passes_beta_lb_gate(lesson, config=beta_lb_config)
         ):
+            quarantine_reason = _graduation_quarantine_reason(lesson)
+            if quarantine_reason:
+                lesson.pending_approval = True
+                lesson.kill_reason = f"graduation_quarantine:{quarantine_reason}"
+                _log.warning(
+                    "Graduation quarantined possible prompt-injection rule (%s): %s: %s",
+                    quarantine_reason,
+                    lesson.category,
+                    lesson.description[:120],
+                )
+                continue
+
             blocked = False
 
             # Gate 1: dedup — skip if too similar to an existing rule.
