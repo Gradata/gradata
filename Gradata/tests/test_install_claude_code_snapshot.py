@@ -94,11 +94,18 @@ def _normalized_snapshot(settings: dict) -> str:
     import re
 
     serialized = json.dumps(settings, indent=2, sort_keys=True)
-    # Normalize: BRAIN_DIR=/tmp/pytest-N/.../brain → BRAIN_DIR=__BRAIN_DIR__
-    serialized = re.sub(r"BRAIN_DIR=/tmp/[^ ]+/brain", "BRAIN_DIR=__BRAIN_DIR__", serialized)
+    # Normalize hook commands across OSes:
+    #   Linux:   BRAIN_DIR=/tmp/.../brain /usr/bin/python3 -m ...
+    #   Windows: BRAIN_DIR='C:\\...\\brain' 'D:\\...\\python.exe' -m ...
+    serialized = re.sub(
+        r"BRAIN_DIR=(?:/tmp/[^ ]+/brain|'[A-Z]:\\\\[^']+\\\\brain') "
+        r"(?:/usr/bin/python3|'[A-Z]:\\\\[^']+\\\\python\.exe') -m",
+        "BRAIN_DIR=__BRAIN_DIR__ /usr/bin/python3 -m",
+        serialized,
+    )
     # Normalize: hook signature ID
     serialized = re.sub(
-        r'"gradata:claude-code:/tmp/[^"]+brain"',
+        r'"gradata:claude-code:(?:/tmp/[^"]+brain|[A-Z]:/[^"]+/brain)"',
         '"gradata:claude-code:__BRAIN_DIR__"',
         serialized,
     )
