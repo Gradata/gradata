@@ -118,6 +118,8 @@ gradata install --agent opencode
 gradata install --agent all
 ```
 
+Install attempts are measured locally in `<gradata-config-dir>/install_measurements.jsonl` with per-agent `status`, `action`, and `failure_kind` (`none`, `code_failure`, or `docs_friction`) for Claude Code, Codex, Hermes, and Cursor.
+
 Once installed, Gradata recalls relevant behavioral rules before tool use. You can also call recall directly:
 
 ```bash

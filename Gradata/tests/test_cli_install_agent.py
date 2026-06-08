@@ -217,3 +217,60 @@ def test_cli_install_agent_verify_flag_skips_on_failed_install(tmp_path: Path) -
         suffix = line.lstrip()
         if suffix.startswith("✓ verify:") or suffix.startswith("✗ verify") or suffix.startswith("⚠ verify"):
             raise AssertionError(f"unexpected verify line on failed install: {line}")
+
+
+def _read_install_measurements(tmp_path: Path) -> list[dict[str, object]]:
+    import json
+
+    path = tmp_path / ".config" / "gradata" / "install_measurements.jsonl"
+    assert path.exists()
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+
+
+def test_cli_install_agent_records_success_measurement_for_measured_cli(tmp_path: Path) -> None:
+    brain = tmp_path / "brain"
+    brain.mkdir()
+
+    result = _run_cli(tmp_path, "install", "--agent", "codex", "--brain", str(brain))
+
+    assert result.returncode == 0, result.stderr
+    measurements = _read_install_measurements(tmp_path)
+    assert measurements[-1]["agent"] == "codex"
+    assert measurements[-1]["status"] == "success"
+    assert measurements[-1]["failure_kind"] == "none"
+    assert measurements[-1]["action"] == "added"
+
+
+def test_cli_install_agent_records_code_failure_measurement(tmp_path: Path) -> None:
+    brain = tmp_path / "brain"
+    brain.mkdir()
+    bad_config_dir = tmp_path / ".claude"
+    bad_config_dir.mkdir(parents=True)
+    (bad_config_dir / "settings.json").write_text("{{{bad json", encoding="utf-8")
+
+    result = _run_cli(tmp_path, "install", "--agent", "claude-code", "--brain", str(brain))
+
+    assert result.returncode != 0
+    measurements = _read_install_measurements(tmp_path)
+    assert measurements[-1]["agent"] == "claude-code"
+    assert measurements[-1]["status"] == "failure"
+    assert measurements[-1]["failure_kind"] == "code_failure"
+
+
+def test_cli_install_agent_all_records_docs_friction_for_missing_measured_cli_configs(
+    tmp_path: Path,
+) -> None:
+    brain = tmp_path / "brain"
+    brain.mkdir()
+    (tmp_path / ".codex").mkdir()
+    (tmp_path / ".codex" / "config.toml").write_text("", encoding="utf-8")
+
+    result = _run_cli(tmp_path, "install", "--agent", "all", "--brain", str(brain))
+
+    assert result.returncode == 0, result.stderr
+    measurements = _read_install_measurements(tmp_path)
+    by_agent = {m["agent"]: m for m in measurements}
+    assert by_agent["codex"]["status"] == "success"
+    assert by_agent["claude-code"]["failure_kind"] == "docs_friction"
+    assert by_agent["hermes"]["failure_kind"] == "docs_friction"
+    assert by_agent["cursor"]["failure_kind"] == "docs_friction"
