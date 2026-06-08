@@ -665,7 +665,23 @@ def cmd_health(args):
 
 
 def cmd_report(args):
+    report_type = args.type
+    if report_type == "case-study-seed":
+        from gradata.enhancements.case_study_seed import (
+            generate_case_study_seed,
+            render_case_study_markdown,
+        )
+
+        brain_root = _resolve_brain_root(args)
+        seed = generate_case_study_seed(brain_root / "system.db")
+        if getattr(args, "json", False):
+            print(json.dumps(seed, indent=2))
+        else:
+            print(render_case_study_markdown(seed), end="")
+        return
+
     brain = _get_brain(args)
+
     try:
         try:
             from gradata_cloud.scoring.reports import (
@@ -2102,9 +2118,14 @@ def main():
     p_health.add_argument("--json", action="store_true")
 
     # report
-    p_report = sub.add_parser("report", help="Generate reports (csv, metrics, rules)")
-    p_report.add_argument("type", choices=["csv", "metrics", "rules", "health"], help="Report type")
+    p_report = sub.add_parser("report", help="Generate reports (csv, metrics, rules, health, case-study-seed)")
+    p_report.add_argument(
+        "type",
+        choices=["csv", "metrics", "rules", "health", "case-study-seed"],
+        help="Report type",
+    )
     p_report.add_argument("--window", type=int, default=20, help="Rolling window size")
+    p_report.add_argument("--json", action="store_true", help="Output supported reports as JSON")
 
     # watch — sidecar file watcher
     p_watch = sub.add_parser("watch", help="Watch a directory for AI-generated file edits")
