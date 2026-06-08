@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tomllib
 from pathlib import Path
 
@@ -259,3 +260,67 @@ def test_claude_code_reinstall_removes_stale_duplicate_when_current_hook_exists(
     inject_commands = [cmd for cmd in commands if "gradata.hooks.inject_brain_rules" in cmd]
     assert len(inject_commands) == 1
     assert str(stale_brain) not in inject_commands[0]
+
+
+def test_claude_code_install_prunes_stale_temp_brain_hooks_across_events(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression for GRA-2052: old temp-brain hooks must not accumulate."""
+    home = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    config_path = adapter_config_path("claude-code")
+    config_path.parent.mkdir(parents=True)
+    stale_brains = [
+        "/tmp/gradata-heartbeat-brain",
+        "/tmp/tmp.tuphauebfu/brain",
+        "my-brain",
+        "/tmp/gradata-show-hn-brain",
+        "/tmp/gra1781-install-P7Qq/brain",
+    ]
+    stale_by_event = {
+        "PostToolUse": ("Edit|Write", "auto_correct"),
+        "PreCompact": ("manual|auto", "pre_compact"),
+        "PreToolUse": ("*", "inject_brain_rules"),
+        "Stop": (None, "session_close"),
+    }
+    config_path.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    event: [
+                        {
+                            **({"matcher": matcher} if matcher is not None else {}),
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": f"BRAIN_DIR={brain} python -m gradata.hooks.{module}",
+                                }
+                            ],
+                        }
+                        for brain in stale_brains
+                    ]
+                    for event, (matcher, module) in stale_by_event.items()
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    brain_dir = tmp_path / "brain"
+    brain_dir.mkdir()
+
+    result = get_adapter("claude-code").install(brain_dir, config_path)
+
+    assert result.action == "added"
+    settings = json.loads(config_path.read_text(encoding="utf-8"))
+    serialized = json.dumps(settings)
+    for stale_brain in stale_brains:
+        assert stale_brain not in serialized
+    for event, (_matcher, module) in stale_by_event.items():
+        commands = [
+            hook["command"]
+            for group in settings["hooks"][event]
+            for hook in group["hooks"]
+            if f"gradata.hooks.{module}" in hook["command"]
+        ]
+        assert commands == [f"BRAIN_DIR={brain_dir} {sys.executable} -m gradata.hooks.{module}"]
