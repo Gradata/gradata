@@ -43,6 +43,34 @@ except ImportError:
     INJECTABLE_META_SOURCES = frozenset()  # type: ignore[assignment]
 
 _log = logging.getLogger(__name__)
+_INJECTION_COUNT_THIS_SESSION = 0
+
+
+def _emit_rule_injected_telemetry(
+    *,
+    brain_dir: str | Path,
+    agent_type: str,
+    rule_ids: list[str],
+) -> None:
+    """Best-effort GRA-2031 rule_injected events, one per injected rule."""
+    global _INJECTION_COUNT_THIS_SESSION
+    if not rule_ids:
+        return
+    try:
+        from gradata import _telemetry
+
+        for rid in rule_ids:
+            _INJECTION_COUNT_THIS_SESSION += 1
+            _telemetry.send_cli_event(
+                "rule_injected",
+                brain_dir=brain_dir,
+                agent_type=agent_type,
+                rule_id=rid,
+                injection_count_this_session=_INJECTION_COUNT_THIS_SESSION,
+            )
+    except Exception as exc:
+        _log.debug("telemetry send_cli_event(rule_injected) failed: %s", exc)
+
 
 # One-shot flag so the qmd-bash-missing warning only fires once per process.
 _QMD_BASH_WARNED = False
@@ -844,6 +872,11 @@ def main(data: dict) -> dict | None:
     # to specific rules (Meta-Harness A). Silent failure: missing manifest
     # just disables per-rule attribution, never blocks session start.
     if injection_manifest:
+        _emit_rule_injected_telemetry(
+            brain_dir=brain_dir,
+            agent_type=_agent_type(data),
+            rule_ids=[str(entry.get("full_id") or "") for entry in injection_manifest.values()],
+        )
         try:
             import json as _json
 

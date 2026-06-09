@@ -121,6 +121,7 @@ class Brain(BrainInspectionMixin):
         self._fired_rules: list[
             Lesson
         ] = []  # Rules injected this session (for misfire attribution)
+        self._telemetry_rule_injection_count = 0
         self._convergence_cache: dict | None = None
         self._convergence_session: int | None = None
 
@@ -1307,6 +1308,19 @@ class Brain(BrainInspectionMixin):
                     )
                 except Exception as e:
                     logger.debug("rule_injected emit failed: %s", e)
+                try:
+                    from gradata import _telemetry
+
+                    self._telemetry_rule_injection_count += 1
+                    _telemetry.send_cli_event(
+                        "rule_injected",
+                        brain_dir=self.dir,
+                        agent_type="sdk",
+                        rule_id=applied_rule.rule_id,
+                        injection_count_this_session=self._telemetry_rule_injection_count,
+                    )
+                except Exception as e:
+                    logger.debug("rule_injected telemetry failed: %s", e)
 
         result = format_rules_for_prompt(applied)
         if max_recall_tokens > 0 and result:

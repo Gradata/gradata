@@ -21,6 +21,7 @@ see in practice (~100s of graduated rules max).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -30,7 +31,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from gradata.hooks._base import extract_message, resolve_brain_dir, run_hook
-from gradata.hooks._injection_guard import is_suspicious, sanitize as sanitize_draft
+from gradata.hooks._injection_guard import is_suspicious
+from gradata.hooks._injection_guard import sanitize as sanitize_draft
 from gradata.hooks._profiles import Profile
 
 if TYPE_CHECKING:
@@ -59,6 +61,34 @@ except ImportError:  # pragma: no cover - import gate
     _BM25_AVAILABLE = False
 
 _log = logging.getLogger(__name__)
+_INJECTION_COUNT_THIS_SESSION = 0
+
+
+def _rule_id_for_lesson(lesson) -> str:
+    category = getattr(lesson, "category", "") or ""
+    description = getattr(lesson, "description", "") or ""
+    return hashlib.sha256(f"{category}:{description}".encode()).hexdigest()[:16]
+
+
+def _emit_rule_injected_telemetry(brain_dir: str | Path, agent_type: str, rule_ids: list[str]) -> None:
+    global _INJECTION_COUNT_THIS_SESSION
+    if not rule_ids:
+        return
+    try:
+        from gradata import _telemetry
+
+        for rid in rule_ids:
+            _INJECTION_COUNT_THIS_SESSION += 1
+            _telemetry.send_cli_event(
+                "rule_injected",
+                brain_dir=brain_dir,
+                agent_type=agent_type,
+                rule_id=rid,
+                injection_count_this_session=_INJECTION_COUNT_THIS_SESSION,
+            )
+    except Exception as exc:
+        _log.debug("telemetry send_cli_event(rule_injected) failed: %s", exc)
+
 
 HOOK_META = {
     "event": "UserPromptSubmit",
@@ -398,6 +428,11 @@ def main(data: dict) -> dict | None:
         lines.append(f"{prefix} {r.description}")
     if not lines:
         return None
+    _emit_rule_injected_telemetry(
+        brain_dir,
+        str(data.get("agent_type") or data.get("agent") or data.get("client") or "unknown"),
+        [_rule_id_for_lesson(r) for r, _sim in ranked[: len(lines)]],
+    )
     rules_block = "\n".join(lines)
     if len(rules_block) > max_prompt_chars:
         rules_block = rules_block[:max_prompt_chars].rstrip()
