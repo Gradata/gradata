@@ -14,7 +14,7 @@ Verified facts used in this FAQ:
 - The product direction favors lazy recall of relevant rules over blindly injecting large static instructions into every session.
 - The motivation includes context-bloat risk: more prompt context is not automatically better, and irrelevant context can degrade agent behavior.
 - Current product work spans SDK/CLI/local daemon/cloud/dashboard surfaces in Gradata repositories.
-- The founder is Oliver, solo, with AE experience at Sprites AI and previously PayPal.
+- The founder is Oliver, solo, with Account Executive (AE) experience at Sprites AI and previously PayPal.
 
 Assumptions/hypotheses that require validation:
 
@@ -108,7 +108,7 @@ Investor objection: "Procedural memory for all agents is broad. What is the firs
 Answer:
 
 - Verified: The current wedge is developer agents and coding/ops workflows across Claude Code, Codex, Gemini, Cursor, Hermes, and OpenCode.
-- Verified: The founder's own environment heavily dogfoods agentic coding and operations workflows.
+- Verified: The founder's own environment extensively uses agentic coding and operations workflows.
 - Hypothesis: The first winning wedge is solo or small-team developers who use multiple coding agents and need repo-specific operating procedure to follow them.
 - Hypothesis: The first killer use cases are repeated code-review preferences, repo conventions, deployment guardrails, and debugging procedures.
 
