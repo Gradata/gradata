@@ -97,35 +97,24 @@ Smaller/local models benefit most. Frontier models get calibrated faster. The cu
 
 ## Quickstart
 
-Install Gradata, create a brain, then attach it to the agent you use every day:
+One command. One path. Install Gradata, create a brain, and attach it to your agent:
 
 ```bash
-pip install gradata
-# If gradata command not found, add to your PATH:
-# export PATH="$HOME/.local/bin:$PATH"
-# Or open a new terminal / run: source ~/.bashrc
-
-gradata init ./my-brain
-gradata install --agent claude-code --brain ./my-brain
-gradata --brain-dir ./my-brain audit
+pip install gradata && gradata init ./my-brain && gradata install --agent claude-code --brain ./my-brain
 ```
 
-Supported agent targets:
+If `gradata` command not found, add to your PATH: `export PATH="$HOME/.local/bin:$PATH"`
+
+Supported agents: `claude-code`, `codex`, `gemini`, `cursor`, `hermes`, `opencode`, `all`
+
+Core commands:
 
 ```bash
-gradata install --agent claude-code
-gradata install --agent codex
-gradata install --agent gemini
-gradata install --agent cursor
-gradata install --agent hermes
-gradata install --agent opencode
-gradata install --agent all
-```
-
-Once installed, Gradata recalls relevant behavioral rules before tool use. You can also call recall directly:
-
-```bash
-gradata recall "drafting cold email to PE-backed ecommerce CMO" --max-tokens 2000
+gradata recall "drafting cold email to PE-backed ecommerce CMO"  # pull relevant rules
+gradata correct --draft "Hi" --final "Hey"                     # log a correction
+gradata status                                                  # brain/daemon summary
+gradata prove                                                   # statistical convergence proof
+gradata doctor                                                  # diagnose issues
 ```
 
 To verify the onboarding path without cloud credentials or mutating your real
@@ -188,30 +177,9 @@ brain.prove()      # Paired t-test on correction rate
 
 ---
 
-## Install
+## Install alternatives
 
-```bash
-pip install gradata
-# If gradata command not found, add to your PATH:
-# export PATH="$HOME/.local/bin:$PATH"
-
-gradata install --agent claude-code --brain ~/.gradata/brain
-```
-
-Replace `--agent claude-code` with your host: `codex`, `gemini`, `hermes`, `opencode`, or `cursor`. One command, one path — the Python CLI is the single install surface for every host.
-
-After install, your AI agent has 6 SDK subcommands:
-
-```bash
-gradata status     # one-page brain/daemon/cloud summary
-gradata correct    # log a draft -> final correction
-gradata forget     # undo lessons by selector
-gradata prove      # statistical evidence the brain is improving (CI signal)
-gradata recall     # pull rules into the current prompt
-gradata doctor     # check environment + brain health
-```
-
-See `gradata --help` for the full list (init, install, embed, sync, watch, tune, health, report, hooks, rule, skill, seed, cloud, project, mine, audit, manifest, stats, validate, demo, context).
+The **Quickstart** above is the recommended path. Alternative install methods below.
 
 ### JS / TypeScript
 
