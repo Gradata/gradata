@@ -12,13 +12,7 @@ You fix a tone. You rewrite a regex. You re-explain how your team formats PRs. T
 **Gradata turns every correction into a rule your AI carries forward.** Not a longer prompt. Not a bigger context window. A behavioral rule that graduates from instinct → pattern → rule the more it proves itself — and dies the moment it stops.
 
 ```bash
-pip install gradata
-```
-
-One-command setup for your agent:
-
-```bash
-gradata install --agent claude-code --brain ./my-brain
+pip install gradata && gradata init ./my-brain && gradata install --agent claude-code --brain ./my-brain
 ```
 
 Works with any LLM. Python 3.11+. Zero required dependencies. Local-first. Apache-2.0.
