@@ -187,7 +187,7 @@ brain.prove()      # Paired t-test on correction rate
 ## Install
 
 ```bash
-pipx install gradata
+pip install gradata
 gradata install --agent claude-code --brain ~/.gradata/brain
 ```
 
