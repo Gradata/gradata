@@ -104,6 +104,17 @@ gradata install --agent claude-code --brain ./my-brain
 Supported targets are `claude-code`, `codex`, `gemini`, `cursor`, `hermes`,
 `opencode`, and `all`.
 
+Each `gradata install --agent ...` attempt appends a structured JSONL row to
+`<gradata-config-dir>/install_measurements.jsonl` (usually
+`~/.gradata/install_measurements.jsonl`, or `$XDG_CONFIG_HOME/gradata/` when set).
+The row records `agent`, `status`, `action`, and `failure_kind` so launch metrics
+can measure install success separately for Claude Code, Codex, Hermes, and Cursor:
+
+- `failure_kind: none` — install succeeded or was already present.
+- `failure_kind: code_failure` — the adapter ran but failed to write/parse config.
+- `failure_kind: docs_friction` — `--agent all` could not detect a measured host
+  config, so docs/onboarding must explain how to create or select that host.
+
 ## Verify
 
 ```bash

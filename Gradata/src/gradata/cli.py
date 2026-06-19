@@ -455,11 +455,28 @@ def _cmd_install_systemd(args) -> None:
 
 
 def _cmd_install_agent(args) -> None:
-    from gradata.hooks.adapters._base import AGENTS, adapter_config_path, get_adapter
+    from gradata._install_measurement import (
+        MEASURED_INSTALL_AGENTS,
+        append_docs_friction,
+        append_measurement,
+    )
+    from gradata.hooks.adapters._base import AGENTS, InstallResult, adapter_config_path, get_adapter
 
     agent = args.agent
     brain_dir = _resolve_agent_brain_root(args)
-    agents = [a for a in AGENTS if adapter_config_path(a).exists()] if agent == "all" else [agent]
+    if agent == "all":
+        agents = [a for a in AGENTS if adapter_config_path(a).exists()]
+        for measured_agent in MEASURED_INSTALL_AGENTS:
+            measured_config_path = adapter_config_path(measured_agent)
+            if not measured_config_path.exists():
+                append_docs_friction(
+                    measured_agent,
+                    config_path=measured_config_path,
+                    brain_dir=brain_dir,
+                    message="agent config not detected during --agent all discovery",
+                )
+    else:
+        agents = [agent]
 
     if not agents:
         print("No agent config files detected.")
@@ -477,12 +494,17 @@ def _cmd_install_agent(args) -> None:
             result = adapter.install(brain_dir, config_path)
         except Exception as exc:
             print(f"✗ {name} → unknown (failed: {exc})")
+            append_measurement(
+                InstallResult(name, adapter_config_path(name), "failed", str(exc)),
+                brain_dir=brain_dir,
+            )
             had_failure = True
             continue
         marker = "✓" if result.action != "failed" else "✗"
         if result.action == "failed":
             had_failure = True
         print(f"{marker} {result.agent} → {result.config_path} ({result.action})")
+        append_measurement(result, brain_dir=brain_dir)
 
         # Record the install in ~/.gradata/install_manifest.json so that
         # `gradata uninstall --agent <host>` can safely reverse it later
