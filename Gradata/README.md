@@ -101,6 +101,10 @@ Install Gradata, create a brain, then attach it to the agent you use every day:
 
 ```bash
 pip install gradata
+# If gradata command not found, add to your PATH:
+# export PATH="$HOME/.local/bin:$PATH"
+# Or open a new terminal / run: source ~/.bashrc
+
 gradata init ./my-brain
 gradata install --agent claude-code --brain ./my-brain
 gradata --brain-dir ./my-brain audit
@@ -188,6 +192,9 @@ brain.prove()      # Paired t-test on correction rate
 
 ```bash
 pip install gradata
+# If gradata command not found, add to your PATH:
+# export PATH="$HOME/.local/bin:$PATH"
+
 gradata install --agent claude-code --brain ~/.gradata/brain
 ```
 
