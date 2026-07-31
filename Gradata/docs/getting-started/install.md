@@ -114,7 +114,9 @@ gradata --brain-dir ./my-brain audit              # data-flow audit
 ```
 
 For a non-mutating offline smoke test that exercises init, agent-install dry
-run, correction, recall, stats, and audit:
+run, correction, recall, stats, and audit. The script creates a temporary HOME
+and ignores inherited live-brain variables such as `BRAIN_DIR`/`GRADATA_BRAIN`
+so it can be run safely from an agent shell:
 
 ```bash
 PYTHONPATH=src python examples/offline_quickstart_smoke.py

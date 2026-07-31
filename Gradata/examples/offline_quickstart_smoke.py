@@ -43,6 +43,10 @@ def main() -> int:
         env["HOME"] = str(home)
         env["GRADATA_BRAIN_DIR"] = str(brain)
         env.setdefault("GRADATA_LOG", "WARNING")
+        # Make this smoke deterministic when run by developers/agents that already
+        # export a live Gradata brain path in their shell.
+        env.pop("BRAIN_DIR", None)
+        env.pop("GRADATA_BRAIN", None)
 
         run(["--help"], env=env)
         run(["init", str(brain), "--domain", "Smoke", "--name", "Quickstart Smoke", "--no-interactive"], env=env)
@@ -57,9 +61,11 @@ def main() -> int:
             "Hey, check out what we just shipped.",
         ], env=env)
         run(["--brain-dir", str(brain), "recall", "draft a launch email", "--max-tokens", "400"], env=env)
-        run(["--brain-dir", str(brain), "stats"], env=env)
+        stats = run(["--brain-dir", str(brain), "stats"], env=env)
         run(["--brain-dir", str(brain), "audit"], env=env)
 
+        if f"Brain: {brain}" not in stats:
+            raise SystemExit(f"stats used the wrong brain directory:\n{stats}")
         if not (brain / "system.db").exists():
             raise SystemExit(f"missing expected brain database: {brain / 'system.db'}")
 
