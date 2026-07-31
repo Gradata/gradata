@@ -169,7 +169,7 @@ skips = [
 # --- Pytest ---
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "scripts"]
 markers = [
     "integration: tests that hit external LLM APIs (cost money, skip in CI)",
     "dualwrite: dual-write crash recovery and reconciliation tests",
