@@ -136,7 +136,7 @@ MACHINE_SEVERITY_WEIGHTS: dict[str, float] = {
 }
 
 # Graduation gate thresholds
-_GRADUATION_DEDUP_THRESHOLD = 0.85  # Near-duplicate rule detection
+_GRADUATION_DEDUP_THRESHOLD = 0.78  # Near-duplicate rule detection (GRA-217: tightened from 0.85)
 
 # Per-step compound-penalty ceiling.
 # gap-analysis/01-internal-audit.md #1.3: without a cap, a single rewrite
