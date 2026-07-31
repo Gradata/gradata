@@ -84,21 +84,30 @@ def _config_path() -> Path:
     return _config_dir() / _CONFIG_FILENAME
 
 
-# The exhaustive set of activation events. Adding a new one here is the
-# only place you need to touch — the prompt copy and the docs reference
-# this tuple, the backend schema just validates string length.
+# The exhaustive set of anonymous telemetry events. Activation events use
+# send_once(); recurring heartbeat events (currently wau_ping) use explicit
+# sender functions so they can fire once per session when the user opted in.
 ACTIVATION_EVENTS: Final[tuple[str, ...]] = (
     "brain_initialized",
     "first_correction_captured",
     "first_graduation",
     "first_hook_installed",
 )
+HEARTBEAT_EVENTS: Final[tuple[str, ...]] = ("wau_ping",)
+TELEMETRY_EVENTS: Final[tuple[str, ...]] = ACTIVATION_EVENTS + HEARTBEAT_EVENTS
 
 ActivationEvent = Literal[
     "brain_initialized",
     "first_correction_captured",
     "first_graduation",
     "first_hook_installed",
+]
+TelemetryEventName = Literal[
+    "brain_initialized",
+    "first_correction_captured",
+    "first_graduation",
+    "first_hook_installed",
+    "wau_ping",
 ]
 
 
@@ -258,11 +267,11 @@ def _build_payload(event: str) -> dict[str, str]:
     }
 
 
-def _post(payload: dict[str, str], timeout: float = 3.0) -> bool:
+def _post(payload: dict[str, str], timeout: float = 3.0, endpoint: str | None = None) -> bool:
     """Best-effort POST. Never raises. Returns True on 2xx."""
     body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
-        _endpoint(),
+        endpoint or _endpoint(),
         data=body,
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -276,13 +285,13 @@ def _post(payload: dict[str, str], timeout: float = 3.0) -> bool:
 
 
 def send_event(event: str, *, blocking: bool = False) -> None:
-    """Fire an activation event if the user opted in.
+    """Fire an anonymous telemetry event if the user opted in.
 
     Runs in a background thread by default so it never blocks the user.
     Pass ``blocking=True`` in tests.
     """
-    if event not in ACTIVATION_EVENTS:
-        raise ValueError(f"Unknown activation event: {event!r}")
+    if event not in TELEMETRY_EVENTS:
+        raise ValueError(f"Unknown telemetry event: {event!r}")
     if not is_enabled():
         return
     payload = _build_payload(event)
@@ -293,6 +302,56 @@ def send_event(event: str, *, blocking: bool = False) -> None:
 
     thread = threading.Thread(target=_post, args=(payload,), daemon=True)
     thread.start()
+
+
+def _ping_endpoint() -> str:
+    endpoint = _endpoint()
+    if endpoint.rstrip("/").endswith("/telemetry/event"):
+        return endpoint.rstrip("/")[: -len("/telemetry/event")] + "/telemetry/ping"
+    return endpoint
+
+
+def send_session_ping(*, blocking: bool = False) -> None:
+    """Best-effort anonymous WAU heartbeat for a session start.
+
+    Payload is the same no-PII four-field shape as activation telemetry, with
+    ``event='wau_ping'``. Default is off unless the user opted in.
+    """
+    if not is_enabled():
+        return
+    payload = _build_payload("wau_ping")
+    ping_endpoint = _ping_endpoint()
+
+    if blocking:
+        _post(payload, endpoint=ping_endpoint)
+        return
+
+    thread = threading.Thread(target=_post, args=(payload,), kwargs={"endpoint": ping_endpoint}, daemon=True)
+    thread.start()
+
+
+def fetch_wau(timeout: float = 3.0) -> dict[str, object]:
+    """Fetch live WAU aggregate from the telemetry endpoint.
+
+    Uses the public aggregate endpoint; returns a small error dict instead of
+    raising so ``gradata telemetry wau`` never crashes because metrics are down.
+    """
+    endpoint = _endpoint().rstrip("/")
+    if endpoint.endswith("/telemetry/event"):
+        endpoint = endpoint[: -len("/telemetry/event")]
+    elif endpoint.endswith("/telemetry/ping"):
+        endpoint = endpoint[: -len("/telemetry/ping")]
+    url = endpoint + "/telemetry/wau"
+    req = urllib.request.Request(url, headers={"User-Agent": "gradata-telemetry/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8")
+            data = json.loads(body)
+            if isinstance(data, dict):
+                return data
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+        logger.debug("telemetry WAU fetch failed: %s", exc)
+    return {"wau": 0, "error": "unavailable"}
 
 
 # ── First-fire guard (activation events fire once per machine) ────────

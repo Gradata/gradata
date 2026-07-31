@@ -118,6 +118,34 @@ agent config, run the offline smoke script from a source checkout:
 PYTHONPATH=src python examples/offline_quickstart_smoke.py
 ```
 
+## Opt-in telemetry and privacy
+
+Telemetry is off by default. On first interactive `gradata init`, Gradata asks
+whether you want to send anonymous usage pings. Your choice is stored in
+`~/.gradata/config.toml`:
+
+```toml
+[telemetry]
+enabled = "true"   # or "false"
+```
+
+If enabled, Gradata sends only:
+
+- event name (`brain_initialized`, `first_correction_captured`, `first_graduation`, `first_hook_installed`, `wau_ping`)
+- anonymous `user_id` (`sha256` of a machine-local seed)
+- UTC timestamp
+- SDK version
+
+It never sends code, file paths, lesson/correction text, prompts, emails, names,
+stack traces, environment variables, or raw IP addresses. Set
+`GRADATA_TELEMETRY=0` to disable telemetry for any session, even if you opted in.
+For dogfood metrics, `wau_ping` fires once on each agent session start and powers
+weekly active user reporting:
+
+```bash
+gradata telemetry wau
+```
+
 ## Bring your own API key
 
 Gradata defaults to `CLIProvider`, which reuses your installed Claude Code, Codex, or Gemini CLI. If you want clearer API terms, do not want to install a CLI, or want lower call latency, configure Gradata to call your own Anthropic, OpenAI, or Google key directly.

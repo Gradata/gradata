@@ -55,6 +55,13 @@ def main(_data: dict) -> dict | None:
         return None
 
     try:
+        from gradata import _telemetry
+
+        _telemetry.send_session_ping()
+    except Exception as e:
+        _log.debug("session telemetry skipped: %s", e)
+
+    try:
         from gradata._events import emit
         from gradata._file_lock import platform_lock
         from gradata._paths import BrainContext
