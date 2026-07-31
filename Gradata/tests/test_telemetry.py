@@ -21,6 +21,9 @@ def _isolate_config(tmp_path, monkeypatch):
     # Clear kill-switch env
     monkeypatch.delenv(_telemetry.ENV_KILL_SWITCH, raising=False)
     monkeypatch.delenv(_telemetry.ENV_ENDPOINT, raising=False)
+    monkeypatch.delenv(_telemetry.ENV_POSTHOG_HOST, raising=False)
+    monkeypatch.delenv(_telemetry.ENV_POSTHOG_API_KEY, raising=False)
+    monkeypatch.delenv(_telemetry.ENV_POSTHOG_PROJECT_API_KEY, raising=False)
     yield
 
 
@@ -117,6 +120,7 @@ class TestPayload:
         assert json.loads(json.dumps(payload)) == payload
 
 
+
 # ── send_event ───────────────────────────────────────────────────────
 class TestSendEvent:
     def test_rejects_unknown_event(self):
@@ -206,3 +210,81 @@ class TestEndpoint:
     def test_override(self, monkeypatch):
         monkeypatch.setenv(_telemetry.ENV_ENDPOINT, "https://test.local/event")
         assert _telemetry._endpoint() == "https://test.local/event"
+        assert _telemetry._posthog_endpoint() == "https://test.local/event"
+
+    def test_posthog_default_and_host_override(self, monkeypatch):
+        assert _telemetry._posthog_endpoint() == _telemetry.DEFAULT_POSTHOG_ENDPOINT
+        monkeypatch.setenv(_telemetry.ENV_POSTHOG_HOST, "https://eu.i.posthog.com/")
+        assert _telemetry._posthog_endpoint() == "https://eu.i.posthog.com/capture/"
+
+    def test_posthog_api_key_env_aliases(self, monkeypatch):
+        monkeypatch.setenv(_telemetry.ENV_POSTHOG_PROJECT_API_KEY, "phc_project")
+        assert _telemetry._posthog_api_key() == "phc_project"
+        monkeypatch.setenv(_telemetry.ENV_POSTHOG_API_KEY, "phc_gradata")
+        assert _telemetry._posthog_api_key() == "phc_gradata"
+
+
+# ── CLI/PostHog funnel telemetry (GRA-2031) ─────────────────────────
+class TestCliTelemetry:
+    def test_cli_payload_schema_includes_identity_and_experiment_fields(self, tmp_path, monkeypatch):
+        monkeypatch.setenv(_telemetry.ENV_POSTHOG_API_KEY, "phc_test")
+        monkeypatch.setenv("GRADATA_EXPERIMENT_ID", "exp-1")
+        monkeypatch.setenv("GRADATA_COHORT", "beta")
+        payload = _telemetry._build_cli_payload(
+            "rule_injected",
+            brain_dir=tmp_path,
+            agent_type="codex",
+            rule_id="rule-1",
+            injection_count_this_session=3,
+        )
+        assert payload["event"] == "rule_injected"
+        assert payload["api_key"] == "phc_test"
+        assert payload["distinct_id"] == payload["properties"]["distinct_id"]
+        props = payload["properties"]
+        assert props["user_id"] == payload["distinct_id"]
+        assert props["brain_id"]
+        assert props["agent_type"] == "codex"
+        assert props["cli_version"]
+        assert props["rule_id"] == "rule-1"
+        assert props["injection_count_this_session"] == 3
+        assert props["experiment_id"] == "exp-1"
+        assert props["cohort"] == "beta"
+
+    def test_cli_payload_experiment_and_cohort_default_to_null(self, tmp_path):
+        payload = _telemetry._build_cli_payload("cli_install", brain_dir=tmp_path)
+        props = payload["properties"]
+        assert props["experiment_id"] is None
+        assert props["cohort"] is None
+        assert props["agent_type"] == "unknown"
+        assert props["install_started_at"]
+
+    def test_send_cli_event_is_opt_in_and_best_effort(self, tmp_path, monkeypatch):
+        monkeypatch.setenv(_telemetry.ENV_POSTHOG_API_KEY, "phc_test")
+        with patch.object(_telemetry, "_post") as post:
+            _telemetry.send_cli_event("cli_install", brain_dir=tmp_path, agent_type="cli", blocking=True)
+            post.assert_not_called()
+        _telemetry.set_enabled(True)
+        with patch.object(_telemetry, "_post", return_value=True) as post:
+            _telemetry.send_cli_event("cli_install", brain_dir=tmp_path, agent_type="cli", blocking=True)
+            post.assert_called_once()
+            assert post.call_args[0][0]["event"] == "cli_install"
+            assert post.call_args.kwargs["endpoint"] == _telemetry.DEFAULT_POSTHOG_ENDPOINT
+
+    def test_send_cli_event_noops_without_posthog_key(self, tmp_path):
+        _telemetry.set_enabled(True)
+        with patch.object(_telemetry, "_post") as post:
+            _telemetry.send_cli_event("cli_install", brain_dir=tmp_path, agent_type="cli", blocking=True)
+            post.assert_not_called()
+
+    def test_send_cli_once_dedupes_first_rule(self, tmp_path, monkeypatch):
+        monkeypatch.setenv(_telemetry.ENV_POSTHOG_API_KEY, "phc_test")
+        _telemetry.set_enabled(True)
+        with patch.object(_telemetry, "_post", return_value=True) as post:
+            assert _telemetry.send_cli_once(
+                "first_rule_graduated", brain_dir=tmp_path, agent_type="sdk", rule_id="r1", blocking=True
+            ) is True
+            assert _telemetry.send_cli_once(
+                "first_rule_graduated", brain_dir=tmp_path, agent_type="sdk", rule_id="r2", blocking=True
+            ) is False
+            assert post.call_count == 1
+            assert post.call_args[0][0]["properties"]["rule_id"] == "r1"

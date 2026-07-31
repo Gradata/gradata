@@ -65,7 +65,11 @@ logger = logging.getLogger("gradata.telemetry")
 
 # ── Constants ─────────────────────────────────────────────────────────
 DEFAULT_ENDPOINT: Final[str] = "https://api.gradata.ai/telemetry/event"
+DEFAULT_POSTHOG_ENDPOINT: Final[str] = "https://us.i.posthog.com/capture/"
 ENV_ENDPOINT: Final[str] = "GRADATA_TELEMETRY_ENDPOINT"
+ENV_POSTHOG_HOST: Final[str] = "GRADATA_POSTHOG_HOST"
+ENV_POSTHOG_API_KEY: Final[str] = "GRADATA_POSTHOG_API_KEY"
+ENV_POSTHOG_PROJECT_API_KEY: Final[str] = "POSTHOG_PROJECT_API_KEY"
 ENV_KILL_SWITCH: Final[str] = "GRADATA_TELEMETRY"
 _CONFIG_FILENAME: Final[str] = "config.toml"
 
@@ -94,11 +98,26 @@ ACTIVATION_EVENTS: Final[tuple[str, ...]] = (
     "first_hook_installed",
 )
 
+# PostHog activation-funnel events requested by GRA-2031. Kept separate from
+# the legacy anonymous activation tuple so older tests and payload contracts do
+# not accidentally widen.
+CLI_TELEMETRY_EVENTS: Final[tuple[str, ...]] = (
+    "cli_install",
+    "first_rule_graduated",
+    "rule_injected",
+)
+
 ActivationEvent = Literal[
     "brain_initialized",
     "first_correction_captured",
     "first_graduation",
     "first_hook_installed",
+]
+
+CliTelemetryEvent = Literal[
+    "cli_install",
+    "first_rule_graduated",
+    "rule_injected",
 ]
 
 
@@ -239,6 +258,24 @@ def _endpoint() -> str:
     return os.environ.get(ENV_ENDPOINT, "").strip() or DEFAULT_ENDPOINT
 
 
+def _posthog_api_key() -> str | None:
+    return (
+        os.environ.get(ENV_POSTHOG_API_KEY, "").strip()
+        or os.environ.get(ENV_POSTHOG_PROJECT_API_KEY, "").strip()
+        or None
+    )
+
+
+def _posthog_endpoint() -> str:
+    explicit = os.environ.get(ENV_ENDPOINT, "").strip()
+    if explicit:
+        return explicit
+    host = os.environ.get(ENV_POSTHOG_HOST, "").strip().rstrip("/")
+    if host:
+        return f"{host}/capture/"
+    return DEFAULT_POSTHOG_ENDPOINT
+
+
 def _sdk_version() -> str:
     try:
         from gradata import __version__
@@ -249,7 +286,7 @@ def _sdk_version() -> str:
 
 
 def _build_payload(event: str) -> dict[str, str]:
-    """Exact wire format. No extra fields, ever."""
+    """Exact legacy wire format. No extra fields, ever."""
     return {
         "event": event,
         "user_id": anonymous_user_id(),
@@ -258,11 +295,97 @@ def _build_payload(event: str) -> dict[str, str]:
     }
 
 
-def _post(payload: dict[str, str], timeout: float = 3.0) -> bool:
+def _safe_brain_id(brain_dir: str | Path | None = None) -> str | None:
+    if brain_dir is None:
+        return None
+    try:
+        from gradata._tenant import tenant_for
+
+        return tenant_for(Path(brain_dir))
+    except Exception:
+        return hashlib.sha256(str(brain_dir).encode("utf-8")).hexdigest()[:32]
+
+
+def _install_started_at() -> str:
+    key = "telemetry.install_started_at"
+    cfg = _read_config()
+    existing = cfg.get(key, "").strip()
+    if existing:
+        return existing
+    ts = datetime.now(UTC).isoformat()
+    with _config_lock():
+        cfg = _read_config()
+        existing = cfg.get(key, "").strip()
+        if existing:
+            return existing
+        _write_config_key(key, ts)
+    return ts
+
+
+def _hours_since_install() -> float | None:
+    raw = _read_config().get("telemetry.install_started_at", "").strip()
+    if not raw:
+        return None
+    try:
+        installed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        return max(0.0, (datetime.now(UTC) - installed).total_seconds() / 3600.0)
+    except ValueError:
+        return None
+
+
+def _cohort() -> str | None:
+    value = os.environ.get("GRADATA_COHORT", "").strip()
+    return value or None
+
+
+def _experiment_id() -> str | None:
+    value = os.environ.get("GRADATA_EXPERIMENT_ID", "").strip()
+    return value or None
+
+
+def _build_cli_payload(
+    event: str,
+    *,
+    brain_dir: str | Path | None = None,
+    agent_type: str | None = None,
+    rule_id: str | None = None,
+    injection_count_this_session: int | None = None,
+) -> dict:
+    """PostHog-compatible activation-funnel payload for CLI/SDK events."""
+    if event not in CLI_TELEMETRY_EVENTS:
+        raise ValueError(f"Unknown CLI telemetry event: {event!r}")
+    user_id = anonymous_user_id()
+    props: dict[str, object] = {
+        "distinct_id": user_id,
+        "user_id": user_id,
+        "brain_id": _safe_brain_id(brain_dir),
+        "agent_type": agent_type or "unknown",
+        "cli_version": _sdk_version(),
+        "experiment_id": _experiment_id(),
+        "cohort": _cohort(),
+    }
+    if rule_id is not None:
+        props["rule_id"] = str(rule_id)
+    if event == "cli_install":
+        props["install_started_at"] = _install_started_at()
+    if event == "first_rule_graduated":
+        props["hours_since_install"] = _hours_since_install()
+    if event == "rule_injected":
+        props["injection_count_this_session"] = int(injection_count_this_session or 0)
+    return {
+        "api_key": _posthog_api_key(),
+        "event": event,
+        "distinct_id": user_id,
+        "properties": props,
+        "timestamp": datetime.now(UTC).isoformat(),
+    }
+
+
+def _post(payload: dict, timeout: float = 3.0, endpoint: str | None = None) -> bool:
     """Best-effort POST. Never raises. Returns True on 2xx."""
     body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
-        _endpoint(),
+        endpoint or _endpoint(),
         data=body,
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -293,6 +416,71 @@ def send_event(event: str, *, blocking: bool = False) -> None:
 
     thread = threading.Thread(target=_post, args=(payload,), daemon=True)
     thread.start()
+
+
+def send_cli_event(
+    event: str,
+    *,
+    brain_dir: str | Path | None = None,
+    agent_type: str | None = None,
+    rule_id: str | None = None,
+    injection_count_this_session: int | None = None,
+    blocking: bool = False,
+) -> None:
+    """Fire a GRA-2031 CLI/SDK funnel event.
+
+    Best-effort and opt-in: no exception or network failure may surface to the
+    user or block hook hot paths.
+    """
+    if event not in CLI_TELEMETRY_EVENTS:
+        raise ValueError(f"Unknown CLI telemetry event: {event!r}")
+    if not is_enabled():
+        return
+    if not _posthog_api_key():
+        logger.debug("CLI telemetry skipped: no PostHog project API key configured")
+        return
+    try:
+        payload = _build_cli_payload(
+            event,
+            brain_dir=brain_dir,
+            agent_type=agent_type,
+            rule_id=rule_id,
+            injection_count_this_session=injection_count_this_session,
+        )
+    except Exception as exc:
+        logger.debug("CLI telemetry payload build failed: %s", exc)
+        return
+
+    endpoint = _posthog_endpoint()
+    if blocking:
+        _post(payload, endpoint=endpoint)
+        return
+
+    thread = threading.Thread(target=_post, args=(payload,), kwargs={"endpoint": endpoint}, daemon=True)
+    thread.start()
+
+
+def send_cli_once(
+    event: str,
+    *,
+    brain_dir: str | Path | None = None,
+    agent_type: str | None = None,
+    rule_id: str | None = None,
+    blocking: bool = False,
+) -> bool:
+    """Fire a CLI telemetry event at most once per user config."""
+    if event not in CLI_TELEMETRY_EVENTS:
+        raise ValueError(f"Unknown CLI telemetry event: {event!r}")
+    if not is_enabled():
+        return False
+    with _config_lock():
+        cfg = _read_config()
+        key = f"telemetry.fired_{event}"
+        if cfg.get(key) == "true":
+            return False
+        _write_config_key(key, "true")
+    send_cli_event(event, brain_dir=brain_dir, agent_type=agent_type, rule_id=rule_id, blocking=blocking)
+    return True
 
 
 # ── First-fire guard (activation events fire once per machine) ────────

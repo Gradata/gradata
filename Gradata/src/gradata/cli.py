@@ -81,6 +81,10 @@ def cmd_init(args):
         _telemetry.send_once("brain_initialized")
     except Exception as exc:
         _log.debug("telemetry send_once(brain_initialized) failed: %s", exc)
+    try:
+        _telemetry.send_cli_event("cli_install", brain_dir=args.path, agent_type="cli")
+    except Exception as exc:
+        _log.debug("telemetry send_cli_event(cli_install) failed: %s", exc)
 
 
 def cmd_search(args):
@@ -496,6 +500,12 @@ def _cmd_install_agent(args) -> None:
             except Exception as exc:
                 # Manifest write is best-effort; don't fail install on it.
                 print(f"  ⚠ install manifest write failed: {exc}")
+            try:
+                from gradata import _telemetry
+
+                _telemetry.send_cli_event("cli_install", brain_dir=brain_dir, agent_type=name)
+            except Exception as exc:
+                _log.debug("telemetry send_cli_event(cli_install) failed: %s", exc)
 
         # ▸ Flag-gated install verification: write + read a test rule
         if verify_install and result.action != "failed":

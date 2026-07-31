@@ -150,6 +150,17 @@ def _emit_rule_graduated(
             brain.emit("RULE_GRADUATED", "graduate", payload, [])
             brain_dir = getattr(brain, "dir", None)
             if brain_dir is not None:
+                try:
+                    from gradata import _telemetry
+
+                    _telemetry.send_cli_once(
+                        "first_rule_graduated",
+                        brain_dir=brain_dir,
+                        agent_type="sdk",
+                        rule_id=rule_id,
+                    )
+                except Exception as exc:
+                    _log.debug("telemetry send_cli_once(first_rule_graduated) failed: %s", exc)
                 from gradata.enhancements.rule_file_materializer import write_rule_file
 
                 write_rule_file(payload, brain_dir)
